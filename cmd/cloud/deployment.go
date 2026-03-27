@@ -175,6 +175,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listDeploymentTeam(cmd, out)
 		},
+		Example: "  astro deployment team list --deployment-id <id> --json",
 	}
 	deploymentTeamListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -325,6 +326,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listDeploymentUser(cmd, out)
 		},
+		Example: "  astro deployment user list --deployment-id <id> --json",
 	}
 	deploymentUserListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -367,6 +369,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentList(cmd, out)
 		},
+		Example: "  astro deployment list --json\n  astro deployment list -o template --template '{{range .Deployments}}{{.Name}}{{\"\\n\"}}{{end}}'",
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	deploymentListOutputFlags.AddFlags(cmd)

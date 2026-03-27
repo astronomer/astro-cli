@@ -83,6 +83,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, out)
 		},
+		Example: "  astro workspace list --json",
 	}
 	workspaceListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -191,6 +192,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceUser(cmd, out)
 		},
+		Example: "  astro workspace user list --json",
 	}
 	workspaceUserListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -287,6 +289,7 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceTeam(cmd, out)
 		},
+		Example: "  astro workspace team list --json",
 	}
 	workspaceTeamListOutputFlags.AddFlags(cmd)
 	return cmd

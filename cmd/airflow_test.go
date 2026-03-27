@@ -946,10 +946,11 @@ func (s *AirflowSuite) TestPrintPSTable() {
 	s.Run("standalone mode running", func() {
 		var buf bytes.Buffer
 		running := true
+		pid := 1234
 		data := &airflowTypes.PSStatus{
 			Mode:    "standalone",
 			Running: &running,
-			PID:     1234,
+			PID:     &pid,
 		}
 
 		err := printPSTable(data, &buf)
@@ -1888,10 +1889,11 @@ func (s *AirflowSuite) TestStandaloneModePS() {
 		defer func() { standaloneFlag = false }()
 
 		running := true
+		pid := 1234
 		mockPS := &airflowTypes.PSStatus{
 			Mode:    "standalone",
 			Running: &running,
-			PID:     1234,
+			PID:     &pid,
 		}
 
 		mockContainerHandler := new(mocks.ContainerHandler)

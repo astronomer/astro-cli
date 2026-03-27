@@ -326,52 +326,6 @@ func GetWorkspaceTeams(client astrocore.CoreClient, workspaceID string, limit in
 	return teams, nil
 }
 
-// Prints a list of all of an organizations teams
-func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspaceID string) error {
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	table := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"ID", "Role", "Name", "Description", "Create Date"},
-	}
-	teams, err := GetWorkspaceTeams(client, workspaceID, teamPagnationLimit)
-	if err != nil {
-		return err
-	}
-
-	for i := range teams {
-		var teamRole string
-		var roles []astrocore.TeamRole
-		if teams[i].Roles != nil {
-			roles = *teams[i].Roles
-		}
-		for _, role := range roles {
-			if role.EntityType == "WORKSPACE" && role.EntityId == workspaceID {
-				teamRole = role.Role
-			}
-		}
-		var teamDescription string
-		if teams[i].Description != nil {
-			teamDescription = *teams[i].Description
-		}
-		table.AddRow([]string{
-			teams[i].Id,
-			teamRole,
-			teams[i].Name,
-			teamDescription,
-			teams[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-	}
-
-	table.Print(out)
-	return nil
-}
-
 func AddWorkspaceTeam(id, role, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
@@ -456,36 +410,6 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 	}
 
 	return teams, nil
-}
-
-// Prints a list of all of an organizations users
-func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
-	table := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "ORG ROLE", "IDP MANAGED", "CREATE DATE"},
-	}
-	teams, err := GetOrgTeams(client)
-	if err != nil {
-		return err
-	}
-
-	for i := range teams {
-		var teamDescription string
-		if teams[i].Description != nil {
-			teamDescription = *teams[i].Description
-		}
-		table.AddRow([]string{
-			teams[i].Id,
-			teams[i].Name,
-			teamDescription,
-			teams[i].OrganizationRole,
-			strconv.FormatBool(teams[i].IsIdpManaged),
-			teams[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-	}
-
-	table.Print(out)
-	return nil
 }
 
 func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
@@ -795,45 +719,6 @@ func GetDeploymentTeams(client astrocore.CoreClient, deploymentID string, limit 
 	}
 
 	return teams, nil
-}
-
-// Prints a list of all of an organizations teams
-func ListDeploymentTeams(out io.Writer, client astrocore.CoreClient, deploymentID string) error {
-	table := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"ID", "Role", "Name", "Description", "Create Date"},
-	}
-	teams, err := GetDeploymentTeams(client, deploymentID, teamPagnationLimit)
-	if err != nil {
-		return err
-	}
-
-	for i := range teams {
-		var teamRole string
-		var teamDescription string
-		if teams[i].Description != nil {
-			teamDescription = *teams[i].Description
-		}
-		var roles []astrocore.TeamRole
-		if teams[i].Roles != nil {
-			roles = *teams[i].Roles
-		}
-		for _, role := range roles {
-			if role.EntityType == "DEPLOYMENT" && role.EntityId == deploymentID {
-				teamRole = role.Role
-			}
-		}
-		table.AddRow([]string{
-			teams[i].Id,
-			teamRole,
-			teams[i].Name,
-			teamDescription,
-			teams[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-	}
-
-	table.Print(out)
-	return nil
 }
 
 func AddDeploymentTeam(id, role, deploymentID string, out io.Writer, client astrocore.CoreClient) error {

@@ -82,6 +82,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationList(cmd, out)
 		},
+		Example: "  astro organization list --json",
 	}
 	organizationListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -175,6 +176,7 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listUsers(cmd, out)
 		},
+		Example: "  astro organization user list --json",
 	}
 	organizationUserListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -306,6 +308,7 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listTeams(cmd, out)
 		},
+		Example: "  astro organization team list --json",
 	}
 	organizationTeamListOutputFlags.AddFlags(cmd)
 	return cmd

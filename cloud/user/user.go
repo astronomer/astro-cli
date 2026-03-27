@@ -221,38 +221,6 @@ func GetOrgUsers(client astrocore.CoreClient) ([]astrocore.User, error) {
 	return users, nil
 }
 
-// Prints a list of all of an organizations users
-func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "ORGANIZATION ROLE", "IDP MANAGED", "CREATE DATE"},
-	}
-	users, err := GetOrgUsers(client)
-	if err != nil {
-		return err
-	}
-
-	for i := range users {
-		orgUserRelationIsIdpManaged := ""
-		orgUserRelationIsIdpManagedPointer := users[i].OrgUserRelationIsIdpManaged
-		if orgUserRelationIsIdpManagedPointer != nil {
-			orgUserRelationIsIdpManaged = strconv.FormatBool(*users[i].OrgUserRelationIsIdpManaged)
-		}
-		table.AddRow([]string{
-			users[i].FullName,
-			users[i].Username,
-			users[i].Id,
-			*users[i].OrgRole,
-			orgUserRelationIsIdpManaged,
-			users[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-	}
-
-	table.Print(out)
-	return nil
-}
-
 func AddWorkspaceUser(email, role, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
@@ -388,34 +356,6 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspaceID string, limit in
 	}
 
 	return users, nil
-}
-
-// Prints a list of all of a workspaces users
-//
-//nolint:dupl
-func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspaceID string) error {
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
-	}
-	users, err := GetWorkspaceUsers(client, workspaceID, userPagnationLimit)
-	if err != nil {
-		return err
-	}
-
-	for i := range users {
-		table.AddRow([]string{
-			users[i].FullName,
-			users[i].Username,
-			users[i].Id,
-			*users[i].WorkspaceRole,
-			users[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-	}
-
-	table.Print(out)
-	return nil
 }
 
 func RemoveWorkspaceUser(email, workspaceID string, out io.Writer, client astrocore.CoreClient) error {
@@ -609,38 +549,6 @@ func GetDeploymentUsers(client astrocore.CoreClient, deploymentID string, limit 
 	}
 
 	return users, nil
-}
-
-// Prints a list of all of an deployments users
-//
-//nolint:dupl
-func ListDeploymentUsers(out io.Writer, client astrocore.CoreClient, deploymentID string) error {
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"FULLNAME", "EMAIL", "ID", "DEPLOYMENT ROLE", "CREATE DATE"},
-	}
-	users, err := GetDeploymentUsers(client, deploymentID, userPagnationLimit)
-	if err != nil {
-		return err
-	}
-
-	for i := range users {
-		var deploymentRole string
-		if users[i].DeploymentRole != nil {
-			deploymentRole = *users[i].DeploymentRole
-		}
-		table.AddRow([]string{
-			users[i].FullName,
-			users[i].Username,
-			users[i].Id,
-			deploymentRole,
-			users[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-	}
-
-	table.Print(out)
-	return nil
 }
 
 // ListDeploymentUsersData returns deployment user list data for structured output

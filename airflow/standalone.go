@@ -882,11 +882,14 @@ func (s *Standalone) Kill() error {
 // PS returns structured process status data
 func (s *Standalone) PS() (*types.PSStatus, error) {
 	pid, alive := s.readPID()
-	return &types.PSStatus{
+	status := &types.PSStatus{
 		Mode:    "standalone",
 		Running: &alive,
-		PID:     pid,
-	}, nil
+	}
+	if alive {
+		status.PID = &pid
+	}
+	return status, nil
 }
 
 // standaloneLogPrefixMap maps Docker container names (passed by the cmd layer)

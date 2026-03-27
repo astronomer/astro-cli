@@ -13,6 +13,6 @@ type PSStatus struct {
 	Containers []ContainerStatus `json:"containers,omitempty"`
 	// For standalone mode: process information
 	Running *bool  `json:"running,omitempty"`
-	PID     int    `json:"pid,omitempty"`
+	PID     *int   `json:"pid,omitempty"`
 	Mode    string `json:"mode"` // "docker" or "standalone"
 }

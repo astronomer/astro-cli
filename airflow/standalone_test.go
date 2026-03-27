@@ -1278,7 +1278,8 @@ func (s *Suite) TestStandalonePS_Running() {
 	s.Equal("standalone", data.Mode)
 	s.NotNil(data.Running)
 	s.True(*data.Running)
-	s.Equal(os.Getpid(), data.PID)
+	s.NotNil(data.PID)
+	s.Equal(os.Getpid(), *data.PID)
 }
 
 func (s *Suite) TestStandaloneBuildEnv_CustomPort() {

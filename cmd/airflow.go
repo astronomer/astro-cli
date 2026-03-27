@@ -347,6 +347,7 @@ func newAirflowPSCmd() *cobra.Command {
 		Long:    "List the status of your local Airflow environment",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowPS,
+		Example: "  astro dev ps --json",
 	}
 	psOutputFlags.AddFlags(cmd)
 	return cmd
@@ -902,7 +903,11 @@ func printPSTable(data *airflowTypes.PSStatus, out io.Writer) error {
 	if data.Mode == modeStandalone {
 		state := "stopped"
 		if data.Running != nil && *data.Running {
-			state = fmt.Sprintf("running (PID %d)", data.PID)
+			pid := 0
+			if data.PID != nil {
+				pid = *data.PID
+			}
+			state = fmt.Sprintf("running (PID %d)", pid)
 		}
 		fmt.Fprintf(out, "Airflow standalone is %s\n", state)
 		return nil

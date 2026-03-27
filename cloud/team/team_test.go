@@ -380,45 +380,6 @@ var (
 	}
 )
 
-func (s *Suite) TestListOrgTeam() {
-	s.Run("happy path TestListOrgTeam", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
-		err := ListOrgTeams(out, mockClient)
-		s.NoError(err)
-	})
-
-	s.Run("error path when ListOrganizationTeamsWithResponse return network error", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListOrgTeams(out, mockClient)
-		s.EqualError(err, "network error")
-	})
-
-	s.Run("error path when ListOrganizationTeamsWithResponse returns an error", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseError, nil).Twice()
-		err := ListOrgTeams(out, mockClient)
-		s.EqualError(err, "failed to list teams")
-	})
-
-	s.Run("error path when getting current context returns an error", func() {
-		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := ListOrgTeams(out, mockClient)
-		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
-	})
-}
-
 func (s *Suite) TestListOrgTeamsData() {
 	s.Run("returns structured team data", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -456,46 +417,6 @@ func (s *Suite) TestListOrgTeamsWithFormat() {
 		s.NoError(json.Unmarshal(buf.Bytes(), &result))
 		s.NotEmpty(result.Teams)
 		s.Equal("team 1", result.Teams[0].Name)
-	})
-}
-
-func (s *Suite) TestListWorkspaceTeam() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.Run("happy path TestListWorkspaceTeam", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
-		err := ListWorkspaceTeams(out, mockClient, "")
-		s.NoError(err)
-	})
-
-	s.Run("error path when ListWorkspaceTeamsWithResponse return network error", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListWorkspaceTeams(out, mockClient, "")
-		s.EqualError(err, "network error")
-	})
-
-	s.Run("error path when ListWorkspaceTeamsWithResponse returns an error", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseError, nil).Twice()
-		err := ListWorkspaceTeams(out, mockClient, "")
-		s.EqualError(err, "failed to list teams")
-	})
-
-	s.Run("error path when getting current context returns an error", func() {
-		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := ListWorkspaceTeams(out, mockClient, "")
-		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
 	})
 }
 
@@ -1527,46 +1448,6 @@ func (s *Suite) TestGetWorkspaceTeams() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		_, err := GetWorkspaceTeams(mockClient, "", 10)
-		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
-	})
-}
-
-func (s *Suite) TestListDeploymentTeam() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.Run("happy path TestListDeploymentTeam", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentTeamsResponseOK, nil).Twice()
-		err := ListDeploymentTeams(out, mockClient, deploymentID)
-		s.NoError(err)
-	})
-
-	s.Run("error path when ListDeploymentTeamsWithResponse return network error", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListDeploymentTeams(out, mockClient, deploymentID)
-		s.EqualError(err, "network error")
-	})
-
-	s.Run("error path when ListDeploymentTeamsWithResponse returns an error", func() {
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListDeploymentTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentTeamsResponseError, nil).Twice()
-		err := ListDeploymentTeams(out, mockClient, deploymentID)
-		s.EqualError(err, "failed to list teams")
-	})
-
-	s.Run("error path when getting current context returns an error", func() {
-		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := ListDeploymentTeams(out, mockClient, deploymentID)
 		s.Error(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
