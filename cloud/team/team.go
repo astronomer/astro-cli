@@ -34,7 +34,10 @@ var (
 	teamPagnationLimit          = 100
 )
 
-func confirmOperation() bool {
+func confirmOperation(force bool) bool {
+	if force {
+		return true
+	}
 	y, _ := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?")
 	return y
 }
@@ -141,7 +144,7 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, out io.Writer, client
 	return nil
 }
 
-func UpdateTeam(id, name, description, role string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateTeam(id, name, description, role string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -170,7 +173,7 @@ func UpdateTeam(id, name, description, role string, out io.Writer, client astroc
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation()
+		y := confirmOperation(force)
 		if !y {
 			return nil
 		}
@@ -412,7 +415,7 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 	return teams, nil
 }
 
-func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
+func Delete(id string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -441,7 +444,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation()
+		y := confirmOperation(force)
 		if !y {
 			return nil
 		}
@@ -459,7 +462,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	return nil
 }
 
-func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveUser(teamID, teamMemberID string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -488,7 +491,7 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation()
+		y := confirmOperation(force)
 		if !y {
 			return nil
 		}
@@ -530,7 +533,7 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 	return nil
 }
 
-func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) error {
+func AddUser(teamID, userID string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -559,7 +562,7 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation()
+		y := confirmOperation(force)
 		if !y {
 			return nil
 		}

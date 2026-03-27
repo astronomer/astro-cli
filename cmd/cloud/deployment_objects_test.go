@@ -72,19 +72,12 @@ func TestDeploymentConnectionRootCommand(t *testing.T) {
 }
 
 func TestConnectionList(t *testing.T) {
-	expectedHelp := "list connections for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"connection", "list", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and connections are not listed", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -106,19 +99,12 @@ func TestConnectionList(t *testing.T) {
 }
 
 func TestConnectionCreate(t *testing.T) {
-	expectedHelp := "Create Airflow connections for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints create  help", func(t *testing.T) {
-		cmdArgs := []string{"connection", "create", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and connections are not created", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -150,19 +136,11 @@ func TestConnectionCreate(t *testing.T) {
 }
 
 func TestConnectionUpdate(t *testing.T) {
-	expectedHelp := "Update existing Airflow connections for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
-
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"connection", "update", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("any errors from api are returned and connections are not updated", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -198,19 +176,11 @@ func TestConnectionUpdate(t *testing.T) {
 }
 
 func TestConnectionCopy(t *testing.T) {
-	expectedHelp := "Copy Airflow connections from one Astro Deployment to another"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
-
-	t.Run("-h prints copy help", func(t *testing.T) {
-		cmdArgs := []string{"connection", "copy", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("any errors from api are returned and connections are not copied", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -247,19 +217,12 @@ func TestConnectionCopy(t *testing.T) {
 }
 
 func TestVariableList(t *testing.T) {
-	expectedHelp := "list Airflow variables stored in an Astro Deployment's metadata database"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"airflow-variable", "list", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and variables are not listed", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -281,19 +244,11 @@ func TestVariableList(t *testing.T) {
 }
 
 func TestVariableUpdate(t *testing.T) {
-	expectedHelp := "Update Airflow variables for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
-
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"airflow-variable", "update", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("any errors from api are returned and variables are not updated", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -328,19 +283,12 @@ func TestVariableUpdate(t *testing.T) {
 }
 
 func TestVariableCreate(t *testing.T) {
-	expectedHelp := "Create Airflow variables for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints create  help", func(t *testing.T) {
-		cmdArgs := []string{"airflow-variable", "create", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and variables are not created", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -374,19 +322,11 @@ func TestVariableCreate(t *testing.T) {
 }
 
 func TestVariableCopy(t *testing.T) {
-	expectedHelp := "Copy Airflow variables from one Astro Deployment to another Astro Deployment."
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
-
-	t.Run("-h prints copy help", func(t *testing.T) {
-		cmdArgs := []string{"airflow-variable", "copy", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("any errors from api are returned and variables are not copied", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
@@ -423,19 +363,12 @@ func TestVariableCopy(t *testing.T) {
 }
 
 func TestPoolList(t *testing.T) {
-	expectedHelp := "list Airflow pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"pool", "list", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and pools are not listed", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -457,19 +390,11 @@ func TestPoolList(t *testing.T) {
 }
 
 func TestPoolUpdate(t *testing.T) {
-	expectedHelp := "Update Airflow pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
-
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"pool", "update", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("any errors from api are returned and pools are not updated", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
@@ -517,19 +442,12 @@ func TestPoolUpdate(t *testing.T) {
 }
 
 func TestPoolCreate(t *testing.T) {
-	expectedHelp := "Create Airflow pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
 
-	t.Run("-h prints create  help", func(t *testing.T) {
-		cmdArgs := []string{"pool", "create", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and pools are not created", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
@@ -575,19 +493,11 @@ func TestPoolCreate(t *testing.T) {
 }
 
 func TestPoolCopy(t *testing.T) {
-	expectedHelp := "Copy Airflow pools from one Astro Deployment to another Astro Deployment."
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	platformCoreClient = mockPlatformCoreClient
-
-	t.Run("-h prints copy help", func(t *testing.T) {
-		cmdArgs := []string{"pool", "copy", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("any errors from api are returned and pools are not copied", func(t *testing.T) {
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)

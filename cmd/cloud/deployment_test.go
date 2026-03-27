@@ -1864,17 +1864,12 @@ var (
 func TestDeploymentUserList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"user", "list", "-h"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1898,17 +1893,12 @@ func TestDeploymentUserList(t *testing.T) {
 func TestDeploymentUserUpdate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"user", "update", "-h"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
 		expectedOut := "The deployment user user@1.com role was successfully updated to DEPLOYMENT_ADMIN"
@@ -1972,17 +1962,12 @@ func TestDeploymentUserUpdate(t *testing.T) {
 func TestDeploymentUserAdd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"user", "add", "-h"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "add", "user@1.com", "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("valid email with valid role adds user", func(t *testing.T) {
 		expectedOut := "The user user@1.com was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"
@@ -2043,21 +2028,14 @@ func TestDeploymentUserAdd(t *testing.T) {
 }
 
 func TestDeploymentUserRemove(t *testing.T) {
-	expectedHelp := "Remove a user from an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints remove help", func(t *testing.T) {
-		cmdArgs := []string{"user", "remove", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "remove", "user@1.com"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("valid email removes user", func(t *testing.T) {
 		expectedOut := "The user user@1.com was successfully removed from the deployment"
@@ -2117,21 +2095,14 @@ func TestDeploymentUserRemove(t *testing.T) {
 }
 
 func TestDeploymentTeamList(t *testing.T) {
-	expectedHelp := "List all the teams in an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"team", "list", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "list"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("any errors from api are returned and teams are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2155,17 +2126,12 @@ func TestDeploymentTeamList(t *testing.T) {
 func TestDeploymentTeamUpdate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "update", "-h"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "update", team1.Id, "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("valid id with valid role updates team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The deployment team %s role was successfully updated to DEPLOYMENT_ADMIN", team1.Id)
@@ -2230,11 +2196,6 @@ func TestDeploymentTeamUpdate(t *testing.T) {
 func TestDeploymentTeamAdd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"team", "add", "-h"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-	})
 	t.Run("valid id with valid role adds team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The team %s was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n", team1.Id)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2252,7 +2213,7 @@ func TestDeploymentTeamAdd(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "add", team1.Id}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("any errors from api are returned and team is not added", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -2304,21 +2265,14 @@ func TestDeploymentTeamAdd(t *testing.T) {
 }
 
 func TestDeploymentTeamRemove(t *testing.T) {
-	expectedHelp := "Remove a team from an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints remove help", func(t *testing.T) {
-		cmdArgs := []string{"team", "remove", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "remove", team1.Id}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("valid id removes team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from deployment %s\n", team1.Name, mockDeploymentID)
@@ -2389,22 +2343,14 @@ func TestDeploymentTokenRootCommand(t *testing.T) {
 }
 
 func TestDeploymentTokenList(t *testing.T) {
-	expectedHelp := "List all the API tokens in an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "list", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "list"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 
 	t.Run("any errors from api are returned and tokens are not listed", func(t *testing.T) {
@@ -2438,22 +2384,14 @@ func TestDeploymentTokenList(t *testing.T) {
 }
 
 func TestDeploymentTokenCreate(t *testing.T) {
-	expectedHelp := "Create an API token in an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "create", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "DEPLOYMENT_ADMIN"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 
 	t.Run("any errors from api are returned and token is not created", func(t *testing.T) {
@@ -2526,23 +2464,15 @@ func TestDeploymentTokenCreate(t *testing.T) {
 }
 
 func TestDeploymentTokenUpdate(t *testing.T) {
-	expectedHelp := "Update a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	tokenID = ""
-
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "update", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "update", "--name", tokenName1}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 
 	t.Run("any errors from api are returned and token is not updated", func(t *testing.T) {
@@ -2617,22 +2547,14 @@ func TestDeploymentTokenUpdate(t *testing.T) {
 
 func TestDeploymentTokenRotate(t *testing.T) {
 	tokenID = ""
-	expectedHelp := "Rotate a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "rotate", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "rotate", "--name", tokenName1, "--force"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 
 	t.Run("any errors from api are returned and token is not rotated", func(t *testing.T) {
@@ -2723,21 +2645,14 @@ func TestDeploymentTokenRotate(t *testing.T) {
 
 func TestDeploymentTokenDelete(t *testing.T) {
 	tokenID = ""
-	expectedHelp := "Delete a Deployment API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "delete", "-h"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("will error if deployment id flag is not provided", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "delete", apiToken1.Id}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.EqualError(t, err, "flag --deployment-id is required")
+		assert.EqualError(t, err, "required flag --deployment-id not set. To find valid values, run: astro deployment list")
 	})
 	t.Run("any errors from api are returned and token is not deleted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)

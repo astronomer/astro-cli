@@ -18,7 +18,7 @@ func TestExtractEndpoints(t *testing.T) {
 			"delete": {"operationId": "deleteOrganization", "summary": "Delete organization", "tags": []string{"Organizations"}, "deprecated": true},
 		},
 	})
-	doc, err := parseSpec(specJSON)
+	doc, _, err := parseSpec(specJSON)
 	require.NoError(t, err)
 
 	endpoints := ExtractEndpoints(doc)
@@ -132,7 +132,7 @@ func TestExtractEndpointsAllMethods(t *testing.T) {
 			"head":    {"operationId": "headResource"},
 		},
 	})
-	doc, err := parseSpec(specJSON)
+	doc, _, err := parseSpec(specJSON)
 	require.NoError(t, err)
 
 	endpoints := ExtractEndpoints(doc)
@@ -147,7 +147,7 @@ func TestExtractEndpointsAllMethods(t *testing.T) {
 
 func TestExtractEndpointsEmptyPaths(t *testing.T) {
 	specJSON := minimalSpecJSON("Test", map[string]map[string]map[string]any{})
-	doc, err := parseSpec(specJSON)
+	doc, _, err := parseSpec(specJSON)
 	require.NoError(t, err)
 
 	endpoints := ExtractEndpoints(doc)

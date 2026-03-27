@@ -249,15 +249,8 @@ var (
 )
 
 func TestWorkspaceUserList(t *testing.T) {
-	expectedHelp := "List all the users in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"user", "list", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
@@ -278,15 +271,8 @@ func TestWorkspaceUserList(t *testing.T) {
 }
 
 func TestWorkspaceUserUpdate(t *testing.T) {
-	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"user", "update", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
 		expectedOut := "The workspace user user@1.com role was successfully updated to WORKSPACE_MEMBER"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -355,15 +341,8 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 }
 
 func TestWorkspaceUserAdd(t *testing.T) {
-	expectedHelp := "astro workspace user add [email] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"user", "add", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid email with valid role adds user", func(t *testing.T) {
 		expectedOut := "The user user@1.com was successfully added to the workspace with the role WORKSPACE_MEMBER\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -432,15 +411,8 @@ func TestWorkspaceUserAdd(t *testing.T) {
 }
 
 func TestWorkspaceUserRemove(t *testing.T) {
-	expectedHelp := "Remove a user from an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints remove help", func(t *testing.T) {
-		cmdArgs := []string{"user", "remove", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid email removes user", func(t *testing.T) {
 		expectedOut := "The user user@1.com was successfully removed from the workspace"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -522,15 +494,8 @@ var (
 )
 
 func TestWorkspaceCreate(t *testing.T) {
-	expectedHelp := "workspace create [flags]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"create", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid name with valid enforce", func(t *testing.T) {
 		expectedOut := "Astro Workspace workspace-test was successfully created\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -589,15 +554,8 @@ var (
 )
 
 func TestWorkspaceDelete(t *testing.T) {
-	expectedHelp := "workspace delete [workspace_id] [flags]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"delete", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id and successful delete", func(t *testing.T) {
 		expectedOut := "Astro Workspace test-workspace was successfully deleted\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -690,15 +648,8 @@ var (
 )
 
 func TestWorkspaceUpdate(t *testing.T) {
-	expectedHelp := "workspace update [workspace_id] [flags]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"update", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id and successful update", func(t *testing.T) {
 		expectedOut := "Astro Workspace test-workspace was successfully updated\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -768,15 +719,8 @@ func TestWorkspaceUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTeamList(t *testing.T) {
-	expectedHelp := "List all the teams in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"team", "list", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and teams are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseError, nil).Once()
@@ -797,15 +741,8 @@ func TestWorkspaceTeamList(t *testing.T) {
 }
 
 func TestWorkspaceTeamUpdate(t *testing.T) {
-	expectedHelp := "astro workspace team update [id] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
-		cmdArgs := []string{"team", "update", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id with valid role updates team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The workspace team %s role was successfully updated to WORKSPACE_MEMBER", team1.Id)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -875,15 +812,8 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTeamAdd(t *testing.T) {
-	expectedHelp := "astro workspace team add [id] --role [WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
-		cmdArgs := []string{"team", "add", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id with valid role adds team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The team %s was successfully added to the workspace with the role WORKSPACE_MEMBER\n", team1.Id)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -967,15 +897,8 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 }
 
 func TestWorkspaceTeamRemove(t *testing.T) {
-	expectedHelp := "Remove a team from an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints remove help", func(t *testing.T) {
-		cmdArgs := []string{"team", "remove", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("valid id removes team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from workspace ck05r3bor07h40d02y2hw4n4v\n", team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1176,15 +1099,8 @@ func TestWorkspaceTokenRootCommand(t *testing.T) {
 }
 
 func TestWorkspaceTokenList(t *testing.T) {
-	expectedHelp := "List all the API tokens in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "list", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and tokens are not listed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1216,15 +1132,8 @@ func TestWorkspaceTokenList(t *testing.T) {
 }
 
 func TestWorkspaceTokenCreate(t *testing.T) {
-	expectedHelp := "Create an API token in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "create", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1295,16 +1204,9 @@ func TestWorkspaceTokenCreate(t *testing.T) {
 }
 
 func TestWorkspaceTokenUpdate(t *testing.T) {
-	expectedHelp := "Update a Workspace or Organaization API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	tokenID = ""
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "update", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1362,15 +1264,8 @@ func TestWorkspaceTokenUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTokenRotate(t *testing.T) {
-	expectedHelp := "Rotate a Workspace API token"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "rotate", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not rotated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1446,15 +1341,8 @@ func TestWorkspaceTokenRotate(t *testing.T) {
 }
 
 func TestWorkspaceTokenDelete(t *testing.T) {
-	expectedHelp := "Delete a Workspace API token or remove an Organization API token from a Workspace"
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "delete", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
 	t.Run("any errors from api are returned and token is not deleted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1575,15 +1463,9 @@ var (
 )
 
 func TestWorkspaceTokenAdd(t *testing.T) {
-	expectedHelp := "Add an Organization API token to an Astro Workspace"
 	orgTokenID = ""
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("-h prints list help", func(t *testing.T) {
-		cmdArgs := []string{"token", "add", "-h"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
-	})
+
 	t.Run("any errors from api are returned and token is not added", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)

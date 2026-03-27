@@ -362,3 +362,153 @@ func TestCloudCmdLongDescription(t *testing.T) {
 	assert.Contains(t, cmd.Long, "Astro Cloud API")
 	assert.Contains(t, cmd.Example, "astro api cloud")
 }
+
+// --- --spec-url flag ---------------------------------------------------------
+
+func TestCloudSpecURLFlag(t *testing.T) {
+	out := new(bytes.Buffer)
+	cmd := NewCloudCmd(out)
+
+	flag := cmd.PersistentFlags().Lookup("spec-url")
+	require.NotNil(t, flag, "--spec-url flag should exist")
+
+	// Verify hidden
+	assert.True(t, flag.Hidden, "--spec-url should be hidden")
+}
+
+func TestInitCloudSpecCache_SpecURL(t *testing.T) {
+	initTestConfig(t)
+
+	opts := &CloudOptions{SpecURL: "https://example.com/spec.json"}
+	ctx := &config.Context{
+		Domain: "example.com",
+		Token:  "my-secret-token",
+	}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, opts.specCache)
+
+	// The spec URL should be the custom one
+	assert.Equal(t, "https://example.com/spec.json", opts.specCache.GetSpecURL())
+	// Cache file name should be hash-based
+	assert.Contains(t, openapi.SpecCacheFileName("https://example.com/spec.json"), "openapi-cache-")
+}
+
+func TestRunCloud_SpecURL_BaseURL(t *testing.T) {
+	initTestConfig(t)
+
+	// Create a test server that serves a Swagger 2.0 spec
+	specJSON := []byte(`{"swagger":"2.0","info":{"title":"T","version":"1"},"basePath":"/api/v1","paths":{"/items":{"get":{"operationId":"ListItems","responses":{"200":{"description":"OK"}}}}}}`)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(specJSON)
+	}))
+	defer ts.Close()
+
+	out := new(bytes.Buffer)
+	opts := &CloudOptions{
+		RequestOptions: RequestOptions{
+			Out:          out,
+			ErrOut:       out,
+			RequestPath:  "ListItems",
+			GenerateCurl: true,
+		},
+		SpecURL: ts.URL,
+	}
+
+	ctx := &config.Context{
+		Domain:       "example.com",
+		Token:        "test-token",
+		Organization: "org-123",
+	}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, opts.specCache)
+
+	// Verify the cache can load the v2 spec
+	err = opts.specCache.Load(false)
+	require.NoError(t, err)
+
+	// Verify the server path is extracted from the spec
+	serverPath := opts.specCache.GetServerPath()
+	assert.Equal(t, "/api/v1", serverPath)
+}
+
+// --- --spec-token-env-var flag -----------------------------------------------
+
+func TestCloudSpecTokenEnvVarFlag(t *testing.T) {
+	out := new(bytes.Buffer)
+	cmd := NewCloudCmd(out)
+
+	flag := cmd.PersistentFlags().Lookup("spec-token-env-var")
+	require.NotNil(t, flag, "--spec-token-env-var flag should exist")
+	assert.True(t, flag.Hidden, "--spec-token-env-var should be hidden")
+}
+
+func TestInitCloudSpecCache_SpecTokenEnvVar(t *testing.T) {
+	initTestConfig(t)
+
+	t.Setenv("TEST_SPEC_TOKEN", "my-secret-token-123")
+
+	opts := &CloudOptions{
+		SpecURL:         "https://example.com/private/spec.json",
+		SpecTokenEnvVar: "TEST_SPEC_TOKEN",
+	}
+	ctx := &config.Context{
+		Domain: "example.com",
+		Token:  "context-token",
+	}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, opts.specCache)
+
+	// Verify the spec URL
+	assert.Equal(t, "https://example.com/private/spec.json", opts.specCache.GetSpecURL())
+}
+
+func TestInitCloudSpecCache_SpecTokenEnvVar_FetchSendsAuth(t *testing.T) {
+	initTestConfig(t)
+
+	specJSON := []byte(`{"swagger":"2.0","info":{"title":"T","version":"1"},"basePath":"/api/v1","paths":{}}`)
+
+	var receivedAuth string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(specJSON)
+	}))
+	defer ts.Close()
+
+	t.Setenv("TEST_SPEC_AUTH", "secret-token-456")
+
+	opts := &CloudOptions{
+		SpecURL:         ts.URL,
+		SpecTokenEnvVar: "TEST_SPEC_AUTH",
+	}
+	ctx := &config.Context{Domain: "example.com"}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+
+	err = opts.specCache.Load(false)
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer secret-token-456", receivedAuth)
+}
+
+func TestInitCloudSpecCache_SpecTokenEnvVar_Empty(t *testing.T) {
+	initTestConfig(t)
+
+	opts := &CloudOptions{
+		SpecURL:         "https://example.com/spec.json",
+		SpecTokenEnvVar: "NONEXISTENT_VAR_FOR_TEST",
+	}
+	ctx := &config.Context{Domain: "example.com"}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `environment variable "NONEXISTENT_VAR_FOR_TEST" is not set`)
+}

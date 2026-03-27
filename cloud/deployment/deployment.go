@@ -901,7 +901,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if cicdEnforcement == enable {
 		isCicdEnforced = true
 	}
-	if isCicdEnforced && dagDeploy != "" {
+	if !force && isCicdEnforced && dagDeploy != "" {
 		if !canCiCdDeploy(c.Token) {
 			fmt.Printf("\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start." +
 				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")

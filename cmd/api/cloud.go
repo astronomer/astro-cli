@@ -19,6 +19,8 @@ import (
 // CloudOptions holds all options for the cloud api command.
 type CloudOptions struct {
 	RequestOptions
+	SpecURL         string // hidden flag: alternative OpenAPI spec URL
+	SpecTokenEnvVar string // hidden flag: env var name containing auth token for spec fetch
 }
 
 // NewCloudCmd creates the 'astro api cloud' command.
@@ -128,6 +130,12 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 
 	// Other flags
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
+	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL (overrides default Cloud API spec)")
+	cmd.PersistentFlags().StringVar(&opts.SpecTokenEnvVar, "spec-token-env-var", "", "Environment variable containing auth token for fetching the spec")
+	//nolint:errcheck
+	cmd.PersistentFlags().MarkHidden("spec-url")
+	//nolint:errcheck
+	cmd.PersistentFlags().MarkHidden("spec-token-env-var")
 
 	// Add list and describe subcommands (cloud-specific to support lazy cache init)
 	cmd.AddCommand(NewCloudListCmd(out, opts))
@@ -206,7 +214,19 @@ func runCloud(opts *CloudOptions) error {
 	}
 
 	// Build the full URL using the domain-derived base URL
-	baseURL := ctx.GetPublicRESTAPIURL("v1")
+	var baseURL string
+	if opts.SpecURL != "" {
+		if err := opts.specCache.Load(false); err != nil {
+			return fmt.Errorf("loading spec: %w", err)
+		}
+		serverPath := opts.specCache.GetServerPath()
+		if serverPath == "" {
+			return fmt.Errorf("spec has no servers/basePath; cannot determine base URL")
+		}
+		baseURL = ctx.GetPublicRESTAPIURL(strings.TrimPrefix(serverPath, "/"))
+	} else {
+		baseURL = ctx.GetPublicRESTAPIURL("v1")
+	}
 	url := buildURL(baseURL, requestPath)
 
 	// Generate curl command if requested
@@ -372,6 +392,23 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 	if opts.specCache != nil {
 		return nil
 	}
+
+	// When --spec-url is provided, use it. If --spec-token-env-var is also set,
+	// read the token from that env var and send it as auth when fetching the spec.
+	if opts.SpecURL != "" {
+		cachePath := filepath.Join(config.HomeConfigPath, openapi.SpecCacheFileName(opts.SpecURL))
+		if opts.SpecTokenEnvVar != "" {
+			token := os.Getenv(opts.SpecTokenEnvVar)
+			if token == "" {
+				return fmt.Errorf("environment variable %q is not set", opts.SpecTokenEnvVar)
+			}
+			opts.specCache = openapi.NewCacheWithAuth(opts.SpecURL, cachePath, token)
+		} else {
+			opts.specCache = openapi.NewCacheWithOptions(opts.SpecURL, cachePath)
+		}
+		return nil
+	}
+
 	domain := domainutil.FormatDomain(ctx.Domain)
 	specURL := ctx.GetPublicRESTAPIURL("spec/v1.0")
 	if specURL == "" {

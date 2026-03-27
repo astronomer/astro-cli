@@ -1094,11 +1094,32 @@ func (s *Suite) TestDockerComposeRun() {
 		mockCLIClient := new(mocks.DockerCLIClient)
 		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", container.ExecOptions{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{ID: "test-exec-id"}, nil).Once()
 		mockCLIClient.On("ContainerExecAttach", context.Background(), "test-exec-id", container.ExecStartOptions{Detach: false}).Return(docker_types.HijackedResponse{Reader: mockResp}, nil).Once()
+		mockCLIClient.On("ContainerExecInspect", context.Background(), "test-exec-id").Return(container.ExecInspect{ExitCode: 0}, nil).Once()
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.cliClient = mockCLIClient
 
 		err := mockDockerCompose.Run(testCmd, "test-user")
 		s.NoError(err)
+		composeMock.AssertExpectations(s.T())
+		mockCLIClient.AssertExpectations(s.T())
+	})
+
+	s.Run("non-zero exit code", func() {
+		testCmd := []string{"test", "command"}
+		str := bytes.NewReader([]byte(`0`))
+		mockResp := bufio.NewReader(str)
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: "test-webserver", State: "running"}}, nil).Once()
+		mockCLIClient := new(mocks.DockerCLIClient)
+		mockCLIClient.On("ContainerExecCreate", context.Background(), "test-webserver-id", container.ExecOptions{User: "test-user", AttachStdout: true, Cmd: testCmd}).Return(docker_types.IDResponse{ID: "test-exec-id"}, nil).Once()
+		mockCLIClient.On("ContainerExecAttach", context.Background(), "test-exec-id", container.ExecStartOptions{Detach: false}).Return(docker_types.HijackedResponse{Reader: mockResp}, nil).Once()
+		mockCLIClient.On("ContainerExecInspect", context.Background(), "test-exec-id").Return(container.ExecInspect{ExitCode: 1}, nil).Once()
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.cliClient = mockCLIClient
+
+		err := mockDockerCompose.Run(testCmd, "test-user")
+		s.EqualError(err, "command exited with code 1")
 		composeMock.AssertExpectations(s.T())
 		mockCLIClient.AssertExpectations(s.T())
 	})

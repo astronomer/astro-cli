@@ -643,7 +643,18 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, execStartCheck)
 
-	return docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr)
+	if err := docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr); err != nil {
+		return err
+	}
+
+	inspectResp, err := d.cliClient.ContainerExecInspect(context.Background(), execID)
+	if err != nil {
+		return err
+	}
+	if inspectResp.ExitCode != 0 {
+		return fmt.Errorf("command exited with code %d", inspectResp.ExitCode)
+	}
+	return nil
 }
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)

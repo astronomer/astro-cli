@@ -79,6 +79,7 @@ var (
 	lintConfigFile         string
 	waitTime               time.Duration
 	forceKill              bool
+	forceInit              bool
 	containerRuntime       runtimes.ContainerRuntime
 	psOutputFlags          output.Flags
 	RunExample             = `
@@ -221,6 +222,7 @@ func newAirflowInitCmd() *cobra.Command {
 		// Override the root PersistentPreRunE to prevent looking up for container runtime.
 		PersistentPreRunE: SetupLogging,
 	}
+	cmd.Flags().BoolVarP(&forceInit, "force", "f", false, "Initialize project without confirmation, even in a non-empty directory")
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
 	cmd.Flags().StringVarP(&fromTemplate, "from-template", "t", "", "Provides a list of templates to select from and create the local astro project based on the selected template. Please note template based astro projects use the latest runtime version, so runtime-version and airflow-version flags will be ignored when creating a project with template flag")
@@ -256,8 +258,8 @@ func newAirflowInitCmd() *cobra.Command {
 func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
-		Short:   "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
-		Long:    "Run tests to see if your environment and DAGs are compatible with a new version of Airflow or Astro Runtime. This test will produce a series of reports where you can see the test results.",
+		Short:   "Test compatibility with a new Airflow or Runtime version",
+		Long:    "Run compatibility tests to check if your environment and DAGs work with a new version of Airflow or Astro Runtime. Produces reports covering dependency version changes, DAG import errors, and Airflow deprecation lint issues. Does not modify your project or local environment.",
 		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowUpgradeTest(cmd, platformCoreClient)
@@ -344,7 +346,7 @@ func newAirflowPSCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "ps",
 		Short:   "List the status of your local Airflow environment",
-		Long:    "List the status of your local Airflow environment",
+		Long:    "List running containers and their status for your local Airflow environment. Shows container name, state, and health check status for each Airflow component (webserver, scheduler, triggerer, etc.).",
 		PreRunE: SetRuntimeIfExists,
 		RunE:    airflowPS,
 		Example: "  astro dev ps --json",
@@ -496,7 +498,7 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "bash",
 		Short:   "Exec into a running an Airflow container",
-		Long:    "Use this command to exec into a container to run bash commands",
+		Long:    "Open an interactive bash shell inside a running Airflow container. Defaults to the webserver container. Use --scheduler, --triggerer, or --postgres flags to target other components.",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE:    airflowBash,
@@ -645,7 +647,7 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 
 	emptyDir := fileutil.IsEmptyDir(config.WorkingPath)
 
-	if !emptyDir {
+	if !emptyDir && !forceInit {
 		i, _ := input.Confirm(
 			fmt.Sprintf("%s is not an empty directory. Are you sure you want to initialize a project here?", config.WorkingPath))
 

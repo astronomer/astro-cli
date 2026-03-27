@@ -79,11 +79,12 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all Astro Workspaces in your organization",
-		Long:    "List all Astro Workspaces in your organization.",
+		Long:    "List all Astro Workspaces you have access to in your current Organization. Use 'astro organization switch' to change Organizations.",
+		Example: `  astro workspace list
+  astro workspace list --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, out)
 		},
-		Example: "  astro workspace list --json",
 	}
 	workspaceListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -94,8 +95,12 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 		Use:     "switch [workspace name/id]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Astro Workspace",
-		Long:    "Switch to a different Astro Workspace",
+		Long:    "Switch your active Astro Workspace. Subsequent deployment, user, and team commands run against the selected Workspace unless overridden with --workspace-id.",
 		Args:    cobra.MaximumNArgs(1),
+		Example: `
+  $ astro workspace switch
+  $ astro workspace switch my-workspace
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(cmd, out, args)
 		},
@@ -108,7 +113,11 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an Astro Workspace",
-		Long:    "Create an Astro Workspace",
+		Long:    "Create a new Workspace in your current Organization. Workspaces group Deployments and control user access independently. Enable --enforce-cicd to require that all deploys to Deployments in this Workspace use an API token, blocking manual deploys from the CLI or UI.",
+		Example: `
+  $ astro workspace create --name "My Workspace" --description "Production pipelines"
+  $ astro workspace create --name "My Workspace" --enforce-cicd ON
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceCreate(cmd, out)
 		},
@@ -124,8 +133,12 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [workspace_id]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro Workspace",
-		Long:    "Update an Astro Workspace",
+		Long:    "Update a Workspace's name, description, or CI/CD enforcement policy. Changing --enforce-cicd affects all Deployments in the Workspace: when enabled, only API token-authenticated deploys are allowed. If no Workspace ID is provided, you will be prompted to select one.",
 		Args:    cobra.MaximumNArgs(1),
+		Example: `
+  $ astro workspace update clxxxxxxxxx --name "New Name"
+  $ astro workspace update clxxxxxxxxx --description "Updated description" --enforce-cicd ON
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUpdate(cmd, out, args)
 		},
@@ -141,8 +154,12 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [workspace_id]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Workspace",
-		Long:    "Delete an Astro Workspace",
+		Long:    "Permanently delete a Workspace. The Workspace must have zero Deployments — delete or transfer all Deployments first. Deletion also removes all Workspace-scoped API tokens and revokes Workspace-level roles from Organization tokens that had access. This action cannot be undone.",
 		Args:    cobra.MaximumNArgs(1),
+		Example: `
+  $ astro workspace delete
+  $ astro workspace delete clxxxxxxxxx
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(cmd, out, args)
 		},
@@ -174,6 +191,10 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add [email]",
 		Short: "Add a user to an Astro Workspace with a specific role",
 		Long:  "Add a user to an Astro Workspace with a specific role\n$astro workspace user add [email] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace user add user@company.com --role WORKSPACE_MEMBER
+  $ astro workspace user add user@company.com --role WORKSPACE_OWNER
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceUser(cmd, args, out)
 		},
@@ -188,11 +209,13 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the users in an Astro Workspace",
-		Long:    "List all the users in an Astro Workspace",
+		Long:    "List all users and their roles in a Workspace.",
+		Example: `  astro workspace user list
+  astro workspace user list --workspace-id clxxxxxxxxx
+  astro workspace user list --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceUser(cmd, out)
 		},
-		Example: "  astro workspace user list --json",
 	}
 	workspaceUserListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -202,8 +225,12 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [email]",
 		Aliases: []string{"up"},
-		Short:   "Update a the role of a user in an Astro Workspace",
+		Short:   "Update the role of a user in an Astro Workspace",
 		Long:    "Update the role of a user in an Astro Workspace\n$astro workspace user update [email] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace user update user@company.com --role WORKSPACE_OPERATOR
+  $ astro workspace user update user@company.com --role WORKSPACE_OWNER
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceUser(cmd, args, out)
 		},
@@ -218,7 +245,10 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from an Astro Workspace",
-		Long:    "Remove a user from an Astro Workspace",
+		Long:    "Remove a user's role from a Workspace. The user loses access to all Deployments in the Workspace unless they have access through a team. This does not remove them from the Organization.",
+		Example: `
+  $ astro workspace user remove user@company.com
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceUser(cmd, args, out)
 		},
@@ -254,7 +284,11 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the API tokens in an Astro Workspace",
-		Long:    "List all the API tokens in an Astro Workspace",
+		Long:    "List all API tokens with a role in a Workspace, including both Workspace-scoped tokens and Organization-scoped tokens that have been granted a Workspace role.",
+		Example: `
+  $ astro workspace token list
+  $ astro workspace token list --workspace-id clxxxxxxxxx
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceToken(cmd, out)
 		},
@@ -285,11 +319,12 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the teams in an Astro Workspace",
-		Long:    "List all the teams in an Astro Workspace",
+		Long:    "List all teams and their assigned roles in a Workspace.",
+		Example: `  astro workspace team list
+  astro workspace team list --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceTeam(cmd, out)
 		},
-		Example: "  astro workspace team list --json",
 	}
 	workspaceTeamListOutputFlags.AddFlags(cmd)
 	return cmd
@@ -302,6 +337,10 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Workspace",
 		Long:    "Create an API token in an Astro Workspace\n$astro workspace token create --name [token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace token create --name "My Token" --role WORKSPACE_MEMBER
+  $ astro workspace token create --name "CI Token" --role WORKSPACE_OPERATOR --expiration 30 --clean-output
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createWorkspaceToken(cmd, out)
 		},
@@ -320,8 +359,12 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
-		Short:   "Update a Workspace or Organaization API token",
-		Long:    "Update a Workspace or Organaization API token that has a role in an Astro Workspace\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Short:   "Update a Workspace or Organization API token",
+		Long:    "Update a Workspace or Organization API token that has a role in an Astro Workspace\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace token update clxxxxxxxxx --new-name "Updated Token" --role WORKSPACE_OPERATOR
+  $ astro workspace token update --name "My Token" --new-name "Renamed Token" --description "Updated description"
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceToken(cmd, args, out)
 		},
@@ -341,6 +384,10 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Workspace API token",
 		Long:    "Rotate a Workspace API token. You can only rotate Workspace API tokens. You cannot rotate Organization API tokens with this command",
+		Example: `
+  $ astro workspace token rotate clxxxxxxxxx
+  $ astro workspace token rotate --name "My Token" --force --clean-output
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
@@ -358,7 +405,11 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete a Workspace API token or remove an Organization API token from a Workspace",
-		Long:    "Delete a Workspace API token or remove an Organization API token from a Workspace",
+		Long:    "Delete a Workspace API token or remove an Organization token's Workspace role. Deleting a Workspace token revokes it permanently. Removing an Organization token only revokes its Workspace role — the token continues to work at other scopes.",
+		Example: `
+  $ astro workspace token delete clxxxxxxxxx
+  $ astro workspace token delete --name "My Token" --force
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteWorkspaceToken(cmd, args, out)
 		},
@@ -375,6 +426,10 @@ func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to an Astro Workspace",
 		Long:  "Add an Organization API token to an Astro Workspace\n$astro workspace token add [ORG_TOKEN_ID] --org-token-name [token name] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace token add clxxxxxxxxx --role WORKSPACE_MEMBER
+  $ astro workspace token add --org-token-name "My Org Token" --role WORKSPACE_OPERATOR
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToWorkspace(cmd, args, out)
 		},
@@ -512,6 +567,9 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from an Astro Workspace",
 		Long:    "Remove a team from an Astro Workspace",
+		Example: `
+  $ astro workspace team remove clxxxxxxxxx
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTeam(cmd, args, out)
 		},
@@ -546,6 +604,10 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add [id]",
 		Short: "Add a team to an Astro Workspace with a specific role",
 		Long:  "Add a team to an Astro Workspace with a specific role\n$astro workspace team add [id] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace team add clxxxxxxxxx --role WORKSPACE_MEMBER
+  $ astro workspace team add clxxxxxxxxx --role WORKSPACE_OPERATOR --workspace-id clyyyyyyyyy
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceTeam(cmd, args, out)
 		},
@@ -572,8 +634,12 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [id]",
 		Aliases: []string{"up"},
-		Short:   "Update a the role of a team in an Astro Workspace",
+		Short:   "Update the role of a team in an Astro Workspace",
 		Long:    "Update the role of a team in an Astro Workspace\n$astro workspace team update [id] --role [" + allowedWorkspaceRoleNames + "].",
+		Example: `
+  $ astro workspace team update clxxxxxxxxx --role WORKSPACE_OPERATOR
+  $ astro workspace team update clxxxxxxxxx --role WORKSPACE_OWNER
+`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceTeam(cmd, args, out)
 		},
