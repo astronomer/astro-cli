@@ -615,13 +615,13 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 
 	var imageName string
 	if useAstronomerCertified {
-		imageName = airflow.AstronomerCertifiedImageName
+		imageName = airflow.FullAstronomerCertifiedImageName
 	} else {
 		switch airflowversions.AirflowMajorVersionForRuntimeVersion(imageTag) {
 		case "3":
-			imageName = airflow.AstroRuntimeAirflow3ImageName
+			imageName = airflow.FullAstroRuntimeAirflow3ImageName
 		case "2":
-			imageName = airflow.AstroRuntimeAirflow2ImageName
+			imageName = airflow.FullAstroRuntimeAirflow2ImageName
 		default:
 			return errors.New("unsupported Airflow major version for runtime version " + imageTag)
 		}

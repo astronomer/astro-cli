@@ -8,6 +8,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
@@ -148,60 +149,49 @@ func Init(path, airflowImageName, airflowImageTag, template, clientImageTag stri
 		return nil
 	}
 
-	// Initialize directories
-	dirs := []string{"dags", "plugins", "include"}
+	var afVersion airflowrt.AirflowVersion
+	switch airflowversions.AirflowMajorVersionForRuntimeVersion(airflowImageTag) {
+	case "3":
+		afVersion = airflowrt.Airflow3
+	case "2":
+		afVersion = airflowrt.Airflow2
+	default:
+		return errors.New("unsupported Airflow major version for runtime version " + airflowImageTag)
+	}
+
+	cfg := airflowrt.ScaffoldConfig{
+		AirflowVersion:     afVersion,
+		RuntimeImageName:   airflowImageName,
+		RuntimeImageTag:    airflowImageTag,
+		IncludeTests:       true,
+		IncludeReadme:      true,
+		IncludeSettingsYaml: true,
+	}
+	if clientImageTag != "" {
+		baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+		if util.IsAstronomerRegistry(baseImageRegistry) {
+			baseImageRegistry = fmt.Sprintf("%s/baseimages", baseImageRegistry)
+		}
+		cfg.ClientImage = &airflowrt.ClientImageConfig{
+			BaseImageRegistry: baseImageRegistry,
+			ImageTag:          clientImageTag,
+		}
+	}
+
+	dirs, files, err := airflowrt.Scaffold(cfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to scaffold project")
+	}
+
 	if err := initDirs(path, dirs); err != nil {
 		return errors.Wrap(err, "failed to create project directories")
 	}
 
-	// Initialize files
-	var files map[string]string
-	switch airflowversions.AirflowMajorVersionForRuntimeVersion(airflowImageTag) {
-	case "3":
-		files = map[string]string{
-			".dockerignore":                        Af3Dockerignore,
-			"Dockerfile":                           fmt.Sprintf(Af3Dockerfile, airflowImageName, airflowImageTag),
-			".gitignore":                           Af3Gitignore,
-			"packages.txt":                         "",
-			"requirements.txt":                     Af3RequirementsTxt,
-			".env":                                 "",
-			"airflow_settings.yaml":                Af3Settingsyml,
-			"dags/exampledag.py":                   Af3ExampleDag,
-			"dags/.airflowignore":                  "",
-			"README.md":                            Af3Readme,
-			"tests/dags/test_dag_example.py":       Af3DagExampleTest,
-			".astro/test_dag_integrity_default.py": Af3DagIntegrityTestDefault,
-			".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
-		}
-		if clientImageTag != "" {
-			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
-			if util.IsAstronomerRegistry(baseImageRegistry) {
-				baseImageRegistry = fmt.Sprintf("%s/baseimages", baseImageRegistry)
-			}
-			files["Dockerfile.client"] = fmt.Sprintf(Af3DockerfileClient, baseImageRegistry, clientImageTag)
-			files["requirements-client.txt"] = Af3RequirementsTxtClient
-			files["packages-client.txt"] = ""
-		}
-	case "2":
-		files = map[string]string{
-			".dockerignore":                        Af2Dockerignore,
-			"Dockerfile":                           fmt.Sprintf(Af2Dockerfile, airflowImageName, airflowImageTag),
-			".gitignore":                           Af2Gitignore,
-			"packages.txt":                         "",
-			"requirements.txt":                     Af2RequirementsTxt,
-			".env":                                 "",
-			"airflow_settings.yaml":                Af2Settingsyml,
-			"dags/exampledag.py":                   Af2ExampleDag,
-			"dags/.airflowignore":                  "",
-			"README.md":                            Af2Readme,
-			"tests/dags/test_dag_example.py":       Af2DagExampleTest,
-			".astro/test_dag_integrity_default.py": Af2DagIntegrityTestDefault,
-			".astro/dag_integrity_exceptions.txt":  "# Add dag files to exempt from parse test below. ex: dags/<test-file>",
-		}
-	default:
-		return errors.New("unsupported Airflow major version for runtime version " + airflowImageTag)
+	fileMap := make(map[string]string, len(files))
+	for _, f := range files {
+		fileMap[f.RelPath] = f.Content
 	}
-	if err := initFiles(path, files); err != nil {
+	if err := initFiles(path, fileMap); err != nil {
 		return errors.Wrap(err, "failed to create project files")
 	}
 
