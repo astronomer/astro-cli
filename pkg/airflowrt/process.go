@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -32,12 +31,7 @@ func ReadPID(pidFilePath string) (int, bool) {
 		return 0, false
 	}
 
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return pid, false
-	}
-	// On Unix, FindProcess always succeeds; use signal 0 to probe.
-	if err := proc.Signal(syscall.Signal(0)); err != nil {
+	if !isProcessAlive(pid) {
 		return pid, false
 	}
 	return pid, true
@@ -63,7 +57,7 @@ func StopProcess(pidFilePath string) (bool, error) {
 		return false, nil
 	}
 
-	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
+	terminateProcess(pid)
 
 	// Poll for process exit
 	deadline := time.Now().Add(StopTimeout)
@@ -74,9 +68,9 @@ func StopProcess(pidFilePath string) (bool, error) {
 		}
 	}
 
-	// If still alive, send SIGKILL
+	// If still alive, force kill
 	if _, stillAlive := ReadPID(pidFilePath); stillAlive {
-		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
+		killProcess(pid)
 		time.Sleep(StopPollInterval)
 	}
 

@@ -14,9 +14,9 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

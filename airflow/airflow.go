@@ -160,11 +160,11 @@ func Init(path, airflowImageName, airflowImageTag, template, clientImageTag stri
 	}
 
 	cfg := airflowrt.ScaffoldConfig{
-		AirflowVersion:     afVersion,
-		RuntimeImageName:   airflowImageName,
-		RuntimeImageTag:    airflowImageTag,
-		IncludeTests:       true,
-		IncludeReadme:      true,
+		AirflowVersion:      afVersion,
+		RuntimeImageName:    airflowImageName,
+		RuntimeImageTag:     airflowImageTag,
+		IncludeTests:        true,
+		IncludeReadme:       true,
 		IncludeSettingsYaml: true,
 	}
 	if clientImageTag != "" {
