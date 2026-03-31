@@ -194,6 +194,6 @@ commands:
           command: |
             apt-get update && apt-get install -y clang llvm cmake libssl-dev patch zlib1g-dev xz-utils
             git clone https://github.com/tpoechtrager/osxcross.git /osxcross
-            wget https://github.com/phracker/MacOSX-SDKs/releases/download/12.3/MacOSX12.3.sdk.tar.xz -P /osxcross/tarballs/
+            wget https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz -P /osxcross/tarballs/
             cd /osxcross && UNATTENDED=yes ./build.sh
             echo 'export PATH="/osxcross/target/bin:$PATH"' >> $BASH_ENV
