@@ -146,20 +146,11 @@ func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error 
 }
 
 // ListWithFormat lists organizations with the specified output format
-func ListWithFormat(platformCoreClient astroplatformcore.CoreClient, format output.Format, template string, out io.Writer) error {
-	data, err := ListData(platformCoreClient)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    organizationTableConfig,
-	})
-
-	return printer.Print(data)
+func ListWithFormat(platformCoreClient astroplatformcore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*OrganizationList, error) { return ListData(platformCoreClient) },
+		organizationTableConfig, format, tmpl, out,
+	)
 }
 
 func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {

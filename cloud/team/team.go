@@ -895,29 +895,20 @@ func ListDeploymentTeamsData(client astrocore.CoreClient, deploymentID string) (
 var deploymentTeamTableConfig = output.BuildTableConfig(
 	[]output.Column[TeamInfo]{
 		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
-		{Header: "Role", Value: func(t TeamInfo) string { return t.DeploymentRole }},
-		{Header: "Name", Value: func(t TeamInfo) string { return t.Name }},
-		{Header: "Description", Value: func(t TeamInfo) string { return t.Description }},
-		{Header: "Create Date", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+		{Header: "ROLE", Value: func(t TeamInfo) string { return t.DeploymentRole }},
+		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
+		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
+		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
 	},
 	func(d any) []TeamInfo { return d.(*TeamList).Teams },
 )
 
 // ListDeploymentTeamsWithFormat lists deployment teams with the specified output format
-func ListDeploymentTeamsWithFormat(client astrocore.CoreClient, deploymentID string, format output.Format, template string, out io.Writer) error {
-	data, err := ListDeploymentTeamsData(client, deploymentID)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    deploymentTeamTableConfig,
-	})
-
-	return printer.Print(data)
+func ListDeploymentTeamsWithFormat(client astrocore.CoreClient, deploymentID string, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*TeamList, error) { return ListDeploymentTeamsData(client, deploymentID) },
+		deploymentTeamTableConfig, format, tmpl, out,
+	)
 }
 
 // ListWorkspaceTeamsData returns workspace team list data for structured output
@@ -960,29 +951,20 @@ func ListWorkspaceTeamsData(client astrocore.CoreClient, workspaceID string) (*T
 var workspaceTeamTableConfig = output.BuildTableConfig(
 	[]output.Column[TeamInfo]{
 		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
-		{Header: "Role", Value: func(t TeamInfo) string { return t.WorkspaceRole }},
-		{Header: "Name", Value: func(t TeamInfo) string { return t.Name }},
-		{Header: "Description", Value: func(t TeamInfo) string { return t.Description }},
-		{Header: "Create Date", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+		{Header: "ROLE", Value: func(t TeamInfo) string { return t.WorkspaceRole }},
+		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
+		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
+		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
 	},
 	func(d any) []TeamInfo { return d.(*TeamList).Teams },
 )
 
 // ListWorkspaceTeamsWithFormat lists workspace teams with the specified output format
-func ListWorkspaceTeamsWithFormat(client astrocore.CoreClient, workspaceID string, format output.Format, template string, out io.Writer) error {
-	data, err := ListWorkspaceTeamsData(client, workspaceID)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    workspaceTeamTableConfig,
-	})
-
-	return printer.Print(data)
+func ListWorkspaceTeamsWithFormat(client astrocore.CoreClient, workspaceID string, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*TeamList, error) { return ListWorkspaceTeamsData(client, workspaceID) },
+		workspaceTeamTableConfig, format, tmpl, out,
+	)
 }
 
 // ListOrgTeamsData returns organization team list data for structured output
@@ -1024,18 +1006,9 @@ var orgTeamTableConfig = output.BuildTableConfig(
 )
 
 // ListOrgTeamsWithFormat lists organization teams with the specified output format
-func ListOrgTeamsWithFormat(client astrocore.CoreClient, format output.Format, template string, out io.Writer) error {
-	data, err := ListOrgTeamsData(client)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    orgTeamTableConfig,
-	})
-
-	return printer.Print(data)
+func ListOrgTeamsWithFormat(client astrocore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*TeamList, error) { return ListOrgTeamsData(client) },
+		orgTeamTableConfig, format, tmpl, out,
+	)
 }

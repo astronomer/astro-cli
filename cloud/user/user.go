@@ -591,20 +591,11 @@ var deploymentUserTableConfig = output.BuildTableConfig(
 )
 
 // ListDeploymentUsersWithFormat lists deployment users with the specified output format
-func ListDeploymentUsersWithFormat(client astrocore.CoreClient, deploymentID string, format output.Format, template string, out io.Writer) error {
-	data, err := ListDeploymentUsersData(client, deploymentID)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    deploymentUserTableConfig,
-	})
-
-	return printer.Print(data)
+func ListDeploymentUsersWithFormat(client astrocore.CoreClient, deploymentID string, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*UserList, error) { return ListDeploymentUsersData(client, deploymentID) },
+		deploymentUserTableConfig, format, tmpl, out,
+	)
 }
 
 // ListWorkspaceUsersData returns workspace user list data for structured output
@@ -647,20 +638,11 @@ var workspaceUserTableConfig = output.BuildTableConfig(
 )
 
 // ListWorkspaceUsersWithFormat lists workspace users with the specified output format
-func ListWorkspaceUsersWithFormat(client astrocore.CoreClient, workspaceID string, format output.Format, template string, out io.Writer) error {
-	data, err := ListWorkspaceUsersData(client, workspaceID)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    workspaceUserTableConfig,
-	})
-
-	return printer.Print(data)
+func ListWorkspaceUsersWithFormat(client astrocore.CoreClient, workspaceID string, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*UserList, error) { return ListWorkspaceUsersData(client, workspaceID) },
+		workspaceUserTableConfig, format, tmpl, out,
+	)
 }
 
 // ListOrgUsersData returns organization user list data for structured output
@@ -708,18 +690,9 @@ var orgUserTableConfig = output.BuildTableConfig(
 )
 
 // ListOrgUsersWithFormat lists organization users with the specified output format
-func ListOrgUsersWithFormat(client astrocore.CoreClient, format output.Format, template string, out io.Writer) error {
-	data, err := ListOrgUsersData(client)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    orgUserTableConfig,
-	})
-
-	return printer.Print(data)
+func ListOrgUsersWithFormat(client astrocore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*UserList, error) { return ListOrgUsersData(client) },
+		orgUserTableConfig, format, tmpl, out,
+	)
 }

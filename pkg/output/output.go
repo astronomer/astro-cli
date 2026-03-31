@@ -273,3 +273,19 @@ func (f *Flags) AddFlags(cmd *cobra.Command) {
 func (f *Flags) Resolve() (Format, error) {
 	return ResolveFormat(f.JSON, f.Format)
 }
+
+// PrintData fetches data via fetchFn and renders it using the given table config, format, template, and writer.
+// This eliminates boilerplate in the common pattern of: fetch data, create printer, call Print.
+func PrintData[T any](fetchFn func() (*T, error), tableCfg *TableConfig, format Format, tmpl string, out io.Writer) error {
+	data, err := fetchFn()
+	if err != nil {
+		return err
+	}
+
+	return New(Options{
+		Format:   format,
+		Template: tmpl,
+		Out:      out,
+		Table:    tableCfg,
+	}).Print(data)
+}

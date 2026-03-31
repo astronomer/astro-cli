@@ -215,20 +215,11 @@ func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcor
 }
 
 // ListWithFormat lists deployments with the specified output format
-func ListWithFormat(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, format output.Format, template string, out io.Writer) error {
-	data, err := ListData(ws, fromAllWorkspaces, platformCoreClient)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    deploymentTableConfig(fromAllWorkspaces, ws),
-	})
-
-	return printer.Print(data)
+func ListWithFormat(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*DeploymentList, error) { return ListData(ws, fromAllWorkspaces, platformCoreClient) },
+		deploymentTableConfig(fromAllWorkspaces, ws), format, tmpl, out,
+	)
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint

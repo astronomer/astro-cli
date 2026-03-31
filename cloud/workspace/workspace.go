@@ -86,20 +86,11 @@ func List(client astrocore.CoreClient, out io.Writer) error {
 }
 
 // ListWithFormat lists workspaces with the specified output format
-func ListWithFormat(client astrocore.CoreClient, format output.Format, template string, out io.Writer) error {
-	data, err := ListData(client)
-	if err != nil {
-		return err
-	}
-
-	printer := output.New(output.Options{
-		Format:   format,
-		Template: template,
-		Out:      out,
-		Table:    workspaceTableConfig,
-	})
-
-	return printer.Print(data)
+func ListWithFormat(client astrocore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*WorkspaceList, error) { return ListData(client) },
+		workspaceTableConfig, format, tmpl, out,
+	)
 }
 
 var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (string, error) {

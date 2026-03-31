@@ -270,6 +270,55 @@ func TestBuildTableConfig(t *testing.T) {
 	})
 }
 
+func TestPrintData(t *testing.T) {
+	data := &testList{
+		Items: []testItem{
+			{Name: "alpha", ID: "id-1"},
+			{Name: "beta", ID: "id-2"},
+		},
+	}
+
+	cfg := BuildTableConfig(
+		[]Column[testItem]{
+			{Header: "NAME", Value: func(i testItem) string { return i.Name }},
+			{Header: "ID", Value: func(i testItem) string { return i.ID }},
+		},
+		func(d any) []testItem { return d.(*testList).Items },
+	)
+
+	t.Run("json output", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := PrintData(
+			func() (*testList, error) { return data, nil },
+			cfg, FormatJSON, "", &buf,
+		)
+		require.NoError(t, err)
+
+		var result testList
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &result))
+		assert.Equal(t, "alpha", result.Items[0].Name)
+	})
+
+	t.Run("table output", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := PrintData(
+			func() (*testList, error) { return data, nil },
+			cfg, FormatTable, "", &buf,
+		)
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "alpha")
+	})
+
+	t.Run("propagates fetch error", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := PrintData(
+			func() (*testList, error) { return nil, assert.AnError },
+			cfg, FormatJSON, "", &buf,
+		)
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+}
+
 func TestFlags_Resolve(t *testing.T) {
 	t.Run("json flag", func(t *testing.T) {
 		f := Flags{JSON: true}
