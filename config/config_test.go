@@ -105,7 +105,7 @@ func (s *Suite) TestProjectConfigExists() {
 func (s *Suite) TestCreateConfig() {
 	viperTest := viper.New()
 	defer os.RemoveAll("./test")
-	err := CreateConfig(viperTest, "./test", "test.yaml")
+	err := CreateConfig(viperTest, afero.NewOsFs(), "./test", "test.yaml")
 	s.NoError(err)
 }
 
