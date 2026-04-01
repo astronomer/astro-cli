@@ -139,7 +139,7 @@ func initHome(fs afero.Fs) {
 	// If home config does not exist, create it
 	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs)
 	if !homeConfigExists {
-		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
+		err := CreateConfig(viperHome, fs, HomeConfigPath, HomeConfigFile)
 		if err != nil {
 			fmt.Printf(configCreateHomeErrorMsg, err)
 			return
@@ -189,7 +189,7 @@ func CreateProjectConfig(projectPath string) {
 	projectConfigDir := filepath.Join(projectPath, ConfigDir)
 	projectConfigFile := filepath.Join(projectConfigDir, ConfigFileNameWithExt)
 
-	err := CreateConfig(viperProject, projectConfigDir, projectConfigFile)
+	err := CreateConfig(viperProject, afero.NewOsFs(), projectConfigDir, projectConfigFile)
 	if err != nil {
 		fmt.Printf(configCreateHomeErrorMsg, err)
 		return
@@ -205,17 +205,17 @@ func configExists(v *viper.Viper) bool {
 }
 
 // CreateConfig creates a config file in the given directory
-func CreateConfig(v *viper.Viper, path, file string) error {
-	err := os.MkdirAll(path, dirPerm)
+func CreateConfig(v *viper.Viper, fs afero.Fs, path, file string) error {
+	err := fs.MkdirAll(path, dirPerm)
 	if err != nil {
 		return fmt.Errorf("error creating config directory: %w", err)
 	}
 
-	_, err = os.Create(file)
+	_, err = fs.Create(file)
 	if err != nil {
 		return fmt.Errorf("error creating config file: %w", err)
 	}
-	err = os.Chmod(file, filePerm)
+	err = fs.Chmod(file, filePerm)
 	if err != nil {
 		return fmt.Errorf("error creating config file: %w", err)
 	}
