@@ -1250,9 +1250,11 @@ func (s *Suite) TestStandalonePS_NotRunning() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	// Should not error even when not running
-	err = handler.PS()
+	data, err := handler.PS()
 	s.NoError(err)
+	s.Equal("standalone", data.Mode)
+	s.NotNil(data.Running)
+	s.False(*data.Running)
 }
 
 func (s *Suite) TestStandalonePS_Running() {
@@ -1271,8 +1273,13 @@ func (s *Suite) TestStandalonePS_Running() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.PS()
+	data, err := handler.PS()
 	s.NoError(err)
+	s.Equal("standalone", data.Mode)
+	s.NotNil(data.Running)
+	s.True(*data.Running)
+	s.NotNil(data.PID)
+	s.Equal(os.Getpid(), *data.PID)
 }
 
 func (s *Suite) TestStandaloneBuildEnv_CustomPort() {

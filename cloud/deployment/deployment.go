@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"golang.org/x/exp/slices"
@@ -79,12 +80,49 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func newTableOutAll() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "CLOUD PROVIDER", "REGION", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT", "DEPLOYMENT TYPE", "REMOTE EXECUTION"},
+// orNA returns notApplicable if s is empty, for table display.
+func orNA(s string) string {
+	if s == "" {
+		return notApplicable
 	}
+	return s
+}
+
+func deploymentTableConfig(fromAllWorkspaces bool, ws string) *output.TableConfig {
+	columns := []output.Column[DeploymentInfo]{
+		{Header: "NAME", Value: func(d DeploymentInfo) string { return d.Name }},
+	}
+	if fromAllWorkspaces {
+		columns = append(columns, output.Column[DeploymentInfo]{
+			Header: "WORKSPACE", Value: func(d DeploymentInfo) string { return d.WorkspaceName },
+		})
+	}
+	columns = append(columns,
+		output.Column[DeploymentInfo]{Header: "NAMESPACE", Value: func(d DeploymentInfo) string { return d.Namespace }},
+		output.Column[DeploymentInfo]{Header: "CLUSTER", Value: func(d DeploymentInfo) string { return orNA(d.ClusterName) }},
+		output.Column[DeploymentInfo]{Header: "CLOUD PROVIDER", Value: func(d DeploymentInfo) string { return orNA(d.CloudProvider) }},
+		output.Column[DeploymentInfo]{Header: "REGION", Value: func(d DeploymentInfo) string { return orNA(d.Region) }},
+		output.Column[DeploymentInfo]{Header: "DEPLOYMENT ID", Value: func(d DeploymentInfo) string { return d.DeploymentID }},
+		output.Column[DeploymentInfo]{Header: "RUNTIME VERSION", Value: func(d DeploymentInfo) string {
+			return d.RuntimeVersion + " (based on Airflow " + d.AirflowVersion + ")"
+		}},
+		output.Column[DeploymentInfo]{Header: "DAG DEPLOY ENABLED", Value: func(d DeploymentInfo) string { return strconv.FormatBool(d.IsDagDeployEnabled) }},
+		output.Column[DeploymentInfo]{Header: "CI-CD ENFORCEMENT", Value: func(d DeploymentInfo) string { return strconv.FormatBool(d.IsCicdEnforced) }},
+		output.Column[DeploymentInfo]{Header: "DEPLOYMENT TYPE", Value: func(d DeploymentInfo) string { return d.Type }},
+		output.Column[DeploymentInfo]{Header: "REMOTE EXECUTION", Value: func(d DeploymentInfo) string { return strconv.FormatBool(d.IsRemoteExecutionEnabled) }},
+	)
+
+	noResultsMsg := ""
+	if !fromAllWorkspaces && ws != "" {
+		noResultsMsg = NoDeploymentInWSMsg + " " + ansi.Bold(ws)
+	}
+
+	return output.BuildTableConfig(
+		columns,
+		func(d any) []DeploymentInfo { return d.(*DeploymentList).Deployments },
+		output.WithPadding([]int{30, 50, 10, 50, 10, 10, 10}),
+		output.WithNoResultsMsg(noResultsMsg),
+	)
 }
 
 func CanCiCdDeploy(bearerToken string) bool {
@@ -104,35 +142,84 @@ func CanCiCdDeploy(bearerToken string) bool {
 	return false
 }
 
-// List all airflow deployments
-func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+// deploymentToInfo converts a deployment to DeploymentInfo for structured output
+func deploymentToInfo(d *astroplatformcore.Deployment, includeWorkspaceName bool) DeploymentInfo {
+	var cloudProvider, clusterName, region, workspaceName, deploymentType string
+
+	if d.CloudProvider != nil {
+		cloudProvider = string(*d.CloudProvider)
+	}
+	if d.Region != nil {
+		region = *d.Region
+	}
+	if d.Type != nil {
+		deploymentType = string(*d.Type)
+		if !IsDeploymentStandard(*d.Type) && d.ClusterName != nil {
+			clusterName = *d.ClusterName
+		}
+	}
+	if includeWorkspaceName && d.WorkspaceName != nil {
+		workspaceName = *d.WorkspaceName
+	}
+
+	isRemoteExecutionEnabled := IsRemoteExecutionEnabled(d)
+
+	return DeploymentInfo{
+		Name:                     d.Name,
+		WorkspaceName:            workspaceName,
+		Namespace:                d.Namespace,
+		ClusterName:              clusterName,
+		CloudProvider:            cloudProvider,
+		Region:                   region,
+		DeploymentID:             d.Id,
+		RuntimeVersion:           d.RuntimeVersion,
+		AirflowVersion:           d.AirflowVersion,
+		IsDagDeployEnabled:       d.IsDagDeployEnabled,
+		IsCicdEnforced:           d.IsCicdEnforced,
+		Type:                     deploymentType,
+		IsRemoteExecutionEnabled: isRemoteExecutionEnabled,
+	}
+}
+
+// ListData returns deployment list data for structured output
+func ListData(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient) (*DeploymentList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	tab := newTableOut()
 
 	if fromAllWorkspaces {
 		ws = ""
-		tab = newTableOutAll()
 	}
 	deployments, err := CoreGetDeployments(ws, c.Organization, platformCoreClient)
 	if err != nil {
-		return err
-	}
-
-	if len(deployments) == 0 {
-		fmt.Printf("%s %s\n", NoDeploymentInWSMsg, ansi.Bold(ws))
-		return nil
+		return nil, err
 	}
 
 	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Name > deployments[j].Name })
 
-	for i := range deployments {
-		deploymentToTableRow(tab, &deployments[i], fromAllWorkspaces)
+	result := &DeploymentList{
+		Deployments: make([]DeploymentInfo, 0, len(deployments)),
 	}
-	tab.Print(out)
-	return nil
+
+	for i := range deployments {
+		result.Deployments = append(result.Deployments, deploymentToInfo(&deployments[i], fromAllWorkspaces))
+	}
+
+	return result, nil
+}
+
+// List all airflow deployments
+func List(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+	return ListWithFormat(ws, fromAllWorkspaces, platformCoreClient, output.FormatTable, "", out)
+}
+
+// ListWithFormat lists deployments with the specified output format
+func ListWithFormat(ws string, fromAllWorkspaces bool, platformCoreClient astroplatformcore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*DeploymentList, error) { return ListData(ws, fromAllWorkspaces, platformCoreClient) },
+		deploymentTableConfig(fromAllWorkspaces, ws), format, tmpl, out,
+	)
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint

@@ -13,9 +13,11 @@ import (
 
 	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -46,13 +48,60 @@ func TestOrganizationRootCommand(t *testing.T) {
 }
 
 func TestOrganizationList(t *testing.T) {
-	orgList = func(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
-		return nil
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	mockOrganizationProduct := astroplatformcore.OrganizationProductHYBRID
+	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.OrganizationsPaginated{
+			Organizations: []astroplatformcore.Organization{
+				{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
+			},
+		},
 	}
 
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+	platformCoreClient = mockPlatformCoreClient
+
 	cmdArgs := []string{"list"}
-	_, err := execOrganizationCmd(cmdArgs...)
+	resp, err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
+	assert.Contains(t, resp, "test-org")
+	mockPlatformCoreClient.AssertExpectations(t)
+}
+
+func TestOrganizationListJSON(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	mockOrganizationProduct := astroplatformcore.OrganizationProductHYBRID
+	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astroplatformcore.OrganizationsPaginated{
+			Organizations: []astroplatformcore.Organization{
+				{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
+			},
+		},
+	}
+
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+	platformCoreClient = mockPlatformCoreClient
+
+	cmdArgs := []string{"list", "--json"}
+	resp, err := execOrganizationCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	var result organization.OrganizationList
+	assert.NoError(t, json.Unmarshal([]byte(resp), &result))
+	assert.Len(t, result.Organizations, 1)
+	assert.Equal(t, "test-org", result.Organizations[0].Name)
+	assert.Equal(t, "test-org-id", result.Organizations[0].ID)
+	mockPlatformCoreClient.AssertExpectations(t)
 }
 
 func TestOrganizationSwitch(t *testing.T) {

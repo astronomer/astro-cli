@@ -434,6 +434,23 @@ func TestDeploymentList(t *testing.T) {
 	mockPlatformCoreClient.AssertExpectations(t)
 }
 
+func TestDeploymentListJSON(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+	platformCoreClient = mockPlatformCoreClient
+
+	cmdArgs := []string{"list", "-a", "--json"}
+	resp, err := execDeploymentCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	var result deployment.DeploymentList
+	assert.NoError(t, json.Unmarshal([]byte(resp), &result))
+	assert.Len(t, result.Deployments, 2)
+	mockPlatformCoreClient.AssertExpectations(t)
+}
+
 func TestDeploymentLogs(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

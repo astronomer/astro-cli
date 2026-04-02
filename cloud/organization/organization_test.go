@@ -119,6 +119,74 @@ func (s *Suite) TestList() {
 	})
 }
 
+func (s *Suite) TestListData() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	s.Run("returns structured organization data", func() {
+		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+
+		data, err := ListData(mockClient)
+		s.NoError(err)
+		s.Len(data.Organizations, 2)
+		s.Equal("org1", data.Organizations[0].Name)
+		s.Equal("org1", data.Organizations[0].ID)
+		s.Equal("org2", data.Organizations[1].Name)
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("returns error on network failure", func() {
+		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
+
+		_, err := ListData(mockClient)
+		s.Error(err)
+		mockClient.AssertExpectations(s.T())
+	})
+}
+
+func (s *Suite) TestListWithFormat() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	s.Run("json output", func() {
+		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(mockClient, "json", "", buf)
+		s.NoError(err)
+
+		var result OrganizationList
+		s.NoError(json.Unmarshal(buf.Bytes(), &result))
+		s.Len(result.Organizations, 2)
+		s.Equal("org1", result.Organizations[0].Name)
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("table output", func() {
+		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(mockClient, "table", "", buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "org1")
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("template output", func() {
+		mockClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := ListWithFormat(mockClient, "template", `{{range .Organizations}}{{.Name}}{{"\n"}}{{end}}`, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "org1")
+		s.Contains(buf.String(), "org2")
+		mockClient.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestGetOrganizationSelection() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
