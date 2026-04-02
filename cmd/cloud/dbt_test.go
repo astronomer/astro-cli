@@ -240,7 +240,7 @@ func (s *DbtSuite) createDbtProjectFile(path string) {
 func (s *DbtSuite) mockListTestDeployments() {
 	s.mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 		JSON200: &astroplatformcore.DeploymentsPaginated{
 			Deployments: []astroplatformcore.Deployment{
@@ -255,7 +255,7 @@ func (s *DbtSuite) mockListTestDeployments() {
 func (s *DbtSuite) mockGetTestDeployment() {
 	s.mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id: "test-deployment-id",

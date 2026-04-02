@@ -734,7 +734,7 @@ func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) (
 	if err != nil {
 		return nil, err
 	}
-	err = astroplatformcore.NormalizeAPIError(clusterOptions.HTTPResponse, clusterOptions.Body)
+	err = astrocore.NormalizeAPIError(clusterOptions.HTTPResponse, clusterOptions.Body)
 	if err != nil {
 		return nil, err
 	}
