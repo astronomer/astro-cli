@@ -99,7 +99,12 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 		return err
 	}
 	if dockerfilePath == "" {
-		dockerfilePath = "Dockerfile"
+		// For pyproject.toml projects, generate a Dockerfile from the project definition.
+		resolved, resolveErr := EnsureDockerfile(buildConfig.Path, "Dockerfile")
+		if resolveErr != nil {
+			return fmt.Errorf("error resolving Dockerfile: %w", resolveErr)
+		}
+		dockerfilePath = resolved
 	}
 	args := []string{"build"}
 	addPullFlag, err := shouldAddPullFlag(dockerfilePath)

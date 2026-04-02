@@ -343,6 +343,92 @@ func (s *AirflowSuite) Test_airflowInitWithRemoteExecution() {
 	})
 }
 
+func (s *AirflowSuite) Test_airflowInitFormatPyProject() {
+	s.Run("creates pyproject.toml project", func() {
+		config.WorkingPath = s.tempDir
+
+		origGetDefaultImageTag := getDefaultImageTag
+		getDefaultImageTag = func(httpClient *airflowversions.Client, av string, rv string, excludeAF3 bool) (string, error) {
+			return "3.0-7", nil
+		}
+		defer func() { getDefaultImageTag = origGetDefaultImageTag }()
+
+		origGetAFVersion := getAirflowVersionForRuntime
+		getAirflowVersionForRuntime = func(runtimeVersion string) string {
+			return "3.0.1"
+		}
+		defer func() { getAirflowVersionForRuntime = origGetAFVersion }()
+
+		origGetPyVersion := getDefaultPythonVersion
+		getDefaultPythonVersion = func(runtimeVersion string) string {
+			return "3.12"
+		}
+		defer func() { getDefaultPythonVersion = origGetPyVersion }()
+
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-pyproject")
+		cmd.Flag("format").Value.Set("pyproject")
+		var args []string
+
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		// pyproject.toml should exist
+		b, err := os.ReadFile(filepath.Join(s.tempDir, "pyproject.toml"))
+		s.NoError(err)
+		content := string(b)
+		s.Contains(content, `name = "test-pyproject"`)
+		s.Contains(content, `airflow-version = "3.0.1"`)
+		s.Contains(content, `runtime-version = "3.0-7"`)
+
+		// Dockerfile should NOT exist
+		_, err = os.Stat(filepath.Join(s.tempDir, "Dockerfile"))
+		s.True(os.IsNotExist(err))
+
+		// requirements.txt should exist (needed by runtime ONBUILD for Docker mode)
+		_, err = os.Stat(filepath.Join(s.tempDir, "requirements.txt"))
+		s.NoError(err)
+	})
+
+	s.Run("rejects pyproject format for Airflow 2", func() {
+		config.WorkingPath = s.tempDir
+
+		origGetDefaultImageTag := getDefaultImageTag
+		getDefaultImageTag = func(httpClient *airflowversions.Client, av string, rv string, excludeAF3 bool) (string, error) {
+			return "12.0.0", nil // Airflow 2 runtime tag
+		}
+		defer func() { getDefaultImageTag = origGetDefaultImageTag }()
+
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-af2")
+		cmd.Flag("format").Value.Set("pyproject")
+		var args []string
+
+		err := airflowInit(cmd, args)
+		s.Error(err)
+		s.Contains(err.Error(), "only supported for Airflow 3")
+	})
+
+	s.Run("default format unchanged", func() {
+		config.WorkingPath = s.tempDir
+
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-default")
+		var args []string
+
+		err := airflowInit(cmd, args)
+		s.NoError(err)
+
+		// Dockerfile should exist (default behavior)
+		_, err = os.Stat(filepath.Join(s.tempDir, "Dockerfile"))
+		s.NoError(err)
+
+		// pyproject.toml should NOT exist
+		_, err = os.Stat(filepath.Join(s.tempDir, "pyproject.toml"))
+		s.True(os.IsNotExist(err))
+	})
+}
+
 func (s *AirflowSuite) cleanUpInitFiles() {
 	s.T().Helper()
 	if s.tempDir != "" {

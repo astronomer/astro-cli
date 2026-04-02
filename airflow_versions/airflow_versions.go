@@ -301,3 +301,42 @@ func GetDefaultPythonVersion(runtimeVersion string) string {
 
 	return ""
 }
+
+// GetLatestRuntimeForAirflow fetches the runtime versions JSON and returns
+// the latest stable runtime version for the given Airflow version.
+// Returns an empty string if no matching version is found.
+func GetLatestRuntimeForAirflow(airflowVersion string) string {
+	r := Request{}
+	resp, err := r.Do()
+	if err != nil {
+		logger.Debugf("Failed to fetch runtime versions: %v", err)
+		return ""
+	}
+
+	tag, err := getAstroRuntimeTag(resp.RuntimeVersions, resp.RuntimeVersionsV3, airflowVersion)
+	if err != nil {
+		return ""
+	}
+	return tag
+}
+
+// GetAirflowVersionForRuntime fetches the runtime versions JSON and returns
+// the Airflow version for the given runtime version. Returns an empty string
+// if the version is not found.
+func GetAirflowVersionForRuntime(runtimeVersion string) string {
+	r := Request{}
+	resp, err := r.Do()
+	if err != nil {
+		logger.Debugf("Failed to fetch runtime versions for Airflow version lookup: %v", err)
+		return ""
+	}
+
+	if rv, ok := resp.RuntimeVersionsV3[runtimeVersion]; ok {
+		return rv.Metadata.AirflowVersion
+	}
+	if rv, ok := resp.RuntimeVersions[runtimeVersion]; ok {
+		return rv.Metadata.AirflowVersion
+	}
+
+	return ""
+}

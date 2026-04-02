@@ -1,0 +1,8 @@
+[project]
+name = "%[1]s"
+requires-python = ">=%[2]s"
+dependencies = []
+
+[tool.astro]
+airflow-version = "%[3]s"
+runtime-version = "%[4]s"

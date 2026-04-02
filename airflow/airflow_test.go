@@ -172,6 +172,72 @@ func (s *Suite) TestInitWithoutClientImageTag() {
 	}
 }
 
+func (s *Suite) TestInitPyProject() {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = InitPyProject(tmpDir, "my-project", "3.0.1", "3.0-7", "3.12")
+	s.NoError(err)
+
+	// Files that SHOULD exist
+	expectedFiles := []string{
+		"pyproject.toml",
+		".gitignore",
+		".env",
+		"airflow_settings.yaml",
+		"dags/exampledag.py",
+		"dags/.airflowignore",
+		"tests/dags/test_dag_example.py",
+		".astro/test_dag_integrity_default.py",
+		".astro/dag_integrity_exceptions.txt",
+	}
+	for _, file := range expectedFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.True(exist, "Expected file %s to exist", file)
+	}
+
+	// Files that should NOT exist (Dockerfile-format-specific)
+	dockerFiles := []string{
+		"Dockerfile",
+		"README.md",
+	}
+	for _, file := range dockerFiles {
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil)
+		s.NoError(err)
+		s.False(exist, "Expected file %s to NOT exist", file)
+	}
+
+	// Verify pyproject.toml content
+	content, err := os.ReadFile(filepath.Join(tmpDir, "pyproject.toml"))
+	s.NoError(err)
+	s.Contains(string(content), `name = "my-project"`)
+	s.Contains(string(content), `requires-python = ">=3.12"`)
+	s.Contains(string(content), `airflow-version = "3.0.1"`)
+	s.Contains(string(content), `runtime-version = "3.0-7"`)
+	s.NotContains(string(content), "Dockerfile")
+}
+
+func (s *Suite) TestInitPyProject_CanBeReadBack() {
+	tmpDir, err := os.MkdirTemp("", "temp")
+	s.Require().NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = InitPyProject(tmpDir, "roundtrip-test", "3.0.1", "3.0-7", "3.12")
+	s.NoError(err)
+
+	// Read it back with our parser from Phase 1
+	proj, err := ReadProject(tmpDir)
+	s.NoError(err)
+	s.Equal("roundtrip-test", proj.Name)
+	s.Equal(">=3.12", proj.RequiresPython)
+	s.Equal("3.0.1", proj.AirflowVersion)
+	s.Equal("3.0-7", proj.RuntimeVersion)
+	s.Equal("docker", proj.Mode) // default when not specified in template
+	s.Empty(proj.Dependencies)   // empty list in template
+}
+
 func (s *Suite) TestTemplateInitFail() {
 	ExtractTemplate = func(templateDir, destDir string) error {
 		err := errors.New("error extracting files")
