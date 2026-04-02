@@ -31,7 +31,7 @@ var (
 	ErrNoTeamMembersFoundInTeam = errors.New("no team members found in team")
 	ErrNoUsersFoundInOrg        = errors.New("no users found in your organization")
 	ErrNoTeamNameProvided       = errors.New("you must give your Team a name")
-	teamPaginationLimit          = 100
+	teamPaginationLimit         = 100
 )
 
 func confirmOperation(force bool) bool {

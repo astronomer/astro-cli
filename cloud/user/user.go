@@ -24,7 +24,7 @@ var (
 	ErrInvalidOrganizationRole = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidEmail            = errors.New("no email provided for the invite. Retry with a valid email address")
 	ErrInvalidUserKey          = errors.New("invalid User selected")
-	userPaginationLimit         = 100
+	userPaginationLimit        = 100
 	ErrUserNotFound            = errors.New("no user was found for the email you provided")
 )
 
