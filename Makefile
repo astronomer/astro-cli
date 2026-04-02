@@ -8,8 +8,7 @@ generate:
 	go generate -x
 
 lint:
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint version
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint run --timeout 15m0s --verbose
+	prek run golangci-lint --all-files
 
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
@@ -24,11 +23,5 @@ mock:
 	go run github.com/vektra/mockery/v2 --version
 	go run github.com/vektra/mockery/v2
 
-.PHONY: ensure-gofumpt
-
-ensure-gofumpt:
-	@command -v gofumpt >/dev/null 2>&1 || { echo "gofumpt not found, installing..."; go install mvdan.cc/gofumpt@latest; }
-
-
-fmt: ensure-gofumpt
-	gofumpt -w .
+fmt:
+	prek run gofumpt --all-files

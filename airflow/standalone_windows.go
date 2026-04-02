@@ -30,14 +30,14 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 	return nil, errStandaloneWindows
 }
 
-func (s *Standalone) Start(_ *types.StartOptions) error      { return errStandaloneWindows }
-func (s *Standalone) Stop(_ bool) error                       { return errStandaloneWindows }
-func (s *Standalone) PS() error                               { return errStandaloneWindows }
-func (s *Standalone) Kill() error                             { return errStandaloneWindows }
-func (s *Standalone) Logs(_ bool, _ ...string) error          { return errStandaloneWindows }
-func (s *Standalone) Run(_ []string, _ string) error          { return errStandaloneWindows }
-func (s *Standalone) Bash(_ string) error                     { return errStandaloneWindows }
-func (s *Standalone) Build(_, _ string, _ bool) error         { return errStandaloneWindows }
+func (s *Standalone) Start(_ *types.StartOptions) error { return errStandaloneWindows }
+func (s *Standalone) Stop(_ bool) error                 { return errStandaloneWindows }
+func (s *Standalone) PS() error                         { return errStandaloneWindows }
+func (s *Standalone) Kill() error                       { return errStandaloneWindows }
+func (s *Standalone) Logs(_ bool, _ ...string) error    { return errStandaloneWindows }
+func (s *Standalone) Run(_ []string, _ string) error    { return errStandaloneWindows }
+func (s *Standalone) Bash(_ string) error               { return errStandaloneWindows }
+func (s *Standalone) Build(_, _ string, _ bool) error   { return errStandaloneWindows }
 func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 	return errStandaloneWindows
 }
