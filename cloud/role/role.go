@@ -9,7 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var rolePagnationLimit = 100
+var rolePaginationLimit = 100
 
 // Returns a list of all of an organizations roles
 func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([]astrocore.Role, []astrocore.DefaultRole, error) {
@@ -32,7 +32,7 @@ func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([
 		resp, err := client.ListRolesWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListRolesParams{
 			IncludeDefaultRoles: &includeDefaultRoles,
 			Offset:              &offset,
-			Limit:               &rolePagnationLimit,
+			Limit:               &rolePaginationLimit,
 		})
 		if err != nil {
 			return nil, nil, err
@@ -51,7 +51,7 @@ func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([
 			break
 		}
 
-		offset += rolePagnationLimit
+		offset += rolePaginationLimit
 	}
 
 	return roles, defaultRoles, nil

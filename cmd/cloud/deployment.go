@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -31,63 +32,66 @@ const (
 )
 
 var (
-	label                      string
-	runtimeVersion             string
-	deploymentID               string
-	logsKeyword                string
-	forceDelete                bool
-	description                string
-	clusterID                  string
-	dagDeploy                  string
-	schedulerAU                int
-	schedulerReplicas          int
-	updateSchedulerReplicas    int
-	updateSchedulerAU          int
-	forceUpdate                bool
-	allDeployments             bool
-	warnLogs                   bool
-	errorLogs                  bool
-	infoLogs                   bool
-	waitForStatus              bool
-	waitTimeForDeployment      time.Duration
-	deploymentCreateEnforceCD  bool
-	deploymentUpdateEnforceCD  bool
-	logCount                   = 500
-	variableKey                string
-	variableValue              string
-	useEnvFile                 bool
-	makeSecret                 bool
-	executor                   string
-	inputFile                  string
-	cloudProvider              string
-	region                     string
-	schedulerSize              string
-	highAvailability           string
-	developmentMode            string
-	cicdEnforcement            string
-	defaultTaskPodMemory       string
-	resourceQuotaCPU           string
-	resourceQuotaMemory        string
-	defaultTaskPodCPU          string
-	addDeploymentRole          string
-	updateDeploymentRole       string
-	workloadIdentity           string
-	until                      string
-	forDuration                string
-	removeOverride             bool
-	forceOverride              bool
-	logApiserver               bool
-	logWebserver               bool
-	logScheduler               bool
-	logWorkers                 bool
-	logTriggerer               bool
-	flagRemoteExecutionEnabled bool
-	flagAllowedIPAddressRanges string
-	flagTaskLogBucket          string
-	flagTaskLogURLPattern      string
-	allowedIPAddressRanges     *[]string
-	taskLogBucket              *string
-	taskLogURLPattern          *string
+	label                         string
+	runtimeVersion                string
+	deploymentID                  string
+	logsKeyword                   string
+	forceDelete                   bool
+	description                   string
+	clusterID                     string
+	dagDeploy                     string
+	schedulerAU                   int
+	schedulerReplicas             int
+	updateSchedulerReplicas       int
+	updateSchedulerAU             int
+	forceUpdate                   bool
+	allDeployments                bool
+	warnLogs                      bool
+	errorLogs                     bool
+	infoLogs                      bool
+	waitForStatus                 bool
+	waitTimeForDeployment         time.Duration
+	deploymentCreateEnforceCD     bool
+	deploymentUpdateEnforceCD     bool
+	logCount                      = 500
+	variableKey                   string
+	variableValue                 string
+	useEnvFile                    bool
+	makeSecret                    bool
+	executor                      string
+	inputFile                     string
+	cloudProvider                 string
+	region                        string
+	schedulerSize                 string
+	highAvailability              string
+	developmentMode               string
+	cicdEnforcement               string
+	defaultTaskPodMemory          string
+	resourceQuotaCPU              string
+	resourceQuotaMemory           string
+	defaultTaskPodCPU             string
+	addDeploymentRole             string
+	updateDeploymentRole          string
+	workloadIdentity              string
+	until                         string
+	forDuration                   string
+	removeOverride                bool
+	forceOverride                 bool
+	logApiserver                  bool
+	logWebserver                  bool
+	logScheduler                  bool
+	logWorkers                    bool
+	logTriggerer                  bool
+	flagRemoteExecutionEnabled    bool
+	flagAllowedIPAddressRanges    string
+	flagTaskLogBucket             string
+	flagTaskLogURLPattern         string
+	allowedIPAddressRanges        *[]string
+	taskLogBucket                 *string
+	taskLogURLPattern             *string
+	deploymentListOutputFlags     output.Flags
+	deploymentUserListOutputFlags output.Flags
+	deploymentTeamListOutputFlags output.Flags
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -162,20 +166,19 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all the teams in an Astro Deployment",
 		Long:    "List all teams and their roles in a Deployment.",
-		Example: `
-  $ astro deployment team list --deployment-id <deployment-id>
-`,
+		Example: `  astro deployment team list --deployment-id <deployment-id>
+  astro deployment team list --deployment-id <id> --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listDeploymentTeam(cmd, out)
 		},
 	}
+	deploymentTeamListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -199,8 +202,14 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
+
+	format, err := deploymentTeamListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	cmd.SilenceUsage = true
-	return team.ListDeploymentTeams(out, astroCoreClient, deploymentID)
+	return team.ListDeploymentTeamsWithFormat(astroCoreClient, deploymentID, format, deploymentTeamListOutputFlags.Template, out)
 }
 
 func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -327,13 +336,13 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List all the users in an Astro Deployment",
 		Long:    "List all users and their roles in a Deployment.",
-		Example: `
-  $ astro deployment user list --deployment-id <deployment-id>
-`,
+		Example: `  astro deployment user list --deployment-id <deployment-id>
+  astro deployment user list --deployment-id <id> --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listDeploymentUser(cmd, out)
 		},
 	}
+	deploymentUserListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -377,15 +386,16 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List all Deployments running in your Astronomer Workspace",
 		Long:    "List all Deployments running in your Astronomer Workspace. Switch Workspaces to see other Deployments in your Organization.",
-		Example: `
-  $ astro deployment list
-  $ astro deployment list --all
-`,
+		Example: `  astro deployment list
+  astro deployment list --all
+  astro deployment list --json
+  astro deployment list -o template --template '{{range .Deployments}}{{.Name}}{{"\\n"}}{{end}}'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentList(cmd, out)
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
+	deploymentListOutputFlags.AddFlags(cmd)
 	return cmd
 }
 
@@ -676,10 +686,15 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		ws = ""
 	}
 
+	format, err := deploymentListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, platformCoreClient, out)
+	return deployment.ListWithFormat(ws, allDeployments, platformCoreClient, format, deploymentListOutputFlags.Template, out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -1016,8 +1031,14 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
+
+	format, err := deploymentUserListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
 	cmd.SilenceUsage = true
-	return user.ListDeploymentUsers(out, astroCoreClient, deploymentID)
+	return user.ListDeploymentUsersWithFormat(astroCoreClient, deploymentID, format, deploymentUserListOutputFlags.Template, out)
 }
 
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {

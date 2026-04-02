@@ -887,14 +887,17 @@ func (s *Standalone) Kill() error {
 }
 
 // PS reports the status of the standalone Airflow process.
-func (s *Standalone) PS() error {
+// PS returns structured process status data
+func (s *Standalone) PS() (*types.PSStatus, error) {
 	pid, alive := s.readPID()
-	if alive {
-		fmt.Printf("Airflow standalone is running (PID %d)\n", pid)
-	} else {
-		fmt.Println("Airflow standalone is not running.")
+	status := &types.PSStatus{
+		Mode:    "standalone",
+		Running: &alive,
 	}
-	return nil
+	if alive {
+		status.PID = &pid
+	}
+	return status, nil
 }
 
 // standaloneLogPrefixMap maps Docker container names (passed by the cmd layer)
