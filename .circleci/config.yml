@@ -105,13 +105,55 @@ executors:
     docker:
       - image: cimg/python:3.11
 commands:
+  install-prek:
+    description: "Install prek git hook framework"
+    parameters:
+      version:
+        type: string
+        default: "0.3.8"
+      x86_64_sha256:
+        type: string
+        default: "732cfb03960e6dfd5df2cb67906797aa8831750ef3a6f6340ec2b90ee8b7a59f"
+      aarch64_sha256:
+        type: string
+        default: "b88d96aef4ea84999d12958c390611d3a26194ee57225fe2ff15a9855e3a71bf"
+    steps:
+      - run:
+          name: Install prek
+          command: |
+            ARCH=$(uname -m)
+            case "$ARCH" in
+              x86_64)  SHA256="<< parameters.x86_64_sha256 >>" ;;
+              aarch64) SHA256="<< parameters.aarch64_sha256 >>" ;;
+              *) echo "Unsupported arch: $ARCH" && exit 1 ;;
+            esac
+            curl -fsSL "https://github.com/j178/prek/releases/download/v<< parameters.version >>/prek-${ARCH}-unknown-linux-musl.tar.gz" \
+              -o /tmp/prek.tar.gz
+            echo "${SHA256}  /tmp/prek.tar.gz" | sha256sum -c
+            mkdir -p ~/bin
+            tar -xz --strip-components=1 -C ~/bin -f /tmp/prek.tar.gz
+            echo 'export PATH="$HOME/bin:$PATH"' >> "$BASH_ENV"
+            ~/bin/prek --version
   lint:
     description: "Run linting checks"
     steps:
       - checkout
+      - install-prek
+      - restore_cache:
+          keys:
+            - prek-v1-{{ checksum "prek.toml" }}
+      - run:
+          name: Check formatting
+          command: |
+            make fmt
+            git diff --exit-code
       - run:
           name: Run golangci-lint
           command: make lint
+      - save_cache:
+          key: prek-v1-{{ checksum "prek.toml" }}
+          paths:
+            - ~/.cache/prek
   test:
     description: "Run tests and code coverage"
     steps:
