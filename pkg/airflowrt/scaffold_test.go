@@ -50,12 +50,12 @@ func TestScaffold_Airflow3_Minimal(t *testing.T) {
 
 func TestScaffold_Airflow3_Full(t *testing.T) {
 	dirs, files, err := Scaffold(ScaffoldConfig{
-		AirflowVersion:     Airflow3,
+		AirflowVersion:      Airflow3,
 		RuntimeImageName:    "astrocrpublic.azurecr.io/runtime",
-		RuntimeImageTag:    "3.1-12",
-		ProjectName:        "my-project",
-		IncludeTests:       true,
-		IncludeReadme:      true,
+		RuntimeImageTag:     "3.1-12",
+		ProjectName:         "my-project",
+		IncludeTests:        true,
+		IncludeReadme:       true,
 		IncludeSettingsYaml: true,
 		ClientImage: &ClientImageConfig{
 			BaseImageRegistry: "images.astronomer.cloud/baseimages",
@@ -83,11 +83,11 @@ func TestScaffold_Airflow3_Full(t *testing.T) {
 
 func TestScaffold_Airflow2(t *testing.T) {
 	_, files, err := Scaffold(ScaffoldConfig{
-		AirflowVersion:     Airflow2,
+		AirflowVersion:      Airflow2,
 		RuntimeImageName:    "quay.io/astronomer/astro-runtime",
-		RuntimeImageTag:    "2.9-11",
-		IncludeTests:       true,
-		IncludeReadme:      true,
+		RuntimeImageTag:     "2.9-11",
+		IncludeTests:        true,
+		IncludeReadme:       true,
 		IncludeSettingsYaml: true,
 	})
 	require.NoError(t, err)

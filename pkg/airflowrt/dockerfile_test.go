@@ -11,9 +11,9 @@ import (
 
 func TestParseRuntimeTagPython(t *testing.T) {
 	tests := []struct {
-		tag            string
-		wantBase       string
-		wantPython     string
+		tag        string
+		wantBase   string
+		wantPython string
 	}{
 		{"3.1-12", "3.1-12", ""},
 		{"3.1-12-python-3.11", "3.1-12", "3.11"},
