@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/astro-client-platform-core
 
-go 1.24.0
+go 1.26.1
 
 require (
 	github.com/oapi-codegen/runtime v1.1.1
