@@ -6,13 +6,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -25,6 +22,7 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -36,19 +34,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	standaloneDir         = ".astro/standalone"
-	standalonePIDFile     = "airflow.pid"
-	standaloneLogFile     = "airflow.log"
-	defaultStandalonePort = "8080"
-	standaloneIndexURL    = "https://pip.astronomer.io/v2/"
-	defaultPythonVersion  = "3.12" // default Python version for all Runtime 3.x images
-	constraintsBaseURL    = "https://cdn.astronomer.io/runtime-constraints"
-	freezeBaseURL         = "https://cdn.astronomer.io/runtime-freeze"
-	stopPollInterval      = 500 * time.Millisecond
-	stopTimeout           = 10 * time.Second
-	filePermissions       = os.FileMode(0o644)
-	dirPermissions        = os.FileMode(0o755)
+var (
+	standaloneDir         = airflowrt.StandaloneDir
+	standalonePIDFile     = airflowrt.StandalonePIDFile
+	standaloneLogFile     = airflowrt.StandaloneLogFile
+	defaultStandalonePort = airflowrt.DefaultPort
+	standaloneIndexURL    = airflowrt.StandaloneIndexURL
+	defaultPythonVersion  = airflowrt.DefaultPython
+	stopPollInterval      = airflowrt.StopPollInterval
+	stopTimeout           = airflowrt.StopTimeout
+	filePermissions       = airflowrt.FilePermissions
 )
 
 var (
@@ -64,31 +59,12 @@ var (
 	startCommand          = startCmd
 	standaloneExec        = standaloneExecDefault
 	osReadFile            = os.ReadFile
-	osFindProcess         = os.FindProcess
 	resolveFloatingTag    = airflowversions.ResolveFloatingTag
 	standaloneOpenURL     = browser.OpenURL
 )
 
-// runtimePythonRe matches the optional -python-X.Y (and optional -base) suffix on a runtime tag.
-var runtimePythonRe = regexp.MustCompile(`-python-(\d+\.\d+)(-base)?$`)
-
-// fullRuntimeTagRe matches a pinned runtime tag in the new format (X.Y-Z).
-var fullRuntimeTagRe = regexp.MustCompile(`^\d+\.\d+-\d+`)
-
-// parseRuntimeTagPython extracts the base runtime tag and the Python version from a
-// full image tag. Returns an empty pythonVersion when the tag has no explicit
-// `-python-X.Y` suffix so the caller can fall back to other sources.
-//
-//	"3.1-12"                    → base="3.1-12", python=""
-//	"3.1-12-python-3.11"       → base="3.1-12", python="3.11"
-//	"3.1-12-python-3.11-base"  → base="3.1-12", python="3.11"
-func parseRuntimeTagPython(tag string) (baseTag, pythonVersion string) {
-	loc := runtimePythonRe.FindStringSubmatchIndex(tag)
-	if loc == nil {
-		return strings.TrimSuffix(tag, "-base"), ""
-	}
-	return tag[:loc[0]], tag[loc[2]:loc[3]]
-}
+// parseRuntimeTagPython delegates to airflowrt.ParseRuntimeTagPython.
+var parseRuntimeTagPython = airflowrt.ParseRuntimeTagPython
 
 // resolvePythonVersion determines the Python version using a 3-tier strategy:
 //  1. Explicit version from the Dockerfile image tag (-python-X.Y suffix)
@@ -185,7 +161,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	// 2. Validate Airflow version (AF3 only).
 	// If the tag isn't a pinned runtime version (X.Y-Z), try to resolve it
 	// as a floating tag (e.g., "3.1" → "3.1-12") via the runtime versions JSON.
-	if !fullRuntimeTagRe.MatchString(baseTag) {
+	if !airflowrt.IsValidRuntimeTag(baseTag) {
 		resolved, resolveErr := resolveFloatingTag(baseTag)
 		if resolveErr == nil {
 			baseTag = resolved
@@ -531,112 +507,17 @@ func (s *Standalone) healthEndpoint() (url, component string) {
 	return "http://localhost:" + s.webserverPort() + "/api/v2/monitor/health", "api-server"
 }
 
-// checkPortAvailable tries to connect to localhost:port. If anything is already
-// listening, we return an error so the user doesn't silently connect to the
-// wrong Airflow instance.
-var checkPortAvailable = checkPortAvailableDefault
-
-func checkPortAvailableDefault(port string) error {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", port), time.Second)
-	if err != nil {
-		return nil // Connection refused / timeout → port is free
-	}
-	conn.Close()
-	return fmt.Errorf("port %s is already in use — stop the other process or set a different port with 'astro config set api-server.port <port>'", port)
-}
+// checkPortAvailable delegates to airflowrt.CheckPortAvailable.
+var checkPortAvailable = airflowrt.CheckPortAvailable
 
 // getConstraints fetches pip constraints and freeze files from the CDN.
-// The constraints file (small, 3 version pins) is used to extract version info.
-// The freeze file (full package list) is used as pip constraints for the install.
-// Both are cached in .astro/standalone/.
+// Delegates to airflowrt.FetchConstraints for the actual fetch + cache logic.
 func (s *Standalone) getConstraints(tag, pythonVersion string) (freezePath, airflowVersion, taskSDKVersion string, err error) {
-	constraintsDir := filepath.Join(s.airflowHome, standaloneDir)
-	constraintsFile := filepath.Join(constraintsDir, fmt.Sprintf("constraints-%s-python-%s.txt", tag, pythonVersion))
-	freezeFile := filepath.Join(constraintsDir, fmt.Sprintf("freeze-%s-python-%s.txt", tag, pythonVersion))
-
-	// Check cache — both files must exist
-	constraintsCached, _ := fileutil.Exists(constraintsFile, nil)
-	freezeCached, _ := fileutil.Exists(freezeFile, nil)
-	if constraintsCached && freezeCached {
-		airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
-		if err == nil && airflowVersion != "" {
-			taskSDKVersion, _ = parsePackageVersionFromConstraints(constraintsFile, "apache-airflow-task-sdk")
-			return freezeFile, airflowVersion, taskSDKVersion, nil
-		}
-	}
-
-	err = os.MkdirAll(constraintsDir, dirPermissions)
-	if err != nil {
-		return "", "", "", fmt.Errorf("error creating standalone directory: %w", err)
-	}
-
-	// Fetch constraints file (small — version pins only, used for parsing)
-	constraintsURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", constraintsBaseURL, tag, pythonVersion)
-	constraintsContent, fetchErr := fetchConstraintsURL(constraintsURL)
-	if fetchErr != nil {
-		return "", "", "", fmt.Errorf("error fetching constraints from %s: %w", constraintsURL, fetchErr)
-	}
-	if err = os.WriteFile(constraintsFile, []byte(constraintsContent), filePermissions); err != nil {
-		return "", "", "", fmt.Errorf("error caching constraints file: %w", err)
-	}
-
-	// Fetch freeze file (full package list, used as pip -c constraints)
-	freezeURL := fmt.Sprintf("%s/runtime-%s-python-%s.txt", freezeBaseURL, tag, pythonVersion)
-	freezeContent, fetchErr := fetchConstraintsURL(freezeURL)
-	if fetchErr != nil {
-		return "", "", "", fmt.Errorf("error fetching freeze file from %s: %w", freezeURL, fetchErr)
-	}
-	if err = os.WriteFile(freezeFile, []byte(freezeContent), filePermissions); err != nil {
-		return "", "", "", fmt.Errorf("error caching freeze file: %w", err)
-	}
-
-	airflowVersion, err = parseAirflowVersionFromConstraints(constraintsFile)
+	result, err := airflowrt.FetchConstraints(s.airflowHome, tag, pythonVersion)
 	if err != nil {
 		return "", "", "", err
 	}
-
-	taskSDKVersion, _ = parsePackageVersionFromConstraints(constraintsFile, "apache-airflow-task-sdk")
-
-	return freezeFile, airflowVersion, taskSDKVersion, nil
-}
-
-// fetchConstraintsURL fetches constraints from a URL and returns the body as a string.
-var fetchConstraintsURL = func(url string) (string, error) {
-	resp, err := http.Get(url) //nolint:gosec,noctx
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch constraints: HTTP %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
-}
-
-// parsePackageVersionFromConstraints reads a constraints file and extracts the version for a given package.
-func parsePackageVersionFromConstraints(constraintsFile, packageName string) (string, error) {
-	data, err := os.ReadFile(constraintsFile)
-	if err != nil {
-		return "", fmt.Errorf("error reading constraints file: %w", err)
-	}
-
-	prefix := packageName + "=="
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, prefix) {
-			return strings.TrimPrefix(line, prefix), nil
-		}
-	}
-	return "", fmt.Errorf("could not find %s version in constraints file", packageName)
-}
-
-// parseAirflowVersionFromConstraints reads a constraints file and extracts the apache-airflow version.
-func parseAirflowVersionFromConstraints(constraintsFile string) (string, error) {
-	return parsePackageVersionFromConstraints(constraintsFile, "apache-airflow")
+	return result.FreezePath, result.AirflowVersion, result.TaskSDKVersion, nil
 }
 
 // buildEnv constructs the environment variables for the standalone process.
@@ -655,7 +536,7 @@ func (s *Standalone) buildEnv() []string {
 	if envFilePath == "" {
 		envFilePath = filepath.Join(s.airflowHome, ".env")
 	}
-	if envVars, err := loadEnvFile(envFilePath); err == nil {
+	if envVars, err := airflowrt.LoadEnvFile(envFilePath); err == nil {
 		for _, kv := range envVars {
 			if idx := strings.IndexByte(kv, '='); idx >= 0 {
 				overrides[kv[:idx]] = kv[idx+1:]
@@ -691,7 +572,7 @@ func (s *Standalone) buildEnv() []string {
 	// Setting NO_PROXY=* tells Python to skip _scproxy entirely.
 	// We only do this when no proxy is configured (env vars or macOS system settings)
 	// so corporate proxy users aren't affected.
-	if !hasProxyConfigured(overrides) {
+	if !airflowrt.HasProxyConfigured(overrides) {
 		overrides["NO_PROXY"] = "*"
 		overrides["no_proxy"] = "*"
 		logger.Debugf("No proxy detected — setting NO_PROXY=* to avoid macOS _scproxy hang")
@@ -713,39 +594,6 @@ func (s *Standalone) buildEnv() []string {
 	}
 
 	return env
-}
-
-// loadEnvFile reads a .env file and returns key=value pairs.
-// Values wrapped in matching single or double quotes are unquoted to match
-// the behavior of Docker Compose's .env loader.
-func loadEnvFile(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var envVars []string
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if idx := strings.IndexByte(line, '='); idx >= 0 {
-			key := line[:idx]
-			val := line[idx+1:]
-			val = stripQuotes(val)
-			envVars = append(envVars, key+"="+val)
-		}
-	}
-	return envVars, nil
-}
-
-// stripQuotes removes matching surrounding single or double quotes from a value.
-func stripQuotes(s string) string {
-	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
-		return s[1 : len(s)-1]
-	}
-	return s
 }
 
 // applySettings imports airflow_settings.yaml using airflow CLI commands run via the venv.
@@ -780,28 +628,9 @@ func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, er
 	return string(out), nil
 }
 
-// readPID reads the PID file and checks if the process is alive.
-// Returns the PID and true if the process is running, or 0 and false otherwise.
+// readPID delegates to airflowrt.ReadPID.
 func (s *Standalone) readPID() (int, bool) {
-	data, err := osReadFile(s.pidFilePath())
-	if err != nil {
-		return 0, false
-	}
-
-	pid := 0
-	if _, err := fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &pid); err != nil || pid <= 0 {
-		return 0, false
-	}
-
-	proc, err := osFindProcess(pid)
-	if err != nil {
-		return pid, false
-	}
-	// On Unix, FindProcess always succeeds; use signal 0 to probe.
-	if err := proc.Signal(syscall.Signal(0)); err != nil {
-		return pid, false
-	}
-	return pid, true
+	return airflowrt.ReadPID(s.pidFilePath())
 }
 
 // Stop terminates the standalone Airflow process.
@@ -1005,37 +834,9 @@ func (s *Standalone) ensureVenv() error {
 	return nil
 }
 
-// standaloneExecDefault runs a command with the given env, dir, and I/O streams.
-// It resolves the binary using the env's PATH (not the parent process's PATH)
-// so that venv binaries like "airflow" and "pytest" are found correctly.
+// standaloneExecDefault delegates to airflowrt.ExecWithEnv.
 func standaloneExecDefault(dir string, env, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	binary := resolveInEnvPath(args[0], env)
-	cmd := exec.Command(binary, args[1:]...) //nolint:gosec
-	cmd.Dir = dir
-	cmd.Env = env
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
-}
-
-// resolveInEnvPath looks up a binary name in the PATH from the given env slice.
-// This is needed because exec.Command uses the parent process's PATH, not cmd.Env.
-func resolveInEnvPath(binary string, env []string) string {
-	if filepath.IsAbs(binary) || strings.Contains(binary, string(filepath.Separator)) {
-		return binary
-	}
-	for _, e := range env {
-		if strings.HasPrefix(e, "PATH=") {
-			for _, dir := range filepath.SplitList(e[5:]) {
-				candidate := filepath.Join(dir, binary)
-				if _, err := os.Stat(candidate); err == nil {
-					return candidate
-				}
-			}
-		}
-	}
-	return binary // fallback to original
+	return airflowrt.ExecWithEnv(dir, env, args, stdin, stdout, stderr)
 }
 
 func (s *Standalone) Build(_, _ string, _ bool) error {
@@ -1190,34 +991,6 @@ func (s *Standalone) Parse(_, _, _ string) error {
 
 func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
-}
-
-// proxyEnvKeys lists environment variable names that indicate a proxy is configured.
-var proxyEnvKeys = []string{
-	"HTTP_PROXY", "http_proxy",
-	"HTTPS_PROXY", "https_proxy",
-	"ALL_PROXY", "all_proxy",
-	"NO_PROXY", "no_proxy",
-}
-
-// hasProxyConfigured returns true if any proxy-related environment variable
-// is set — either in the inherited environment, the .env overrides, or the
-// macOS system proxy settings. When true, we leave proxy settings alone.
-func hasProxyConfigured(overrides map[string]string) bool {
-	// Check .env overrides
-	for _, key := range proxyEnvKeys {
-		if _, ok := overrides[key]; ok {
-			return true
-		}
-	}
-	// Check inherited environment
-	for _, key := range proxyEnvKeys {
-		if os.Getenv(key) != "" {
-			return true
-		}
-	}
-	// Check macOS system proxy (no-op on other platforms)
-	return hasSystemProxy()
 }
 
 // execCommand runs a command in the given directory.

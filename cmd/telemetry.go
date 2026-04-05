@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/telemetry"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 

@@ -7,16 +7,16 @@ import (
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +41,7 @@ func NewRootCmd() *cobra.Command {
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
 	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient())
-	platformCoreClient := astroplatformcore.NewPlatformCoreClient(httputil.NewHTTPClient())
+	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()

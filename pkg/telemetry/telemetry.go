@@ -8,19 +8,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/version"
 	"github.com/google/uuid"
-	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 const (
 	// TelemetryAPIURL is the telemetry API endpoint
 	TelemetryAPIURL = "https://api.astronomer.io/v1alpha1/telemetry"
-
-	// SourceName identifies this CLI as the telemetry source
-	SourceName = "astro-cli"
 
 	// Environment variable to disable telemetry
 	envTelemetryDisabled = "ASTRO_TELEMETRY_DISABLED"
@@ -28,14 +21,6 @@ const (
 	envTelemetryAPIURL = "ASTRO_TELEMETRY_API_URL"
 	// Environment variable to enable synchronous debug mode
 	envTelemetryDebug = "ASTRO_TELEMETRY_DEBUG"
-)
-
-// SkipPreRunAnnotation is the cobra annotation key used to skip PersistentPreRunE
-const SkipPreRunAnnotation = "skipPreRun"
-
-// Event types
-const (
-	EventCommandExecution = "CLI Command"
 )
 
 // TelemetryPayload represents the data sent to the telemetry API
@@ -90,29 +75,15 @@ var ciEnvVars = []envMapping{
 	{"CI", "ci-unknown"},
 }
 
-// IsEnabled checks if telemetry is enabled
-func IsEnabled() bool {
-	// Check environment variable first (takes precedence)
+// IsDisabledByEnv checks if telemetry is disabled via the ASTRO_TELEMETRY_DISABLED env var.
+func IsDisabledByEnv() bool {
 	envVal := os.Getenv(envTelemetryDisabled)
-	if envVal == "1" || strings.EqualFold(envVal, "true") {
-		return false
-	}
-
-	// Check config setting
-	return config.CFG.TelemetryEnabled.GetBool()
+	return envVal == "1" || strings.EqualFold(envVal, "true")
 }
 
-// GetAnonymousID returns the anonymous user ID, creating one if it doesn't exist
-func GetAnonymousID() string {
-	existingID := config.CFG.TelemetryAnonymousID.GetHomeString()
-	if existingID != "" {
-		return existingID
-	}
-
-	// Generate new UUID
-	newID := uuid.New().String()
-	_ = config.CFG.TelemetryAnonymousID.SetHomeString(newID)
-	return newID
+// NewAnonymousID generates a new anonymous UUID. Callers are responsible for persistence.
+func NewAnonymousID() string {
+	return uuid.New().String()
 }
 
 // GetTelemetryAPIURL returns the telemetry API URL, allowing override via env var
@@ -121,20 +92,6 @@ func GetTelemetryAPIURL() string {
 		return url
 	}
 	return TelemetryAPIURL
-}
-
-// GetCommandPath extracts the command path from a cobra.Command
-// Returns the full command path (e.g., "deploy", "dev start")
-func GetCommandPath(cmd *cobra.Command) string {
-	// Get the full command path
-	path := cmd.CommandPath()
-	// Remove the root command name ("astro")
-	parts := strings.SplitN(path, " ", 2)
-	if len(parts) > 1 {
-		return parts[1]
-	}
-	// Return empty string for root command
-	return ""
 }
 
 // DetectAgent returns the name of the detected agent (e.g. "claude-code"), or "" if none.
@@ -157,86 +114,30 @@ func DetectCISystem() string {
 	return ""
 }
 
-// IsInteractive returns true if stdin is a terminal.
-func IsInteractive() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
-}
-
-// showFirstRunNotice prints a one-time notice about telemetry on the first CLI invocation.
-func showFirstRunNotice() {
-	if config.CFG.TelemetryNoticeShown.GetHomeString() != "" {
-		return
+// GetOSVersion returns the OS version string (e.g., "Darwin 24.3.0", "Linux 6.5.0")
+func GetOSVersion() string {
+	switch runtime.GOOS {
+	case "windows":
+		out, err := exec.Command("cmd", "/c", "ver").Output()
+		if err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "linux", "darwin":
+		out, err := exec.Command("uname", "-sr").Output()
+		if err == nil {
+			return strings.TrimSpace(string(out))
+		}
 	}
-	fmt.Fprintln(os.Stderr,
-		"The Astro CLI now collects anonymous usage data to help us prioritize and invest in CLI features.\n"+
-			"Only commands, OS, and CLI version are tracked — no personal information is collected.\n"+
-			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
-	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
+	return runtime.GOOS
 }
 
 // isTestRun returns true if the current process is a Go test binary.
-// Go test binaries are always named with a ".test" suffix.
 func isTestRun() bool {
 	executable, err := os.Executable()
 	if err != nil {
 		return false
 	}
 	return strings.HasSuffix(executable, ".test") || strings.HasSuffix(executable, ".test.exe")
-}
-
-// TrackCommand sends telemetry data for a command execution
-// It spawns a subprocess to send the data asynchronously
-func TrackCommand(cmd *cobra.Command) {
-	if !IsEnabled() || isTestRun() {
-		return
-	}
-
-	showFirstRunNotice()
-
-	commandPath := GetCommandPath(cmd)
-	// Don't track root command, hidden commands, or telemetry commands
-	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
-		return
-	}
-
-	context := "non-interactive"
-	if IsInteractive() {
-		context = "interactive"
-	}
-
-	properties := map[string]interface{}{
-		"command":      commandPath,
-		"cli_version":  version.CurrVersion,
-		"os":           runtime.GOOS,
-		"os_version":   getOSVersion(),
-		"go_version":   runtime.Version(),
-		"context":      context,
-		"architecture": runtime.GOARCH,
-	}
-
-	if agent := DetectAgent(); agent != "" {
-		properties["agent"] = agent
-	}
-	if ciSystem := DetectCISystem(); ciSystem != "" {
-		properties["ci_system"] = ciSystem
-	}
-
-	payload := TelemetryPayload{
-		Source:      SourceName,
-		Event:       EventCommandExecution,
-		AnonymousID: GetAnonymousID(),
-		Properties:  properties,
-	}
-
-	apiURL := GetTelemetryAPIURL()
-
-	if isDebugMode() {
-		sendDebug(payload, apiURL)
-		return
-	}
-
-	// Spawn subprocess to send telemetry
-	spawnTelemetrySender(payload, apiURL)
 }
 
 // isDebugMode returns true if synchronous debug mode is enabled
@@ -258,66 +159,22 @@ func sendDebug(payload TelemetryPayload, apiURL string) {
 	fmt.Fprintf(os.Stderr, "[telemetry] response: %d OK\n", status)
 }
 
-// getOSVersion returns the OS version string (e.g., "Darwin 24.3.0", "Linux 6.5.0")
-func getOSVersion() string {
-	switch runtime.GOOS {
-	case "windows":
-		out, err := exec.Command("cmd", "/c", "ver").Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
-		}
-	case "linux", "darwin":
-		out, err := exec.Command("uname", "-sr").Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
-		}
-	}
-	return runtime.GOOS
-}
-
-// spawnTelemetrySender spawns a detached subprocess to send telemetry
-func spawnTelemetrySender(payload TelemetryPayload, apiURL string) {
-	sp := senderPayload{
-		TelemetryPayload: payload,
-		APIURL:           apiURL,
-	}
-	payloadJSON, err := json.Marshal(sp)
-	if err != nil {
+// Track sends a telemetry event asynchronously in a goroutine.
+// This is the main entry point for non-CLI callers (e.g., Desktop).
+// It checks the env-var disable flag and skips sending during test runs.
+func Track(payload TelemetryPayload) {
+	if IsDisabledByEnv() || isTestRun() {
 		return
 	}
 
-	// Get the path to the current executable
-	executable, err := os.Executable()
-	if err != nil {
+	apiURL := GetTelemetryAPIURL()
+
+	if isDebugMode() {
+		sendDebug(payload, apiURL)
 		return
 	}
 
-	// Create command to run astro _telemetry-send
-	cmd := exec.Command(executable, "_telemetry-send")
-	cmd.Stdin = strings.NewReader(string(payloadJSON))
-
-	// Detach the process so it doesn't block the main CLI
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-
-	// Start the process without waiting
-	if err := cmd.Start(); err != nil {
-		if isDebugMode() {
-			fmt.Fprintf(os.Stderr, "[telemetry] failed to spawn sender: %v\n", err)
-		}
-		return
-	}
-
-	// Don't wait for the process to complete
-	if cmd.Process != nil {
-		_ = cmd.Process.Release()
-	}
-}
-
-// CreateTrackingHook returns a RunE function that tracks command execution
-func CreateTrackingHook() func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		TrackCommand(cmd)
-		return nil
-	}
+	go func() {
+		_, _ = Send(payload, apiURL)
+	}()
 }

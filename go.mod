@@ -2,9 +2,16 @@ module github.com/astronomer/astro-cli
 
 go 1.26.1
 
+tool (
+	github.com/golangci/golangci-lint/cmd/golangci-lint
+	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+	github.com/vektra/mockery/v2
+)
+
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.3.1
+	github.com/astronomer/astro-cli/pkg/telemetry v0.0.0
 	github.com/briandowns/spinner v1.23.1
 	github.com/docker/cli v27.4.0+incompatible
 	github.com/docker/compose/v2 v2.31.0
@@ -29,6 +36,10 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
+	github.com/astronomer/astro-cli/astro-client-platform-core v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
 	github.com/compose-spec/compose-go/v2 v2.4.5
 	github.com/distribution/reference v0.6.0
 	github.com/fatih/camelcase v1.0.0
@@ -36,17 +47,14 @@ require (
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
-	github.com/golangci/golangci-lint v1.62.2
-	github.com/hashicorp/go-retryablehttp v0.7.8
+	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/itchyny/gojq v0.12.18
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neilotoole/jsoncolor v0.7.1
-	github.com/oapi-codegen/oapi-codegen/v2 v2.4.0
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/pb33f/libopenapi v0.34.0
 	github.com/pelletier/go-toml/v2 v2.2.3
-	github.com/vektra/mockery/v2 v2.50.0
 	github.com/whilp/git-urls v1.0.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp v0.0.0-20241210194714-1829a127f884
@@ -156,6 +164,7 @@ require (
 	github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a // indirect
 	github.com/golangci/go-printf-func-name v0.1.0 // indirect
 	github.com/golangci/gofmt v0.0.0-20240816233607-d8596aa466a9 // indirect
+	github.com/golangci/golangci-lint v1.62.2 // indirect
 	github.com/golangci/misspell v0.6.0 // indirect
 	github.com/golangci/modinfo v0.3.4 // indirect
 	github.com/golangci/plugin-module-register v0.1.1 // indirect
@@ -219,6 +228,7 @@ require (
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/nunnatsa/ginkgolinter v0.18.3 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
+	github.com/oapi-codegen/oapi-codegen/v2 v2.4.0 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -274,6 +284,7 @@ require (
 	github.com/ultraware/whitespace v0.1.1 // indirect
 	github.com/uudashr/gocognit v1.2.0 // indirect
 	github.com/uudashr/iface v1.2.1 // indirect
+	github.com/vektra/mockery/v2 v2.50.0 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xen0n/gosmopolitan v1.2.2 // indirect
@@ -349,7 +360,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -411,3 +422,13 @@ require (
 replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
 
 replace github.com/ldez/tagliatelle => github.com/ldez/tagliatelle v0.5.0
+
+replace github.com/astronomer/astro-cli/pkg/proxy => ./pkg/proxy
+
+replace github.com/astronomer/astro-cli/pkg/airflowrt => ./pkg/airflowrt
+
+replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
+
+replace github.com/astronomer/astro-cli/astro-client-platform-core => ./astro-client-platform-core
+
+replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry

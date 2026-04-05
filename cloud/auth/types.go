@@ -2,6 +2,7 @@ package auth
 
 import (
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/astroauth"
 )
 
 // higher order functions to facilate writing unit test cases
@@ -17,13 +18,8 @@ type Authenticator struct {
 	callbackHandler   AuthorizeCallbackHandler
 }
 
-type UserInfo struct {
-	Email      string `json:"email"`
-	Picture    string `json:"picture"`
-	Name       string `json:"name"`
-	GivenName  string `json:"given_name"`
-	FamilyName string `json:"family_name"`
-}
+// UserInfo is an alias for astroauth.UserInfo.
+type UserInfo = astroauth.UserInfo
 
 type postTokenResponse struct {
 	AccessToken      string  `json:"access_token"`

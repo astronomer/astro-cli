@@ -1,7 +1,6 @@
 package util
 
 import (
-	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
+
+	"github.com/astronomer/astro-cli/pkg/astroauth"
 )
 
 type CustomClaims struct {
@@ -72,13 +73,10 @@ func Exists(path string) (bool, error) {
 	return false, err
 }
 
+// Base64URLEncode delegates to astroauth.Base64URLEncode.
 // See https://datatracker.ietf.org/doc/html/rfc4648#section-5
 func Base64URLEncode(arg []byte) string {
-	s := b64.StdEncoding.EncodeToString(arg)
-	s = strings.TrimRight(s, "=")
-	s = strings.Replace(s, "+", "-", -1)
-	s = strings.Replace(s, "/", "_", -1)
-	return s
+	return astroauth.Base64URLEncode(arg)
 }
 
 func CheckEnvBool(envBool string) bool {

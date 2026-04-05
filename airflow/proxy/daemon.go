@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
+
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/version"
 )
@@ -100,11 +102,11 @@ func EnsureRunning(port string) (string, error) {
 // StartDaemon starts the proxy as a background process.
 // It re-executes the current CLI binary with a hidden subcommand.
 var StartDaemon = func(port string) error {
-	if err := os.MkdirAll(proxyDirPath(), dirPermRWX); err != nil {
+	if err := os.MkdirAll(proxyDirPath(), pkgproxy.DirPermRWX); err != nil {
 		return fmt.Errorf("error creating proxy directory: %w", err)
 	}
 
-	logFile, err := os.OpenFile(logFilePath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePermRW)
+	logFile, err := os.OpenFile(logFilePath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, pkgproxy.FilePermRW)
 	if err != nil {
 		return fmt.Errorf("error opening proxy log file: %w", err)
 	}
@@ -136,7 +138,7 @@ var StartDaemon = func(port string) error {
 	if version.CurrVersion != "" {
 		pidContent += " " + version.CurrVersion
 	}
-	if err := os.WriteFile(pidFilePath(), []byte(pidContent), filePermRW); err != nil {
+	if err := os.WriteFile(pidFilePath(), []byte(pidContent), pkgproxy.FilePermRW); err != nil {
 		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck
 		logFile.Close()
 		return fmt.Errorf("error writing proxy PID file: %w", err)

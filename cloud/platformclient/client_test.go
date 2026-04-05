@@ -1,4 +1,4 @@
-package astroplatformcore
+package platformclient
 
 import (
 	"testing"
