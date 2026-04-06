@@ -40,6 +40,7 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(projectPath, "dags")
+	overrides["AIRFLOW__CORE__PLUGINS_FOLDER"] = filepath.Join(projectPath, "plugins")
 	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
 	if port != DefaultPort {
 		overrides["AIRFLOW__API__PORT"] = port
