@@ -56,7 +56,15 @@ jobs:
       - setup-cross-build-libs
       - run:
           name: goreleaser
-          command: curl -sL https://raw.githubusercontent.com/goreleaser/get/master/get | bash
+          command: |
+            GORELEASER_VERSION=v2.15.2
+            GORELEASER_SHA256=0ebdbf0353aba566b969dde746cc4e4806f96c27aa2f3971b229a9df7611fedc
+            curl -fsSL "https://github.com/goreleaser/goreleaser/releases/download/${GORELEASER_VERSION}/goreleaser_Linux_x86_64.tar.gz" \
+              -o /tmp/goreleaser.tar.gz
+            echo "${GORELEASER_SHA256}  /tmp/goreleaser.tar.gz" | sha256sum -c
+            tar -xz -C /usr/local/bin -f /tmp/goreleaser.tar.gz goreleaser
+            rm /tmp/goreleaser.tar.gz
+            goreleaser release --clean
 workflows:
   version: 2.1
   build-images:
