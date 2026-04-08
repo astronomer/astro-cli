@@ -7,10 +7,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var errMock = errors.New("api error")

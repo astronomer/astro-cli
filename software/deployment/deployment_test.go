@@ -9,13 +9,11 @@ import (
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
-
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var (

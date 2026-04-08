@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/config"

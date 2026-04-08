@@ -8,13 +8,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/version"
-
-	sharedtel "github.com/astronomer/astro-cli/pkg/telemetry"
-
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"github.com/astronomer/astro-cli/config"
+	sharedtel "github.com/astronomer/astro-cli/pkg/telemetry"
+	"github.com/astronomer/astro-cli/version"
 )
 
 const (

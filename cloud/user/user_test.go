@@ -9,13 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-
-	"github.com/stretchr/testify/assert"
-
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

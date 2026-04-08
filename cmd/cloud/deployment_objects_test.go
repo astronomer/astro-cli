@@ -6,15 +6,14 @@ import (
 	"os"
 	"testing"
 
-	airflowclient "github.com/astronomer/astro-cli/airflow-client"
-	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
-
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	airflowclient "github.com/astronomer/astro-cli/airflow-client"
+	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

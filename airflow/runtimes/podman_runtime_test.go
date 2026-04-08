@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	"github.com/briandowns/spinner"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var (

@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/ansi"
-
 	semver "github.com/Masterminds/semver/v3"
+
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 var CurrVersion string

@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
-
-	"github.com/stretchr/testify/assert"
-
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

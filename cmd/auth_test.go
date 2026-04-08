@@ -5,11 +5,10 @@ import (
 	"io"
 	"os"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-
 	"github.com/spf13/cobra"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"

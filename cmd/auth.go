@@ -5,16 +5,15 @@ import (
 	"io"
 	"strings"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/spf13/cobra"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	softwareAuth "github.com/astronomer/astro-cli/software/auth"
-
-	"github.com/spf13/cobra"
 )
 
 var (

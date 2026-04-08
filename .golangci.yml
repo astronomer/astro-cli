@@ -121,15 +121,14 @@ linters:
       - examples$
 formatters:
   enable:
+    - gci
     - gofumpt
-    - goimports
   settings:
     gci:
       sections:
+        - standard
+        - default
         - prefix(github.com/astronomer/astro-cli)
-    goimports:
-      local-prefixes:
-        - github.com/astronomer/astro-cli
   exclusions:
     generated: lax
     paths:

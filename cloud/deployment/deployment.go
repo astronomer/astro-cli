@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -26,8 +27,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
-
-	"github.com/pkg/errors"
 )
 
 var (
