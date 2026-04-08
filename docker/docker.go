@@ -6,10 +6,11 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
 	"golang.org/x/term"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 )
 
 const (

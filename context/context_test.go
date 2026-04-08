@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/astronomer/astro-cli/config"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {

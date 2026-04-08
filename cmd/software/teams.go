@@ -3,10 +3,11 @@ package software
 import (
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/teams"
-	"github.com/spf13/cobra"
 )
 
 func newTeamCmd(out io.Writer) *cobra.Command {

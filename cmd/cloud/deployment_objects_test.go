@@ -11,10 +11,11 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var (

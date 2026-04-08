@@ -7,13 +7,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroiamcore_mocks "github.com/astronomer/astro-cli/astro-client-iam-core/mocks"
 	"github.com/astronomer/astro-cli/cloud/user"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/mock"
 )
 
 var (

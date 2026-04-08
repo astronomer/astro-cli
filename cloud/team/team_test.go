@@ -12,10 +12,11 @@ import (
 
 	"github.com/astronomer/astro-cli/cloud/user"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )

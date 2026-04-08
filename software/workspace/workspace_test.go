@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/stretchr/testify/suite"
+
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"

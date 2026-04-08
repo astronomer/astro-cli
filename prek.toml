@@ -23,7 +23,7 @@ hooks = [
     language = "golang",
     entry = "golangci-lint run --timeout 15m0s",
     pass_filenames = false,
-    additional_dependencies = ["github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2"],
+    additional_dependencies = ["github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4"],
   },
 ]
 

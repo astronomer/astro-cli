@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/stretchr/testify/mock"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+
 	"github.com/stretchr/testify/assert"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 func TestNewDeploymentInspectCmd(t *testing.T) {

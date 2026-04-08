@@ -5,8 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/suite"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"

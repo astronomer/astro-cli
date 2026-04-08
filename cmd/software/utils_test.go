@@ -5,9 +5,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/spf13/cobra"
 )
 
 func (s *Suite) TestVersionMatchCmds() {

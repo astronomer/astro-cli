@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 func TestAddCmds(t *testing.T) {

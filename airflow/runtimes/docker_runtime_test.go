@@ -5,8 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
 
 	"github.com/stretchr/testify/assert"
 )

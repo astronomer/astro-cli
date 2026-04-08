@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/mock"
 )
 
 var errMockHouston = errors.New("some houston error")

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/versions"
+
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
@@ -20,7 +22,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/software/auth"
-	"github.com/docker/docker/api/types/versions"
 )
 
 var (
@@ -212,7 +213,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		token = c.Token
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
-			registry, err := getDeploymentRegistryURL(deploymentInfo.Urls)
+			var err error
+			registry, err = getDeploymentRegistryURL(deploymentInfo.Urls)
 			if err != nil {
 				return err
 			}

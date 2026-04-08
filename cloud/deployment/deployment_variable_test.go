@@ -6,11 +6,12 @@ import (
 	"os"
 	"testing"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var (

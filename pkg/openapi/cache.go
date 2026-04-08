@@ -13,9 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/config"
 	v2high "github.com/pb33f/libopenapi/datamodel/high/v2"
 	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/astronomer/astro-cli/config"
 )
 
 const (

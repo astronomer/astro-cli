@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	semver "github.com/Masterminds/semver/v3"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/suite"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {

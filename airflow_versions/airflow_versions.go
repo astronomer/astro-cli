@@ -7,8 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/logger"
 	"golang.org/x/mod/semver"
+
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const (

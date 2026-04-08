@@ -5,12 +5,13 @@ import (
 	"io"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 var (

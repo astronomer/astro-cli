@@ -3,8 +3,9 @@ package houston
 import (
 	"sort"
 
-	"github.com/astronomer/astro-cli/pkg/logger"
 	"golang.org/x/mod/semver"
+
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 // queryByVersion - defines properties needed to maintain differences in a query overtime introduced by Houston API

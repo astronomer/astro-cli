@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 type RunE func(cmd *cobra.Command, args []string) error

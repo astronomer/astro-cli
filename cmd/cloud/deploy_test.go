@@ -3,12 +3,13 @@ package cloud
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 )
 
 func execDeployCmd(args ...string) error {

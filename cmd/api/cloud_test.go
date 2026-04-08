@@ -7,11 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
 // initTestConfig initializes the config with an in-memory filesystem for tests.

@@ -7,9 +7,10 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/logger"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/config"
 )
 
 var (

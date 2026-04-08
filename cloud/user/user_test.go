@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/stretchr/testify/mock"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+
 	"github.com/stretchr/testify/assert"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // org user variables
