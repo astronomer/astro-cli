@@ -29,9 +29,6 @@ linters:
   settings:
     dupl:
       threshold: 100
-    funlen:
-      lines: 100
-      statements: 50
     goconst:
       min-len: 3
       min-occurrences: 3
@@ -59,8 +56,6 @@ linters:
     govet:
       enable:
         - shadow
-    lll:
-      line-length: 140
     misspell:
       locale: US
     mnd:
@@ -77,8 +72,6 @@ linters:
       require-explanation: false
       require-specific: false
       allow-unused: true
-    revive:
-      confidence: 0
     staticcheck:
       checks:
         - all
@@ -99,7 +92,6 @@ linters:
           - gocyclo
           - gosec
           - mnd
-          - revive
           - unused
         path: _test\.go
       - path: (.+)\.go$
