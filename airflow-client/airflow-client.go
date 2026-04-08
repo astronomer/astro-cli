@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
+
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/hashicorp/go-retryablehttp"
 )
 
 var errDecode = errors.New("failed to decode response from API")

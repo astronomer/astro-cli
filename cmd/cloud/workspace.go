@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/team"
@@ -16,9 +19,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 var (

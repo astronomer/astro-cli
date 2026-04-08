@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/software/deploy"
-
-	"github.com/spf13/cobra"
 )
 
 var (

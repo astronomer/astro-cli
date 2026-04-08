@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/cloud/organization"
 	roleClient "github.com/astronomer/astro-cli/cloud/role"
 	"github.com/astronomer/astro-cli/cloud/team"
@@ -16,7 +18,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/spf13/cobra"
 )
 
 var (

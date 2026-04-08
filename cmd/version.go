@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"github.com/astronomer/astro-cli/version"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/version"
 )
 
 func newVersionCommand() *cobra.Command {

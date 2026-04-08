@@ -3,10 +3,10 @@ package cloud
 import (
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
-
-	"github.com/spf13/cobra"
 )
 
 var (

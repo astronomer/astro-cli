@@ -11,16 +11,17 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
-	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/astronomer/astro-cli/airflow/mocks"
+	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var errMock = errors.New("build error")

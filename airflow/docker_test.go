@@ -11,6 +11,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v2/pkg/api"
+	docker_types "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -20,13 +28,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/pkg/api"
-	docker_types "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/pkg/errors"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/mock"
 )
 
 var (

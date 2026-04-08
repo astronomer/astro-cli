@@ -10,6 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iancoleman/strcase"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
@@ -27,9 +31,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/iancoleman/strcase"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 const modeStandalone = "standalone"

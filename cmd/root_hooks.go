@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
@@ -14,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/version"
-	"github.com/spf13/cobra"
 )
 
 // SetupLogging is a pre-run hook shared between software & cloud

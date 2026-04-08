@@ -10,17 +10,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/ansi"
-	"github.com/astronomer/astro-cli/pkg/logger"
-
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/settings"
-
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/fatih/camelcase"
 	giturls "github.com/whilp/git-urls"
+
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/settings"
 )
 
 var (

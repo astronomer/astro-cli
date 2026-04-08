@@ -7,6 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ghodss/yaml"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -15,10 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/ghodss/yaml"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
 )
 
 const (

@@ -9,8 +9,9 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/gorilla/websocket"
+
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 type AuthPayload struct {

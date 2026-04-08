@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"testing"
 
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/stretchr/testify/assert"
+
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 func TestIsRunning_NoPIDFile(t *testing.T) {

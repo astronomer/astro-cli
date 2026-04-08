@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/docker/docker/api/types/versions"
+
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -13,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/workspace"
-	"github.com/docker/docker/api/types/versions"
 )
 
 const (

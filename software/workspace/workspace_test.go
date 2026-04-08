@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"testing"
 
-	mocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/spf13/afero"
 )
 
 var (

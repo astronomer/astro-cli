@@ -1,11 +1,12 @@
 package cloud
 
 import (
+	"github.com/spf13/cobra"
+
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/spf13/cobra"
 )
 
 var (

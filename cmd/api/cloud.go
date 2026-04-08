@@ -8,12 +8,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
-	"github.com/spf13/cobra"
 )
 
 // CloudOptions holds all options for the cloud api command.

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 )
 
 func TestTelemetryCmd(t *testing.T) {

@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/openapi"
-	"github.com/spf13/cobra"
 )
 
 const (

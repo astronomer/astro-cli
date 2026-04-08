@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/briandowns/spinner"
+
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	sp "github.com/astronomer/astro-cli/pkg/spinner"
-	"github.com/briandowns/spinner"
 )
 
 const (

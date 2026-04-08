@@ -1,129 +1,129 @@
----
+version: "2"
 run:
-  # timeout for analysis, e.g. 30s, 5m
   timeout: 3m
-  skip-files:
-linters-settings:
-  # to be added once migrated out of logrus logger
-  # depguard:
-  #   rules:
-  #     logger:
-  #       # Allow everything that we don't explicitly deny
-  #       listMode: lax
-  #       deny: []
-  #       #   # logging is allowed only by logutils.Log,
-  #       #   # logrus is allowed to use only in logutils package.
-  #       #   - pkg: "github.com/sirupsen/logrus"
-  #       #     desc: logging is allowed only by logutils.Log
-  dupl:
-    threshold: 100
-  funlen:
-    lines: 100
-    statements: 50
-  gci:
-    sections:
-      - prefix(github.com/golangci/golangci-lint)
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-    # ignore-strings: Help for[ ]|Bearer[ ]|The (new )?role for the[ ]|https:\/\/|/dags.tar.gz
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport  # https://github.com/go-critic/go-critic/issues/845
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
-  gocyclo:
-    min-complexity: 25
-  goimports:
-    local-prefixes: github.com/golangci/golangci-lint
-  revive:
-    confidence: 0
-  govet:
-    shadow: true
-    settings:
-      printf:
-        funcs:
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-  lll:
-    line-length: 140
-  maligned:
-    suggest-new: true
-  misspell:
-    locale: US
-  mnd:
-    # don't include the "operation" and "assign"
-    checks: [argument, case, condition, return]
-    ignored-numbers: 2,10,64  # numbers used by strconv
-  nolintlint:
-    allow-leading-space: true  # don't require machine-readable nolint directives (i.e. with no leading space)
-    allow-unused: true  # don't report any unused nolint directives
-    require-explanation: false  # don't require an explanation for nolint directives
-    require-specific: false  # don't require nolint directives to be specific about which linter is being skipped
-
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
-  disable-all: true
+  default: none
   enable:
-    # to be added once migrated out of logrus logger
-    # - depguard
+    - copyloopvar
     - dogsled
     - dupl
     - errcheck
-    - copyloopvar
     - exhaustive
+    - gocognit
     - goconst
     - gocritic
     - gocyclo
-    - gofumpt
-    - goimports
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - misspell
     - mnd
     - nakedret
-    - noctx
     - nolintlint
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
     - whitespace
-    - prealloc
-    - gocognit
-
-issues:
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gomnd
-        - dupl
-        - goconst
-        - errcheck
-        - gosec
-        - typecheck
-        - revive
-        - unused
-        - gocyclo
-  exclude:
-    - "shadow: declaration of .err. shadows declaration"
-    - "sloppyTestFuncName: function cleanUpInitFiles should be of form"
-    # Once golangci updates to include goconst 1.7 these can be dropped
-    - >-
-      string `(/dags\.tar\.gz|Bearer |https://|Help for |The (new )?role for the )` has \d+ occurrences
+  settings:
+    dupl:
+      threshold: 100
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+      ignore-string-values:
+        - '^true$'
+        - 'Help for '
+        - 'Bearer '
+        - 'https://'
+        - '/dags\.tar\.gz'
+        - 'The (new )?role for the '
+    gocritic:
+      disabled-checks:
+        - dupImport
+        - octalLiteral
+        - whyNoLint
+        - wrapperFunc
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 25
+    govet:
+      enable:
+        - shadow
+    misspell:
+      locale: US
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      ignored-numbers:
+        - "2"
+        - "10"
+        - "64"
+    nolintlint:
+      require-explanation: false
+      require-specific: false
+      allow-unused: true
+    staticcheck:
+      checks:
+        - all
+        - "-QF*"    # quickfix suggestions, fix incrementally
+        - "-ST1005" # capitalized error strings, fix incrementally
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - dupl
+          - errcheck
+          - goconst
+          - gocyclo
+          - gosec
+          - mnd
+          - unused
+        path: _test\.go
+      - path: (.+)\.go$
+        text: 'shadow: declaration of .err. shadows declaration'
+      - path: (.+)\.go$
+        text: 'sloppyTestFuncName: function cleanUpInitFiles should be of form'
+      # gosec rules newly surfaced in v2, fix incrementally
+      - linters: [gosec]
+        text: 'G115:'
+      - linters: [gosec]
+        text: 'G117:'
+      - linters: [gosec]
+        text: 'G122:'
+      - linters: [gosec]
+        text: 'G602:'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/astronomer/astro-cli)
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

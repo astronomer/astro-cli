@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/astronomer/astro-cli/software/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 var errMockHouston = errors.New("mock houston error")

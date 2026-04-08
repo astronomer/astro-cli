@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 const (

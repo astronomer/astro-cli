@@ -5,10 +5,11 @@ import (
 	"errors"
 	"io"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
-	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/astronomer/astro-cli/airflow/mocks"
+	"github.com/astronomer/astro-cli/airflow/runtimes"
 )
 
 func (s *Suite) TestDockerRegistryInit() {

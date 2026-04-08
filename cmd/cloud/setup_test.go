@@ -8,20 +8,20 @@ import (
 	"testing"
 	"time"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/golang-jwt/jwt/v4"
-
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	"github.com/astronomer/astro-cli/context"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
-
 	"github.com/astronomer/astro-cli/houston"
 )
 

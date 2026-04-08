@@ -9,10 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/pkg/errors"
 )
 
 var (

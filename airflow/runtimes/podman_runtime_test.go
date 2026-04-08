@@ -4,13 +4,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
-	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"github.com/briandowns/spinner"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
+	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 )
 
 var (

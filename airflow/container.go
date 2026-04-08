@@ -9,6 +9,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
+
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -16,9 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/docker/client"
-	"github.com/pkg/errors"
 )
 
 // StartOptions is re-exported from airflow/types for use by callers.
