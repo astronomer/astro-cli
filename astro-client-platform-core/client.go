@@ -1,33 +1,26 @@
 package astroplatformcore
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/http"
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-var (
-	ErrorRequest  = errors.New("failed to perform request")
-	ErrorBaseURL  = errors.New("invalid baseurl")
-	HTTPStatus200 = 200
-	HTTPStatus204 = 204
-)
-
-const TrueString = "true"
+// NormalizeAPIError is a deliberate re-export of httputil.NormalizeAPIError, allowing
+// callers to override error normalization per-client without importing pkg/httputil.
+var NormalizeAPIError = httputil.NormalizeAPIError
 
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-func NormalizeAPIError(httpResp *http.Response, body []byte) error {
-	if httpResp.StatusCode != HTTPStatus200 && httpResp.StatusCode != HTTPStatus204 {
-		decode := Error{}
-		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
+// create api client for astro platform core services
+func NewPlatformCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
+	// we append base url in request editor, so set to an empty string here
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
+		ctx, err := context.GetCurrentContext()
 		if err != nil {
-			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
+			return "", "", err
 		}
-		return errors.New(decode.Message)
-	}
-	return nil
+		return ctx.Token, ctx.GetPublicRESTAPIURL("platform/v1beta1"), nil
+	})))
+	return cl
 }

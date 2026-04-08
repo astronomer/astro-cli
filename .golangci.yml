@@ -33,7 +33,7 @@ linters:
       min-len: 3
       min-occurrences: 3
       ignore-string-values:
-        - '^true$'
+        - 'true'
         - 'Help for '
         - 'Bearer '
         - 'https://'

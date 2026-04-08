@@ -2378,7 +2378,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
-					StatusCode: astrocore.HTTPStatus200,
+					StatusCode: http.StatusOK,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
 					IsHibernating: &tt.IsHibernating,
@@ -2403,7 +2403,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
-					StatusCode: astrocore.HTTPStatus200,
+					StatusCode: http.StatusOK,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
 					IsHibernating: &tt.IsHibernating,
@@ -2492,7 +2492,7 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 	s.Run("remove override", func() {
 		mockResponse := astroplatformcore.DeleteDeploymentHibernationOverrideResponse{
 			HTTPResponse: &http.Response{
-				StatusCode: astrocore.HTTPStatus204,
+				StatusCode: http.StatusNoContent,
 			},
 		}
 
@@ -2511,7 +2511,7 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 	s.Run("remove override with deployment selection", func() {
 		mockResponse := astroplatformcore.DeleteDeploymentHibernationOverrideResponse{
 			HTTPResponse: &http.Response{
-				StatusCode: astrocore.HTTPStatus204,
+				StatusCode: http.StatusNoContent,
 			},
 		}
 
