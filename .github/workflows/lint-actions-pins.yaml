@@ -9,4 +9,16 @@ permissions:
 
 jobs:
   lint:
-    uses: astronomer/actions/.github/workflows/lint-actions-pins.yaml@cc9a58459f68a7bfa751ad3cb076dcfcf963c25b
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Check pinning
+        uses: suzuki-shunsuke/pinact-action@cf51507d80d4d6522a07348e3d58790290eaf0b6 # v2.0.0
+        with:
+          min_age: 7
+          review: true
+          skip_push: true
+          verify: true
