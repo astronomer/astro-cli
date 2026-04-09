@@ -61,6 +61,13 @@ type AirflowPools []struct {
 	PoolDescription string `yaml:"description"`
 }
 
+// poolImportEntry is the JSON value format expected by `airflow pools import`.
+// The pool name is used as the dict key.
+type poolImportEntry struct {
+	Slots       int    `json:"slots"`
+	Description string `json:"description"`
+}
+
 // types for creating variables and connections yaml files
 
 type DAGRunVariables struct {

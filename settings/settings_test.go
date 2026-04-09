@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,6 +12,18 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
+
+// extractJSONFromHeredoc extracts the JSON content from a batch import command
+// that uses the heredoc pattern: cat > /tmp/... <<'__ASTRO_CLI_EOF__'\n<json>\n__ASTRO_CLI_EOF__\n...
+func extractJSONFromHeredoc(command string) string {
+	parts := strings.Split(command, "__ASTRO_CLI_EOF__")
+	if len(parts) >= 2 {
+		s := strings.TrimSpace(parts[1])
+		s = strings.TrimPrefix(s, "'")
+		return strings.TrimSpace(s)
+	}
+	return ""
+}
 
 type Suite struct {
 	suite.Suite
@@ -77,14 +90,20 @@ func (s *Suite) TestAddConnectionsAirflowTwo() {
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
-	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
-	expectedDelCmd := "airflow connections delete   \"test-id\""
-	expectedListCmd := "airflow connections list -o plain"
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
-		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
-		}
+		s.Contains(airflowCommand, "airflow connections import --overwrite")
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var connMap map[string]interface{}
+		s.NoError(json.Unmarshal([]byte(jsonStr), &connMap))
+		s.Contains(connMap, "test-id")
+		connObj, ok := connMap["test-id"].(map[string]interface{})
+		s.True(ok)
+		s.Equal("test-type", connObj["conn_type"])
+		s.Equal("test-host", connObj["host"])
+		s.Equal("test-login", connObj["login"])
+		s.Equal("test-password", connObj["password"])
+		s.Equal("test-schema", connObj["schema"])
+		s.Equal(float64(1), connObj["port"])
 		return "", nil
 	}
 	err := AddConnections("test-conn-id", 2, nil)
@@ -125,17 +144,23 @@ func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
 		},
 	}
 
-	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
-	expectedDelCmd := "airflow connections delete   \"test-id\""
-	expectedListCmd := "airflow connections list -o plain"
-
-	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\":\"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
-
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
-		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
-		}
+		s.Contains(airflowCommand, "airflow connections import --overwrite")
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var connMap map[string]interface{}
+		s.NoError(json.Unmarshal([]byte(jsonStr), &connMap))
+		// Both settings and env connections should be present
+		s.Contains(connMap, "test-id")
+		s.Contains(connMap, "test-env-id")
+		// Verify env connection fields
+		envConn, ok := connMap["test-env-id"].(map[string]interface{})
+		s.True(ok)
+		s.Equal("test-env-type", envConn["conn_type"])
+		s.Equal("test-env-host", envConn["host"])
+		s.Equal(float64(2), envConn["port"])
+		extra, ok := envConn["extra"].(map[string]interface{})
+		s.True(ok)
+		s.Equal("test-extra-value", extra["test-extra-key"])
 		return "", nil
 	}
 	err := AddConnections("test-conn-id", 2, envConns)
@@ -144,18 +169,21 @@ func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
 
 func (s *Suite) TestAddConnectionsAirflowTwoURI() {
 	testConn := Connection{
+		ConnID:  "test-id",
 		ConnURI: "test-uri",
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
-	expectedAddCmd := "airflow connections add   'test-id' --conn-uri 'test-uri'"
-	expectedDelCmd := "airflow connections delete   \"test-id\""
-	expectedListCmd := "airflow connections list -o plain"
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
-		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
-		}
+		s.Contains(airflowCommand, "airflow connections import --overwrite")
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var connMap map[string]interface{}
+		s.NoError(json.Unmarshal([]byte(jsonStr), &connMap))
+		s.Contains(connMap, "test-id")
+		// URI-only connection should be a string value, not an object
+		connVal, ok := connMap["test-id"].(string)
+		s.True(ok)
+		s.Equal("test-uri", connVal)
 		return "", nil
 	}
 	err := AddConnections("test-conn-id", 2, nil)
@@ -213,9 +241,12 @@ func (s *Suite) TestAddVariableAirflowTwo() {
 		},
 	}
 
-	expectedAddCmd := "airflow variables set test-var-name 'test-var-val'"
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
+		s.Contains(airflowCommand, "airflow variables import")
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var varsMap map[string]string
+		s.NoError(json.Unmarshal([]byte(jsonStr), &varsMap))
+		s.Equal("test-var-val", varsMap["test-var-name"])
 		return "", nil
 	}
 	err := AddVariables("test-conn-id", 2)
@@ -249,9 +280,15 @@ func (s *Suite) TestAddPoolsAirflowTwo() {
 		},
 	}
 
-	expectedAddCmd := "airflow pools set  test-pool-name 1 'test-pool-description' "
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
+		s.Contains(airflowCommand, "airflow pools import")
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var poolMap map[string]poolImportEntry
+		s.NoError(json.Unmarshal([]byte(jsonStr), &poolMap))
+		s.Len(poolMap, 1)
+		s.Contains(poolMap, "test-pool-name")
+		s.Equal(1, poolMap["test-pool-name"].Slots)
+		s.Equal("test-pool-description", poolMap["test-pool-name"].Description)
 		return "", nil
 	}
 	err := AddPools("test-conn-id", 2)
@@ -273,6 +310,175 @@ func (s *Suite) TestAddVariableFailure() {
 	}
 	err := AddVariables("test-conn-id", 1)
 	s.Contains(err.Error(), "mock error")
+}
+
+func (s *Suite) TestAddVariableBatchFailure() {
+	settings.Airflow.Variables = Variables{
+		{
+			VariableName:  "test-var-name",
+			VariableValue: "test-var-val",
+		},
+	}
+
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		return "", fmt.Errorf("mock import error")
+	}
+	err := AddVariables("test-conn-id", 2)
+	s.Contains(err.Error(), "mock import error")
+}
+
+func (s *Suite) TestAddConnectionsBatchFailure() {
+	settings.Airflow.Connections = []Connection{
+		{
+			ConnID:   "test-id",
+			ConnType: "test-type",
+		},
+	}
+
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		return "", fmt.Errorf("mock import error")
+	}
+	err := AddConnections("test-conn-id", 2, nil)
+	s.Contains(err.Error(), "mock import error")
+}
+
+func (s *Suite) TestAddPoolsBatchFailure() {
+	settings.Airflow.Pools = Pools{
+		{
+			PoolName:        "test-pool",
+			PoolSlot:        1,
+			PoolDescription: "desc",
+		},
+	}
+
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		return "", fmt.Errorf("mock import error")
+	}
+	err := AddPools("test-conn-id", 2)
+	s.Contains(err.Error(), "mock import error")
+}
+
+func (s *Suite) TestBatchImportEmptyLists() {
+	settings.Airflow.Variables = Variables{}
+	settings.Airflow.Connections = Connections{}
+	settings.Airflow.Pools = Pools{}
+
+	called := false
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		called = true
+		return "", nil
+	}
+
+	s.NoError(AddVariables("test-id", 2))
+	s.NoError(AddConnections("test-id", 2, nil))
+	s.NoError(AddPools("test-id", 2))
+	s.False(called, "execAirflowCommand should not be called for empty lists")
+}
+
+func (s *Suite) TestBatchImportMultipleVariables() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "var1", VariableValue: "val1"},
+		{VariableName: "var2", VariableValue: "val2"},
+		{VariableName: "var3", VariableValue: "val3"},
+	}
+
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		s.Contains(airflowCommand, "airflow variables import")
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var varsMap map[string]string
+		s.NoError(json.Unmarshal([]byte(jsonStr), &varsMap))
+		s.Len(varsMap, 3)
+		s.Equal("val1", varsMap["var1"])
+		s.Equal("val2", varsMap["var2"])
+		s.Equal("val3", varsMap["var3"])
+		return "", nil
+	}
+	err := AddVariables("test-id", 2)
+	s.NoError(err)
+}
+
+func (s *Suite) TestBatchImportConnectionExtraTypes() {
+	s.Run("map extra", func() {
+		settings.Airflow.Connections = []Connection{
+			{
+				ConnID:   "map-extra-conn",
+				ConnType: "http",
+				ConnExtra: map[any]any{
+					"key1": "val1",
+					"key2": "val2",
+				},
+			},
+		}
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			jsonStr := extractJSONFromHeredoc(airflowCommand)
+			var connMap map[string]map[string]interface{}
+			s.NoError(json.Unmarshal([]byte(jsonStr), &connMap))
+			extra, ok := connMap["map-extra-conn"]["extra"].(map[string]interface{})
+			s.True(ok)
+			s.Equal("val1", extra["key1"])
+			s.Equal("val2", extra["key2"])
+			return "", nil
+		}
+		s.NoError(AddConnections("test-id", 2, nil))
+	})
+
+	s.Run("string json extra", func() {
+		settings.Airflow.Connections = []Connection{
+			{
+				ConnID:    "str-extra-conn",
+				ConnType:  "http",
+				ConnExtra: `{"key":"val"}`,
+			},
+		}
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			jsonStr := extractJSONFromHeredoc(airflowCommand)
+			var connMap map[string]map[string]interface{}
+			s.NoError(json.Unmarshal([]byte(jsonStr), &connMap))
+			extra, ok := connMap["str-extra-conn"]["extra"].(map[string]interface{})
+			s.True(ok)
+			s.Equal("val", extra["key"])
+			return "", nil
+		}
+		s.NoError(AddConnections("test-id", 2, nil))
+	})
+
+	s.Run("nil extra", func() {
+		settings.Airflow.Connections = []Connection{
+			{
+				ConnID:    "nil-extra-conn",
+				ConnType:  "http",
+				ConnExtra: nil,
+			},
+		}
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			jsonStr := extractJSONFromHeredoc(airflowCommand)
+			var connMap map[string]map[string]interface{}
+			s.NoError(json.Unmarshal([]byte(jsonStr), &connMap))
+			_, hasExtra := connMap["nil-extra-conn"]["extra"]
+			s.False(hasExtra, "nil extra should not appear in JSON")
+			return "", nil
+		}
+		s.NoError(AddConnections("test-id", 2, nil))
+	})
+}
+
+func (s *Suite) TestBatchImportMixedValidInvalid() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "good_var", VariableValue: "good_val"},
+		{VariableName: "", VariableValue: "orphan_val"},
+		{VariableName: "empty_val_var", VariableValue: ""},
+	}
+
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		jsonStr := extractJSONFromHeredoc(airflowCommand)
+		var varsMap map[string]string
+		s.NoError(json.Unmarshal([]byte(jsonStr), &varsMap))
+		s.Len(varsMap, 1)
+		s.Equal("good_val", varsMap["good_var"])
+		return "", nil
+	}
+	err := AddVariables("test-id", 2)
+	s.NoError(err)
 }
 
 func (s *Suite) TestInitSettingsSuccess() {

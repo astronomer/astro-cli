@@ -108,24 +108,68 @@ func InitSettings(settingsFile string) error {
 	return nil
 }
 
+// buildBatchImportCommand builds a compound shell command that writes jsonContent
+// to tmpFile via heredoc, runs importCmd against that file, then cleans up.
+func buildBatchImportCommand(tmpFile, importCmd, jsonContent string) string {
+	return fmt.Sprintf("cat > %s <<'__ASTRO_CLI_EOF__'\n%s\n__ASTRO_CLI_EOF__\n%s %s; _ret=$?; rm -f %s; exit $_ret",
+		tmpFile, jsonContent, importCmd, tmpFile, tmpFile)
+}
+
 // AddVariables is a function to add Variables from settings.yaml
 func AddVariables(id string, version uint64) error {
 	variables := settings.Airflow.Variables
+
+	if version >= AirflowVersionTwo {
+		return addVariablesBatch(id, variables)
+	}
+	return addVariablesLegacy(id, variables)
+}
+
+func addVariablesBatch(id string, variables Variables) error {
+	varsMap := make(map[string]string)
+	var names []string
+	for _, variable := range variables {
+		if !objectValidator(0, variable.VariableName) {
+			if objectValidator(0, variable.VariableValue) {
+				fmt.Print("Skipping Variable Creation: No Variable Name Specified.\n")
+			}
+			continue
+		}
+		if !objectValidator(0, variable.VariableValue) {
+			continue
+		}
+		varsMap[variable.VariableName] = variable.VariableValue
+		names = append(names, variable.VariableName)
+	}
+	if len(varsMap) == 0 {
+		return nil
+	}
+
+	jsonBytes, err := json.Marshal(varsMap)
+	if err != nil {
+		return fmt.Errorf("error marshaling variables to JSON: %w", err)
+	}
+
+	cmd := buildBatchImportCommand("/tmp/astro_import_variables.json", "airflow variables import", string(jsonBytes))
+	out, err := execAirflowCommand(id, cmd)
+	if err != nil {
+		return fmt.Errorf("error importing variables: %w", err)
+	}
+	logger.Debugf("Batch import variables logs:\n%s", out)
+	for _, name := range names {
+		fmt.Printf("Added Variable: %s\n", name)
+	}
+	return nil
+}
+
+func addVariablesLegacy(id string, variables Variables) error {
 	for _, variable := range variables {
 		if !objectValidator(0, variable.VariableName) {
 			if objectValidator(0, variable.VariableValue) {
 				fmt.Print("Skipping Variable Creation: No Variable Name Specified.\n")
 			}
 		} else if objectValidator(0, variable.VariableValue) {
-			baseCmd := "airflow variables "
-			if version >= AirflowVersionTwo {
-				baseCmd += "set %s " // Airflow 2.0.0 command
-			} else {
-				baseCmd += "-s %s"
-			}
-
-			airflowCommand := fmt.Sprintf(baseCmd, variable.VariableName)
-
+			airflowCommand := fmt.Sprintf("airflow variables -s %s", variable.VariableName)
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 			out, err := execAirflowCommand(id, airflowCommand)
 			if err != nil {
@@ -143,21 +187,133 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 	connections := settings.Airflow.Connections
 	connections = AppendEnvironmentConnections(connections, envConns)
 
-	baseCmd := "airflow connections "
-	var baseRmCmd, baseListCmd, connIDArg string
 	if version >= AirflowVersionTwo {
-		// Airflow 2.0.0 command
-		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
-		baseRmCmd = baseCmd + "delete "
-		baseListCmd = baseCmd + "list -o plain"
-		connIDArg = ""
-	} else {
-		// Airflow 1.0.0 command based on
-		// https://airflow.readthedocs.io/en/1.10.12/cli-ref.html#connections
-		baseRmCmd = baseCmd + "-d "
-		baseListCmd = baseCmd + "-l "
-		connIDArg = "--conn_id"
+		return addConnectionsBatch(id, connections)
 	}
+	return addConnectionsLegacy(id, connections)
+}
+
+// connectionImportObject builds the JSON value for a single connection in the
+// airflow connections import format. Returns nil if the connection should be skipped.
+func connectionImportObject(conn *Connection) interface{} {
+	// URI-only connection: if conn_uri is set and no individual fields are populated
+	hasFields := objectValidator(0, conn.ConnType) || objectValidator(0, conn.ConnHost) ||
+		objectValidator(0, conn.ConnLogin) || objectValidator(0, conn.ConnPassword) ||
+		objectValidator(0, conn.ConnSchema) || conn.ConnPort != 0
+	if objectValidator(0, conn.ConnURI) && !hasFields {
+		return conn.ConnURI
+	}
+
+	obj := map[string]interface{}{
+		"conn_type": conn.ConnType,
+	}
+	if objectValidator(0, conn.ConnHost) {
+		obj["host"] = conn.ConnHost
+	}
+	if objectValidator(0, conn.ConnLogin) {
+		obj["login"] = conn.ConnLogin
+	}
+	if objectValidator(0, conn.ConnPassword) {
+		obj["password"] = conn.ConnPassword
+	}
+	if objectValidator(0, conn.ConnSchema) {
+		obj["schema"] = conn.ConnSchema
+	}
+	if conn.ConnPort != 0 {
+		obj["port"] = conn.ConnPort
+	}
+	if extra := connExtraObject(conn.ConnExtra); extra != nil {
+		obj["extra"] = extra
+	}
+	return obj
+}
+
+// connExtraObject converts ConnExtra (which can be various types) into a
+// map[string]interface{} suitable for JSON marshaling in the import file.
+func connExtraObject(extra interface{}) interface{} {
+	switch v := extra.(type) {
+	case nil:
+		return nil
+	case string:
+		if v == "" {
+			return nil
+		}
+		// Try to parse JSON string back to a map
+		var m map[string]interface{}
+		if err := json.Unmarshal([]byte(v), &m); err == nil {
+			return m
+		}
+		// If it's not valid JSON, return as-is (Airflow accepts string extras)
+		return v
+	case map[any]any:
+		m := make(map[string]interface{})
+		for k, val := range v {
+			kStr, ok := k.(string)
+			if !ok {
+				continue
+			}
+			m[kStr] = val
+		}
+		if len(m) == 0 {
+			return nil
+		}
+		return m
+	case map[string]any:
+		if len(v) == 0 {
+			return nil
+		}
+		return v
+	default:
+		return nil
+	}
+}
+
+func addConnectionsBatch(id string, connections Connections) error {
+	connMap := make(map[string]interface{})
+	var names []string
+	for i := range connections {
+		conn := connections[i]
+		if !objectValidator(0, conn.ConnID) {
+			continue
+		}
+		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
+			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
+			continue
+		}
+		obj := connectionImportObject(&conn)
+		if obj == nil {
+			continue
+		}
+		connMap[conn.ConnID] = obj
+		names = append(names, conn.ConnID)
+	}
+	if len(connMap) == 0 {
+		return nil
+	}
+
+	jsonBytes, err := json.Marshal(connMap)
+	if err != nil {
+		return fmt.Errorf("error marshaling connections to JSON: %w", err)
+	}
+
+	cmd := buildBatchImportCommand("/tmp/astro_import_connections.json", "airflow connections import --overwrite", string(jsonBytes))
+	out, err := execAirflowCommand(id, cmd)
+	if err != nil {
+		return fmt.Errorf("error importing connections: %w", err)
+	}
+	logger.Debugf("Batch import connections logs:\n%s", out)
+	for _, name := range names {
+		fmt.Printf("Added Connection: %s\n", name)
+	}
+	return nil
+}
+
+func addConnectionsLegacy(id string, connections Connections) error {
+	baseCmd := "airflow connections "
+	baseRmCmd := baseCmd + "-d "
+	baseListCmd := baseCmd + "-l "
+	connIDArg := "--conn_id"
+
 	airflowCommand := baseListCmd
 	out, err := execAirflowCommand(id, airflowCommand)
 	if err != nil {
@@ -188,7 +344,7 @@ func AddConnections(id string, version uint64, envConns map[string]astrocore.Env
 			continue
 		}
 
-		airflowCommand = prepareAirflowConnectionAddCommand(version, &conn, extraString)
+		airflowCommand = prepareAirflowConnectionAddCommand(1, &conn, extraString)
 		if airflowCommand != "" {
 			out, err := execAirflowCommand(id, airflowCommand)
 			if err != nil {
@@ -311,16 +467,53 @@ func AppendEnvironmentConnections(connections Connections, envConnections map[st
 // AddPools  is a function to add Pools from settings.yaml
 func AddPools(id string, version uint64) error {
 	pools := settings.Airflow.Pools
-	baseCmd := "airflow "
 
 	if version >= AirflowVersionTwo {
-		// Airflow 2.0.0 command
-		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
-		baseCmd += "pools set "
-	} else {
-		baseCmd += "pool -s "
+		return addPoolsBatch(id, pools)
+	}
+	return addPoolsLegacy(id, pools)
+}
+
+func addPoolsBatch(id string, pools Pools) error {
+	poolMap := make(map[string]poolImportEntry)
+	var names []string
+	for _, pool := range pools {
+		if !objectValidator(0, pool.PoolName) {
+			continue
+		}
+		if pool.PoolSlot == 0 {
+			fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
+			continue
+		}
+		poolMap[pool.PoolName] = poolImportEntry{
+			Slots:       pool.PoolSlot,
+			Description: pool.PoolDescription,
+		}
+		names = append(names, pool.PoolName)
+	}
+	if len(poolMap) == 0 {
+		return nil
 	}
 
+	jsonBytes, err := json.Marshal(poolMap)
+	if err != nil {
+		return fmt.Errorf("error marshaling pools to JSON: %w", err)
+	}
+
+	cmd := buildBatchImportCommand("/tmp/astro_import_pools.json", "airflow pools import", string(jsonBytes))
+	out, err := execAirflowCommand(id, cmd)
+	if err != nil {
+		return fmt.Errorf("error importing pools: %w", err)
+	}
+	logger.Debugf("Batch import pools logs:\n%s", out)
+	for _, name := range names {
+		fmt.Printf("Added Pool: %s\n", name)
+	}
+	return nil
+}
+
+func addPoolsLegacy(id string, pools Pools) error {
+	baseCmd := "airflow pool -s "
 	for _, pool := range pools {
 		if objectValidator(0, pool.PoolName) {
 			airflowCommand := fmt.Sprintf("%s %s ", baseCmd, pool.PoolName)
