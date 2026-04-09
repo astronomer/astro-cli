@@ -12,7 +12,7 @@ import (
 //
 // If no Secret Service daemon is available (e.g. headless CI environments),
 // falls back to a plaintext JSON file at ~/.astro/credentials.json with
-// 0600 permissions. This matches the current plaintext config.yaml behaviour
+// 0600 permissions. This matches the current plaintext config.yaml behavior
 // and is intentional — encrypted file fallback is not worth the complexity
 // given that CI environments use ASTRO_API_TOKEN anyway.
 //
