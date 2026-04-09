@@ -46,25 +46,6 @@ jobs:
     steps:
       - checkout
       - commit-next-tag
-  release:
-    docker:
-      - image: golang:1.26
-    working_directory: /go/src/github.com/astronomer/astro-cli
-    resource_class: xlarge
-    steps:
-      - checkout
-      - setup-cross-build-libs
-      - run:
-          name: goreleaser
-          command: |
-            GORELEASER_VERSION=v2.15.2
-            GORELEASER_SHA256=0ebdbf0353aba566b969dde746cc4e4806f96c27aa2f3971b229a9df7611fedc
-            curl -fsSL "https://github.com/goreleaser/goreleaser/releases/download/${GORELEASER_VERSION}/goreleaser_Linux_x86_64.tar.gz" \
-              -o /tmp/goreleaser.tar.gz
-            echo "${GORELEASER_SHA256}  /tmp/goreleaser.tar.gz" | sha256sum -c
-            tar -xz -C /usr/local/bin -f /tmp/goreleaser.tar.gz goreleaser
-            rm /tmp/goreleaser.tar.gz
-            goreleaser release --clean
 workflows:
   version: 2.1
   build-images:
@@ -97,15 +78,6 @@ workflows:
           filters:
             branches:
               only: "/release-.*/"
-      - release:
-          context:
-            - github-repo
-          # Only run this job on git tag pushes
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
 executors:
   docker-executor:
     environment:
@@ -236,14 +208,3 @@ commands:
             git tag $NEXT_TAG
             git push origin $NEXT_TAG
 
-  setup-cross-build-libs:
-    description: "Setup MacOS cross build libraries via osxcross"
-    steps:
-      - run:
-          name: Install cross build libraries
-          command: |
-            apt-get update && apt-get install -y clang llvm cmake libssl-dev patch zlib1g-dev xz-utils
-            git clone https://github.com/tpoechtrager/osxcross.git /osxcross
-            wget https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz -P /osxcross/tarballs/
-            cd /osxcross && UNATTENDED=yes ./build.sh
-            echo 'export PATH="/osxcross/target/bin:$PATH"' >> $BASH_ENV

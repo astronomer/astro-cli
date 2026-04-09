@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+(\.[0-9]+)*(-.*)?' 
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+            clang llvm cmake libssl-dev patch zlib1g-dev xz-utils
+
+      - name: Cache osxcross
+        id: cache-osxcross
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /tmp/osxcross
+          key: osxcross-macos12.3-${{ runner.os }}
+
+      - name: Build osxcross
+        if: steps.cache-osxcross.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/tpoechtrager/osxcross.git /tmp/osxcross
+          wget -q https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz \
+            -P /tmp/osxcross/tarballs/
+          cd /tmp/osxcross && UNATTENDED=yes ./build.sh
+
+      - name: Add osxcross to PATH
+        run: echo "/tmp/osxcross/target/bin" >> $GITHUB_PATH
+
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+        with:
+          version: v2.15.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
