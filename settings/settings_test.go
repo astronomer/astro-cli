@@ -41,40 +41,14 @@ func (s *Suite) TearDownTest() {
 
 func (s *Suite) TestConfigSettings() {
 	// config settings success
-	err := ConfigSettings("container-id", "", nil, 2, false, false, false)
+	err := ConfigSettings("container-id", "", nil, false, false, false)
 	s.NoError(err)
 	// config setttings no id error
-	err = ConfigSettings("", "", nil, 2, false, false, false)
+	err = ConfigSettings("", "", nil, false, false, false)
 	s.ErrorIs(err, errNoID)
 }
 
-func (s *Suite) TestAddConnectionsAirflowOne() {
-	var testExtra map[string]string
-
-	testConn := Connection{
-		ConnID:       "test-id",
-		ConnType:     "test-type",
-		ConnHost:     "test-host",
-		ConnSchema:   "test-schema",
-		ConnLogin:    "test-login",
-		ConnPassword: "test-password",
-		ConnPort:     1,
-		ConnURI:      "test-uri",
-		ConnExtra:    testExtra,
-	}
-	settings.Airflow.Connections = []Connection{testConn}
-
-	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
-	expectedListCmd := "airflow connections -l "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd}, airflowCommand)
-		return "", nil
-	}
-	err := AddConnections("test-conn-id", 1, nil)
-	s.NoError(err)
-}
-
-func (s *Suite) TestAddConnectionsAirflowTwo() {
+func (s *Suite) TestAddConnections() {
 	var testExtra map[string]string
 
 	testConn := Connection{
@@ -106,7 +80,7 @@ func (s *Suite) TestAddConnectionsAirflowTwo() {
 		s.Equal(float64(1), connObj["port"])
 		return "", nil
 	}
-	err := AddConnections("test-conn-id", 2, nil)
+	err := AddConnections("test-conn-id", nil)
 	s.NoError(err)
 }
 
@@ -114,7 +88,7 @@ func ptr[T any](t T) *T {
 	return &t
 }
 
-func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
+func (s *Suite) TestAddConnectionsWithEnvConns() {
 	var testExtra map[string]string
 
 	testConn := Connection{
@@ -163,11 +137,11 @@ func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
 		s.Equal("test-extra-value", extra["test-extra-key"])
 		return "", nil
 	}
-	err := AddConnections("test-conn-id", 2, envConns)
+	err := AddConnections("test-conn-id", envConns)
 	s.NoError(err)
 }
 
-func (s *Suite) TestAddConnectionsAirflowTwoURI() {
+func (s *Suite) TestAddConnectionsURI() {
 	testConn := Connection{
 		ConnID:  "test-id",
 		ConnURI: "test-uri",
@@ -186,54 +160,11 @@ func (s *Suite) TestAddConnectionsAirflowTwoURI() {
 		s.Equal("test-uri", connVal)
 		return "", nil
 	}
-	err := AddConnections("test-conn-id", 2, nil)
+	err := AddConnections("test-conn-id", nil)
 	s.NoError(err)
 }
 
-func (s *Suite) TestAddConnectionsFailure() {
-	var testExtra map[string]string
-
-	testConn := Connection{
-		ConnID:       "test-id",
-		ConnType:     "test-type",
-		ConnHost:     "test-host",
-		ConnSchema:   "test-schema",
-		ConnLogin:    "test-login",
-		ConnPassword: "test-password",
-		ConnPort:     1,
-		ConnURI:      "test-uri",
-		ConnExtra:    testExtra,
-	}
-	settings.Airflow.Connections = []Connection{testConn}
-
-	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
-	expectedListCmd := "airflow connections -l "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd}, airflowCommand)
-		return "", fmt.Errorf("mock error")
-	}
-	err := AddConnections("test-conn-id", 1, nil)
-	s.Contains(err.Error(), "mock error")
-}
-
-func (s *Suite) TestAddVariableAirflowOne() {
-	settings.Airflow.Variables = Variables{
-		{
-			VariableName:  "test-var-name",
-			VariableValue: "test-var-val",
-		},
-	}
-
-	expectedAddCmd := "airflow variables -s test-var-name'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", nil
-	}
-	err := AddVariables("test-conn-id", 1)
-	s.NoError(err)
-}
-
-func (s *Suite) TestAddVariableAirflowTwo() {
+func (s *Suite) TestAddVariables() {
 	settings.Airflow.Variables = Variables{
 		{
 			VariableName:  "test-var-name",
@@ -249,29 +180,11 @@ func (s *Suite) TestAddVariableAirflowTwo() {
 		s.Equal("test-var-val", varsMap["test-var-name"])
 		return "", nil
 	}
-	err := AddVariables("test-conn-id", 2)
+	err := AddVariables("test-conn-id")
 	s.NoError(err)
 }
 
-func (s *Suite) TestAddPoolsAirflowOne() {
-	settings.Airflow.Pools = Pools{
-		{
-			PoolName:        "test-pool-name",
-			PoolSlot:        1,
-			PoolDescription: "test-pool-description",
-		},
-	}
-
-	expectedAddCmd := "airflow pool -s  test-pool-name 1 'test-pool-description' "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", nil
-	}
-	err := AddPools("test-conn-id", 1)
-	s.NoError(err)
-}
-
-func (s *Suite) TestAddPoolsAirflowTwo() {
+func (s *Suite) TestAddPools() {
 	settings.Airflow.Pools = Pools{
 		{
 			PoolName:        "test-pool-name",
@@ -291,25 +204,8 @@ func (s *Suite) TestAddPoolsAirflowTwo() {
 		s.Equal("test-pool-description", poolMap["test-pool-name"].Description)
 		return "", nil
 	}
-	err := AddPools("test-conn-id", 2)
+	err := AddPools("test-conn-id")
 	s.NoError(err)
-}
-
-func (s *Suite) TestAddVariableFailure() {
-	settings.Airflow.Variables = Variables{
-		{
-			VariableName:  "test-var-name",
-			VariableValue: "test-var-val",
-		},
-	}
-
-	expectedAddCmd := "airflow variables -s test-var-name'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", fmt.Errorf("mock error")
-	}
-	err := AddVariables("test-conn-id", 1)
-	s.Contains(err.Error(), "mock error")
 }
 
 func (s *Suite) TestAddVariableBatchFailure() {
@@ -323,7 +219,7 @@ func (s *Suite) TestAddVariableBatchFailure() {
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		return "", fmt.Errorf("mock import error")
 	}
-	err := AddVariables("test-conn-id", 2)
+	err := AddVariables("test-conn-id")
 	s.Contains(err.Error(), "mock import error")
 }
 
@@ -338,7 +234,7 @@ func (s *Suite) TestAddConnectionsBatchFailure() {
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		return "", fmt.Errorf("mock import error")
 	}
-	err := AddConnections("test-conn-id", 2, nil)
+	err := AddConnections("test-conn-id", nil)
 	s.Contains(err.Error(), "mock import error")
 }
 
@@ -354,7 +250,7 @@ func (s *Suite) TestAddPoolsBatchFailure() {
 	execAirflowCommand = func(id, airflowCommand string) (string, error) {
 		return "", fmt.Errorf("mock import error")
 	}
-	err := AddPools("test-conn-id", 2)
+	err := AddPools("test-conn-id")
 	s.Contains(err.Error(), "mock import error")
 }
 
@@ -369,9 +265,9 @@ func (s *Suite) TestBatchImportEmptyLists() {
 		return "", nil
 	}
 
-	s.NoError(AddVariables("test-id", 2))
-	s.NoError(AddConnections("test-id", 2, nil))
-	s.NoError(AddPools("test-id", 2))
+	s.NoError(AddVariables("test-id"))
+	s.NoError(AddConnections("test-id", nil))
+	s.NoError(AddPools("test-id"))
 	s.False(called, "execAirflowCommand should not be called for empty lists")
 }
 
@@ -393,7 +289,7 @@ func (s *Suite) TestBatchImportMultipleVariables() {
 		s.Equal("val3", varsMap["var3"])
 		return "", nil
 	}
-	err := AddVariables("test-id", 2)
+	err := AddVariables("test-id")
 	s.NoError(err)
 }
 
@@ -419,7 +315,7 @@ func (s *Suite) TestBatchImportConnectionExtraTypes() {
 			s.Equal("val2", extra["key2"])
 			return "", nil
 		}
-		s.NoError(AddConnections("test-id", 2, nil))
+		s.NoError(AddConnections("test-id", nil))
 	})
 
 	s.Run("string json extra", func() {
@@ -439,7 +335,7 @@ func (s *Suite) TestBatchImportConnectionExtraTypes() {
 			s.Equal("val", extra["key"])
 			return "", nil
 		}
-		s.NoError(AddConnections("test-id", 2, nil))
+		s.NoError(AddConnections("test-id", nil))
 	})
 
 	s.Run("nil extra", func() {
@@ -458,7 +354,7 @@ func (s *Suite) TestBatchImportConnectionExtraTypes() {
 			s.False(hasExtra, "nil extra should not appear in JSON")
 			return "", nil
 		}
-		s.NoError(AddConnections("test-id", 2, nil))
+		s.NoError(AddConnections("test-id", nil))
 	})
 }
 
@@ -477,7 +373,7 @@ func (s *Suite) TestBatchImportMixedValidInvalid() {
 		s.Equal("good_val", varsMap["good_var"])
 		return "", nil
 	}
-	err := AddVariables("test-id", 2)
+	err := AddVariables("test-id")
 	s.NoError(err)
 }
 

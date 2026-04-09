@@ -1451,12 +1451,6 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return err
 	}
 
-	// Get airflow version
-	airflowDockerVersion, err := d.checkAirflowVersion()
-	if err != nil {
-		return err
-	}
-
 	fileState, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
@@ -1465,7 +1459,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return errNoFile
 	}
 
-	err = initSettings(containerID, settingsFile, nil, airflowDockerVersion, connections, variables, pools)
+	err = initSettings(containerID, settingsFile, nil, connections, variables, pools)
 	if err != nil {
 		return err
 	}
@@ -1730,7 +1724,7 @@ func printProxyStatus(settingsFile string, envConns map[string]astrocore.Environ
 			if strings.Contains(container.Name, project.Name) &&
 				(strings.Contains(container.Name, WebserverDockerContainerName) ||
 					strings.Contains(container.Name, APIServerDockerContainerName)) {
-				err = initSettings(container.ID, settingsFile, envConns, airflowMajorVersion, true, true, true)
+				err = initSettings(container.ID, settingsFile, envConns, true, true, true)
 				if err != nil {
 					return err
 				}
@@ -1779,7 +1773,7 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 			if strings.Contains(container.Name, project.Name) &&
 				(strings.Contains(container.Name, WebserverDockerContainerName) ||
 					strings.Contains(container.Name, APIServerDockerContainerName)) {
-				err = initSettings(container.ID, settingsFile, envConns, airflowMajorVersion, true, true, true)
+				err = initSettings(container.ID, settingsFile, envConns, true, true, true)
 				if err != nil {
 					return err
 				}

@@ -610,7 +610,7 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
-	return settings.ConfigSettings("standalone", settingsFile, envConns, 3, true, true, true) //nolint:mnd
+	return settings.ConfigSettings("standalone", settingsFile, envConns, true, true, true)
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -886,7 +886,7 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
-	err = settings.ConfigSettings("standalone", settingsFile, nil, 3, connections, variables, pools) //nolint:mnd
+	err = settings.ConfigSettings("standalone", settingsFile, nil, connections, variables, pools)
 	if err != nil {
 		return err
 	}

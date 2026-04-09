@@ -58,7 +58,7 @@ var (
 )
 
 // ConfigSettings is the main builder of the settings package
-func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
+func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 	if id == "" {
 		return errNoID
 	}
@@ -67,17 +67,17 @@ func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.Envir
 		logger.Debugf("Unable to initialize settings file: %s", err)
 	}
 	if pools {
-		if err := AddPools(id, version); err != nil {
+		if err := AddPools(id); err != nil {
 			return fmt.Errorf("error adding pools: %w", err)
 		}
 	}
 	if variables {
-		if err := AddVariables(id, version); err != nil {
+		if err := AddVariables(id); err != nil {
 			return fmt.Errorf("error adding variables: %w", err)
 		}
 	}
 	if connections {
-		if err := AddConnections(id, version, envConns); err != nil {
+		if err := AddConnections(id, envConns); err != nil {
 			return fmt.Errorf("error adding connections: %w", err)
 		}
 	}
@@ -116,16 +116,8 @@ func buildBatchImportCommand(tmpFile, importCmd, jsonContent string) string {
 }
 
 // AddVariables is a function to add Variables from settings.yaml
-func AddVariables(id string, version uint64) error {
+func AddVariables(id string) error {
 	variables := settings.Airflow.Variables
-
-	if version >= AirflowVersionTwo {
-		return addVariablesBatch(id, variables)
-	}
-	return addVariablesLegacy(id, variables)
-}
-
-func addVariablesBatch(id string, variables Variables) error {
 	varsMap := make(map[string]string)
 	var names []string
 	for _, variable := range variables {
@@ -162,39 +154,16 @@ func addVariablesBatch(id string, variables Variables) error {
 	return nil
 }
 
-func addVariablesLegacy(id string, variables Variables) error {
-	for _, variable := range variables {
-		if !objectValidator(0, variable.VariableName) {
-			if objectValidator(0, variable.VariableValue) {
-				fmt.Print("Skipping Variable Creation: No Variable Name Specified.\n")
-			}
-		} else if objectValidator(0, variable.VariableValue) {
-			airflowCommand := fmt.Sprintf("airflow variables -s %s", variable.VariableName)
-			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
-			out, err := execAirflowCommand(id, airflowCommand)
-			if err != nil {
-				return fmt.Errorf("error adding variable %s: %w", variable.VariableName, err)
-			}
-			logger.Debugf("Adding variable logs:\n%s", out)
-			fmt.Printf("Added Variable: %s\n", variable.VariableName)
-		}
-	}
-	return nil
-}
-
 // AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string, version uint64, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func AddConnections(id string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	connections := settings.Airflow.Connections
 	connections = AppendEnvironmentConnections(connections, envConns)
 
-	if version >= AirflowVersionTwo {
-		return addConnectionsBatch(id, connections)
-	}
-	return addConnectionsLegacy(id, connections)
+	return addConnectionsBatch(id, connections)
 }
 
 // connectionImportObject builds the JSON value for a single connection in the
-// airflow connections import format. Returns nil if the connection should be skipped.
+// airflow connections import format.
 func connectionImportObject(conn *Connection) interface{} {
 	// URI-only connection: if conn_uri is set and no individual fields are populated
 	hasFields := objectValidator(0, conn.ConnType) || objectValidator(0, conn.ConnHost) ||
@@ -280,11 +249,7 @@ func addConnectionsBatch(id string, connections Connections) error {
 			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
 			continue
 		}
-		obj := connectionImportObject(&conn)
-		if obj == nil {
-			continue
-		}
-		connMap[conn.ConnID] = obj
+		connMap[conn.ConnID] = connectionImportObject(&conn)
 		names = append(names, conn.ConnID)
 	}
 	if len(connMap) == 0 {
@@ -306,123 +271,6 @@ func addConnectionsBatch(id string, connections Connections) error {
 		fmt.Printf("Added Connection: %s\n", name)
 	}
 	return nil
-}
-
-func addConnectionsLegacy(id string, connections Connections) error {
-	baseCmd := "airflow connections "
-	baseRmCmd := baseCmd + "-d "
-	baseListCmd := baseCmd + "-l "
-	connIDArg := "--conn_id"
-
-	airflowCommand := baseListCmd
-	out, err := execAirflowCommand(id, airflowCommand)
-	if err != nil {
-		return fmt.Errorf("error listing connections: %w", err)
-	}
-
-	for i := range connections {
-		conn := connections[i]
-		if !objectValidator(0, conn.ConnID) {
-			continue
-		}
-
-		extraString := jsonString(&conn)
-
-		quotedConnID := "'" + conn.ConnID + "'"
-
-		if strings.Contains(out, quotedConnID) || strings.Contains(out, conn.ConnID) {
-			fmt.Printf("Updating Connection %q...\n", conn.ConnID)
-			airflowCommand = fmt.Sprintf("%s %s %q", baseRmCmd, connIDArg, conn.ConnID)
-			_, err = execAirflowCommand(id, airflowCommand)
-			if err != nil {
-				return fmt.Errorf("error removing connection %s: %w", conn.ConnID, err)
-			}
-		}
-
-		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
-			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
-			continue
-		}
-
-		airflowCommand = prepareAirflowConnectionAddCommand(1, &conn, extraString)
-		if airflowCommand != "" {
-			out, err := execAirflowCommand(id, airflowCommand)
-			if err != nil {
-				return fmt.Errorf("error adding connection %s: %w", conn.ConnID, err)
-			}
-			logger.Debugf("Adding Connection logs:\n\n%s", out)
-			fmt.Printf("Added Connection: %s\n", conn.ConnID)
-		}
-	}
-	return nil
-}
-
-func prepareAirflowConnectionAddCommand(version uint64, conn *Connection, extraString string) string {
-	if conn == nil {
-		return ""
-	}
-	baseCmd := "airflow connections "
-	var baseAddCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
-	if version >= AirflowVersionTwo {
-		// Airflow 2.0.0 command
-		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
-		baseAddCmd = baseCmd + "add "
-		connIDArg = ""
-		connTypeArg = "--conn-type"
-		connURIArg = "--conn-uri"
-		connExtraArg = "--conn-extra"
-		connHostArg = "--conn-host"
-		connLoginArg = "--conn-login"
-		connPasswordArg = "--conn-password"
-		connSchemaArg = "--conn-schema"
-		connPortArg = "--conn-port"
-	} else {
-		// Airflow 1.0.0 command based on
-		// https://airflow.readthedocs.io/en/1.10.12/cli-ref.html#connections
-		baseAddCmd = baseCmd + "-a "
-		connIDArg = "--conn_id"
-		connTypeArg = "--conn_type"
-		connURIArg = "--conn_uri"
-		connExtraArg = "--conn_extra"
-		connHostArg = "--conn_host"
-		connLoginArg = "--conn_login"
-		connPasswordArg = "--conn_password"
-		connSchemaArg = "--conn_schema"
-		connPortArg = "--conn_port"
-	}
-	var j int
-	airflowCommand := fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.ConnID)
-	if objectValidator(0, conn.ConnType) {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.ConnType)
-		j++
-	}
-	if extraString != "" {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, extraString)
-	}
-	if objectValidator(0, conn.ConnHost) {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
-		j++
-	}
-	if objectValidator(0, conn.ConnLogin) {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
-		j++
-	}
-	if objectValidator(0, conn.ConnPassword) {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
-		j++
-	}
-	if objectValidator(0, conn.ConnSchema) {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
-		j++
-	}
-	if conn.ConnPort != 0 {
-		airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
-		j++
-	}
-	if objectValidator(0, conn.ConnURI) && j == 0 {
-		airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
-	}
-	return airflowCommand
 }
 
 func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrocore.EnvironmentObjectConnection) Connections {
@@ -464,14 +312,10 @@ func AppendEnvironmentConnections(connections Connections, envConnections map[st
 	return connections
 }
 
-// AddPools  is a function to add Pools from settings.yaml
-func AddPools(id string, version uint64) error {
+// AddPools is a function to add Pools from settings.yaml
+func AddPools(id string) error {
 	pools := settings.Airflow.Pools
-
-	if version >= AirflowVersionTwo {
-		return addPoolsBatch(id, pools)
-	}
-	return addPoolsLegacy(id, pools)
+	return addPoolsBatch(id, pools)
 }
 
 func addPoolsBatch(id string, pools Pools) error {
@@ -508,33 +352,6 @@ func addPoolsBatch(id string, pools Pools) error {
 	logger.Debugf("Batch import pools logs:\n%s", out)
 	for _, name := range names {
 		fmt.Printf("Added Pool: %s\n", name)
-	}
-	return nil
-}
-
-func addPoolsLegacy(id string, pools Pools) error {
-	baseCmd := "airflow pool -s "
-	for _, pool := range pools {
-		if objectValidator(0, pool.PoolName) {
-			airflowCommand := fmt.Sprintf("%s %s ", baseCmd, pool.PoolName)
-			if pool.PoolSlot != 0 {
-				airflowCommand += fmt.Sprintf("%v ", pool.PoolSlot)
-				if objectValidator(0, pool.PoolDescription) {
-					airflowCommand += fmt.Sprintf("'%s' ", pool.PoolDescription)
-				} else {
-					airflowCommand += "''"
-				}
-				fmt.Println(airflowCommand)
-				out, err := execAirflowCommand(id, airflowCommand)
-				if err != nil {
-					return fmt.Errorf("error adding pool %s: %w", pool.PoolName, err)
-				}
-				logger.Debugf("Adding pool logs:\n%s", out)
-				fmt.Printf("Added Pool: %s\n", pool.PoolName)
-			} else {
-				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
-			}
-		}
 	}
 	return nil
 }

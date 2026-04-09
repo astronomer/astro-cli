@@ -1753,7 +1753,7 @@ func (s *Suite) TestDockerComposeSettings() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
 
-		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
+		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return nil
 		}
 
@@ -1770,7 +1770,7 @@ func (s *Suite) TestDockerComposeSettings() {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running", Name: "test-webserver"}}, nil).Once()
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
-		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
+		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return errMockSettings
 		}
 
@@ -2161,7 +2161,7 @@ func (s *Suite) TestInitSettings() {
 
 			// Mock initSettings to track if it's called
 			originalInitSettings := initSettings
-			initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, version uint64, connections, variables, pools bool) error {
+			initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 				initSettingsCalled = true
 				return nil
 			}
