@@ -6,6 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -13,10 +18,6 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
 )
 
 type DbtSuite struct {
@@ -239,7 +240,7 @@ func (s *DbtSuite) createDbtProjectFile(path string) {
 func (s *DbtSuite) mockListTestDeployments() {
 	s.mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 		JSON200: &astroplatformcore.DeploymentsPaginated{
 			Deployments: []astroplatformcore.Deployment{
@@ -254,7 +255,7 @@ func (s *DbtSuite) mockListTestDeployments() {
 func (s *DbtSuite) mockGetTestDeployment() {
 	s.mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id: "test-deployment-id",

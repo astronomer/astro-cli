@@ -5,10 +5,9 @@ import (
 	"errors"
 	"os"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var (

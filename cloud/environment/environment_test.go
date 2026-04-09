@@ -6,14 +6,15 @@ import (
 	"net/http"
 	"testing"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	"github.com/astronomer/astro-cli/config"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/lucsky/cuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/config"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {

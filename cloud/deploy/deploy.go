@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -26,7 +28,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/pkg/errors"
 )
 
 const (

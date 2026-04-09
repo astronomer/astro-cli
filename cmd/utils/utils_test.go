@@ -4,9 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/astronomer/astro-cli/config"
 )
 
 func TestEnsureProjectDir(t *testing.T) {

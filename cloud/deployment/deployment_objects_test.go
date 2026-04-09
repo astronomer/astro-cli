@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/stretchr/testify/mock"
+
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
-	"github.com/stretchr/testify/mock"
 )
 
 var (

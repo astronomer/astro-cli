@@ -1,9 +1,9 @@
 package software
 
 import (
-	"github.com/astronomer/astro-cli/houston"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/astronomer/astro-cli/houston"
 )
 
 func (s *Suite) TestValidateDagDeploymentArgs() {

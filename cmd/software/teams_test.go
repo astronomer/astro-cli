@@ -3,11 +3,12 @@ package software
 import (
 	"bytes"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/teams"
-	"github.com/stretchr/testify/mock"
 )
 
 func execTeamCmd(args ...string) (string, error) {

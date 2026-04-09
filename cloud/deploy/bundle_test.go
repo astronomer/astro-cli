@@ -9,6 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -16,10 +21,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/git"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 type BundleSuite struct {
@@ -390,7 +391,7 @@ func mockCreateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, bund
 	}
 	response := &astrocore.CreateDeployResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 		JSON200: &astrocore.Deploy{
 			Id: "test-deploy-id",
@@ -408,7 +409,7 @@ func mockUpdateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, expe
 	}
 	client.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, request).Return(&astrocore.UpdateDeployResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 	}, nil)
 }
@@ -416,7 +417,7 @@ func mockUpdateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, expe
 func mockGetDeployment(client *astroplatformcore_mocks.ClientWithResponsesInterface, isDagDeployEnabled, isCicdEnforced bool) {
 	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
-			StatusCode: astrocore.HTTPStatus200,
+			StatusCode: http.StatusOK,
 		},
 		JSON200: &astroplatformcore.Deployment{
 			Id:                 "test-deployment-id",

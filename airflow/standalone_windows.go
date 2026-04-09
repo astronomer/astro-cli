@@ -5,10 +5,11 @@ package airflow
 import (
 	"errors"
 
+	"github.com/pkg/browser"
+
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/pkg/browser"
 )
 
 var (

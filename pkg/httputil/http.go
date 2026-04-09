@@ -9,12 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/logger"
-
-	"github.com/astronomer/astro-cli/pkg/fileutil"
-
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
+
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const defaultHTTPTimeout = 30 * time.Second

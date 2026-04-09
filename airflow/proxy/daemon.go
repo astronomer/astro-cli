@@ -12,9 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
-
 	"github.com/astronomer/astro-cli/pkg/logger"
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/version"
 )
 

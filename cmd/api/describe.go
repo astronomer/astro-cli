@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/fatih/color"
+
+	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
 const (

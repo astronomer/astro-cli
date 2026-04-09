@@ -3,8 +3,9 @@ package platformclient
 import (
 	"testing"
 
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 func TestNewPlatformCoreClient(t *testing.T) {

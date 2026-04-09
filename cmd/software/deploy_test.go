@@ -3,10 +3,11 @@ package software
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/deploy"
-	"github.com/spf13/cobra"
 )
 
 func execDeployCmd(args ...string) error {

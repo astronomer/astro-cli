@@ -6,9 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 func setupTestDir(t *testing.T) {

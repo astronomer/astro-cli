@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/astronomer/astro-cli/version"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/version"
 )
 
 type CmdSuite struct {

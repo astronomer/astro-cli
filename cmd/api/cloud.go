@@ -8,12 +8,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
-	"github.com/spf13/cobra"
 )
 
 // CloudOptions holds all options for the cloud api command.
@@ -130,7 +131,7 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 
 	// Other flags
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
-	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL (overrides default Cloud API spec)")
+	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL or file path (overrides default Cloud API spec)")
 	cmd.PersistentFlags().StringVar(&opts.SpecTokenEnvVar, "spec-token-env-var", "", "Environment variable containing auth token for fetching the spec")
 	//nolint:errcheck
 	cmd.PersistentFlags().MarkHidden("spec-url")
@@ -393,9 +394,19 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 		return nil
 	}
 
-	// When --spec-url is provided, use it. If --spec-token-env-var is also set,
-	// read the token from that env var and send it as auth when fetching the spec.
+	// When --spec-url is provided, use it. It can be a remote URL or a local file path.
 	if opts.SpecURL != "" {
+		// Local file: read directly from disk, no caching or auth needed.
+		if openapi.IsLocalSpec(opts.SpecURL) {
+			localPath, err := openapi.ResolveLocalPath(opts.SpecURL)
+			if err != nil {
+				return fmt.Errorf("resolving spec path: %w", err)
+			}
+			opts.specCache = openapi.NewCacheForLocalFile(localPath)
+			return nil
+		}
+
+		// Remote URL: cache with optional auth via --spec-token-env-var.
 		cachePath := filepath.Join(config.HomeConfigPath, openapi.SpecCacheFileName(opts.SpecURL))
 		if opts.SpecTokenEnvVar != "" {
 			token := os.Getenv(opts.SpecTokenEnvVar)

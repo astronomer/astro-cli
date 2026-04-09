@@ -3,9 +3,10 @@ package software
 import (
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/deploy"
-	"github.com/stretchr/testify/suite"
 )
 
 type Suite struct {

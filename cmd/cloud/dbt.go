@@ -7,11 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
+
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 )
 
 var (

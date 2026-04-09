@@ -4,9 +4,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/astronomer/astro-cli/software/deployment"
-
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/software/deployment"
 )
 
 const (
