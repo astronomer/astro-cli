@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/software/deploy"
 )
@@ -28,14 +29,14 @@ func (s *Suite) TestDeploy() {
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 		if description == "" {
 			return deploymentID, fmt.Errorf("description should not be empty")
 		}
 		return deploymentID, nil
 	}
 
-	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 		return nil
 	}
 
@@ -53,7 +54,7 @@ func (s *Suite) TestDeploy() {
 	s.NoError(err)
 
 	// Test when the default description is used
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 		expectedDesc := "Deployed via <astro deploy>"
 		if description != expectedDesc {
 			return deploymentID, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, description)
@@ -68,20 +69,20 @@ func (s *Suite) TestDeploy() {
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 
 	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
 		}
 
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, nil
 		}
 	})
 
 	s.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return deploy.ErrNoWorkspaceID
 		}
 		err := execDeployCmd([]string{"-f"}...)
@@ -89,7 +90,7 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --dags when the feature is disabled", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return deploy.ErrDagOnlyDeployDisabledInConfig
 		}
 		err := execDeployCmd([]string{"test-deployment-id", "--dags", "--force"}...)
@@ -102,7 +103,7 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --image for image deployment", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, deploy.ErrDeploymentTypeIncorrectForImageOnly
 		}
 		err := execDeployCmd([]string{"test-deployment-id", "--image", "--force"}...)
@@ -110,11 +111,11 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --image for dags-only deployment", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			return deploymentID, nil
 		}
 		// This function is not called since --image is passed
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return deploy.ErrNoWorkspaceID
 		}
 		err := execDeployCmd([]string{"test-deployment-id", "--image", "--force"}...)
@@ -123,11 +124,11 @@ func (s *Suite) TestDeploy() {
 
 	s.Run("Test for the flag --image-name", func() {
 		var capturedImageName string
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			capturedImageName = imageName // Capture the imageName
 			return deploymentID, nil
 		}
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return nil
 		}
 		testImageName := "test-image-name" // Set the expected image name
@@ -138,14 +139,14 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --image-name with --remote. Dags should be deployed but DeployAirflowImage shouldn't be called", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return nil
 		}
 		// Create a flag to track if DeployAirflowImage is called
 		deployAirflowImageCalled := false
 
 		// Mock function for DeployAirflowImage
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		DeployAirflowImage = func(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 			deployAirflowImageCalled = true // Set the flag if this function is called
 			return deploymentID, nil
 		}
@@ -177,7 +178,7 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 			return deploy.ErrBYORegistryDomainNotSet
 		}
 		err := execDeployCmd([]string{"-f"}...)

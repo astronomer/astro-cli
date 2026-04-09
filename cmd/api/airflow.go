@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
@@ -43,12 +44,13 @@ type AirflowOptions struct {
 	// Internal
 	detectedVersion     string // The Airflow version being used (detected or overridden)
 	CredentialsExplicit bool   // true when --username or --password was explicitly passed
+	creds               *credentials.CurrentCredentials
 }
 
 // NewAirflowCmd creates the 'astro api airflow' command.
 //
 //nolint:dupl
-func NewAirflowCmd(out io.Writer) *cobra.Command {
+func NewAirflowCmd(out io.Writer, creds *credentials.CurrentCredentials) *cobra.Command {
 	opts := &AirflowOptions{
 		RequestOptions: RequestOptions{
 			Out:             out,
@@ -56,6 +58,7 @@ func NewAirflowCmd(out io.Writer) *cobra.Command {
 			TotalCountField: "total_entries",
 			// specCache is initialized lazily when we know the Airflow version
 		},
+		creds: creds,
 	}
 
 	cmd := &cobra.Command{
@@ -460,7 +463,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 	}
 
 	// Check for token
-	if ctx.Token == "" {
+	if opts.creds == nil || opts.creds.Get() == "" {
 		return "", "", fmt.Errorf("not authenticated. Run 'astro login' to authenticate")
 	}
 
@@ -474,7 +477,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 	}
 
 	// Create platform client
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
+	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient(), opts.creds)
 
 	// Fetch deployment
 	dep, err := deployment.GetDeploymentByID(orgID, opts.DeploymentID, astroV1Client)
@@ -493,7 +496,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 		airflowURL = "https://" + airflowURL
 	}
 
-	return airflowURL, ctx.Token, nil
+	return airflowURL, opts.creds.Get(), nil
 }
 
 // runAirflowInteractive runs the airflow API command in interactive mode.

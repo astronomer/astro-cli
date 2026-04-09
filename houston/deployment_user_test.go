@@ -40,7 +40,7 @@ func (s *Suite) TestListDeploymentUsers() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
 		s.NoError(err)
@@ -55,7 +55,7 @@ func (s *Suite) TestListDeploymentUsers() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -94,7 +94,7 @@ func (s *Suite) TestAddDeploymentUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
 		s.NoError(err)
@@ -110,7 +110,7 @@ func (s *Suite) TestAddDeploymentUser() {
 			}
 		})
 
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -149,7 +149,7 @@ func (s *Suite) TestUpdateDeploymentUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
 		s.NoError(err)
@@ -164,7 +164,7 @@ func (s *Suite) TestUpdateDeploymentUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -203,7 +203,7 @@ func (s *Suite) TestDeleteDeploymentUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
 		s.NoError(err)
@@ -218,7 +218,7 @@ func (s *Suite) TestDeleteDeploymentUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
 		s.Contains(err.Error(), "Internal Server Error")

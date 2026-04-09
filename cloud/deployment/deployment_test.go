@@ -19,6 +19,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -1733,13 +1734,13 @@ func (s *Suite) TestCanCiCdDeploy() {
 		return &mockClaims, nil
 	}
 
-	canDeploy := CanCiCdDeploy("bearer token")
+	canDeploy := CanCiCdDeploy(credentials.New("bearer token"))
 	s.Equal(canDeploy, false)
 
 	parseToken = func(astroAPIToken string) (*util.CustomClaims, error) {
 		return nil, errMock
 	}
-	canDeploy = CanCiCdDeploy("bearer token")
+	canDeploy = CanCiCdDeploy(credentials.New("bearer token"))
 	s.Equal(canDeploy, false)
 
 	permissions = []string{
@@ -1754,7 +1755,7 @@ func (s *Suite) TestCanCiCdDeploy() {
 		return &mockClaims, nil
 	}
 
-	canDeploy = CanCiCdDeploy("bearer token")
+	canDeploy = CanCiCdDeploy(credentials.New("bearer token"))
 	s.Equal(canDeploy, true)
 }
 
@@ -1810,7 +1811,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with hybrid type in this test nothing is being change just ensuring that dag deploy stays true. Addtionally no deployment id/name is given so user input is needed to select one
-		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, true, mockV1Client)
+		err := Update("", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, true, mockV1Client, nil)
 		s.NoError(err)
 		s.Equal(deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
@@ -1819,7 +1820,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "y")()
 
 		// success updating the kubernetes executor on hybrid type. deployment name is given
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to standard
@@ -1831,7 +1832,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "y")()
 
 		// success with standard type and deployment name input and dag deploy stays the same
-		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 		s.Equal(deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
@@ -1839,7 +1840,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "y")()
 
 		// success updating to kubernetes executor on standard type
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to dedicatd
@@ -1849,7 +1850,7 @@ func (s *Suite) TestUpdate() { //nolint
 		// defer testUtil.MockUserInput(t, "1")()
 
 		// success with dedicated type no changes made asserts that dag deploy stays the same
-		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 		s.Equal(deploymentResponse.JSON200.IsDagDeployEnabled, dagDeployEnabled)
 
@@ -1857,7 +1858,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "y")()
 
 		// success with dedicated updating to kubernetes executor
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 	s.Run("successfully update schedulerSize and highAvailability and CICDEnforement", func() {
@@ -1877,7 +1878,7 @@ func (s *Suite) TestUpdate() { //nolint
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(s.T(), "1")()
 		// success with standard type with name
-		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to dedicatd
@@ -1888,20 +1889,20 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with dedicated type
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// success with large scheduler size
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "large", "enable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "large", "enable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// success with extra large scheduler size
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "extra_large", "enable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "extra_large", "enable", "", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// success with hybrid type with id
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// Mock user input for deployment name
@@ -1909,7 +1910,7 @@ func (s *Suite) TestUpdate() { //nolint
 
 		// success with hybrid type with id
 		deploymentResponse.JSON200.Executor = &executorKubernetes
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -1927,7 +1928,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with standard type with name
-		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to dedicatd and set development mode to false
@@ -1938,7 +1939,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with dedicated type
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "disable", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "disable", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -1971,7 +1972,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with standard type with name
-		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// mock os.Stdin
@@ -1979,7 +1980,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with standard type
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, nil, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "enable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, nil, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2012,7 +2013,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with dedicated type with name
-		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("", "test", ws, "", "", "enable", CeleryExecutor, "medium", "disable", "disable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// mock os.Stdin
@@ -2020,7 +2021,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "1")()
 
 		// success with dedicated type
-		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "disable", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, nil, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "", "test-1", "enable", CeleryExecutor, "medium", "disable", "enable", "disable", "", "", "2CPU", "2Gi", "", 0, 0, nil, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2029,35 +2030,35 @@ func (s *Suite) TestUpdate() { //nolint
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorIs(err, errMock)
 
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "10Gi", "2CPU", "10Gi", "", 100, 100, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "10Gi", "2CPU", "10Gi", "", 100, 100, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorIs(err, ErrInvalidResourceRequest)
 	})
 
 	s.Run("list deployments failure", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorIs(err, errMock)
 	})
 
 	s.Run("invalid deployment id", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 		// list deployment error
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorIs(err, errMock)
 
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 
 		// invalid id
-		err = Update("invalid-id", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("invalid-id", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorContains(err, "the Deployment specified was not found in this workspace.")
 		// invalid name
-		err = Update("", "", ws, "update", "invalid-name", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "update", "invalid-name", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorContains(err, "the Deployment specified was not found in this workspace.")
 
 		// mock os.Stdin
@@ -2065,7 +2066,7 @@ func (s *Suite) TestUpdate() { //nolint
 		defer testUtil.MockUserInput(s.T(), "0")()
 
 		// invalid selection
-		err = Update("", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorContains(err, "invalid Deployment selected")
 	})
 
@@ -2080,7 +2081,7 @@ func (s *Suite) TestUpdate() { //nolint
 		// Mock user input for deployment name
 		defer testUtil.MockUserInput(s.T(), "n")()
 
-		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2091,7 +2092,7 @@ func (s *Suite) TestUpdate() { //nolint
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.ErrorIs(err, errMock)
 		s.NotContains(err.Error(), organization.AstronomerConnectionErrMsg)
 	})
@@ -2101,7 +2102,7 @@ func (s *Suite) TestUpdate() { //nolint
 		deploymentResponse.JSON200.IsDagDeployEnabled = true
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2109,12 +2110,12 @@ func (s *Suite) TestUpdate() { //nolint
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		canCiCdDeploy = func(astroAPIToken string) bool {
+		canCiCdDeploy = func(creds *credentials.CurrentCredentials) bool {
 			return false
 		}
 
 		defer testUtil.MockUserInput(s.T(), "n")()
-		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2123,7 +2124,7 @@ func (s *Suite) TestUpdate() { //nolint
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2144,7 +2145,7 @@ func (s *Suite) TestUpdate() { //nolint
 
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		err := Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to standard
@@ -2152,7 +2153,7 @@ func (s *Suite) TestUpdate() { //nolint
 
 		defer testUtil.MockUserInput(s.T(), "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to standard
@@ -2160,7 +2161,7 @@ func (s *Suite) TestUpdate() { //nolint
 
 		defer testUtil.MockUserInput(s.T(), "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "", KubeExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 
 		s.NoError(err)
 	})
@@ -2179,7 +2180,7 @@ func (s *Suite) TestUpdate() { //nolint
 
 		defer testUtil.MockUserInput(s.T(), "y")()
 		// test update with standard type
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// change type to standard
@@ -2187,14 +2188,14 @@ func (s *Suite) TestUpdate() { //nolint
 
 		defer testUtil.MockUserInput(s.T(), "y")()
 		// test update with standard type
-		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		defer testUtil.MockUserInput(s.T(), "y")()
 
 		// test update with hybrid type
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2210,7 +2211,7 @@ func (s *Suite) TestUpdate() { //nolint
 
 		defer testUtil.MockUserInput(s.T(), "n")()
 
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2238,7 +2239,7 @@ func (s *Suite) TestUpdate() { //nolint
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponseWithNoNodePools, nil).Once()
 
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 
@@ -2261,7 +2262,7 @@ func (s *Suite) TestUpdate() { //nolint
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		// Call the Update function with a non-empty workload ID
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "small", "enable", "", "disable", "", "", "", "", mockWorkloadIdentity, 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, true, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "small", "enable", "", "disable", "", "", "", "", mockWorkloadIdentity, 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, true, mockV1Client, nil)
 		s.NoError(err)
 	})
 	s.Run("update deployment to change executor to/from ASTRO executor", func() {
@@ -2276,26 +2277,26 @@ func (s *Suite) TestUpdate() { //nolint
 		// CELERY -> ASTRO
 		deploymentResponse.JSON200.Executor = &executorCelery
 		defer testUtil.MockUserInput(s.T(), "y")()
-		err := Update("test-id-1", "", ws, "", "", "", AstroExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "", "", "", AstroExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// ASTRO -> CELERY
 		astroExecutor := astrov1.DeploymentExecutorASTRO
 		deploymentResponse.JSON200.Executor = &astroExecutor
 		defer testUtil.MockUserInput(s.T(), "y")()
-		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", CeleryExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// ASTRO -> KUBERNETES
 		deploymentResponse.JSON200.Executor = &astroExecutor
 		defer testUtil.MockUserInput(s.T(), "y")()
-		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", KubeExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 
 		// KUBERNETES -> ASTRO
 		deploymentResponse.JSON200.Executor = &executorKubernetes
 		defer testUtil.MockUserInput(s.T(), "y")()
-		err = Update("test-id-1", "", ws, "", "", "", AstroExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client)
+		err = Update("test-id-1", "", ws, "", "", "", AstroExecutor, "", "", "", "", "", "", "", "", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 	s.Run("update deployment to change remote execution config", func() {
@@ -2318,7 +2319,7 @@ func (s *Suite) TestUpdate() { //nolint
 		newTaskLogURLPattern := "new-task-log-url-pattern"
 		newAllowedIPAddressRanges := []string{"1.2.3.5/32"}
 		defer testUtil.MockUserInput(s.T(), "y")()
-		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, &newAllowedIPAddressRanges, &newTaskLogBucket, &newTaskLogURLPattern, false, mockV1Client)
+		err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, &newAllowedIPAddressRanges, &newTaskLogBucket, &newTaskLogURLPattern, false, mockV1Client, nil)
 		s.NoError(err)
 	})
 }

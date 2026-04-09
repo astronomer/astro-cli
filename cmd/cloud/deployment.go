@@ -826,7 +826,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		if disallowedFlagSet {
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, waitForStatus, waitTimeForDeployment, forceUpdate)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, waitForStatus, waitTimeForDeployment, forceUpdate, creds)
 	}
 
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
@@ -875,7 +875,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, false, 0*time.Second, forceUpdate)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, false, 0*time.Second, forceUpdate, creds)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
@@ -911,7 +911,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client, creds)
 }
 
 func validateCICD() error {

@@ -119,7 +119,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	}
 
 	if isDagOnlyDeploy {
-		return DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
+		return DagsOnlyDeploy(houstonClient, store, ws, deploymentID, config.WorkingPath, nil, true, description)
 	}
 
 	if imagePresentOnRemote {
@@ -132,7 +132,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-		deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt, description, isImageOnlyDeploy, imageName)
+		deploymentID, err = DeployAirflowImage(houstonClient, store, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt, description, isImageOnlyDeploy, imageName)
 		if err != nil {
 			return err
 		}
@@ -144,7 +144,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	err = DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
+	err = DagsOnlyDeploy(houstonClient, store, ws, deploymentID, config.WorkingPath, nil, true, description)
 	// Don't throw the error if dag-deploy itself is disabled
 	if deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
 		return nil

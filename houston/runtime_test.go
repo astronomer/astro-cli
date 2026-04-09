@@ -30,7 +30,7 @@ func (s *Suite) TestGetRuntimeReleases() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		vars := make(map[string]interface{})
 		resp, err := api.GetRuntimeReleases(vars)
@@ -46,7 +46,7 @@ func (s *Suite) TestGetRuntimeReleases() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		vars := make(map[string]interface{})
 		vars["clusterId"] = "test-cluster-id"
@@ -63,7 +63,7 @@ func (s *Suite) TestGetRuntimeReleases() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		vars := make(map[string]interface{})
 		vars["airflowVersion"] = "2.2.4"
@@ -80,7 +80,7 @@ func (s *Suite) TestGetRuntimeReleases() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		vars := make(map[string]interface{})
 		_, err := api.GetRuntimeReleases(vars)

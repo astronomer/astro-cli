@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -30,8 +31,8 @@ func isHelpOrVersion(args []string) bool {
 
 // Start spawns Otto with the given arguments and environment from the current context.
 // It blocks until Otto exits, forwarding signals for clean shutdown.
-func Start(args []string) error {
-	cfg := NewConfigFromContext()
+func Start(args []string, creds *credentials.CurrentCredentials) error {
+	cfg := NewConfigFromContext(creds)
 	if cfg.Token == "" && !isHelpOrVersion(args) {
 		fmt.Fprintln(os.Stderr, "You're not logged in to Astro. Otto is an AI assistant for Airflow — sign in or start a trial to use it.")
 		fmt.Fprintln(os.Stderr)

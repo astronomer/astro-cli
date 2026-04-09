@@ -137,6 +137,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
 		AstroV1Client: astroV1Client,
+		Creds:         creds,
 	}
 	return DeployBundle(deployBundleInput)
 }

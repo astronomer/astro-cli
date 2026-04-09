@@ -45,7 +45,7 @@ func (s *Suite) TestGetAppConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		config, err := api.GetAppConfig(GetAppConfigRequest{})
 		s.NoError(err)
@@ -68,7 +68,7 @@ func (s *Suite) TestGetAppConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		// reset the local variables
 		appConfig = nil
@@ -98,7 +98,7 @@ func (s *Suite) TestGetAppConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetAppConfig(GetAppConfigRequest{})
 		s.ErrorAs(err, &ErrFieldsNotAvailable{})
@@ -128,7 +128,7 @@ func (s *Suite) TestGetAvailableNamespaces() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		namespaces, err := api.GetAvailableNamespaces(nil)
 		s.NoError(err)
@@ -143,7 +143,7 @@ func (s *Suite) TestGetAvailableNamespaces() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetAvailableNamespaces(nil)
 		s.Contains(err.Error(), "Internal Server Error")
@@ -169,7 +169,7 @@ func (s *Suite) TestGetPlatformVersion() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 		version = "0.30.0"
 		versionErr = nil
 		resp, err := api.GetPlatformVersion(nil)
@@ -185,7 +185,7 @@ func (s *Suite) TestGetPlatformVersion() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 		version = ""
 		versionErr = errMockHouston
 		resp, err := api.GetPlatformVersion(nil)
@@ -201,7 +201,7 @@ func (s *Suite) TestGetPlatformVersion() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 		version = ""
 		versionErr = nil
 		platformVersion, err := api.GetPlatformVersion(nil)
@@ -217,7 +217,7 @@ func (s *Suite) TestGetPlatformVersion() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 		version = ""
 		versionErr = nil
 		_, err := api.GetPlatformVersion(nil)

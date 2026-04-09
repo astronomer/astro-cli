@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/otto"
 )
 
@@ -29,20 +30,22 @@ func printAstroSubcommands(w io.Writer) {
 	fmt.Fprintln(w)
 }
 
-func newOttoCmd() *cobra.Command {
+func newOttoCmd(creds *credentials.CurrentCredentials) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "otto [flags/args forwarded to Otto]",
 		Short:              "Start the Otto AI agent",
 		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations.\nAll flags and arguments are forwarded directly to Otto.",
 		SilenceUsage:       true,
 		DisableFlagParsing: true,
-		RunE:               ottoRun,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return ottoRun(args, creds)
+		},
 	}
 
 	return cmd
 }
 
-func ottoRun(cmd *cobra.Command, args []string) error {
+func ottoRun(args []string, creds *credentials.CurrentCredentials) error {
 	// With DisableFlagParsing, cobra won't route to subcommands,
 	// so we dispatch "update" and "version" ourselves. "upgrade" is
 	// aliased to "update" — otherwise it falls through to Otto and gets
@@ -83,7 +86,7 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 	// Same treatment for ErrNotLoggedIn: Start has already printed the sign-up
 	// guidance to stderr, so returning the error to cobra would just tack on a
 	// redundant "Error: not logged in" line.
-	err := otto.Start(args)
+	err := otto.Start(args, creds)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		os.Exit(exitErr.ExitCode())

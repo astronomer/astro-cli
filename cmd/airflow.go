@@ -29,6 +29,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -150,7 +151,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	proxyPortFlag        string
 )
 
-func newDevRootCmd(astroV1Client astrov1.APIClient) *cobra.Command {
+func newDevRootCmd(astroV1Client astrov1.APIClient, store keychain.SecureStore) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -184,7 +185,7 @@ func newDevRootCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 		newAirflowRestartCmd(astroV1Client),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(astroV1Client),
+		newAirflowUpgradeTestCmd(astroV1Client, store),
 		newProxyRootCmd(),
 	)
 	return cmd
@@ -268,14 +269,14 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd(astroV1Client astrov1.APIClient) *cobra.Command {
+func newAirflowUpgradeTestCmd(astroV1Client astrov1.APIClient, store keychain.SecureStore) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
 		Short:   "Test compatibility with a new Airflow or Runtime version",
 		Long:    "Run compatibility tests to check if your environment and DAGs work with a new version of Airflow or Astro Runtime. Produces reports covering dependency version changes, DAG import errors, and Airflow deprecation lint issues. Does not modify your project or local environment.",
 		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowUpgradeTest(cmd, astroV1Client)
+			return airflowUpgradeTest(cmd, astroV1Client, store)
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version.")
@@ -769,7 +770,7 @@ func ensureProjectName(args []string, projectName string) (string, error) {
 	return projectName, nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) error { //nolint:gocognit
+func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient, store keychain.SecureStore) error { //nolint:gocognit
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
@@ -812,7 +813,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) err
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
-	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, astroV1Client)
+	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, astroV1Client, store)
 	if err != nil {
 		return err
 	}

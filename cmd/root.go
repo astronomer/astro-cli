@@ -18,13 +18,16 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 )
 
 var (
 	verboseLevel   string
 	houstonClient  houston.ClientInterface
 	houstonVersion string
+	newSecureStore = keychain.New
 )
 
 const (
@@ -35,12 +38,15 @@ const (
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
 	var err error
-	httpClient := houston.NewHTTPClient()
-	houstonClient = houston.NewClient(httpClient)
+	creds := &credentials.CurrentCredentials{}
+	store, storeErr := newSecureStore()
 
-	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
-	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient())
+	httpClient := houston.NewHTTPClient()
+	houstonClient = houston.NewClient(httpClient, creds)
+
+	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient(), creds)
+	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient(), creds)
+	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient(), creds)
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -72,34 +78,34 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(astroV1Client),
+				CreateRootPersistentPreRunE(storeErr, store, creds, astroV1Client),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroV1Client, os.Stdout),
-		newLogoutCommand(os.Stdout),
-		newAuthRootCmd(astroV1Client, os.Stdout),
+		newLoginCommand(store, creds, astroV1Client, os.Stdout),
+		newLogoutCommand(store, os.Stdout),
+		newAuthRootCmd(store, creds, astroV1Client, os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(astroV1Client),
+		newDevRootCmd(astroV1Client, store),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
-		api.NewAPICmd(),
+		api.NewAPICmd(creds),
 		newTelemetryCmd(os.Stdout),
 		newTelemetrySendCmd(),
-		newOttoCmd(),
+		newOttoCmd(creds),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, os.Stdout)...,
+			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, creds, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(
-			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
+			softwareCmd.AddCmds(houstonClient, store, os.Stdout)...,
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}

@@ -45,7 +45,7 @@ func (s *AddCmdSuite) TestAddCmds() {
 	houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
-	cmds := AddCmds(houstonMock, buf)
+	cmds := AddCmds(houstonMock, nil, buf)
 	for cmdIdx := range cmds {
 		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
@@ -57,7 +57,7 @@ func (s *AddCmdSuite) TestAppConfigFailure() {
 	houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMock)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
-	cmds := AddCmds(houstonMock, buf)
+	cmds := AddCmds(houstonMock, nil, buf)
 	for cmdIdx := range cmds {
 		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
@@ -76,7 +76,7 @@ func (s *AddCmdSuite) TestPlatformVersionFailure() {
 	houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("", errMock)
 	buf := new(bytes.Buffer)
-	cmds := AddCmds(houstonMock, buf)
+	cmds := AddCmds(houstonMock, nil, buf)
 	for cmdIdx := range cmds {
 		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}

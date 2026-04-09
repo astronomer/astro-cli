@@ -26,3 +26,6 @@ testbin/
 testbin/golangci-lint
 upgrade-test*
 vendor/github.com/theupdateframework/notary/Dockerfile
+
+# flock sidecars written next to config files at runtime; disposable
+*.yaml.lock

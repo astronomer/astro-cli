@@ -20,7 +20,9 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -46,6 +48,7 @@ type TokenResponse struct {
 	IDToken          string  `json:"id_token"`
 	TokenType        string  `json:"token_type"`
 	ExpiresIn        int64   `json:"expires_in"`
+	RefreshToken     string  `json:"refresh_token,omitempty"`
 	Scope            string  `json:"scope"`
 	Error            *string `json:"error,omitempty"`
 	ErrorDescription string  `json:"error_description,omitempty"`
@@ -63,7 +66,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
+func Setup(cmd *cobra.Command, store keychain.SecureStore, creds *credentials.CurrentCredentials, astroV1Client astrov1.APIClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -107,7 +110,7 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, astroV1Client)
+	apiToken, err := checkAPIToken(isDeploymentFile, creds, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -116,14 +119,14 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(astroV1Client, isDeploymentFile)
+	apiKey, err := checkAPIKeys(astroV1Client, creds, isDeploymentFile)
 	if err != nil {
 		return err
 	}
 	if apiKey {
 		return nil
 	}
-	err = checkToken(astroV1Client, os.Stdout)
+	err = checkToken(store, creds, astroV1Client, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -131,60 +134,44 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	return nil
 }
 
-func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
-	c, err := context.GetCurrentContext() // get current context
+func checkToken(store keychain.SecureStore, creds *credentials.CurrentCredentials, astroV1Client astrov1.APIClient, out io.Writer) error {
+	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	expireTime, _ := c.GetExpiresIn()
-	// check if user is logged in
-	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
-		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", astroV1Client, out, false)
-		if err != nil {
-			return err
-		}
 
-		return nil
-	} else if isExpired(expireTime, accessTokenExpThreshold) {
+	keyCreds, err := store.GetCredentials(c.Domain)
+	if err != nil || keyCreds.Token == "" {
+		return authLogin(c.Domain, "", store, creds, astroV1Client, out, false)
+	}
+
+	if isExpired(keyCreds.ExpiresAt, accessTokenExpThreshold) {
 		authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
 		if err != nil {
 			return err
 		}
-		res, err := refresh(c.RefreshToken, authConfig)
+		res, err := refresh(keyCreds.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", astroV1Client, out, false)
-			if err != nil {
-				return err
-			}
+			return authLogin(c.Domain, "", store, creds, astroV1Client, out, false)
 		}
-		// persist the updated context with the renewed access token
-		err = c.SetContextKey("token", "Bearer "+res.AccessToken)
-		if err != nil {
+		newCreds := keychain.Credentials{
+			Token:        "Bearer " + res.AccessToken,
+			RefreshToken: keyCreds.RefreshToken,
+			UserEmail:    keyCreds.UserEmail,
+			ExpiresAt:    time.Now().Add(time.Duration(res.ExpiresIn) * time.Second),
+		}
+		if res.RefreshToken != "" {
+			newCreds.RefreshToken = res.RefreshToken
+		}
+		if err := store.SetCredentials(c.Domain, newCreds); err != nil {
 			return err
 		}
-		err = c.SetExpiresIn(res.ExpiresIn)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("workspace", c.Workspace)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("workspace", c.LastUsedWorkspace)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("organization", c.Organization)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("organization_product", c.OrganizationProduct)
-		if err != nil {
-			return err
-		}
+		creds.Set(newCreds.Token)
+		return nil
 	}
+
+	creds.Set(keyCreds.Token)
 	return nil
 }
 
@@ -233,7 +220,7 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(astroV1Client astrov1.APIClient, creds *credentials.CurrentCredentials, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -314,15 +301,8 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		return false, errors.New(tokenRes.ErrorDescription)
 	}
 
-	err = c.SetContextKey("token", "Bearer "+tokenRes.AccessToken)
-	if err != nil {
-		return false, err
-	}
+	creds.Set("Bearer " + tokenRes.AccessToken)
 
-	err = c.SetExpiresIn(tokenRes.ExpiresIn)
-	if err != nil {
-		return false, err
-	}
 	orgs, err := organization.ListOrganizations(astroV1Client)
 	if err != nil {
 		return false, err
@@ -351,7 +331,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, creds *credentials.CurrentCredentials, astroV1Client astrov1.APIClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -388,15 +368,8 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 		}
 	}
 
-	err = c.SetContextKey("token", "Bearer "+astroAPIToken)
-	if err != nil {
-		return false, err
-	}
+	creds.Set("Bearer " + astroAPIToken)
 
-	err = c.SetExpiresIn(time.Now().AddDate(1, 0, 0).Unix())
-	if err != nil {
-		return false, err
-	}
 	// Parse the token to peek at the custom claims
 	claims, err := parseAPIToken(astroAPIToken)
 	if err != nil {

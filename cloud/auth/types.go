@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 )
 
@@ -42,27 +41,4 @@ type Result struct {
 type CallbackMessage struct {
 	authorizationCode string
 	errorMessage      string
-}
-
-func (res Result) writeToContext(c *config.Context) error {
-	err = c.SetContextKey("token", "Bearer "+res.AccessToken)
-	if err != nil {
-		return err
-	}
-
-	err = c.SetContextKey("refreshtoken", res.RefreshToken)
-	if err != nil {
-		return err
-	}
-
-	err = c.SetExpiresIn(res.ExpiresIn)
-	if err != nil {
-		return err
-	}
-
-	err = c.SetContextKey("user_email", res.UserEmail)
-	if err != nil {
-		return err
-	}
-	return nil
 }

@@ -21,8 +21,10 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -360,7 +362,7 @@ func CheckUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -407,9 +409,20 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 		return err
 	}
 
-	err = res.writeToContext(&c)
-	if err != nil {
-		return err
+	keyCreds := keychain.Credentials{
+		Token:        "Bearer " + res.AccessToken,
+		RefreshToken: res.RefreshToken,
+		UserEmail:    res.UserEmail,
+		ExpiresAt:    time.Now().Add(time.Duration(res.ExpiresIn) * time.Second),
+	}
+	if store == nil {
+		return fmt.Errorf("credential store not available; cannot save login credentials")
+	}
+	if err := store.SetCredentials(domain, keyCreds); err != nil {
+		return fmt.Errorf("storing credentials: %w", err)
+	}
+	if creds != nil {
+		creds.Set(keyCreds.Token)
 	}
 
 	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
@@ -424,16 +437,11 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Astro next.
-func Logout(domain string, out io.Writer) {
-	c, _ := context.GetContext(domain)
-
-	err = c.SetContextKey("token", "")
-	if err != nil {
-		return
-	}
-	err = c.SetContextKey("user_email", "")
-	if err != nil {
-		return
+func Logout(domain string, store keychain.SecureStore, out io.Writer) {
+	if store == nil {
+		fmt.Fprintln(out, "Warning: credential store not available; local credentials may not be cleared")
+	} else if err := store.DeleteCredentials(domain); err != nil {
+		fmt.Fprintf(out, "Failed to remove credentials from secure store: %s\n", err.Error())
 	}
 
 	// remove the current context

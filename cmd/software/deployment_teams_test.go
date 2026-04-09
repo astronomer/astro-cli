@@ -103,7 +103,7 @@ func (s *Suite) TestDeploymentTeamsListCmd() {
 			Header:     make(http.Header),
 		}
 	})
-	houstonClient = houston.NewClient(client)
+	houstonClient = houston.NewClient(client, nil)
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentTeamListCmd(buf)
 	s.NotNil(cmd)
