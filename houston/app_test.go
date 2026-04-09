@@ -47,11 +47,11 @@ func (s *Suite) TestGetAppConfig() {
 		})
 		api := NewClient(client)
 
-		config, err := api.GetAppConfig("")
+		config, err := api.GetAppConfig(GetAppConfigRequest{})
 		s.NoError(err)
 		s.Equal(config, mockAppConfig)
 
-		config, err = api.GetAppConfig("")
+		config, err = api.GetAppConfig(GetAppConfigRequest{})
 		s.NoError(err)
 		s.Equal(config, mockAppConfig)
 
@@ -74,11 +74,11 @@ func (s *Suite) TestGetAppConfig() {
 		appConfig = nil
 		appConfigErr = nil
 
-		config, err := api.GetAppConfig("")
+		config, err := api.GetAppConfig(GetAppConfigRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
 		s.Nil(config)
 
-		config, err = api.GetAppConfig("")
+		config, err = api.GetAppConfig(GetAppConfigRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
 		s.Nil(config)
 
@@ -100,7 +100,7 @@ func (s *Suite) TestGetAppConfig() {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAppConfig("")
+		_, err := api.GetAppConfig(GetAppConfigRequest{})
 		s.EqualError(err, ErrFieldsNotAvailable{}.Error())
 	})
 }
