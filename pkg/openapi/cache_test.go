@@ -606,3 +606,128 @@ func TestGetEndpoints_V2(t *testing.T) {
 	assert.Equal(t, "/orgs", endpoints[0].Path)
 	assert.Equal(t, "ListOrgs", endpoints[0].OperationID)
 }
+
+// --- IsLocalSpec -------------------------------------------------------------
+
+func TestIsLocalSpec(t *testing.T) {
+	tests := []struct {
+		name     string
+		specURL  string
+		expected bool
+	}{
+		{"https URL", "https://example.com/spec", false},
+		{"http URL", "http://localhost/spec", false},
+		{"HTTPS uppercase", "HTTPS://example.com/spec", false},
+		{"absolute path", "/tmp/spec.json", true},
+		{"relative path", "./spec.yaml", true},
+		{"parent relative path", "../spec.json", true},
+		{"tilde path", "~/spec.json", true},
+		{"file URL", "file:///tmp/spec.json", true},
+		{"file URL relative", "file://./spec.json", true},
+		{"empty string", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsLocalSpec(tt.specURL))
+		})
+	}
+}
+
+// --- ResolveLocalPath --------------------------------------------------------
+
+func TestResolveLocalPath(t *testing.T) {
+	t.Run("absolute path unchanged", func(t *testing.T) {
+		got, err := ResolveLocalPath("/tmp/spec.json")
+		require.NoError(t, err)
+		assert.Equal(t, "/tmp/spec.json", got)
+	})
+
+	t.Run("file:// stripped to absolute", func(t *testing.T) {
+		got, err := ResolveLocalPath("file:///tmp/spec.json")
+		require.NoError(t, err)
+		assert.Equal(t, "/tmp/spec.json", got)
+	})
+
+	t.Run("tilde expands to home", func(t *testing.T) {
+		home, err := os.UserHomeDir()
+		require.NoError(t, err)
+		got, err := ResolveLocalPath("~/spec.json")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(home, "spec.json"), got)
+	})
+
+	t.Run("relative path made absolute", func(t *testing.T) {
+		got, err := ResolveLocalPath("spec.json")
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(got))
+		assert.True(t, strings.HasSuffix(got, "/spec.json"))
+	})
+}
+
+// --- NewCacheForLocalFile ----------------------------------------------------
+
+func TestNewCacheForLocalFile(t *testing.T) {
+	cache := NewCacheForLocalFile("/tmp/spec.json")
+	assert.Equal(t, "/tmp/spec.json", cache.specURL)
+	assert.Equal(t, "/tmp/spec.json", cache.localPath)
+}
+
+// --- Load with local files ---------------------------------------------------
+
+func TestLoad_LocalFile(t *testing.T) {
+	specJSON := minimalSpecJSON("Local Spec", map[string]map[string]map[string]any{
+		"/items": {"get": {"operationId": "listItems"}},
+	})
+
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
+
+	cache := NewCacheForLocalFile(tmpFile)
+	err := cache.Load(false)
+	require.NoError(t, err)
+	assert.True(t, cache.IsLoaded())
+	assert.Equal(t, "Local Spec", cache.GetDoc().Info.Title)
+
+	endpoints := cache.GetEndpoints()
+	require.Len(t, endpoints, 1)
+	assert.Equal(t, "/items", endpoints[0].Path)
+}
+
+func TestLoad_LocalFile_NotFound(t *testing.T) {
+	cache := NewCacheForLocalFile("/nonexistent/spec.json")
+	err := cache.Load(false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reading local spec file")
+}
+
+func TestLoad_LocalFile_InvalidSpec(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "bad.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("<<<not valid>>>"), 0o600))
+
+	cache := NewCacheForLocalFile(tmpFile)
+	err := cache.Load(false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing local spec file")
+}
+
+func TestLoad_LocalFile_AlwaysFresh(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+
+	// Write version 1
+	v1 := minimalSpecJSON("Version 1", map[string]map[string]map[string]any{})
+	require.NoError(t, os.WriteFile(tmpFile, v1, 0o600))
+
+	cache := NewCacheForLocalFile(tmpFile)
+	err := cache.Load(false)
+	require.NoError(t, err)
+	assert.Equal(t, "Version 1", cache.GetDoc().Info.Title)
+
+	// Overwrite with version 2
+	v2 := minimalSpecJSON("Version 2", map[string]map[string]map[string]any{})
+	require.NoError(t, os.WriteFile(tmpFile, v2, 0o600))
+
+	// Load again without forceRefresh — should still see version 2
+	err = cache.Load(false)
+	require.NoError(t, err)
+	assert.Equal(t, "Version 2", cache.GetDoc().Info.Title)
+}
