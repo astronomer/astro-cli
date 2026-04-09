@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -22,18 +23,19 @@ type CloudOptions struct {
 	RequestOptions
 	SpecURL         string // hidden flag: alternative OpenAPI spec URL
 	SpecTokenEnvVar string // hidden flag: env var name containing auth token for spec fetch
+	tokenHolder     *httputil.TokenHolder
 }
 
 // NewCloudCmd creates the 'astro api cloud' command.
 //
 //nolint:dupl
-func NewCloudCmd(out io.Writer) *cobra.Command {
+func NewCloudCmd(out io.Writer, tokenHolder *httputil.TokenHolder) *cobra.Command {
 	opts := &CloudOptions{
 		RequestOptions: RequestOptions{
 			Out:    out,
 			ErrOut: os.Stderr,
-			// specCache is initialized lazily when the domain is known
 		},
+		tokenHolder: tokenHolder,
 	}
 
 	cmd := &cobra.Command{
@@ -159,7 +161,7 @@ func runCloud(opts *CloudOptions) error {
 	}
 
 	// Check for token
-	if ctx.Token == "" {
+	if opts.tokenHolder == nil || opts.tokenHolder.Get() == "" {
 		return fmt.Errorf("not authenticated. Run 'astro login' to authenticate")
 	}
 
@@ -232,11 +234,11 @@ func runCloud(opts *CloudOptions) error {
 
 	// Generate curl command if requested
 	if opts.GenerateCurl {
-		return generateCurl(opts.Out, method, url, ctx.Token, opts.RequestHeaders, params, opts.RequestInputFile)
+		return generateCurl(opts.Out, method, url, opts.tokenHolder.Get(), opts.RequestHeaders, params, opts.RequestInputFile)
 	}
 
 	// Build and execute the request
-	return executeRequest(&opts.RequestOptions, method, url, ctx.Token, params)
+	return executeRequest(&opts.RequestOptions, method, url, opts.tokenHolder.Get(), params)
 }
 
 // isOperationID checks if the input looks like an operation ID rather than a path.

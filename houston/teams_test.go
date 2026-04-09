@@ -30,7 +30,7 @@ func (s *Suite) TestGetTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.GetTeam("team-id")
 		s.NoError(err)
@@ -45,7 +45,7 @@ func (s *Suite) TestGetTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetTeam("team-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -75,7 +75,7 @@ func (s *Suite) TestGetTeamUsers() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.GetTeamUsers("team-id")
 		s.NoError(err)
@@ -90,7 +90,7 @@ func (s *Suite) TestGetTeamUsers() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetTeamUsers("team-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -123,7 +123,7 @@ func (s *Suite) TestListTeams() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListTeams(ListTeamsRequest{"", 1})
 		s.NoError(err)
@@ -138,7 +138,7 @@ func (s *Suite) TestListTeams() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListTeams(ListTeamsRequest{"", 1})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -165,7 +165,7 @@ func (s *Suite) TestCreateTeamSystemRoleBinding() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		s.NoError(err)
@@ -180,7 +180,7 @@ func (s *Suite) TestCreateTeamSystemRoleBinding() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -207,7 +207,7 @@ func (s *Suite) TestDeleteTeamSystemRoleBinding() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		s.NoError(err)
@@ -222,7 +222,7 @@ func (s *Suite) TestDeleteTeamSystemRoleBinding() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		s.Contains(err.Error(), "Internal Server Error")

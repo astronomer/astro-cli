@@ -36,7 +36,7 @@ func (s *Suite) TestAuthenticateWithBasicAuth() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		token, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
 		s.NoError(err)
@@ -51,7 +51,7 @@ func (s *Suite) TestAuthenticateWithBasicAuth() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -83,7 +83,7 @@ func (s *Suite) TestGetAuthConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		authConfig, err := api.GetAuthConfig(&ctx)
 		s.NoError(err)
@@ -98,7 +98,7 @@ func (s *Suite) TestGetAuthConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetAuthConfig(&ctx)
 		s.Contains(err.Error(), "Internal Server Error")

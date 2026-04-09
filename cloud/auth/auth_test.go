@@ -12,14 +12,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -680,8 +681,12 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Login("astronomer.io", "", mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
+		store := keychain.NewTestStore()
+		err := Login("astronomer.io", "", store, nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
+		creds, err := store.GetCredentials("astronomer.io")
+		require.NoError(t, err)
+		assert.Equal(t, "Bearer test-token", creds.Token)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -723,7 +728,7 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 
-		err = Login("pr5723.cloud.astronomer-dev.io", "", mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
+		err = Login("pr5723.cloud.astronomer-dev.io", "", keychain.NewTestStore(), nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -752,14 +757,14 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 
-		err := Login("astronomer.io", "OAuth Token", mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
+		err := Login("astronomer.io", "OAuth Token", keychain.NewTestStore(), nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid domain", func(t *testing.T) {
-		err := Login("fail.astronomer.io", "", nil, nil, os.Stdout, false)
+		err := Login("fail.astronomer.io", "", nil, nil, nil, nil, os.Stdout, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Invalid domain.")
 	})
@@ -769,7 +774,7 @@ func TestLogin(t *testing.T) {
 			return "", errMock
 		}
 		authenticator = Authenticator{callbackHandler: callbackHandler}
-		err := Login("cloud.astronomer.io", "", nil, nil, os.Stdout, false)
+		err := Login("cloud.astronomer.io", "", nil, nil, nil, nil, os.Stdout, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -793,7 +798,7 @@ func TestLogin(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfErrorResponse, nil).Once()
-		err := Login("", "", mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
+		err := Login("", "", keychain.NewTestStore(), nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, false)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -827,7 +832,7 @@ func TestLogin(t *testing.T) {
 		// initialize stdin with user email input
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
 		// do the test
-		err = Login("astronomer.io", "", mockCoreClient, mockPlatformCoreClient, os.Stdout, true)
+		err = Login("astronomer.io", "", keychain.NewTestStore(), nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, true)
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -860,15 +865,13 @@ func TestLogin(t *testing.T) {
 		}
 		// initialize user input with email
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
-		err := Login("astronomer.io", "", mockCoreClient, mockPlatformCoreClient, os.Stdout, true)
+		store := keychain.NewTestStore()
+		err := Login("astronomer.io", "", store, nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, true)
 		assert.NoError(t, err)
-		// assert that everything got set in the right spot
-		domainContext, err := context.GetContext("astronomer.io")
-		assert.NoError(t, err)
-		currentContext, err := context.GetContext("localhost")
-		assert.NoError(t, err)
-		assert.Equal(t, domainContext.Token, "Bearer access_token")
-		assert.Equal(t, currentContext.Token, "token")
+		// assert that credentials were stored in the keychain
+		creds, err := store.GetCredentials("astronomer.io")
+		require.NoError(t, err)
+		assert.Equal(t, "Bearer access_token", creds.Token)
 		mockCoreClient.AssertExpectations(t)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -878,75 +881,61 @@ func TestLogout(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
-		Logout("astronomer.io", buf)
+		Logout("astronomer.io", keychain.NewTestStore(), buf)
 		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
 	})
 
-	t.Run("success_with_email", func(t *testing.T) {
-		assertions := func(expUserEmail string, expToken string) {
-			contexts, err := config.GetContexts()
-			assert.NoError(t, err)
-			context := contexts.Contexts["localhost"]
-
-			assert.NoError(t, err)
-			assert.Equal(t, expUserEmail, context.UserEmail)
-			assert.Equal(t, expToken, context.Token)
-		}
+	t.Run("success_with_credentials_deleted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		store := keychain.NewTestStore()
+		err := store.SetCredentials("localhost", keychain.Credentials{
+			Token:     "Bearer some-token",
+			UserEmail: "test.user@astronomer.io",
+		})
+		require.NoError(t, err)
+
 		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("user_email", "test.user@astronomer.io")
-		assert.NoError(t, err)
-		err = c.SetContextKey("token", "Bearer some-token")
-		assert.NoError(t, err)
-		// test before
-		assertions("test.user@astronomer.io", "Bearer some-token")
+		require.NoError(t, err)
+		Logout(c.Domain, store, os.Stdout)
 
-		// log out
-		c, err = config.GetCurrentContext()
-		assert.NoError(t, err)
-		Logout(c.Domain, os.Stdout)
-
-		// test after logout
-		assertions("", "")
+		_, err = store.GetCredentials("localhost")
+		assert.ErrorIs(t, err, keychain.ErrNotFound)
 	})
 }
 
-func Test_writeResultToContext(t *testing.T) {
-	assertConfigContents := func(expToken string, expRefresh string, expExpires time.Time, expUserEmail string) {
-		context, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		// test the output on the config file
-		assert.Equal(t, expToken, context.Token)
-		assert.Equal(t, expRefresh, context.RefreshToken)
-		expiresIn, err := context.GetExpiresIn()
-		assert.NoError(t, err)
-		assert.Equal(t, expExpires.Round(time.Second), expiresIn.Round(time.Second))
-		assert.Equal(t, expUserEmail, context.UserEmail)
-		assert.NoError(t, err)
-	}
+func TestLogin_storesCredentialsInKeychain(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	c, err := config.GetCurrentContext()
-	assert.NoError(t, err)
-	err = c.SetContextKey("token", "old_token")
-	assert.NoError(t, err)
-	// test input
-	res := Result{
-		AccessToken:  "new_token",
-		RefreshToken: "new_refresh_token",
-		ExpiresIn:    1234,
-		UserEmail:    "test.user@astronomer.io",
+	mockUserInfo := UserInfo{Email: "test.user@astronomer.io"}
+	userInfoRequester := func(authConfig Config, accessToken string) (UserInfo, error) {
+		return mockUserInfo, nil
 	}
-	// test before changes
-	var timeZero time.Time
-	assertConfigContents("old_token", "", timeZero, "")
+	authenticator = Authenticator{
+		userInfoRequester: userInfoRequester,
+		callbackHandler:   func() (string, error) { return "authorizationCode", nil },
+		tokenRequester: func(authConfig Config, verifier, code string) (Result, error) {
+			return Result{
+				RefreshToken: "new_refresh_token",
+				AccessToken:  "new_access_token",
+				ExpiresIn:    1234,
+			}, nil
+		},
+	}
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+	mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astroplatformcore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 
-	// apply function
-	c, err = config.GetCurrentContext()
-	assert.NoError(t, err)
-	err = res.writeToContext(&c)
-	assert.NoError(t, err)
+	store := keychain.NewTestStore()
+	err := Login("astronomer.io", "", store, nil, mockCoreClient, mockPlatformCoreClient, os.Stdout, true)
+	require.NoError(t, err)
 
-	// test after changes
-	assertConfigContents("Bearer new_token", "new_refresh_token", time.Now().Add(1234*time.Second), "test.user@astronomer.io")
+	creds, err := store.GetCredentials("astronomer.io")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer new_access_token", creds.Token)
+	assert.Equal(t, "new_refresh_token", creds.RefreshToken)
+	assert.Equal(t, "test.user@astronomer.io", creds.UserEmail)
+	assert.WithinDuration(t, time.Now().Add(1234*time.Second), creds.ExpiresAt, 5*time.Second)
+	mockCoreClient.AssertExpectations(t)
+	mockPlatformCoreClient.AssertExpectations(t)
 }

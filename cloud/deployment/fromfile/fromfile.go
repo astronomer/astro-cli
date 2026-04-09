@@ -694,11 +694,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		// update deployment
 		if !force && deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments && dagDeploy {
-			c, err := config.GetCurrentContext()
-			if err != nil {
-				return err
-			}
-			if !canCiCdDeploy(c.Token) {
+			if !canCiCdDeploy("Bearer " + os.Getenv("ASTRO_API_TOKEN")) {
 				fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
 					"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens instead.")
 				y, _ := input.Confirm("\n\nAre you sure you want to continue?")

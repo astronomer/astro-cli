@@ -107,8 +107,8 @@ type ClientImplementation struct {
 
 // NewClient - initialized the Houston Client object with proper HTTP Client configuration
 // set as a variable so we can change it to return mock houston clients in tests
-var NewClient = func(c *httputil.HTTPClient) ClientInterface {
-	client := newInternalClient(c)
+var NewClient = func(c *httputil.HTTPClient, tokenHolder *httputil.TokenHolder) ClientInterface {
+	client := newInternalClient(c, tokenHolder)
 	return &ClientImplementation{
 		client: client,
 	}
@@ -116,7 +116,8 @@ var NewClient = func(c *httputil.HTTPClient) ClientInterface {
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
-	HTTPClient *httputil.HTTPClient
+	HTTPClient  *httputil.HTTPClient
+	tokenHolder *httputil.TokenHolder
 }
 
 func NewHTTPClient() *httputil.HTTPClient {
@@ -135,9 +136,10 @@ func NewHTTPClient() *httputil.HTTPClient {
 }
 
 // newInternalClient returns a new Client with the logger and HTTP Client setup.
-func newInternalClient(c *httputil.HTTPClient) *Client {
+func newInternalClient(c *httputil.HTTPClient, tokenHolder *httputil.TokenHolder) *Client {
 	return &Client{
-		HTTPClient: c,
+		HTTPClient:  c,
+		tokenHolder: tokenHolder,
 	}
 }
 
@@ -164,7 +166,7 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 
 // Do (request) is a wrapper to more easily pass variables to a Client.Do request
 func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(newInternalClient(httputil.NewHTTPClient()))
+	return r.DoWithClient(newInternalClient(httputil.NewHTTPClient(), nil))
 }
 
 // Do fetches the current context, and returns Houston API response, error
@@ -180,8 +182,10 @@ func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 // DoWithContext executes a query against the Houston API, logging out any errors contained in the response object
 func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) (*Response, error) {
 	// set headers
-	if ctx.Token != "" {
-		doOpts.Headers["authorization"] = ctx.Token
+	if c.tokenHolder != nil {
+		if tok := c.tokenHolder.Get(); tok != "" {
+			doOpts.Headers["authorization"] = tok
+		}
 	}
 	newLogger.Debugf("Request Data: %v\n", string(doOpts.Data))
 	doOpts.Method = http.MethodPost

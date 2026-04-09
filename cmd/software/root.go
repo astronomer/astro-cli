@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -19,14 +20,16 @@ var (
 	houstonClient  houston.ClientInterface
 	appConfig      *houston.AppConfig
 	houstonVersion string
+	store          keychain.SecureStore
 
 	workspaceID string
 	teamID      string
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
-func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
+func AddCmds(client houston.ClientInterface, s keychain.SecureStore, out io.Writer) []*cobra.Command {
 	houstonClient = client
+	store = s
 
 	var err error
 	// There is no clusterID in the GetAppConfig call at this point of lifecycle, so we are getting the app config for the default cluster

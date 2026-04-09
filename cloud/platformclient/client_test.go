@@ -9,6 +9,6 @@ import (
 )
 
 func TestNewPlatformCoreClient(t *testing.T) {
-	client := NewPlatformCoreClient(httputil.NewHTTPClient())
+	client := NewPlatformCoreClient(httputil.NewHTTPClient(), &httputil.TokenHolder{})
 	assert.NotNil(t, client, "Can't create new Astro Platform Core client")
 }

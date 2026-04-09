@@ -44,7 +44,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// if CI/CD is enforced, check the subject can deploy
-	if currentDeployment.IsCicdEnforced && !canCiCdDeploy(c.Token) {
+	if currentDeployment.IsCicdEnforced && !canCiCdDeploy("Bearer "+os.Getenv("ASTRO_API_TOKEN")) {
 		return fmt.Errorf(errCiCdEnforcementUpdate, currentDeployment.Name)
 	}
 

@@ -59,7 +59,7 @@ func (s *Suite) TestNewWorkspaceUserListCmd() {
 			Header:     make(http.Header),
 		}
 	})
-	houstonClient = houston.NewClient(client)
+	houstonClient = houston.NewClient(client, nil)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceUserListCmd(buf)
 	s.NotNil(cmd)

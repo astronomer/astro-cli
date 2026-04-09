@@ -12,15 +12,16 @@ var NormalizeAPIError = httputil.NormalizeAPIError
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-// create api client for astro core services
-func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
-	// we append base url in request editor, so set to an empty string here
+// NewCoreClient creates an API client for astro core services.
+// The provided TokenHolder is read on every request — set it via
+// TokenHolder.Set after credentials are resolved in PersistentPreRunE.
+func NewCoreClient(c *httputil.HTTPClient, holder *httputil.TokenHolder) *ClientWithResponses {
 	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
 		ctx, err := context.GetCurrentContext()
 		if err != nil {
 			return "", "", err
 		}
-		return ctx.Token, ctx.GetPublicRESTAPIURL("v1alpha1"), nil
+		return holder.Get(), ctx.GetPublicRESTAPIURL("v1alpha1"), nil
 	})))
 	return cl
 }

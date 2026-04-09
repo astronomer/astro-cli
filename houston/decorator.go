@@ -152,7 +152,7 @@ func getVersion() string {
 
 	// fallback case in which somehow we reach here without getting houston version
 	httpClient := NewHTTPClient()
-	client := NewClient(httpClient)
+	client := NewClient(httpClient, nil)
 
 	version, versionErr = client.GetPlatformVersion(nil)
 	return version

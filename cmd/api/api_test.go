@@ -17,7 +17,7 @@ func newRootWithAPI(rootHook func(cmd *cobra.Command, args []string) error) *cob
 		Use:               "astro",
 		PersistentPreRunE: rootHook,
 	}
-	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
+	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer), nil)
 	root.AddCommand(apiCmd)
 	return apiCmd
 }
@@ -53,7 +53,7 @@ func TestPersistentPreRunE_RootHookErrorPropagates(t *testing.T) {
 func TestPersistentPreRunE_NoRootHook(t *testing.T) {
 	// Root has no PersistentPreRunE -- should not panic or error.
 	root := &cobra.Command{Use: "astro"}
-	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
+	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer), nil)
 	root.AddCommand(apiCmd)
 
 	child := &cobra.Command{Use: "child"}
@@ -77,7 +77,7 @@ func TestPersistentPreRunE_SilenceUsagePropagated(t *testing.T) {
 }
 
 func TestNewAPICmdWithOutput_SubcommandRegistration(t *testing.T) {
-	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
+	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer), nil)
 
 	names := make([]string, 0, len(apiCmd.Commands()))
 	for _, sub := range apiCmd.Commands() {
@@ -88,6 +88,6 @@ func TestNewAPICmdWithOutput_SubcommandRegistration(t *testing.T) {
 }
 
 func TestNewAPICmdWithOutput_Flags(t *testing.T) {
-	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
+	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer), nil)
 	assert.NotNil(t, apiCmd.PersistentFlags().Lookup("no-color"))
 }

@@ -47,7 +47,7 @@ func (s *Suite) TestCreateDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.CreateDeployment(map[string]interface{}{})
 		s.NoError(err)
@@ -88,7 +88,7 @@ func (s *Suite) TestCreateDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.CreateDeployment(map[string]interface{}{})
 		s.NoError(err)
@@ -103,7 +103,7 @@ func (s *Suite) TestCreateDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.CreateDeployment(map[string]interface{}{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -147,7 +147,7 @@ func (s *Suite) TestDeleteDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
 		s.NoError(err)
@@ -162,7 +162,7 @@ func (s *Suite) TestDeleteDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -208,7 +208,7 @@ func (s *Suite) TestListDeployments() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deploymentList, err := api.ListDeployments(ListDeploymentsRequest{})
 		s.NoError(err)
@@ -223,7 +223,7 @@ func (s *Suite) TestListDeployments() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListDeployments(ListDeploymentsRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -267,7 +267,7 @@ func (s *Suite) TestUpdateDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.UpdateDeployment(map[string]interface{}{})
 		s.NoError(err)
@@ -308,7 +308,7 @@ func (s *Suite) TestUpdateDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.UpdateDeployment(map[string]interface{}{})
 		s.NoError(err)
@@ -323,7 +323,7 @@ func (s *Suite) TestUpdateDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeployment(map[string]interface{}{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -367,7 +367,7 @@ func (s *Suite) TestGetDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.GetDeployment("deployment-id")
 		s.NoError(err)
@@ -382,7 +382,7 @@ func (s *Suite) TestGetDeployment() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetDeployment("deployment-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -426,7 +426,7 @@ func (s *Suite) TestUpdateDeploymentAirflow() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.UpdateDeploymentAirflow(map[string]interface{}{})
 		s.NoError(err)
@@ -441,7 +441,7 @@ func (s *Suite) TestUpdateDeploymentAirflow() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeploymentAirflow(map[string]interface{}{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -479,7 +479,7 @@ func (s *Suite) TestGetDeploymentConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deploymentConfig, err := api.GetDeploymentConfig(nil)
 		s.NoError(err)
@@ -494,7 +494,7 @@ func (s *Suite) TestGetDeploymentConfig() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetDeploymentConfig(nil)
 		s.Contains(err.Error(), "Internal Server Error")
@@ -524,7 +524,7 @@ func (s *Suite) TestListDeploymentLogs() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		logs, err := api.ListDeploymentLogs(ListDeploymentLogsRequest{})
 		s.NoError(err)
@@ -539,7 +539,7 @@ func (s *Suite) TestListDeploymentLogs() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListDeploymentLogs(ListDeploymentLogsRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -586,7 +586,7 @@ func (s *Suite) TestUpdateDeploymentRuntime() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
 		s.NoError(err)
@@ -601,7 +601,7 @@ func (s *Suite) TestUpdateDeploymentRuntime() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -635,7 +635,7 @@ func (s *Suite) TestCancelUpdateDeploymentRuntime() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		deployment, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
 		s.NoError(err)
@@ -650,7 +650,7 @@ func (s *Suite) TestCancelUpdateDeploymentRuntime() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -680,7 +680,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		s.NoError(err)
@@ -694,7 +694,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		s.Contains(err.Error(), "Internal Server Error")

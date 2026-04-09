@@ -14,13 +14,14 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 func TestNewAirflowCmd(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewAirflowCmd(out)
+	cmd := NewAirflowCmd(out, nil)
 
 	assert.Equal(t, "airflow <endpoint | operation-id>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -39,7 +40,7 @@ func TestNewAirflowCmd(t *testing.T) {
 
 func TestAirflowCmdFlags(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewAirflowCmd(out)
+	cmd := NewAirflowCmd(out, nil)
 
 	// Check airflow-specific flags exist (these are persistent flags so they're inherited by subcommands)
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("api-url"))
@@ -128,7 +129,7 @@ func TestResolveAirflowAPIURL_DeploymentID_NoToken(t *testing.T) {
 	// Set up context without token
 	ctx, err := config.GetCurrentContext()
 	require.NoError(t, err)
-	ctx.Token = ""
+
 	err = ctx.SetContext()
 	require.NoError(t, err)
 
@@ -149,7 +150,7 @@ func TestResolveAirflowAPIURL_DeploymentID_Success(t *testing.T) {
 	// Set up context with token and organization
 	ctx, err := config.GetCurrentContext()
 	require.NoError(t, err)
-	ctx.Token = "test-token"
+
 	ctx.Organization = "test-org"
 	err = ctx.SetContext()
 	require.NoError(t, err)
@@ -168,8 +169,10 @@ func TestResolveAirflowAPIURL_DeploymentID_Success(t *testing.T) {
 		}, nil
 	}
 
+	th := httputil.NewTokenHolder("test-token")
 	opts := &AirflowOptions{
 		DeploymentID: "test-deployment-id",
+		tokenHolder:  th,
 	}
 
 	baseURL, authToken, err := resolveAirflowAPIURL(opts)
@@ -186,7 +189,7 @@ func TestResolveAirflowAPIURL_DeploymentID_WithOrgOverride(t *testing.T) {
 	// Set up context with token but different organization
 	ctx, err := config.GetCurrentContext()
 	require.NoError(t, err)
-	ctx.Token = "test-token"
+
 	ctx.Organization = "context-org"
 	err = ctx.SetContext()
 	require.NoError(t, err)
@@ -206,9 +209,11 @@ func TestResolveAirflowAPIURL_DeploymentID_WithOrgOverride(t *testing.T) {
 		}, nil
 	}
 
+	th := httputil.NewTokenHolder("test-token")
 	opts := &AirflowOptions{
 		DeploymentID:   "test-deployment-id",
 		OrganizationID: "override-org",
+		tokenHolder:    th,
 	}
 
 	baseURL, authToken, err := resolveAirflowAPIURL(opts)
@@ -225,7 +230,7 @@ func TestResolveAirflowAPIURL_DeploymentID_NoAirflowURL(t *testing.T) {
 	// Set up context with token and organization
 	ctx, err := config.GetCurrentContext()
 	require.NoError(t, err)
-	ctx.Token = "test-token"
+
 	ctx.Organization = "test-org"
 	err = ctx.SetContext()
 	require.NoError(t, err)
@@ -241,8 +246,10 @@ func TestResolveAirflowAPIURL_DeploymentID_NoAirflowURL(t *testing.T) {
 		}, nil
 	}
 
+	th := httputil.NewTokenHolder("test-token")
 	opts := &AirflowOptions{
 		DeploymentID: "test-deployment-id",
+		tokenHolder:  th,
 	}
 
 	_, _, err = resolveAirflowAPIURL(opts)

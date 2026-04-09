@@ -6,6 +6,6 @@ import (
 )
 
 // NewPlatformCoreClient creates an API client for Astro platform core services.
-func NewPlatformCoreClient(c *httputil.HTTPClient) *astroplatformcore.ClientWithResponses {
-	return astroplatformcore.NewPlatformCoreClient(c)
+func NewPlatformCoreClient(c *httputil.HTTPClient, holder *httputil.TokenHolder) *astroplatformcore.ClientWithResponses {
+	return astroplatformcore.NewPlatformCoreClient(c, holder)
 }

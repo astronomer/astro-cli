@@ -7,9 +7,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/version"
 )
+
+func init() {
+	newSecureStore = func() (keychain.SecureStore, error) {
+		return keychain.NewTestStore(), nil
+	}
+}
 
 type CmdSuite struct {
 	suite.Suite

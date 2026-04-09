@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/software/workspace"
 )
@@ -84,7 +85,7 @@ func oAuth(oAuthURL string) string {
 }
 
 // RegistryAuth authenticates with the private registry
-func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain string) error {
+func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain, token string) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -126,7 +127,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 	}
 
 	if !appConfig.Flags.BYORegistryEnabled {
-		err = registryHandler.Login("user", c.Token)
+		err = registryHandler.Login("user", token)
 	} else {
 		err = registryHandler.Login("", "")
 	}
@@ -161,7 +162,7 @@ func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, store keychain.SecureStore, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
 	var pageSize int
@@ -206,9 +207,12 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		return err
 	}
 
-	err = c.SetContextKey("token", token)
-	if err != nil {
-		return err
+	if store == nil {
+		return fmt.Errorf("credential store not available; cannot save login credentials")
+	}
+	// Houston tokens do not have refresh tokens or expiry — only Token is stored.
+	if err := store.SetCredentials(c.Domain, keychain.Credentials{Token: token}); err != nil {
+		return fmt.Errorf("storing credentials: %w", err)
 	}
 
 	workspaces, err := getWorkspaces(client, interactive)
@@ -248,7 +252,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		}
 	}
 
-	err = RegistryAuth(client, out, "")
+	err = RegistryAuth(client, out, "", token)
 	if err != nil {
 		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}
@@ -257,20 +261,13 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 }
 
 // Logout removes the locally stored token and reset current context
-func Logout(domain string) {
-	c, err := context.GetContext(domain)
-	if err != nil {
-		return
-	}
-
-	err = c.SetContextKey("token", "")
-	if err != nil {
-		return
+func Logout(domain string, store keychain.SecureStore) {
+	if err := store.DeleteCredentials(domain); err != nil {
+		fmt.Printf("Failed to remove credentials: %s\n", err.Error())
 	}
 
 	// remove the current context
-	err = config.ResetCurrentContext()
-	if err != nil {
+	if err := config.ResetCurrentContext(); err != nil {
 		fmt.Println("Failed to reset current context: ", err.Error())
 		return
 	}

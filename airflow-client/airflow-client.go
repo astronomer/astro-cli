@@ -11,7 +11,6 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 
-	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -41,12 +40,14 @@ type Client interface {
 // Client containers the logger and HTTPClient used to communicate with the Astronomer API
 type HTTPClient struct {
 	*httputil.HTTPClient
+	tokenHolder *httputil.TokenHolder
 }
 
-// NewAstroClient returns a new Client with the logger and HTTP client setup.
-func NewAirflowClient(c *httputil.HTTPClient) *HTTPClient {
+// NewAirflowClient returns a new Client with the logger and HTTP client setup.
+func NewAirflowClient(c *httputil.HTTPClient, tokenHolder *httputil.TokenHolder) *HTTPClient {
 	return &HTTPClient{
-		c,
+		HTTPClient:  c,
+		tokenHolder: tokenHolder,
 	}
 }
 
@@ -242,17 +243,14 @@ func checkRetryPolicy(method string) retryablehttp.CheckRetry {
 }
 
 func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, error) {
-	cl, err := context.GetCurrentContext()
-	if err != nil {
-		return nil, err
-	}
-
-	if cl.Token != "" {
-		doOpts.Headers = map[string]string{
-			"authorization": cl.Token,
+	if c.tokenHolder != nil {
+		if tok := c.tokenHolder.Get(); tok != "" {
+			if doOpts.Headers == nil {
+				doOpts.Headers = map[string]string{}
+			}
+			doOpts.Headers["authorization"] = tok
 		}
 	}
-
 	req, err := retryablehttp.NewRequest(doOpts.Method, doOpts.Path, doOpts.Data)
 	if err != nil {
 		return nil, err

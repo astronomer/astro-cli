@@ -20,12 +20,14 @@ import (
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 )
 
 var (
 	verboseLevel   string
 	houstonClient  houston.ClientInterface
 	houstonVersion string
+	newSecureStore = keychain.New
 )
 
 const (
@@ -36,13 +38,16 @@ const (
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
 	var err error
-	httpClient := houston.NewHTTPClient()
-	houstonClient = houston.NewClient(httpClient)
+	tokenHolder := &httputil.TokenHolder{}
+	store, storeErr := newSecureStore()
 
-	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
-	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
-	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient())
-	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient())
+	httpClient := houston.NewHTTPClient()
+	houstonClient = houston.NewClient(httpClient, tokenHolder)
+
+	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient(), tokenHolder)
+	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient(), tokenHolder)
+	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient(), tokenHolder)
+	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient(), tokenHolder)
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -74,22 +79,22 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+				CreateRootPersistentPreRunE(storeErr, store, tokenHolder, astroCoreClient, platformCoreClient),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroCoreClient, platformCoreClient, os.Stdout),
-		newLogoutCommand(os.Stdout),
-		newAuthRootCmd(astroCoreClient, platformCoreClient, os.Stdout),
+		newLoginCommand(store, tokenHolder, astroCoreClient, platformCoreClient, os.Stdout),
+		newLogoutCommand(store, os.Stdout),
+		newAuthRootCmd(store, tokenHolder, astroCoreClient, platformCoreClient, os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(platformCoreClient, astroCoreClient),
+		newDevRootCmd(platformCoreClient, astroCoreClient, store),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
-		api.NewAPICmd(),
+		api.NewAPICmd(tokenHolder),
 		newTelemetryCmd(os.Stdout),
 		newTelemetrySendCmd(),
 	)
@@ -100,7 +105,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(
-			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
+			softwareCmd.AddCmds(houstonClient, store, os.Stdout)...,
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}

@@ -32,7 +32,7 @@ func TestAirflowClient(t *testing.T) {
 }
 
 func (s *Suite) TestNew() {
-	client := NewAirflowClient(httputil.NewHTTPClient())
+	client := NewAirflowClient(httputil.NewHTTPClient(), nil)
 	s.NotNil(client, "Can't create new Astro client")
 }
 
@@ -46,7 +46,8 @@ func (s *Suite) TestDoAirflowClient() {
 			Header:     make(http.Header),
 		}
 	})
-	airflowClient := NewAirflowClient(client)
+	th := httputil.NewTokenHolder("token")
+	airflowClient := NewAirflowClient(client, th)
 	doOpts := &httputil.DoOptions{
 		Path: "/test",
 		Headers: map[string]string{
@@ -110,7 +111,8 @@ func (s *Suite) TestGetConnections() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		response, err := airflowClient.GetConnections("test-airflow-url")
 		s.NoError(err)
@@ -126,7 +128,7 @@ func (s *Suite) TestGetConnections() {
 					Header:     make(http.Header),
 				}
 			})
-			airflowClient := NewAirflowClient(client)
+			airflowClient := NewAirflowClient(client, nil)
 
 			_, err := airflowClient.GetConnections("test-airflow-url")
 			s.Error(err)
@@ -141,7 +143,8 @@ func (s *Suite) TestGetConnections() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		_, err := airflowClient.GetConnections("test-airflow-url")
 		s.Error(err)
@@ -174,7 +177,8 @@ func (s *Suite) TestUpdateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdateConnection("test-airflow-url", mockConn)
 		s.NoError(err)
@@ -188,7 +192,8 @@ func (s *Suite) TestUpdateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdateConnection("test-airflow-url", mockConn)
 		s.Error(err)
@@ -203,7 +208,8 @@ func (s *Suite) TestUpdateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		// Pass a nil connection to force JSON marshal error
 		err := airflowClient.UpdateConnection("test-airflow-url", mockConn)
@@ -219,7 +225,8 @@ func (s *Suite) TestUpdateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdateConnection("test-airflow-url", mockConn)
 		s.Error(err)
@@ -252,7 +259,8 @@ func (s *Suite) TestCreateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreateConnection("test-airflow-url", mockConn)
 		s.NoError(err)
@@ -266,7 +274,8 @@ func (s *Suite) TestCreateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreateConnection("test-airflow-url", mockConn)
 		s.Error(err)
@@ -281,7 +290,8 @@ func (s *Suite) TestCreateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		// Pass a nil connection to force JSON marshal error
 		err := airflowClient.CreateConnection("test-airflow-url", nil)
@@ -297,7 +307,8 @@ func (s *Suite) TestCreateConnection() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreateConnection("test-airflow-url", mockConn)
 		s.Error(err)
@@ -330,7 +341,8 @@ func (s *Suite) TestCreateVariable() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreateVariable("test-airflow-url", *mockVar)
 		s.NoError(err)
@@ -344,7 +356,8 @@ func (s *Suite) TestCreateVariable() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreateVariable("test-airflow-url", *mockVar)
 		s.Error(err)
@@ -359,7 +372,8 @@ func (s *Suite) TestCreateVariable() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreateVariable("test-airflow-url", Variable{Key: "", Value: "test-value"})
 		s.Error(err)
@@ -385,7 +399,8 @@ func (s *Suite) TestGetVariables() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		response, err := airflowClient.GetVariables("test-airflow-url")
 		s.NoError(err)
@@ -401,7 +416,7 @@ func (s *Suite) TestGetVariables() {
 					Header:     make(http.Header),
 				}
 			})
-			airflowClient := NewAirflowClient(client)
+			airflowClient := NewAirflowClient(client, nil)
 
 			_, err := airflowClient.GetVariables("test-airflow-url")
 			s.Error(err)
@@ -435,7 +450,8 @@ func (s *Suite) TestUpdateVariable() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdateVariable("test-airflow-url", *mockVar)
 		s.NoError(err)
@@ -449,7 +465,8 @@ func (s *Suite) TestUpdateVariable() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdateVariable("test-airflow-url", *mockVar)
 		s.Error(err)
@@ -464,7 +481,8 @@ func (s *Suite) TestUpdateVariable() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdateVariable("test-airflow-url", Variable{Key: "", Value: "test-value"})
 		s.Error(err)
@@ -514,7 +532,8 @@ func (s *Suite) TestCreatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreatePool("test-airflow-url", *mockPool)
 		s.NoError(err)
@@ -528,7 +547,8 @@ func (s *Suite) TestCreatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreatePool("test-airflow-url", *mockPool)
 		s.Error(err)
@@ -543,7 +563,8 @@ func (s *Suite) TestCreatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		// Pass a nil pool to force JSON marshal error
 		err := airflowClient.CreatePool("test-airflow-url", *mockPool)
@@ -559,7 +580,8 @@ func (s *Suite) TestCreatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.CreatePool("test-airflow-url", *mockPool)
 		s.Error(err)
@@ -592,7 +614,8 @@ func (s *Suite) TestUpdatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdatePool("test-airflow-url", *mockPool)
 		s.NoError(err)
@@ -623,7 +646,8 @@ func (s *Suite) TestUpdatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err = airflowClient.UpdatePool("test-airflow-url", defaultPool)
 		s.NoError(err)
@@ -637,7 +661,8 @@ func (s *Suite) TestUpdatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdatePool("test-airflow-url", *mockPool)
 		s.Error(err)
@@ -652,7 +677,8 @@ func (s *Suite) TestUpdatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		// Pass a nil pool to force JSON marshal error
 		err := airflowClient.UpdatePool("test-airflow-url", Pool{})
@@ -668,7 +694,8 @@ func (s *Suite) TestUpdatePool() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		err := airflowClient.UpdatePool("test-airflow-url", *mockPool)
 		s.Error(err)
@@ -693,7 +720,8 @@ func (s *Suite) TestGetPools() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		response, err := airflowClient.GetPools("test-airflow-url")
 		s.NoError(err)
@@ -709,7 +737,7 @@ func (s *Suite) TestGetPools() {
 					Header:     make(http.Header),
 				}
 			})
-			airflowClient := NewAirflowClient(client)
+			airflowClient := NewAirflowClient(client, nil)
 
 			response, err := airflowClient.GetPools("test-airflow-url")
 			s.Error(err)
@@ -726,7 +754,8 @@ func (s *Suite) TestGetPools() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		th := httputil.NewTokenHolder("token")
+		airflowClient := NewAirflowClient(client, th)
 
 		response, err := airflowClient.GetPools("test-airflow-url")
 		s.Error(err)
@@ -759,7 +788,7 @@ func (s *Suite) TestDoAirflowClientRetry() {
 					Header:     make(http.Header),
 				}
 			})
-			airflowClient := NewAirflowClient(client)
+			airflowClient := NewAirflowClient(client, nil)
 
 			doOpts := &httputil.DoOptions{
 				Path:   "/test",
@@ -783,7 +812,7 @@ func (s *Suite) TestDoAirflowClientRetry() {
 					Header:     make(http.Header),
 				}
 			})
-			airflowClient := NewAirflowClient(client)
+			airflowClient := NewAirflowClient(client, nil)
 
 			doOpts := &httputil.DoOptions{
 				Path:   "/test",
@@ -807,7 +836,7 @@ func (s *Suite) TestDoAirflowClientRetry() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		airflowClient := NewAirflowClient(client, nil)
 
 		doOpts := &httputil.DoOptions{
 			Path:   "/test",
@@ -829,7 +858,7 @@ func (s *Suite) TestDoAirflowClientRetry() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		airflowClient := NewAirflowClient(client, nil)
 
 		doOpts := &httputil.DoOptions{
 			Path:   "/test",
@@ -848,7 +877,7 @@ func (s *Suite) TestDoAirflowClientRetry() {
 			callCount++
 			return stdctx.Canceled
 		})
-		airflowClient := NewAirflowClient(cancelTransport)
+		airflowClient := NewAirflowClient(cancelTransport, nil)
 
 		doOpts := &httputil.DoOptions{
 			Path:   "/test",
@@ -897,7 +926,7 @@ func (s *Suite) TestGetConnectionsPagination() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		airflowClient := NewAirflowClient(client, nil)
 
 		response, err := airflowClient.GetConnections("test-airflow-url")
 		s.NoError(err)
@@ -941,7 +970,7 @@ func (s *Suite) TestGetVariablesPagination() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		airflowClient := NewAirflowClient(client, nil)
 
 		response, err := airflowClient.GetVariables("test-airflow-url")
 		s.NoError(err)
@@ -985,7 +1014,7 @@ func (s *Suite) TestGetPoolsPagination() {
 				Header:     make(http.Header),
 			}
 		})
-		airflowClient := NewAirflowClient(client)
+		airflowClient := NewAirflowClient(client, nil)
 
 		response, err := airflowClient.GetPools("test-airflow-url")
 		s.NoError(err)

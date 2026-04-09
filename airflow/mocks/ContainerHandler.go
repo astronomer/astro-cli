@@ -5,6 +5,7 @@ package mocks
 import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -295,17 +296,17 @@ func (_m *ContainerHandler) Stop(waitForExit bool) error {
 	return r0
 }
 
-// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroPlatformCore
-func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, customImageName string, buildSecretString string, versionTest bool, dagTest bool, lintTest bool, includeLintDeprecations bool, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.ClientWithResponsesInterface) error {
-	ret := _m.Called(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroPlatformCore)
+// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroPlatformCore, store
+func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, customImageName string, buildSecretString string, versionTest bool, dagTest bool, lintTest bool, includeLintDeprecations bool, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.ClientWithResponsesInterface, store keychain.SecureStore) error {
+	ret := _m.Called(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroPlatformCore, store)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpgradeTest")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, bool, bool, bool, bool, string, astroplatformcore.ClientWithResponsesInterface) error); ok {
-		r0 = rf(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroPlatformCore)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, bool, bool, bool, bool, string, astroplatformcore.ClientWithResponsesInterface, keychain.SecureStore) error); ok {
+		r0 = rf(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroPlatformCore, store)
 	} else {
 		r0 = ret.Error(0)
 	}

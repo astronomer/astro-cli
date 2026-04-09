@@ -42,6 +42,7 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -701,7 +702,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient, store keychain.SecureStore) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -719,7 +720,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	}
 	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
-		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore)
+		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore, store)
 		if err != nil {
 			return err
 		}
@@ -806,7 +807,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	return nil
 }
 
-func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient, store keychain.SecureStore) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -817,9 +818,15 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCor
 		return err
 	}
 	deploymentImage := fmt.Sprintf("%s:%s", currentDeployment.ImageRepository, currentDeployment.ImageTag)
-	token := c.Token
+	if store == nil {
+		return fmt.Errorf("no credentials found for %s: credential store unavailable", c.Domain)
+	}
+	creds, err := store.GetCredentials(c.Domain)
+	if err != nil {
+		return fmt.Errorf("no credentials found for %s, please run 'astro login': %w", c.Domain, err)
+	}
 	fmt.Printf("\nPulling image from Astro Deployment %s\n\n", currentDeployment.Name)
-	err = d.imageHandler.Pull(deploymentImage, registryUsername, token)
+	err = d.imageHandler.Pull(deploymentImage, registryUsername, creds.Token)
 	if err != nil {
 		return err
 	}

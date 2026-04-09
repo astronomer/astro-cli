@@ -893,7 +893,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		isCicdEnforced = true
 	}
 	if !force && isCicdEnforced && dagDeploy != "" {
-		if !canCiCdDeploy(c.Token) {
+		if !canCiCdDeploy("Bearer " + os.Getenv("ASTRO_API_TOKEN")) {
 			fmt.Printf("\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start." +
 				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")
 			y, _ := input.Confirm("\n\nAre you sure you want to continue?")

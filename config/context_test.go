@@ -2,7 +2,6 @@ package config
 
 import (
 	"bytes"
-	"time"
 
 	"github.com/spf13/afero"
 )
@@ -40,7 +39,6 @@ context: example_com
 contexts:
   example_com:
     domain: example.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
@@ -48,7 +46,6 @@ contexts:
 	InitConfig(fs)
 
 	ctx := Context{
-		Token:             "token",
 		LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v",
 		Workspace:         "ck05r3bor07h40d02y2hw4n4v",
 		Domain:            "example.com",
@@ -74,7 +71,6 @@ context: example_com
 contexts:
   example_com:
     domain: example.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace:
 `)
@@ -82,7 +78,6 @@ contexts:
 	InitConfig(fs)
 
 	ctx := Context{
-		Token:             "token",
 		LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v",
 		Workspace:         "",
 		Domain:            "example.com",
@@ -108,7 +103,6 @@ context: example_com
 contexts:
   example_com:
     domain: example.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
@@ -117,7 +111,6 @@ contexts:
 	ctx, err := GetCurrentContext()
 	s.NoError(err)
 	s.Equal("example.com", ctx.Domain)
-	s.Equal("token", ctx.Token)
 	s.Equal("ck05r3bor07h40d02y2hw4n4v", ctx.Workspace)
 }
 
@@ -135,12 +128,10 @@ context: example_com
 contexts:
   example_com:
     domain: example.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
   stage_example_com:
     domain: stage.example.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4w
     workspace: ck05r3bor07h40d02y2hw4n4w
 `)
@@ -150,7 +141,6 @@ contexts:
 	ctx, err := GetCurrentContext()
 	s.NoError(err)
 	s.Equal("stage.example.com", ctx.Domain)
-	s.Equal("token", ctx.Token)
 	s.Equal("ck05r3bor07h40d02y2hw4n4w", ctx.Workspace)
 }
 
@@ -161,13 +151,11 @@ context: test_com
 contexts:
   example_com:
     domain: example.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
     organization: test-org-id
   test_com:
     domain: test.com
-    token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
     organization: test-org-id
@@ -196,16 +184,21 @@ func (s *Suite) TestGetContexts() {
 	initTestConfig()
 	ctxs, err := GetContexts()
 	s.NoError(err)
-	s.Equal(Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
+	s.Equal(Contexts{Contexts: map[string]Context{
+		"test_com":    {Domain: "test.com", Organization: "test-org-id", Workspace: "ck05r3bor07h40d02y2hw4n4v", LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v"},
+		"example_com": {Domain: "example.com", Organization: "test-org-id", Workspace: "ck05r3bor07h40d02y2hw4n4v", LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v"},
+	}}, ctxs)
 }
 
 func (s *Suite) TestSetContextKey() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
-	ctx.SetContextKey("token", "test")
+	err := ctx.SetContextKey("workspace", "ws-123")
+	s.NoError(err)
 	outCtx, err := ctx.GetContext()
 	s.NoError(err)
-	s.Equal("test", outCtx.Token)
+	s.Equal("localhost", outCtx.Domain)
+	s.Equal("ws-123", outCtx.Workspace)
 }
 
 func (s *Suite) TestSetOrganizationContext() {
@@ -226,30 +219,4 @@ func (s *Suite) TestSetOrganizationContext() {
 		s.Error(err)
 		s.Contains(err.Error(), "context config invalid, no domain specified")
 	})
-}
-
-func (s *Suite) TestExpiresIn() {
-	initTestConfig()
-	ctx := Context{Domain: "localhost"}
-	err := ctx.SetExpiresIn(12)
-	s.NoError(err)
-
-	outCtx, err := ctx.GetContext()
-	s.NoError(err)
-
-	val, err := outCtx.GetExpiresIn()
-	s.NoError(err)
-	s.Equal("localhost", outCtx.Domain)
-	s.True(time.Now().Add(time.Duration(12) * time.Second).After(val)) // now + 12 seconds will always be after expire time, since that is set before
-}
-
-func (s *Suite) TestExpiresInFailure() {
-	initTestConfig()
-	ctx := Context{}
-	err := ctx.SetExpiresIn(1)
-	s.ErrorIs(err, ErrCtxConfigErr)
-
-	val, err := ctx.GetExpiresIn()
-	s.ErrorIs(err, ErrCtxConfigErr)
-	s.Equal(time.Time{}, val)
 }

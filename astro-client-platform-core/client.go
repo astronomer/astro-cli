@@ -12,15 +12,13 @@ var NormalizeAPIError = httputil.NormalizeAPIError
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-// create api client for astro platform core services
-func NewPlatformCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
-	// we append base url in request editor, so set to an empty string here
+func NewPlatformCoreClient(c *httputil.HTTPClient, holder *httputil.TokenHolder) *ClientWithResponses {
 	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
 		ctx, err := context.GetCurrentContext()
 		if err != nil {
 			return "", "", err
 		}
-		return ctx.Token, ctx.GetPublicRESTAPIURL("platform/v1beta1"), nil
+		return holder.Get(), ctx.GetPublicRESTAPIURL("platform/v1beta1"), nil
 	})))
 	return cl
 }

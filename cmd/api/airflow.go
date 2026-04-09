@@ -43,18 +43,19 @@ type AirflowOptions struct {
 	// Internal
 	detectedVersion     string // The Airflow version being used (detected or overridden)
 	CredentialsExplicit bool   // true when --username or --password was explicitly passed
+	tokenHolder         *httputil.TokenHolder
 }
 
 // NewAirflowCmd creates the 'astro api airflow' command.
 //
 //nolint:dupl
-func NewAirflowCmd(out io.Writer) *cobra.Command {
+func NewAirflowCmd(out io.Writer, tokenHolder *httputil.TokenHolder) *cobra.Command {
 	opts := &AirflowOptions{
 		RequestOptions: RequestOptions{
 			Out:    out,
 			ErrOut: os.Stderr,
-			// specCache is initialized lazily when we know the Airflow version
 		},
+		tokenHolder: tokenHolder,
 	}
 
 	cmd := &cobra.Command{
@@ -459,7 +460,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 	}
 
 	// Check for token
-	if ctx.Token == "" {
+	if opts.tokenHolder == nil || opts.tokenHolder.Get() == "" {
 		return "", "", fmt.Errorf("not authenticated. Run 'astro login' to authenticate")
 	}
 
@@ -473,7 +474,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 	}
 
 	// Create platform client
-	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient())
+	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient(), opts.tokenHolder)
 
 	// Fetch deployment
 	dep, err := deployment.CoreGetDeployment(orgID, opts.DeploymentID, platformCoreClient)
@@ -492,7 +493,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 		airflowURL = "https://" + airflowURL
 	}
 
-	return airflowURL, ctx.Token, nil
+	return airflowURL, opts.tokenHolder.Get(), nil
 }
 
 // runAirflowInteractive runs the airflow API command in interactive mode.

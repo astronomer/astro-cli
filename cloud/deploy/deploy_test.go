@@ -209,7 +209,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.Token = "test testing"
+
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
@@ -309,7 +309,7 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.Token = "test testing"
+
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
@@ -452,7 +452,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.Token = "test testing"
+
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
@@ -681,7 +681,7 @@ func TestNoDagsDeploy(t *testing.T) {
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.Token = "test testing"
+
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
@@ -717,7 +717,6 @@ func TestNoDagsDeployForceSkipsPrompt(t *testing.T) {
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.Token = "test testing"
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
@@ -753,7 +752,6 @@ func TestNoDagsImageDeployForceSkipsPrompt(t *testing.T) {
 
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.Token = "test testing"
 	err = ctx.SetContext()
 	assert.NoError(t, err)
 
@@ -1374,6 +1372,8 @@ func TestDeployClientImage(t *testing.T) {
 	}()
 
 	t.Run("successful client deploy", func(t *testing.T) {
+		t.Setenv("ASTRO_API_TOKEN", "test-token")
+
 		// Set up temporary directory with Dockerfile.client
 		tempDir, err := os.MkdirTemp("", "test-deploy-*")
 		assert.NoError(t, err)
@@ -1394,7 +1394,7 @@ func TestDeployClientImage(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		ctx.Token = "test-token"
+
 		err = ctx.SetContext()
 		assert.NoError(t, err)
 		// Mock DockerLogin
@@ -1435,7 +1435,7 @@ func TestDeployClientImage(t *testing.T) {
 		assert.True(t, dockerLoginCalled, "DockerLogin should have been called")
 		assert.Equal(t, "images.astronomer.cloud", capturedRegistry)
 		assert.Equal(t, "cli", capturedUsername)
-		assert.Equal(t, "test-token", capturedToken)
+		assert.Equal(t, "Bearer test-token", capturedToken)
 		mockImageHandler.AssertExpectations(t)
 	})
 
@@ -1444,7 +1444,7 @@ func TestDeployClientImage(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		ctx.Token = "test-token"
+
 		err = ctx.SetContext()
 		assert.NoError(t, err)
 
@@ -1470,7 +1470,7 @@ func TestDeployClientImage(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		ctx.Token = "test-token"
+
 		err = ctx.SetContext()
 		assert.NoError(t, err)
 
@@ -1515,7 +1515,7 @@ func TestDeployClientImage(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		ctx.Token = "test-token"
+
 		err = ctx.SetContext()
 		assert.NoError(t, err)
 
@@ -1571,7 +1571,7 @@ func TestDeployClientImage(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		ctx.Token = "test-token"
+
 		err = ctx.SetContext()
 		assert.NoError(t, err)
 
@@ -1612,7 +1612,7 @@ func TestDeployClientImage(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		ctx.Token = "test-token"
+
 		err = ctx.SetContext()
 		assert.NoError(t, err)
 
