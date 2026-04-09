@@ -1750,15 +1750,11 @@ func (s *Suite) TestDockerComposeSettings() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running", Name: "test-webserver"}}, nil).Once()
 
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
-
 		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return nil
 		}
 
 		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", true, true, true)
 		s.NoError(err)
@@ -1768,14 +1764,11 @@ func (s *Suite) TestDockerComposeSettings() {
 	s.Run("import failure", func() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running", Name: "test-webserver"}}, nil).Once()
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
 		initSettings = func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return errMockSettings
 		}
 
 		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", false, false, false)
 		s.ErrorIs(err, errMockSettings)
@@ -1850,14 +1843,11 @@ func (s *Suite) TestDockerComposeSettings() {
 		composeMock.AssertExpectations(s.T())
 	})
 
-	s.Run("list lables import error", func() {
+	s.Run("import ps error", func() {
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running", Name: "test-webserver"}}, nil).Once()
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{}, errMock).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMock).Once()
 
 		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", true, true, true)
 		s.Contains(err.Error(), errMock.Error())
