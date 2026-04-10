@@ -20,6 +20,7 @@ import (
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -179,6 +180,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           false,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -279,6 +281,7 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           false,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -383,10 +386,11 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           false,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
-	canCiCdDeploy = func(astroAPIToken string) bool {
+	canCiCdDeploy = func(creds *credentials.CurrentCredentials) bool {
 		return false
 	}
 
@@ -420,6 +424,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           false,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -522,6 +527,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           false,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	defer testUtil.MockUserInput(t, "1")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
@@ -552,6 +558,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		Dags:           true,
 		WaitForStatus:  false,
 		DagsPath:       "./testfiles/dags",
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -637,6 +644,7 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 		Image:          true,
 		WaitForStatus:  false,
 		DagsPath:       "./testfiles/dags",
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -700,6 +708,7 @@ func TestNoDagsDeploy(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           true,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	defer testUtil.MockUserInput(t, "1")()
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
@@ -734,6 +743,7 @@ func TestNoDagsDeployForceSkipsPrompt(t *testing.T) {
 		WsID:      ws,
 		Dags:      true,
 		Force:     true,
+		Creds:     &credentials.CurrentCredentials{},
 	}
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
@@ -780,6 +790,7 @@ func TestNoDagsImageDeployForceSkipsPrompt(t *testing.T) {
 		EnvFile:   "./testfiles/.env",
 		Dags:      false,
 		Force:     true,
+		Creds:     &credentials.CurrentCredentials{},
 	}
 	err = Deploy(deployInput, mockPlatformCoreClient, mockCoreClient)
 	assert.NoError(t, err)
@@ -805,6 +816,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           true,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
 	mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
@@ -868,6 +880,7 @@ func TestDeployFailure(t *testing.T) {
 		Prompt:         true,
 		WaitForStatus:  false,
 		Dags:           false,
+		Creds:          &credentials.CurrentCredentials{},
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
@@ -945,6 +958,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 		Prompt:         true,
 		Dags:           true,
 		DagsPath:       "./testfiles/dags",
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -1028,6 +1042,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 		Prompt:         true,
 		Dags:           true,
 		DagsPath:       "./testfiles/dags",
+		Creds:          &credentials.CurrentCredentials{},
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -1428,6 +1443,7 @@ func TestDeployClientImage(t *testing.T) {
 		deployInput := InputClientDeploy{
 			Path:              tempDir,
 			BuildSecretString: "",
+			Creds:             credentials.New("Bearer test-token"),
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1458,6 +1474,7 @@ func TestDeployClientImage(t *testing.T) {
 		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
+			Creds:             &credentials.CurrentCredentials{},
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1486,6 +1503,7 @@ func TestDeployClientImage(t *testing.T) {
 		deployInput := InputClientDeploy{
 			Path:              "/test/path",
 			BuildSecretString: "",
+			Creds:             &credentials.CurrentCredentials{},
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1542,6 +1560,7 @@ func TestDeployClientImage(t *testing.T) {
 		deployInput := InputClientDeploy{
 			Path:              tempDir,
 			BuildSecretString: "",
+			Creds:             &credentials.CurrentCredentials{},
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1599,6 +1618,7 @@ func TestDeployClientImage(t *testing.T) {
 		deployInput := InputClientDeploy{
 			Path:              tempDir,
 			BuildSecretString: "",
+			Creds:             &credentials.CurrentCredentials{},
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1646,6 +1666,7 @@ func TestDeployClientImage(t *testing.T) {
 			Path:              tempDir,
 			ImageName:         "custom-image:tag",
 			BuildSecretString: "",
+			Creds:             &credentials.CurrentCredentials{},
 		}
 
 		err = DeployClientImage(deployInput, nil)

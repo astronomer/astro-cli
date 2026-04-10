@@ -16,7 +16,7 @@ import (
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/version"
 )
@@ -29,7 +29,7 @@ func SetupLogging(_ *cobra.Command, _ []string) error {
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra
 // pre-run hook that sets up the context and checks for the latest version.
-func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, astroCoreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) func(cmd *cobra.Command, args []string) error {
+func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, creds *credentials.CurrentCredentials, astroCoreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		// login/logout don't need existing credentials, skip auth setup
 		if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
@@ -56,19 +56,19 @@ func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, tok
 		}
 
 		if context.IsCloudContext() {
-			if err := handleCloudSetup(cmd, store, tokenHolder, platformCoreClient, astroCoreClient); err != nil {
+			if err := handleCloudSetup(cmd, store, creds, platformCoreClient, astroCoreClient); err != nil {
 				return err
 			}
 		} else {
-			loadSoftwareToken(store, tokenHolder)
+			loadSoftwareToken(store, creds)
 		}
 		softwareCmd.PrintDebugLogs()
 		return nil
 	}
 }
 
-func handleCloudSetup(cmd *cobra.Command, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) error {
-	err := cloudCmd.Setup(cmd, store, tokenHolder, platformCoreClient, astroCoreClient)
+func handleCloudSetup(cmd *cobra.Command, store keychain.SecureStore, creds *credentials.CurrentCredentials, platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) error {
+	err := cloudCmd.Setup(cmd, store, creds, platformCoreClient, astroCoreClient)
 	if err == nil {
 		return nil
 	}
@@ -82,7 +82,7 @@ func handleCloudSetup(cmd *cobra.Command, store keychain.SecureStore, tokenHolde
 	return nil
 }
 
-func loadSoftwareToken(store keychain.SecureStore, tokenHolder *httputil.TokenHolder) {
+func loadSoftwareToken(store keychain.SecureStore, creds *credentials.CurrentCredentials) {
 	if store == nil {
 		return
 	}
@@ -90,7 +90,7 @@ func loadSoftwareToken(store keychain.SecureStore, tokenHolder *httputil.TokenHo
 	if err != nil {
 		return
 	}
-	if creds, credErr := store.GetCredentials(c.Domain); credErr == nil {
-		tokenHolder.Set(creds.Token)
+	if keyCreds, credErr := store.GetCredentials(c.Domain); credErr == nil {
+		creds.Set(keyCreds.Token)
 	}
 }

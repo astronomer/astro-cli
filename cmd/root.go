@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 )
@@ -38,16 +39,16 @@ const (
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
 	var err error
-	tokenHolder := &httputil.TokenHolder{}
+	creds := &credentials.CurrentCredentials{}
 	store, storeErr := newSecureStore()
 
 	httpClient := houston.NewHTTPClient()
-	houstonClient = houston.NewClient(httpClient, tokenHolder)
+	houstonClient = houston.NewClient(httpClient, creds)
 
-	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient(), tokenHolder)
-	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient(), tokenHolder)
-	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient(), tokenHolder)
-	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient(), tokenHolder)
+	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient(), creds)
+	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient(), creds)
+	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient(), creds)
+	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient(), creds)
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -79,29 +80,29 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(storeErr, store, tokenHolder, astroCoreClient, platformCoreClient),
+				CreateRootPersistentPreRunE(storeErr, store, creds, astroCoreClient, platformCoreClient),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(store, tokenHolder, astroCoreClient, platformCoreClient, os.Stdout),
+		newLoginCommand(store, creds, astroCoreClient, platformCoreClient, os.Stdout),
 		newLogoutCommand(store, os.Stdout),
-		newAuthRootCmd(store, tokenHolder, astroCoreClient, platformCoreClient, os.Stdout),
+		newAuthRootCmd(store, creds, astroCoreClient, platformCoreClient, os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(platformCoreClient, astroCoreClient, store),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
-		api.NewAPICmd(tokenHolder),
+		api.NewAPICmd(creds),
 		newTelemetryCmd(os.Stdout),
 		newTelemetrySendCmd(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(platformCoreClient, astroCoreClient, airflowClient, astroCoreIamClient, os.Stdout)...,
+			cloudCmd.AddCmds(platformCoreClient, astroCoreClient, airflowClient, astroCoreIamClient, creds, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(

@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -66,7 +67,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+func Setup(cmd *cobra.Command, store keychain.SecureStore, creds *credentials.CurrentCredentials, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -110,7 +111,7 @@ func Setup(cmd *cobra.Command, store keychain.SecureStore, tokenHolder *httputil
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, tokenHolder, platformCoreClient)
+	apiToken, err := checkAPIToken(isDeploymentFile, creds, platformCoreClient)
 	if err != nil {
 		return err
 	}
@@ -119,14 +120,14 @@ func Setup(cmd *cobra.Command, store keychain.SecureStore, tokenHolder *httputil
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(platformCoreClient, tokenHolder, isDeploymentFile)
+	apiKey, err := checkAPIKeys(platformCoreClient, creds, isDeploymentFile)
 	if err != nil {
 		return err
 	}
 	if apiKey {
 		return nil
 	}
-	err = checkToken(store, tokenHolder, coreClient, platformCoreClient, os.Stdout)
+	err = checkToken(store, creds, coreClient, platformCoreClient, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -134,30 +135,30 @@ func Setup(cmd *cobra.Command, store keychain.SecureStore, tokenHolder *httputil
 	return nil
 }
 
-func checkToken(store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func checkToken(store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	creds, err := store.GetCredentials(c.Domain)
-	if err != nil || creds.Token == "" {
-		return authLogin(c.Domain, "", store, tokenHolder, coreClient, platformCoreClient, out, false)
+	keyCreds, err := store.GetCredentials(c.Domain)
+	if err != nil || keyCreds.Token == "" {
+		return authLogin(c.Domain, "", store, creds, coreClient, platformCoreClient, out, false)
 	}
 
-	if isExpired(creds.ExpiresAt, accessTokenExpThreshold) {
+	if isExpired(keyCreds.ExpiresAt, accessTokenExpThreshold) {
 		authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
 		if err != nil {
 			return err
 		}
-		res, err := refresh(creds.RefreshToken, authConfig)
+		res, err := refresh(keyCreds.RefreshToken, authConfig)
 		if err != nil {
-			return authLogin(c.Domain, "", store, tokenHolder, coreClient, platformCoreClient, out, false)
+			return authLogin(c.Domain, "", store, creds, coreClient, platformCoreClient, out, false)
 		}
 		newCreds := keychain.Credentials{
 			Token:        "Bearer " + res.AccessToken,
-			RefreshToken: creds.RefreshToken,
-			UserEmail:    creds.UserEmail,
+			RefreshToken: keyCreds.RefreshToken,
+			UserEmail:    keyCreds.UserEmail,
 			ExpiresAt:    time.Now().Add(time.Duration(res.ExpiresIn) * time.Second),
 		}
 		if res.RefreshToken != "" {
@@ -166,11 +167,11 @@ func checkToken(store keychain.SecureStore, tokenHolder *httputil.TokenHolder, c
 		if err := store.SetCredentials(c.Domain, newCreds); err != nil {
 			return err
 		}
-		tokenHolder.Set(newCreds.Token)
+		creds.Set(newCreds.Token)
 		return nil
 	}
 
-	tokenHolder.Set(creds.Token)
+	creds.Set(keyCreds.Token)
 	return nil
 }
 
@@ -219,7 +220,7 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	return tokenRes, nil
 }
 
-func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, tokenHolder *httputil.TokenHolder, isDeploymentFile bool) (bool, error) {
+func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, creds *credentials.CurrentCredentials, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -300,7 +301,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, tokenHolder *
 		return false, errors.New(tokenRes.ErrorDescription)
 	}
 
-	tokenHolder.Set("Bearer " + tokenRes.AccessToken)
+	creds.Set("Bearer " + tokenRes.AccessToken)
 
 	orgs, err := organization.ListOrganizations(platformCoreClient)
 	if err != nil {
@@ -330,7 +331,7 @@ func checkAPIKeys(platformCoreClient astroplatformcore.CoreClient, tokenHolder *
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, tokenHolder *httputil.TokenHolder, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, creds *credentials.CurrentCredentials, platformCoreClient astroplatformcore.CoreClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -367,7 +368,7 @@ func checkAPIToken(isDeploymentFile bool, tokenHolder *httputil.TokenHolder, pla
 		}
 	}
 
-	tokenHolder.Set("Bearer " + astroAPIToken)
+	creds.Set("Bearer " + astroAPIToken)
 
 	// Parse the token to peek at the custom claims
 	claims, err := parseAPIToken(astroAPIToken)

@@ -169,6 +169,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Description:       deployDescription,
 		BuildSecretString: BuildSecretString,
 		Force:             forceDeploy,
+		Creds:             creds,
 	}
 
 	return DeployImage(deployInput, platformCoreClient, astroCoreClient)

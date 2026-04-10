@@ -14,6 +14,7 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -29,6 +30,7 @@ type DeployBundleInput struct {
 	WaitTime           time.Duration
 	PlatformCoreClient astroplatformcore.CoreClient
 	CoreClient         astrocore.CoreClient
+	Creds              *credentials.CurrentCredentials
 }
 
 func DeployBundle(input *DeployBundleInput) error {
@@ -44,7 +46,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// if CI/CD is enforced, check the subject can deploy
-	if currentDeployment.IsCicdEnforced && !canCiCdDeploy("Bearer "+os.Getenv("ASTRO_API_TOKEN")) {
+	if currentDeployment.IsCicdEnforced && !canCiCdDeploy(input.Creds) {
 		return fmt.Errorf(errCiCdEnforcementUpdate, currentDeployment.Name)
 	}
 

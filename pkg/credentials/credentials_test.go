@@ -1,15 +1,15 @@
-package httputil_test
+package credentials_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 )
 
-func TestTokenHolder(t *testing.T) {
-	h := &httputil.TokenHolder{}
+func TestCurrentCredentials(t *testing.T) {
+	h := &credentials.CurrentCredentials{}
 	assert.Equal(t, "", h.Get())
 
 	h.Set("Bearer abc")

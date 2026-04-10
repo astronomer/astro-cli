@@ -14,7 +14,7 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -169,10 +169,10 @@ func TestResolveAirflowAPIURL_DeploymentID_Success(t *testing.T) {
 		}, nil
 	}
 
-	th := httputil.NewTokenHolder("test-token")
+	creds := credentials.New("test-token")
 	opts := &AirflowOptions{
 		DeploymentID: "test-deployment-id",
-		tokenHolder:  th,
+		creds:        creds,
 	}
 
 	baseURL, authToken, err := resolveAirflowAPIURL(opts)
@@ -209,11 +209,11 @@ func TestResolveAirflowAPIURL_DeploymentID_WithOrgOverride(t *testing.T) {
 		}, nil
 	}
 
-	th := httputil.NewTokenHolder("test-token")
+	creds := credentials.New("test-token")
 	opts := &AirflowOptions{
 		DeploymentID:   "test-deployment-id",
 		OrganizationID: "override-org",
-		tokenHolder:    th,
+		creds:          creds,
 	}
 
 	baseURL, authToken, err := resolveAirflowAPIURL(opts)
@@ -246,10 +246,10 @@ func TestResolveAirflowAPIURL_DeploymentID_NoAirflowURL(t *testing.T) {
 		}, nil
 	}
 
-	th := httputil.NewTokenHolder("test-token")
+	creds := credentials.New("test-token")
 	opts := &AirflowOptions{
 		DeploymentID: "test-deployment-id",
-		tokenHolder:  th,
+		creds:        creds,
 	}
 
 	_, _, err = resolveAirflowAPIURL(opts)

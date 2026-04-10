@@ -2,6 +2,7 @@ package astroplatformcore
 
 import (
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -12,7 +13,7 @@ var NormalizeAPIError = httputil.NormalizeAPIError
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-func NewPlatformCoreClient(c *httputil.HTTPClient, holder *httputil.TokenHolder) *ClientWithResponses {
+func NewPlatformCoreClient(c *httputil.HTTPClient, holder *credentials.CurrentCredentials) *ClientWithResponses {
 	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
 		ctx, err := context.GetCurrentContext()
 		if err != nil {

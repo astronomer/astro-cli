@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/keychain"
@@ -341,7 +342,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -388,7 +389,7 @@ func Login(domain, token string, store keychain.SecureStore, tokenHolder *httput
 		return err
 	}
 
-	creds := keychain.Credentials{
+	keyCreds := keychain.Credentials{
 		Token:        "Bearer " + res.AccessToken,
 		RefreshToken: res.RefreshToken,
 		UserEmail:    res.UserEmail,
@@ -397,11 +398,11 @@ func Login(domain, token string, store keychain.SecureStore, tokenHolder *httput
 	if store == nil {
 		return fmt.Errorf("credential store not available; cannot save login credentials")
 	}
-	if err := store.SetCredentials(domain, creds); err != nil {
+	if err := store.SetCredentials(domain, keyCreds); err != nil {
 		return fmt.Errorf("storing credentials: %w", err)
 	}
-	if tokenHolder != nil {
-		tokenHolder.Set(creds.Token)
+	if creds != nil {
+		creds.Set(keyCreds.Token)
 	}
 
 	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))

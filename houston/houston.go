@@ -15,6 +15,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -107,8 +108,8 @@ type ClientImplementation struct {
 
 // NewClient - initialized the Houston Client object with proper HTTP Client configuration
 // set as a variable so we can change it to return mock houston clients in tests
-var NewClient = func(c *httputil.HTTPClient, tokenHolder *httputil.TokenHolder) ClientInterface {
-	client := newInternalClient(c, tokenHolder)
+var NewClient = func(c *httputil.HTTPClient, creds *credentials.CurrentCredentials) ClientInterface {
+	client := newInternalClient(c, creds)
 	return &ClientImplementation{
 		client: client,
 	}
@@ -116,8 +117,8 @@ var NewClient = func(c *httputil.HTTPClient, tokenHolder *httputil.TokenHolder) 
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
-	HTTPClient  *httputil.HTTPClient
-	tokenHolder *httputil.TokenHolder
+	HTTPClient *httputil.HTTPClient
+	creds      *credentials.CurrentCredentials
 }
 
 func NewHTTPClient() *httputil.HTTPClient {
@@ -136,10 +137,10 @@ func NewHTTPClient() *httputil.HTTPClient {
 }
 
 // newInternalClient returns a new Client with the logger and HTTP Client setup.
-func newInternalClient(c *httputil.HTTPClient, tokenHolder *httputil.TokenHolder) *Client {
+func newInternalClient(c *httputil.HTTPClient, creds *credentials.CurrentCredentials) *Client {
 	return &Client{
-		HTTPClient:  c,
-		tokenHolder: tokenHolder,
+		HTTPClient: c,
+		creds:      creds,
 	}
 }
 
@@ -182,8 +183,8 @@ func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 // DoWithContext executes a query against the Houston API, logging out any errors contained in the response object
 func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) (*Response, error) {
 	// set headers
-	if c.tokenHolder != nil {
-		if tok := c.tokenHolder.Get(); tok != "" {
+	if c.creds != nil {
+		if tok := c.creds.Get(); tok != "" {
 			doOpts.Headers["authorization"] = tok
 		}
 	}

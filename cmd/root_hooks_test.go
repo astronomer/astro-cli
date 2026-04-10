@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -16,7 +16,7 @@ func TestLoadSoftwareToken_LoadsToken(t *testing.T) {
 	err := store.SetCredentials("astronomer_dev.com", keychain.Credentials{Token: "test-token"})
 	assert.NoError(t, err)
 
-	holder := &httputil.TokenHolder{}
+	holder := &credentials.CurrentCredentials{}
 	loadSoftwareToken(store, holder)
 	assert.Equal(t, "test-token", holder.Get())
 }

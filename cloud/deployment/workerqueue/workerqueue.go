@@ -231,7 +231,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	}
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient)
+	err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient, nil)
 	if err != nil {
 		return err
 	}
@@ -558,7 +558,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient, nil)
 			if err != nil {
 				return err
 			}
@@ -580,7 +580,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, platformC
 				}
 			}
 			// update the deployment with the new list
-			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient)
+			err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, coreClient, platformCoreClient, nil)
 			if err != nil {
 				return err
 			}

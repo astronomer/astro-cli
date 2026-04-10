@@ -12,8 +12,8 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	softwareAuth "github.com/astronomer/astro-cli/software/auth"
 )
@@ -30,8 +30,8 @@ var (
 )
 
 // newLoginCommand is a top-level alias for "astro auth login" kept for backward compatibility.
-func newLoginCommand(store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
-	cmd := newAuthLoginCommand(store, tokenHolder, coreClient, platformCoreClient, out)
+func newLoginCommand(store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
+	cmd := newAuthLoginCommand(store, creds, coreClient, platformCoreClient, out)
 	cmd.Long = "Authenticate to Astro or Astro Private Cloud. This is an alias for 'astro auth login'."
 	return cmd
 }
@@ -43,7 +43,7 @@ func newLogoutCommand(store keychain.SecureStore, out io.Writer) *cobra.Command 
 	return cmd
 }
 
-func login(cmd *cobra.Command, args []string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func login(cmd *cobra.Command, args []string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -57,15 +57,15 @@ func login(cmd *cobra.Command, args []string, store keychain.SecureStore, tokenH
 			}
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, store, houstonClient, out)
 		}
-		return cloudLogin(args[0], token, store, tokenHolder, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(args[0], token, store, creds, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(domainutil.DefaultDomain, token, store, tokenHolder, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(domainutil.DefaultDomain, token, store, creds, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, token, store, tokenHolder, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(ctx.Domain, token, store, creds, coreClient, platformCoreClient, out, shouldDisplayLoginLink)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, store, houstonClient, out)
 }
@@ -93,28 +93,28 @@ func logout(cmd *cobra.Command, args []string, store keychain.SecureStore, out i
 	return nil
 }
 
-func newAuthRootCmd(store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
+func newAuthRootCmd(store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Manage authentication to Astronomer",
 		Long:  "Commands for authenticating to Astro or Astro Private Cloud",
 	}
 	cmd.AddCommand(
-		newAuthLoginCommand(store, tokenHolder, coreClient, platformCoreClient, out),
+		newAuthLoginCommand(store, creds, coreClient, platformCoreClient, out),
 		newAuthLogoutCommand(store, out),
 		newAuthTokenCommand(store, out),
 	)
 	return cmd
 }
 
-func newAuthLoginCommand(store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
+func newAuthLoginCommand(store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
 		Long:  "Authenticate to Astro or Astro Private Cloud",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, store, tokenHolder, coreClient, platformCoreClient, out)
+			return login(cmd, args, store, creds, coreClient, platformCoreClient, out)
 		},
 	}
 

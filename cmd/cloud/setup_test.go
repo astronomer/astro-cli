@@ -20,7 +20,7 @@ import (
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -69,11 +69,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, nil, nil)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -90,11 +90,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, nil, nil)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -170,11 +170,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "deployment"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, nil, nil)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -190,11 +190,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, nil, nil)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, nil, nil)
 		assert.NoError(t, err)
 	})
 
@@ -243,7 +243,7 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 	})
@@ -267,7 +267,7 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "bad token")
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, mockPlatformCoreClient, mockCoreClient)
 		assert.Error(t, err)
 	})
 
@@ -284,13 +284,13 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
 		t.Setenv("ASTRO_API_TOKEN", "")
 
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 	})
 
@@ -320,7 +320,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -341,7 +341,7 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		err = Setup(cmd, keychain.NewTestStore(), &httputil.TokenHolder{}, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, keychain.NewTestStore(), &credentials.CurrentCredentials{}, mockPlatformCoreClient, mockCoreClient)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
@@ -371,7 +371,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -398,7 +398,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		err = context.Switch(domain)
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIKeys(mockPlatformCoreClient, holder, false)
 		assert.NoError(t, err)
 		mockPlatformCoreClient.AssertExpectations(t)
@@ -411,20 +411,20 @@ func TestCheckToken(t *testing.T) {
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	t.Run("test check token", func(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		err := checkToken(keychain.NewTestStore(), holder, mockCoreClient, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 	})
 	t.Run("trigger login when no token is found", func(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errorLogin
 		}
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		err := checkToken(keychain.NewTestStore(), holder, mockCoreClient, mockPlatformCoreClient, nil)
 		assert.Contains(t, err.Error(), "failed to login")
 	})
@@ -434,7 +434,7 @@ func TestCheckToken(t *testing.T) {
 		store := keychain.NewTestStore()
 		_ = store.SetCredentials("astronomer.io", keychain.Credentials{Token: "Bearer tok", ExpiresAt: time.Now().Add(time.Hour)})
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		err := checkToken(store, holder, mockCoreClient, mockPlatformCoreClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, "Bearer tok", holder.Get())
@@ -477,7 +477,7 @@ func TestCheckAPIToken(t *testing.T) {
 	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 
 	t.Run("test context switch", func(t *testing.T) {
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -494,13 +494,13 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIToken(true, holder, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
 
 	t.Run("failed to parse api token", func(t *testing.T) {
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -517,12 +517,12 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIToken(true, holder, mockPlatformCoreClient)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -536,7 +536,7 @@ func TestCheckAPIToken(t *testing.T) {
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIToken(true, holder, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
@@ -556,7 +556,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -573,7 +573,7 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIToken(false, holder, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
@@ -596,7 +596,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -613,7 +613,7 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIToken(true, holder, mockPlatformCoreClient)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
@@ -635,7 +635,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, store keychain.SecureStore, tokenHolder *httputil.TokenHolder, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -652,7 +652,7 @@ func TestCheckAPIToken(t *testing.T) {
 		err := context.Switch(domain)
 		assert.NoError(t, err)
 
-		holder := &httputil.TokenHolder{}
+		holder := &credentials.CurrentCredentials{}
 		_, err = checkAPIToken(true, holder, mockPlatformCoreClient)
 		assert.NoError(t, err)
 	})
