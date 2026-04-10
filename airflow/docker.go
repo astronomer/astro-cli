@@ -1461,8 +1461,8 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return err
 	}
 
-	apiURL := airflowAPIURL(airflowDockerVersion)
-	authHeader := airflowAuthHeader(airflowDockerVersion)
+	apiURL := airflowAPIURL(airflowDockerVersion, nil)
+	authHeader := airflowAuthHeader(airflowDockerVersion, nil)
 
 	err = initSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
@@ -1712,14 +1712,20 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 }
 
 // airflowAPIURL returns the base API URL for the local Airflow instance.
-func airflowAPIURL(airflowMajorVersion uint64) string {
+func airflowAPIURL(airflowMajorVersion uint64, portOvr *PortOverrides) string {
 	var port, apiPrefix string
 	switch airflowMajorVersion {
 	case airflowMajorVersion3:
 		port = config.CFG.APIServerPort.GetString()
+		if portOvr != nil && portOvr.APIServerPort != "" {
+			port = portOvr.APIServerPort
+		}
 		apiPrefix = "/api/v2"
 	default:
 		port = config.CFG.WebserverPort.GetString()
+		if portOvr != nil && portOvr.WebserverPort != "" {
+			port = portOvr.WebserverPort
+		}
 		apiPrefix = "/api/v1"
 	}
 	parts := strings.Split(port, ":")
@@ -1727,13 +1733,13 @@ func airflowAPIURL(airflowMajorVersion uint64) string {
 }
 
 // airflowAuthHeader returns the Authorization header for the local Airflow instance.
-func airflowAuthHeader(airflowMajorVersion uint64) string {
+func airflowAuthHeader(airflowMajorVersion uint64, portOvr *PortOverrides) string {
 	if airflowMajorVersion == airflowMajorVersion2 {
 		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
 	}
 	// Airflow 3 uses JWT auth via /auth/token endpoint.
 	// With SimpleAuthManager + ALL_ADMINS=True, any credentials work.
-	token, err := fetchLocalAirflowToken(airflowMajorVersion)
+	token, err := fetchLocalAirflowToken(airflowMajorVersion, portOvr)
 	if err != nil {
 		logger.Debugf("Unable to fetch Airflow auth token: %s", err)
 		return ""
@@ -1742,8 +1748,8 @@ func airflowAuthHeader(airflowMajorVersion uint64) string {
 }
 
 // fetchLocalAirflowToken gets a JWT token from the local Airflow 3 instance.
-func fetchLocalAirflowToken(airflowMajorVersion uint64) (string, error) {
-	apiURL := airflowAPIURL(airflowMajorVersion)
+func fetchLocalAirflowToken(airflowMajorVersion uint64, portOvr *PortOverrides) (string, error) {
+	apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
 	root := strings.TrimSuffix(apiURL, "/api/v2")
 	tokenURL := root + "/auth/token"
 
@@ -1778,8 +1784,8 @@ func printProxyStatus(settingsFile string, envConns map[string]astrocore.Environ
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion)
-		authHeader := airflowAuthHeader(airflowMajorVersion)
+		apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
+		authHeader := airflowAuthHeader(airflowMajorVersion, portOvr)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
@@ -1816,8 +1822,8 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion)
-		authHeader := airflowAuthHeader(airflowMajorVersion)
+		apiURL := airflowAPIURL(airflowMajorVersion, nil)
+		authHeader := airflowAuthHeader(airflowMajorVersion, nil)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
