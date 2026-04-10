@@ -126,6 +126,19 @@ func (s *Standalone) pidFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standalonePIDFile)
 }
 
+func (s *Standalone) portFilePath() string {
+	return filepath.Join(s.airflowHome, standaloneDir, "port")
+}
+
+// readPersistedPort reads the port from the state file, returns empty string if not found.
+func (s *Standalone) readPersistedPort() string {
+	data, err := os.ReadFile(s.portFilePath())
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
 }
@@ -329,6 +342,9 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		return fmt.Errorf("error starting airflow standalone: %w", err)
 	}
 
+	// Persist the port for subsequent commands (object import, etc.)
+	_ = os.WriteFile(s.portFilePath(), []byte(s.webserverPort()), filePermissions)
+
 	// Forward signals to the entire process group so child processes
 	// (scheduler, triggerer, api-server, etc.) are also terminated.
 	sigChan := make(chan os.Signal, 1)
@@ -444,6 +460,8 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
 		return fmt.Errorf("error writing PID file: %w", err)
 	}
+	// Persist the port so subsequent commands (object import, etc.) can find it.
+	_ = os.WriteFile(s.portFilePath(), []byte(s.webserverPort()), filePermissions)
 
 	// Run health check (blocking — wait for healthy or timeout)
 	healthURL, healthComp := s.healthEndpoint()
@@ -606,8 +624,15 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 		}
 	}
 
-	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", s.webserverPort())
-	return settings.ConfigSettings(apiURL, "", settingsFile, envConns, true, true, true)
+	port := s.webserverPort()
+	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)
+	// Standalone mode runs Airflow 3 with SimpleAuthManager — fetch a JWT token.
+	authHeader, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
+	if err != nil {
+		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
+		authHeader = ""
+	}
+	return settings.ConfigSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -645,6 +670,7 @@ func (s *Standalone) Stop(_ bool) error {
 	if !alive {
 		// Stale PID file — clean up
 		os.Remove(s.pidFilePath())
+		os.Remove(s.portFilePath())
 		fmt.Println("No standalone Airflow process found (cleaned up stale PID file).")
 		return nil
 	}
@@ -668,6 +694,7 @@ func (s *Standalone) Stop(_ bool) error {
 	}
 
 	os.Remove(s.pidFilePath())
+	os.Remove(s.portFilePath())
 	fmt.Println("Airflow standalone stopped.")
 	return nil
 }
@@ -880,8 +907,21 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 		return errors.New("file specified does not exist")
 	}
 
-	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", s.webserverPort())
-	err = settings.ConfigSettings(apiURL, "", settingsFile, nil, connections, variables, pools)
+	// Prefer the persisted port from when standalone was started, since it
+	// may differ from config (e.g., when proxy mode allocated a random port).
+	port := s.readPersistedPort()
+	if port == "" {
+		port = s.webserverPort()
+	}
+
+	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)
+	authHeader, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
+	if err != nil {
+		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
+		authHeader = ""
+	}
+
+	err = settings.ConfigSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
 		return err
 	}

@@ -1745,11 +1745,15 @@ func (s *Suite) TestDockerComposeSettings() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
 
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Maybe()
+
 		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return nil
 		}
 
 		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", true, true, true)
 		s.NoError(err)
@@ -1759,11 +1763,16 @@ func (s *Suite) TestDockerComposeSettings() {
 	s.Run("import failure", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Maybe()
+
 		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return errMockSettings
 		}
 
 		mockDockerCompose.imageHandler = imageHandler
+		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", false, false, false)
 		s.ErrorIs(err, errMockSettings)
