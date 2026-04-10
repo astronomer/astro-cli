@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
@@ -41,7 +42,7 @@ func (s *AddCmdSuite) TestAddCmds() {
 		},
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", "").Return(appConfig, nil)
+	houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
@@ -53,7 +54,7 @@ func (s *AddCmdSuite) TestAddCmds() {
 
 func (s *AddCmdSuite) TestAppConfigFailure() {
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", "").Return(nil, errMock)
+	houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMock)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
@@ -72,7 +73,7 @@ func (s *AddCmdSuite) TestPlatformVersionFailure() {
 		},
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", "").Return(appConfig, nil)
+	houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("", errMock)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)

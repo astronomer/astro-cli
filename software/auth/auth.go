@@ -94,7 +94,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 		return nil
 	}
 
-	appConfig, err := houston.Call(client.GetAppConfig)("")
+	appConfig, err := houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{})
 	if err != nil {
 		return err
 	}

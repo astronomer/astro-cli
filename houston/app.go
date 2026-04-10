@@ -85,6 +85,19 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "2.0.0",
+			query: `
+			query AppConfig($clusterId: Uuid, $workspaceUuid: Uuid, $deploymentUuid: Uuid) {
+				appConfig(clusterId: $clusterId, workspaceUuid: $workspaceUuid, deploymentUuid: $deploymentUuid) {
+					version
+					baseDomain
+					byoUpdateRegistryHost
+					smtpConfigured
+					featureFlags
+				}
+			}`,
+		},
 	}
 
 	AvailableNamespacesGetRequest = queryList{
@@ -117,21 +130,27 @@ var (
 )
 
 // GetAppConfig - get application configuration
-func (h ClientImplementation) GetAppConfig(clusterID string) (*AppConfig, error) {
+func (h ClientImplementation) GetAppConfig(req GetAppConfigRequest) (*AppConfig, error) {
 	// Even if application config has already been requested, we want to request it again
 	// Because we want to get the app config for the clusterID if it is provided
 	vars := map[string]interface{}{}
-	if clusterID != "" {
-		vars["clusterId"] = clusterID
+	if req.ClusterID != "" {
+		vars["clusterId"] = req.ClusterID
+	}
+	if req.WorkspaceUUID != "" {
+		vars["workspaceUuid"] = req.WorkspaceUUID
+	}
+	if req.DeploymentUUID != "" {
+		vars["deploymentUuid"] = req.DeploymentUUID
 	}
 	reqQuery := AppConfigRequest.GreatestLowerBound(version)
-	req := Request{
+	httpReq := Request{
 		Query:     reqQuery,
 		Variables: vars,
 	}
 
 	var r *Response
-	r, appConfigErr = req.DoWithClient(h.client)
+	r, appConfigErr = httpReq.DoWithClient(h.client)
 	if appConfigErr != nil {
 		appConfigErr = handleAPIErr(appConfigErr)
 		return nil, appConfigErr

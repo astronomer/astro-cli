@@ -75,7 +75,7 @@ type ClientInterface interface {
 	DeleteWorkspaceServiceAccount(req DeleteServiceAccountRequest) (*ServiceAccount, error)
 	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
-	GetAppConfig(clusterID string) (*AppConfig, error)
+	GetAppConfig(req GetAppConfigRequest) (*AppConfig, error)
 	GetAvailableNamespaces(vars map[string]interface{}) ([]Namespace, error)
 	GetPlatformVersion(interface{}) (string, error)
 	// runtime

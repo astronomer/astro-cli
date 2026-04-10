@@ -30,7 +30,7 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 
 	var err error
 	// There is no clusterID in the GetAppConfig call at this point of lifecycle, so we are getting the app config for the default cluster
-	appConfig, err = houston.Call(client.GetAppConfig)("")
+	appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{})
 	if err != nil {
 		InitDebugLogs = append(InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	}

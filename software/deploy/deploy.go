@@ -99,7 +99,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 
-	appConfig, err := houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: wsID, DeploymentUUID: deploymentID})
 	if err != nil {
 		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
 	}
@@ -483,7 +483,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
-	appConfig, err := houston.Call(houstonClient.GetAppConfig)(deploymentInfo.ClusterID)
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: wsID, DeploymentUUID: deploymentID})
 	if err != nil {
 		return fmt.Errorf("failed to get app config: %w", err)
 	}
