@@ -262,7 +262,9 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 
 // Logout removes the locally stored token and reset current context
 func Logout(domain string, store keychain.SecureStore) {
-	if err := store.DeleteCredentials(domain); err != nil {
+	if store == nil {
+		fmt.Println("Warning: credential store not available; local credentials may not be cleared")
+	} else if err := store.DeleteCredentials(domain); err != nil {
 		fmt.Printf("Failed to remove credentials: %s\n", err.Error())
 	}
 

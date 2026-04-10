@@ -15,17 +15,21 @@ import (
 // 0600 permissions. This matches the current plaintext config.yaml behavior
 // and is intentional — encrypted file fallback is not worth the complexity
 // given that CI environments use ASTRO_API_TOKEN anyway.
-//
-// NOTE: if 99designs/keyring fails to connect to Secret Service in environments
-// that DO have it running, replace with godbus/dbus directly:
-// https://github.com/godbus/dbus — the SecureStore interface is the only
-// change boundary.
 func New() (SecureStore, error) {
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:             serviceName,
 		LibSecretCollectionName: "astro-cli",
 		KWalletAppID:            "astro-cli",
 		KWalletFolder:           "astro-cli",
+		// Only allow persistent, non-interactive backends. KeyCtl stores
+		// credentials in kernel memory that doesn't survive reboot. Pass
+		// and File prompt for passphrases, which breaks non-interactive
+		// CLI usage. When neither desktop backend is available we fall
+		// through to our own fileStore below.
+		AllowedBackends: []keyring.BackendType{
+			keyring.SecretServiceBackend,
+			keyring.KWalletBackend,
+		},
 	})
 	if err == nil {
 		return newCachedStore(&keyringStore{ring: ring}), nil
