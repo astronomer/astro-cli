@@ -200,10 +200,6 @@ func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization,
 		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint
 	}
 	_ = c.SetOrganizationContext(targetOrg.Id, orgProduct)
-	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
-	_ = c.SetContextKey("token", c.Token)
-	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
-	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
 	err := CheckUserSession(&c, coreClient, platformCoreClient, out)

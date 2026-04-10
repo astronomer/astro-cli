@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Suite) TestNewHoustonClient() {
-	client := newInternalClient(httputil.NewHTTPClient())
+	client := newInternalClient(httputil.NewHTTPClient(), nil)
 	s.NotNil(client, "Can't create new houston Client")
 }
 

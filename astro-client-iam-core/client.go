@@ -2,6 +2,7 @@ package astroiamcore
 
 import (
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -12,14 +13,13 @@ var NormalizeAPIError = httputil.NormalizeAPIError
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-func NewIamCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
-	// we append base url in request editor, so set to an empty string here
+func NewIamCoreClient(c *httputil.HTTPClient, holder *credentials.CurrentCredentials) *ClientWithResponses {
 	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
 		ctx, err := context.GetCurrentContext()
 		if err != nil {
 			return "", "", err
 		}
-		return ctx.Token, ctx.GetPublicRESTAPIURL("iam/v1beta1"), nil
+		return holder.Get(), ctx.GetPublicRESTAPIURL("iam/v1beta1"), nil
 	})))
 	return cl
 }

@@ -148,7 +148,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 }
 
 func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
-	cmd := newDevRootCmd(nil, nil)
+	cmd := newDevRootCmd(nil, nil, nil)
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
@@ -761,71 +761,71 @@ func (s *AirflowSuite) TestAirflowStart() {
 
 func (s *AirflowSuite) TestAirflowUpgradeTest() {
 	s.Run("success", func() {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, false, "", nil).Return(nil).Once()
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, false, "", nil, nil).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
 	})
 
 	s.Run("failure", func() {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, false, "", nil).Return(errMock).Once()
+			mockContainerHandler.On("UpgradeTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, false, false, false, false, "", nil, nil).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		s.ErrorIs(err, errMock)
 		mockContainerHandler.AssertExpectations(s.T())
 	})
 
 	s.Run("containerHandlerInit failure", func() {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			return nil, errMock
 		}
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		s.ErrorIs(err, errMock)
 	})
 
 	s.Run("Both airflow and runtime version used", func() {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		airflowVersion = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		s.ErrorIs(err, errInvalidBothAirflowAndRuntimeVersionsUpgrade)
 	})
 
 	s.Run("Both runtime version and custom image used", func() {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		customImageName = "something"
 		runtimeVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		s.ErrorIs(err, errInvalidBothCustomImageandVersion)
 	})
 
 	s.Run("Both airflow version and custom image used", func() {
-		cmd := newAirflowUpgradeTestCmd(nil)
+		cmd := newAirflowUpgradeTestCmd(nil, nil)
 
 		customImageName = "something"
 		airflowVersion = "something"
 
-		err := airflowUpgradeTest(cmd, nil)
+		err := airflowUpgradeTest(cmd, nil, nil)
 		s.ErrorIs(err, errInvalidBothCustomImageandVersion)
 	})
 }
@@ -1919,7 +1919,7 @@ func (s *AirflowSuite) TestDevCommandLocalSubcommandRemoved() {
 
 func (s *AirflowSuite) TestStandaloneDockerFlagsMutuallyExclusive() {
 	// Verify that the flags are registered as mutually exclusive on the dev root command
-	cmd := newDevRootCmd(nil, nil)
+	cmd := newDevRootCmd(nil, nil, nil)
 	s.NotNil(cmd.PersistentFlags().Lookup("standalone"))
 	s.NotNil(cmd.PersistentFlags().Lookup("docker"))
 

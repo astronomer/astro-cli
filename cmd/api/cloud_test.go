@@ -38,7 +38,7 @@ contexts:
 
 func TestNewCloudCmd(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewCloudCmd(out)
+	cmd := NewCloudCmd(out, nil)
 
 	assert.Equal(t, "cloud <endpoint | operation-id>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
@@ -57,7 +57,7 @@ func TestNewCloudCmd(t *testing.T) {
 
 func TestCloudCmdFlags(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewCloudCmd(out)
+	cmd := NewCloudCmd(out, nil)
 
 	// Request flags
 	assert.NotNil(t, cmd.Flags().Lookup("method"))
@@ -347,7 +347,7 @@ func TestPlaceholderRE(t *testing.T) {
 
 func TestCloudCmd_NoArgs_ShowsHelp(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewCloudCmd(out)
+	cmd := NewCloudCmd(out, nil)
 	// Verify Args validator
 	err := cmd.Args(cmd, nil)
 	assert.NoError(t, err) // MaximumNArgs(1) allows 0
@@ -361,7 +361,7 @@ func TestCloudCmd_NoArgs_ShowsHelp(t *testing.T) {
 
 func TestCloudCmdLongDescription(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewCloudCmd(out)
+	cmd := NewCloudCmd(out, nil)
 	assert.Contains(t, cmd.Long, "Astro Cloud API")
 	assert.Contains(t, cmd.Example, "astro api cloud")
 }
@@ -370,7 +370,7 @@ func TestCloudCmdLongDescription(t *testing.T) {
 
 func TestCloudSpecURLFlag(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewCloudCmd(out)
+	cmd := NewCloudCmd(out, nil)
 
 	flag := cmd.PersistentFlags().Lookup("spec-url")
 	require.NotNil(t, flag, "--spec-url flag should exist")
@@ -385,7 +385,6 @@ func TestInitCloudSpecCache_SpecURL(t *testing.T) {
 	opts := &CloudOptions{SpecURL: "https://example.com/spec.json"}
 	ctx := &config.Context{
 		Domain: "example.com",
-		Token:  "my-secret-token",
 	}
 
 	err := initCloudSpecCache(opts, ctx)
@@ -423,7 +422,6 @@ func TestRunCloud_SpecURL_BaseURL(t *testing.T) {
 
 	ctx := &config.Context{
 		Domain:       "example.com",
-		Token:        "test-token",
 		Organization: "org-123",
 	}
 
@@ -444,7 +442,7 @@ func TestRunCloud_SpecURL_BaseURL(t *testing.T) {
 
 func TestCloudSpecTokenEnvVarFlag(t *testing.T) {
 	out := new(bytes.Buffer)
-	cmd := NewCloudCmd(out)
+	cmd := NewCloudCmd(out, nil)
 
 	flag := cmd.PersistentFlags().Lookup("spec-token-env-var")
 	require.NotNil(t, flag, "--spec-token-env-var flag should exist")
@@ -462,7 +460,6 @@ func TestInitCloudSpecCache_SpecTokenEnvVar(t *testing.T) {
 	}
 	ctx := &config.Context{
 		Domain: "example.com",
-		Token:  "context-token",
 	}
 
 	err := initCloudSpecCache(opts, ctx)

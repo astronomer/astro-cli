@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -53,7 +54,7 @@ const (
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
+func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool, creds *credentials.CurrentCredentials) error { //nolint
 	var (
 		err                                           error
 		errHelp, clusterID, workspaceID, outputFormat string
@@ -128,7 +129,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		}
 		// this deployment does not exist so create it
 		// transform formattedDeployment to DeploymentCreateInput
-		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, createAction, &astroplatformcore.Deployment{}, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus, waitTime, force)
+		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, createAction, &astroplatformcore.Deployment{}, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus, waitTime, force, creds)
 		if err != nil {
 			return err
 		}
@@ -171,7 +172,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return fmt.Errorf("%w \n failed to %s alert emails", err, action)
 		}
 		// transform formattedDeployment to DeploymentUpdateInput
-		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus, waitTime, force)
+		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus, waitTime, force, creds)
 		if err != nil {
 			return err
 		}
@@ -196,7 +197,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 // It returns an error if node pool id could not be found for the worker type.
 //
 //nolint:dupl
-func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool, dagDeploy bool, envVars []astroplatformcore.DeploymentEnvironmentVariableRequest, coreClient astrocore.CoreClient, astroPlatformCore astroplatformcore.CoreClient, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
+func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool, dagDeploy bool, envVars []astroplatformcore.DeploymentEnvironmentVariableRequest, coreClient astrocore.CoreClient, astroPlatformCore astroplatformcore.CoreClient, waitForStatus bool, waitTime time.Duration, force bool, creds *credentials.CurrentCredentials) error { //nolint
 	var (
 		defaultOptions          astroplatformcore.WorkerQueueOptions
 		configOptions           astroplatformcore.DeploymentOptions
@@ -694,11 +695,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		}
 		// update deployment
 		if !force && deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments && dagDeploy {
-			c, err := config.GetCurrentContext()
-			if err != nil {
-				return err
-			}
-			if !canCiCdDeploy(c.Token) {
+			if !canCiCdDeploy(creds) {
 				fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
 					"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens instead.")
 				y, _ := input.Confirm("\n\nAre you sure you want to continue?")

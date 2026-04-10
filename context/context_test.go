@@ -36,10 +36,9 @@ func (s *Suite) TestGetCurrentContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cluster, err := GetCurrentContext()
 	s.NoError(err)
-	s.Equal(cluster.Domain, testUtil.GetEnv("HOST", "localhost"))
+	s.Equal("localhost", cluster.Domain)
 	s.Equal(cluster.Workspace, "ck05r3bor07h40d02y2hw4n4v")
 	s.Equal(cluster.LastUsedWorkspace, "ck05r3bor07h40d02y2hw4n4v")
-	s.Equal(cluster.Token, "token")
 }
 
 func (s *Suite) TestGetContextKeyValidContextConfig() {

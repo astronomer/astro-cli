@@ -68,6 +68,8 @@ linters:
         - "2"
         - "10"
         - "64"
+        - "0o600"
+        - "0o700"
     nolintlint:
       require-explanation: false
       require-specific: false

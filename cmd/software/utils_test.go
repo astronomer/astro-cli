@@ -18,7 +18,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		mockAPI.On("GetAppConfig", "").Return(&houston.AppConfig{Version: "0.27.0"}, nil)
 		mockAPI.On("GetPlatformVersion", nil).Return("0.27.0", nil)
 		cmd := &cobra.Command{Use: "astro"}
-		childCMDs := AddCmds(mockAPI, buf)
+		childCMDs := AddCmds(mockAPI, nil, buf)
 		cmd.AddCommand(childCMDs...)
 
 		VersionMatchCmds(cmd, []string{"astro"})
@@ -46,7 +46,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		mockAPI.On("GetAppConfig", "").Return(&houston.AppConfig{Version: "0.30.0"}, nil)
 		mockAPI.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 		cmd := &cobra.Command{Use: "astro"}
-		childCMDs := AddCmds(mockAPI, buf)
+		childCMDs := AddCmds(mockAPI, nil, buf)
 		cmd.AddCommand(childCMDs...)
 
 		VersionMatchCmds(cmd, []string{"astro"})

@@ -102,7 +102,7 @@ func (s *Suite) TestWorkspaceTeamsListCmd() {
 			Header:     make(http.Header),
 		}
 	})
-	houstonClient = houston.NewClient(client)
+	houstonClient = houston.NewClient(client, nil)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceTeamsListCmd(buf)
 	s.NotNil(cmd)

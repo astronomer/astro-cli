@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/software/deployment"
 )
 
@@ -144,7 +145,16 @@ astro deployment logs triggerer YOU_DEPLOYMENT_ID -s string-to-find
 
 func fetchRemoteLogs(component string, args []string, out io.Writer) error {
 	if follow {
-		return deployment.SubscribeDeploymentLog(args[0], component, search, since)
+		var token string
+		if store != nil {
+			c, err := config.GetCurrentContext()
+			if err == nil {
+				if creds, credErr := store.GetCredentials(c.Domain); credErr == nil {
+					token = creds.Token
+				}
+			}
+		}
+		return deployment.SubscribeDeploymentLog(args[0], component, search, token, since)
 	}
 	return deployment.Log(args[0], component, search, since, houstonClient, out)
 }

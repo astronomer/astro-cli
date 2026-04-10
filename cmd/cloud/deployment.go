@@ -820,7 +820,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		if disallowedFlagSet {
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus, waitTimeForDeployment, forceUpdate)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus, waitTimeForDeployment, forceUpdate, creds)
 	}
 
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
@@ -869,7 +869,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, false, 0*time.Second, forceUpdate)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, false, 0*time.Second, forceUpdate, creds)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
@@ -905,7 +905,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroCoreClient, platformCoreClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroCoreClient, platformCoreClient, creds)
 }
 
 func validateCICD() error {
