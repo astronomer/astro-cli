@@ -159,7 +159,8 @@ func airflowAPIRequest(method, requestURL, authHeader string, body []byte) (resp
 }
 
 // airflowAPIUpsert creates a resource via POST, and if it already exists (409), updates via PATCH.
-func airflowAPIUpsert(baseURL, resource, id, authHeader string, body []byte) error {
+// updateSuffix is appended to the PATCH URL (e.g., "?update_mask=slots" for default_pool).
+func airflowAPIUpsert(baseURL, resource, id, authHeader string, body []byte, updateSuffix string) error {
 	createURL := fmt.Sprintf("%s/%s", baseURL, resource)
 	respBody, status, err := airflowAPIRequest(http.MethodPost, createURL, authHeader, body)
 	if err != nil {
@@ -170,7 +171,7 @@ func airflowAPIUpsert(baseURL, resource, id, authHeader string, body []byte) err
 	}
 	if status == http.StatusConflict {
 		// Already exists — update via PATCH
-		updateURL := fmt.Sprintf("%s/%s/%s", baseURL, resource, id)
+		updateURL := fmt.Sprintf("%s/%s/%s%s", baseURL, resource, id, updateSuffix)
 		respBody, status, err = airflowAPIRequest(http.MethodPatch, updateURL, authHeader, body)
 		if err != nil {
 			return err
@@ -204,7 +205,7 @@ func AddVariables(airflowURL, authHeader string) error {
 		if err != nil {
 			return fmt.Errorf("error marshaling variable %s: %w", variable.VariableName, err)
 		}
-		if err := airflowAPIUpsert(airflowURL, "variables", variable.VariableName, authHeader, body); err != nil {
+		if err := airflowAPIUpsert(airflowURL, "variables", variable.VariableName, authHeader, body, ""); err != nil {
 			return fmt.Errorf("error adding variable %s: %w", variable.VariableName, err)
 		}
 		fmt.Printf("Added Variable: %s\n", variable.VariableName)
@@ -232,7 +233,7 @@ func AddConnections(airflowURL, authHeader string, envConns map[string]astrocore
 		if err != nil {
 			return fmt.Errorf("error marshaling connection %s: %w", conn.ConnID, err)
 		}
-		if err := airflowAPIUpsert(airflowURL, "connections", conn.ConnID, authHeader, body); err != nil {
+		if err := airflowAPIUpsert(airflowURL, "connections", conn.ConnID, authHeader, body, ""); err != nil {
 			return fmt.Errorf("error adding connection %s: %w", conn.ConnID, err)
 		}
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
@@ -381,7 +382,12 @@ func AddPools(airflowURL, authHeader string) error {
 		if err != nil {
 			return fmt.Errorf("error marshaling pool %s: %w", pool.PoolName, err)
 		}
-		if err := airflowAPIUpsert(airflowURL, "pools", pool.PoolName, authHeader, body); err != nil {
+		// default_pool only allows updating slots and include_deferred
+		updateSuffix := ""
+		if pool.PoolName == "default_pool" {
+			updateSuffix = "?update_mask=slots&update_mask=include_deferred"
+		}
+		if err := airflowAPIUpsert(airflowURL, "pools", pool.PoolName, authHeader, body, updateSuffix); err != nil {
 			return fmt.Errorf("error adding pool %s: %w", pool.PoolName, err)
 		}
 		fmt.Printf("Added Pool: %s\n", pool.PoolName)
