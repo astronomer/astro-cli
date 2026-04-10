@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -36,13 +37,45 @@ func (s *Suite) TestStandaloneHandlerInit() {
 	s.NotNil(handler)
 }
 
-func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
-	// Airflow 2 runtime versions (old format like 12.0.0) should be rejected
+func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
+	// Airflow 2 runtime versions (old format like 12.0.0) should be accepted
+	tmpDir, err := os.MkdirTemp("", "standalone-af2-test")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	// Pre-create cached constraints + freeze for AF2 tag
+	constraintsDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(constraintsDir, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "constraints-12.0.0-python-3.12.txt"), []byte("apache-airflow==2.7.3+astro.1\n"), 0o644)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-12.0.0-python-3.12.txt"), []byte("apache-airflow==2.7.3+astro.1\n"), 0o644)
+	s.NoError(err)
+
+	// Create fake airflow and python binaries (python needed for macOS shim path)
+	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	err = os.MkdirAll(venvBin, 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(venvBin, "python"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	s.NoError(err)
+
 	origParseFile := standaloneParseFile
 	origResolve := resolveFloatingTag
+	origLookPath := lookPath
+	origRunCommand := runCommand
+	origCheckHealth := checkWebserverHealth
+	origResolvePython := resolvePythonVersion
+	origCheckPort := checkPortAvailable
 	defer func() {
 		standaloneParseFile = origParseFile
 		resolveFloatingTag = origResolve
+		lookPath = origLookPath
+		runCommand = origRunCommand
+		checkWebserverHealth = origCheckHealth
+		resolvePythonVersion = origResolvePython
+		checkPortAvailable = origCheckPort
 	}()
 
 	standaloneParseFile = func(filename string) ([]docker.Command, error) {
@@ -53,13 +86,25 @@ func (s *Suite) TestStandaloneStart_Airflow2Rejected() {
 	resolveFloatingTag = func(tag string) (string, error) {
 		return "", fmt.Errorf("no runtime version found matching '%s'", tag)
 	}
+	lookPath = func(file string) (string, error) { return "/usr/local/bin/uv", nil }
+	runCommand = func(dir, name string, args ...string) error { return nil }
+	checkWebserverHealth = func(url string, timeout time.Duration, component string) error { return nil }
+	resolvePythonVersion = func(_, _ string) string { return "3.12" }
+	checkPortAvailable = func(_ string) error { return nil }
 
-	handler, err := StandaloneInit("/tmp/test", ".env", "Dockerfile")
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
 	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
-	s.Error(err)
-	s.Equal(errUnsupportedAirflowVersion, err)
+	s.NoError(err)
+	s.Equal("2", handler.airflowMajorVersion)
+
+	// On macOS the shim should have been written
+	if runtime.GOOS == "darwin" {
+		shimPath := filepath.Join(venvBin, "_standalone_macos.py")
+		_, statErr := os.Stat(shimPath)
+		s.NoError(statErr, "macOS shim should be written for AF2")
+	}
 }
 
 func (s *Suite) TestStandaloneStart_UnsupportedVersion() {
@@ -489,6 +534,7 @@ func TestStripQuotes(t *testing.T) {
 func (s *Suite) TestStandaloneBuildEnv() {
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
+	handler.airflowMajorVersion = "3"
 
 	env := handler.buildEnv()
 
@@ -1199,34 +1245,49 @@ api-server | api line
 
 func TestBuildLogPrefixes(t *testing.T) {
 	t.Run("empty returns nil", func(t *testing.T) {
-		assert.Nil(t, buildLogPrefixes(nil))
-		assert.Nil(t, buildLogPrefixes([]string{}))
+		assert.Nil(t, buildLogPrefixes(nil, "3"))
+		assert.Nil(t, buildLogPrefixes([]string{}, "3"))
 	})
 
-	t.Run("maps docker names to standalone prefixes", func(t *testing.T) {
-		prefixes := buildLogPrefixes([]string{SchedulerDockerContainerName})
+	t.Run("maps docker names to standalone prefixes AF3", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{SchedulerDockerContainerName}, "3")
 		assert.Equal(t, []string{"scheduler "}, prefixes)
 	})
 
-	t.Run("webserver maps to api-server", func(t *testing.T) {
-		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName})
+	t.Run("webserver maps to api-server AF3", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName}, "3")
 		assert.Equal(t, []string{"api-server "}, prefixes)
 	})
 
-	t.Run("deduplicates webserver and api-server", func(t *testing.T) {
-		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName, APIServerDockerContainerName})
+	t.Run("deduplicates webserver and api-server AF3", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName, APIServerDockerContainerName}, "3")
 		assert.Equal(t, []string{"api-server "}, prefixes)
 	})
 
-	t.Run("multiple components", func(t *testing.T) {
-		prefixes := buildLogPrefixes([]string{SchedulerDockerContainerName, TriggererDockerContainerName})
+	t.Run("multiple components AF3", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{SchedulerDockerContainerName, TriggererDockerContainerName}, "3")
 		assert.Contains(t, prefixes, "scheduler ")
 		assert.Contains(t, prefixes, "triggerer ")
 		assert.Len(t, prefixes, 2)
 	})
 
 	t.Run("unknown names are ignored", func(t *testing.T) {
-		prefixes := buildLogPrefixes([]string{"postgres"})
+		prefixes := buildLogPrefixes([]string{"postgres"}, "3")
+		assert.Empty(t, prefixes)
+	})
+
+	t.Run("webserver maps to webserver AF2", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{WebserverDockerContainerName}, "2")
+		assert.Equal(t, []string{"webserver "}, prefixes)
+	})
+
+	t.Run("AF2 has no dag-processor", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{DAGProcessorDockerContainerName}, "2")
+		assert.Empty(t, prefixes)
+	})
+
+	t.Run("AF2 has no api-server mapping", func(t *testing.T) {
+		prefixes := buildLogPrefixes([]string{APIServerDockerContainerName}, "2")
 		assert.Empty(t, prefixes)
 	})
 }
@@ -1289,6 +1350,7 @@ func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
 	handler.port = "9090"
+	handler.airflowMajorVersion = "3"
 
 	env := handler.buildEnv()
 
@@ -1301,6 +1363,66 @@ func (s *Suite) TestStandaloneBuildEnv_CustomPort() {
 	}
 
 	s.Equal("9090", envMap["AIRFLOW__API__PORT"])
+}
+
+func (s *Suite) TestStandaloneBuildEnv_AF2() {
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+	handler.airflowMajorVersion = "2"
+
+	env := handler.buildEnv()
+
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	s.Equal("/tmp/test-project/.astro/standalone", envMap["AIRFLOW_HOME"])
+	s.Equal("local", envMap["ASTRONOMER_ENVIRONMENT"])
+	s.Equal("False", envMap["AIRFLOW__CORE__LOAD_EXAMPLES"])
+	// AF2 should NOT have AF3-specific env vars
+	_, hasSimpleAuth := envMap["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"]
+	s.False(hasSimpleAuth, "AF2 should not set SIMPLE_AUTH_MANAGER_ALL_ADMINS")
+	_, hasExecutionAPI := envMap["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"]
+	s.False(hasExecutionAPI, "AF2 should not set EXECUTION_API_SERVER_URL")
+	// OBJC_DISABLE_INITIALIZE_FORK_SAFETY should never be set (unreliable)
+	_, hasObjC := envMap["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"]
+	s.False(hasObjC, "OBJC_DISABLE_INITIALIZE_FORK_SAFETY should not be set")
+	// WORKERS=1 is only set on non-macOS (macOS uses the shim instead)
+	if runtime.GOOS == "darwin" {
+		_, hasWorkers := envMap["AIRFLOW__WEBSERVER__WORKERS"]
+		s.False(hasWorkers, "macOS should not set WORKERS (shim avoids gunicorn)")
+	} else {
+		s.Equal("1", envMap["AIRFLOW__WEBSERVER__WORKERS"])
+	}
+	// AF2 should use LocalExecutor with SQLite skip-check and new-interpreter mode
+	s.Equal("LocalExecutor", envMap["AIRFLOW__CORE__EXECUTOR"])
+	s.Equal("1", envMap["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"])
+	s.Equal("True", envMap["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"])
+}
+
+func (s *Suite) TestStandaloneBuildEnv_AF2_CustomPort() {
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+	handler.port = "9090"
+	handler.airflowMajorVersion = "2"
+
+	env := handler.buildEnv()
+
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := splitEnvVar(e)
+		if parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	s.Equal("9090", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"])
+	_, hasAPIPort := envMap["AIRFLOW__API__PORT"]
+	s.False(hasAPIPort, "AF2 should not set AIRFLOW__API__PORT")
 }
 
 // --- proxy bypass tests ---

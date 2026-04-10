@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -34,6 +35,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const osDarwin = "darwin"
+
 var (
 	standaloneDir         = airflowrt.StandaloneDir
 	standalonePIDFile     = airflowrt.StandalonePIDFile
@@ -44,11 +47,12 @@ var (
 	stopPollInterval      = airflowrt.StopPollInterval
 	stopTimeout           = airflowrt.StopTimeout
 	filePermissions       = airflowrt.FilePermissions
+	dirPermissions        = airflowrt.DirPermissions
 )
 
 var (
 	errStandaloneNotSupported    = errors.New("this command is not supported in standalone mode")
-	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 3 (runtime 3.x)")
+	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 2.2+ or Airflow 3 (runtime 3.x or 13.x+)")
 	errUVNotFound                = errors.New("'uv' is required for standalone mode but was not found on PATH.\nInstall it with: curl -LsSf https://astral.sh/uv/install.sh | sh\nSee https://docs.astral.sh/uv/getting-started/installation/ for more options")
 
 	// Function variables for testing
@@ -65,6 +69,165 @@ var (
 
 // parseRuntimeTagPython delegates to airflowrt.ParseRuntimeTagPython.
 var parseRuntimeTagPython = airflowrt.ParseRuntimeTagPython
+
+// writeDarwinForkSafetyPatch installs a .pth file into the venv's
+// site-packages that neutralizes macOS fork-safety hazards at Python
+// startup.  After os.fork() on macOS the Objective-C, CoreFoundation,
+// and Network framework runtimes are in a corrupt state, causing forked
+// children to spin at 100 % CPU on getaddrinfo, setproctitle, or any
+// call that touches os_log / libdispatch.
+//
+// The patch does two things (only on macOS):
+//
+//  1. Removes os.fork from the Python namespace so that Airflow's
+//     CAN_FORK = hasattr(os, "fork") evaluates to False.  This forces
+//     standard_task_runner to use subprocess (_start_by_exec) instead of
+//     the unsafe fork path (_start_by_fork).  subprocess.Popen uses
+//     C-level fork+exec via _posixsubprocess, not os.fork, so it is
+//     unaffected.
+//
+//  2. Replaces setproctitle.setproctitle with a no-op to prevent the
+//     CoreFoundation CFBundleGetFunctionPointerForName spin in any
+//     process that was still forked by other means.
+//
+// We use a .pth file (processed by Python's site module at startup)
+// rather than sitecustomize.py because the venv's lib/pythonX.Y/
+// directory is not on sys.path, whereas site-packages is.
+func writeDarwinForkSafetyPatch(venvPath string) error {
+	libDir := filepath.Join(venvPath, "lib")
+	entries, err := os.ReadDir(libDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), "python") {
+			continue
+		}
+
+		sitePackages := filepath.Join(libDir, e.Name(), "site-packages")
+
+		patchPy := filepath.Join(sitePackages, "_fix_setproctitle.py")
+		pyContent := `import sys
+import os
+
+if sys.platform == "darwin":
+    if hasattr(os, "fork"):
+        os._real_fork = os.fork
+        del os.fork
+
+    try:
+        import setproctitle
+        setproctitle.setproctitle = lambda *a, **kw: None
+        setproctitle.setthreadtitle = lambda *a, **kw: None
+    except ImportError:
+        pass
+`
+		if err := os.WriteFile(patchPy, []byte(pyContent), filePermissions); err != nil {
+			return err
+		}
+
+		patchPth := filepath.Join(sitePackages, "_fix_setproctitle.pth")
+		return os.WriteFile(patchPth, []byte("import _fix_setproctitle\n"), filePermissions)
+	}
+	return nil
+}
+
+// af2PickleFixPlugin is an Airflow plugin that fixes QueuedLocalWorker
+// pickling on macOS.  macOS Python defaults to "spawn" for multiprocessing,
+// which requires pickling worker objects.  QueuedLocalWorker has a
+// decorated do_work method whose 'wrapper' attribute can't be pickled.
+// Setting __name__/__qualname__ on the method makes it picklable.
+const af2PickleFixPlugin = `from airflow.executors.local_executor import LocalWorker, QueuedLocalWorker
+
+QueuedLocalWorker.do_work.__name__ = "do_work"
+QueuedLocalWorker.do_work.__qualname__ = "QueuedLocalWorker.do_work"
+LocalWorker.do_work.__name__ = "do_work"
+LocalWorker.do_work.__qualname__ = "LocalWorker.do_work"
+`
+
+// af2DarwinShim is a self-contained Python script that replaces
+// `airflow standalone` on macOS for Airflow 2.  AF2's webserver uses
+// gunicorn which always forks workers; on macOS the fork inherits
+// corrupted Objective-C runtime state, causing SIGSEGV crashes and
+// the "Python quit unexpectedly" dialog.  This shim runs individual
+// components and passes --debug to the webserver so it uses Flask's
+// built-in dev server (no gunicorn, no fork).
+const af2DarwinShim = `#!/usr/bin/env python3
+"""AF2 standalone shim for macOS — avoids gunicorn fork crash."""
+import os, signal, subprocess, sys, threading, time
+
+def _stream(proc, prefix):
+    for line in iter(proc.stdout.readline, b""):
+        sys.stdout.buffer.write(("{} | ".format(prefix)).encode() + line)
+        sys.stdout.buffer.flush()
+    proc.stdout.close()
+
+def main():
+    af = [sys.executable, "-m", "airflow"]
+
+    # DB migrations
+    print("standalone | Running DB migrations...")
+    subprocess.run(af + ["db", "migrate"], check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Idempotent admin user creation
+    result = subprocess.run(
+        af + ["users", "create",
+              "--role", "Admin",
+              "--username", "admin",
+              "--password", "admin",
+              "--firstname", "Admin",
+              "--lastname", "User",
+              "--email", "admin@example.com"],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print("standalone | Created admin user.  Login: admin / admin")
+    else:
+        print("standalone | Admin user already exists.  Login: admin / admin")
+
+    # Start components — webserver uses Flask dev server (--debug) to
+    # avoid gunicorn's fork which crashes on macOS.
+    procs = {}
+    for name, extra in [("scheduler", []), ("webserver", ["--debug"]), ("triggerer", [])]:
+        procs[name] = subprocess.Popen(
+            af + [name] + extra,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+
+    for name, proc in procs.items():
+        t = threading.Thread(target=_stream, args=(proc, name), daemon=True)
+        t.start()
+
+    def shutdown(sig=None, frame=None):
+        for proc in procs.values():
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+        for proc in procs.values():
+            try:
+                proc.wait(timeout=10)
+            except Exception:
+                proc.kill()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
+    # Block until any component exits, then tear down everything.
+    while all(p.poll() is None for p in procs.values()):
+        time.sleep(1)
+
+    for name, proc in procs.items():
+        rc = proc.poll()
+        if rc is not None:
+            print("standalone | {} exited with code {}".format(name, rc))
+    shutdown()
+
+if __name__ == "__main__":
+    main()
+`
 
 // resolvePythonVersion determines the Python version using a 3-tier strategy:
 //  1. Explicit version from the Dockerfile image tag (-python-X.Y suffix)
@@ -87,15 +250,16 @@ var resolvePythonVersion = func(baseTag, tagPython string) string {
 
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
-	airflowHome   string
-	envFile       string
-	dockerfile    string
-	foreground    bool   // if true, run in foreground (stream output, block on Wait)
-	noBrowser     bool   // if true, don't open the browser after startup
-	port          string // webserver port; defaults to defaultStandalonePort
-	useProxy      bool   // whether the reverse proxy is active
-	proxyHostname string // e.g. "my-project.localhost"
-	proxyPort     string // proxy listener port (default 6563)
+	airflowHome         string
+	envFile             string
+	dockerfile          string
+	foreground          bool   // if true, run in foreground (stream output, block on Wait)
+	noBrowser           bool   // if true, don't open the browser after startup
+	port                string // webserver port; defaults to defaultStandalonePort
+	useProxy            bool   // whether the reverse proxy is active
+	proxyHostname       string // e.g. "my-project.localhost"
+	proxyPort           string // proxy listener port (default 6563)
+	airflowMajorVersion string // "2" or "3", determined from the runtime tag at Start()
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -109,16 +273,34 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 
 // webserverPort returns the configured port. It checks (in order):
 // 1. Explicit --port flag
-// 2. api-server.port from .astro/config.yaml (same config used by `astro dev start`)
+// 2. api-server.port (AF3) or webserver.port (AF2) from .astro/config.yaml
 // 3. Default (8080)
 func (s *Standalone) webserverPort() string {
 	if s.port != "" {
 		return s.port
 	}
-	if p := config.CFG.APIServerPort.GetString(); p != "" && p != "0" {
-		return p
+	if s.airflowMajorVersion == "3" {
+		if p := config.CFG.APIServerPort.GetString(); p != "" && p != "0" {
+			return p
+		}
+	} else {
+		if p := config.CFG.WebserverPort.GetString(); p != "" && p != "0" {
+			return p
+		}
 	}
 	return defaultStandalonePort
+}
+
+// airflowMajorVersionUint returns the Airflow major version as a uint64 for settings APIs.
+func (s *Standalone) airflowMajorVersionUint() uint64 {
+	const (
+		airflowV2 = 2
+		airflowV3 = 3
+	)
+	if s.airflowMajorVersion == "2" {
+		return airflowV2
+	}
+	return airflowV3
 }
 
 func (s *Standalone) pidFilePath() string {
@@ -158,22 +340,22 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 
 	baseTag, tagPython := parseRuntimeTagPython(tag)
 
-	// 2. Validate Airflow version (AF3 only).
-	// If the tag isn't a pinned runtime version (X.Y-Z), try to resolve it
+	// 2. Validate Airflow version (AF2 or AF3).
+	// If the tag isn't a pinned runtime version (X.Y-Z or semver), try to resolve it
 	// as a floating tag (e.g., "3.1" → "3.1-12") via the runtime versions JSON.
 	if !airflowrt.IsValidRuntimeTag(baseTag) {
 		resolved, resolveErr := resolveFloatingTag(baseTag)
 		if resolveErr == nil {
 			baseTag = resolved
 		} else if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) == "" {
-			// Not a recognized format and not resolvable
-			return fmt.Errorf("could not determine runtime version from Dockerfile image tag '%s'.\nStandalone mode requires a pinned Astronomer Runtime image (e.g., astro-runtime:3.1-12)", tag)
+			return fmt.Errorf("could not determine runtime version from Dockerfile image tag '%s'.\nStandalone mode requires a pinned Astronomer Runtime image (e.g., astro-runtime:3.1-12 or astro-runtime:13.5.0)", tag)
 		}
-		// If it's an old-format tag (e.g., "12.0.0"), fall through to the AF3 check
 	}
-	if airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag) != "3" {
+	afMajor := airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag)
+	if afMajor != "2" && afMajor != "3" {
 		return errUnsupportedAirflowVersion
 	}
+	s.airflowMajorVersion = afMajor
 
 	pythonVersion := resolvePythonVersion(baseTag, tagPython)
 
@@ -299,7 +481,38 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
 	airflowBin := filepath.Join(venvBin, "airflow")
 
-	cmd := exec.Command(airflowBin, "standalone") //nolint:gosec
+	var cmd *exec.Cmd
+	if s.airflowMajorVersion == "2" && runtime.GOOS == osDarwin {
+		// On macOS, AF2's gunicorn webserver forks workers which inherit
+		// corrupted ObjC runtime state → SIGSEGV.  Use a shim that runs
+		// `airflow webserver --debug` (Flask dev server, no fork).
+		shimPath := filepath.Join(venvBin, "_standalone_macos.py")
+		if err := os.WriteFile(shimPath, []byte(af2DarwinShim), filePermissions); err != nil {
+			return fmt.Errorf("error writing macOS standalone shim: %w", err)
+		}
+
+		// Disable os.fork and patch setproctitle on macOS.  After fork()
+		// the ObjC/CF/Network runtimes are corrupt, causing children to
+		// spin at 100 % CPU on getaddrinfo or setproctitle calls.
+		if err := writeDarwinForkSafetyPatch(filepath.Join(s.airflowHome, ".venv")); err != nil {
+			logger.Debugf("Warning: could not write Darwin fork-safety patch: %v", err)
+		}
+
+		// Write the LocalExecutor pickle fix plugin so QueuedLocalWorker
+		// can be serialized across macOS spawn-mode multiprocessing.
+		pluginsDir := filepath.Join(s.airflowHome, "plugins")
+		if err := os.MkdirAll(pluginsDir, dirPermissions); err == nil {
+			pickleFix := filepath.Join(pluginsDir, "fix_local_executor_pickle.py")
+			if _, err := os.Stat(pickleFix); os.IsNotExist(err) {
+				_ = os.WriteFile(pickleFix, []byte(af2PickleFixPlugin), filePermissions)
+			}
+		}
+
+		pythonBin := filepath.Join(venvBin, "python")
+		cmd = exec.Command(pythonBin, shimPath) //nolint:gosec
+	} else {
+		cmd = exec.Command(airflowBin, "standalone") //nolint:gosec
+	}
 	cmd.Dir = s.airflowHome
 	cmd.Env = env
 	// Start the subprocess in its own process group so we can kill the entire
@@ -504,7 +717,11 @@ func (s *Standalone) registerProxyRoute(pid int) string {
 
 // healthEndpoint returns the health check URL and component name.
 func (s *Standalone) healthEndpoint() (url, component string) {
-	return "http://localhost:" + s.webserverPort() + "/api/v2/monitor/health", "api-server"
+	port := s.webserverPort()
+	if s.airflowMajorVersion == "3" {
+		return "http://localhost:" + port + "/api/v2/monitor/health", "api-server"
+	}
+	return "http://localhost:" + port + "/health", "webserver"
 }
 
 // checkPortAvailable delegates to airflowrt.CheckPortAvailable.
@@ -559,19 +776,39 @@ func (s *Standalone) buildEnv() []string {
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
-	overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
+	overrides["AIRFLOW__CORE__PLUGINS_FOLDER"] = filepath.Join(s.airflowHome, "plugins")
 	port := s.webserverPort()
-	if port != defaultStandalonePort {
-		overrides["AIRFLOW__API__PORT"] = port
+	if s.airflowMajorVersion == "3" {
+		overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
+		if port != defaultStandalonePort {
+			overrides["AIRFLOW__API__PORT"] = port
+		}
+		overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
+	} else {
+		if port != defaultStandalonePort {
+			overrides["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"] = port
+		}
+		// On Linux, limit gunicorn to 1 worker as a defensive default for
+		// local development.  On macOS the shim replaces gunicorn entirely
+		// so these are not needed.
+		if runtime.GOOS != osDarwin {
+			overrides["AIRFLOW__WEBSERVER__WORKERS"] = "1"
+		}
+		// Use LocalExecutor so the scheduler can heartbeat while tasks run.
+		// SQLite is fine for local dev; the skip-check flag allows it.
+		// execute_tasks_new_python_interpreter runs each task as a fresh
+		// subprocess instead of using multiprocessing fork/spawn.
+		overrides["AIRFLOW__CORE__EXECUTOR"] = "LocalExecutor"
+		overrides["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"] = "1"
+		overrides["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"] = "True"
 	}
-	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
 
-	// Layer 3: macOS proxy workaround.
-	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
-	// When Airflow's LocalExecutor forks, this can spin at 100% CPU indefinitely.
-	// Setting NO_PROXY=* tells Python to skip _scproxy entirely.
-	// We only do this when no proxy is configured (env vars or macOS system settings)
-	// so corporate proxy users aren't affected.
+	// Layer 3: macOS fork-safety workarounds.
+	// a) Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
+	//    When Airflow forks, this can spin at 100% CPU indefinitely.
+	//    Setting NO_PROXY=* tells Python to skip _scproxy entirely.
+	//    We only do this when no proxy is configured so corporate proxy users
+	//    aren't affected.
 	if !airflowrt.HasProxyConfigured(overrides) {
 		overrides["NO_PROXY"] = "*"
 		overrides["no_proxy"] = "*"
@@ -609,7 +846,7 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
-	return settings.ConfigSettings("standalone", settingsFile, envConns, 3, true, true, true) //nolint:mnd
+	return settings.ConfigSettings("standalone", settingsFile, envConns, s.airflowMajorVersionUint(), true, true, true)
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -729,26 +966,37 @@ func (s *Standalone) PS() (*types.PSStatus, error) {
 	return status, nil
 }
 
-// standaloneLogPrefixMap maps Docker container names (passed by the cmd layer)
-// to the log prefixes used by `airflow standalone`.
-var standaloneLogPrefixMap = map[string]string{
-	WebserverDockerContainerName:    "api-server",
-	APIServerDockerContainerName:    "api-server",
-	SchedulerDockerContainerName:    "scheduler",
-	TriggererDockerContainerName:    "triggerer",
-	DAGProcessorDockerContainerName: "dag-processor",
+// standaloneLogPrefixMaps maps Docker container names (passed by the cmd layer)
+// to the log prefixes used by `airflow standalone`, keyed by Airflow major version.
+var standaloneLogPrefixMaps = map[string]map[string]string{
+	"3": {
+		WebserverDockerContainerName:    "api-server",
+		APIServerDockerContainerName:    "api-server",
+		SchedulerDockerContainerName:    "scheduler",
+		TriggererDockerContainerName:    "triggerer",
+		DAGProcessorDockerContainerName: "dag-processor",
+	},
+	"2": {
+		WebserverDockerContainerName: "webserver",
+		SchedulerDockerContainerName: "scheduler",
+		TriggererDockerContainerName: "triggerer",
+	},
 }
 
 // buildLogPrefixes converts Docker container names to standalone log prefix
 // filters. Returns nil when no filtering should be applied.
-func buildLogPrefixes(containerNames []string) []string {
+func buildLogPrefixes(containerNames []string, airflowMajorVersion string) []string {
 	if len(containerNames) == 0 {
 		return nil
+	}
+	prefixMap := standaloneLogPrefixMaps[airflowMajorVersion]
+	if prefixMap == nil {
+		prefixMap = standaloneLogPrefixMaps["3"]
 	}
 	seen := map[string]bool{}
 	var prefixes []string
 	for _, name := range containerNames {
-		if p, ok := standaloneLogPrefixMap[name]; ok && !seen[p] {
+		if p, ok := prefixMap[name]; ok && !seen[p] {
 			seen[p] = true
 			prefixes = append(prefixes, p+" ")
 		}
@@ -779,7 +1027,7 @@ func (s *Standalone) Logs(follow bool, containerNames ...string) error {
 		return fmt.Errorf("no log file found at %s — has standalone been started?", logPath)
 	}
 
-	prefixes := buildLogPrefixes(containerNames)
+	prefixes := buildLogPrefixes(containerNames, s.airflowMajorVersion)
 
 	if !follow {
 		data, err := osReadFile(logPath)
@@ -885,7 +1133,7 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
-	err = settings.ConfigSettings("standalone", settingsFile, nil, 3, connections, variables, pools) //nolint:mnd
+	err = settings.ConfigSettings("standalone", settingsFile, nil, s.airflowMajorVersionUint(), connections, variables, pools)
 	if err != nil {
 		return err
 	}
@@ -904,8 +1152,10 @@ func (s *Standalone) ExportSettings(settingsFile, envFile string, connections, v
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
 	defer settings.SetExecAirflowCommand(origExec)
 
+	afVersion := s.airflowMajorVersionUint()
+
 	if envExport {
-		err := settings.EnvExport("standalone", envFile, 3, connections, variables) //nolint:mnd
+		err := settings.EnvExport("standalone", envFile, afVersion, connections, variables)
 		if err != nil {
 			return err
 		}
@@ -921,7 +1171,7 @@ func (s *Standalone) ExportSettings(settingsFile, envFile string, connections, v
 		return errors.New("file specified does not exist")
 	}
 
-	err = settings.Export("standalone", settingsFile, 3, connections, variables, pools) //nolint:mnd
+	err = settings.Export("standalone", settingsFile, afVersion, connections, variables, pools)
 	if err != nil {
 		return err
 	}
