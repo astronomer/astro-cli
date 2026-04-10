@@ -1,8 +1,12 @@
 package settings
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -53,31 +57,50 @@ const (
 )
 
 var (
-	errNoID = errors.New("container ID is not found, the webserver may not be running")
-	re      = regexp.MustCompile(noColorString)
+	errNoURL = errors.New("airflow API URL is not set, the webserver may not be running")
+	errNoID  = errors.New("container ID is not found, the webserver may not be running")
+	re       = regexp.MustCompile(noColorString)
+
+	// httpClient is the HTTP client used for Airflow API calls. Replaceable for testing.
+	httpClient HTTPDoer = http.DefaultClient
 )
 
-// ConfigSettings is the main builder of the settings package
-func ConfigSettings(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
-	if id == "" {
-		return errNoID
+// HTTPDoer is an interface for making HTTP requests, allowing test mocking.
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// SetHTTPClient replaces the HTTP client used for Airflow API calls.
+// It returns the previous client so callers can restore it.
+func SetHTTPClient(c HTTPDoer) HTTPDoer {
+	prev := httpClient
+	httpClient = c
+	return prev
+}
+
+// ConfigSettings is the main builder of the settings package.
+// airflowURL is the base API URL (e.g., "http://localhost:8080/api/v1").
+// authHeader is an optional Authorization header value (e.g., "Basic ...").
+func ConfigSettings(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
+	if airflowURL == "" {
+		return errNoURL
 	}
 	err := InitSettings(settingsFile)
 	if err != nil {
 		logger.Debugf("Unable to initialize settings file: %s", err)
 	}
 	if pools {
-		if err := AddPools(id); err != nil {
+		if err := AddPools(airflowURL, authHeader); err != nil {
 			return fmt.Errorf("error adding pools: %w", err)
 		}
 	}
 	if variables {
-		if err := AddVariables(id); err != nil {
+		if err := AddVariables(airflowURL, authHeader); err != nil {
 			return fmt.Errorf("error adding variables: %w", err)
 		}
 	}
 	if connections {
-		if err := AddConnections(id, envConns); err != nil {
+		if err := AddConnections(airflowURL, authHeader, envConns); err != nil {
 			return fmt.Errorf("error adding connections: %w", err)
 		}
 	}
@@ -108,18 +131,61 @@ func InitSettings(settingsFile string) error {
 	return nil
 }
 
-// buildBatchImportCommand builds a compound shell command that writes jsonContent
-// to tmpFile via heredoc, runs importCmd against that file, then cleans up.
-func buildBatchImportCommand(tmpFile, importCmd, jsonContent string) string {
-	return fmt.Sprintf("cat > %s <<'__ASTRO_CLI_EOF__'\n%s\n__ASTRO_CLI_EOF__\n%s %s; _ret=$?; rm -f %s; exit $_ret",
-		tmpFile, jsonContent, importCmd, tmpFile, tmpFile)
+// airflowAPIRequest makes an HTTP request to the Airflow REST API.
+// It returns the response body and status code.
+func airflowAPIRequest(method, requestURL, authHeader string, body []byte) (respBody []byte, statusCode int, err error) {
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, requestURL, bodyReader) //nolint:gosec
+	if err != nil {
+		return nil, 0, fmt.Errorf("error creating request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error making request to %s: %w", requestURL, err)
+	}
+	defer resp.Body.Close()
+	respBody, _ = io.ReadAll(resp.Body)
+	return respBody, resp.StatusCode, nil
 }
 
-// AddVariables is a function to add Variables from settings.yaml
-func AddVariables(id string) error {
+// airflowAPIUpsert creates a resource via POST, and if it already exists (409), updates via PATCH.
+func airflowAPIUpsert(baseURL, resource, id, authHeader string, body []byte) error {
+	createURL := fmt.Sprintf("%s/%s", baseURL, resource)
+	respBody, status, err := airflowAPIRequest(http.MethodPost, createURL, authHeader, body)
+	if err != nil {
+		return err
+	}
+	if status >= 200 && status < 300 {
+		return nil
+	}
+	if status == http.StatusConflict {
+		// Already exists — update via PATCH
+		updateURL := fmt.Sprintf("%s/%s/%s", baseURL, resource, id)
+		respBody, status, err = airflowAPIRequest(http.MethodPatch, updateURL, authHeader, body)
+		if err != nil {
+			return err
+		}
+		if status >= 200 && status < 300 {
+			return nil
+		}
+		return fmt.Errorf("error updating %s %s (HTTP %d): %s", resource, id, status, string(respBody))
+	}
+	return fmt.Errorf("error creating %s %s (HTTP %d): %s", resource, id, status, string(respBody))
+}
+
+// AddVariables adds Variables from settings.yaml via the Airflow REST API.
+func AddVariables(airflowURL, authHeader string) error {
 	variables := settings.Airflow.Variables
-	varsMap := make(map[string]string)
-	var names []string
 	for _, variable := range variables {
 		if !objectValidator(0, variable.VariableName) {
 			if objectValidator(0, variable.VariableValue) {
@@ -130,51 +196,67 @@ func AddVariables(id string) error {
 		if !objectValidator(0, variable.VariableValue) {
 			continue
 		}
-		varsMap[variable.VariableName] = variable.VariableValue
-		names = append(names, variable.VariableName)
-	}
-	if len(varsMap) == 0 {
-		return nil
-	}
 
-	jsonBytes, err := json.Marshal(varsMap)
-	if err != nil {
-		return fmt.Errorf("error marshaling variables to JSON: %w", err)
-	}
-
-	cmd := buildBatchImportCommand("/tmp/astro_import_variables.json", "airflow variables import", string(jsonBytes))
-	out, err := execAirflowCommand(id, cmd)
-	if err != nil {
-		return fmt.Errorf("error importing variables: %w", err)
-	}
-	logger.Debugf("Batch import variables logs:\n%s", out)
-	for _, name := range names {
-		fmt.Printf("Added Variable: %s\n", name)
+		body, err := json.Marshal(map[string]string{
+			"key":   variable.VariableName,
+			"value": variable.VariableValue,
+		})
+		if err != nil {
+			return fmt.Errorf("error marshaling variable %s: %w", variable.VariableName, err)
+		}
+		if err := airflowAPIUpsert(airflowURL, "variables", variable.VariableName, authHeader, body); err != nil {
+			return fmt.Errorf("error adding variable %s: %w", variable.VariableName, err)
+		}
+		fmt.Printf("Added Variable: %s\n", variable.VariableName)
 	}
 	return nil
 }
 
-// AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+// AddConnections adds Connections from settings.yaml via the Airflow REST API.
+func AddConnections(airflowURL, authHeader string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	connections := settings.Airflow.Connections
 	connections = AppendEnvironmentConnections(connections, envConns)
 
-	return addConnectionsBatch(id, connections)
+	for i := range connections {
+		conn := connections[i]
+		if !objectValidator(0, conn.ConnID) {
+			continue
+		}
+		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
+			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
+			continue
+		}
+
+		apiConn := connectionToAPIObject(&conn)
+		body, err := json.Marshal(apiConn)
+		if err != nil {
+			return fmt.Errorf("error marshaling connection %s: %w", conn.ConnID, err)
+		}
+		if err := airflowAPIUpsert(airflowURL, "connections", conn.ConnID, authHeader, body); err != nil {
+			return fmt.Errorf("error adding connection %s: %w", conn.ConnID, err)
+		}
+		fmt.Printf("Added Connection: %s\n", conn.ConnID)
+	}
+	return nil
 }
 
-// connectionImportObject builds the JSON value for a single connection in the
-// airflow connections import format.
-func connectionImportObject(conn *Connection) interface{} {
-	// URI-only connection: if conn_uri is set and no individual fields are populated
+// connectionToAPIObject converts a settings Connection to the Airflow REST API format.
+func connectionToAPIObject(conn *Connection) map[string]interface{} {
+	obj := map[string]interface{}{
+		"connection_id": conn.ConnID,
+	}
+
+	// URI-only connection: parse the URI into individual fields
 	hasFields := objectValidator(0, conn.ConnType) || objectValidator(0, conn.ConnHost) ||
 		objectValidator(0, conn.ConnLogin) || objectValidator(0, conn.ConnPassword) ||
 		objectValidator(0, conn.ConnSchema) || conn.ConnPort != 0
 	if objectValidator(0, conn.ConnURI) && !hasFields {
-		return conn.ConnURI
+		parseConnectionURI(conn.ConnURI, obj)
+		return obj
 	}
 
-	obj := map[string]interface{}{
-		"conn_type": conn.ConnType,
+	if objectValidator(0, conn.ConnType) {
+		obj["conn_type"] = conn.ConnType
 	}
 	if objectValidator(0, conn.ConnHost) {
 		obj["host"] = conn.ConnHost
@@ -191,86 +273,52 @@ func connectionImportObject(conn *Connection) interface{} {
 	if conn.ConnPort != 0 {
 		obj["port"] = conn.ConnPort
 	}
-	if extra := connExtraObject(conn.ConnExtra); extra != nil {
+	if extra := connExtraString(conn.ConnExtra); extra != "" {
 		obj["extra"] = extra
 	}
 	return obj
 }
 
-// connExtraObject converts ConnExtra (which can be various types) into a
-// map[string]interface{} suitable for JSON marshaling in the import file.
-func connExtraObject(extra interface{}) interface{} {
-	switch v := extra.(type) {
-	case nil:
-		return nil
-	case string:
-		if v == "" {
-			return nil
+// parseConnectionURI parses a connection URI into individual fields in the obj map.
+func parseConnectionURI(connURI string, obj map[string]interface{}) {
+	parsed, err := url.Parse(connURI)
+	if err != nil {
+		return
+	}
+	obj["conn_type"] = parsed.Scheme
+	obj["host"] = parsed.Hostname()
+	if parsed.User != nil {
+		obj["login"] = parsed.User.Username()
+		if pwd, ok := parsed.User.Password(); ok {
+			obj["password"] = pwd
 		}
-		// Try to parse JSON string back to a map
-		var m map[string]interface{}
-		if err := json.Unmarshal([]byte(v), &m); err == nil {
-			return m
+	}
+	if p := parsed.Port(); p != "" {
+		if port, err := strconv.Atoi(p); err == nil {
+			obj["port"] = port
 		}
-		// If it's not valid JSON, return as-is (Airflow accepts string extras)
-		return v
-	case map[any]any:
-		m := make(map[string]interface{})
-		for k, val := range v {
-			kStr, ok := k.(string)
-			if !ok {
-				continue
-			}
-			m[kStr] = val
-		}
-		if len(m) == 0 {
-			return nil
-		}
-		return m
-	case map[string]any:
-		if len(v) == 0 {
-			return nil
-		}
-		return v
-	default:
-		return nil
+	}
+	if parsed.Path != "" {
+		obj["schema"] = strings.TrimPrefix(parsed.Path, "/")
+	}
+	if parsed.RawQuery != "" {
+		obj["extra"] = "{" + queryToJSONPairs(parsed.Query()) + "}"
 	}
 }
 
-func addConnectionsBatch(id string, connections Connections) error {
-	connMap := make(map[string]interface{})
-	var names []string
-	for i := range connections {
-		conn := connections[i]
-		if !objectValidator(0, conn.ConnID) {
-			continue
-		}
-		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
-			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
-			continue
-		}
-		connMap[conn.ConnID] = connectionImportObject(&conn)
-		names = append(names, conn.ConnID)
+// queryToJSONPairs converts URL query parameters to JSON key-value pair strings.
+func queryToJSONPairs(values url.Values) string {
+	pairs := make([]string, 0, len(values))
+	for k, v := range values {
+		val := strings.Join(v, ",")
+		pairs = append(pairs, fmt.Sprintf("%q: %q", k, val))
 	}
-	if len(connMap) == 0 {
-		return nil
-	}
+	return strings.Join(pairs, ", ")
+}
 
-	jsonBytes, err := json.Marshal(connMap)
-	if err != nil {
-		return fmt.Errorf("error marshaling connections to JSON: %w", err)
-	}
-
-	cmd := buildBatchImportCommand("/tmp/astro_import_connections.json", "airflow connections import --overwrite", string(jsonBytes))
-	out, err := execAirflowCommand(id, cmd)
-	if err != nil {
-		return fmt.Errorf("error importing connections: %w", err)
-	}
-	logger.Debugf("Batch import connections logs:\n%s", out)
-	for _, name := range names {
-		fmt.Printf("Added Connection: %s\n", name)
-	}
-	return nil
+// connExtraString converts ConnExtra to a JSON string for the Airflow REST API.
+func connExtraString(extra interface{}) string {
+	return jsonString(&Connection{ConnExtra: extra})
 }
 
 func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrocore.EnvironmentObjectConnection) Connections {
@@ -312,15 +360,9 @@ func AppendEnvironmentConnections(connections Connections, envConnections map[st
 	return connections
 }
 
-// AddPools is a function to add Pools from settings.yaml
-func AddPools(id string) error {
+// AddPools adds Pools from settings.yaml via the Airflow REST API.
+func AddPools(airflowURL, authHeader string) error {
 	pools := settings.Airflow.Pools
-	return addPoolsBatch(id, pools)
-}
-
-func addPoolsBatch(id string, pools Pools) error {
-	poolMap := make(map[string]poolImportEntry)
-	var names []string
 	for _, pool := range pools {
 		if !objectValidator(0, pool.PoolName) {
 			continue
@@ -329,29 +371,20 @@ func addPoolsBatch(id string, pools Pools) error {
 			fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
 			continue
 		}
-		poolMap[pool.PoolName] = poolImportEntry{
-			Slots:       pool.PoolSlot,
-			Description: pool.PoolDescription,
+
+		body, err := json.Marshal(map[string]interface{}{
+			"name":             pool.PoolName,
+			"slots":            pool.PoolSlot,
+			"description":      pool.PoolDescription,
+			"include_deferred": false,
+		})
+		if err != nil {
+			return fmt.Errorf("error marshaling pool %s: %w", pool.PoolName, err)
 		}
-		names = append(names, pool.PoolName)
-	}
-	if len(poolMap) == 0 {
-		return nil
-	}
-
-	jsonBytes, err := json.Marshal(poolMap)
-	if err != nil {
-		return fmt.Errorf("error marshaling pools to JSON: %w", err)
-	}
-
-	cmd := buildBatchImportCommand("/tmp/astro_import_pools.json", "airflow pools import", string(jsonBytes))
-	out, err := execAirflowCommand(id, cmd)
-	if err != nil {
-		return fmt.Errorf("error importing pools: %w", err)
-	}
-	logger.Debugf("Batch import pools logs:\n%s", out)
-	for _, name := range names {
-		fmt.Printf("Added Pool: %s\n", name)
+		if err := airflowAPIUpsert(airflowURL, "pools", pool.PoolName, authHeader, body); err != nil {
+			return fmt.Errorf("error adding pool %s: %w", pool.PoolName, err)
+		}
+		fmt.Printf("Added Pool: %s\n", pool.PoolName)
 	}
 	return nil
 }

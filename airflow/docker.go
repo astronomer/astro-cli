@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -416,9 +419,9 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	// Print the status
 	if useProxy && proxyHostname != "" {
-		err = printProxyStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, portOvr)
+		err = printProxyStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, portOvr)
 	} else {
-		err = printStatus(settingsFile, envConns, project, d.composeService, airflowDockerVersion, noBrowser)
+		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser)
 	}
 	if err != nil {
 		return err
@@ -1445,12 +1448,6 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		pools = true
 	}
 
-	// Get project containers
-	containerID, err := d.getWebServerContainerID()
-	if err != nil {
-		return err
-	}
-
 	fileState, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
@@ -1459,7 +1456,15 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return errNoFile
 	}
 
-	err = initSettings(containerID, settingsFile, nil, connections, variables, pools)
+	airflowDockerVersion, err := d.checkAirflowVersion()
+	if err != nil {
+		return err
+	}
+
+	apiURL := airflowAPIURL(airflowDockerVersion)
+	authHeader := airflowAuthHeader(airflowDockerVersion)
+
+	err = initSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
 		return err
 	}
@@ -1706,29 +1711,78 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 	return project, nil
 }
 
-// printProxyStatus prints status information when the proxy is active.
-func printProxyStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
-	containers, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
-		All: true,
-	})
+// airflowAPIURL returns the base API URL for the local Airflow instance.
+func airflowAPIURL(airflowMajorVersion uint64) string {
+	var port, apiPrefix string
+	switch airflowMajorVersion {
+	case airflowMajorVersion3:
+		port = config.CFG.APIServerPort.GetString()
+		apiPrefix = "/api/v2"
+	default:
+		port = config.CFG.WebserverPort.GetString()
+		apiPrefix = "/api/v1"
+	}
+	parts := strings.Split(port, ":")
+	return fmt.Sprintf("http://localhost:%s%s", parts[len(parts)-1], apiPrefix)
+}
+
+// airflowAuthHeader returns the Authorization header for the local Airflow instance.
+func airflowAuthHeader(airflowMajorVersion uint64) string {
+	if airflowMajorVersion == airflowMajorVersion2 {
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
+	}
+	// Airflow 3 uses JWT auth via /auth/token endpoint.
+	// With SimpleAuthManager + ALL_ADMINS=True, any credentials work.
+	token, err := fetchLocalAirflowToken(airflowMajorVersion)
 	if err != nil {
-		return errors.Wrap(err, composeStatusCheckErrMsg)
+		logger.Debugf("Unable to fetch Airflow auth token: %s", err)
+		return ""
+	}
+	return token
+}
+
+// fetchLocalAirflowToken gets a JWT token from the local Airflow 3 instance.
+func fetchLocalAirflowToken(airflowMajorVersion uint64) (string, error) {
+	apiURL := airflowAPIURL(airflowMajorVersion)
+	root := strings.TrimSuffix(apiURL, "/api/v2")
+	tokenURL := root + "/auth/token"
+
+	reqBody, _ := json.Marshal(map[string]string{
+		"username": "admin",
+		"password": "admin",
+	})
+
+	resp, err := http.Post(tokenURL, "application/json", bytes.NewReader(reqBody)) //nolint:gosec
+	if err != nil {
+		return "", fmt.Errorf("error fetching token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("auth endpoint returned status %d", resp.StatusCode)
 	}
 
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("decoding auth response: %w", err)
+	}
+	return "Bearer " + tokenResp.AccessToken, nil
+}
+
+// printProxyStatus prints status information when the proxy is active.
+func printProxyStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		for _, container := range containers { //nolint:gocritic
-			if strings.Contains(container.Name, project.Name) &&
-				(strings.Contains(container.Name, WebserverDockerContainerName) ||
-					strings.Contains(container.Name, APIServerDockerContainerName)) {
-				err = initSettings(container.ID, settingsFile, envConns, true, true, true)
-				if err != nil {
-					return err
-				}
-			}
+		apiURL := airflowAPIURL(airflowMajorVersion)
+		authHeader := airflowAuthHeader(airflowMajorVersion)
+		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -1756,28 +1810,17 @@ func printProxyStatus(settingsFile string, envConns map[string]astrocore.Environ
 	return nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, project *composetypes.Project, composeService api.Service, airflowMajorVersion uint64, noBrowser bool) error {
-	containers, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
-		All: true,
-	})
-	if err != nil {
-		return errors.Wrap(err, composeStatusCheckErrMsg)
-	}
-
+func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		for _, container := range containers { //nolint:gocritic
-			if strings.Contains(container.Name, project.Name) &&
-				(strings.Contains(container.Name, WebserverDockerContainerName) ||
-					strings.Contains(container.Name, APIServerDockerContainerName)) {
-				err = initSettings(container.ID, settingsFile, envConns, true, true, true)
-				if err != nil {
-					return err
-				}
-			}
+		apiURL := airflowAPIURL(airflowMajorVersion)
+		authHeader := airflowAuthHeader(airflowMajorVersion)
+		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
+		if err != nil {
+			return err
 		}
 	}
 

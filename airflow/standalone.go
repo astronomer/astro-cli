@@ -597,7 +597,7 @@ func (s *Standalone) buildEnv() []string {
 	return env
 }
 
-// applySettings imports airflow_settings.yaml using airflow CLI commands run via the venv.
+// applySettings imports airflow_settings.yaml using the Airflow REST API.
 func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	settingsExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil || !settingsExists {
@@ -606,11 +606,8 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 		}
 	}
 
-	// Temporarily swap the execAirflowCommand to use venv instead of docker
-	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
-	defer settings.SetExecAirflowCommand(origExec)
-
-	return settings.ConfigSettings("standalone", settingsFile, envConns, true, true, true)
+	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", s.webserverPort())
+	return settings.ConfigSettings(apiURL, "", settingsFile, envConns, true, true, true)
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -883,10 +880,8 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 		return errors.New("file specified does not exist")
 	}
 
-	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
-	defer settings.SetExecAirflowCommand(origExec)
-
-	err = settings.ConfigSettings("standalone", settingsFile, nil, connections, variables, pools)
+	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", s.webserverPort())
+	err = settings.ConfigSettings(apiURL, "", settingsFile, nil, connections, variables, pools)
 	if err != nil {
 		return err
 	}

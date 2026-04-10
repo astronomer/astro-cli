@@ -17,7 +17,7 @@ type Suite struct {
 	suite.Suite
 	origCmdExec              func(cmd string, stdout, stderr io.Writer, args ...string) error
 	origGetDockerClient      func() (client.APIClient, error)
-	origInitSettings         func(id, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error
+	origInitSettings         func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error
 	origCheckWebserverHealth func(url string, timeout time.Duration, component string) error
 	origCheckPortAvailable   func(port string) error
 	origResolveFloatingTag   func(tag string) (string, error)
