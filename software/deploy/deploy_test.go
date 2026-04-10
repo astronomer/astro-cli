@@ -1234,7 +1234,6 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		}
 		updateDeploymentImageResp := &houston.UpdateDeploymentImageResp{
 			ReleaseName:    releaseName,
-			AirflowVersion: "",
 			RuntimeVersion: runtimeVersion,
 		}
 		deployment := &houston.Deployment{

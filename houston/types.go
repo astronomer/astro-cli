@@ -307,7 +307,6 @@ type AirflowImage struct {
 
 type UpdateDeploymentImageResp struct {
 	ReleaseName    string `json:"releaseName"`
-	AirflowVersion string `json:"airflowVersion"`
 	RuntimeVersion string `json:"runtimeVersion"`
 }
 
