@@ -13,9 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/config"
 	v2high "github.com/pb33f/libopenapi/datamodel/high/v2"
 	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/astronomer/astro-cli/config"
 )
 
 const (
@@ -65,6 +66,7 @@ type CachedSpec struct {
 type Cache struct {
 	specURL     string
 	cachePath   string
+	localPath   string // local file path; when set, Load reads from disk (no HTTP, no caching)
 	stripPrefix string // optional prefix to strip from endpoint paths (e.g. "/api/v2")
 	authToken   string // optional auth token for fetching specs
 	httpClient  *http.Client
@@ -118,10 +120,51 @@ func NewCacheWithAuth(specURL, cachePath, authToken string) *Cache {
 	}
 }
 
+// NewCacheForLocalFile creates a Cache that reads a spec directly from a local
+// file path. The spec is parsed fresh on every Load call; no on-disk caching is
+// performed.
+func NewCacheForLocalFile(path string) *Cache {
+	return &Cache{
+		specURL:   path,
+		localPath: path,
+	}
+}
+
 // SpecCacheFileName returns a deterministic cache file name derived from a spec URL.
 func SpecCacheFileName(specURL string) string {
 	h := sha256.Sum256([]byte(specURL))
 	return fmt.Sprintf("openapi-cache-%x.json", h[:8])
+}
+
+// IsLocalSpec reports whether specURL refers to a local file rather than an
+// HTTP(S) URL.
+func IsLocalSpec(specURL string) bool {
+	lower := strings.ToLower(specURL)
+	return specURL != "" &&
+		!strings.HasPrefix(lower, "http://") &&
+		!strings.HasPrefix(lower, "https://")
+}
+
+// ResolveLocalPath converts a spec URL to an absolute local file path.
+// It handles file:// URLs, ~ home directory expansion, and relative paths.
+func ResolveLocalPath(specURL string) (string, error) {
+	path := specURL
+
+	// Strip file:// scheme
+	if strings.HasPrefix(strings.ToLower(path), "file://") {
+		path = path[len("file://"):]
+	}
+
+	// Expand ~ to home directory
+	if strings.HasPrefix(path, "~/") || path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("expanding home directory: %w", err)
+		}
+		path = filepath.Join(home, path[1:])
+	}
+
+	return filepath.Abs(path)
 }
 
 // NewAirflowCacheForVersion creates a new OpenAPI cache configured for a specific Airflow version.
@@ -152,7 +195,12 @@ func NewAirflowCacheForVersion(version string) (*Cache, error) {
 
 // Load loads the OpenAPI spec, using cache if valid or fetching if needed.
 // If forceRefresh is true, the cache is ignored and a fresh spec is fetched.
+// For local files, the spec is always read fresh from disk.
 func (c *Cache) Load(forceRefresh bool) error {
+	if c.localPath != "" {
+		return c.readLocalFile()
+	}
+
 	if !forceRefresh {
 		// Try to load from cache first
 		if err := c.readCache(); err == nil && !c.isExpired() {
@@ -245,6 +293,25 @@ func (c *Cache) readCache() error {
 	c.v2doc = v2doc
 	c.rawSpec = cached.RawSpec
 	c.fetchedAt = cached.FetchedAt
+	return nil
+}
+
+// readLocalFile reads and parses a spec from the local filesystem.
+func (c *Cache) readLocalFile() error {
+	data, err := os.ReadFile(c.localPath)
+	if err != nil {
+		return fmt.Errorf("reading local spec file: %w", err)
+	}
+
+	v3doc, v2doc, err := parseSpec(data)
+	if err != nil {
+		return fmt.Errorf("parsing local spec file: %w", err)
+	}
+
+	c.doc = v3doc
+	c.v2doc = v2doc
+	c.rawSpec = data
+	c.fetchedAt = time.Now()
 	return nil
 }
 

@@ -13,12 +13,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
-	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/spinner"
-	"github.com/astronomer/astro-cli/pkg/util"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/cli/cli/streams"
@@ -26,6 +20,13 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/sirupsen/logrus"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes"
+	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/spinner"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (

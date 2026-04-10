@@ -3,9 +3,10 @@ package proxy
 import (
 	"testing"
 
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Port allocation logic is thoroughly tested in pkg/proxy/ports_test.go.

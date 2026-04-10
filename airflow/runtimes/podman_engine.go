@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/briandowns/spinner"
+
 	"github.com/astronomer/astro-cli/airflow/runtimes/types"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/briandowns/spinner"
 )
 
 const (

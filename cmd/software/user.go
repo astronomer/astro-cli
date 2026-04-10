@@ -3,9 +3,9 @@ package software
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/software/user"
-
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/software/user"
 )
 
 const (

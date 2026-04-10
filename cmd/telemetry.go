@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/telemetry"
-	"github.com/spf13/cobra"
 )
 
 func newTelemetryCmd(out io.Writer) *cobra.Command {

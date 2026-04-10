@@ -3,11 +3,12 @@ package cloud
 import (
 	"io"
 
+	"github.com/spf13/cobra"
+
 	airflow "github.com/astronomer/astro-cli/airflow-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/spf13/cobra"
 )
 
 var (

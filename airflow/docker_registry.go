@@ -6,13 +6,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
-	"github.com/astronomer/astro-cli/pkg/logger"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
 	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
+
+	"github.com/astronomer/astro-cli/airflow/runtimes"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 // DockerLogin is a testable variable that holds the docker login function

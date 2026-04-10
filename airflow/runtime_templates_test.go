@@ -12,8 +12,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 type RuntimeTemplateSuite struct {

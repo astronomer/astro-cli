@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/houston"
 )
 
 var cmdAvailabilityByVersion = map[string]houston.VersionRestrictions{

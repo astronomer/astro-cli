@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/suite"
+
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {

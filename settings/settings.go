@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 var (

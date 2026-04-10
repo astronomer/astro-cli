@@ -664,8 +664,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		Data: ResponseData{
 			UpdateDeploymentImage: UpdateDeploymentImageResp{
 				ReleaseName:    "prehistoric-gravity-930",
-				AirflowVersion: "2.2.0",
-				RuntimeVersion: "",
+				RuntimeVersion: "6.0.0",
 			},
 		},
 	}
@@ -682,7 +681,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, RuntimeVersion: "6.0.0"})
 		s.NoError(err)
 	})
 
@@ -696,7 +695,7 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, RuntimeVersion: "6.0.0"})
 		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

@@ -16,6 +16,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/browser"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -30,9 +34,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/settings"
-	"github.com/pkg/browser"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const osDarwin = "darwin"

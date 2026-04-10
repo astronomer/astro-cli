@@ -276,7 +276,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
+	err = astroplatformcore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
 	if err != nil {
 		return err
 	}

@@ -5,10 +5,11 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
-	"github.com/spf13/cobra"
 )
 
 func newProxyRootCmd() *cobra.Command {

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/astronomer/astro-cli/airflow/runtimes/mocks"
 )
 
 var (

@@ -11,6 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
@@ -19,9 +23,6 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
 )
 
 type Suite struct {
@@ -2377,7 +2378,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
-					StatusCode: astrocore.HTTPStatus200,
+					StatusCode: http.StatusOK,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
 					IsHibernating: &tt.IsHibernating,
@@ -2402,7 +2403,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 			isActive := true
 			mockResponse := astroplatformcore.UpdateDeploymentHibernationOverrideResponse{
 				HTTPResponse: &http.Response{
-					StatusCode: astrocore.HTTPStatus200,
+					StatusCode: http.StatusOK,
 				},
 				JSON200: &astroplatformcore.DeploymentHibernationOverride{
 					IsHibernating: &tt.IsHibernating,
@@ -2491,7 +2492,7 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 	s.Run("remove override", func() {
 		mockResponse := astroplatformcore.DeleteDeploymentHibernationOverrideResponse{
 			HTTPResponse: &http.Response{
-				StatusCode: astrocore.HTTPStatus204,
+				StatusCode: http.StatusNoContent,
 			},
 		}
 
@@ -2510,7 +2511,7 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 	s.Run("remove override with deployment selection", func() {
 		mockResponse := astroplatformcore.DeleteDeploymentHibernationOverrideResponse{
 			HTTPResponse: &http.Response{
-				StatusCode: astrocore.HTTPStatus204,
+				StatusCode: http.StatusNoContent,
 			},
 		}
 

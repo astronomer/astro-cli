@@ -3,9 +3,9 @@ package spinner
 import (
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/ansi"
-
 	"github.com/briandowns/spinner"
+
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 var spinnerCharSet = spinner.CharSets[14]

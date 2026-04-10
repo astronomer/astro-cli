@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/pkg/browser"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -21,9 +23,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/go-git/go-billy/v5/osfs"
-	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
 var (

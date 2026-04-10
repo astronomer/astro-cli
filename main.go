@@ -3,10 +3,11 @@ package main
 import (
 	"os"
 
+	"github.com/spf13/afero"
+
 	"github.com/astronomer/astro-cli/cmd"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
-	"github.com/spf13/afero"
 )
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --version

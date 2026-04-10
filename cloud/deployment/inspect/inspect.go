@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 type deploymentMetadata struct {

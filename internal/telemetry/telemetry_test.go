@@ -4,11 +4,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/config"
 )
 
 func initTestConfig(t *testing.T) {

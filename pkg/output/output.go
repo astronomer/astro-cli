@@ -7,11 +7,12 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	jsoncolor "github.com/neilotoole/jsoncolor"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 // Format represents the output format type

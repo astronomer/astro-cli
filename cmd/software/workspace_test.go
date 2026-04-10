@@ -3,10 +3,10 @@ package software
 import (
 	"bytes"
 
-	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

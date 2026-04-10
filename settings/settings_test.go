@@ -6,9 +6,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/stretchr/testify/suite"
 )
 
 type Suite struct {

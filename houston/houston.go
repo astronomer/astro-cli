@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
+	newLogger "github.com/sirupsen/logrus"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-
-	newLogger "github.com/sirupsen/logrus"
 )
 
 var (

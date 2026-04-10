@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/config"
-
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/config"
 )
 
 const (

@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/openapi"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
 // initTestConfig initializes the config with an in-memory filesystem for tests.
@@ -511,4 +514,69 @@ func TestInitCloudSpecCache_SpecTokenEnvVar_Empty(t *testing.T) {
 	err := initCloudSpecCache(opts, ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `environment variable "NONEXISTENT_VAR_FOR_TEST" is not set`)
+}
+
+// --- --spec-url with local files ---------------------------------------------
+
+func TestInitCloudSpecCache_LocalFile(t *testing.T) {
+	initTestConfig(t)
+
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"Local","version":"1"},"paths":{}}`)
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
+
+	opts := &CloudOptions{SpecURL: tmpFile}
+	ctx := &config.Context{Domain: "example.com", Token: "tok"}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, opts.specCache)
+
+	// Verify it can load and parse
+	err = opts.specCache.Load(false)
+	require.NoError(t, err)
+	assert.Equal(t, "Local", opts.specCache.GetDoc().Info.Title)
+}
+
+func TestInitCloudSpecCache_LocalFile_FileURL(t *testing.T) {
+	initTestConfig(t)
+
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"FileURL","version":"1"},"paths":{}}`)
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
+
+	opts := &CloudOptions{SpecURL: "file://" + tmpFile}
+	ctx := &config.Context{Domain: "example.com", Token: "tok"}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, opts.specCache)
+
+	err = opts.specCache.Load(false)
+	require.NoError(t, err)
+	assert.Equal(t, "FileURL", opts.specCache.GetDoc().Info.Title)
+}
+
+func TestInitCloudSpecCache_LocalFile_IgnoresSpecTokenEnvVar(t *testing.T) {
+	initTestConfig(t)
+
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"IgnoreToken","version":"1"},"paths":{}}`)
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
+
+	// SpecTokenEnvVar is set to a nonexistent var — for remote URLs this would error,
+	// but for local files it should be silently ignored.
+	opts := &CloudOptions{
+		SpecURL:         tmpFile,
+		SpecTokenEnvVar: "NONEXISTENT_TOKEN_VAR",
+	}
+	ctx := &config.Context{Domain: "example.com"}
+
+	err := initCloudSpecCache(opts, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, opts.specCache)
+
+	err = opts.specCache.Load(false)
+	require.NoError(t, err)
+	assert.Equal(t, "IgnoreToken", opts.specCache.GetDoc().Info.Title)
 }

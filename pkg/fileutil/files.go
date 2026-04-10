@@ -16,10 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+
+	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const openPermissions = 0o777

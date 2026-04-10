@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/houston"
 	sa "github.com/astronomer/astro-cli/software/service_account"
-	"github.com/spf13/cobra"
 )
 
 var (

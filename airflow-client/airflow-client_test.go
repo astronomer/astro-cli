@@ -10,9 +10,10 @@ import (
 	"testing"
 	"testing/synctest"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/suite"
 )
 
 type Suite struct {

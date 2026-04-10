@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
@@ -17,7 +19,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"golang.org/x/exp/slices"
 )
 
 func newTokenTableOut() *printutil.Table {
