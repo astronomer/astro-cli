@@ -42,7 +42,7 @@ var (
 
 const (
 	airflowConnectionList = "airflow connections list -o yaml"
-	ariflowPoolsList      = "airflow pools list -o yaml"
+	airflowPoolsList      = "airflow pools list -o yaml"
 	airflowConnExport     = "airflow connections export tmp.connections --file-format env"
 	airflowVarExport      = "airflow variables export tmp.var"
 	catVarFile            = "cat tmp.var"
@@ -593,7 +593,7 @@ func ExportVariables(id string) error {
 			return fmt.Errorf("error reading variables file: %w", err)
 		}
 
-		m := map[string]string{}
+		var m map[string]interface{}
 		err := json.Unmarshal([]byte(out), &m)
 		if err != nil {
 			fmt.Println("variable json decode unsuccessful")
@@ -603,13 +603,26 @@ func ExportVariables(id string) error {
 			for j := range settings.Airflow.Variables {
 				if settings.Airflow.Variables[j].VariableName == k {
 					fmt.Println("Updating Pool: " + k)
-					// Remove variable if it already exits
+					// Remove variable if it already exists
 					settings.Airflow.Variables = append(settings.Airflow.Variables[:j], settings.Airflow.Variables[j+1:]...)
 					break
 				}
 			}
 
-			newVariables := Variables{{k, v}}
+			var vs string
+			switch vt := v.(type) {
+			case string:
+				vs = vt
+			default:
+				// Re-encode complex types as JSON.
+				b, err := json.Marshal(v)
+				if err != nil {
+					fmt.Println("variable json reencode unsuccessful")
+					return err
+				}
+				vs = string(b)
+			}
+			newVariables := Variables{{k, vs}}
 			fmt.Println("Exporting Variable: " + k)
 			settings.Airflow.Variables = append(settings.Airflow.Variables, newVariables...)
 		}
@@ -631,7 +644,7 @@ func ExportVariables(id string) error {
 
 func ExportPools(id string) error {
 	// Setup airflow command to export pools
-	airflowCommand := ariflowPoolsList
+	airflowCommand := airflowPoolsList
 	out, err := execAirflowCommand(id, airflowCommand)
 	if err != nil {
 		return fmt.Errorf("error listing pools: %w", err)
