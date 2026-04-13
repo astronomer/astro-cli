@@ -872,6 +872,11 @@ func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 
 // ImportSettings imports connections/variables/pools from the settings file.
 func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variables, pools bool) error {
+	// Verify standalone is actually running before attempting to import.
+	if _, alive := s.readPID(); !alive {
+		return errors.New("standalone Airflow is not running, run astro dev start --standalone to start it")
+	}
+
 	if !connections && !variables && !pools {
 		connections = true
 		variables = true
