@@ -126,19 +126,6 @@ func (s *Standalone) pidFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standalonePIDFile)
 }
 
-func (s *Standalone) portFilePath() string {
-	return filepath.Join(s.airflowHome, standaloneDir, "port")
-}
-
-// readPersistedPort reads the port from the state file, returns empty string if not found.
-func (s *Standalone) readPersistedPort() string {
-	data, err := os.ReadFile(s.portFilePath())
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
-
 func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
 }
@@ -342,9 +329,6 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		return fmt.Errorf("error starting airflow standalone: %w", err)
 	}
 
-	// Persist the port for subsequent commands (object import, etc.)
-	_ = os.WriteFile(s.portFilePath(), []byte(s.webserverPort()), filePermissions)
-
 	// Forward signals to the entire process group so child processes
 	// (scheduler, triggerer, api-server, etc.) are also terminated.
 	sigChan := make(chan os.Signal, 1)
@@ -460,9 +444,6 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
 		return fmt.Errorf("error writing PID file: %w", err)
 	}
-	// Persist the port so subsequent commands (object import, etc.) can find it.
-	_ = os.WriteFile(s.portFilePath(), []byte(s.webserverPort()), filePermissions)
-
 	// Run health check (blocking — wait for healthy or timeout)
 	healthURL, healthComp := s.healthEndpoint()
 	err = checkWebserverHealth(healthURL, waitTime, healthComp)
@@ -670,7 +651,6 @@ func (s *Standalone) Stop(_ bool) error {
 	if !alive {
 		// Stale PID file — clean up
 		os.Remove(s.pidFilePath())
-		os.Remove(s.portFilePath())
 		fmt.Println("No standalone Airflow process found (cleaned up stale PID file).")
 		return nil
 	}
@@ -694,7 +674,6 @@ func (s *Standalone) Stop(_ bool) error {
 	}
 
 	os.Remove(s.pidFilePath())
-	os.Remove(s.portFilePath())
 	fmt.Println("Airflow standalone stopped.")
 	return nil
 }
@@ -907,11 +886,11 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 		return errors.New("file specified does not exist")
 	}
 
-	// Prefer the persisted port from when standalone was started, since it
-	// may differ from config (e.g., when proxy mode allocated a random port).
-	port := s.readPersistedPort()
-	if port == "" {
-		port = s.webserverPort()
+	// If proxy mode allocated a random port, the actual port is stored in
+	// the proxy route registered during Start. Fall back to config default.
+	port := s.webserverPort()
+	if route, rerr := proxy.GetRouteByProject(s.airflowHome); rerr == nil && route != nil && route.Port != "" {
+		port = route.Port
 	}
 
 	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)

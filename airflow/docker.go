@@ -70,7 +70,6 @@ const (
 	ruffFilePermission                    = 0o600
 	airflowMajorVersion2           uint64 = 2
 	airflowMajorVersion3           uint64 = 3
-	webserverContainerPort                = 8080
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -1462,13 +1461,13 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return err
 	}
 
-	// Get the actual published port from the running container, in case
-	// proxy mode allocated a non-default port.
+	// If proxy mode allocated a random port, the actual port is stored in
+	// the proxy route registered during Start. Fall back to config default.
 	var portOvr *PortOverrides
-	if publishedPort, perr := d.getWebServerPublishedPort(); perr == nil {
+	if route, rerr := proxy.GetRouteByProject(d.airflowHome); rerr == nil && route != nil && route.Port != "" {
 		portOvr = &PortOverrides{
-			WebserverPort: publishedPort,
-			APIServerPort: publishedPort,
+			WebserverPort: route.Port,
+			APIServerPort: route.Port,
 		}
 	}
 
@@ -1504,36 +1503,6 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 		}
 	}
 	return "", err
-}
-
-// getWebServerPublishedPort returns the actual host port that maps to the
-// webserver/API server container's port 8080. This handles port overrides
-// allocated dynamically (e.g., by proxy mode).
-func (d *DockerCompose) getWebServerPublishedPort() (string, error) {
-	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
-		All: true,
-	})
-	if err != nil {
-		return "", errors.Wrap(err, composeStatusCheckErrMsg)
-	}
-	if len(psInfo) == 0 {
-		return "", errors.New("project not running, run astro dev start to start project")
-	}
-
-	replacer := strings.NewReplacer("_", "", "-", "")
-	strippedProjectName := replacer.Replace(d.projectName)
-	for i := range psInfo {
-		if strings.Contains(replacer.Replace(psInfo[i].Name), strippedProjectName) &&
-			(strings.Contains(psInfo[i].Name, WebserverDockerContainerName) ||
-				strings.Contains(psInfo[i].Name, APIServerDockerContainerName)) {
-			for _, p := range psInfo[i].Publishers {
-				if p.TargetPort == webserverContainerPort && p.PublishedPort != 0 {
-					return strconv.Itoa(p.PublishedPort), nil
-				}
-			}
-		}
-	}
-	return "", errors.New("could not determine webserver published port")
 }
 
 func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate string, noCache, taskLogs bool) error {
