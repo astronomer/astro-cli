@@ -270,28 +270,37 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 		return err
 	}
 	activeOrgID := c.Organization
-	// fetch all orgs that the user can access
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
-	orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
-	if err != nil {
-		return err
-	}
-	err = astroplatformcore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
-	if err != nil {
-		return err
-	}
-	orgsPaginated := *orgsResp.JSON200
-	orgs := orgsPaginated.Organizations
-	if len(orgs) == 0 {
-		return ErrorNoOrganization
-	}
-	// default to first one in case something crazy happen lol
-	activeOrg := orgs[0]
-	for i := range orgs {
-		if orgs[i].Id == activeOrgID {
-			activeOrg = orgs[i]
-			break
+
+	var activeOrg astroplatformcore.Organization
+	if activeOrgID != "" {
+		// Fetch the specific org directly by ID to avoid a silent wrong-org fallback
+		// when the user belongs to more organizations than the API's default page size.
+		orgResp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), activeOrgID, &astroplatformcore.GetOrganizationParams{})
+		if err != nil {
+			return err
 		}
+		err = astroplatformcore.NormalizeAPIError(orgResp.HTTPResponse, orgResp.Body)
+		if err != nil {
+			return err
+		}
+		activeOrg = *orgResp.JSON200
+	} else {
+		// No active org in context — list orgs and use the first available one.
+		organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+		orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
+		if err != nil {
+			return err
+		}
+		err = astroplatformcore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
+		if err != nil {
+			return err
+		}
+		orgsPaginated := *orgsResp.JSON200
+		orgs := orgsPaginated.Organizations
+		if len(orgs) == 0 {
+			return ErrorNoOrganization
+		}
+		activeOrg = orgs[0]
 	}
 
 	orgProduct := "HYBRID"
