@@ -530,9 +530,9 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{
-		ClusterID:       deploymentInfo.ClusterID,
-		WorkspaceUUID:   deploymentInfo.Workspace.ID,
-		DeploymentUUID:  args[0],
+		ClusterID:      deploymentInfo.ClusterID,
+		WorkspaceUUID:  deploymentInfo.Workspace.ID,
+		DeploymentUUID: args[0],
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get app config: %w", err)
