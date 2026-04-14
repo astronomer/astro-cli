@@ -1669,7 +1669,7 @@ func (s *Suite) TestStandaloneBash_Success() {
 
 // --- ImportSettings tests ---
 
-func (s *Suite) TestStandaloneImportSettings_FileNotFound() {
+func (s *Suite) TestStandaloneImportSettings_NotRunning() {
 	tmpDir, err := os.MkdirTemp("", "standalone-import")
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
@@ -1679,7 +1679,7 @@ func (s *Suite) TestStandaloneImportSettings_FileNotFound() {
 
 	err = handler.ImportSettings(filepath.Join(tmpDir, "nonexistent.yaml"), "", false, false, false)
 	s.Error(err)
-	s.Contains(err.Error(), "file specified does not exist")
+	s.Contains(err.Error(), "standalone Airflow is not running")
 }
 
 func (s *Suite) TestStandaloneImportSettings_DefaultsAllFlags() {
@@ -1695,14 +1695,11 @@ func (s *Suite) TestStandaloneImportSettings_DefaultsAllFlags() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	// This will fail because there's no real airflow to exec, but we can verify
-	// it gets past the file check and flag defaulting
+	// Without a running standalone process, ImportSettings should fail
+	// with a "not running" error before reaching the file check
 	err = handler.ImportSettings(settingsFile, "", false, false, false)
-	// Error is expected since we don't have a real venv, but it should NOT be
-	// "file specified does not exist"
-	if err != nil {
-		s.NotContains(err.Error(), "file specified does not exist")
-	}
+	s.Error(err)
+	s.Contains(err.Error(), "standalone Airflow is not running")
 }
 
 // --- ExportSettings tests ---

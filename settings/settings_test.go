@@ -3,7 +3,11 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -26,78 +30,119 @@ func (s *Suite) TearDownTest() {
 	settings = Config{}
 }
 
-func (s *Suite) TestConfigSettings() {
-	// config settings success
-	err := ConfigSettings("container-id", "", nil, 2, false, false, false)
-	s.NoError(err)
-	// config setttings no id error
-	err = ConfigSettings("", "", nil, 2, false, false, false)
-	s.ErrorIs(err, errNoID)
+// mockAirflowAPI creates an httptest server that accepts POST (create) and PATCH (update)
+// requests for Airflow API resources. It returns 201 on POST, 200 on PATCH, and records requests.
+type apiRequest struct {
+	Method  string
+	Path    string
+	Body    map[string]interface{}
+	RawBody []byte
 }
 
-func (s *Suite) TestAddConnectionsAirflowOne() {
-	var testExtra map[string]string
-
-	testConn := Connection{
-		ConnID:       "test-id",
-		ConnType:     "test-type",
-		ConnHost:     "test-host",
-		ConnSchema:   "test-schema",
-		ConnLogin:    "test-login",
-		ConnPassword: "test-password",
-		ConnPort:     1,
-		ConnURI:      "test-uri",
-		ConnExtra:    testExtra,
-	}
-	settings.Airflow.Connections = []Connection{testConn}
-
-	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
-	expectedListCmd := "airflow connections -l "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd}, airflowCommand)
-		return "", nil
-	}
-	err := AddConnections("test-conn-id", 1, nil)
-	s.NoError(err)
-}
-
-func (s *Suite) TestAddConnectionsAirflowTwo() {
-	var testExtra map[string]string
-
-	testConn := Connection{
-		ConnID:       "test-id",
-		ConnType:     "test-type",
-		ConnHost:     "test-host",
-		ConnSchema:   "test-schema",
-		ConnLogin:    "test-login",
-		ConnPassword: "test-password",
-		ConnPort:     1,
-		ConnURI:      "test-uri",
-		ConnExtra:    testExtra,
-	}
-	settings.Airflow.Connections = []Connection{testConn}
-
-	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
-	expectedDelCmd := "airflow connections delete   \"test-id\""
-	expectedListCmd := "airflow connections list -o plain"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
-		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
+func newMockAirflowAPI(s *Suite) (*httptest.Server, *[]apiRequest) {
+	var requests []apiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		req := apiRequest{Method: r.Method, Path: r.URL.Path, RawBody: body}
+		if len(body) > 0 {
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(body, &parsed); err == nil {
+				req.Body = parsed
+			}
 		}
-		return "", nil
-	}
-	err := AddConnections("test-conn-id", 2, nil)
+		requests = append(requests, req)
+
+		switch r.Method {
+		case http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+		case http.MethodPatch:
+			w.WriteHeader(http.StatusOK)
+		}
+		fmt.Fprint(w, "{}")
+	}))
+	origClient := SetHTTPClient(server.Client())
+	s.T().Cleanup(func() {
+		SetHTTPClient(origClient)
+		server.Close()
+	})
+	return server, &requests
+}
+
+// newConflictAirflowAPI creates a server that returns 409 on POST (to test upsert/update path).
+func newConflictAirflowAPI(s *Suite) (*httptest.Server, *[]apiRequest) {
+	var requests []apiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		req := apiRequest{Method: r.Method, Path: r.URL.Path, RawBody: body}
+		if len(body) > 0 {
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(body, &parsed); err == nil {
+				req.Body = parsed
+			}
+		}
+		requests = append(requests, req)
+
+		switch r.Method {
+		case http.MethodPost:
+			w.WriteHeader(http.StatusConflict)
+			fmt.Fprint(w, `{"detail":"already exists"}`)
+		case http.MethodPatch:
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "{}")
+		}
+	}))
+	origClient := SetHTTPClient(server.Client())
+	s.T().Cleanup(func() {
+		SetHTTPClient(origClient)
+		server.Close()
+	})
+	return server, &requests
+}
+
+func (s *Suite) TestConfigSettings() {
+	server, _ := newMockAirflowAPI(s)
+	err := ConfigSettings(server.URL+"/api/v2", "", "", nil, false, false, false)
 	s.NoError(err)
+	// empty URL error
+	err = ConfigSettings("", "", "", nil, false, false, false)
+	s.ErrorIs(err, errNoURL)
+}
+
+func (s *Suite) TestAddVariables() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "test-var-name", VariableValue: "test-var-val"},
+	}
+
+	server, requests := newMockAirflowAPI(s)
+	err := AddVariables(server.URL+"/api/v2", "")
+	s.NoError(err)
+	s.Len(*requests, 1)
+	s.Equal(http.MethodPost, (*requests)[0].Method)
+	s.Equal("/api/v2/variables", (*requests)[0].Path)
+	s.Equal("test-var-name", (*requests)[0].Body["key"])
+	s.Equal("test-var-val", (*requests)[0].Body["value"])
+}
+
+func (s *Suite) TestAddVariablesUpdate() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "existing-var", VariableValue: "new-val"},
+	}
+
+	server, requests := newConflictAirflowAPI(s)
+	err := AddVariables(server.URL+"/api/v2", "")
+	s.NoError(err)
+	// Should have POST (409) then PATCH
+	s.Len(*requests, 2)
+	s.Equal(http.MethodPost, (*requests)[0].Method)
+	s.Equal(http.MethodPatch, (*requests)[1].Method)
+	s.Equal("/api/v2/variables/existing-var", (*requests)[1].Path)
 }
 
 func ptr[T any](t T) *T {
 	return &t
 }
 
-func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
-	var testExtra map[string]string
-
+func (s *Suite) TestAddConnections() {
 	testConn := Connection{
 		ConnID:       "test-id",
 		ConnType:     "test-type",
@@ -106,8 +151,29 @@ func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
 		ConnLogin:    "test-login",
 		ConnPassword: "test-password",
 		ConnPort:     1,
-		ConnURI:      "test-uri",
-		ConnExtra:    testExtra,
+	}
+	settings.Airflow.Connections = []Connection{testConn}
+
+	server, requests := newMockAirflowAPI(s)
+	err := AddConnections(server.URL+"/api/v2", "", nil)
+	s.NoError(err)
+	s.Len(*requests, 1)
+	s.Equal(http.MethodPost, (*requests)[0].Method)
+	s.Equal("/api/v2/connections", (*requests)[0].Path)
+	s.Equal("test-id", (*requests)[0].Body["connection_id"])
+	s.Equal("test-type", (*requests)[0].Body["conn_type"])
+	s.Equal("test-host", (*requests)[0].Body["host"])
+	s.Equal("test-login", (*requests)[0].Body["login"])
+	s.Equal("test-password", (*requests)[0].Body["password"])
+	s.Equal("test-schema", (*requests)[0].Body["schema"])
+	s.Equal(float64(1), (*requests)[0].Body["port"])
+}
+
+func (s *Suite) TestAddConnectionsWithEnvConns() {
+	testConn := Connection{
+		ConnID:   "test-id",
+		ConnType: "test-type",
+		ConnHost: "test-host",
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
@@ -125,154 +191,252 @@ func (s *Suite) TestAddConnectionsAirflowTwoWithEnvConns() {
 		},
 	}
 
-	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
-	expectedDelCmd := "airflow connections delete   \"test-id\""
-	expectedListCmd := "airflow connections list -o plain"
-
-	expectedEnvAddCmd := "airflow connections add   'test-env-id' --conn-type 'test-env-type' --conn-extra '{\"test-extra-key\":\"test-extra-value\"}' --conn-host 'test-env-host' --conn-login 'test-env-login' --conn-password 'test-env-password' --conn-schema 'test-env-schema' --conn-port 2"
-
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedEnvAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
-		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
-		}
-		return "", nil
-	}
-	err := AddConnections("test-conn-id", 2, envConns)
+	server, requests := newMockAirflowAPI(s)
+	err := AddConnections(server.URL+"/api/v2", "", envConns)
 	s.NoError(err)
+	// Both settings and env connections should create requests
+	s.Len(*requests, 2)
+
+	// Find the env connection request
+	var envReq *apiRequest
+	for i := range *requests {
+		if (*requests)[i].Body["connection_id"] == "test-env-id" {
+			envReq = &(*requests)[i]
+			break
+		}
+	}
+	s.NotNil(envReq)
+	s.Equal("test-env-type", envReq.Body["conn_type"])
+	s.Equal("test-env-host", envReq.Body["host"])
 }
 
-func (s *Suite) TestAddConnectionsAirflowTwoURI() {
+func (s *Suite) TestAddConnectionsURI() {
 	testConn := Connection{
-		ConnURI: "test-uri",
+		ConnID:  "test-id",
+		ConnURI: "postgres://user:pass@host:5432/db",
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
-	expectedAddCmd := "airflow connections add   'test-id' --conn-uri 'test-uri'"
-	expectedDelCmd := "airflow connections delete   \"test-id\""
-	expectedListCmd := "airflow connections list -o plain"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
-		if airflowCommand == expectedListCmd {
-			return "'test-id' 'test-type' 'test-host' 'test-uri'", nil
-		}
-		return "", nil
-	}
-	err := AddConnections("test-conn-id", 2, nil)
+	server, requests := newMockAirflowAPI(s)
+	err := AddConnections(server.URL+"/api/v2", "", nil)
 	s.NoError(err)
+	s.Len(*requests, 1)
+	// URI should be parsed into individual fields
+	s.Equal("postgres", (*requests)[0].Body["conn_type"])
+	s.Equal("host", (*requests)[0].Body["host"])
+	s.Equal("user", (*requests)[0].Body["login"])
+	s.Equal("pass", (*requests)[0].Body["password"])
+	s.Equal(float64(5432), (*requests)[0].Body["port"])
+	s.Equal("db", (*requests)[0].Body["schema"])
 }
 
-func (s *Suite) TestAddConnectionsFailure() {
-	var testExtra map[string]string
-
-	testConn := Connection{
-		ConnID:       "test-id",
-		ConnType:     "test-type",
-		ConnHost:     "test-host",
-		ConnSchema:   "test-schema",
-		ConnLogin:    "test-login",
-		ConnPassword: "test-password",
-		ConnPort:     1,
-		ConnURI:      "test-uri",
-		ConnExtra:    testExtra,
-	}
-	settings.Airflow.Connections = []Connection{testConn}
-
-	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
-	expectedListCmd := "airflow connections -l "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Contains([]string{expectedAddCmd, expectedListCmd}, airflowCommand)
-		return "", fmt.Errorf("mock error")
-	}
-	err := AddConnections("test-conn-id", 1, nil)
-	s.Contains(err.Error(), "mock error")
-}
-
-func (s *Suite) TestAddVariableAirflowOne() {
-	settings.Airflow.Variables = Variables{
-		{
-			VariableName:  "test-var-name",
-			VariableValue: "test-var-val",
-		},
+func (s *Suite) TestAddConnectionsUpdate() {
+	settings.Airflow.Connections = []Connection{
+		{ConnID: "existing", ConnType: "http"},
 	}
 
-	expectedAddCmd := "airflow variables -s test-var-name'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", nil
-	}
-	err := AddVariables("test-conn-id", 1)
+	server, requests := newConflictAirflowAPI(s)
+	err := AddConnections(server.URL+"/api/v2", "", nil)
 	s.NoError(err)
+	s.Len(*requests, 2)
+	s.Equal(http.MethodPost, (*requests)[0].Method)
+	s.Equal(http.MethodPatch, (*requests)[1].Method)
+	s.Equal("/api/v2/connections/existing", (*requests)[1].Path)
 }
 
-func (s *Suite) TestAddVariableAirflowTwo() {
-	settings.Airflow.Variables = Variables{
-		{
-			VariableName:  "test-var-name",
-			VariableValue: "test-var-val",
-		},
-	}
-
-	expectedAddCmd := "airflow variables set test-var-name 'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", nil
-	}
-	err := AddVariables("test-conn-id", 2)
-	s.NoError(err)
-}
-
-func (s *Suite) TestAddPoolsAirflowOne() {
+func (s *Suite) TestAddPools() {
 	settings.Airflow.Pools = Pools{
-		{
-			PoolName:        "test-pool-name",
-			PoolSlot:        1,
-			PoolDescription: "test-pool-description",
-		},
+		{PoolName: "test-pool", PoolSlot: 5, PoolDescription: "test desc"},
 	}
 
-	expectedAddCmd := "airflow pool -s  test-pool-name 1 'test-pool-description' "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", nil
-	}
-	err := AddPools("test-conn-id", 1)
+	server, requests := newMockAirflowAPI(s)
+	err := AddPools(server.URL+"/api/v2", "")
 	s.NoError(err)
-}
-
-func (s *Suite) TestAddPoolsAirflowTwo() {
-	settings.Airflow.Pools = Pools{
-		{
-			PoolName:        "test-pool-name",
-			PoolSlot:        1,
-			PoolDescription: "test-pool-description",
-		},
-	}
-
-	expectedAddCmd := "airflow pools set  test-pool-name 1 'test-pool-description' "
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", nil
-	}
-	err := AddPools("test-conn-id", 2)
-	s.NoError(err)
+	s.Len(*requests, 1)
+	s.Equal(http.MethodPost, (*requests)[0].Method)
+	s.Equal("/api/v2/pools", (*requests)[0].Path)
+	s.Equal("test-pool", (*requests)[0].Body["name"])
+	s.Equal(float64(5), (*requests)[0].Body["slots"])
+	s.Equal("test desc", (*requests)[0].Body["description"])
 }
 
 func (s *Suite) TestAddVariableFailure() {
 	settings.Airflow.Variables = Variables{
-		{
-			VariableName:  "test-var-name",
-			VariableValue: "test-var-val",
-		},
+		{VariableName: "test-var", VariableValue: "val"},
 	}
 
-	expectedAddCmd := "airflow variables -s test-var-name'test-var-val'"
-	execAirflowCommand = func(id, airflowCommand string) (string, error) {
-		s.Equal(expectedAddCmd, airflowCommand)
-		return "", fmt.Errorf("mock error")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"detail":"server error"}`)
+	}))
+	origClient := SetHTTPClient(server.Client())
+	defer func() { SetHTTPClient(origClient); server.Close() }()
+
+	err := AddVariables(server.URL+"/api/v2", "")
+	s.Error(err)
+	s.Contains(err.Error(), "server error")
+}
+
+func (s *Suite) TestAddConnectionsFailure() {
+	settings.Airflow.Connections = []Connection{
+		{ConnID: "test-id", ConnType: "test-type"},
 	}
-	err := AddVariables("test-conn-id", 1)
-	s.Contains(err.Error(), "mock error")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"detail":"server error"}`)
+	}))
+	origClient := SetHTTPClient(server.Client())
+	defer func() { SetHTTPClient(origClient); server.Close() }()
+
+	err := AddConnections(server.URL+"/api/v2", "", nil)
+	s.Error(err)
+	s.Contains(err.Error(), "server error")
+}
+
+func (s *Suite) TestAddPoolsFailure() {
+	settings.Airflow.Pools = Pools{
+		{PoolName: "test-pool", PoolSlot: 1, PoolDescription: "desc"},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"detail":"server error"}`)
+	}))
+	origClient := SetHTTPClient(server.Client())
+	defer func() { SetHTTPClient(origClient); server.Close() }()
+
+	err := AddPools(server.URL+"/api/v2", "")
+	s.Error(err)
+	s.Contains(err.Error(), "server error")
+}
+
+func (s *Suite) TestEmptyLists() {
+	settings.Airflow.Variables = Variables{}
+	settings.Airflow.Connections = Connections{}
+	settings.Airflow.Pools = Pools{}
+
+	server, requests := newMockAirflowAPI(s)
+	url := server.URL + "/api/v2"
+
+	s.NoError(AddVariables(url, ""))
+	s.NoError(AddConnections(url, "", nil))
+	s.NoError(AddPools(url, ""))
+	s.Empty(*requests, "no API calls should be made for empty lists")
+}
+
+func (s *Suite) TestMultipleVariables() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "var1", VariableValue: "val1"},
+		{VariableName: "var2", VariableValue: "val2"},
+		{VariableName: "var3", VariableValue: "val3"},
+	}
+
+	server, requests := newMockAirflowAPI(s)
+	err := AddVariables(server.URL+"/api/v2", "")
+	s.NoError(err)
+	s.Len(*requests, 3)
+}
+
+func (s *Suite) TestConnectionExtraTypes() {
+	s.Run("map extra", func() {
+		settings.Airflow.Connections = []Connection{
+			{
+				ConnID:   "map-extra-conn",
+				ConnType: "http",
+				ConnExtra: map[any]any{
+					"key1": "val1",
+				},
+			},
+		}
+		server, requests := newMockAirflowAPI(s)
+		s.NoError(AddConnections(server.URL+"/api/v2", "", nil))
+		s.Len(*requests, 1)
+		s.Contains((*requests)[0].Body["extra"], "key1")
+	})
+
+	s.Run("string json extra", func() {
+		settings.Airflow.Connections = []Connection{
+			{
+				ConnID:    "str-extra-conn",
+				ConnType:  "http",
+				ConnExtra: `{"key":"val"}`,
+			},
+		}
+		server, requests := newMockAirflowAPI(s)
+		s.NoError(AddConnections(server.URL+"/api/v2", "", nil))
+		s.Len(*requests, 1)
+		s.Equal(`{"key":"val"}`, (*requests)[0].Body["extra"])
+	})
+
+	s.Run("nil extra", func() {
+		settings.Airflow.Connections = []Connection{
+			{
+				ConnID:    "nil-extra-conn",
+				ConnType:  "http",
+				ConnExtra: nil,
+			},
+		}
+		server, requests := newMockAirflowAPI(s)
+		s.NoError(AddConnections(server.URL+"/api/v2", "", nil))
+		s.Len(*requests, 1)
+		_, hasExtra := (*requests)[0].Body["extra"]
+		s.False(hasExtra, "nil extra should not appear in JSON")
+	})
+}
+
+func (s *Suite) TestMixedValidInvalid() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "good_var", VariableValue: "good_val"},
+		{VariableName: "", VariableValue: "orphan_val"},
+		{VariableName: "empty_val_var", VariableValue: ""},
+	}
+
+	server, requests := newMockAirflowAPI(s)
+	err := AddVariables(server.URL+"/api/v2", "")
+	s.NoError(err)
+	// Only 1 valid variable should create an API call
+	s.Len(*requests, 1)
+	s.Equal("good_var", (*requests)[0].Body["key"])
+}
+
+func (s *Suite) TestAuthHeaderPassedThrough() {
+	settings.Airflow.Variables = Variables{
+		{VariableName: "test", VariableValue: "val"},
+	}
+
+	var receivedAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, "{}")
+	}))
+	origClient := SetHTTPClient(server.Client())
+	defer func() { SetHTTPClient(origClient); server.Close() }()
+
+	err := AddVariables(server.URL+"/api/v2", "Basic dGVzdDp0ZXN0")
+	s.NoError(err)
+	s.Equal("Basic dGVzdDp0ZXN0", receivedAuth)
+}
+
+func (s *Suite) TestSkipMessages() {
+	s.Run("skip pool with zero slots", func() {
+		settings.Airflow.Pools = Pools{
+			{PoolName: "zero-pool", PoolSlot: 0, PoolDescription: "should skip"},
+		}
+		server, requests := newMockAirflowAPI(s)
+		s.NoError(AddPools(server.URL+"/api/v2", ""))
+		s.Empty(*requests)
+	})
+
+	s.Run("skip connection without type or uri", func() {
+		settings.Airflow.Connections = []Connection{
+			{ConnID: "no-type", ConnHost: "host"},
+		}
+		server, requests := newMockAirflowAPI(s)
+		s.NoError(AddConnections(server.URL+"/api/v2", "", nil))
+		s.Empty(*requests)
+	})
 }
 
 func (s *Suite) TestInitSettingsSuccess() {
@@ -320,12 +484,7 @@ func (s *Suite) TestEnvExport() {
 
 	s.Run("variable failure", func() {
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowVarExport:
-				return "", nil
-			default:
-				return "", nil
-			}
+			return "", nil
 		}
 
 		err := EnvExport("id", "testfiles/test.env", 2, false, true)
@@ -335,12 +494,7 @@ func (s *Suite) TestEnvExport() {
 
 	s.Run("connection failure", func() {
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowConnExport:
-				return "", nil
-			default:
-				return "", nil
-			}
+			return "", nil
 		}
 
 		err := EnvExport("id", "testfiles/test.env", 2, true, false)
@@ -395,12 +549,7 @@ func (s *Suite) TestExport() {
 	s.Run("variable failure", func() {
 		WorkingPath = "./testfiles/"
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowVarExport:
-				return "", nil
-			default:
-				return "", nil
-			}
+			return "", nil
 		}
 
 		err := Export("id", "airflow_settings_export.yaml", 2, false, true, false)
@@ -475,3 +624,9 @@ func (s *Suite) TestWriteAirflowSettingstoYAML() {
 		os.Remove("./variables.yaml")
 	})
 }
+
+// Ensure unused imports are consumed
+var (
+	_ = strings.TrimSpace
+	_ = fmt.Sprint
+)

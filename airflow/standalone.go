@@ -657,7 +657,6 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
 		return fmt.Errorf("error writing PID file: %w", err)
 	}
-
 	// Run health check (blocking — wait for healthy or timeout)
 	healthURL, healthComp := s.healthEndpoint()
 	err = checkWebserverHealth(healthURL, waitTime, healthComp)
@@ -834,7 +833,7 @@ func (s *Standalone) buildEnv() []string {
 	return env
 }
 
-// applySettings imports airflow_settings.yaml using airflow CLI commands run via the venv.
+// applySettings imports airflow_settings.yaml using the Airflow REST API.
 func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	settingsExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil || !settingsExists {
@@ -843,11 +842,15 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 		}
 	}
 
-	// Temporarily swap the execAirflowCommand to use venv instead of docker
-	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
-	defer settings.SetExecAirflowCommand(origExec)
-
-	return settings.ConfigSettings("standalone", settingsFile, envConns, s.airflowMajorVersionUint(), true, true, true)
+	port := s.webserverPort()
+	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)
+	// Standalone mode runs Airflow 3 with SimpleAuthManager — fetch a JWT token.
+	authHeader, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
+	if err != nil {
+		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
+		authHeader = ""
+	}
+	return settings.ConfigSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 }
 
 // standaloneExecAirflowCommand runs an airflow command via the local venv.
@@ -1117,6 +1120,11 @@ func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 
 // ImportSettings imports connections/variables/pools from the settings file.
 func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variables, pools bool) error {
+	// Verify standalone is actually running before attempting to import.
+	if _, alive := s.readPID(); !alive {
+		return errors.New("standalone Airflow is not running, run astro dev start --standalone to start it")
+	}
+
 	if !connections && !variables && !pools {
 		connections = true
 		variables = true
@@ -1131,10 +1139,21 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 		return errors.New("file specified does not exist")
 	}
 
-	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
-	defer settings.SetExecAirflowCommand(origExec)
+	// If proxy mode allocated a random port, the actual port is stored in
+	// the proxy route registered during Start. Fall back to config default.
+	port := s.webserverPort()
+	if route, rerr := proxy.GetRouteByProject(s.airflowHome); rerr == nil && route != nil && route.Port != "" {
+		port = route.Port
+	}
 
-	err = settings.ConfigSettings("standalone", settingsFile, nil, s.airflowMajorVersionUint(), connections, variables, pools)
+	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)
+	authHeader, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
+	if err != nil {
+		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
+		authHeader = ""
+	}
+
+	err = settings.ConfigSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
 		return err
 	}
