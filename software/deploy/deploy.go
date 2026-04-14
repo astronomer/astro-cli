@@ -219,7 +219,11 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 				return err
 			}
 			// Switch to per deployment registry login
-			err = auth.RegistryAuth(houstonClient, os.Stdout, registry)
+			err = auth.RegistryAuth(houstonClient, os.Stdout, registry, houston.GetAppConfigRequest{
+				ClusterID:       deploymentInfo.ClusterID,
+				WorkspaceUUID:   deploymentInfo.Workspace.ID,
+				DeploymentUUID:  deploymentInfo.ID,
+			})
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 				return err

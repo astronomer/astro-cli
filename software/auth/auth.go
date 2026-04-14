@@ -83,8 +83,9 @@ func oAuth(oAuthURL string) string {
 	return input.Text(inputOAuthToken)
 }
 
-// RegistryAuth authenticates with the private registry
-func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain string) error {
+// RegistryAuth authenticates with the private registry.
+// appConfigReq supplies optional workspace/deployment context for Houston 2.0+ appConfig; use zero value when unknown (e.g. login).
+func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain string, appConfigReq houston.GetAppConfigRequest) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -94,7 +95,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 		return nil
 	}
 
-	appConfig, err := houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{})
+	appConfig, err := houston.Call(client.GetAppConfig)(appConfigReq)
 	if err != nil {
 		return err
 	}
@@ -248,7 +249,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		}
 	}
 
-	err = RegistryAuth(client, out, "")
+	err = RegistryAuth(client, out, "", houston.GetAppConfigRequest{})
 	if err != nil {
 		logger.Debugf("There was an error logging into registry: %s", err.Error())
 	}

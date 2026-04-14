@@ -198,7 +198,7 @@ func (s *Suite) TestRegistryAuthSuccess() {
 			err = ctx.SwitchContext()
 			s.NoError(err)
 
-			tt.errAssertion(s.T(), RegistryAuth(houstonMock, out, ""))
+			tt.errAssertion(s.T(), RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{}))
 		})
 	}
 	mockRegistryHandler.AssertExpectations(s.T())
@@ -270,7 +270,7 @@ func (s *Suite) TestRegistryAuthRegistryDomain() {
 			}, nil)
 
 			out := new(bytes.Buffer)
-			RegistryAuth(houstonMock, out, tt.registryDomain)
+			RegistryAuth(houstonMock, out, tt.registryDomain, houston.GetAppConfigRequest{})
 
 			mockRegistryHandler.AssertExpectations(s.T())
 		})
@@ -292,7 +292,7 @@ func (s *Suite) TestRegistryAuthFailure() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: true}}, nil).Twice()
 
-		err := RegistryAuth(houstonMock, out, "")
+		err := RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.ErrorIs(err, errMockRegistry)
 
 		mockRegistryHandler := new(mocks.RegistryHandler)
@@ -301,12 +301,12 @@ func (s *Suite) TestRegistryAuthFailure() {
 			return mockRegistryHandler, nil
 		}
 
-		err = RegistryAuth(houstonMock, out, "")
+		err = RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.NoError(err)
 
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil).Once()
 
-		err = RegistryAuth(houstonMock, out, "")
+		err = RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.ErrorIs(err, errMockRegistry)
 
 		mockRegistryHandler.AssertExpectations(s.T())
@@ -318,7 +318,7 @@ func (s *Suite) TestRegistryAuthFailure() {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMockHouston).Once()
 
-		err := RegistryAuth(houstonMock, out, "")
+		err := RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.ErrorIs(err, errMockHouston)
 		houstonMock.AssertExpectations(s.T())
 	})

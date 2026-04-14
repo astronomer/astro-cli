@@ -414,13 +414,13 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
-	if clusterID != "" {
-		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID})
-	}
-
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
+	}
+
+	if clusterID != "" {
+		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws})
 	}
 
 	// Silence Usage as we have now validated command input
@@ -529,7 +529,11 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
-	appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, DeploymentUUID: args[0]})
+	appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{
+		ClusterID:       deploymentInfo.ClusterID,
+		WorkspaceUUID:   deploymentInfo.Workspace.ID,
+		DeploymentUUID:  args[0],
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get app config: %w", err)
 	}
