@@ -84,6 +84,7 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		Platform:          remotePlatform,
 		BuildSecretString: buildSecretString,
 		DeploymentID:      remoteDeploymentID,
+		Creds:             creds,
 	}
 
 	return cloud.DeployClientImage(deployInput, platformCoreClient)

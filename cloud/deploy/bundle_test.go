@@ -19,6 +19,7 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/git"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -40,7 +41,7 @@ func TestBundles(t *testing.T) {
 }
 
 func (s *BundleSuite) TestBundleDeploy_Success() {
-	canCiCdDeploy = func(token string) bool {
+	canCiCdDeploy = func(creds *credentials.CurrentCredentials) bool {
 		return true
 	}
 
@@ -57,6 +58,7 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 		Description:        "test-description",
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, true, true)
@@ -82,7 +84,7 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 }
 
 func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
-	canCiCdDeploy = func(token string) bool {
+	canCiCdDeploy = func(creds *credentials.CurrentCredentials) bool {
 		return false
 	}
 
@@ -90,6 +92,7 @@ func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
 		DeploymentID:       "test-deployment-id",
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, true, true)
@@ -105,6 +108,7 @@ func (s *BundleSuite) TestBundleDeploy_DagDeployDisabled() {
 	input := &DeployBundleInput{
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, false, false)
@@ -124,6 +128,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 		BundlePath:         gitPath,
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, true, false)
@@ -167,6 +172,7 @@ func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 		BundlePath:         gitPath,
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, true, false)
@@ -206,6 +212,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 		BundlePath:         gitPath,
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, true, false)
@@ -236,6 +243,7 @@ func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 	input := &DeployBundleInput{
 		PlatformCoreClient: s.mockPlatformCoreClient,
 		CoreClient:         s.mockCoreClient,
+		Creds:              &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockPlatformCoreClient, true, false)

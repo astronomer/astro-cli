@@ -37,7 +37,7 @@ func (s *Suite) TestAddDeploymentTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		s.NoError(err)
@@ -52,7 +52,7 @@ func (s *Suite) TestAddDeploymentTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -87,7 +87,7 @@ func (s *Suite) TestDeleteDeploymentTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
 		s.NoError(err)
@@ -102,7 +102,7 @@ func (s *Suite) TestDeleteDeploymentTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -134,7 +134,7 @@ func (s *Suite) TestListDeploymentTeamsAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListDeploymentTeamsAndRoles("deployment-id")
 		s.NoError(err)
@@ -149,7 +149,7 @@ func (s *Suite) TestListDeploymentTeamsAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListDeploymentTeamsAndRoles("deploymeny-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -184,7 +184,7 @@ func (s *Suite) TestUpdateDeploymentTeamAndRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", DeploymentAdminRole})
 		s.NoError(err)
@@ -199,7 +199,7 @@ func (s *Suite) TestUpdateDeploymentTeamAndRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		s.Contains(err.Error(), "Internal Server Error")

@@ -15,6 +15,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -107,8 +108,8 @@ type ClientImplementation struct {
 
 // NewClient - initialized the Houston Client object with proper HTTP Client configuration
 // set as a variable so we can change it to return mock houston clients in tests
-var NewClient = func(c *httputil.HTTPClient) ClientInterface {
-	client := newInternalClient(c)
+var NewClient = func(c *httputil.HTTPClient, creds *credentials.CurrentCredentials) ClientInterface {
+	client := newInternalClient(c, creds)
 	return &ClientImplementation{
 		client: client,
 	}
@@ -117,6 +118,7 @@ var NewClient = func(c *httputil.HTTPClient) ClientInterface {
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
 	HTTPClient *httputil.HTTPClient
+	creds      *credentials.CurrentCredentials
 }
 
 func NewHTTPClient() *httputil.HTTPClient {
@@ -135,9 +137,10 @@ func NewHTTPClient() *httputil.HTTPClient {
 }
 
 // newInternalClient returns a new Client with the logger and HTTP Client setup.
-func newInternalClient(c *httputil.HTTPClient) *Client {
+func newInternalClient(c *httputil.HTTPClient, creds *credentials.CurrentCredentials) *Client {
 	return &Client{
 		HTTPClient: c,
+		creds:      creds,
 	}
 }
 
@@ -164,7 +167,7 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 
 // Do (request) is a wrapper to more easily pass variables to a Client.Do request
 func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(newInternalClient(httputil.NewHTTPClient()))
+	return r.DoWithClient(newInternalClient(httputil.NewHTTPClient(), nil))
 }
 
 // Do fetches the current context, and returns Houston API response, error
@@ -180,8 +183,10 @@ func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 // DoWithContext executes a query against the Houston API, logging out any errors contained in the response object
 func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) (*Response, error) {
 	// set headers
-	if ctx.Token != "" {
-		doOpts.Headers["authorization"] = ctx.Token
+	if c.creds != nil {
+		if tok := c.creds.Get(); tok != "" {
+			doOpts.Headers["authorization"] = tok
+		}
 	}
 	newLogger.Debugf("Request Data: %v\n", string(doOpts.Data))
 	doOpts.Method = http.MethodPost

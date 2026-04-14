@@ -7,15 +7,17 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/pkg/credentials"
 )
 
 // NewAPICmd creates the parent 'astro api' command.
-func NewAPICmd() *cobra.Command {
-	return NewAPICmdWithOutput(os.Stdout)
+func NewAPICmd(creds *credentials.CurrentCredentials) *cobra.Command {
+	return NewAPICmdWithOutput(os.Stdout, creds)
 }
 
 // NewAPICmdWithOutput creates the parent 'astro api' command with a custom output writer.
-func NewAPICmdWithOutput(out io.Writer) *cobra.Command {
+func NewAPICmdWithOutput(out io.Writer, creds *credentials.CurrentCredentials) *cobra.Command {
 	var noColor bool
 
 	cmd := &cobra.Command{
@@ -68,8 +70,8 @@ Use "astro api [command] --help" for more information about a command.`,
 
 	cmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colorized output")
 
-	cmd.AddCommand(NewAirflowCmd(out))
-	cmd.AddCommand(NewCloudCmd(out))
+	cmd.AddCommand(NewAirflowCmd(out, creds))
+	cmd.AddCommand(NewCloudCmd(out, creds))
 	cmd.AddCommand(NewRegistryCmd(out))
 
 	return cmd

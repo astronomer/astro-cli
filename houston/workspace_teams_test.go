@@ -34,7 +34,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
 		s.NoError(err)
@@ -49,7 +49,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -81,7 +81,7 @@ func (s *Suite) TestDeleteWorkspaceTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
 		s.NoError(err)
@@ -96,7 +96,7 @@ func (s *Suite) TestDeleteWorkspaceTeam() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -128,7 +128,7 @@ func (s *Suite) TestListWorkspaceTeamsAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListWorkspaceTeamsAndRoles("workspace-id")
 		s.NoError(err)
@@ -143,7 +143,7 @@ func (s *Suite) TestListWorkspaceTeamsAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListWorkspaceTeamsAndRoles("workspace-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -169,7 +169,7 @@ func (s *Suite) TestUpdateWorkspaceTeamAndRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", WorkspaceAdminRole})
 		s.NoError(err)
@@ -184,7 +184,7 @@ func (s *Suite) TestUpdateWorkspaceTeamAndRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", "role"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -206,7 +206,7 @@ func (s *Suite) TestGetWorkspaceTeamRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
 		s.NoError(err)
@@ -221,7 +221,7 @@ func (s *Suite) TestGetWorkspaceTeamRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
 		s.Contains(err.Error(), "Internal Server Error")

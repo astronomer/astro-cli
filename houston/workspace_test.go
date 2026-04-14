@@ -44,7 +44,7 @@ func (s *Suite) TestCreateWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		s.NoError(err)
@@ -59,7 +59,7 @@ func (s *Suite) TestCreateWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -120,7 +120,7 @@ func (s *Suite) TestListWorkspaces() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListWorkspaces(nil)
 		s.NoError(err)
@@ -135,7 +135,7 @@ func (s *Suite) TestListWorkspaces() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListWorkspaces(nil)
 		s.Contains(err.Error(), "Internal Server Error")
@@ -196,7 +196,7 @@ func (s *Suite) TestPaginatedListWorkspaces() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
 		s.NoError(err)
@@ -211,7 +211,7 @@ func (s *Suite) TestPaginatedListWorkspaces() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -253,7 +253,7 @@ func (s *Suite) TestDeleteWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.DeleteWorkspace("workspace-id")
 		s.NoError(err)
@@ -268,7 +268,7 @@ func (s *Suite) TestDeleteWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.DeleteWorkspace("workspace-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -310,7 +310,7 @@ func (s *Suite) TestGetWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.GetWorkspace("workspace-id")
 		s.NoError(err)
@@ -325,7 +325,7 @@ func (s *Suite) TestGetWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetWorkspace("workspace-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -357,7 +357,7 @@ func (s *Suite) TestValidateWorkspaceID() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ValidateWorkspaceID("workspace-id")
 		s.NoError(err)
@@ -372,7 +372,7 @@ func (s *Suite) TestValidateWorkspaceID() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ValidateWorkspaceID("workspace-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -414,7 +414,7 @@ func (s *Suite) TestUpdateWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		s.NoError(err)
@@ -429,7 +429,7 @@ func (s *Suite) TestUpdateWorkspace() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		s.Contains(err.Error(), "Internal Server Error")

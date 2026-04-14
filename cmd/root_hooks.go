@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -15,6 +16,8 @@ import (
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/version"
 )
 
@@ -26,32 +29,68 @@ func SetupLogging(_ *cobra.Command, _ []string) error {
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra
 // pre-run hook that sets up the context and checks for the latest version.
-func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) func(cmd *cobra.Command, args []string) error {
+func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, creds *credentials.CurrentCredentials, astroCoreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		// login/logout don't need existing credentials, skip auth setup
+		if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
+			return nil
+		}
+
+		if storeErr != nil {
+			return fmt.Errorf("secure credential store unavailable: %w", storeErr)
+		}
+
 		// Check for latest version
 		if config.CFG.UpgradeMessage.GetBool() {
-			// create http client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
 			httpClient := &http.Client{Timeout: 3 * time.Second}
-
-			// compare current version to latest
 			err := version.CompareVersions(cmd.Context(), httpClient)
 			if err != nil {
 				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
 			}
 		}
+
+		if migrated, err := config.MigrateLegacyCredentials(store); err != nil {
+			softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "credential migration error: "+err.Error())
+		} else if migrated > 0 {
+			fmt.Printf("Migrated credentials for %d context(s) to your system's secure store.\n", migrated)
+		}
+
 		if context.IsCloudContext() {
-			err := cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
-			if err != nil {
-				if strings.Contains(err.Error(), "token is invalid or malformed") {
-					return errors.New("API Token is invalid or malformed") //nolint
-				}
-				if strings.Contains(err.Error(), "the API token given has expired") {
-					return errors.New("API Token is expired") //nolint
-				}
-				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
+			if err := handleCloudSetup(cmd, store, creds, platformCoreClient, astroCoreClient); err != nil {
+				return err
 			}
+		} else {
+			loadSoftwareToken(store, creds)
 		}
 		softwareCmd.PrintDebugLogs()
 		return nil
+	}
+}
+
+func handleCloudSetup(cmd *cobra.Command, store keychain.SecureStore, creds *credentials.CurrentCredentials, platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) error {
+	err := cloudCmd.Setup(cmd, store, creds, platformCoreClient, astroCoreClient)
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "token is invalid or malformed") {
+		return errors.New("API Token is invalid or malformed") //nolint
+	}
+	if strings.Contains(err.Error(), "the API token given has expired") {
+		return errors.New("API Token is expired") //nolint
+	}
+	softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
+	return nil
+}
+
+func loadSoftwareToken(store keychain.SecureStore, creds *credentials.CurrentCredentials) {
+	if store == nil {
+		return
+	}
+	c, err := context.GetCurrentContext()
+	if err != nil {
+		return
+	}
+	if keyCreds, credErr := store.GetCredentials(c.Domain); credErr == nil {
+		creds.Set(keyCreds.Token)
 	}
 }

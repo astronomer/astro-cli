@@ -238,7 +238,7 @@ func (s *Suite) TestStandaloneUnsupportedCommands() {
 	s.Error(composeErr)
 	s.Contains(composeErr.Error(), "not available in standalone mode")
 
-	upgradeErr := handler.UpgradeTest("", "", "", "", false, false, false, false, false, "", nil)
+	upgradeErr := handler.UpgradeTest("", "", "", "", false, false, false, false, false, "", nil, nil)
 	s.Error(upgradeErr)
 	s.Contains(upgradeErr.Error(), "not available in standalone mode")
 }

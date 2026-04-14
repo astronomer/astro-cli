@@ -15,10 +15,12 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/software/auth"
@@ -76,7 +78,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+func Airflow(houstonClient houston.ClientInterface, store keychain.SecureStore, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return deploymentID, err
@@ -126,7 +128,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description, imageName)
+	err = buildPushDockerImage(houstonClient, store, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description, imageName)
 	if err != nil {
 		return deploymentID, err
 	}
@@ -204,13 +206,17 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	return deploymentID, err
 }
 
-func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
+func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, store keychain.SecureStore, customImageName string) error {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
-		token = c.Token
+		if ctx, err := context.GetCurrentContext(); err == nil {
+			if creds, err := store.GetCredentials(ctx.Domain); err == nil {
+				token = creds.Token
+			}
+		}
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			var err error
@@ -219,7 +225,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 				return err
 			}
 			// Switch to per deployment registry login
-			err = auth.RegistryAuth(houstonClient, os.Stdout, registry)
+			err = auth.RegistryAuth(houstonClient, os.Stdout, registry, token)
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 				return err
@@ -228,7 +234,6 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		} else {
 			registry = registryDomainPrefix + cloudDomain
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-			token = c.Token
 		}
 	}
 	if customImageName != "" {
@@ -320,14 +325,14 @@ func getGetTagFromImageName(imageName string) string {
 	return ""
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, store keychain.SecureStore, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string) error {
 	imageName := airflow.ImageName(name, "latest")
 	imageHandler := imageHandlerInit(imageName)
 	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient, description)
 	if err != nil {
 		return err
 	}
-	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
+	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, store, customImageName)
 }
 
 func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
@@ -468,7 +473,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return ""
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, store keychain.SecureStore, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
 	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return err
@@ -540,8 +545,13 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 
 	c, _ := config.GetCurrentContext()
 
+	var token string
+	if creds, err := store.GetCredentials(c.Domain); err == nil {
+		token = creds.Token
+	}
+
 	headers := map[string]string{
-		"authorization": c.Token,
+		"authorization": token,
 	}
 
 	uploadFileArgs := fileutil.UploadFileArguments{

@@ -5,10 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 func TestNewCoreClient(t *testing.T) {
-	client := NewCoreClient(httputil.NewHTTPClient())
+	client := NewCoreClient(httputil.NewHTTPClient(), &credentials.CurrentCredentials{})
 	assert.NotNil(t, client, "Can't create new Astro Core client")
 }

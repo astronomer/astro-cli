@@ -11,6 +11,8 @@ import (
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/credentials"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -26,38 +28,38 @@ func (s *CmdSuite) TestLogin() {
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	cloudLogin = func(domain, token string, store keychain.SecureStore, creds *credentials.CurrentCredentials, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		s.Equal(cloudDomain, domain)
 		return nil
 	}
 
-	softwareLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+	softwareLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, store keychain.SecureStore, client houston.ClientInterface, out io.Writer) error {
 		s.Equal(softwareDomain, domain)
 		return nil
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, nil, nil, buf)
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
-	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, nil, nil, buf)
 
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, nil, nil, buf)
 
 	// no domain, software login
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, nil, nil, buf)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, nil, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	softwareDomain = "software.astronomer.io"
-	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, nil, nil, buf)
 	s.Contains(buf.String(), "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 }
 
@@ -65,96 +67,96 @@ func (s *CmdSuite) TestLogout() {
 	localDomain := "localhost"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogout = func(domain string, out io.Writer) {
+	cloudLogout = func(domain string, store keychain.SecureStore, out io.Writer) {
 		s.Equal(localDomain, domain)
 	}
-	softwareLogout = func(domain string) {
+	softwareLogout = func(domain string, store keychain.SecureStore) {
 		s.Equal(softwareDomain, domain)
 	}
 
 	// cloud logout success
-	err := logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
+	err := logout(&cobra.Command{}, []string{localDomain}, nil, os.Stdout)
 	s.NoError(err)
 
 	// software logout success
-	err = logout(&cobra.Command{}, []string{softwareDomain}, os.Stdout)
+	err = logout(&cobra.Command{}, []string{softwareDomain}, nil, os.Stdout)
 	s.NoError(err)
 
 	// no domain, cloud logout
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err = logout(&cobra.Command{}, []string{}, os.Stdout)
+	err = logout(&cobra.Command{}, []string{}, nil, os.Stdout)
 	s.NoError(err)
 
 	// no domain, software logout
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	err = logout(&cobra.Command{}, []string{}, os.Stdout)
+	err = logout(&cobra.Command{}, []string{}, nil, os.Stdout)
 	s.NoError(err)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	err = logout(&cobra.Command{}, []string{}, os.Stdout)
+	err = logout(&cobra.Command{}, []string{}, nil, os.Stdout)
 	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 }
 
 func (s *CmdSuite) TestAuthToken() {
 	buf := new(bytes.Buffer)
-
-	// Test with valid token (with Bearer prefix)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	c, err := config.GetCurrentContext()
 	s.NoError(err)
 	expectedToken := "test-token-12345"
-	err = c.SetContextKey("token", "Bearer "+expectedToken)
-	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	store := keychain.NewTestStore()
+
+	// Test with valid token (with Bearer prefix)
+	s.NoError(store.SetCredentials(c.Domain, keychain.Credentials{Token: "Bearer " + expectedToken}))
+	err = printAuthToken(&cobra.Command{}, store, "", buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
 	// Test with token without Bearer prefix
 	buf.Reset()
-	err = c.SetContextKey("token", expectedToken)
-	s.NoError(err)
-
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	s.NoError(store.SetCredentials(c.Domain, keychain.Credentials{Token: expectedToken}))
+	err = printAuthToken(&cobra.Command{}, store, "", buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
 	// Test with no token (not authenticated)
 	buf.Reset()
-	err = c.SetContextKey("token", "")
-	s.NoError(err)
+	s.NoError(store.SetCredentials(c.Domain, keychain.Credentials{}))
+	err = printAuthToken(&cobra.Command{}, store, "", buf)
+	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	// Test with nil store
+	buf.Reset()
+	err = printAuthToken(&cobra.Command{}, nil, "", buf)
 	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 
 	// Test with no current context set
 	buf.Reset()
 	config.ResetCurrentContext()
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	err = printAuthToken(&cobra.Command{}, store, "", buf)
 	s.Error(err)
 }
 
 func (s *CmdSuite) TestAuthTokenWithContext() {
 	buf := new(bytes.Buffer)
-
-	// Set up a specific context with a token
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	c, err := config.GetCurrentContext()
 	s.NoError(err)
 	expectedToken := "context-specific-token"
-	err = c.SetContextKey("token", "Bearer "+expectedToken)
-	s.NoError(err)
+
+	store := keychain.NewTestStore()
+	s.NoError(store.SetCredentials(c.Domain, keychain.Credentials{Token: "Bearer " + expectedToken}))
 
 	// Retrieve token using explicit context domain
-	err = printAuthToken(&cobra.Command{}, c.Domain, buf)
+	err = printAuthToken(&cobra.Command{}, store, c.Domain, buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
-	// Test with non-existent context
+	// Test with domain that has no credentials
 	buf.Reset()
-	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", buf)
-	s.Error(err)
+	err = printAuthToken(&cobra.Command{}, store, "nonexistent.domain.com", buf)
+	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 }
 
 func (s *CmdSuite) TestAuthRootCmd() {
