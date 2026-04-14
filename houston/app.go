@@ -162,7 +162,6 @@ func (h ClientImplementation) GetAppConfig(req GetAppConfigRequest) (*AppConfig,
 		appConfig.Flags.HardDeleteDeployment = appConfig.HardDeleteDeployment
 		appConfig.Flags.ManualNamespaceNames = appConfig.ManualNamespaceNames
 		appConfig.Flags.TriggererEnabled = appConfig.TriggererEnabled
-		appConfig.Flags.TriggererEnabled = appConfig.TriggererEnabled
 	}
 	return appConfig, nil
 }
