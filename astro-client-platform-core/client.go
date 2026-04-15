@@ -1,26 +1,4 @@
 package astroplatformcore
 
-import (
-	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-)
-
-// NormalizeAPIError is a deliberate re-export of httputil.NormalizeAPIError, allowing
-// callers to override error normalization per-client without importing pkg/httputil.
-var NormalizeAPIError = httputil.NormalizeAPIError
-
-// a shorter alias
+// CoreClient is a shorter alias for the platform core client interface.
 type CoreClient = ClientWithResponsesInterface
-
-// create api client for astro platform core services
-func NewPlatformCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
-	// we append base url in request editor, so set to an empty string here
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
-		ctx, err := context.GetCurrentContext()
-		if err != nil {
-			return "", "", err
-		}
-		return ctx.Token, ctx.GetPublicRESTAPIURL("platform/v1beta1"), nil
-	})))
-	return cl
-}
