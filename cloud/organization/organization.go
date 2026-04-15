@@ -13,6 +13,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -52,7 +53,7 @@ func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astro
 	if err != nil {
 		return nil, err
 	}
-	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func GetOrganization(orgID string, platformCoreClient astroplatformcore.CoreClie
 	if err != nil {
 		return nil, err
 	}
-	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func findOrganizationByName(name string, platformCoreClient astroplatformcore.Co
 		if err != nil {
 			return nil, err
 		}
-		err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +302,7 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 	if err != nil {
 		return err
 	}
-	err = astroplatformcore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}

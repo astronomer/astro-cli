@@ -17,6 +17,7 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -276,7 +277,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 	if err != nil {
 		return err
 	}
-	err = astroplatformcore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
+	err = platformclient.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
 	if err != nil {
 		return err
 	}
