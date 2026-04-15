@@ -4,6 +4,7 @@ package airflow
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -49,6 +50,7 @@ var (
 	stopTimeout           = airflowrt.StopTimeout
 	filePermissions       = airflowrt.FilePermissions
 	dirPermissions        = airflowrt.DirPermissions
+	standaloneVersionFile = airflowrt.StandaloneVersionFile
 )
 
 var (
@@ -100,15 +102,8 @@ func writeDarwinForkSafetyPatch(venvPath string) error {
 	if err != nil {
 		return err
 	}
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), "python") {
-			continue
-		}
 
-		sitePackages := filepath.Join(libDir, e.Name(), "site-packages")
-
-		patchPy := filepath.Join(sitePackages, "_fix_setproctitle.py")
-		pyContent := `import sys
+	pyContent := `import sys
 import os
 
 if sys.platform == "darwin":
@@ -123,12 +118,21 @@ if sys.platform == "darwin":
     except ImportError:
         pass
 `
-		if err := os.WriteFile(patchPy, []byte(pyContent), filePermissions); err != nil {
-			return err
+	pthContent := "import _fix_setproctitle\n"
+
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), "python") {
+			continue
 		}
 
-		patchPth := filepath.Join(sitePackages, "_fix_setproctitle.pth")
-		return os.WriteFile(patchPth, []byte("import _fix_setproctitle\n"), filePermissions)
+		sitePackages := filepath.Join(libDir, e.Name(), "site-packages")
+
+		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.py"), []byte(pyContent), filePermissions); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.pth"), []byte(pthContent), filePermissions); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -167,9 +171,8 @@ def main():
     af = [sys.executable, "-m", "airflow"]
 
     # DB migrations
-    print("standalone | Running DB migrations...")
-    subprocess.run(af + ["db", "migrate"], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("standalone | Running DB migrations...", flush=True)
+    subprocess.run(af + ["db", "migrate"], check=True)
 
     # Idempotent admin user creation
     result = subprocess.run(
@@ -183,9 +186,15 @@ def main():
         capture_output=True, text=True,
     )
     if result.returncode == 0:
-        print("standalone | Created admin user.  Login: admin / admin")
+        print("standalone | Created admin user.  Login: admin / admin", flush=True)
+    elif "already exists" in (result.stdout + result.stderr):
+        print("standalone | Admin user already exists.  Login: admin / admin", flush=True)
     else:
-        print("standalone | Admin user already exists.  Login: admin / admin")
+        print("standalone | WARNING: failed to create admin user (exit {})".format(
+            result.returncode), flush=True)
+        if result.stderr:
+            for line in result.stderr.strip().splitlines():
+                print("standalone |   " + line, flush=True)
 
     # Start components — webserver uses Flask dev server (--debug) to
     # avoid gunicorn's fork which crashes on macOS.
@@ -223,7 +232,7 @@ def main():
     for name, proc in procs.items():
         rc = proc.poll()
         if rc is not None:
-            print("standalone | {} exited with code {}".format(name, rc))
+            print("standalone | {} exited with code {}".format(name, rc), flush=True)
     shutdown()
 
 if __name__ == "__main__":
@@ -266,10 +275,57 @@ type Standalone struct {
 // StandaloneInit creates a new Standalone handler.
 func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error) {
 	return &Standalone{
-		airflowHome: airflowHome,
-		envFile:     envFile,
-		dockerfile:  dockerfile,
+		airflowHome:         airflowHome,
+		envFile:             envFile,
+		dockerfile:          dockerfile,
+		airflowMajorVersion: readPersistedVersion(airflowHome),
 	}, nil
+}
+
+func versionFilePath(airflowHome string) string {
+	return filepath.Join(airflowHome, standaloneDir, standaloneVersionFile)
+}
+
+// persistVersion writes the Airflow major version ("2" or "3") to
+// .astro/standalone/airflow_version so subcommands that create a fresh
+// Standalone via StandaloneInit can recover it without re-parsing.
+func (s *Standalone) persistVersion() {
+	dir := filepath.Join(s.airflowHome, standaloneDir)
+	if err := os.MkdirAll(dir, dirPermissions); err != nil {
+		logger.Debugf("Warning: could not create standalone dir for version file: %v", err)
+		return
+	}
+	if err := os.WriteFile(versionFilePath(s.airflowHome), []byte(s.airflowMajorVersion), filePermissions); err != nil {
+		logger.Debugf("Warning: could not persist airflow version: %v", err)
+	}
+}
+
+// readPersistedVersion reads the Airflow major version from the version file.
+// Falls back to parsing the Dockerfile if the file doesn't exist.
+func readPersistedVersion(airflowHome string) string {
+	data, err := os.ReadFile(versionFilePath(airflowHome))
+	if err == nil {
+		v := strings.TrimSpace(string(data))
+		if v == "2" || v == "3" {
+			return v
+		}
+	}
+	return detectVersionFromDockerfile(airflowHome)
+}
+
+// detectVersionFromDockerfile parses the Dockerfile to extract the runtime
+// tag and derive the Airflow major version.  Returns "" if anything fails.
+func detectVersionFromDockerfile(airflowHome string) string {
+	cmds, err := standaloneParseFile(filepath.Join(airflowHome, "Dockerfile"))
+	if err != nil {
+		return ""
+	}
+	_, tag := standaloneGetImageTag(cmds)
+	if tag == "" {
+		return ""
+	}
+	baseTag, _ := parseRuntimeTagPython(tag)
+	return airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag)
 }
 
 // webserverPort returns the configured port. It checks (in order):
@@ -357,6 +413,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		return errUnsupportedAirflowVersion
 	}
 	s.airflowMajorVersion = afMajor
+	s.persistVersion()
 
 	pythonVersion := resolvePythonVersion(baseTag, tagPython)
 
@@ -496,16 +553,20 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		// the ObjC/CF/Network runtimes are corrupt, causing children to
 		// spin at 100 % CPU on getaddrinfo or setproctitle calls.
 		if err := writeDarwinForkSafetyPatch(filepath.Join(s.airflowHome, ".venv")); err != nil {
-			logger.Debugf("Warning: could not write Darwin fork-safety patch: %v", err)
+			logger.Warnf("could not write Darwin fork-safety patch: %v", err)
 		}
 
 		// Write the LocalExecutor pickle fix plugin so QueuedLocalWorker
 		// can be serialized across macOS spawn-mode multiprocessing.
 		pluginsDir := filepath.Join(s.airflowHome, "plugins")
-		if err := os.MkdirAll(pluginsDir, dirPermissions); err == nil {
+		if err := os.MkdirAll(pluginsDir, dirPermissions); err != nil {
+			logger.Warnf("could not create plugins directory: %v", err)
+		} else {
 			pickleFix := filepath.Join(pluginsDir, "fix_local_executor_pickle.py")
 			if _, err := os.Stat(pickleFix); os.IsNotExist(err) {
-				_ = os.WriteFile(pickleFix, []byte(af2PickleFixPlugin), filePermissions)
+				if err := os.WriteFile(pickleFix, []byte(af2PickleFixPlugin), filePermissions); err != nil {
+					logger.Warnf("could not write LocalExecutor pickle fix plugin: %v", err)
+				}
 			}
 		}
 
@@ -833,6 +894,29 @@ func (s *Standalone) buildEnv() []string {
 	return env
 }
 
+// standaloneAPIURL returns the versioned API URL for the running standalone instance.
+// AF2 exposes /api/v1, AF3 exposes /api/v2.
+func (s *Standalone) standaloneAPIURL(port string) string {
+	if s.airflowMajorVersion == "2" {
+		return fmt.Sprintf("http://localhost:%s/api/v1", port)
+	}
+	return fmt.Sprintf("http://localhost:%s/api/v2", port)
+}
+
+// standaloneAuthHeader returns the Authorization header for the running standalone instance.
+// AF2 uses Basic auth (admin:admin); AF3 uses JWT from /auth/token.
+func (s *Standalone) standaloneAuthHeader(port string) string {
+	if s.airflowMajorVersion == "2" {
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
+	}
+	token, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
+	if err != nil {
+		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
+		return ""
+	}
+	return token
+}
+
 // applySettings imports airflow_settings.yaml using the Airflow REST API.
 func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
 	settingsExists, err := fileutil.Exists(settingsFile, nil)
@@ -843,13 +927,8 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 	}
 
 	port := s.webserverPort()
-	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)
-	// Standalone mode runs Airflow 3 with SimpleAuthManager — fetch a JWT token.
-	authHeader, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
-	if err != nil {
-		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
-		authHeader = ""
-	}
+	apiURL := s.standaloneAPIURL(port)
+	authHeader := s.standaloneAuthHeader(port)
 	return settings.ConfigSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 }
 
@@ -1146,12 +1225,8 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 		port = route.Port
 	}
 
-	apiURL := fmt.Sprintf("http://localhost:%s/api/v2", port)
-	authHeader, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
-	if err != nil {
-		logger.Debugf("Unable to fetch Airflow auth token for standalone: %s", err)
-		authHeader = ""
-	}
+	apiURL := s.standaloneAPIURL(port)
+	authHeader := s.standaloneAuthHeader(port)
 
 	err = settings.ConfigSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
