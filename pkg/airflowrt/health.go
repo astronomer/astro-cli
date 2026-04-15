@@ -8,10 +8,11 @@ import (
 )
 
 // CheckHealth polls the Airflow health endpoint until it responds with 200 or the timeout is reached.
-var CheckHealth = func(port string, timeout time.Duration) error {
+// The provided context can be used to cancel the health check before the timeout expires.
+var CheckHealth = func(ctx context.Context, port string, timeout time.Duration) error {
 	url := fmt.Sprintf("http://localhost:%s/api/v2/monitor/health", port)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	client := &http.Client{Timeout: 5 * time.Second}
