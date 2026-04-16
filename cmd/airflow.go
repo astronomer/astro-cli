@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -163,6 +164,8 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		PersistentPreRunE: utils.ChainRunEs(
 			SetupLogging,
 			ConfigureContainerRuntime,
+			setDevModeAnnotation,
+			telemetry.CreateTrackingHook(),
 		),
 	}
 	cmd.PersistentFlags().BoolVar(&standaloneFlag, "standalone", false, "Run in standalone mode (without Docker)")
@@ -197,6 +200,16 @@ func resolveDevMode() string {
 		return "docker"
 	}
 	return config.CFG.DevMode.GetString()
+}
+
+// setDevModeAnnotation writes the resolved dev mode into a cobra annotation
+// so the telemetry layer can include it without importing cmd-level config.
+func setDevModeAnnotation(cmd *cobra.Command, _ []string) error {
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[telemetry.DevModeAnnotation] = resolveDevMode()
+	return nil
 }
 
 // isStandaloneMode returns true if the current dev mode is standalone.

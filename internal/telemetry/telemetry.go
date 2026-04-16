@@ -23,6 +23,10 @@ const (
 	// SkipPreRunAnnotation is the cobra annotation key used to skip PersistentPreRunE
 	SkipPreRunAnnotation = "skipPreRun"
 
+	// DevModeAnnotation is the cobra annotation key for the resolved dev mode
+	// ("standalone" or "docker"). Set by the dev command's pre-run hook.
+	DevModeAnnotation = "dev_mode"
+
 	// EventCommandExecution is the event type for CLI command tracking
 	EventCommandExecution = "CLI Command"
 )
@@ -108,6 +112,10 @@ func TrackCommand(cmd *cobra.Command) {
 	}
 	if ciSystem := sharedtel.DetectCISystem(); ciSystem != "" {
 		properties["ci_system"] = ciSystem
+	}
+
+	if mode := cmd.Annotations[DevModeAnnotation]; mode != "" {
+		properties["dev_mode"] = mode
 	}
 
 	payload := sharedtel.TelemetryPayload{
