@@ -339,7 +339,7 @@ func (s *Suite) TestLoginSuccess() {
 		houstonMock.On("ValidateWorkspaceID", "test-workspace-id").Return(&houston.Workspace{ID: "test-workspace-id"}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if !s.NoError(Login("localhost", false, "test", "test", "0.29.0", keychain.NewTestStore(), houstonMock, out)) {
+		if !s.NoError(Login("localhost", false, "test", "test", "0.29.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -348,7 +348,7 @@ func (s *Suite) TestLoginSuccess() {
 
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
 		out = &bytes.Buffer{}
-		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
@@ -378,7 +378,7 @@ func (s *Suite) TestLoginSuccess() {
 		houstonMock.On("ValidateWorkspaceID", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
@@ -407,7 +407,7 @@ func (s *Suite) TestLoginSuccess() {
 		}
 
 		out := &bytes.Buffer{}
-		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "ck05r3bor07h40d02y2hw4n4v"}, gotOut) {
@@ -439,7 +439,7 @@ func (s *Suite) TestLoginSuccess() {
 		houstonMock.On("ValidateWorkspaceID", "test-workspace-1").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out)) {
+		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-1"}, gotOut) {
@@ -461,7 +461,7 @@ func (s *Suite) TestLoginFailure() {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(nil, errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if !s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out), errMockRegistry) {
+		if !s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -476,7 +476,7 @@ func (s *Suite) TestLoginFailure() {
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out), errMockRegistry) {
+		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -492,7 +492,7 @@ func (s *Suite) TestLoginFailure() {
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{}, errMockRegistry).Once()
 
 		out := &bytes.Buffer{}
-		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out), errMockRegistry) {
+		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out), errMockRegistry) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
@@ -509,7 +509,7 @@ func (s *Suite) TestLoginFailure() {
 		houstonMock.On("GetAppConfig", "").Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		out := &bytes.Buffer{}
-		if s.NoError(Login("dev.astro.io", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out)) {
+		if s.NoError(Login("dev.astro.io", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"dev.astro.io", "No default workspace detected"}, gotOut) {
@@ -532,7 +532,7 @@ func (s *Suite) TestLoginFailure() {
 		}
 
 		out := &bytes.Buffer{}
-		if s.NoError(Login("test.astro.io", false, "test", "test", "0.30.0", keychain.NewTestStore(), houstonMock, out)) {
+		if s.NoError(Login("test.astro.io", false, "test", "test", "0.30.0", keychain.NewTestStore(), nil, houstonMock, out)) {
 			return
 		}
 		if gotOut := out.String(); !testUtil.StringContains([]string{"test.astro.io", "Failed to authenticate to the registry"}, gotOut) {

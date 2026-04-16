@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -162,7 +163,7 @@ func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, store keychain.SecureStore, client houston.ClientInterface, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, store keychain.SecureStore, creds *credentials.CurrentCredentials, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
 	var pageSize int
@@ -213,6 +214,9 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 	// Houston tokens do not have refresh tokens or expiry — only Token is stored.
 	if err := store.SetCredentials(c.Domain, keychain.Credentials{Token: token}); err != nil {
 		return fmt.Errorf("storing credentials: %w", err)
+	}
+	if creds != nil {
+		creds.Set(token)
 	}
 
 	workspaces, err := getWorkspaces(client, interactive)
