@@ -282,8 +282,11 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		componentSources = append(componentSources, serverComponent, "scheduler", "triggerer", "worker")
 	}
 
+	maxPerPage := 5000
+	perPage := min(logCount, maxPerPage)
 	getDeploymentLogsParams := astrocore.GetDeploymentLogsParams{
 		Sources:       componentSources,
+		Limit:         &perPage,
 		MaxNumResults: &logCount,
 		Range:         &timeRange,
 		Offset:        &offset,
