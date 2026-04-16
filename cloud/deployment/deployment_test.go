@@ -850,7 +850,7 @@ func (s *Suite) TestLogs() {
 			Limit:         logCount,
 			MaxNumResults: 10,
 			Offset:        0,
-			ResultCount:   1,
+			ResultCount:   2,
 			Results: []astrocore.DeploymentLogEntry{
 				{
 					Raw:       "test log line",
@@ -871,10 +871,10 @@ func (s *Suite) TestLogs() {
 	}
 	mockGetDeploymentLogsMultipleComponentsResponse := astrocore.GetDeploymentLogsResponse{
 		JSON200: &astrocore.DeploymentLog{
-			Limit:         4,
+			Limit:         10,
 			MaxNumResults: 10,
 			Offset:        0,
-			ResultCount:   1,
+			ResultCount:   5,
 			Results: []astrocore.DeploymentLogEntry{
 				{
 					Raw:       "test log line",
@@ -979,6 +979,45 @@ func (s *Suite) TestLogs() {
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsMultipleComponentsResponse, nil).Once()
 
 		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
+
+		mockPlatformCoreClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
+	})
+	s.Run("pagination fetches multiple pages", func() {
+		page1Response := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit:         2,
+				MaxNumResults: 10,
+				Offset:        0,
+				ResultCount:   2,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log line 1", Timestamp: 1, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log line 2", Timestamp: 2, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+				SearchId: "search-id-1",
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		page2Response := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit:         2,
+				MaxNumResults: 10,
+				Offset:        2,
+				ResultCount:   1,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log line 3", Timestamp: 3, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+				SearchId: "search-id-1",
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page1Response, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page2Response, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 10, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 
 		mockPlatformCoreClient.AssertExpectations(s.T())

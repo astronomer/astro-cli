@@ -292,17 +292,34 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		getDeploymentLogsParams.SearchText = &logLevel
 	}
 
-	deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, coreClient)
-	if err != nil {
-		return err
+	var allResults []astrocore.DeploymentLogEntry
+	for {
+		deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, coreClient)
+		if err != nil {
+			return err
+		}
+
+		allResults = append(allResults, deploymentLogs.Results...)
+
+		// Stop paginating if we got fewer results than the per-page limit
+		// (meaning there are no more pages) or we've reached the requested count.
+		if deploymentLogs.ResultCount < deploymentLogs.Limit || len(allResults) >= logCount {
+			break
+		}
+
+		// Set up the next page request using the search cursor and updated offset.
+		searchID := deploymentLogs.SearchId
+		getDeploymentLogsParams.SearchId = &searchID
+		nextOffset := deploymentLogs.Offset + deploymentLogs.ResultCount
+		getDeploymentLogsParams.Offset = &nextOffset
 	}
 
-	if len(deploymentLogs.Results) == 0 {
+	if len(allResults) == 0 {
 		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deployment.Name)
 		return nil
 	}
-	for i := range deploymentLogs.Results {
-		fmt.Printf("%f %s %s\n", deploymentLogs.Results[i].Timestamp, deploymentLogs.Results[i].Raw, deploymentLogs.Results[i].Source)
+	for i := range allResults {
+		fmt.Printf("%f %s %s\n", allResults[i].Timestamp, allResults[i].Raw, allResults[i].Source)
 	}
 	return nil
 }
