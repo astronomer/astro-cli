@@ -144,28 +144,31 @@ func TestGetAnonymousID(t *testing.T) {
 	assert.Equal(t, id1, id2, "Should return the same ID on subsequent calls")
 }
 
-func TestDevModeAnnotationConstant(t *testing.T) {
-	assert.Equal(t, "dev_mode", DevModeAnnotation, "annotation key should be dev_mode")
-}
+func TestBuildCommandProperties_DevMode(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "astro"}
+	devCmd := &cobra.Command{Use: "dev"}
+	startCmd := &cobra.Command{Use: "start"}
+	rootCmd.AddCommand(devCmd)
+	devCmd.AddCommand(startCmd)
 
-func TestDevModeAnnotationIncludedInProperties(t *testing.T) {
-	// TrackCommand is guarded by IsEnabled() and isTestRun(), so we can't
-	// easily call it end-to-end in a test binary.  Instead, verify that the
-	// annotation plumbing works by checking the constant is the expected
-	// value and that the Annotations map on cobra.Command behaves as expected.
-	cmd := &cobra.Command{
-		Use:         "start",
-		Annotations: map[string]string{DevModeAnnotation: "standalone"},
-	}
-	assert.Equal(t, "standalone", cmd.Annotations[DevModeAnnotation])
+	t.Run("includes dev_mode when annotation is set", func(t *testing.T) {
+		startCmd.Annotations = map[string]string{DevModeAnnotation: "standalone"}
+		props := buildCommandProperties(startCmd)
+		assert.Equal(t, "standalone", props[DevModeAnnotation])
+		assert.Equal(t, "dev start", props["command"])
+	})
 
-	cmdDocker := &cobra.Command{
-		Use:         "start",
-		Annotations: map[string]string{DevModeAnnotation: "docker"},
-	}
-	assert.Equal(t, "docker", cmdDocker.Annotations[DevModeAnnotation])
+	t.Run("includes docker dev_mode annotation", func(t *testing.T) {
+		startCmd.Annotations = map[string]string{DevModeAnnotation: "docker"}
+		props := buildCommandProperties(startCmd)
+		assert.Equal(t, "docker", props[DevModeAnnotation])
+	})
 
-	cmdNoAnnotation := &cobra.Command{Use: "deploy"}
-	assert.Empty(t, cmdNoAnnotation.Annotations[DevModeAnnotation],
-		"non-dev commands should have no dev_mode annotation")
+	t.Run("omits dev_mode for non-dev commands", func(t *testing.T) {
+		deployCmd := &cobra.Command{Use: "deploy"}
+		rootCmd.AddCommand(deployCmd)
+		props := buildCommandProperties(deployCmd)
+		_, hasDevMode := props[DevModeAnnotation]
+		assert.False(t, hasDevMode, "non-dev commands should not have dev_mode property")
+	})
 }

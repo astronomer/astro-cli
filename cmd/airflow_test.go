@@ -1804,7 +1804,7 @@ func (s *AirflowSuite) TestSetDevModeAnnotation() {
 		s.Equal("docker", cmd.Annotations["dev_mode"])
 	})
 
-	s.Run("works with existing annotations", func() {
+	s.Run("preserves existing annotations", func() {
 		standaloneFlag = false
 		dockerFlag = false
 
@@ -1814,7 +1814,8 @@ func (s *AirflowSuite) TestSetDevModeAnnotation() {
 		}
 		err := setDevModeAnnotation(cmd, nil)
 		s.NoError(err)
-		s.Equal("docker", cmd.Annotations["dev_mode"])
+		// Neither flag is set, so resolveDevMode falls back to the config value.
+		s.Equal(config.CFG.DevMode.GetString(), cmd.Annotations["dev_mode"])
 		s.Equal("value", cmd.Annotations["other"])
 	})
 }
