@@ -69,8 +69,8 @@ var (
 		{
 			version: "1.0.0",
 			query: `
-			query AppConfig($clusterId: Uuid) {
-				appConfig(clusterId: $clusterId) {
+			query AppConfig($clusterId: Uuid, $workspaceUuid: Uuid, $deploymentUuid: Uuid) {
+				appConfig(clusterId: $clusterId, workspaceUuid: $workspaceUuid, deploymentUuid: $deploymentUuid) {
 					version
 					baseDomain
 					byoUpdateRegistryHost

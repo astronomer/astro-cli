@@ -101,7 +101,8 @@ func (s *Suite) TestGetAppConfig() {
 		api := NewClient(client)
 
 		_, err := api.GetAppConfig(GetAppConfigRequest{})
-		s.EqualError(err, ErrFieldsNotAvailable{}.Error())
+		s.ErrorAs(err, &ErrFieldsNotAvailable{})
+		s.Contains(err.Error(), "Cannot query field")
 	})
 }
 
@@ -222,4 +223,11 @@ func (s *Suite) TestGetPlatformVersion() {
 		_, err := api.GetPlatformVersion(nil)
 		s.Contains(err.Error(), "Internal Server Error")
 	})
+}
+
+func (s *Suite) TestAppConfigRequestGreatestLowerBound_prereleaseTwoUsesSlimQuery() {
+	q := AppConfigRequest.GreatestLowerBound("2.0.0-beta.2")
+	s.Contains(q, "workspaceUuid")
+	s.Contains(q, "featureFlags")
+	s.NotContains(q, "configureDagDeployment")
 }
