@@ -717,21 +717,24 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		}
 	}
 
-	// parse dockerfile
-	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
-	}
-
-	DockerfileImage := docker.GetImageFromParsedFile(cmds)
-
 	version, err = imageHandler.GetLabel("", runtimeImageLabel)
 	if err != nil {
 		fmt.Println("unable get runtime version from image")
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && version == "" {
-		fmt.Printf(warningInvalidImageNameMsg, DockerfileImage)
+		// When a pre-built image is supplied via --image-name, the Dockerfile is
+		// not needed to determine the base image — use the image name directly in
+		// the warning.  Only parse the Dockerfile when we built locally.
+		warningImage := imageName
+		if imageName == "" {
+			cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
+			if err != nil {
+				return "", errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
+			}
+			warningImage = docker.GetImageFromParsedFile(cmds)
+		}
+		fmt.Printf(warningInvalidImageNameMsg, warningImage)
 		fmt.Println("Canceling deploy...")
 		os.Exit(1)
 	}
