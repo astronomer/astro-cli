@@ -41,7 +41,8 @@ const (
 	composeSkipImageBuildingPromptMsg = "Skipping building image..."
 	deploymentHeaderMsg               = "Authenticated to %s \n\n"
 
-	warningInvalidImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
+	warningInvalidImageNameMsg         = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
+	warningInvalidPrebuiltImageNameMsg = "WARNING! The image '%s' does not appear to be based on Astro Runtime (the '%s' label is missing). Ensure your image is built FROM quay.io/astronomer/astro-runtime to proceed.\n"
 
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
@@ -723,18 +724,19 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && version == "" {
-		// When a pre-built image is supplied via --image-name, the Dockerfile is
-		// not needed to determine the base image — use the image name directly in
-		// the warning.  Only parse the Dockerfile when we built locally.
-		warningImage := imageName
-		if imageName == "" {
+		if imageName != "" {
+			// Registry image names are arbitrary and do not convey base image
+			// information; reference the missing label in the warning instead.
+			fmt.Printf(warningInvalidPrebuiltImageNameMsg, imageName, runtimeImageLabel)
+		} else {
+			// Parse the Dockerfile to include the FROM image in the warning,
+			// giving the user a concrete reference for what needs to change.
 			cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
 			if err != nil {
 				return "", errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
 			}
-			warningImage = docker.GetImageFromParsedFile(cmds)
+			fmt.Printf(warningInvalidImageNameMsg, docker.GetImageFromParsedFile(cmds))
 		}
-		fmt.Printf(warningInvalidImageNameMsg, warningImage)
 		fmt.Println("Canceling deploy...")
 		os.Exit(1)
 	}
