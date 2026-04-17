@@ -39,15 +39,15 @@ var (
 )
 
 var (
-	ErrNoWorkspaceID                         = errors.New("no workspace id provided")
-	errNoDomainSet                           = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID                   = errors.New("please specify a valid deployment ID")
-	errDeploymentNotFound                    = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected             = errors.New("invalid deployment selection\n") //nolint
+	ErrNoWorkspaceID             = errors.New("no workspace id provided")
+	errNoDomainSet               = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
+	errDeploymentNotFound        = errors.New("no airflow deployments found")
+	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
 	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
 	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
-	ErrDagOnlyDeployDisabledInConfig = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your Astronomer cluster")
+	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your Astronomer cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
