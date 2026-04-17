@@ -11,6 +11,13 @@ import (
 	"github.com/fatih/camelcase"
 )
 
+var defaultExecutorExtraCapacity = map[string]houston.ResourceCapacity{
+	"KubernetesExecutor": {
+		CPU:    1000,
+		Memory: 3840,
+	},
+}
+
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 30, 10, 50, 10},
@@ -30,6 +37,23 @@ func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 	}
 
 	return r.Data.GetAppConfig, nil
+}
+
+// GetDeploymentConfig returns deployment config from houston-api.
+func GetDeploymentConfig(client *houston.Client, deploymentID string) (*houston.DeploymentConfig, error) {
+	req := houston.Request{
+		Query: houston.DeploymentInfoRequest,
+	}
+	if deploymentID != "" {
+		req.Variables = map[string]interface{}{"deploymentId": deploymentID}
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return nil, err
+	}
+
+	return &r.Data.DeploymentConfig, nil
 }
 
 func checkManualReleaseNames(client *houston.Client) bool {
@@ -162,8 +186,61 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 	return tab.Print(out)
 }
 
+func getExecutorDefaultExtraCapacity(executor, deploymentID string, client *houston.Client) houston.ResourceCapacity {
+	fallback := defaultExecutorExtraCapacity[executor]
+	if executor != "KubernetesExecutor" {
+		return fallback
+	}
+
+	config, err := GetDeploymentConfig(client, deploymentID)
+	if err != nil {
+		return fallback
+	}
+
+	executorConfig, ok := config.Executors[executor]
+	if !ok {
+		return fallback
+	}
+
+	extraCapacity := executorConfig.DefaultExtraCapacity
+	if extraCapacity.CPU == 0 && extraCapacity.Memory == 0 {
+		return fallback
+	}
+
+	return extraCapacity
+}
+
+func ensureExecutorExtraCapacityDefaults(id string, payload map[string]interface{}, client *houston.Client) {
+	executor, ok := payload["executor"].(string)
+	if !ok || executor == "" {
+		return
+	}
+
+	defaultExtraCapacity := getExecutorDefaultExtraCapacity(executor, id, client)
+	if defaultExtraCapacity.CPU == 0 && defaultExtraCapacity.Memory == 0 {
+		return
+	}
+
+	properties, ok := payload["properties"].(map[string]interface{})
+	if !ok || properties == nil {
+		properties = map[string]interface{}{}
+	}
+
+	if _, exists := properties["extra_capacity"]; exists {
+		return
+	}
+
+	properties["extra_capacity"] = map[string]interface{}{
+		"cpu":    defaultExtraCapacity.CPU,
+		"memory": defaultExtraCapacity.Memory,
+	}
+	payload["properties"] = properties
+}
+
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]interface{}, client *houston.Client, out io.Writer) error {
+	ensureExecutorExtraCapacityDefaults(id, args, client)
+
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole

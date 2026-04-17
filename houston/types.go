@@ -206,10 +206,22 @@ type AirflowImage struct {
 	Tag     string `json:"tag"`
 }
 
+// ResourceCapacity contains CPU and memory values for a resource block
+type ResourceCapacity struct {
+	CPU    int `json:"cpu"`
+	Memory int `json:"memory"`
+}
+
+// ExecutorConfig contains the subset of executor config needed by the CLI
+type ExecutorConfig struct {
+	DefaultExtraCapacity ResourceCapacity `json:"defaultExtraCapacity"`
+}
+
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
-	AirflowImages          []AirflowImage `json:"airflowImages"`
-	DefaultAirflowImageTag string         `json:"defaultAirflowImageTag"`
+	AirflowImages          []AirflowImage            `json:"airflowImages"`
+	DefaultAirflowImageTag string                    `json:"defaultAirflowImageTag"`
+	Executors              map[string]ExecutorConfig `json:"executors"`
 }
 
 func (config *DeploymentConfig) GetValidTags() (tags []string) {

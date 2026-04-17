@@ -432,13 +432,14 @@ var (
       }
     }`
 	DeploymentInfoRequest = `
-	query DeploymentInfo {
-		deploymentConfig {
+	query DeploymentInfo($deploymentId: Uuid) {
+		deploymentConfig(deploymentUuid: $deploymentId) {
 			airflowImages {
 				version
 				tag
 		}
 		defaultAirflowImageTag
+		executors
 		}
 	}`
 	AppConfigRequest = `

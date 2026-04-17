@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -293,7 +294,7 @@ func TestUpdate(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
+	deploymentConfig := make(map[string]interface{})
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
@@ -305,6 +306,94 @@ func TestUpdate(t *testing.T) {
  Successfully updated deployment
 `
 	assert.Equal(t, buf.String(), expected)
+}
+
+func TestUpdateSetsDefaultExtraCapacityForKubernetesExecutor(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	deploymentConfigResponse := `{
+  "data": {
+    "deploymentConfig": {
+      "airflowImages": [],
+      "defaultAirflowImageTag": "",
+      "executors": {
+        "KubernetesExecutor": {
+          "defaultExtraCapacity": {
+            "cpu": 1000,
+            "memory": 3840
+          }
+        }
+      }
+    }
+  }
+}`
+	updateResponse := `{
+  "data": {
+    "updateDeployment": {
+      "id": "ckbv801t300qh0760pck7ea0c",
+      "label": "test123",
+      "releaseName": "burning-terrestrial-5940",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9"
+      }
+    }
+  }
+}`
+
+	var payload map[string]interface{}
+	requestCount := 0
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		requestCount++
+
+		body, err := ioutil.ReadAll(req.Body)
+		assert.NoError(t, err)
+
+		var graphQLRequest struct {
+			Query     string                 `json:"query"`
+			Variables map[string]interface{} `json:"variables"`
+		}
+		err = json.Unmarshal(body, &graphQLRequest)
+		assert.NoError(t, err)
+
+		if graphQLRequest.Variables["deploymentId"] == "ck1qg6whg001r08691y117hub" && graphQLRequest.Variables["payload"] == nil {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(deploymentConfigResponse)),
+				Header:     make(http.Header),
+			}
+		}
+
+		payload = graphQLRequest.Variables["payload"].(map[string]interface{})
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(updateResponse)),
+			Header:     make(http.Header),
+		}
+	})
+
+	api := houston.NewHoustonClient(client)
+	id := "ck1qg6whg001r08691y117hub"
+	role := "test-role"
+	deploymentConfig := map[string]interface{}{
+		"executor": "KubernetesExecutor",
+	}
+
+	buf := new(bytes.Buffer)
+	err := Update(id, role, deploymentConfig, api, buf)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, requestCount)
+	assert.Equal(t, "KubernetesExecutor", payload["executor"])
+	assert.Equal(
+		t,
+		map[string]interface{}{
+			"extra_capacity": map[string]interface{}{
+				"cpu":    float64(1000),
+				"memory": float64(3840),
+			},
+		},
+		payload["properties"],
+	)
 }
 
 func TestUpdateError(t *testing.T) {
@@ -319,7 +408,7 @@ func TestUpdateError(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
+	deploymentConfig := make(map[string]interface{})
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)

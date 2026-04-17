@@ -45,7 +45,7 @@ var (
 	deploymentSaDeleteExample = `
   $ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
 `
-	deploymentUpdateAttrs = []string{"label"}
+	deploymentUpdateAttrs = []string{"label", "description", "version", "executor"}
 )
 
 func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
@@ -79,7 +79,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			return deploymentCreate(cmd, args, client, out)
 		},
 	}
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
+	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
@@ -211,17 +211,11 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var executorType string
-	switch executor {
-	case "local":
-		executorType = "LocalExecutor"
-	case "celery":
-		executorType = "CeleryExecutor"
-	case "kubernetes", "k8s":
-		executorType = "KubernetesExecutor"
-	default:
-		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+	executorType, err := normalizeExecutor(executor)
+	if err != nil {
+		return err
 	}
+
 	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, client, out)
 }
 
@@ -256,10 +250,36 @@ func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client,
 		return err
 	}
 
+	payload := make(map[string]interface{}, len(argsMap))
+	for key, value := range argsMap {
+		payload[key] = value
+	}
+
+	if rawExecutor, ok := argsMap["executor"]; ok {
+		executorType, err := normalizeExecutor(rawExecutor)
+		if err != nil {
+			return err
+		}
+		payload["executor"] = executorType
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Update(args[0], cloudRole, argsMap, client, out)
+	return deployment.Update(args[0], cloudRole, payload, client, out)
+}
+
+func normalizeExecutor(rawExecutor string) (string, error) {
+	switch strings.ToLower(rawExecutor) {
+	case "local", "localexecutor":
+		return "LocalExecutor", nil
+	case "celery", "celeryexecutor":
+		return "CeleryExecutor", nil
+	case "kubernetes", "k8s", "kubernetesexecutor":
+		return "KubernetesExecutor", nil
+	default:
+		return "", errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+	}
 }
 
 func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
