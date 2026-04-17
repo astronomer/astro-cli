@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/versions"
+	"golang.org/x/mod/semver"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -38,12 +39,15 @@ var (
 )
 
 var (
-	ErrNoWorkspaceID                         = errors.New("no workspace id provided")
-	errNoDomainSet                           = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID                   = errors.New("please specify a valid deployment ID")
-	errDeploymentNotFound                    = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected             = errors.New("invalid deployment selection\n") //nolint
-	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
+	ErrNoWorkspaceID             = errors.New("no workspace id provided")
+	errNoDomainSet               = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
+	errDeploymentNotFound        = errors.New("no airflow deployments found")
+	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
+	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
+	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
+	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
+	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your Astronomer cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
@@ -99,7 +103,8 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 
-	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: wsID, DeploymentUUID: deploymentID})
+	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
 		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
 	}
@@ -146,6 +151,21 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 		}
 	}
 	return false
+}
+
+// resolvedWorkspaceUUIDForAppConfig prefers the workspace ID Houston associates with the
+// deployment so appConfig merges deployments config at the same tier as GetDeployment /
+// workspaceDeployments. Falls back to wsID when the API response omits workspace (older queries).
+func resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID string, deployments []houston.Deployment, deploymentInfo *houston.Deployment) string {
+	if deploymentInfo != nil && deploymentInfo.Workspace.ID != "" {
+		return deploymentInfo.Workspace.ID
+	}
+	for i := range deployments {
+		if deployments[i].ID == deploymentID && deployments[i].Workspace.ID != "" {
+			return deployments[i].Workspace.ID
+		}
+	}
+	return wsID
 }
 
 func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, deploymentInfo *houston.Deployment) error {
@@ -428,6 +448,36 @@ func isDagOnlyDeploymentEnabled(appConfig *houston.AppConfig) bool {
 	return appConfig != nil && appConfig.Flags.DagOnlyDeployment
 }
 
+// IsDagOnlyDeployDisabledInClusterConfig reports whether err is the sentinel for DAG-only deploy
+// disabled at cluster / merged-config level (either legacy or 2.0+ wording).
+func IsDagOnlyDeployDisabledInClusterConfig(err error) bool {
+	return errors.Is(err, ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, ErrDagOnlyDeployDisabledInConfigLegacy)
+}
+
+func isHoustonPlatformVersionGTE200(version string) bool {
+	if version == "" {
+		return false
+	}
+	v := version
+	if !strings.HasPrefix(v, "v") {
+		v = "v" + v
+	}
+	if pr := semver.Prerelease(v); pr != "" {
+		v = strings.TrimSuffix(v, pr)
+	}
+	if !semver.IsValid(v) {
+		return false
+	}
+	return semver.Compare(v, "v2.0.0") >= 0
+}
+
+func errDagOnlyDeployDisabledAtCluster(appConfig *houston.AppConfig) error {
+	if appConfig != nil && isHoustonPlatformVersionGTE200(appConfig.Version) {
+		return ErrDagOnlyDeployDisabledInConfig
+	}
+	return ErrDagOnlyDeployDisabledInConfigLegacy
+}
+
 func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment) bool {
 	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
 }
@@ -473,7 +523,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 }
 
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
-	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	deploymentID, deployments, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return err
 	}
@@ -487,13 +537,14 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
-	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: wsID, DeploymentUUID: deploymentID})
+	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
 		return fmt.Errorf("failed to get app config: %w", err)
 	}
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return ErrDagOnlyDeployDisabledInConfig
+		return errDagOnlyDeployDisabledAtCluster(appConfig)
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
 		return ErrDagOnlyDeployNotEnabledForDeployment

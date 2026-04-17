@@ -350,7 +350,6 @@ var (
 						current
 					}
 					version
-					airflowVersion
 					runtimeVersion
 					clusterId
 					createdAt
@@ -443,7 +442,6 @@ var (
 						current
 					}
 					version
-					airflowVersion
 					runtimeVersion
 					clusterId
 					createdAt
@@ -691,10 +689,7 @@ var (
 					where: {id: $id}
 				){
 					id
-					airflowVersion
-					desiredAirflowVersion
 					runtimeVersion
-					desiredRuntimeVersion
 					runtimeAirflowVersion
 					releaseName
 					urls {

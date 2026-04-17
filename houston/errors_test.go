@@ -17,6 +17,7 @@ func (s *Suite) TestHandleAPIError() {
 
 	s.Run("should return query fields error", func() {
 		gotErr := handleAPIErr(errQuery)
-		s.EqualError(gotErr, ErrFieldsNotAvailable{}.Error())
+		s.ErrorAs(gotErr, &ErrFieldsNotAvailable{})
+		s.Contains(gotErr.Error(), "Cannot query field")
 	})
 }
