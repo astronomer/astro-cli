@@ -741,7 +741,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 	deploymentID := "test-deployment-id"
 	wsID := "test-workspace-id"
 
-	s.Run("When config flag is set to false", func() {
+	s.Run("When config flag is set to false on Houston before 2.0.0", func() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
@@ -750,7 +750,30 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}
 
 		appConfig := &houston.AppConfig{
-			Flags: *featureFlags,
+			Version: "1.0.0",
+			Flags:   *featureFlags,
+		}
+		deployment := &houston.Deployment{
+			ClusterID: "test-cluster-id",
+			ID:        deploymentID,
+		}
+		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
+		s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
+		err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description)
+		s.ErrorIs(err, ErrDagOnlyDeployDisabledInConfigLegacy)
+	})
+
+	s.Run("When config flag is set to false on Houston 2.0.0+", func() {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		featureFlags := &houston.FeatureFlags{
+			DagOnlyDeployment: false,
+		}
+
+		appConfig := &houston.AppConfig{
+			Version: "2.0.0",
+			Flags:   *featureFlags,
 		}
 		deployment := &houston.Deployment{
 			ClusterID: "test-cluster-id",

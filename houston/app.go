@@ -3,6 +3,8 @@ package houston
 import (
 	"errors"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -69,8 +71,8 @@ var (
 		{
 			version: "1.0.0",
 			query: `
-			query AppConfig($clusterId: Uuid, $workspaceUuid: Uuid, $deploymentUuid: Uuid) {
-				appConfig(clusterId: $clusterId, workspaceUuid: $workspaceUuid, deploymentUuid: $deploymentUuid) {
+			query AppConfig($clusterId: Uuid) {
+				appConfig(clusterId: $clusterId) {
 					version
 					baseDomain
 					byoUpdateRegistryHost
@@ -142,6 +144,12 @@ func (h ClientImplementation) GetAppConfig(req GetAppConfigRequest) (*AppConfig,
 	}
 	if req.DeploymentUUID != "" {
 		vars["deploymentUuid"] = req.DeploymentUUID
+	}
+	// workspaceUuid / deploymentUuid on appConfig exist only in Houston 2.0+; omit variables for
+	// older platforms so the request matches the selected 1.0.0 query (clusterId only).
+	if version != "" && semver.Compare(sanitiseVersionString(version), "v2.0.0") < 0 {
+		delete(vars, "workspaceUuid")
+		delete(vars, "deploymentUuid")
 	}
 	reqQuery := AppConfigRequest.GreatestLowerBound(version)
 	httpReq := Request{
