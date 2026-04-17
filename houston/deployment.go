@@ -842,7 +842,7 @@ var (
 			mutation updateDeploymentImage(
 				$releaseName:String!,
 				$image:String!,
-				$runtimeVersion:String,
+				$runtimeVersion:String!,
 			){
 				updateDeploymentImage(
 					releaseName:$releaseName,
