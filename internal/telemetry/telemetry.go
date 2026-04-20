@@ -23,6 +23,10 @@ const (
 	// SkipPreRunAnnotation is the cobra annotation key used to skip PersistentPreRunE
 	SkipPreRunAnnotation = "skipPreRun"
 
+	// DevModeAnnotation is the cobra annotation key for the resolved dev mode
+	// ("standalone" or "docker"). Set by the dev command's pre-run hook.
+	DevModeAnnotation = "dev_mode"
+
 	// EventCommandExecution is the event type for CLI command tracking
 	EventCommandExecution = "CLI Command"
 )
@@ -74,27 +78,16 @@ func showFirstRunNotice() {
 	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
 }
 
-// TrackCommand sends telemetry data for a command execution.
-// It spawns a subprocess to send the data asynchronously.
-func TrackCommand(cmd *cobra.Command) {
-	if !IsEnabled() || isTestRun() {
-		return
-	}
-
-	showFirstRunNotice()
-
-	commandPath := GetCommandPath(cmd)
-	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
-		return
-	}
-
+// buildCommandProperties constructs the telemetry property map for a command.
+// Extracted so it can be tested independently of the send path.
+func buildCommandProperties(cmd *cobra.Command) map[string]interface{} {
 	context := "non-interactive"
 	if IsInteractive() {
 		context = "interactive"
 	}
 
 	properties := map[string]interface{}{
-		"command":      commandPath,
+		"command":      GetCommandPath(cmd),
 		"cli_version":  version.CurrVersion,
 		"os":           runtime.GOOS,
 		"os_version":   sharedtel.GetOSVersion(),
@@ -109,6 +102,29 @@ func TrackCommand(cmd *cobra.Command) {
 	if ciSystem := sharedtel.DetectCISystem(); ciSystem != "" {
 		properties["ci_system"] = ciSystem
 	}
+
+	if mode := cmd.Annotations[DevModeAnnotation]; mode != "" {
+		properties[DevModeAnnotation] = mode
+	}
+
+	return properties
+}
+
+// TrackCommand sends telemetry data for a command execution.
+// It spawns a subprocess to send the data asynchronously.
+func TrackCommand(cmd *cobra.Command) {
+	if !IsEnabled() || isTestRun() {
+		return
+	}
+
+	showFirstRunNotice()
+
+	commandPath := GetCommandPath(cmd)
+	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
+		return
+	}
+
+	properties := buildCommandProperties(cmd)
 
 	payload := sharedtel.TelemetryPayload{
 		Source:      SourceName,

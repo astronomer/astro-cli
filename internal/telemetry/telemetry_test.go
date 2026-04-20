@@ -143,3 +143,32 @@ func TestGetAnonymousID(t *testing.T) {
 	id2 := GetAnonymousID()
 	assert.Equal(t, id1, id2, "Should return the same ID on subsequent calls")
 }
+
+func TestBuildCommandProperties_DevMode(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "astro"}
+	devCmd := &cobra.Command{Use: "dev"}
+	startCmd := &cobra.Command{Use: "start"}
+	rootCmd.AddCommand(devCmd)
+	devCmd.AddCommand(startCmd)
+
+	t.Run("includes dev_mode when annotation is set", func(t *testing.T) {
+		startCmd.Annotations = map[string]string{DevModeAnnotation: "standalone"}
+		props := buildCommandProperties(startCmd)
+		assert.Equal(t, "standalone", props[DevModeAnnotation])
+		assert.Equal(t, "dev start", props["command"])
+	})
+
+	t.Run("includes docker dev_mode annotation", func(t *testing.T) {
+		startCmd.Annotations = map[string]string{DevModeAnnotation: "docker"}
+		props := buildCommandProperties(startCmd)
+		assert.Equal(t, "docker", props[DevModeAnnotation])
+	})
+
+	t.Run("omits dev_mode for non-dev commands", func(t *testing.T) {
+		deployCmd := &cobra.Command{Use: "deploy"}
+		rootCmd.AddCommand(deployCmd)
+		props := buildCommandProperties(deployCmd)
+		_, hasDevMode := props[DevModeAnnotation]
+		assert.False(t, hasDevMode, "non-dev commands should not have dev_mode property")
+	})
+}
