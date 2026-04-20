@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -37,7 +39,7 @@ Successfully added cl0evnxfl0120dxxu1s4nbnk7 to airflow
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockWorkspaceTeamRole.Team.ID, Role: mockWorkspaceTeamRole.Role}).Return(mockWorkspace, nil)
 	houstonClient = api
 
@@ -58,7 +60,7 @@ func (s *Suite) TestWorkspaceTeamRm() {
 	mockTeamID := "ckc0eir8e01gj07608ajmvia1"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockTeamID}).Return(mockWorkspace, nil)
 	houstonClient = api
 
@@ -78,7 +80,7 @@ func (s *Suite) TestWorkspaceTeamUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockWorkspaceTeamRole.Team.ID}).Return(mockWorkspaceTeam, nil)
 	api.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockWorkspaceTeamRole.Team.ID, Role: mockWorkspaceTeamRole.Role}).Return(mockWorkspace.Label, nil)
 	houstonClient = api

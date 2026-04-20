@@ -18,7 +18,11 @@ type ErrFieldsNotAvailable struct {
 }
 
 func (e ErrFieldsNotAvailable) Error() string {
-	return "Some fields requested by the CLI are not available in the server schema."
+	msg := "Some fields requested by the CLI are not available in the server schema."
+	if e.BaseError != nil {
+		return msg + ": " + e.BaseError.Error()
+	}
+	return msg
 }
 
 func handleAPIErr(err error) error {
