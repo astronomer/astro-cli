@@ -33,6 +33,8 @@ type RuntimeVersionMetadata struct {
 	ReleaseDate          string   `json:"releaseDate"`
 	PythonVersions       []string `json:"pythonVersions,omitempty"`
 	DefaultPythonVersion string   `json:"defaultPythonVersion,omitempty"`
+	Yanked               bool     `json:"yanked,omitempty"`
+	YankedReason         string   `json:"yankedReason,omitempty"`
 }
 
 type RuntimeVersionMigrations struct {
