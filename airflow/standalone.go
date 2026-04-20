@@ -239,10 +239,21 @@ if __name__ == "__main__":
     main()
 `
 
-// resolvePythonVersion determines the Python version using a 3-tier strategy:
+// af2RuntimePythonDefaults maps AF2 runtime major versions to their default
+// Python version.  The runtime versions JSON does not populate
+// defaultPythonVersion for AF2 entries, so this serves as the authoritative
+// lookup.
+var af2RuntimePythonDefaults = map[string]string{
+	"11": "3.11",
+	"12": "3.12",
+	"13": "3.12",
+}
+
+// resolvePythonVersion determines the Python version using a 4-tier strategy:
 //  1. Explicit version from the Dockerfile image tag (-python-X.Y suffix)
 //  2. defaultPythonVersion from the runtime versions JSON (updates.astronomer.io)
-//  3. Hardcoded fallback (3.12)
+//  3. Known AF2 runtime-major → Python mapping
+//  4. Hardcoded fallback (3.12)
 var resolvePythonVersion = func(baseTag, tagPython string) string {
 	// Tier 1: Dockerfile image tag had an explicit -python-X.Y suffix
 	if tagPython != "" {
@@ -254,7 +265,12 @@ var resolvePythonVersion = func(baseTag, tagPython string) string {
 		return v
 	}
 
-	// Tier 3: Hardcoded fallback
+	// Tier 3: AF2 runtime-major lookup
+	if v, ok := af2RuntimePythonDefaults[airflowversions.RuntimeVersionMajor(baseTag)]; ok {
+		return v
+	}
+
+	// Tier 4: Hardcoded fallback
 	return defaultPythonVersion
 }
 
@@ -409,7 +425,12 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		}
 	}
 	afMajor := airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag)
-	if afMajor != "2" && afMajor != "3" {
+	if afMajor == "2" {
+		rtMajor := airflowversions.RuntimeVersionMajor(baseTag)
+		if rtMajor != "11" && rtMajor != "12" && rtMajor != "13" {
+			return fmt.Errorf("standalone mode supports Airflow 2 runtime versions 11.x through 13.x, got %s", baseTag)
+		}
+	} else if afMajor != "3" {
 		return errUnsupportedAirflowVersion
 	}
 	s.airflowMajorVersion = afMajor
