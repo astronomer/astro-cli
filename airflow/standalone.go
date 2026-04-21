@@ -55,7 +55,7 @@ var (
 
 var (
 	errStandaloneNotSupported    = errors.New("this command is not supported in standalone mode")
-	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 2.2+ or Airflow 3 (runtime 3.x or 13.x+)")
+	errUnsupportedAirflowVersion = errors.New("standalone mode requires Airflow 2 (runtime 11.x-13.x) or Airflow 3 (runtime X.Y-Z format, e.g. 3.0-1)")
 	errUVNotFound                = errors.New("'uv' is required for standalone mode but was not found on PATH.\nInstall it with: curl -LsSf https://astral.sh/uv/install.sh | sh\nSee https://docs.astral.sh/uv/getting-started/installation/ for more options")
 
 	// Function variables for testing
@@ -126,6 +126,11 @@ if sys.platform == "darwin":
 		}
 
 		sitePackages := filepath.Join(libDir, e.Name(), "site-packages")
+
+		// Skip if already patched.
+		if _, err := os.Stat(filepath.Join(sitePackages, "_fix_setproctitle.pth")); err == nil {
+			continue
+		}
 
 		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.py"), []byte(pyContent), filePermissions); err != nil {
 			return err
@@ -427,6 +432,10 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	afMajor := airflowversions.AirflowMajorVersionForRuntimeVersion(baseTag)
 	if afMajor == "2" {
 		rtMajor := airflowversions.RuntimeVersionMajor(baseTag)
+		// Allow-list of AF2 runtime major versions supported by standalone mode.
+		// When a future AF2 runtime version ships, add its major version here
+		// and update the error message below so it doesn't silently fall through
+		// to errUnsupportedAirflowVersion.
 		if rtMajor != "11" && rtMajor != "12" && rtMajor != "13" {
 			return fmt.Errorf("standalone mode supports Airflow 2 runtime versions 11.x through 13.x, got %s", baseTag)
 		}
@@ -573,21 +582,21 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		// Disable os.fork and patch setproctitle on macOS.  After fork()
 		// the ObjC/CF/Network runtimes are corrupt, causing children to
 		// spin at 100 % CPU on getaddrinfo or setproctitle calls.
+		// Without this patch, AF2 on macOS will hit SIGSEGV or 100% CPU spin.
 		if err := writeDarwinForkSafetyPatch(filepath.Join(s.airflowHome, ".venv")); err != nil {
-			logger.Warnf("could not write Darwin fork-safety patch: %v", err)
+			return fmt.Errorf("could not write Darwin fork-safety patch (AF2 on macOS requires this to avoid SIGSEGV): %w", err)
 		}
 
 		// Write the LocalExecutor pickle fix plugin so QueuedLocalWorker
 		// can be serialized across macOS spawn-mode multiprocessing.
 		pluginsDir := filepath.Join(s.airflowHome, "plugins")
 		if err := os.MkdirAll(pluginsDir, dirPermissions); err != nil {
-			logger.Warnf("could not create plugins directory: %v", err)
-		} else {
-			pickleFix := filepath.Join(pluginsDir, "fix_local_executor_pickle.py")
-			if _, err := os.Stat(pickleFix); os.IsNotExist(err) {
-				if err := os.WriteFile(pickleFix, []byte(af2PickleFixPlugin), filePermissions); err != nil {
-					logger.Warnf("could not write LocalExecutor pickle fix plugin: %v", err)
-				}
+			return fmt.Errorf("could not create plugins directory for LocalExecutor pickle fix: %w", err)
+		}
+		pickleFix := filepath.Join(pluginsDir, "fix_local_executor_pickle.py")
+		if _, err := os.Stat(pickleFix); os.IsNotExist(err) {
+			if err := os.WriteFile(pickleFix, []byte(af2PickleFixPlugin), filePermissions); err != nil {
+				return fmt.Errorf("could not write LocalExecutor pickle fix plugin (AF2 on macOS requires this): %w", err)
 			}
 		}
 
@@ -858,7 +867,6 @@ func (s *Standalone) buildEnv() []string {
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
-	overrides["AIRFLOW__CORE__PLUGINS_FOLDER"] = filepath.Join(s.airflowHome, "plugins")
 	port := s.webserverPort()
 	if s.airflowMajorVersion == "3" {
 		overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
@@ -867,6 +875,11 @@ func (s *Standalone) buildEnv() []string {
 		}
 		overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
 	} else {
+		// AF2: point plugins at the project directory so the pickle-fix plugin
+		// written during Start() is visible to Airflow.  AF3 intentionally
+		// omits this override and falls back to $AIRFLOW_HOME/plugins
+		// (.astro/standalone/plugins).
+		overrides["AIRFLOW__CORE__PLUGINS_FOLDER"] = filepath.Join(s.airflowHome, "plugins")
 		if port != defaultStandalonePort {
 			overrides["AIRFLOW__WEBSERVER__WEB_SERVER_PORT"] = port
 		}
@@ -928,6 +941,11 @@ func (s *Standalone) standaloneAPIURL(port string) string {
 // AF2 uses Basic auth (admin:admin); AF3 uses JWT from /auth/token.
 func (s *Standalone) standaloneAuthHeader(port string) string {
 	if s.airflowMajorVersion == "2" {
+		// Hardcoded to admin:admin, which matches the --password admin flag passed
+		// by af2DarwinShim and the default AF2 user created during Start().
+		// If the user changes the admin password after first start, settings
+		// import/export will silently fail against the real credentials.
+		// This is acceptable for local dev but means credentials are coupled.
 		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
 	}
 	token, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))

@@ -62,6 +62,12 @@ func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
 	err = os.WriteFile(filepath.Join(venvBin, "python"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
 	s.NoError(err)
 
+	// Pre-create site-packages so writeDarwinForkSafetyPatch can install the fork-safety patch.
+	// Without this the patch fails and Start() returns a hard error on macOS.
+	sitePackages := filepath.Join(tmpDir, ".venv", "lib", "python3.12", "site-packages")
+	err = os.MkdirAll(sitePackages, 0o755)
+	s.NoError(err)
+
 	origParseFile := standaloneParseFile
 	origResolve := resolveFloatingTag
 	origLookPath := lookPath
@@ -100,11 +106,17 @@ func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
 	s.NoError(err)
 	s.Equal("2", handler.airflowMajorVersion)
 
-	// On macOS the shim should have been written
+	// On macOS the shim and fork-safety patch should have been written
 	if runtime.GOOS == "darwin" {
 		shimPath := filepath.Join(venvBin, "_standalone_macos.py")
 		_, statErr := os.Stat(shimPath)
 		s.NoError(statErr, "macOS shim should be written for AF2")
+
+		_, statErr = os.Stat(filepath.Join(sitePackages, "_fix_setproctitle.py"))
+		s.NoError(statErr, "fork-safety patch _fix_setproctitle.py should be installed in site-packages")
+
+		_, statErr = os.Stat(filepath.Join(sitePackages, "_fix_setproctitle.pth"))
+		s.NoError(statErr, "fork-safety patch _fix_setproctitle.pth should be installed in site-packages")
 	}
 }
 
@@ -1993,4 +2005,154 @@ func TestResolveInEnvPath(t *testing.T) {
 		result := airflowrt.ResolveInEnvPath("mybinary", env)
 		assert.Equal(t, "mybinary", result)
 	})
+}
+
+// --- version-branching helper tests ---
+
+func TestStandaloneAPIURL(t *testing.T) {
+	tests := []struct {
+		name         string
+		majorVersion string
+		port         string
+		want         string
+	}{
+		{"AF2 uses /api/v1", "2", "8080", "http://localhost:8080/api/v1"},
+		{"AF3 uses /api/v2", "3", "8080", "http://localhost:8080/api/v2"},
+		{"empty version defaults to AF3", "", "9090", "http://localhost:9090/api/v2"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Standalone{airflowMajorVersion: tc.majorVersion}
+			assert.Equal(t, tc.want, s.standaloneAPIURL(tc.port))
+		})
+	}
+}
+
+func TestStandaloneAuthHeader(t *testing.T) {
+	t.Run("AF2 returns Basic auth header", func(t *testing.T) {
+		s := &Standalone{airflowMajorVersion: "2"}
+		header := s.standaloneAuthHeader("8080")
+		assert.True(t, strings.HasPrefix(header, "Basic "), "expected Basic auth, got: %s", header)
+	})
+
+	t.Run("AF3 returns empty string when JWT fetch fails", func(t *testing.T) {
+		// No server is listening so fetchAirflowJWTToken will fail; the function
+		// should fall through to an empty string rather than panicking.
+		s := &Standalone{airflowMajorVersion: "3"}
+		header := s.standaloneAuthHeader("19999")
+		assert.Equal(t, "", header)
+	})
+}
+
+func TestAirflowMajorVersionUint(t *testing.T) {
+	tests := []struct {
+		name         string
+		majorVersion string
+		want         uint64
+	}{
+		{"AF2 string returns 2", "2", 2},
+		{"AF3 string returns 3", "3", 3},
+		{"empty string defaults to 3", "", 3},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Standalone{airflowMajorVersion: tc.majorVersion}
+			assert.Equal(t, tc.want, s.airflowMajorVersionUint())
+		})
+	}
+}
+
+func TestReadPersistedVersion(t *testing.T) {
+	t.Run("returns version from file when valid 2", func(t *testing.T) {
+		dir := t.TempDir()
+		versionDir := filepath.Join(dir, ".astro", "standalone")
+		require.NoError(t, os.MkdirAll(versionDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(versionDir, "airflow_version"), []byte("2"), 0o644))
+		assert.Equal(t, "2", readPersistedVersion(dir))
+	})
+
+	t.Run("returns version from file when valid 3", func(t *testing.T) {
+		dir := t.TempDir()
+		versionDir := filepath.Join(dir, ".astro", "standalone")
+		require.NoError(t, os.MkdirAll(versionDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(versionDir, "airflow_version"), []byte("3\n"), 0o644))
+		assert.Equal(t, "3", readPersistedVersion(dir))
+	})
+
+	t.Run("falls back to Dockerfile when file contains unexpected value", func(t *testing.T) {
+		dir := t.TempDir()
+		versionDir := filepath.Join(dir, ".astro", "standalone")
+		require.NoError(t, os.MkdirAll(versionDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(versionDir, "airflow_version"), []byte("bogus"), 0o644))
+
+		origParseFile := standaloneParseFile
+		defer func() { standaloneParseFile = origParseFile }()
+		standaloneParseFile = func(_ string) ([]docker.Command, error) {
+			return nil, fmt.Errorf("no dockerfile")
+		}
+		assert.Equal(t, "", readPersistedVersion(dir))
+	})
+
+	t.Run("falls back to Dockerfile when file is missing", func(t *testing.T) {
+		dir := t.TempDir()
+
+		origParseFile := standaloneParseFile
+		defer func() { standaloneParseFile = origParseFile }()
+		standaloneParseFile = func(_ string) ([]docker.Command, error) {
+			return nil, fmt.Errorf("no dockerfile")
+		}
+		assert.Equal(t, "", readPersistedVersion(dir))
+	})
+}
+
+func TestDetectVersionFromDockerfile(t *testing.T) {
+	tests := []struct {
+		name     string
+		commands []docker.Command
+		parseErr error
+		want     string
+	}{
+		{
+			name: "AF3 runtime tag (new X.Y-Z format) returns 3",
+			commands: []docker.Command{
+				{Cmd: "from", Value: []string{"quay.io/astronomer/astro-runtime:3.0-1"}},
+			},
+			want: "3",
+		},
+		{
+			name: "AF2 runtime tag 12.x returns 2",
+			commands: []docker.Command{
+				{Cmd: "from", Value: []string{"quay.io/astronomer/astro-runtime:12.0.0"}},
+			},
+			want: "2",
+		},
+		{
+			name: "AF2 runtime tag 11.x returns 2",
+			commands: []docker.Command{
+				{Cmd: "from", Value: []string{"quay.io/astronomer/astro-runtime:11.0.0"}},
+			},
+			want: "2",
+		},
+		{
+			name:     "Dockerfile parse error returns empty string",
+			parseErr: fmt.Errorf("no such file"),
+			want:     "",
+		},
+		{
+			name:     "no FROM command returns empty string",
+			commands: []docker.Command{},
+			want:     "",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			origParseFile := standaloneParseFile
+			defer func() { standaloneParseFile = origParseFile }()
+			standaloneParseFile = func(_ string) ([]docker.Command, error) {
+				return tc.commands, tc.parseErr
+			}
+			assert.Equal(t, tc.want, detectVersionFromDockerfile(dir))
+		})
+	}
 }
