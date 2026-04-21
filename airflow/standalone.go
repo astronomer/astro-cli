@@ -4,6 +4,7 @@ package airflow
 
 import (
 	"bufio"
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -103,23 +104,6 @@ func writeDarwinForkSafetyPatch(venvPath string) error {
 		return err
 	}
 
-	pyContent := `import sys
-import os
-
-if sys.platform == "darwin":
-    if hasattr(os, "fork"):
-        os._real_fork = os.fork
-        del os.fork
-
-    try:
-        import setproctitle
-        setproctitle.setproctitle = lambda *a, **kw: None
-        setproctitle.setthreadtitle = lambda *a, **kw: None
-    except ImportError:
-        pass
-`
-	pthContent := "import _fix_setproctitle\n"
-
 	for _, e := range entries {
 		if !e.IsDir() || !strings.HasPrefix(e.Name(), "python") {
 			continue
@@ -127,122 +111,42 @@ if sys.platform == "darwin":
 
 		sitePackages := filepath.Join(libDir, e.Name(), "site-packages")
 
-		// Skip if already patched.
+		// Skip if already patched. We treat the .pth file as the sentinel —
+		// both files are always written together, so its presence implies
+		// _fix_setproctitle.py is also in place.
 		if _, err := os.Stat(filepath.Join(sitePackages, "_fix_setproctitle.pth")); err == nil {
 			continue
 		}
 
-		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.py"), []byte(pyContent), filePermissions); err != nil {
+		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.py"), darwinForkSafetyPy, filePermissions); err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.pth"), []byte(pthContent), filePermissions); err != nil {
+		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.pth"), darwinForkSafetyPth, filePermissions); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// af2PickleFixPlugin is an Airflow plugin that fixes QueuedLocalWorker
-// pickling on macOS.  macOS Python defaults to "spawn" for multiprocessing,
-// which requires pickling worker objects.  QueuedLocalWorker has a
-// decorated do_work method whose 'wrapper' attribute can't be pickled.
-// Setting __name__/__qualname__ on the method makes it picklable.
-const af2PickleFixPlugin = `from airflow.executors.local_executor import LocalWorker, QueuedLocalWorker
+// af2DarwinShim is the macOS shim that replaces `airflow standalone` for AF2,
+// avoiding gunicorn's fork which crashes on macOS.
+//
+//go:embed standalone_scripts/af2_darwin_shim.py
+var af2DarwinShim []byte
 
-QueuedLocalWorker.do_work.__name__ = "do_work"
-QueuedLocalWorker.do_work.__qualname__ = "QueuedLocalWorker.do_work"
-LocalWorker.do_work.__name__ = "do_work"
-LocalWorker.do_work.__qualname__ = "LocalWorker.do_work"
-`
+// af2PickleFixPlugin fixes QueuedLocalWorker pickling under macOS spawn-mode multiprocessing.
+//
+//go:embed standalone_scripts/af2_pickle_fix_plugin.py
+var af2PickleFixPlugin []byte
 
-// af2DarwinShim is a self-contained Python script that replaces
-// `airflow standalone` on macOS for Airflow 2.  AF2's webserver uses
-// gunicorn which always forks workers; on macOS the fork inherits
-// corrupted Objective-C runtime state, causing SIGSEGV crashes and
-// the "Python quit unexpectedly" dialog.  This shim runs individual
-// components and passes --debug to the webserver so it uses Flask's
-// built-in dev server (no gunicorn, no fork).
-const af2DarwinShim = `#!/usr/bin/env python3
-"""AF2 standalone shim for macOS — avoids gunicorn fork crash."""
-import os, signal, subprocess, sys, threading, time
+// darwinForkSafetyPy / darwinForkSafetyPth are installed into the venv's
+// site-packages to neutralize macOS fork-safety hazards at Python startup.
+//
+//go:embed standalone_scripts/fix_setproctitle.py
+var darwinForkSafetyPy []byte
 
-def _stream(proc, prefix):
-    for line in iter(proc.stdout.readline, b""):
-        sys.stdout.buffer.write(("{} | ".format(prefix)).encode() + line)
-        sys.stdout.buffer.flush()
-    proc.stdout.close()
-
-def main():
-    af = [sys.executable, "-m", "airflow"]
-
-    # DB migrations
-    print("standalone | Running DB migrations...", flush=True)
-    subprocess.run(af + ["db", "migrate"], check=True)
-
-    # Idempotent admin user creation
-    result = subprocess.run(
-        af + ["users", "create",
-              "--role", "Admin",
-              "--username", "admin",
-              "--password", "admin",
-              "--firstname", "Admin",
-              "--lastname", "User",
-              "--email", "admin@example.com"],
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        print("standalone | Created admin user.  Login: admin / admin", flush=True)
-    elif "already exists" in (result.stdout + result.stderr):
-        print("standalone | Admin user already exists.  Login: admin / admin", flush=True)
-    else:
-        print("standalone | WARNING: failed to create admin user (exit {})".format(
-            result.returncode), flush=True)
-        if result.stderr:
-            for line in result.stderr.strip().splitlines():
-                print("standalone |   " + line, flush=True)
-
-    # Start components — webserver uses Flask dev server (--debug) to
-    # avoid gunicorn's fork which crashes on macOS.
-    procs = {}
-    for name, extra in [("scheduler", []), ("webserver", ["--debug"]), ("triggerer", [])]:
-        procs[name] = subprocess.Popen(
-            af + [name] + extra,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        )
-
-    for name, proc in procs.items():
-        t = threading.Thread(target=_stream, args=(proc, name), daemon=True)
-        t.start()
-
-    def shutdown(sig=None, frame=None):
-        for proc in procs.values():
-            try:
-                proc.terminate()
-            except OSError:
-                pass
-        for proc in procs.values():
-            try:
-                proc.wait(timeout=10)
-            except Exception:
-                proc.kill()
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, shutdown)
-    signal.signal(signal.SIGINT, shutdown)
-
-    # Block until any component exits, then tear down everything.
-    while all(p.poll() is None for p in procs.values()):
-        time.sleep(1)
-
-    for name, proc in procs.items():
-        rc = proc.poll()
-        if rc is not None:
-            print("standalone | {} exited with code {}".format(name, rc), flush=True)
-    shutdown()
-
-if __name__ == "__main__":
-    main()
-`
+//go:embed standalone_scripts/fix_setproctitle.pth
+var darwinForkSafetyPth []byte
 
 // af2RuntimePythonDefaults maps AF2 runtime major versions to their default
 // Python version.  The runtime versions JSON does not populate
@@ -575,7 +479,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		// corrupted ObjC runtime state → SIGSEGV.  Use a shim that runs
 		// `airflow webserver --debug` (Flask dev server, no fork).
 		shimPath := filepath.Join(venvBin, "_standalone_macos.py")
-		if err := os.WriteFile(shimPath, []byte(af2DarwinShim), filePermissions); err != nil {
+		if err := os.WriteFile(shimPath, af2DarwinShim, filePermissions); err != nil {
 			return fmt.Errorf("error writing macOS standalone shim: %w", err)
 		}
 
@@ -595,7 +499,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		}
 		pickleFix := filepath.Join(pluginsDir, "fix_local_executor_pickle.py")
 		if _, err := os.Stat(pickleFix); os.IsNotExist(err) {
-			if err := os.WriteFile(pickleFix, []byte(af2PickleFixPlugin), filePermissions); err != nil {
+			if err := os.WriteFile(pickleFix, af2PickleFixPlugin, filePermissions); err != nil {
 				return fmt.Errorf("could not write LocalExecutor pickle fix plugin (AF2 on macOS requires this): %w", err)
 			}
 		}
