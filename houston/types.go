@@ -347,6 +347,12 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 	return false
 }
 
+type GetAppConfigRequest struct {
+	ClusterID      string
+	WorkspaceUUID  string
+	DeploymentUUID string
+}
+
 // AppConfig contains current houston config
 type AppConfig struct {
 	Version                string       `json:"version"`

@@ -115,6 +115,9 @@ func getAstroRuntimeTag(runtimeVersions, runtimeVersionsV3 map[string]RuntimeVer
 		if r.Metadata.Channel != VersionChannelStable {
 			continue
 		}
+		if r.Metadata.Yanked {
+			continue
+		}
 		if airflowVersion != "" && r.Metadata.AirflowVersion != airflowVersion {
 			continue
 		}
@@ -122,6 +125,9 @@ func getAstroRuntimeTag(runtimeVersions, runtimeVersionsV3 map[string]RuntimeVer
 	}
 	for runtimeVersion, r := range runtimeVersionsV3 {
 		if r.Metadata.Channel != VersionChannelStable {
+			continue
+		}
+		if r.Metadata.Yanked {
 			continue
 		}
 		if airflowVersion != "" && r.Metadata.AirflowVersion != airflowVersion {
@@ -267,20 +273,29 @@ func ResolveFloatingTag(floatingTag string) (string, error) {
 		return "", fmt.Errorf("failed to fetch runtime versions: %w", err)
 	}
 
-	var latest string
-	for version := range resp.RuntimeVersionsV3 {
-		if strings.HasPrefix(version, floatingTag+"-") || strings.HasPrefix(version, floatingTag+".") {
-			if latest == "" || CompareRuntimeVersions(version, latest) > 0 {
-				latest = version
-			}
-		}
-	}
-
+	latest := pickLatestMatchingRuntimeVersion(floatingTag, resp.RuntimeVersionsV3)
 	if latest == "" {
 		return "", fmt.Errorf("no runtime version found matching '%s'", floatingTag)
 	}
-
 	return latest, nil
+}
+
+// pickLatestMatchingRuntimeVersion returns the highest non-yanked version whose
+// name starts with the floating tag. Returns "" if nothing matches.
+func pickLatestMatchingRuntimeVersion(floatingTag string, runtimeVersionsV3 map[string]RuntimeVersion) string {
+	var latest string
+	for version, rv := range runtimeVersionsV3 {
+		if rv.Metadata.Yanked {
+			continue
+		}
+		if !strings.HasPrefix(version, floatingTag+"-") && !strings.HasPrefix(version, floatingTag+".") {
+			continue
+		}
+		if latest == "" || CompareRuntimeVersions(version, latest) > 0 {
+			latest = version
+		}
+	}
+	return latest
 }
 
 // GetDefaultPythonVersion fetches the runtime versions JSON and returns the

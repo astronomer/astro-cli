@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
@@ -46,7 +47,7 @@ func (s *Suite) TestWorkspaceList() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(&houston.AppConfig{}, nil)
+	api.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{}, nil)
 	api.On("ListWorkspaces", nil).Return(mockWorkspaces, nil)
 
 	houstonClient = api

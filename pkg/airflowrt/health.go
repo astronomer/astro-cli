@@ -7,11 +7,26 @@ import (
 	"time"
 )
 
-// CheckHealth polls the Airflow health endpoint until it responds with 200 or the timeout is reached.
-var CheckHealth = func(port string, timeout time.Duration) error {
-	url := fmt.Sprintf("http://localhost:%s/api/v2/monitor/health", port)
+// HealthCheckConfig holds version-specific options for CheckHealth.
+// Using a struct lets callers add new fields without changing the function signature.
+type HealthCheckConfig struct {
+	// AirflowMajorVersion selects the health endpoint: "2" uses /health (AF2),
+	// anything else (including empty string) uses /api/v2/monitor/health (AF3).
+	AirflowMajorVersion string
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+// CheckHealth polls the Airflow health endpoint until it responds with 200 or the timeout is reached.
+// cfg.AirflowMajorVersion selects the correct endpoint: "/api/v2/monitor/health" for AF3,
+// "/health" for AF2. An empty AirflowMajorVersion defaults to AF3.
+// The provided context can be used to cancel the health check before the timeout expires.
+var CheckHealth = func(ctx context.Context, port string, timeout time.Duration, cfg HealthCheckConfig) error {
+	healthPath := "/api/v2/monitor/health"
+	if cfg.AirflowMajorVersion == "2" {
+		healthPath = "/health"
+	}
+	url := fmt.Sprintf("http://localhost:%s%s", port, healthPath)
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	client := &http.Client{Timeout: 5 * time.Second}

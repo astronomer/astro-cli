@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
@@ -15,7 +16,7 @@ func (s *Suite) TestVersionMatchCmds() {
 	s.Run("0.27.0 platform with teams command", func() {
 		buf := new(bytes.Buffer)
 		mockAPI := new(houston_mocks.ClientInterface)
-		mockAPI.On("GetAppConfig", "").Return(&houston.AppConfig{Version: "0.27.0"}, nil)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "0.27.0"}, nil)
 		mockAPI.On("GetPlatformVersion", nil).Return("0.27.0", nil)
 		cmd := &cobra.Command{Use: "astro"}
 		childCMDs := AddCmds(mockAPI, buf)
@@ -43,7 +44,7 @@ func (s *Suite) TestVersionMatchCmds() {
 	s.Run("0.30.0 platform with teams command", func() {
 		buf := new(bytes.Buffer)
 		mockAPI := new(houston_mocks.ClientInterface)
-		mockAPI.On("GetAppConfig", "").Return(&houston.AppConfig{Version: "0.30.0"}, nil)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "0.30.0"}, nil)
 		mockAPI.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 		cmd := &cobra.Command{Use: "astro"}
 		childCMDs := AddCmds(mockAPI, buf)

@@ -1,6 +1,8 @@
 package software
 
 import (
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -27,7 +29,7 @@ func (s *Suite) TestDeploymentSAListCommand() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("ListDeploymentServiceAccounts", mockDeployment.ID).Return([]houston.ServiceAccount{mockSA}, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
@@ -56,7 +58,7 @@ func (s *Suite) TestDeploymentSaDeleteRootCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "1234", ServiceAccountID: mockDeploymentSA.ID}).Return(mockDeploymentSA, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
@@ -93,7 +95,7 @@ func (s *Suite) TestDeploymentSaCreateCommand() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("CreateDeploymentServiceAccount", expectedSARequest).Return(mockSA, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
