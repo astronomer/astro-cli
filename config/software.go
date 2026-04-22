@@ -27,7 +27,7 @@ func (c *Context) PrintSoftwareContext(out io.Writer) error {
 		workspace = noApply
 	}
 	tab := printutil.Table{
-		Padding: []int{36, 36},
+		Padding: []int{60, 20},
 		Header:  []string{"CLUSTER", "WORKSPACE"},
 	}
 
