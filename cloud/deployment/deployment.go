@@ -71,9 +71,9 @@ var (
 	dagDeployEnabled bool
 )
 
-// defaultWorkerMachineNam is the machine type UpdateDeployment falls back to when
+// defaultWorkerMachineName is the machine type UpdateDeployment falls back to when
 // an executor change forces it to synthesize a replacement worker queue.
-const defaultWorkerMachineNam = "A5"
+const defaultWorkerMachineName = "A5"
 
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
@@ -971,11 +971,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 
 		var workerConcurrency int
 		for i := range configOption.WorkerMachines {
-			if strings.EqualFold(defaultWorkerMachineNam, string(configOption.WorkerMachines[i].Name)) {
+			if strings.EqualFold(defaultWorkerMachineName, string(configOption.WorkerMachines[i].Name)) {
 				workerConcurrency = int(configOption.WorkerMachines[i].Concurrency.Default)
 			}
 		}
-		defaultMachine := astrov1.UpdateWorkerQueueRequestAstroMachine(defaultWorkerMachineNam)
+		defaultMachine := astrov1.UpdateWorkerQueueRequestAstroMachine(defaultWorkerMachineName)
 		defaultWorkerQueue := []astrov1.UpdateWorkerQueueRequest{{
 			AstroMachine:      &defaultMachine,
 			IsDefault:         true,
