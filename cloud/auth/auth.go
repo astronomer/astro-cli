@@ -274,20 +274,37 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 
 	var activeOrg astroplatformcore.Organization
 	if activeOrgID != "" {
-		// Fetch the specific org directly by ID to avoid a silent wrong-org fallback
-		// when the user belongs to more organizations than the API's default page size.
+		// Resolve the active org directly by ID to avoid the silent wrong-org
+		// fallback that triggered when the user belonged to more orgs than the
+		// API's default page size (#2083).
 		orgResp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), activeOrgID, &astroplatformcore.GetOrganizationParams{})
 		if err != nil {
 			return err
 		}
-		err = platformclient.NormalizeAPIError(orgResp.HTTPResponse, orgResp.Body)
-		if err != nil {
-			return err
+		// If the context org is no longer accessible for this identity (membership
+		// revoked, org deleted, or state left over from a prior account on the same
+		// domain), fall through to the list-and-pick-first branch below so the user
+		// still lands somewhere usable. Properly scrubbing identity-scoped state on
+		// logout and hydrating it on login would let us drop this fallback — see #2097.
+		if orgResp.HTTPResponse != nil && (orgResp.HTTPResponse.StatusCode == http.StatusForbidden || orgResp.HTTPResponse.StatusCode == http.StatusNotFound) {
+			activeOrgID = ""
+		} else {
+			err = platformclient.NormalizeAPIError(orgResp.HTTPResponse, orgResp.Body)
+			if err != nil {
+				return err
+			}
+			if orgResp.JSON200 == nil {
+				return ErrorNoOrganization
+			}
+			activeOrg = *orgResp.JSON200
 		}
-		activeOrg = *orgResp.JSON200
-	} else {
-		// No active org in context — list orgs and use the first available one.
-		organizationListParams := &astroplatformcore.ListOrganizationsParams{}
+	}
+
+	if activeOrgID == "" {
+		// First login, or context org was unreachable above — list orgs and take
+		// the first available one.
+		limit := 100
+		organizationListParams := &astroplatformcore.ListOrganizationsParams{Limit: &limit}
 		orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 		if err != nil {
 			return err
