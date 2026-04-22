@@ -1111,19 +1111,35 @@ func TestBuildImageFailure(t *testing.T) {
 	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.ErrorIs(t, err, errMock)
 
+	// dockerfile parsing error: no imageName, version label empty → enters parse branch
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil).Once()
 		return mockImageHandler
 	}
-
-	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
 	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
+	// --image-name provided: Dockerfile parse is skipped, so a missing/invalid
+	// Dockerfile must not cause an error
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
+		return mockImageHandler
+	}
+	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
+	dockerfile = "Dockerfile.invalid" // would normally cause a parse error
+	_, err = buildImage("./testfiles/", "4.2.5", "", "my-registry/my-image:tag", "", "", false, false, mockPlatformCoreClient)
+	assert.NoError(t, err, "Dockerfile should not be parsed when --image-name is provided")
+
 	// failed to get runtime releases
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
+		return mockImageHandler
+	}
 	dockerfile = "Dockerfile"
 	mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
 	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockPlatformCoreClient)
