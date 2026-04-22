@@ -383,7 +383,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			wsPort = portOvr.WebserverPort
 		}
 		healthURL = fmt.Sprintf("http://localhost:%s/health", wsPort)
-		healthComponent = "webserver"
+		healthComponent = WebserverDockerContainerName
 	}
 
 	// Check the health of the webserver, up to the timeout.

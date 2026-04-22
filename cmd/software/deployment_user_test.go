@@ -1,6 +1,8 @@
 package software
 
 import (
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -20,7 +22,7 @@ func (s *Suite) TestDeploymentUserAddCommand() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("AddDeploymentUser", expectedAddUserRequest).Return(mockDeploymentUserRole, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
@@ -43,7 +45,7 @@ func (s *Suite) TestDeploymentUserDeleteCommand() {
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("DeleteDeploymentUser", houston.DeleteDeploymentUserRequest{DeploymentID: mockDeploymentUserRole.Deployment.ID, Email: mockDeploymentUserRole.User.Username}).
 		Return(mockDeploymentUserRole, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
@@ -93,7 +95,7 @@ func (s *Suite) TestDeploymentUserUpdateCommand() {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", "").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
 	api.On("UpdateDeploymentUser", expectedUpdateUserRequest).Return(&mockResponseUserRole, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 

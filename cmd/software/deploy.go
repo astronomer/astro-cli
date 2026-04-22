@@ -141,7 +141,7 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 
 	err = DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
 	// Don't throw the error if dag-deploy itself is disabled
-	if errors.Is(err, deploy.ErrDagOnlyDeployDisabledInConfig) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
+	if deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
 		return nil
 	}
 	return err

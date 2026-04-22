@@ -1782,6 +1782,44 @@ func (s *AirflowSuite) TestResolveDevMode() {
 	})
 }
 
+func (s *AirflowSuite) TestSetDevModeAnnotation() {
+	s.Run("sets standalone annotation", func() {
+		standaloneFlag = true
+		defer func() { standaloneFlag = false }()
+
+		cmd := &cobra.Command{Use: "start"}
+		err := setDevModeAnnotation(cmd, nil)
+		s.NoError(err)
+		s.Equal("standalone", cmd.Annotations["dev_mode"])
+	})
+
+	s.Run("sets docker annotation", func() {
+		standaloneFlag = false
+		dockerFlag = true
+		defer func() { dockerFlag = false }()
+
+		cmd := &cobra.Command{Use: "start"}
+		err := setDevModeAnnotation(cmd, nil)
+		s.NoError(err)
+		s.Equal("docker", cmd.Annotations["dev_mode"])
+	})
+
+	s.Run("preserves existing annotations", func() {
+		standaloneFlag = false
+		dockerFlag = false
+
+		cmd := &cobra.Command{
+			Use:         "start",
+			Annotations: map[string]string{"other": "value"},
+		}
+		err := setDevModeAnnotation(cmd, nil)
+		s.NoError(err)
+		// Neither flag is set, so resolveDevMode falls back to the config value.
+		s.Equal(config.CFG.DevMode.GetString(), cmd.Annotations["dev_mode"])
+		s.Equal("value", cmd.Annotations["other"])
+	})
+}
+
 func (s *AirflowSuite) TestStandaloneModeStart() {
 	s.Run("standalone flag uses localHandlerInit", func() {
 		cmd := newAirflowStartCmd(nil)

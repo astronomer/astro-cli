@@ -240,6 +240,49 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	return res, nil
 }
 
+// resolveActiveOrg returns the org the current context points at. When a context
+// org is set, we fetch it directly by ID — listing-and-searching with no limit
+// silently fell back to the first page's [0] when the user belonged to more orgs
+// than the API's default page size (#2083).
+//
+// If GetOrganization returns 403/404, the context org is no longer accessible
+// (membership revoked, org deleted, or state left over from a prior account on
+// the same domain), so we fall through to list-and-pick-first to keep the user
+// usable. Properly scrubbing identity-scoped state on logout and hydrating it
+// on login would let us drop that fallback — see #2097.
+func resolveActiveOrg(c *config.Context, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+	if c.Organization != "" {
+		orgResp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), c.Organization, &astroplatformcore.GetOrganizationParams{})
+		if err != nil {
+			return nil, err
+		}
+		stale := orgResp.HTTPResponse != nil && (orgResp.HTTPResponse.StatusCode == http.StatusForbidden || orgResp.HTTPResponse.StatusCode == http.StatusNotFound)
+		if !stale {
+			if err := platformclient.NormalizeAPIError(orgResp.HTTPResponse, orgResp.Body); err != nil {
+				return nil, err
+			}
+			if orgResp.JSON200 == nil {
+				return nil, ErrorNoOrganization
+			}
+			return orgResp.JSON200, nil
+		}
+	}
+
+	limit := 100
+	orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), &astroplatformcore.ListOrganizationsParams{Limit: &limit})
+	if err != nil {
+		return nil, err
+	}
+	if err := platformclient.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body); err != nil {
+		return nil, err
+	}
+	orgs := orgsResp.JSON200.Organizations
+	if len(orgs) == 0 {
+		return nil, ErrorNoOrganization
+	}
+	return &orgs[0], nil
+}
+
 func switchToLastUsedWorkspace(c *config.Context, workspaces []astrocore.Workspace) (astrocore.Workspace, bool, error) {
 	if c.LastUsedWorkspace != "" {
 		for i := range workspaces {
@@ -270,29 +313,9 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 	if err != nil {
 		return err
 	}
-	activeOrgID := c.Organization
-	// fetch all orgs that the user can access
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{}
-	orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
+	activeOrg, err := resolveActiveOrg(c, platformCoreClient)
 	if err != nil {
 		return err
-	}
-	err = platformclient.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
-	if err != nil {
-		return err
-	}
-	orgsPaginated := *orgsResp.JSON200
-	orgs := orgsPaginated.Organizations
-	if len(orgs) == 0 {
-		return ErrorNoOrganization
-	}
-	// default to first one in case something crazy happen lol
-	activeOrg := orgs[0]
-	for i := range orgs {
-		if orgs[i].Id == activeOrgID {
-			activeOrg = orgs[i]
-			break
-		}
 	}
 
 	orgProduct := "HYBRID"

@@ -608,9 +608,9 @@ func (_m *ClientInterface) DeleteWorkspaceUser(req houston.DeleteWorkspaceUserRe
 	return r0, r1
 }
 
-// GetAppConfig provides a mock function with given fields: clusterID
-func (_m *ClientInterface) GetAppConfig(clusterID string) (*houston.AppConfig, error) {
-	ret := _m.Called(clusterID)
+// GetAppConfig provides a mock function with given fields: req
+func (_m *ClientInterface) GetAppConfig(req houston.GetAppConfigRequest) (*houston.AppConfig, error) {
+	ret := _m.Called(req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAppConfig")
@@ -618,19 +618,19 @@ func (_m *ClientInterface) GetAppConfig(clusterID string) (*houston.AppConfig, e
 
 	var r0 *houston.AppConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*houston.AppConfig, error)); ok {
-		return rf(clusterID)
+	if rf, ok := ret.Get(0).(func(houston.GetAppConfigRequest) (*houston.AppConfig, error)); ok {
+		return rf(req)
 	}
-	if rf, ok := ret.Get(0).(func(string) *houston.AppConfig); ok {
-		r0 = rf(clusterID)
+	if rf, ok := ret.Get(0).(func(houston.GetAppConfigRequest) *houston.AppConfig); ok {
+		r0 = rf(req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*houston.AppConfig)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(clusterID)
+	if rf, ok := ret.Get(1).(func(houston.GetAppConfigRequest) error); ok {
+		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
 	}

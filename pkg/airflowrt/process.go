@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	StandalonePIDFile = "airflow.pid"
-	StandaloneLogFile = "airflow.log"
-	StopPollInterval  = 500 * time.Millisecond
-	StopTimeout       = 10 * time.Second
+	StandalonePIDFile     = "airflow.pid"
+	StandaloneLogFile     = "airflow.log"
+	StandaloneVersionFile = "airflow_version"
+	StopPollInterval      = 500 * time.Millisecond
+	StopTimeout           = 10 * time.Second
 )
 
 // ReadPID reads a PID file and checks if the process is alive.

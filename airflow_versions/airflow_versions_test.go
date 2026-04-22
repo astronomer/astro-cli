@@ -192,6 +192,18 @@ func (s *Suite) TestGetAstroRuntimeTag() {
 				AirflowDatabase: false,
 			},
 		},
+		"3.0-9": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "3.0.5",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2025-08-20",
+				Yanked:         true,
+				YankedReason:   "broken connection extras deserialization",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
 	}
 
 	tests := []struct {
@@ -203,6 +215,7 @@ func (s *Suite) TestGetAstroRuntimeTag() {
 		{airflowVersion: "2.1.1", output: "3.0.1", err: nil},
 		{airflowVersion: "2.2.2", output: "", err: ErrNoTagAvailable{airflowVersion: "2.2.2"}},
 		{airflowVersion: "3.0.0", output: "3.0-1", err: nil},
+		{airflowVersion: "3.0.5", output: "", err: ErrNoTagAvailable{airflowVersion: "3.0.5"}},
 	}
 
 	for _, tt := range tests {
@@ -214,6 +227,42 @@ func (s *Suite) TestGetAstroRuntimeTag() {
 		}
 		s.Equal(tt.output, defaultImageTag)
 	}
+}
+
+func (s *Suite) TestPickLatestMatchingRuntimeVersion() {
+	runtimeVersionsV3 := map[string]RuntimeVersion{
+		"3.0-1": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
+		"3.0-3": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
+		"3.0-9": {
+			Metadata: RuntimeVersionMetadata{
+				Channel:      VersionChannelStable,
+				Yanked:       true,
+				YankedReason: "broken connection extras deserialization",
+			},
+		},
+		"3.1-1": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
+		"3.1-2": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
+	}
+
+	tests := []struct {
+		floatingTag string
+		output      string
+	}{
+		{floatingTag: "3.0", output: "3.0-3"},
+		{floatingTag: "3.1", output: "3.1-2"},
+		{floatingTag: "4.0", output: ""},
+	}
+
+	for _, tt := range tests {
+		s.Equal(tt.output, pickLatestMatchingRuntimeVersion(tt.floatingTag, runtimeVersionsV3), "floatingTag=%q", tt.floatingTag)
+	}
+
+	s.Run("all matching yanked returns empty", func() {
+		allYanked := map[string]RuntimeVersion{
+			"3.2-1": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable, Yanked: true}},
+		}
+		s.Equal("", pickLatestMatchingRuntimeVersion("3.2", allYanked))
+	})
 }
 
 func (s *Suite) TestGetDefaultImageTag() {
@@ -333,6 +382,18 @@ func (s *Suite) TestGetDefaultImageTag() {
 						AirflowVersion: "2.2.0",
 						Channel:        VersionChannelStable,
 						ReleaseDate:    "2021-10-12",
+					},
+					Migrations: RuntimeVersionMigrations{
+						AirflowDatabase: false,
+					},
+				},
+				"5.0.0": {
+					Metadata: RuntimeVersionMetadata{
+						AirflowVersion: "2.3.0",
+						Channel:        VersionChannelStable,
+						ReleaseDate:    "2022-01-01",
+						Yanked:         true,
+						YankedReason:   "critical regression",
 					},
 					Migrations: RuntimeVersionMigrations{
 						AirflowDatabase: false,

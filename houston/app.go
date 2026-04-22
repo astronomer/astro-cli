@@ -3,6 +3,8 @@ package houston
 import (
 	"errors"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -85,6 +87,19 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "2.0.0",
+			query: `
+			query AppConfig($clusterId: Uuid, $workspaceUuid: Uuid, $deploymentUuid: Uuid) {
+				appConfig(clusterId: $clusterId, workspaceUuid: $workspaceUuid, deploymentUuid: $deploymentUuid) {
+					version
+					baseDomain
+					byoUpdateRegistryHost
+					smtpConfigured
+					featureFlags
+				}
+			}`,
+		},
 	}
 
 	AvailableNamespacesGetRequest = queryList{
@@ -117,21 +132,33 @@ var (
 )
 
 // GetAppConfig - get application configuration
-func (h ClientImplementation) GetAppConfig(clusterID string) (*AppConfig, error) {
+func (h ClientImplementation) GetAppConfig(req GetAppConfigRequest) (*AppConfig, error) {
 	// Even if application config has already been requested, we want to request it again
 	// Because we want to get the app config for the clusterID if it is provided
 	vars := map[string]interface{}{}
-	if clusterID != "" {
-		vars["clusterId"] = clusterID
+	if req.ClusterID != "" {
+		vars["clusterId"] = req.ClusterID
+	}
+	if req.WorkspaceUUID != "" {
+		vars["workspaceUuid"] = req.WorkspaceUUID
+	}
+	if req.DeploymentUUID != "" {
+		vars["deploymentUuid"] = req.DeploymentUUID
+	}
+	// workspaceUuid / deploymentUuid on appConfig exist only in Houston 2.0+; omit variables for
+	// older platforms so the request matches the selected 1.0.0 query (clusterId only).
+	if version != "" && semver.Compare(sanitiseVersionString(version), "v2.0.0") < 0 {
+		delete(vars, "workspaceUuid")
+		delete(vars, "deploymentUuid")
 	}
 	reqQuery := AppConfigRequest.GreatestLowerBound(version)
-	req := Request{
+	httpReq := Request{
 		Query:     reqQuery,
 		Variables: vars,
 	}
 
 	var r *Response
-	r, appConfigErr = req.DoWithClient(h.client)
+	r, appConfigErr = httpReq.DoWithClient(h.client)
 	if appConfigErr != nil {
 		appConfigErr = handleAPIErr(appConfigErr)
 		return nil, appConfigErr
@@ -142,7 +169,6 @@ func (h ClientImplementation) GetAppConfig(clusterID string) (*AppConfig, error)
 		appConfig.Flags.NfsMountDagDeployment = appConfig.NfsMountDagDeployment
 		appConfig.Flags.HardDeleteDeployment = appConfig.HardDeleteDeployment
 		appConfig.Flags.ManualNamespaceNames = appConfig.ManualNamespaceNames
-		appConfig.Flags.TriggererEnabled = appConfig.TriggererEnabled
 		appConfig.Flags.TriggererEnabled = appConfig.TriggererEnabled
 	}
 	return appConfig, nil
