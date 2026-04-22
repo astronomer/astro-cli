@@ -850,7 +850,7 @@ func (s *Suite) TestLogs() {
 			Limit:         logCount,
 			MaxNumResults: 10,
 			Offset:        0,
-			ResultCount:   1,
+			ResultCount:   2,
 			Results: []astrocore.DeploymentLogEntry{
 				{
 					Raw:       "test log line",
@@ -871,10 +871,10 @@ func (s *Suite) TestLogs() {
 	}
 	mockGetDeploymentLogsMultipleComponentsResponse := astrocore.GetDeploymentLogsResponse{
 		JSON200: &astrocore.DeploymentLog{
-			Limit:         4,
+			Limit:         10,
 			MaxNumResults: 10,
 			Offset:        0,
-			ResultCount:   1,
+			ResultCount:   5,
 			Results: []astrocore.DeploymentLogEntry{
 				{
 					Raw:       "test log line",
@@ -981,6 +981,114 @@ func (s *Suite) TestLogs() {
 		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 
+		mockPlatformCoreClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
+	})
+	s.Run("pagination fetches multiple pages", func() {
+		page1Response := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit:         2,
+				MaxNumResults: 10,
+				Offset:        0,
+				ResultCount:   2,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log line 1", Timestamp: 1, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log line 2", Timestamp: 2, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+				SearchId: "search-id-1",
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		page2Response := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit:         2,
+				MaxNumResults: 10,
+				Offset:        2,
+				ResultCount:   1,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log line 3", Timestamp: 3, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+				SearchId: "search-id-1",
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page1Response, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page2Response, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 10, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
+
+		mockPlatformCoreClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
+	})
+	s.Run("subsequent pages shrink to remaining count", func() {
+		// logCount=3, page 1 returns 2 (API capping at Limit=2) → page 2 should be
+		// requested with Limit=1, not the original Limit=3, so the API doesn't
+		// ship results we'd discard.
+		page1Response := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit: 2, MaxNumResults: 3, Offset: 0, ResultCount: 2,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log 1", Timestamp: 1, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log 2", Timestamp: 2, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+				SearchId: "search-id-shrink",
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		page2Response := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit: 1, MaxNumResults: 3, Offset: 2, ResultCount: 1,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log 3", Timestamp: 3, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+				SearchId: "search-id-shrink",
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		// First call: Limit pointer points to 3.
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrocore.GetDeploymentLogsParams) bool { return p.Limit != nil && *p.Limit == 3 }),
+		).Return(&page1Response, nil).Once()
+		// Second call: Limit pointer should have been shrunk to 1 (logCount - already-fetched).
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrocore.GetDeploymentLogsParams) bool { return p.Limit != nil && *p.Limit == 1 }),
+		).Return(&page2Response, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 3, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
+		mockPlatformCoreClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
+	})
+	s.Run("over-returned page is trimmed to requested count", func() {
+		// API returns more results on a single page than logCount asked for. The
+		// trim guard at the end of Logs should keep us from printing the extra.
+		// We verify by mocking a single call (trim happens, no second call needed)
+		// and asserting only one mock call landed.
+		oversizedResponse := astrocore.GetDeploymentLogsResponse{
+			JSON200: &astrocore.DeploymentLog{
+				Limit: 2, MaxNumResults: 2, Offset: 0, ResultCount: 5,
+				Results: []astrocore.DeploymentLogEntry{
+					{Raw: "log 1", Timestamp: 1, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log 2", Timestamp: 2, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log 3", Timestamp: 3, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log 4", Timestamp: 4, Source: astrocore.DeploymentLogEntrySourceScheduler},
+					{Raw: "log 5", Timestamp: 5, Source: astrocore.DeploymentLogEntrySourceScheduler},
+				},
+			},
+			HTTPResponse: &http.Response{StatusCode: 200},
+		}
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&oversizedResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 2, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
 		mockPlatformCoreClient.AssertExpectations(s.T())
 		mockCoreClient.AssertExpectations(s.T())
 	})

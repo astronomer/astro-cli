@@ -282,8 +282,11 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		componentSources = append(componentSources, serverComponent, "scheduler", "triggerer", "worker")
 	}
 
+	maxPerPage := 5000
+	perPage := min(logCount, maxPerPage)
 	getDeploymentLogsParams := astrocore.GetDeploymentLogsParams{
 		Sources:       componentSources,
+		Limit:         &perPage,
 		MaxNumResults: &logCount,
 		Range:         &timeRange,
 		Offset:        &offset,
@@ -292,17 +295,44 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		getDeploymentLogsParams.SearchText = &logLevel
 	}
 
-	deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, coreClient)
-	if err != nil {
-		return err
+	var allResults []astrocore.DeploymentLogEntry
+	for {
+		deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, coreClient)
+		if err != nil {
+			return err
+		}
+
+		allResults = append(allResults, deploymentLogs.Results...)
+
+		// Stop paginating if we got fewer results than the per-page limit
+		// (meaning there are no more pages) or we've reached the requested count.
+		if deploymentLogs.ResultCount < deploymentLogs.Limit || len(allResults) >= logCount {
+			break
+		}
+
+		// Set up the next page request using the search cursor and updated offset.
+		// Shrink the next page to only what's still needed so the API doesn't ship
+		// results we'll throw away.
+		searchID := deploymentLogs.SearchId
+		getDeploymentLogsParams.SearchId = &searchID
+		nextOffset := deploymentLogs.Offset + deploymentLogs.ResultCount
+		getDeploymentLogsParams.Offset = &nextOffset
+		nextPerPage := min(logCount-len(allResults), maxPerPage)
+		getDeploymentLogsParams.Limit = &nextPerPage
 	}
 
-	if len(deploymentLogs.Results) == 0 {
-		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deployment.Name)
+	// Belt-and-suspenders for the case where the API still over-returns.
+	if len(allResults) > logCount {
+		allResults = allResults[:logCount]
+	}
+
+	if len(allResults) == 0 {
+		hours := timeRange / 3600
+		fmt.Printf("No matching logs have been recorded in the past %d hours for Deployment %s\n", hours, deployment.Name)
 		return nil
 	}
-	for i := range deploymentLogs.Results {
-		fmt.Printf("%f %s %s\n", deploymentLogs.Results[i].Timestamp, deploymentLogs.Results[i].Raw, deploymentLogs.Results[i].Source)
+	for i := range allResults {
+		fmt.Printf("%f %s %s\n", allResults[i].Timestamp, allResults[i].Raw, allResults[i].Source)
 	}
 	return nil
 }
