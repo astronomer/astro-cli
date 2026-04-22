@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -45,12 +45,12 @@ func isSecretsFetchingNotAllowedError(err error) bool {
 	return false
 }
 
-func ListConnections(workspaceID, deploymentID string, coreClient astrocore.CoreClient) (map[string]astrocore.EnvironmentObjectConnection, error) {
-	envObjs, err := listEnvironmentObjects(workspaceID, deploymentID, astrocore.CONNECTION, coreClient)
+func ListConnections(workspaceID, deploymentID string, astroV1Client astrov1.APIClient) (map[string]astrov1.EnvironmentObjectConnection, error) {
+	envObjs, err := listEnvironmentObjects(workspaceID, deploymentID, astrov1.CONNECTION, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
-	connections := make(map[string]astrocore.EnvironmentObjectConnection)
+	connections := make(map[string]astrov1.EnvironmentObjectConnection)
 	for i := range envObjs {
 		connections[envObjs[i].ObjectKey] = *envObjs[i].Connection
 	}
@@ -58,7 +58,7 @@ func ListConnections(workspaceID, deploymentID string, coreClient astrocore.Core
 	return connections, nil
 }
 
-func listEnvironmentObjects(workspaceID, deploymentID string, objectType astrocore.ListEnvironmentObjectsParamsObjectType, coreClient astrocore.CoreClient) ([]astrocore.EnvironmentObject, error) {
+func listEnvironmentObjects(workspaceID, deploymentID string, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func listEnvironmentObjects(workspaceID, deploymentID string, objectType astroco
 	showSecrets := true
 	resolvedLinked := true
 	limit := 1000
-	listParams := &astrocore.ListEnvironmentObjectsParams{
+	listParams := &astrov1.ListEnvironmentObjectsParams{
 		ObjectType:    &objectType,
 		ShowSecrets:   &showSecrets,
 		ResolveLinked: &resolvedLinked,
@@ -86,11 +86,11 @@ func listEnvironmentObjects(workspaceID, deploymentID string, objectType astroco
 		return nil, ErrorEntityIDNotSpecified
 	}
 
-	resp, err := coreClient.ListEnvironmentObjectsWithResponse(http_context.Background(), c.Organization, listParams)
+	resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(http_context.Background(), c.Organization, listParams)
 	if err != nil {
 		return nil, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		// Check for secrets fetching permission error and provide enhanced guidance
 		if isSecretsFetchingNotAllowedError(err) {

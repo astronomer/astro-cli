@@ -18,8 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/environment"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
@@ -151,7 +150,7 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	proxyPortFlag        string
 )
 
-func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newDevRootCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -173,7 +172,7 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 	cmd.MarkFlagsMutuallyExclusive("standalone", "docker")
 	cmd.AddCommand(
 		newAirflowInitCmd(),
-		newAirflowStartCmd(astroCoreClient),
+		newAirflowStartCmd(astroV1Client),
 		newAirflowBuildCmd(),
 		newAirflowRunCmd(),
 		newAirflowPSCmd(),
@@ -182,10 +181,10 @@ func newDevRootCmd(platformCoreClient astroplatformcore.CoreClient, astroCoreCli
 		newAirflowKillCmd(),
 		newAirflowPytestCmd(),
 		newAirflowParseCmd(),
-		newAirflowRestartCmd(astroCoreClient),
+		newAirflowRestartCmd(astroV1Client),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newAirflowUpgradeTestCmd(platformCoreClient),
+		newAirflowUpgradeTestCmd(astroV1Client),
 		newProxyRootCmd(),
 	)
 	return cmd
@@ -269,14 +268,14 @@ func newAirflowInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *cobra.Command {
+func newAirflowUpgradeTestCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade-test",
 		Short:   "Test compatibility with a new Airflow or Runtime version",
 		Long:    "Run compatibility tests to check if your environment and DAGs work with a new version of Airflow or Astro Runtime. Produces reports covering dependency version changes, DAG import errors, and Airflow deprecation lint issues. Does not modify your project or local environment.",
 		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowUpgradeTest(cmd, platformCoreClient)
+			return airflowUpgradeTest(cmd, astroV1Client)
 		},
 	}
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "The version of Airflow you want to upgrade to. The default is the latest available version. Tests are run against the equivalent Astro Runtime version.")
@@ -313,7 +312,7 @@ func newAirflowUpgradeTestCmd(platformCoreClient astroplatformcore.CoreClient) *
 	return cmd
 }
 
-func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newAirflowStartCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start",
 		Short:   "Start a local Airflow environment",
@@ -321,7 +320,7 @@ func newAirflowStartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: EnsureRuntime,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowStart(cmd, args, astroCoreClient)
+			return airflowStart(cmd, args, astroV1Client)
 		},
 	}
 	// Common flags
@@ -422,14 +421,14 @@ func newAirflowKillCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowRestartCmd(astroCoreClient astrocore.CoreClient) *cobra.Command {
+func newAirflowRestartCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "restart",
 		Short:   "Restart your local Airflow environment",
 		Long:    "Restart your local Airflow environment. This command stops and then starts your environment to apply changes.",
 		PreRunE: SetRuntimeIfExists,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowRestart(cmd, args, astroCoreClient)
+			return airflowRestart(cmd, args, astroV1Client)
 		},
 	}
 	// Common flags
@@ -770,7 +769,7 @@ func ensureProjectName(args []string, projectName string) (string, error) {
 	return projectName, nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocognit
+func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) error { //nolint:gocognit
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade
@@ -813,7 +812,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)
 
-	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, platformCoreClient)
+	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -822,7 +821,7 @@ func airflowUpgradeTest(cmd *cobra.Command, platformCoreClient astroplatformcore
 }
 
 // Start an airflow cluster
-func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.CoreClient) error {
+func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -831,10 +830,10 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 		envFile = args[0]
 	}
 
-	var envConns map[string]astrocore.EnvironmentObjectConnection
+	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
-		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -1017,7 +1016,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 }
 
 // Restart an airflow cluster
-func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore.CoreClient) error {
+func airflowRestart(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -1043,10 +1042,10 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	// don't startup browser on restart
 	noBrowser = true
 
-	var envConns map[string]astrocore.EnvironmentObjectConnection
+	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
-		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroV1Client)
 		if err != nil {
 			return err
 		}

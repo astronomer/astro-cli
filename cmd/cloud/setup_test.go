@@ -14,10 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -26,19 +24,17 @@ import (
 
 var (
 	errorLogin              = errors.New("failed to login")
-	mockOrganizationProduct = astroplatformcore.OrganizationProductHYBRID
+	mockOrganizationProduct = astrov1.OrganizationProductHYBRID
 )
 
 func TestSetup(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	t.Run("login cmd", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -50,7 +46,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -67,11 +63,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -88,11 +84,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -104,7 +100,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -116,7 +112,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -128,7 +124,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -140,7 +136,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "context"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -152,7 +148,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "completion"}
 		rootCmd.AddCommand(cmd)
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -168,11 +164,11 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "deployment"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
@@ -188,26 +184,26 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		err = Setup(cmd, nil, nil)
+		err = Setup(cmd, nil)
 		assert.NoError(t, err)
 	})
 
 	t.Run("use API token", func(t *testing.T) {
-		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+		mockOrgsResponse := astrov1.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astroplatformcore.OrganizationsPaginated{
-				Organizations: []astroplatformcore.Organization{
+			JSON200: &astrov1.OrganizationsPaginated{
+				Organizations: []astrov1.Organization{
 					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
 				},
 			},
 		}
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockClaims := util.CustomClaims{
 			Permissions: []string{
 				"workspaceId:workspace-id",
@@ -241,9 +237,9 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, mockV1Client)
 		assert.NoError(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("using a bad API token will throw error", func(t *testing.T) {
@@ -265,7 +261,7 @@ func TestSetup(t *testing.T) {
 
 		t.Setenv("ASTRO_API_TOKEN", "bad token")
 
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, mockV1Client)
 		assert.Error(t, err)
 	})
 
@@ -282,29 +278,29 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
 		t.Setenv("ASTRO_API_TOKEN", "")
 
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, mockV1Client)
 		assert.NoError(t, err)
 	})
 
 	t.Run("use API key", func(t *testing.T) {
-		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+		mockOrgsResponse := astrov1.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astroplatformcore.OrganizationsPaginated{
-				Organizations: []astroplatformcore.Organization{
+			JSON200: &astrov1.OrganizationsPaginated{
+				Organizations: []astrov1.Organization{
 					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
 				},
 			},
 		}
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
@@ -318,7 +314,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -339,24 +335,23 @@ func TestSetup(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		err = Setup(cmd, mockPlatformCoreClient, mockCoreClient)
+		err = Setup(cmd, mockV1Client)
 		assert.NoError(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 }
 
 func TestCheckAPIKeys(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	t.Run("test context switch", func(t *testing.T) {
-		mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+		mockOrgsResponse := astrov1.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astroplatformcore.OrganizationsPaginated{
-				Organizations: []astroplatformcore.Organization{
+			JSON200: &astrov1.OrganizationsPaginated{
+				Organizations: []astrov1.Organization{
 					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
 				},
 			},
@@ -366,10 +361,10 @@ func TestCheckAPIKeys(t *testing.T) {
 		err = c.SetContextKey("domain", "astronomer.io")
 		assert.NoError(t, err)
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -397,28 +392,27 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockPlatformCoreClient, false)
+		_, err = checkAPIKeys(mockV1Client, false)
 		assert.NoError(t, err)
-		mockPlatformCoreClient.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 }
 
 func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
 	t.Run("test check token", func(t *testing.T) {
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		// run checkToken
-		err := checkToken(mockCoreClient, mockPlatformCoreClient, nil)
+		err := checkToken(mockV1Client, nil)
 		assert.NoError(t, err)
 	})
 	t.Run("trigger login when no token is found", func(t *testing.T) {
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errorLogin
 		}
 
@@ -426,7 +420,7 @@ func TestCheckToken(t *testing.T) {
 		assert.NoError(t, err)
 		ctx.SetContextKey("token", "")
 		// run checkToken
-		err = checkToken(mockCoreClient, mockPlatformCoreClient, nil)
+		err = checkToken(mockV1Client, nil)
 		assert.Contains(t, err.Error(), "failed to login")
 	})
 }
@@ -435,12 +429,12 @@ func TestCheckAPIToken(t *testing.T) {
 	var mockClaims util.CustomClaims
 	var permissions []string
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockOrgsResponse := astroplatformcore.ListOrganizationsResponse{
+	mockOrgsResponse := astrov1.ListOrganizationsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astroplatformcore.OrganizationsPaginated{
-			Organizations: []astroplatformcore.Organization{
+		JSON200: &astrov1.OrganizationsPaginated{
+			Organizations: []astrov1.Organization{
 				{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
 			},
 			TotalCount: 1,
@@ -464,10 +458,10 @@ func TestCheckAPIToken(t *testing.T) {
 			ID:        "test-id",
 		},
 	}
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
 	t.Run("test context switch", func(t *testing.T) {
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -475,7 +469,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -485,12 +479,12 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockV1Client)
 		assert.NoError(t, err)
 	})
 
 	t.Run("failed to parse api token", func(t *testing.T) {
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -498,7 +492,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil, errors.New("Failed to parse token")
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -508,11 +502,11 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockV1Client)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -520,14 +514,14 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -546,7 +540,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -554,7 +548,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -564,7 +558,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(false, mockPlatformCoreClient)
+		_, err = checkAPIToken(false, mockV1Client)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -586,7 +580,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -594,7 +588,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -604,7 +598,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockV1Client)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 
@@ -625,7 +619,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -633,7 +627,7 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
-		mockPlatformCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
@@ -643,7 +637,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockPlatformCoreClient)
+		_, err = checkAPIToken(true, mockV1Client)
 		assert.NoError(t, err)
 	})
 }

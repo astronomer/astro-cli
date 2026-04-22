@@ -15,8 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
@@ -165,11 +164,11 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	return nil
 }
 
-func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType) bool {
+func shouldIncludeMonitoringDag(deploymentType astrov1.DeploymentType) bool {
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, deploymentType astroplatformcore.DeploymentType, noDagsBaseDir bool) (string, error) {
+func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, deploymentType astrov1.DeploymentType, noDagsBaseDir bool) (string, error) {
 	if shouldIncludeMonitoringDag(deploymentType) {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -195,7 +194,7 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error { //nolint
+func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient) error { //nolint
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -207,7 +206,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		fmt.Printf(deploymentHeaderMsg, c.Domain)
 	}
 
-	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, platformCoreClient, coreClient)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -247,7 +246,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	}
 
 	// Check if git metadata is enabled (default: true)
-	var deployGit *astrocore.DeployGit
+	var deployGit *astrov1.CreateDeployGitRequest
 	var commitMessage string
 	if config.CFG.DeployGitMetadata.GetBool() {
 		deployGit, commitMessage = retrieveLocalGitMetadata(deployInput.Path)
@@ -260,35 +259,23 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 	}
 
 	// Build the deploy request with git metadata
-	createDeployRequest := astroplatformcore.CreateDeployRequest{
+	createDeployRequest := astrov1.CreateDeployRequest{
 		Description: &description,
 	}
 
 	// Set deploy type
 	switch {
 	case deployInput.Dags:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeDAGONLY
+		createDeployRequest.Type = astrov1.CreateDeployRequestTypeDAGONLY
 	case deployInput.Image:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEONLY
+		createDeployRequest.Type = astrov1.CreateDeployRequestTypeIMAGEONLY
 	default:
-		createDeployRequest.Type = astroplatformcore.CreateDeployRequestTypeIMAGEANDDAG
+		createDeployRequest.Type = astrov1.CreateDeployRequestTypeIMAGEANDDAG
 	}
 
-	// Add git metadata if available
-	if deployGit != nil {
-		createDeployRequest.Git = &astroplatformcore.CreateDeployGitRequest{
-			Provider:   astroplatformcore.CreateDeployGitRequestProvider(deployGit.Provider),
-			Account:    deployGit.Account,
-			Repo:       deployGit.Repo,
-			Path:       deployGit.Path,
-			Branch:     deployGit.Branch,
-			CommitSha:  deployGit.CommitSha,
-			CommitUrl:  deployGit.CommitUrl,
-			AuthorName: deployGit.AuthorName,
-		}
-	}
+	createDeployRequest.Git = deployGit
 
-	deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, platformCoreClient)
+	deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -314,7 +301,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		if deployInput.Pytest != "" {
-			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, platformCoreClient)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -330,7 +317,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astroplatformcore.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
+		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astrov1.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -340,14 +327,14 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// finish deploy
-		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, platformCoreClient)
+		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, astroV1Client)
 		if err != nil {
 			return err
 		}
 
 		if deployInput.WaitForStatus {
 			// Keeping wait timeout low since dag only deploy is faster
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, int(deployInput.WaitTime.Seconds()), platformCoreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, int(deployInput.WaitTime.Seconds()), astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -394,7 +381,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		}
 
 		// Build our image
-		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, platformCoreClient)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -421,7 +408,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
 			if !deployInput.Image {
-				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astroplatformcore.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
+				dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astrov1.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
 				if err != nil {
 					return err
 				}
@@ -430,13 +417,13 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 			}
 		}
 		// finish deploy
-		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, platformCoreClient)
+		err = finalizeDeploy(deployID, deployInfo.deploymentID, deployInfo.organizationID, dagTarballVersion, deployInfo.dagDeployEnabled, astroV1Client)
 		if err != nil {
 			return err
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, int(deployInput.WaitTime.Seconds()), platformCoreClient)
+			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, int(deployInput.WaitTime.Seconds()), astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -452,8 +439,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 func getDeploymentInfo(
 	deploymentID, wsID, deploymentName string,
 	prompt bool,
-	platformCoreClient astroplatformcore.CoreClient,
-	coreClient astrocore.CoreClient,
+	astroV1Client astrov1.APIClient,
 ) (deploymentInfo, error) {
 	// Use config deployment if provided
 	if deploymentID == "" {
@@ -469,17 +455,17 @@ func getDeploymentInfo(
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, nil, platformCoreClient, coreClient)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, false, nil, astroV1Client)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
-		coreDeployment, err := deployment.CoreGetDeployment(currentDeployment.OrganizationId, currentDeployment.Id, platformCoreClient)
+		deploymentByID, err := deployment.GetDeploymentByID(currentDeployment.OrganizationId, currentDeployment.Id, astroV1Client)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
 		var desiredDagTarballVersion string
-		if coreDeployment.DesiredDagTarballVersion != nil {
-			desiredDagTarballVersion = *coreDeployment.DesiredDagTarballVersion
+		if deploymentByID.DesiredDagTarballVersion != nil {
+			desiredDagTarballVersion = *deploymentByID.DesiredDagTarballVersion
 		} else {
 			desiredDagTarballVersion = ""
 		}
@@ -504,7 +490,7 @@ func getDeploymentInfo(
 	if err != nil {
 		return deploymentInfo{}, err
 	}
-	deployInfo, err := fetchDeploymentDetails(deploymentID, c.Organization, platformCoreClient)
+	deployInfo, err := fetchDeploymentDetails(deploymentID, c.Organization, astroV1Client)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
@@ -586,13 +572,13 @@ func checkPytest(pytest, deployImage, buildSecretString string, containerHandler
 	return err
 }
 
-func fetchDeploymentDetails(deploymentID, organizationID string, platformCoreClient astroplatformcore.CoreClient) (deploymentInfo, error) {
-	resp, err := platformCoreClient.GetDeploymentWithResponse(httpContext.Background(), organizationID, deploymentID)
+func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client astrov1.APIClient) (deploymentInfo, error) {
+	resp, err := astroV1Client.GetDeploymentWithResponse(httpContext.Background(), organizationID, deploymentID)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
 
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
@@ -690,7 +676,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return nil
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, astroV1Client astrov1.APIClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
@@ -741,11 +727,11 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		os.Exit(1)
 	}
 
-	resp, err := platformCoreClient.GetDeploymentOptionsWithResponse(httpContext.Background(), organizationID, &astroplatformcore.GetDeploymentOptionsParams{})
+	resp, err := astroV1Client.GetDeploymentOptionsWithResponse(httpContext.Background(), organizationID, &astrov1.GetDeploymentOptionsParams{})
 	if err != nil {
 		return "", err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -765,16 +751,16 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 }
 
 // finalize deploy
-func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, platformCoreClient astroplatformcore.CoreClient) error {
-	finalizeDeployRequest := astroplatformcore.FinalizeDeployRequest{}
+func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion string, dagDeploy bool, astroV1Client astrov1.APIClient) error {
+	finalizeDeployRequest := astrov1.FinalizeDeployRequest{}
 	if dagDeploy {
 		finalizeDeployRequest.DagTarballVersion = &dagTarballVersion
 	}
-	resp, err := platformCoreClient.FinalizeDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, finalizeDeployRequest)
+	resp, err := astroV1Client.FinalizeDeployWithResponse(httpContext.Background(), organizationID, deploymentID, deployID, finalizeDeployRequest)
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -787,12 +773,12 @@ func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion st
 	return nil
 }
 
-func createDeploy(organizationID, deploymentID string, request astroplatformcore.CreateDeployRequest, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Deploy, error) {
-	resp, err := platformCoreClient.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
+func createDeploy(organizationID, deploymentID string, request astrov1.CreateDeployRequest, astroV1Client astrov1.APIClient) (*astrov1.Deploy, error) {
+	resp, err := astroV1Client.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
 	if err != nil {
 		return nil, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -924,14 +910,14 @@ func setupClientDependencyFiles(buildDir string) error {
 }
 
 // DeployClientImage handles the client deploy functionality
-func DeployClientImage(deployInput InputClientDeploy, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocritic
+func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return errors.Wrap(err, "failed to get current context")
 	}
 
 	// Validate deployment runtime version if deployment ID is provided
-	if err := validateClientImageRuntimeVersion(deployInput, platformCoreClient); err != nil {
+	if err := validateClientImageRuntimeVersion(deployInput, astroV1Client); err != nil {
 		return err
 	}
 
@@ -1048,7 +1034,7 @@ func DeployClientImage(deployInput InputClientDeploy, platformCoreClient astropl
 
 // validateClientImageRuntimeVersion validates that the client image runtime version
 // is not newer than the deployment runtime version
-func validateClientImageRuntimeVersion(deployInput InputClientDeploy, platformCoreClient astroplatformcore.CoreClient) error { //nolint:gocritic
+func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic
 	// Skip validation if no deployment ID provided
 	if deployInput.DeploymentID == "" {
 		return nil
@@ -1061,7 +1047,7 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, platformCo
 	}
 
 	// Get deployment information
-	deployInfo, err := fetchDeploymentDetails(deployInput.DeploymentID, c.Organization, platformCoreClient)
+	deployInfo, err := fetchDeploymentDetails(deployInput.DeploymentID, c.Organization, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to get deployment information")
 	}

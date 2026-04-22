@@ -8,9 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -34,82 +33,81 @@ func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 
 func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	platformCoreClient = mockPlatformCoreClient
-	astroCoreClient = mockCoreClient
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mockV1Client
+	astroV1Client = mockV1Client
 
 	t.Run("create worker queue when no deployment id was provided", func(t *testing.T) {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
 		cmdArgs := []string{"worker-queue", "create", "-n", "test-queue", "-t", "test-worker-1"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("create worker queue when deployment id was provided", func(t *testing.T) {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-id-1", "-t", "test-worker-1", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("create worker queue when deployment name was provided", func(t *testing.T) {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
 		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test", "-t", "test-worker-1", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("create worker queue when no name was provided", func(t *testing.T) {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "test-queue")()
 
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-id-1", "-t", "test-worker-1"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
@@ -123,15 +121,14 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 
 func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	platformCoreClient = mockPlatformCoreClient
-	astroCoreClient = mockCoreClient
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mockV1Client
+	astroV1Client = mockV1Client
 
 	t.Run("happy path delete worker queue", func(t *testing.T) {
 		testID := "test-wq-id"
 		astroMachine := "A5"
-		workerQueueList := []astroplatformcore.WorkerQueue{
+		workerQueueList := []astrov1.WorkerQueue{
 			{
 				Id:                testID,
 				Name:              "default",
@@ -161,19 +158,19 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
 
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
 		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)
 
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
@@ -187,10 +184,9 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 
 func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-	platformCoreClient = mockPlatformCoreClient
-	astroCoreClient = mockCoreClient
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mockV1Client
+	astroV1Client = mockV1Client
 
 	t.Run("throw error if worker concurrency is set as 0", func(t *testing.T) {
 		cmdArgs := []string{"worker-queue", "update", "--concurrency", "0"}
@@ -200,21 +196,21 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 	t.Run("happy path update worker queue", func(t *testing.T) {
 		// mock os.Stdin
 		defer testUtil.MockUserInput(t, "1")()
-		deploymentResponse.JSON200.WorkerQueues = &[]astroplatformcore.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
+		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
 		expectedOutMessage := "worker queue default for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace updated\n"
-		mockCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockPlatformCoreClient.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
-		mockPlatformCoreClient.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 
 		// updating min count
 		cmdArgs := []string{"worker-queue", "update", "-n", "default", "-t", "test-worker-1", "--min-count", "0", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)

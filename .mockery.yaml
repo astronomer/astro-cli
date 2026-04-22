@@ -1,3 +1,4 @@
+---
 filename: "{{.InterfaceName}}.go"
 outpkg: "{{.PackageName}}_mocks"
 mockname: "{{.InterfaceName}}"
@@ -25,23 +26,16 @@ packages:
       outpkg: airflow_mocks
     interfaces:
       Client:
-  github.com/astronomer/astro-cli/astro-client-core:
+  github.com/astronomer/astro-cli/astro-client-v1:
     config:
-      dir: astro-client-core/mocks
+      dir: astro-client-v1/mocks
     interfaces:
       ClientWithResponsesInterface:
         config:
           filename: client.go
-  github.com/astronomer/astro-cli/astro-client-iam-core:
+  github.com/astronomer/astro-cli/astro-client-v1alpha1:
     config:
-      dir: astro-client-iam-core/mocks
-    interfaces:
-      ClientWithResponsesInterface:
-        config:
-          filename: client.go
-  github.com/astronomer/astro-cli/astro-client-platform-core:
-    config:
-      dir: astro-client-platform-core/mocks
+      dir: astro-client-v1alpha1/mocks
     interfaces:
       ClientWithResponsesInterface:
         config:

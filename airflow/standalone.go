@@ -25,8 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -522,7 +521,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 }
 
 // startForeground runs the airflow process in the foreground, streaming output to the terminal.
-func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("error creating stdout pipe: %w", err)
@@ -624,7 +623,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 // startBackground runs the airflow process in the background, writes a PID file,
 // runs the health check, and returns.
-func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	logPath := s.logFilePath()
 	logFile, err := os.Create(logPath)
 	if err != nil {
@@ -861,7 +860,7 @@ func (s *Standalone) standaloneAuthHeader(port string) string {
 }
 
 // applySettings imports airflow_settings.yaml using the Airflow REST API.
-func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	settingsExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil || !settingsExists {
 		if len(envConns) == 0 {
@@ -1277,7 +1276,7 @@ func (s *Standalone) Parse(_, _, _ string) error {
 	return nil
 }
 
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
 }
 

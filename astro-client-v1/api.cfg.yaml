@@ -1,0 +1,22 @@
+---
+package: astrov1
+generate:
+  - types
+  - client
+include-tags:
+  - Authorization
+  - Organization
+  - AllowedIpAddressRange
+  - Options
+  - Cluster
+  - Deployment
+  - AgentToken
+  - Deploy
+  - Environment
+  - Invite
+  - Role
+  - Team
+  - ApiToken
+  - User
+  - Workspace
+output: ./astro-client-v1/api.gen.go

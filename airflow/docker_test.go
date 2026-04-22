@@ -21,9 +21,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -44,25 +43,25 @@ var (
 	runtimeVersionLabel        = "12.0.0"
 	labels                     = map[string]string{airflowVersionLabelName: airflowVersionLabel, runtimeVersionLabelName: runtimeVersionLabel}
 	deploymentID               = "test-deployment-id"
-	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
+	mockCoreDeploymentResponse = []astrov1.Deployment{
 		{
 			Id:     deploymentID,
 			Status: "HEALTHY",
 		},
 	}
-	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
+	mockListDeploymentsResponse = astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
+		JSON200: &astrov1.DeploymentsPaginated{
 			Deployments: mockCoreDeploymentResponse,
 		},
 	}
-	mockGetDeploymentsResponse = astroplatformcore.GetDeploymentResponse{
+	mockGetDeploymentsResponse = astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astroplatformcore.Deployment{
+		JSON200: &astrov1.Deployment{
 			Id: deploymentID,
 		},
 	}
@@ -1259,9 +1258,9 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 	s.Run("success with deployment id", func() {
 		imageHandler := new(mocks.ImageHandler)
 
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
 		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		imageHandler.On("Build", mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Times(2)
 		imageHandler.On("GetLabel", mock.Anything, mock.Anything).Return("old-version", nil)
@@ -1271,7 +1270,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", true, true, true, false, false, "", mockPlatformCoreClient) // All tests enabled by default
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", true, true, true, false, false, "", mockV1Client) // All tests enabled by default
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1361,26 +1360,26 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 	s.Run("get deployments failure", func() {
 		imageHandler := new(mocks.ImageHandler)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once() // Error on first call
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once() // Error on first call
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, false, "", mockPlatformCoreClient)
+		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, false, "", mockV1Client)
 		s.Error(err)
 		// No image handler expectations needed as it fails before pull/build
 	})
 
 	s.Run("image pull failure", func() {
 		imageHandler := new(mocks.ImageHandler)
-		mockPlatformCoreClient := new(astroplatformcore_mocks.ClientWithResponsesInterface)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentsResponse, nil).Once()
 		imageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker)
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, false, false, "", mockPlatformCoreClient)
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, false, false, "", mockV1Client)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T()) // Only Pull is called
 	})
@@ -1748,7 +1747,7 @@ func (s *Suite) TestDockerComposeSettings() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Maybe()
 
-		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
+		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return nil
 		}
 
@@ -1767,7 +1766,7 @@ func (s *Suite) TestDockerComposeSettings() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Maybe()
 
-		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
+		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error {
 			return errMockSettings
 		}
 
@@ -1871,8 +1870,6 @@ func (s *Suite) TestDockerComposeSettings() {
 		s.Contains(err.Error(), errMock.Error())
 		composeMock.AssertExpectations(s.T())
 	})
-
-	// Note: ImportSettings no longer calls Ps; version check failure is tested in "import list labels error"
 
 	s.Run("compose ps failure export", func() {
 		composeMock := new(mocks.DockerComposeAPI)
@@ -2029,7 +2026,7 @@ func (s *Suite) TestInitSettings() {
 	testCases := []struct {
 		name                     string
 		settingsFile             string
-		envConns                 map[string]astrocore.EnvironmentObjectConnection
+		envConns                 map[string]astrov1.EnvironmentObjectConnection
 		airflowMajorVersion      uint64
 		project                  *types.Project
 		containerSummary         []api.ContainerSummary
@@ -2038,7 +2035,7 @@ func (s *Suite) TestInitSettings() {
 		{
 			name:                "initSettings called when only settings file exists",
 			settingsFile:        "./testfiles/airflow_settings.yaml",
-			envConns:            map[string]astrocore.EnvironmentObjectConnection{},
+			envConns:            map[string]astrov1.EnvironmentObjectConnection{},
 			airflowMajorVersion: airflowMajorVersion2,
 			project: &types.Project{
 				Name: "test-project",
@@ -2054,7 +2051,7 @@ func (s *Suite) TestInitSettings() {
 		{
 			name:         "initSettings called when only env connections exist",
 			settingsFile: "./testfiles/non_existent_settings.yaml",
-			envConns: map[string]astrocore.EnvironmentObjectConnection{
+			envConns: map[string]astrov1.EnvironmentObjectConnection{
 				"test-conn": {},
 			},
 			airflowMajorVersion: airflowMajorVersion2,
@@ -2072,7 +2069,7 @@ func (s *Suite) TestInitSettings() {
 		{
 			name:         "initSettings called when both settings file and env connections exist",
 			settingsFile: "./testfiles/airflow_settings.yaml",
-			envConns: map[string]astrocore.EnvironmentObjectConnection{
+			envConns: map[string]astrov1.EnvironmentObjectConnection{
 				"test-conn": {},
 			},
 			airflowMajorVersion: airflowMajorVersion2,
@@ -2090,7 +2087,7 @@ func (s *Suite) TestInitSettings() {
 		{
 			name:                "initSettings NOT called when neither settings file nor env connections exist",
 			settingsFile:        "./testfiles/non_existent_settings.yaml",
-			envConns:            map[string]astrocore.EnvironmentObjectConnection{},
+			envConns:            map[string]astrov1.EnvironmentObjectConnection{},
 			airflowMajorVersion: airflowMajorVersion2,
 			project: &types.Project{
 				Name: "test-project",
@@ -2106,7 +2103,7 @@ func (s *Suite) TestInitSettings() {
 		{
 			name:                "initSettings called for API server container in Airflow 3",
 			settingsFile:        "./testfiles/airflow_settings.yaml",
-			envConns:            map[string]astrocore.EnvironmentObjectConnection{},
+			envConns:            map[string]astrov1.EnvironmentObjectConnection{},
 			airflowMajorVersion: airflowMajorVersion3,
 			project: &types.Project{
 				Name: "test-project",
@@ -2127,7 +2124,7 @@ func (s *Suite) TestInitSettings() {
 
 			// Mock initSettings to track if it's called
 			originalInitSettings := initSettings
-			initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
+			initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error {
 				initSettingsCalled = true
 				return nil
 			}

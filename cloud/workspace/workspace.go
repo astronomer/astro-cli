@@ -9,7 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -53,7 +53,7 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 // ListData returns workspace list data for structured output
-func ListData(client astrocore.CoreClient) (*WorkspaceList, error) {
+func ListData(client astrov1.APIClient) (*WorkspaceList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -81,19 +81,19 @@ func ListData(client astrocore.CoreClient) (*WorkspaceList, error) {
 }
 
 // List all workspaces
-func List(client astrocore.CoreClient, out io.Writer) error {
+func List(client astrov1.APIClient, out io.Writer) error {
 	return ListWithFormat(client, output.FormatTable, "", out)
 }
 
 // ListWithFormat lists workspaces with the specified output format
-func ListWithFormat(client astrocore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+func ListWithFormat(client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
 	return output.PrintData(
 		func() (*WorkspaceList, error) { return ListData(client) },
 		workspaceTableConfig, format, tmpl, out,
 	)
 }
 
-var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (string, error) {
+var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (string, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -112,7 +112,7 @@ var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (st
 		return "", err
 	}
 
-	deployMap := map[string]astrocore.Workspace{}
+	deployMap := map[string]astrov1.Workspace{}
 	for i := range ws {
 		index := i + 1
 
@@ -131,7 +131,7 @@ var GetWorkspaceSelection = func(client astrocore.CoreClient, out io.Writer) (st
 	return selected.Id, nil
 }
 
-func Switch(workspaceNameOrID string, client astrocore.CoreClient, out io.Writer) error {
+func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
 	var wsID string
 	if workspaceNameOrID == "" {
 		id, err := GetWorkspaceSelection(client, out)
@@ -197,7 +197,7 @@ func validateEnforceCD(enforceCD string) (bool, error) {
 	return enforce, nil
 }
 
-func Create(name, description, enforceCD string, out io.Writer, client astrocore.CoreClient) error {
+func Create(name, description, enforceCD string, out io.Writer, client astrov1.APIClient) error {
 	if name == "" {
 		return ErrInvalidName
 	}
@@ -209,16 +209,16 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 	if err != nil {
 		return err
 	}
-	workspaceCreateRequest := astrocore.CreateWorkspaceJSONRequestBody{
-		ApiKeyOnlyDeploymentsDefault: &enforce,
-		Description:                  &description,
-		Name:                         name,
+	workspaceCreateRequest := astrov1.CreateWorkspaceJSONRequestBody{
+		CicdEnforcedDefault: &enforce,
+		Description:         &description,
+		Name:                name,
 	}
 	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceCreateRequest)
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 	return nil
 }
 
-func Update(id, name, description, enforceCD string, out io.Writer, client astrocore.CoreClient) error {
+func Update(id, name, description, enforceCD string, out io.Writer, client astrov1.APIClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -235,7 +235,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	var workspace astrocore.Workspace
+	var workspace astrov1.Workspace
 	if id == "" {
 		workspace, err = selectWorkspace(workspaces)
 		if workspace.Id == "" {
@@ -256,7 +256,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	}
 	workspaceID := workspace.Id
 
-	workspaceUpdateRequest := astrocore.UpdateWorkspaceRequest{}
+	workspaceUpdateRequest := astrov1.UpdateWorkspaceRequest{}
 
 	if name == "" {
 		workspaceUpdateRequest.Name = workspace.Name
@@ -265,24 +265,26 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	}
 
 	if description == "" {
-		workspaceUpdateRequest.Description = workspace.Description
+		if workspace.Description != nil {
+			workspaceUpdateRequest.Description = *workspace.Description
+		}
 	} else {
-		workspaceUpdateRequest.Description = &description
+		workspaceUpdateRequest.Description = description
 	}
 	if enforceCD == "" {
-		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = workspace.ApiKeyOnlyDeploymentsDefault
+		workspaceUpdateRequest.CicdEnforcedDefault = workspace.CicdEnforcedDefault
 	} else {
 		enforce, err := validateEnforceCD(enforceCD)
 		if err != nil {
 			return err
 		}
-		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = enforce
+		workspaceUpdateRequest.CicdEnforcedDefault = enforce
 	}
 	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID, workspaceUpdateRequest)
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -290,7 +292,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	return nil
 }
 
-func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
+func Delete(id string, out io.Writer, client astrov1.APIClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -299,7 +301,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	if err != nil {
 		return err
 	}
-	var workspace astrocore.Workspace
+	var workspace astrov1.Workspace
 	if id == "" {
 		workspace, err = selectWorkspace(workspaces)
 		if workspace.Id == "" {
@@ -323,7 +325,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -331,9 +333,9 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	return nil
 }
 
-func selectWorkspace(workspaces []astrocore.Workspace) (astrocore.Workspace, error) {
+func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) {
 	if len(workspaces) == 0 {
-		return astrocore.Workspace{}, nil
+		return astrov1.Workspace{}, nil
 	}
 
 	if len(workspaces) == 1 {
@@ -352,14 +354,14 @@ func selectWorkspace(workspaces []astrocore.Workspace) (astrocore.Workspace, err
 
 	fmt.Println("\nPlease select the workspace you would like to update:")
 
-	workspaceMap := map[string]astrocore.Workspace{}
+	workspaceMap := map[string]astrov1.Workspace{}
 	for i := range workspaces {
 		index := i + 1
 		table.AddRow([]string{
 			strconv.Itoa(index),
 			workspaces[i].Name,
 			workspaces[i].Id,
-			strconv.FormatBool(workspaces[i].ApiKeyOnlyDeploymentsDefault),
+			strconv.FormatBool(workspaces[i].CicdEnforcedDefault),
 		}, false)
 		workspaceMap[strconv.Itoa(index)] = workspaces[i]
 	}
@@ -368,31 +370,31 @@ func selectWorkspace(workspaces []astrocore.Workspace) (astrocore.Workspace, err
 	choice := input.Text("\n> ")
 	selected, ok := workspaceMap[choice]
 	if !ok {
-		return astrocore.Workspace{}, errInvalidWorkspaceKey
+		return astrov1.Workspace{}, errInvalidWorkspaceKey
 	}
 	return selected, nil
 }
 
-func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
+func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return []astrocore.Workspace{}, err
+		return []astrov1.Workspace{}, err
 	}
 
-	sorts := []astrocore.ListWorkspacesParamsSorts{"name:asc"}
+	sorts := []astrov1.ListWorkspacesParamsSorts{"name:asc"}
 	limit := 1000
-	workspaceListParams := &astrocore.ListWorkspacesParams{
+	workspaceListParams := &astrov1.ListWorkspacesParams{
 		Limit: &limit,
 		Sorts: &sorts,
 	}
 
 	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
 	if err != nil {
-		return []astrocore.Workspace{}, err
+		return []astrov1.Workspace{}, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return []astrocore.Workspace{}, err
+		return []astrov1.Workspace{}, err
 	}
 
 	workspaces := resp.JSON200.Workspaces

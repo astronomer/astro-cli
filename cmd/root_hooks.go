@@ -9,8 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
@@ -26,7 +25,7 @@ func SetupLogging(_ *cobra.Command, _ []string) error {
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra
 // pre-run hook that sets up the context and checks for the latest version.
-func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient) func(cmd *cobra.Command, args []string) error {
+func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		// Check for latest version
 		if config.CFG.UpgradeMessage.GetBool() {
@@ -40,7 +39,7 @@ func CreateRootPersistentPreRunE(astroCoreClient astrocore.CoreClient, platformC
 			}
 		}
 		if context.IsCloudContext() {
-			err := cloudCmd.Setup(cmd, platformCoreClient, astroCoreClient)
+			err := cloudCmd.Setup(cmd, astroV1Client)
 			if err != nil {
 				if strings.Contains(err.Error(), "token is invalid or malformed") {
 					return errors.New("API Token is invalid or malformed") //nolint

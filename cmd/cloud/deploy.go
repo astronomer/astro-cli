@@ -171,5 +171,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Force:             forceDeploy,
 	}
 
-	return DeployImage(deployInput, platformCoreClient, astroCoreClient)
+	return DeployImage(deployInput, astroV1Client)
 }
