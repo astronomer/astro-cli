@@ -311,14 +311,24 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		}
 
 		// Set up the next page request using the search cursor and updated offset.
+		// Shrink the next page to only what's still needed so the API doesn't ship
+		// results we'll throw away.
 		searchID := deploymentLogs.SearchId
 		getDeploymentLogsParams.SearchId = &searchID
 		nextOffset := deploymentLogs.Offset + deploymentLogs.ResultCount
 		getDeploymentLogsParams.Offset = &nextOffset
+		nextPerPage := min(logCount-len(allResults), maxPerPage)
+		getDeploymentLogsParams.Limit = &nextPerPage
+	}
+
+	// Belt-and-suspenders for the case where the API still over-returns.
+	if len(allResults) > logCount {
+		allResults = allResults[:logCount]
 	}
 
 	if len(allResults) == 0 {
-		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deployment.Name)
+		hours := timeRange / 3600
+		fmt.Printf("No matching logs have been recorded in the past %d hours for Deployment %s\n", hours, deployment.Name)
 		return nil
 	}
 	for i := range allResults {
