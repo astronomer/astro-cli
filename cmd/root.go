@@ -92,6 +92,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		api.NewAPICmd(),
 		newTelemetryCmd(os.Stdout),
 		newTelemetrySendCmd(),
+		newOttoCmd(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
