@@ -1,11 +1,14 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 
@@ -96,6 +99,7 @@ var (
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
 		ProxyPort:               newCfg("proxy.port", "6563"),
+		AgentAutoUpdate:         newCfg("agent.auto_update", "true"),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -262,11 +266,42 @@ func IsWithinProjectDir(path string) (bool, error) {
 	return false, nil
 }
 
-// saveConfig will save the config to a file
+// saveConfig serializes viper writes under an exclusive OS-level file lock.
+// viper.WriteConfigAs has no locking, so concurrent astro invocations can
+// interleave writes and corrupt ~/.astro/config.yaml.
+//
+// The `<file>.lock` sidecar is only ever a handle for flock — the OS releases
+// the lock when the holding process exits regardless of whether the file is
+// deleted, so a stale `.lock` file on disk is never itself a problem.
 func saveConfig(v *viper.Viper, file string) error {
-	err := v.WriteConfigAs(file)
+	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
+	// dir hasn't been created yet. viper.WriteConfigAs creates the parent on
+	// its own, but we need the lock held before we write — so do it upfront.
+	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
+		return fmt.Errorf("creating config dir: %w", err)
+	}
+
+	lockFile := file + ".lock"
+	lock := flock.New(lockFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+	defer cancel()
+	locked, err := lock.TryLockContext(ctx, lockRetryInterval)
 	if err != nil {
+		return fmt.Errorf("acquiring config lock %s: %w", lockFile, err)
+	}
+	if !locked {
+		return fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
+	}
+	defer func() { _ = lock.Unlock() }()
+
+	if err := v.WriteConfigAs(file); err != nil {
 		return fmt.Errorf("error saving config: %w", err)
 	}
 	return nil
 }
+
+const (
+	lockTimeout       = 10 * time.Second
+	lockRetryInterval = 100 * time.Millisecond
+)
