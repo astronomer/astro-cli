@@ -53,10 +53,16 @@ func agentRun(cmd *cobra.Command, args []string) error {
 	// Everything else (flags, prompt, etc.) is forwarded directly to Otto.
 	// Propagate Otto's exit code when it exits non-zero — Otto has already
 	// printed its own error, so we skip cobra's "Error: exit status N" noise.
+	// Same treatment for ErrNotLoggedIn: Start has already printed the sign-up
+	// guidance to stderr, so returning the error to cobra would just tack on a
+	// redundant "Error: not logged in" line.
 	err := agent.Start(args)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		os.Exit(exitErr.ExitCode())
+	}
+	if errors.Is(err, agent.ErrNotLoggedIn) {
+		os.Exit(1)
 	}
 	return err
 }

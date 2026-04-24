@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,12 +10,33 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
+// ErrNotLoggedIn signals that the user invoked `astro agent` without an auth
+// context. agentRun intercepts this and exits silently so cobra doesn't print
+// "Error: ..." on top of the guidance we already wrote to stderr.
+var ErrNotLoggedIn = errors.New("not logged in")
+
+// isHelpOrVersion reports whether args is a help- or version-only invocation.
+// Otto's --help / --version exit before bootstrap() runs (see otto cli.ts),
+// so they don't need an auth context — let them through even when logged out.
+func isHelpOrVersion(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "--help", "-h", "--version":
+			return true
+		}
+	}
+	return false
+}
+
 // Start spawns Otto with the given arguments and environment from the current context.
 // It blocks until Otto exits, forwarding signals for clean shutdown.
 func Start(args []string) error {
 	cfg := NewConfigFromContext()
-	if cfg.Token == "" {
-		return fmt.Errorf("not logged in. Run `astro login` first")
+	if cfg.Token == "" && !isHelpOrVersion(args) {
+		fmt.Fprintln(os.Stderr, "You're not logged in to Astro.")
+		fmt.Fprintln(os.Stderr, "  • Already have an account? Run `astro login`")
+		fmt.Fprintln(os.Stderr, "  • New to Astro? Sign up for a free trial at https://www.astronomer.io/try-astro")
+		return ErrNotLoggedIn
 	}
 
 	if err := EnsureBinary(); err != nil {
