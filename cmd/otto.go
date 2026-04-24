@@ -8,43 +8,43 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/pkg/agent"
+	"github.com/astronomer/astro-cli/pkg/otto"
 )
 
-func newAgentCmd() *cobra.Command {
+func newOttoCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                "agent [flags/args forwarded to Otto]",
+		Use:                "otto [flags/args forwarded to Otto]",
 		Short:              "Start the Otto AI agent",
 		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations.\nAll flags and arguments are forwarded directly to Otto.",
 		SilenceUsage:       true,
 		DisableFlagParsing: true,
-		RunE:               agentRun,
+		RunE:               ottoRun,
 	}
 
 	return cmd
 }
 
-func agentRun(cmd *cobra.Command, args []string) error {
+func ottoRun(cmd *cobra.Command, args []string) error {
 	// With DisableFlagParsing, cobra won't route to subcommands,
 	// so we dispatch "update" and "version" ourselves.
 	if len(args) > 0 {
 		switch args[0] {
 		case "update":
-			return agent.Update()
+			return otto.Update()
 		case "version":
-			installed, err := agent.InstalledVersion()
+			installed, err := otto.InstalledVersion()
 			if err != nil {
 				return err
 			}
 			if installed == "" {
-				fmt.Println("Otto is not installed. Run `astro agent` to install.")
+				fmt.Println("Otto is not installed. Run `astro otto` to install.")
 				return nil
 			}
 			fmt.Printf("Otto %s\n", installed)
 
-			available, latest, err := agent.IsUpdateAvailable()
+			available, latest, err := otto.IsUpdateAvailable()
 			if err == nil && available {
-				fmt.Printf("Update available: %s (run `astro agent update`)\n", latest)
+				fmt.Printf("Update available: %s (run `astro otto update`)\n", latest)
 			}
 			return nil
 		}
@@ -56,12 +56,12 @@ func agentRun(cmd *cobra.Command, args []string) error {
 	// Same treatment for ErrNotLoggedIn: Start has already printed the sign-up
 	// guidance to stderr, so returning the error to cobra would just tack on a
 	// redundant "Error: not logged in" line.
-	err := agent.Start(args)
+	err := otto.Start(args)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		os.Exit(exitErr.ExitCode())
 	}
-	if errors.Is(err, agent.ErrNotLoggedIn) {
+	if errors.Is(err, otto.ErrNotLoggedIn) {
 		os.Exit(1)
 	}
 	return err

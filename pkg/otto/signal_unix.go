@@ -1,16 +1,17 @@
-//go:build windows
+//go:build !windows
 
-package agent
+package otto
 
 import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"syscall"
 )
 
 func forwardSignals(cmd *exec.Cmd) {
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
 	go func() {
 		for sig := range sigCh {

@@ -99,7 +99,7 @@ var (
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
 		ProxyPort:               newCfg("proxy.port", "6563"),
-		AgentAutoUpdate:         newCfg("agent.auto_update", "true"),
+		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
 	}
 
 	// viperHome is the viper object in the users home directory

@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"fmt"
@@ -116,7 +116,7 @@ func (c *Config) BuildEnv() []string {
 	set("ASTRO_DOMAIN", c.Domain)
 	set("ASTRO_ORGANIZATION", c.Organization)
 
-	// Stop `astro dev start` from popping a browser when the agent runs it.
+	// Stop `astro dev start` from popping a browser when Otto runs it.
 	// The user is already having a conversation in the TUI — surprise browser
 	// tabs steal focus and break the flow. Any `astro dev start` invoked by
 	// Otto (or by the user from the bash tool) inherits this env var; the

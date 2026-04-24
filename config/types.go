@@ -61,7 +61,7 @@ type cfgs struct {
 	TelemetryAnonymousID    cfg
 	TelemetryNoticeShown    cfg
 	ProxyPort               cfg
-	AgentAutoUpdate         cfg
+	OttoAutoUpdate          cfg
 }
 
 // Creates a new cfg struct

@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"encoding/json"
@@ -40,7 +40,7 @@ func hintUpdateAvailable(w io.Writer) {
 		return
 	}
 	if isVersionNewer(state.LatestKnown, installed) {
-		fmt.Fprintf(w, "Otto %s is available. Run `astro agent update` to upgrade.\n", state.LatestKnown)
+		fmt.Fprintf(w, "Otto %s is available. Run `astro otto update` to upgrade.\n", state.LatestKnown)
 	}
 }
 
@@ -51,7 +51,7 @@ func hintUpdateAvailable(w io.Writer) {
 // existing binary.
 //
 // `download` is parameterized so tests can swap in a stub — production
-// callers pass downloadAndInstall. Gating on the `agent.auto_update` flag
+// callers pass downloadAndInstall. Gating on the `otto.auto_update` flag
 // is the caller's responsibility; this function always applies when called.
 func autoUpdate(w io.Writer, download func() error) {
 	installed, err := InstalledVersion()
@@ -71,10 +71,10 @@ func autoUpdate(w io.Writer, download func() error) {
 	}
 }
 
-// autoUpdateEnabled reads the `agent.auto_update` flag. Default is true via
-// the newCfg("agent.auto_update", "true") registration in config/config.go.
+// autoUpdateEnabled reads the `otto.auto_update` flag. Default is true via
+// the newCfg("otto.auto_update", "true") registration in config/config.go.
 func autoUpdateEnabled() bool {
-	return config.CFG.AgentAutoUpdate.GetBool()
+	return config.CFG.OttoAutoUpdate.GetBool()
 }
 
 // refreshUpdateCacheAsync refreshes the cached latest version if the cache is

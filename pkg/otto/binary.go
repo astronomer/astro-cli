@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"archive/tar"
@@ -116,7 +116,7 @@ func EnsureBinary() error {
 		return err
 	}
 	if version == "" {
-		fmt.Println("Downloading Otto agent...")
+		fmt.Println("Downloading Otto...")
 		return downloadAndInstall()
 	}
 	iv, err := semver.NewVersion(version)
@@ -133,7 +133,7 @@ func EnsureBinary() error {
 
 // Update downloads and installs the latest Otto binary.
 func Update() error {
-	fmt.Println("Updating Otto agent...")
+	fmt.Println("Updating Otto...")
 	return downloadAndInstall()
 }
 
@@ -204,7 +204,7 @@ func downloadAndInstall() error {
 
 // renamePlatformBinary renames the extracted `otto-<os>-<arch>` to `otto`,
 // overwriting any prior version. os.Rename on POSIX replaces the target
-// atomically, so an `astro agent update` reliably swaps the old binary out.
+// atomically, so an `astro otto update` reliably swaps the old binary out.
 func renamePlatformBinary(binDir string) error {
 	entries, err := os.ReadDir(binDir)
 	if err != nil {

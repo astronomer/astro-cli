@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"fmt"
@@ -12,13 +12,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
-// maxLogSize caps the agent log file. When exceeded, the current file is
+// maxLogSize caps the CLI-side log file. When exceeded, the current file is
 // rolled over to a sibling `.old` before a fresh one is opened — so at most
 // ~2x this value is kept on disk.
 const maxLogSize = 1 << 20 // 1 MiB
 
 func logFilePath() string {
-	return filepath.Join(config.HomeConfigPath, "otto", "logs", "agent.log")
+	return filepath.Join(config.HomeConfigPath, "otto", "logs", "cli.log")
 }
 
 // redirectCLILogs routes the CLI's own log output to a file so background

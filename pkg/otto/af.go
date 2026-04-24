@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ func afWrapperContent() string {
 // EnsureAfWrapper writes the `af` wrapper at AfWrapperPath() if it's missing
 // or out-of-date. Best-effort: returns nil on success and a diagnostic error
 // otherwise — callers should log and continue rather than failing the whole
-// `astro agent` launch, because Otto has a built-in fallback to the full
+// `astro otto` launch, because Otto has a built-in fallback to the full
 // `uvx --from ...` prefix when the wrapper isn't on PATH.
 func EnsureAfWrapper() error {
 	path := AfWrapperPath()

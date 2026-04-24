@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"archive/tar"
@@ -171,21 +171,21 @@ func (s *BinarySuite) TestDownloadAndInstall_FromMockServer() {
 	s.Equal("0.0.5", v)
 }
 
-// Regression: `astro agent update` used to be a no-op when an older `otto`
+// Regression: `astro otto update` used to be a no-op when an older `otto`
 // already existed — the rename only fired if `otto` was missing, so the
 // freshly-extracted `otto-<os>-<arch>` sat unused next to the old binary.
 func (s *BinarySuite) TestRenamePlatformBinary_OverwritesExisting() {
 	binDir := BinDir()
 	s.Require().NoError(os.MkdirAll(binDir, dirPerm))
 
-	otto := filepath.Join(binDir, "otto")
+	binPath := filepath.Join(binDir, "otto")
 	platform := filepath.Join(binDir, "otto-"+runtime.GOOS+"-"+runtime.GOARCH)
-	s.Require().NoError(os.WriteFile(otto, []byte("old"), binPerm))
+	s.Require().NoError(os.WriteFile(binPath, []byte("old"), binPerm))
 	s.Require().NoError(os.WriteFile(platform, []byte("new"), binPerm))
 
 	s.Require().NoError(renamePlatformBinary(binDir))
 
-	got, err := os.ReadFile(otto)
+	got, err := os.ReadFile(binPath)
 	s.NoError(err)
 	s.Equal("new", string(got), "otto should be replaced with the freshly-extracted binary")
 	_, err = os.Stat(platform)

@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"errors"
@@ -10,8 +10,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
-// ErrNotLoggedIn signals that the user invoked `astro agent` without an auth
-// context. agentRun intercepts this and exits silently so cobra doesn't print
+// ErrNotLoggedIn signals that the user invoked `astro otto` without an auth
+// context. ottoRun intercepts this and exits silently so cobra doesn't print
 // "Error: ..." on top of the guidance we already wrote to stderr.
 var ErrNotLoggedIn = errors.New("not logged in")
 
@@ -54,7 +54,7 @@ func Start(args []string) error {
 	}
 
 	// Otto is a TUI — CLI-side writes to stderr corrupt its rendering. Route
-	// the CLI's own logger to a file for the lifetime of the agent.
+	// the CLI's own logger to a file for the lifetime of the session.
 	if closer, err := redirectCLILogs(); err != nil {
 		// Logging redirection is best-effort. If it fails (permissions, disk
 		// full), silence the logger entirely — a broken TUI is worse than
@@ -68,7 +68,7 @@ func Start(args []string) error {
 	// (disk full, permissions, etc.), Otto falls back to the full
 	// `uvx --from ...` prefix at runtime.
 	if err := EnsureAfWrapper(); err != nil {
-		logger.Warnf("agent: failed to install af wrapper: %v (will fall back to uvx)", err)
+		logger.Warnf("otto: failed to install af wrapper: %v (will fall back to uvx)", err)
 	}
 
 	// Refresh the cached latest-version in the background so the next launch

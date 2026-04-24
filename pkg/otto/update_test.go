@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"bytes"
@@ -96,7 +96,7 @@ func (s *UpdateSuite) TestHintUpdateAvailable_CacheNewerThanInstalled() {
 	var buf bytes.Buffer
 	hintUpdateAvailable(&buf)
 	s.Contains(buf.String(), "Otto 0.0.9 is available")
-	s.Contains(buf.String(), "astro agent update")
+	s.Contains(buf.String(), "astro otto update")
 }
 
 func (s *UpdateSuite) TestHintUpdateAvailable_InstalledUnparseable() {
@@ -166,7 +166,7 @@ func (s *UpdateSuite) TestUpdateStateFile_PathIsBinDirSibling() {
 
 // --- autoUpdate ---
 // Exercises the download-when-newer-is-cached path with a stubbed downloader.
-// The gating on `agent.auto_update` lives in Start() and is covered by the
+// The gating on `otto.auto_update` lives in Start() and is covered by the
 // real-auth smoke path.
 
 // stubDownloader returns a downloader that records whether it was called and

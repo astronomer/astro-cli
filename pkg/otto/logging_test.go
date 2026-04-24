@@ -1,4 +1,4 @@
-package agent
+package otto
 
 import (
 	"os"
@@ -20,7 +20,7 @@ func TestLoggingSuite(t *testing.T) {
 
 func (s *LoggingSuite) TestRotateIfLarge_UnderThreshold() {
 	dir := s.T().TempDir()
-	path := filepath.Join(dir, "agent.log")
+	path := filepath.Join(dir, "cli.log")
 	require.NoError(s.T(), os.WriteFile(path, []byte("small"), logFilePerm))
 
 	rotateIfLarge(path, 1024)
@@ -33,7 +33,7 @@ func (s *LoggingSuite) TestRotateIfLarge_UnderThreshold() {
 
 func (s *LoggingSuite) TestRotateIfLarge_OverThreshold() {
 	dir := s.T().TempDir()
-	path := filepath.Join(dir, "agent.log")
+	path := filepath.Join(dir, "cli.log")
 	big := []byte(strings.Repeat("x", 2048))
 	require.NoError(s.T(), os.WriteFile(path, big, logFilePerm))
 
