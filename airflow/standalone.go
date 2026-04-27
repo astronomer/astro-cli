@@ -815,7 +815,7 @@ func (s *Standalone) buildEnv() []string {
 		// basic-auth clients like `af`. Match the docker template.
 		overrides["AIRFLOW__API__AUTH_BACKEND"] = "airflow.api.auth.backend.basic_auth"
 		overrides["AIRFLOW__WEBSERVER__SECRET_KEY"] = signingSecret
-		overrides["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"] = "True" //nolint:goconst // matches the docker template's literal value
+		overrides["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"] = "True"
 	}
 
 	// Layer 3: macOS fork-safety workarounds.
