@@ -566,6 +566,9 @@ func (s *Suite) TestStandaloneBuildEnv() {
 	s.Equal("/tmp/test-project/dags", envMap["AIRFLOW__CORE__DAGS_FOLDER"])
 	s.Equal("True", envMap["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"])
 	s.Contains(envMap["PATH"], "/tmp/test-project/.venv/bin")
+	s.Equal("d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw=", envMap["AIRFLOW__CORE__FERNET_KEY"])
+	s.NotEmpty(envMap["AIRFLOW__API__SECRET_KEY"])
+	s.NotEmpty(envMap["AIRFLOW__API_AUTH__JWT_SECRET"])
 }
 
 func (s *Suite) TestStandaloneBuildEnv_NoDuplicateKeys() {
@@ -1415,6 +1418,12 @@ func (s *Suite) TestStandaloneBuildEnv_AF2() {
 	s.Equal("LocalExecutor", envMap["AIRFLOW__CORE__EXECUTOR"])
 	s.Equal("1", envMap["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"])
 	s.Equal("True", envMap["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"])
+	// AF2 should mirror the docker template's auth + signing settings so
+	// basic-auth clients work and login state survives restarts.
+	s.Equal("airflow.api.auth.backend.basic_auth", envMap["AIRFLOW__API__AUTH_BACKEND"])
+	s.Equal("d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw=", envMap["AIRFLOW__CORE__FERNET_KEY"])
+	s.NotEmpty(envMap["AIRFLOW__WEBSERVER__SECRET_KEY"])
+	s.Equal("True", envMap["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"])
 }
 
 func (s *Suite) TestStandaloneBuildEnv_AF2_CustomPort() {
