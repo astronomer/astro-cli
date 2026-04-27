@@ -80,13 +80,12 @@ func Base64URLEncode(arg []byte) string {
 }
 
 func CheckEnvBool(envBool string) bool {
-	if envBool == "False" || envBool == "false" {
+	switch strings.ToLower(envBool) {
+	case "true", "1", "yes", "y", "on":
+		return true
+	default:
 		return false
 	}
-	if envBool == "True" || envBool == "true" {
-		return true
-	}
-	return false
 }
 
 func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
