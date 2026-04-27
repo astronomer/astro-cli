@@ -771,6 +771,15 @@ func (s *Standalone) buildEnv() []string {
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
+	// Stable Fernet key so encrypted connection extras survive restart.
+	// Same value the docker compose template ships.
+	overrides["AIRFLOW__CORE__FERNET_KEY"] = "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+	// Stable per-project signing secret so login sessions / JWTs survive
+	// restart. Falls back to a constant if the project hash isn't available.
+	signingSecret, err := ProjectNameUnique()
+	if err != nil {
+		signingSecret = "astro-standalone"
+	}
 	port := s.webserverPort()
 	if s.airflowMajorVersion == "3" {
 		overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
@@ -778,6 +787,8 @@ func (s *Standalone) buildEnv() []string {
 			overrides["AIRFLOW__API__PORT"] = port
 		}
 		overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
+		overrides["AIRFLOW__API__SECRET_KEY"] = signingSecret
+		overrides["AIRFLOW__API_AUTH__JWT_SECRET"] = signingSecret
 	} else {
 		// AF2: point plugins at the project directory so the pickle-fix plugin
 		// written during Start() is visible to Airflow.  AF3 intentionally
@@ -800,14 +811,11 @@ func (s *Standalone) buildEnv() []string {
 		overrides["AIRFLOW__CORE__EXECUTOR"] = "LocalExecutor"
 		overrides["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"] = "1"
 		overrides["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"] = "True"
-		// Enable basic auth on the API. AF2's upstream default is
-		// session-only auth, which 403s every basic-auth-using client
-		// (including `af` / astro-airflow-mcp). The docker-compose
-		// template has set this since PR #394 (2020); standalone has to
-		// match so workflows that drive the API from outside the UI
-		// (e.g. the airflow-upgrade skill calling `af config`) work
-		// regardless of dev mode.
+		// AF2's upstream default is session-only API auth, which 403s
+		// basic-auth clients like `af`. Match the docker template.
 		overrides["AIRFLOW__API__AUTH_BACKEND"] = "airflow.api.auth.backend.basic_auth"
+		overrides["AIRFLOW__WEBSERVER__SECRET_KEY"] = signingSecret
+		overrides["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"] = "True"
 	}
 
 	// Layer 3: macOS fork-safety workarounds.
