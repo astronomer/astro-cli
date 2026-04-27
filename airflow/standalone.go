@@ -800,6 +800,14 @@ func (s *Standalone) buildEnv() []string {
 		overrides["AIRFLOW__CORE__EXECUTOR"] = "LocalExecutor"
 		overrides["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"] = "1"
 		overrides["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"] = "True"
+		// Enable basic auth on the API. AF2's upstream default is
+		// session-only auth, which 403s every basic-auth-using client
+		// (including `af` / astro-airflow-mcp). The docker-compose
+		// template has set this since PR #394 (2020); standalone has to
+		// match so workflows that drive the API from outside the UI
+		// (e.g. the airflow-upgrade skill calling `af config`) work
+		// regardless of dev mode.
+		overrides["AIRFLOW__API__AUTH_BACKEND"] = "airflow.api.auth.backend.basic_auth"
 	}
 
 	// Layer 3: macOS fork-safety workarounds.

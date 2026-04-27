@@ -1415,6 +1415,11 @@ func (s *Suite) TestStandaloneBuildEnv_AF2() {
 	s.Equal("LocalExecutor", envMap["AIRFLOW__CORE__EXECUTOR"])
 	s.Equal("1", envMap["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"])
 	s.Equal("True", envMap["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"])
+	// AF2 should advertise basic auth on the API so `af` / astro-airflow-mcp
+	// and other basic-auth clients can hit /api/v1/* endpoints without 403.
+	// Without this, the upstream default of session-only auth makes the
+	// airflow-upgrade skill's `af config` calls fail in standalone mode.
+	s.Equal("airflow.api.auth.backend.basic_auth", envMap["AIRFLOW__API__AUTH_BACKEND"])
 }
 
 func (s *Suite) TestStandaloneBuildEnv_AF2_CustomPort() {
