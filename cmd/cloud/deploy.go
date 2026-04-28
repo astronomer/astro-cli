@@ -50,6 +50,8 @@ const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
 
 	deployWaitTime = 300 * time.Second
+
+	imageNameFlag = "image-name"
 )
 
 func NewDeployCmd() *cobra.Command {
@@ -59,7 +61,7 @@ func NewDeployCmd() *cobra.Command {
 		Long:    "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed("image-name") {
+			if cmd.Flags().Changed(imageNameFlag) {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
@@ -74,7 +76,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&pytest, "pytest", false, "Deploy code to Astro only if the specified Pytests are passed")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
+	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
@@ -131,9 +133,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
 	}
 
-	// --image-name supplies a prebuilt image, so this is an image-only deploy by definition.
-	// Reject flags that only apply when building from a local project, and force image-only semantics.
-	if cmd.Flags().Changed("image-name") {
+	if cmd.Flags().Changed(imageNameFlag) {
 		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secrets"} {
 			if cmd.Flags().Changed(f) {
 				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
