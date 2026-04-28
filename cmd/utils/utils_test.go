@@ -37,6 +37,25 @@ func TestEnsureProjectDir(t *testing.T) {
 	config.ConfigDir = ""
 	err = EnsureProjectDir(&cobra.Command{}, []string{})
 	assert.NoError(t, err)
+
+	// --image-name passed: project dir check is skipped even when the directory is invalid
+	config.WorkingPath = "./test"
+	config.ConfigFileNameWithExt = fileName
+	config.ConfigDir = dirName
+	cmdWithImageName := &cobra.Command{}
+	var imageName string
+	cmdWithImageName.Flags().StringVarP(&imageName, "image-name", "i", "", "")
+	err = cmdWithImageName.Flags().Set("image-name", "my-custom-image")
+	assert.NoError(t, err)
+	err = EnsureProjectDir(cmdWithImageName, []string{})
+	assert.NoError(t, err)
+
+	// --image-name registered but not passed: project dir check still runs
+	cmdImageNameUnset := &cobra.Command{}
+	cmdImageNameUnset.Flags().StringVarP(&imageName, "image-name", "i", "", "")
+	err = EnsureProjectDir(cmdImageNameUnset, []string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "this is not an Astro project directory")
 }
 
 func TestGetDefaultDeployDescription(t *testing.T) {

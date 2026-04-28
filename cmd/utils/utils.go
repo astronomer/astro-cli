@@ -23,6 +23,12 @@ func ChainRunEs(runEs ...RunE) RunE {
 }
 
 func EnsureProjectDir(cmd *cobra.Command, args []string) error {
+	// Skip the project directory check when --image-name is provided, since
+	// deploying a prebuilt image does not require local project files.
+	if flag := cmd.Flags().Lookup("image-name"); flag != nil && flag.Changed {
+		return nil
+	}
+
 	isProjectDir, err := config.IsProjectDir(config.WorkingPath)
 	if err != nil {
 		return errors.Wrap(err, ansi.Red("failed to verify that your working directory is an Astro project.\nTry running astro dev init to turn your working directory into an Astro project"))
