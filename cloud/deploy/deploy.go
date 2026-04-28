@@ -246,10 +246,12 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		return err
 	}
 
-	// Check if git metadata is enabled (default: true)
+	// Check if git metadata is enabled (default: true).
+	// Skip when --image-name is provided: the local working directory does not necessarily
+	// reflect the contents of a prebuilt image, so attaching its git metadata would be misleading.
 	var deployGit *astrocore.DeployGit
 	var commitMessage string
-	if config.CFG.DeployGitMetadata.GetBool() {
+	if config.CFG.DeployGitMetadata.GetBool() && deployInput.ImageName == "" {
 		deployGit, commitMessage = retrieveLocalGitMetadata(deployInput.Path)
 	}
 
