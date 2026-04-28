@@ -51,10 +51,10 @@ const (
 
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deploy [DEPLOYMENT ID]",
-		Short:   "Deploy an Airflow project",
-		Long:    "Deploy an Airflow project to an Astronomer Cluster",
-		Args: cobra.MaximumNArgs(1),
+		Use:   "deploy [DEPLOYMENT ID]",
+		Short: "Deploy an Airflow project",
+		Long:  "Deploy an Airflow project to an Astronomer Cluster",
+		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("image-name") {
 				return nil
