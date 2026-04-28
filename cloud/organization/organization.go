@@ -10,10 +10,8 @@ import (
 	"strings"
 	"time"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/auth"
-	"github.com/astronomer/astro-cli/cloud/platformclient"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -44,16 +42,16 @@ var organizationTableConfig = output.BuildTableConfig(
 	output.WithPadding([]int{44, 50}),
 )
 
-func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Organization, error) {
+func ListOrganizations(astroV1Client astrov1.APIClient) ([]astrov1.Organization, error) {
 	limit := 100
-	organizationListParams := &astroplatformcore.ListOrganizationsParams{
+	organizationListParams := &astrov1.ListOrganizationsParams{
 		Limit: &limit,
 	}
-	resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
+	resp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
 	}
-	err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +60,12 @@ func ListOrganizations(platformCoreClient astroplatformcore.CoreClient) ([]astro
 	return orgs, nil
 }
 
-func GetOrganization(orgID string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
-	resp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), orgID, &astroplatformcore.GetOrganizationParams{})
+func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
+	resp, err := astroV1Client.GetOrganizationWithResponse(http_context.Background(), orgID, &astrov1.GetOrganizationParams{})
 	if err != nil {
 		return nil, err
 	}
-	err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -87,16 +85,16 @@ func isCUID(s string) bool {
 	return true
 }
 
-func findOrganizationByName(name string, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+func findOrganizationByName(name string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
 	pageSize := 100
 	offset := 0
 	for {
-		params := &astroplatformcore.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
-		resp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), params)
+		params := &astrov1.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
+		resp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), params)
 		if err != nil {
 			return nil, err
 		}
-		err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -115,12 +113,12 @@ func findOrganizationByName(name string, platformCoreClient astroplatformcore.Co
 }
 
 // ListData returns organization list data for structured output
-func ListData(platformCoreClient astroplatformcore.CoreClient) (*OrganizationList, error) {
+func ListData(astroV1Client astrov1.APIClient) (*OrganizationList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	or, err := ListOrganizations(platformCoreClient)
+	or, err := ListOrganizations(astroV1Client)
 	if err != nil {
 		return nil, fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
 	}
@@ -142,19 +140,19 @@ func ListData(platformCoreClient astroplatformcore.CoreClient) (*OrganizationLis
 }
 
 // List all organizations
-func List(out io.Writer, platformCoreClient astroplatformcore.CoreClient) error {
-	return ListWithFormat(platformCoreClient, output.FormatTable, "", out)
+func List(out io.Writer, astroV1Client astrov1.APIClient) error {
+	return ListWithFormat(astroV1Client, output.FormatTable, "", out)
 }
 
 // ListWithFormat lists organizations with the specified output format
-func ListWithFormat(platformCoreClient astroplatformcore.CoreClient, format output.Format, tmpl string, out io.Writer) error {
+func ListWithFormat(astroV1Client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
 	return output.PrintData(
-		func() (*OrganizationList, error) { return ListData(platformCoreClient) },
+		func() (*OrganizationList, error) { return ListData(astroV1Client) },
 		organizationTableConfig, format, tmpl, out,
 	)
 }
 
-func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -168,12 +166,12 @@ func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcor
 		return nil, err
 	}
 
-	or, err := ListOrganizations(platformCoreClient)
+	or, err := ListOrganizations(astroV1Client)
 	if err != nil {
 		return nil, err
 	}
 
-	deployMap := map[string]astroplatformcore.Organization{}
+	deployMap := map[string]astrov1.Organization{}
 	for i := range or {
 		index := i + 1
 
@@ -192,7 +190,7 @@ func getOrganizationSelection(out io.Writer, platformCoreClient astroplatformcor
 	return &selected, nil
 }
 
-func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Client astrov1.APIClient, out io.Writer) error {
 	c, _ := context.GetCurrentContext()
 
 	// reset org context
@@ -207,7 +205,7 @@ func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization,
 	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
-	err := CheckUserSession(&c, coreClient, platformCoreClient, out)
+	err := CheckUserSession(&c, astroV1Client, out)
 	if err != nil {
 		return err
 	}
@@ -216,7 +214,7 @@ func SwitchWithContext(domain string, targetOrg *astroplatformcore.Organization,
 }
 
 // Switch switches organizations
-func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
 	c, err := context.GetCurrentContext()
 	if err != nil {
@@ -224,22 +222,22 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 	}
 
 	// get target org
-	var targetOrg *astroplatformcore.Organization
+	var targetOrg *astrov1.Organization
 	switch {
 	case orgNameOrID == "":
-		targetOrg, err = getOrganizationSelection(out, platformCoreClient)
+		targetOrg, err = getOrganizationSelection(out, astroV1Client)
 		if err != nil {
 			return err
 		}
 	case isCUID(orgNameOrID):
 		// Input looks like a CUID — fetch directly by ID
-		targetOrg, err = GetOrganization(orgNameOrID, platformCoreClient)
+		targetOrg, err = GetOrganization(orgNameOrID, astroV1Client)
 		if err != nil {
 			return err
 		}
 	default:
 		// Input is a name — paginate through all orgs to find it
-		targetOrg, err = findOrganizationByName(orgNameOrID, platformCoreClient)
+		targetOrg, err = findOrganizationByName(orgNameOrID, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -252,13 +250,13 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
 		return nil
 	}
-	return SwitchWithContext(c.Domain, targetOrg, coreClient, platformCoreClient, out)
+	return SwitchWithContext(c.Domain, targetOrg, astroV1Client, out)
 }
 
 // Write the audit logs to the provided io.Writer.
-func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, orgName, filePath string, earliest int) error {
+func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, earliest int) error {
 	var orgID string
-	or, err := ListOrganizations(platformCoreClient)
+	or, err := ListOrganizations(astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -286,7 +284,6 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 			return errInvalidOrganizationName
 		}
 	}
-	earliestString := fmt.Sprint(earliest)
 	if filePath == "" {
 		orgName = strings.ReplaceAll(strings.ToLower(orgName), " ", "")
 
@@ -295,14 +292,15 @@ func ExportAuditLogs(coreClient astrocore.CoreClient, platformCoreClient astropl
 		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgName, earliest, pluralize(earliest), date)
 	}
 
-	organizationAuditLogsParams := &astrocore.GetOrganizationAuditLogsParams{
-		Earliest: &earliestString,
+	startDate := time.Now().AddDate(0, 0, -earliest)
+	organizationAuditLogsParams := &astrov1.GetOrganizationAuditLogsParams{
+		StartDate: &startDate,
 	}
-	resp, err := coreClient.GetOrganizationAuditLogsWithResponse(http_context.Background(), orgID, organizationAuditLogsParams)
+	resp, err := astroV1Client.GetOrganizationAuditLogsWithResponse(http_context.Background(), orgID, organizationAuditLogsParams)
 	if err != nil {
 		return err
 	}
-	err = platformclient.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -329,16 +327,16 @@ func IsOrgHosted() bool {
 	return c.OrganizationProduct == "HOSTED"
 }
 
-func ListClusters(organizationID string, platformCoreClient astroplatformcore.CoreClient) ([]astroplatformcore.Cluster, error) {
+func ListClusters(organizationID string, astroV1Client astrov1.APIClient) ([]astrov1.Cluster, error) {
 	limit := 1000
-	clusterListParams := &astroplatformcore.ListClustersParams{
+	clusterListParams := &astrov1.ListClustersParams{
 		Limit: &limit,
 	}
-	resp, err := platformCoreClient.ListClustersWithResponse(http_context.Background(), organizationID, clusterListParams)
+	resp, err := astroV1Client.ListClustersWithResponse(http_context.Background(), organizationID, clusterListParams)
 	if err != nil {
 		return nil, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}

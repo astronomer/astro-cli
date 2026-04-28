@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -81,7 +81,7 @@ func SetHTTPClient(c HTTPDoer) HTTPDoer {
 // ConfigSettings is the main builder of the settings package.
 // airflowURL is the base API URL (e.g., "http://localhost:8080/api/v1").
 // authHeader is an optional Authorization header value (e.g., "Basic ...").
-func ConfigSettings(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error {
+func ConfigSettings(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error {
 	if airflowURL == "" {
 		return errNoURL
 	}
@@ -214,7 +214,7 @@ func AddVariables(airflowURL, authHeader string) error {
 }
 
 // AddConnections adds Connections from settings.yaml via the Airflow REST API.
-func AddConnections(airflowURL, authHeader string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func AddConnections(airflowURL, authHeader string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	connections := settings.Airflow.Connections
 	connections = AppendEnvironmentConnections(connections, envConns)
 
@@ -322,7 +322,7 @@ func connExtraString(extra interface{}) string {
 	return jsonString(&Connection{ConnExtra: extra})
 }
 
-func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrocore.EnvironmentObjectConnection) Connections {
+func AppendEnvironmentConnections(connections Connections, envConnections map[string]astrov1.EnvironmentObjectConnection) Connections {
 	for envConnID, envConn := range envConnections {
 		for i := range connections {
 			if connections[i].ConnID == envConnID {

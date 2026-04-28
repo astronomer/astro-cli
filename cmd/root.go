@@ -8,9 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
-	"github.com/astronomer/astro-cli/cloud/platformclient"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
@@ -40,9 +39,8 @@ func NewRootCmd() *cobra.Command {
 	houstonClient = houston.NewClient(httpClient)
 
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
-	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
-	astroCoreIamClient := astroiamcore.NewIamCoreClient(httputil.NewHTTPClient())
-	platformCoreClient := platformclient.NewPlatformCoreClient(httputil.NewHTTPClient())
+	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
+	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -74,18 +72,18 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(astroCoreClient, platformCoreClient),
+				CreateRootPersistentPreRunE(astroV1Client),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroCoreClient, platformCoreClient, os.Stdout),
+		newLoginCommand(astroV1Client, os.Stdout),
 		newLogoutCommand(os.Stdout),
-		newAuthRootCmd(astroCoreClient, platformCoreClient, os.Stdout),
+		newAuthRootCmd(astroV1Client, os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(platformCoreClient, astroCoreClient),
+		newDevRootCmd(astroV1Client),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
@@ -97,7 +95,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(platformCoreClient, astroCoreClient, airflowClient, astroCoreIamClient, os.Stdout)...,
+			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(

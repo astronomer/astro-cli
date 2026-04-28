@@ -27,10 +27,22 @@ func IsGitRepository(path string) bool {
 }
 
 func GetRemoteRepository(path, remote string) (*url.URL, error) {
-	urlStr, err := runGitCommand(path, []string{"remote", "get-url", remote})
+	urlStr, err := GetRemoteURL(path, remote)
 	if err != nil {
 		return nil, err
 	}
+	return parseGitURL(urlStr)
+}
+
+// GetRemoteURL returns the raw remote URL string as configured by `git remote get-url`.
+// This preserves the SCP-like form (e.g. git@github.com:astronomer/astro-cli) when present,
+// which is what the v1 deploy API expects for GENERIC-provider remotes.
+func GetRemoteURL(path, remote string) (string, error) {
+	return runGitCommand(path, []string{"remote", "get-url", remote})
+}
+
+// ParseRemoteURL parses a raw remote URL into a *url.URL, handling SCP-like SSH URLs.
+func ParseRemoteURL(urlStr string) (*url.URL, error) {
 	return parseGitURL(urlStr)
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
@@ -499,7 +498,7 @@ func addOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) 
 	}
 	cmd.SilenceUsage = true
 
-	return workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "create", out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "create", out, astroV1Client)
 }
 
 func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -514,7 +513,7 @@ func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	cmd.SilenceUsage = true
 
-	return workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "update", out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, "update", out, astroV1Client)
 }
 
 func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
@@ -538,7 +537,7 @@ func removeOrganizationTokenWorkspaceRole(cmd *cobra.Command, args []string, out
 	}
 
 	cmd.SilenceUsage = true
-	return workspacetoken.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, out, astroV1Client)
 }
 
 func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
@@ -555,10 +554,8 @@ func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
 
 func listOrganizationTokensInWorkspace(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	tokenTypes := []astrocore.ListWorkspaceApiTokensParamsTokenTypes{
-		"ORGANIZATION",
-	}
-	return workspacetoken.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+	tokenTypes := []workspacetoken.TokenType{workspacetoken.TokenTypeORGANIZATION}
+	return workspacetoken.ListTokens(astroV1Client, deploymentID, &tokenTypes, out)
 }
 
 func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
@@ -584,7 +581,7 @@ func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListWorkspaceTeamsWithFormat(astroCoreClient, "", format, workspaceTeamListOutputFlags.Template, out)
+	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", format, workspaceTeamListOutputFlags.Template, out)
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -596,7 +593,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.RemoveWorkspaceTeam(id, "", out, astroCoreClient)
+	return team.RemoveWorkspaceTeam(id, "", out, astroV1Client)
 }
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
@@ -627,7 +624,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.AddWorkspaceTeam(id, addWorkspaceRole, workspaceID, out, astroCoreClient)
+	return team.AddWorkspaceTeam(id, addWorkspaceRole, workspaceID, out, astroV1Client)
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -666,7 +663,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	}
 
 	cmd.SilenceUsage = true
-	return team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, "", out, astroCoreClient)
+	return team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, "", out, astroV1Client)
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
@@ -677,7 +674,7 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.ListWithFormat(astroCoreClient, format, workspaceListOutputFlags.Template, out)
+	return workspace.ListWithFormat(astroV1Client, format, workspaceListOutputFlags.Template, out)
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -689,12 +686,12 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		workspaceNameOrID = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Switch(workspaceNameOrID, astroCoreClient, out)
+	return workspace.Switch(workspaceNameOrID, astroV1Client, out)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return workspace.Create(workspaceName, workspaceDescription, enforceCD, out, astroCoreClient)
+	return workspace.Create(workspaceName, workspaceDescription, enforceCD, out, astroV1Client)
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -704,7 +701,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Update(id, workspaceName, workspaceDescription, enforceCD, out, astroCoreClient)
+	return workspace.Update(id, workspaceName, workspaceDescription, enforceCD, out, astroV1Client)
 }
 
 func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -714,7 +711,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Delete(id, out, astroCoreClient)
+	return workspace.Delete(id, out, astroV1Client)
 }
 
 func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -727,7 +724,7 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.AddWorkspaceUser(email, addWorkspaceRole, workspaceID, out, astroCoreClient)
+	return user.AddWorkspaceUser(email, addWorkspaceRole, workspaceID, out, astroV1Client)
 }
 
 func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
@@ -737,7 +734,7 @@ func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsersWithFormat(astroCoreClient, workspaceID, format, workspaceUserListOutputFlags.Template, out)
+	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, format, workspaceUserListOutputFlags.Template, out)
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -755,7 +752,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, workspaceID, out, astroCoreClient)
+	return user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, workspaceID, out, astroV1Client)
 }
 
 func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -768,12 +765,12 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	}
 
 	cmd.SilenceUsage = true
-	return user.RemoveWorkspaceUser(email, workspaceID, out, astroCoreClient)
+	return user.RemoveWorkspaceUser(email, workspaceID, out, astroV1Client)
 }
 
 func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return workspacetoken.ListTokens(astroCoreClient, workspaceID, nil, out)
+	return workspacetoken.ListTokens(astroV1Client, workspaceID, nil, out)
 }
 
 func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
@@ -792,7 +789,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	return workspacetoken.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+	return workspacetoken.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, cleanTokenOutput, out, astroV1Client)
 }
 
 func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -803,7 +800,7 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, out, astroV1Client)
 }
 
 func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -813,7 +810,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return workspacetoken.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroV1Client)
 }
 
 func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -824,7 +821,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspacetoken.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroCoreClient, astroCoreIamClient)
+	return workspacetoken.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroV1Client)
 }
 
 func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -843,7 +840,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		}
 	}
 	cmd.SilenceUsage = true
-	return organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, out, astroCoreClient, astroCoreIamClient)
+	return organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, out, astroV1Client)
 }
 
 func coalesceWorkspace() (string, error) {

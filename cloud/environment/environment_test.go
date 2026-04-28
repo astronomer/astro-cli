@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -31,13 +31,13 @@ func (s *Suite) TestListConnections() {
 	context, _ := config.GetCurrentContext()
 	organization := context.Organization
 	deploymentID := cuid.New()
-	objectType := astrocore.CONNECTION
+	objectType := astrov1.CONNECTION
 	showSecrets := true
 	resolvedLinked := true
 	limit := 1000
 
 	s.Run("List connections with deployment ID", func() {
-		listParams := &astrocore.ListEnvironmentObjectsParams{
+		listParams := &astrov1.ListEnvironmentObjectsParams{
 			DeploymentId:  &deploymentID,
 			ObjectType:    &objectType,
 			ShowSecrets:   &showSecrets,
@@ -45,11 +45,11 @@ func (s *Suite) TestListConnections() {
 			Limit:         &limit,
 		}
 
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(&astrocore.ListEnvironmentObjectsResponse{
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-				{ObjectKey: "conn1", Connection: &astrocore.EnvironmentObjectConnection{Type: "postgres"}},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+				{ObjectKey: "conn1", Connection: &astrov1.EnvironmentObjectConnection{Type: "postgres"}},
 			}},
 		}, nil).Once()
 
@@ -63,7 +63,7 @@ func (s *Suite) TestListConnections() {
 
 	s.Run("List connections with specified workspace ID", func() {
 		workspaceID := cuid.New()
-		listParams := &astrocore.ListEnvironmentObjectsParams{
+		listParams := &astrov1.ListEnvironmentObjectsParams{
 			WorkspaceId:   &workspaceID,
 			ObjectType:    &objectType,
 			ShowSecrets:   &showSecrets,
@@ -71,11 +71,11 @@ func (s *Suite) TestListConnections() {
 			Limit:         &limit,
 		}
 
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(&astrocore.ListEnvironmentObjectsResponse{
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-				{ObjectKey: "conn1", Connection: &astrocore.EnvironmentObjectConnection{Type: "postgres"}},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+				{ObjectKey: "conn1", Connection: &astrov1.EnvironmentObjectConnection{Type: "postgres"}},
 			}},
 		}, nil).Once()
 
@@ -93,7 +93,7 @@ func (s *Suite) TestListConnections() {
 		context.SetContext()
 		defer func() { context.Workspace = originalWorkspace; context.SetContext() }()
 
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 
 		_, err := ListConnections("", "", mockClient)
 		s.Error(err)
@@ -102,7 +102,7 @@ func (s *Suite) TestListConnections() {
 	})
 
 	s.Run("List no connections when core listing fails", func() {
-		listParams := &astrocore.ListEnvironmentObjectsParams{
+		listParams := &astrov1.ListEnvironmentObjectsParams{
 			WorkspaceId:   &context.Workspace,
 			ObjectType:    &objectType,
 			ShowSecrets:   &showSecrets,
@@ -110,7 +110,7 @@ func (s *Suite) TestListConnections() {
 			Limit:         &limit,
 		}
 
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, organization, listParams).Return(nil, assert.AnError).Once()
 
 		_, err := ListConnections(context.Workspace, "", mockClient)

@@ -129,15 +129,14 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 
 	// deploy the dbt project as a bundle
 	deployBundleInput := &cloud.DeployBundleInput{
-		BundlePath:         dbtProjectPath,
-		MountPath:          mountPath,
-		DeploymentID:       deploymentID,
-		BundleType:         dbtBundleType,
-		Description:        deployDescription,
-		Wait:               waitForDeploy,
-		WaitTime:           waitTime,
-		PlatformCoreClient: platformCoreClient,
-		CoreClient:         astroCoreClient,
+		BundlePath:    dbtProjectPath,
+		MountPath:     mountPath,
+		DeploymentID:  deploymentID,
+		BundleType:    dbtBundleType,
+		Description:   deployDescription,
+		Wait:          waitForDeploy,
+		WaitTime:      waitTime,
+		AstroV1Client: astroV1Client,
 	}
 	return DeployBundle(deployBundleInput)
 }
@@ -217,15 +216,14 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	deleteBundleInput := &cloud.DeleteBundleInput{
-		MountPath:          mountPath,
-		DeploymentID:       deploymentID,
-		WorkspaceID:        workspaceID,
-		BundleType:         dbtBundleType,
-		Description:        deployDescription,
-		Wait:               waitForDeploy,
-		WaitTime:           waitTime,
-		PlatformCoreClient: platformCoreClient,
-		CoreClient:         astroCoreClient,
+		MountPath:     mountPath,
+		DeploymentID:  deploymentID,
+		WorkspaceID:   workspaceID,
+		BundleType:    dbtBundleType,
+		Description:   deployDescription,
+		Wait:          waitForDeploy,
+		WaitTime:      waitTime,
+		AstroV1Client: astroV1Client,
 	}
 	return DeleteBundle(deleteBundleInput)
 }
@@ -270,7 +268,7 @@ func resolveDeploymentIDFromDbtArgsFlags(args []string, workspaceID, deploymentN
 	}
 
 	// otherwise, prompt the user to select a deployment
-	selectedDeployment, err := deployment.GetDeployment(workspaceID, "", deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	selectedDeployment, err := deployment.GetDeployment(workspaceID, "", deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return "", err
 	}

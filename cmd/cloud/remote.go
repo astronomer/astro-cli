@@ -86,5 +86,5 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		DeploymentID:      remoteDeploymentID,
 	}
 
-	return cloud.DeployClientImage(deployInput, platformCoreClient)
+	return cloud.DeployClientImage(deployInput, astroV1Client)
 }

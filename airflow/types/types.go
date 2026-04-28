@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 )
 
 // ImageBuildConfig defines options when building a container image
@@ -25,7 +25,7 @@ type StartOptions struct {
 	NoCache           bool
 	NoBrowser         bool
 	WaitTime          time.Duration
-	EnvConns          map[string]astrocore.EnvironmentObjectConnection
+	EnvConns          map[string]astrov1.EnvironmentObjectConnection
 
 	// Proxy options
 	NoProxy bool // disable the reverse proxy (use fixed ports instead)

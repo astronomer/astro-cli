@@ -10,8 +10,7 @@ import (
 	"time"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -20,15 +19,14 @@ import (
 )
 
 type DeployBundleInput struct {
-	BundlePath         string
-	MountPath          string
-	DeploymentID       string
-	BundleType         string
-	Description        string
-	Wait               bool
-	WaitTime           time.Duration
-	PlatformCoreClient astroplatformcore.CoreClient
-	CoreClient         astrocore.CoreClient
+	BundlePath    string
+	MountPath     string
+	DeploymentID  string
+	BundleType    string
+	Description   string
+	Wait          bool
+	WaitTime      time.Duration
+	AstroV1Client astrov1.APIClient
 }
 
 func DeployBundle(input *DeployBundleInput) error {
@@ -38,7 +36,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// get the current deployment so we can check the deploy is valid
-	currentDeployment, err := deployment.CoreGetDeployment(c.Organization, input.DeploymentID, input.PlatformCoreClient)
+	currentDeployment, err := deployment.GetDeploymentByID(c.Organization, input.DeploymentID, input.AstroV1Client)
 	if err != nil {
 		return err
 	}
@@ -54,7 +52,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// Check if git metadata is enabled (default: true)
-	var deployGit *astrocore.DeployGit
+	var deployGit *astrov1.CreateDeployGitRequest
 	var commitMessage string
 	if config.CFG.DeployGitMetadata.GetBool() {
 		deployGit, commitMessage = retrieveLocalGitMetadata(input.BundlePath)
@@ -66,7 +64,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// initialize the deploy
-	deploy, err := createBundleDeploy(c.Organization, input, deployGit, input.CoreClient)
+	deploy, err := createBundleDeploy(c.Organization, input, deployGit, input.AstroV1Client)
 	if err != nil {
 		return err
 	}
@@ -83,7 +81,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// finalize the deploy
-	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, tarballVersion, input.CoreClient)
+	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, tarballVersion, input.AstroV1Client)
 	if err != nil {
 		return err
 	}
@@ -91,7 +89,7 @@ func DeployBundle(input *DeployBundleInput) error {
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.PlatformCoreClient)
+		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
 		if err != nil {
 			return err
 		}
@@ -101,15 +99,14 @@ func DeployBundle(input *DeployBundleInput) error {
 }
 
 type DeleteBundleInput struct {
-	MountPath          string
-	DeploymentID       string
-	WorkspaceID        string
-	BundleType         string
-	Description        string
-	Wait               bool
-	WaitTime           time.Duration
-	CoreClient         astrocore.CoreClient
-	PlatformCoreClient astroplatformcore.CoreClient
+	MountPath     string
+	DeploymentID  string
+	WorkspaceID   string
+	BundleType    string
+	Description   string
+	Wait          bool
+	WaitTime      time.Duration
+	AstroV1Client astrov1.APIClient
 }
 
 func DeleteBundle(input *DeleteBundleInput) error {
@@ -125,13 +122,13 @@ func DeleteBundle(input *DeleteBundleInput) error {
 		BundleType:   input.BundleType,
 		Description:  input.Description,
 	}
-	deploy, err := createBundleDeploy(c.Organization, createInput, nil, input.CoreClient)
+	deploy, err := createBundleDeploy(c.Organization, createInput, nil, input.AstroV1Client)
 	if err != nil {
 		return err
 	}
 
 	// immediately finalize with no version, which will delete the bundle from the deployment
-	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, "", input.CoreClient)
+	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, "", input.AstroV1Client)
 	if err != nil {
 		return err
 	}
@@ -139,7 +136,7 @@ func DeleteBundle(input *DeleteBundleInput) error {
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(input.DeploymentID, input.WorkspaceID, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.PlatformCoreClient)
+		err = deployment.HealthPoll(input.DeploymentID, input.WorkspaceID, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
 		if err != nil {
 			return err
 		}
@@ -245,45 +242,34 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 	return versionID, nil
 }
 
-func createBundleDeploy(organizationID string, input *DeployBundleInput, deployGit *astrocore.DeployGit, coreClient astrocore.CoreClient) (*astrocore.Deploy, error) {
-	request := astrocore.CreateDeployRequest{
+func createBundleDeploy(organizationID string, input *DeployBundleInput, deployGit *astrov1.CreateDeployGitRequest, astroV1Client astrov1.APIClient) (*astrov1.Deploy, error) {
+	request := astrov1.CreateDeployRequest{
 		Description:     &input.Description,
-		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
+		Type:            astrov1.CreateDeployRequestTypeBUNDLE,
 		BundleMountPath: &input.MountPath,
 		BundleType:      &input.BundleType,
+		Git:             deployGit,
 	}
-	if deployGit != nil {
-		request.Git = &astrocore.CreateDeployGitRequest{
-			Provider:   astrocore.CreateDeployGitRequestProvider(deployGit.Provider),
-			Account:    deployGit.Account,
-			Repo:       deployGit.Repo,
-			Path:       deployGit.Path,
-			Branch:     deployGit.Branch,
-			CommitSha:  deployGit.CommitSha,
-			CommitUrl:  deployGit.CommitUrl,
-			AuthorName: deployGit.AuthorName,
-		}
-	}
-	resp, err := coreClient.CreateDeployWithResponse(context.Background(), organizationID, input.DeploymentID, request)
+	resp, err := astroV1Client.CreateDeployWithResponse(context.Background(), organizationID, input.DeploymentID, request)
 	if err != nil {
 		return nil, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	return resp.JSON200, nil
 }
 
-func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion string, coreClient astrocore.CoreClient) error {
-	request := astrocore.UpdateDeployRequest{
+func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion string, astroV1Client astrov1.APIClient) error {
+	request := astrov1.FinalizeDeployRequest{
 		BundleTarballVersion: &tarballVersion,
 	}
-	resp, err := coreClient.UpdateDeployWithResponse(context.Background(), organizationID, deploymentID, deployID, request)
+	resp, err := astroV1Client.FinalizeDeployWithResponse(context.Background(), organizationID, deploymentID, deployID, request)
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -292,35 +278,25 @@ func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion
 
 // retrieveLocalGitMetadata retrieves git metadata from the local repository for deploy tracking.
 // Returns nil and empty string if the repository has uncommitted changes or if git metadata cannot be retrieved.
-func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit, commitMessage string) {
+func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeployGitRequest, commitMessage string) {
 	if git.HasUncommittedChanges(bundlePath) {
 		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
 		return nil, ""
 	}
 
-	deployGit = &astrocore.DeployGit{}
-
-	// get the remote repository details, assume the remote is named "origin"
-	repoURL, err := git.GetRemoteRepository(bundlePath, "origin")
+	// get the raw remote URL (needed for the GENERIC provider), assume the remote is named "origin"
+	remoteURL, err := git.GetRemoteURL(bundlePath, "origin")
 	if err != nil {
 		logger.Debugf("Failed to retrieve remote repository details, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
-	switch repoURL.Host {
-	case "github.com":
-		deployGit.Provider = astrocore.DeployGitProviderGITHUB
-	default:
-		logger.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
+	repoURL, err := git.ParseRemoteURL(remoteURL)
+	if err != nil {
+		logger.Debugf("Failed to parse remote repository URL, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
-	urlPath := strings.TrimPrefix(repoURL.Path, "/")
-	firstSlashIndex := strings.Index(urlPath, "/")
-	if firstSlashIndex == -1 {
-		logger.Debugf("Failed to parse remote repository path, skipping Git metadata retrieval: %s", repoURL.Path)
-		return nil, ""
-	}
-	deployGit.Account = urlPath[:firstSlashIndex]
-	deployGit.Repo = urlPath[firstSlashIndex+1:]
+
+	deployGit = &astrov1.CreateDeployGitRequest{}
 
 	// get the path of the bundle within the repository
 	path, err := git.GetLocalRepositoryPathPrefix(bundlePath, bundlePath)
@@ -338,7 +314,7 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 		logger.Debugf("Failed to retrieve branch name, skipping Git metadata retrieval: %s", err)
 		return nil, ""
 	}
-	deployGit.Branch = branch
+	deployGit.Branch = &branch
 
 	// get the local commit
 	sha, message, authorName, _, err := git.GetHeadCommit(bundlePath)
@@ -351,16 +327,33 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrocore.DeployGit
 		deployGit.AuthorName = &authorName
 	}
 
-	// derive the remote URL of the local commit
-	switch repoURL.Host {
-	case "github.com":
-		deployGit.CommitUrl = fmt.Sprintf("https://%s/%s/%s/commit/%s", repoURL.Host, deployGit.Account, deployGit.Repo, sha)
-	default:
-		logger.Debugf("Unsupported Git provider, skipping Git metadata retrieval: %s", repoURL.Host)
-		return nil, ""
+	// populate provider-specific fields. GitHub gets first-class treatment; everything else is GENERIC.
+	if repoURL.Host == "github.com" {
+		account, repo, ok := splitGithubPath(repoURL.Path)
+		if !ok {
+			logger.Debugf("Failed to parse GitHub repository path, skipping Git metadata retrieval: %s", repoURL.Path)
+			return nil, ""
+		}
+		deployGit.Provider = astrov1.CreateDeployGitRequestProviderGITHUB
+		deployGit.Account = &account
+		deployGit.Repo = &repo
+		commitURL := fmt.Sprintf("https://%s/%s/%s/commit/%s", repoURL.Host, account, repo, sha)
+		deployGit.CommitUrl = &commitURL
+	} else {
+		deployGit.Provider = astrov1.CreateDeployGitRequestProviderGENERIC
+		deployGit.RemoteUrl = &remoteURL
 	}
 
 	logger.Debugf("Retrieved Git metadata: %+v", deployGit)
 
 	return deployGit, message
+}
+
+func splitGithubPath(path string) (account, repo string, ok bool) {
+	trimmed := strings.TrimPrefix(path, "/")
+	slash := strings.Index(trimmed, "/")
+	if slash == -1 {
+		return "", "", false
+	}
+	return trimmed[:slash], trimmed[slash+1:], true
 }

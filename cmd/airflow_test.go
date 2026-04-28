@@ -19,8 +19,8 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	coreMocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	v1Mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -148,7 +148,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 }
 
 func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
-	cmd := newDevRootCmd(nil, nil)
+	cmd := newDevRootCmd(nil)
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
@@ -665,21 +665,21 @@ func (s *AirflowSuite) TestAirflowStart() {
 		cmd.Flag("deployment-id").Value.Set(deploymentID)
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
+		envObj := astrov1.EnvironmentObject{
 			ObjectKey: "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{
+			Connection: &astrov1.EnvironmentObjectConnection{
 				Type: "test-conn-type",
 			},
 		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrocore.ListEnvironmentObjectsParams) bool {
+		mockV1Client := new(v1Mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrov1.ListEnvironmentObjectsParams) bool {
 			return *params.DeploymentId == deploymentID
-		})).Return(&astrocore.ListEnvironmentObjectsResponse{
+		})).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrov1.EnvironmentObject{envObj},
 			},
 		}, nil).Once()
 
@@ -689,10 +689,10 @@ func (s *AirflowSuite) TestAirflowStart() {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowStart(cmd, args, mockCoreClient)
+		err := airflowStart(cmd, args, mockV1Client)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
-		mockCoreClient.AssertExpectations(s.T())
+		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with workspace id flag set", func() {
@@ -701,21 +701,21 @@ func (s *AirflowSuite) TestAirflowStart() {
 		cmd.Flag("workspace-id").Value.Set(workspaceID)
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
+		envObj := astrov1.EnvironmentObject{
 			ObjectKey: "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{
+			Connection: &astrov1.EnvironmentObjectConnection{
 				Type: "test-conn-type",
 			},
 		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrocore.ListEnvironmentObjectsParams) bool {
+		mockV1Client := new(v1Mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrov1.ListEnvironmentObjectsParams) bool {
 			return *params.WorkspaceId == workspaceID
-		})).Return(&astrocore.ListEnvironmentObjectsResponse{
+		})).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrov1.EnvironmentObject{envObj},
 			},
 		}, nil).Once()
 
@@ -725,10 +725,10 @@ func (s *AirflowSuite) TestAirflowStart() {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowStart(cmd, args, mockCoreClient)
+		err := airflowStart(cmd, args, mockV1Client)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
-		mockCoreClient.AssertExpectations(s.T())
+		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("failure", func() {
@@ -1162,19 +1162,19 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		cmd.Flag("deployment-id").Value.Set(deploymentID)
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
+		envObj := astrov1.EnvironmentObject{
 			ObjectKey:  "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{Type: "test-conn-type"},
+			Connection: &astrov1.EnvironmentObjectConnection{Type: "test-conn-type"},
 		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrocore.ListEnvironmentObjectsParams) bool {
+		mockV1Client := new(v1Mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrov1.ListEnvironmentObjectsParams) bool {
 			return *params.DeploymentId == deploymentID
-		})).Return(&astrocore.ListEnvironmentObjectsResponse{
+		})).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrov1.EnvironmentObject{envObj},
 			},
 		}, nil).Once()
 
@@ -1185,7 +1185,7 @@ func (s *AirflowSuite) TestAirflowRestart() {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, mockV1Client)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
 	})
@@ -1197,19 +1197,19 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		cmd.Flag("workspace-id").Value.Set(workspaceID)
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
+		envObj := astrov1.EnvironmentObject{
 			ObjectKey:  "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{Type: "test-conn-type"},
+			Connection: &astrov1.EnvironmentObjectConnection{Type: "test-conn-type"},
 		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrocore.ListEnvironmentObjectsParams) bool {
+		mockV1Client := new(v1Mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrov1.ListEnvironmentObjectsParams) bool {
 			return *params.WorkspaceId == workspaceID
-		})).Return(&astrocore.ListEnvironmentObjectsResponse{
+		})).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrov1.EnvironmentObject{envObj},
 			},
 		}, nil).Once()
 
@@ -1220,7 +1220,7 @@ func (s *AirflowSuite) TestAirflowRestart() {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, mockV1Client)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
 	})
@@ -1314,19 +1314,19 @@ func (s *AirflowSuite) TestAirflowRestart() {
 		cmd.Flag("deployment-id").Value.Set(deploymentID)
 		args := []string{"test-env-file"}
 
-		envObj := astrocore.EnvironmentObject{
+		envObj := astrov1.EnvironmentObject{
 			ObjectKey:  "test-object-key",
-			Connection: &astrocore.EnvironmentObjectConnection{Type: "test-conn-type"},
+			Connection: &astrov1.EnvironmentObjectConnection{Type: "test-conn-type"},
 		}
-		mockCoreClient := new(coreMocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrocore.ListEnvironmentObjectsParams) bool {
+		mockV1Client := new(v1Mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(params *astrov1.ListEnvironmentObjectsParams) bool {
 			return *params.DeploymentId == deploymentID
-		})).Return(&astrocore.ListEnvironmentObjectsResponse{
+		})).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{envObj},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrov1.EnvironmentObject{envObj},
 			},
 		}, nil).Once()
 
@@ -1337,10 +1337,10 @@ func (s *AirflowSuite) TestAirflowRestart() {
 			return mockContainerHandler, nil
 		}
 
-		err := airflowRestart(cmd, args, mockCoreClient)
+		err := airflowRestart(cmd, args, mockV1Client)
 		s.NoError(err)
 		mockContainerHandler.AssertExpectations(s.T())
-		mockCoreClient.AssertExpectations(s.T())
+		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("kill flag with start failure", func() {
@@ -1957,7 +1957,7 @@ func (s *AirflowSuite) TestDevCommandLocalSubcommandRemoved() {
 
 func (s *AirflowSuite) TestStandaloneDockerFlagsMutuallyExclusive() {
 	// Verify that the flags are registered as mutually exclusive on the dev root command
-	cmd := newDevRootCmd(nil, nil)
+	cmd := newDevRootCmd(nil)
 	s.NotNil(cmd.PersistentFlags().Lookup("standalone"))
 	s.NotNil(cmd.PersistentFlags().Lookup("docker"))
 

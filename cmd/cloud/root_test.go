@@ -12,7 +12,7 @@ import (
 func TestAddCmds(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	buf := new(bytes.Buffer)
-	cmds := AddCmds(nil, nil, nil, nil, buf)
+	cmds := AddCmds(nil, nil, nil, buf)
 	for cmdIdx := range cmds {
 		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace", "user", "organization", "dbt", "ide", "remote"}, cmds[cmdIdx].Use)
 	}

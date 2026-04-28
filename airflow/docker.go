@@ -38,8 +38,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -704,7 +703,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -722,7 +721,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	}
 	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
-		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore)
+		err := d.pullImageFromDeployment(deploymentID, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -809,13 +808,13 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	return nil
 }
 
-func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, astroV1Client astrov1.APIClient) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 	ws := c.Workspace
-	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, platformCoreClient, nil)
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -1794,7 +1793,7 @@ func fetchAirflowJWTToken(baseURL string) (string, error) {
 }
 
 // printProxyStatus prints status information when the proxy is active.
-func printProxyStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
+func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
@@ -1832,7 +1831,7 @@ func printProxyStatus(settingsFile string, envConns map[string]astrocore.Environ
 	return nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool) error {
+func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
