@@ -131,6 +131,17 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
 	}
 
+	// --image-name supplies a prebuilt image, so this is an image-only deploy by definition.
+	// Reject flags that only apply when building from a local project, and force image-only semantics.
+	if cmd.Flags().Changed("image-name") {
+		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secrets"} {
+			if cmd.Flags().Changed(f) {
+				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
+			}
+		}
+		image = true
+	}
+
 	// Save deploymentId in config if specified
 	if deploymentID != "" && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
