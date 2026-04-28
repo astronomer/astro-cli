@@ -67,3 +67,26 @@ func TestDeployImage(t *testing.T) {
 	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--parse", "--pytest")
 	assert.NoError(t, err)
 }
+
+func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return assert.AnError
+	}
+	defer func() {
+		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	}()
+
+	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+		return nil
+	}
+
+	// With --image-name, the project-dir check should be skipped.
+	err := execDeployCmd("-f", "test-deployment-id", "--image-name", "custom-image:latest")
+	assert.NoError(t, err)
+
+	// Without --image-name, the project-dir check should still run and propagate.
+	err = execDeployCmd("-f", "test-deployment-id")
+	assert.ErrorIs(t, err, assert.AnError)
+}

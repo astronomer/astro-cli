@@ -54,8 +54,13 @@ func NewDeployCmd() *cobra.Command {
 		Use:     "deploy [DEPLOYMENT ID]",
 		Short:   "Deploy an Airflow project",
 		Long:    "Deploy an Airflow project to an Astronomer Cluster",
-		Args:    cobra.MaximumNArgs(1),
-		PreRunE: EnsureProjectDir,
+		Args: cobra.MaximumNArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("image-name") {
+				return nil
+			}
+			return EnsureProjectDir(cmd, args)
+		},
 		RunE:    deployAirflow,
 		Example: deployExample,
 	}
