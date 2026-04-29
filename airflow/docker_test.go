@@ -2140,7 +2140,7 @@ func (s *Suite) TestInitSettings() {
 			}
 			defer func() { openURL = originalOpenURL }()
 
-			err := printStatus(tc.settingsFile, tc.envConns, tc.airflowMajorVersion, true)
+			err := printStatus(tc.settingsFile, tc.envConns, tc.airflowMajorVersion, true, nil)
 			s.NoError(err)
 			s.Equal(tc.expectInitSettingsCalled, initSettingsCalled)
 		})
