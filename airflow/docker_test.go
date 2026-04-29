@@ -2025,6 +2025,67 @@ func (s *Suite) TestDockerComposeRunDAG() {
 
 var errExecMock = errors.New("docker is not running")
 
+func (s *Suite) TestPrintStatusURL() {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig(testUtil.LocalPlatform)
+	err := afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	s.NoError(err)
+	config.InitConfig(fs)
+
+	originalOpenURL := openURL
+	openURL = func(url string) error { return nil }
+	defer func() { openURL = originalOpenURL }()
+
+	capture := func(fn func()) string {
+		origStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		fn()
+		w.Close()
+		os.Stdout = origStdout
+		out, _ := io.ReadAll(r)
+		return string(out)
+	}
+
+	s.Run("uses config port when no overrides (Airflow 2)", func() {
+		out := capture(func() {
+			err := printStatus("./testfiles/non_existent_settings.yaml", nil, airflowMajorVersion2, true, nil)
+			s.NoError(err)
+		})
+		s.Contains(out, "http://localhost:"+config.CFG.WebserverPort.GetString())
+	})
+
+	s.Run("uses webserver port override (Airflow 2)", func() {
+		ovr := &PortOverrides{
+			PostgresPort:  "55432",
+			WebserverPort: "58080",
+			APIServerPort: "58080",
+		}
+		out := capture(func() {
+			err := printStatus("./testfiles/non_existent_settings.yaml", nil, airflowMajorVersion2, true, ovr)
+			s.NoError(err)
+		})
+		s.Contains(out, "http://localhost:58080")
+		s.Contains(out, "postgresql://localhost:55432/postgres")
+		// Make sure the proxy hostname did NOT leak into the printed URL.
+		s.NotContains(out, ".localhost:")
+	})
+
+	s.Run("uses api-server port override (Airflow 3)", func() {
+		ovr := &PortOverrides{
+			PostgresPort:  "55432",
+			WebserverPort: "58080",
+			APIServerPort: "58080",
+		}
+		out := capture(func() {
+			err := printStatus("./testfiles/non_existent_settings.yaml", nil, airflowMajorVersion3, true, ovr)
+			s.NoError(err)
+		})
+		s.Contains(out, "http://localhost:58080")
+		s.NotContains(out, ".localhost:")
+	})
+}
+
 func (s *Suite) TestInitSettings() {
 	testCases := []struct {
 		name                     string
@@ -2140,7 +2201,7 @@ func (s *Suite) TestInitSettings() {
 			}
 			defer func() { openURL = originalOpenURL }()
 
-			err := printStatus(tc.settingsFile, tc.envConns, tc.airflowMajorVersion, true)
+			err := printStatus(tc.settingsFile, tc.envConns, tc.airflowMajorVersion, true, nil)
 			s.NoError(err)
 			s.Equal(tc.expectInitSettingsCalled, initSettingsCalled)
 		})
