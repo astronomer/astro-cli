@@ -9,7 +9,7 @@ import (
 
 // afPinnedVersion is the astro-airflow-mcp release that Otto is developed
 // against. Bump in lockstep with Otto's prompt reference.
-const afPinnedVersion = "0.6.1"
+const afPinnedVersion = "0.6.4"
 
 // afPackageSpec is the pip-style spec passed to uvx --from.
 const afPackageSpec = "astro-airflow-mcp==" + afPinnedVersion
