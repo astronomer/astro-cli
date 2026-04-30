@@ -254,6 +254,21 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		}
 	}
 
+	// Copy the contents of include/ back from the container to the host so
+	// artifacts written to include/ during the test run (e.g.
+	// --junit-xml=include/pytest_report.junit.xml) are accessible after
+	// pytest finishes, as documented at
+	// https://www.astronomer.io/docs/astro/cli/astro-dev-pytest.
+	includeDest := airflowHome + "/include"
+	if exists, _ := util.Exists(includeDest); exists {
+		// The trailing /. copies the contents of include/ into the existing
+		// host include/ directory instead of nesting it.
+		cpErr := cmdExec(containerRuntime, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/include/.", includeDest)
+		if cpErr != nil {
+			logger.Debugf("Error copying include/ from the pytest container: %s", cpErr.Error())
+		}
+	}
+
 	// delete container
 	rmErr := cmdExec(containerRuntime, nil, stderr, "rm", "astro-pytest")
 	if rmErr != nil {
