@@ -33,9 +33,11 @@ func isHelpOrVersion(args []string) bool {
 func Start(args []string) error {
 	cfg := NewConfigFromContext()
 	if cfg.Token == "" && !isHelpOrVersion(args) {
-		fmt.Fprintln(os.Stderr, "You're not logged in to Astro.")
-		fmt.Fprintln(os.Stderr, "  • Already have an account? Run `astro login`")
-		fmt.Fprintln(os.Stderr, "  • New to Astro? Sign up for a free trial at https://www.astronomer.io/try-astro")
+		fmt.Fprintln(os.Stderr, "You're not logged in to Astro. Otto is an AI assistant for Airflow — sign in or start a trial to use it.")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "  • Sign in:        astro login")
+		fmt.Fprintln(os.Stderr, "  • Free trial:     https://www.astronomer.io/try-astro")
+		fmt.Fprintln(os.Stderr, "  • What Otto does: astro otto --help")
 		return ErrNotLoggedIn
 	}
 
