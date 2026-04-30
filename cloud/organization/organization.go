@@ -74,8 +74,8 @@ func GetOrganization(orgID string, platformCoreClient astroplatformcore.CoreClie
 	return resp.JSON200, nil
 }
 
-// isCUID returns true if s is a valid CUID (25 chars: 'c' + 24 lowercase alphanumeric).
-func isCUID(s string) bool {
+// IsCUID returns true if s is a valid CUID (25 chars: 'c' + 24 lowercase alphanumeric).
+func IsCUID(s string) bool {
 	if len(s) != 25 || s[0] != 'c' {
 		return false
 	}
@@ -231,7 +231,7 @@ func Switch(orgNameOrID string, coreClient astrocore.CoreClient, platformCoreCli
 		if err != nil {
 			return err
 		}
-	case isCUID(orgNameOrID):
+	case IsCUID(orgNameOrID):
 		// Input looks like a CUID — fetch directly by ID
 		targetOrg, err = GetOrganization(orgNameOrID, platformCoreClient)
 		if err != nil {

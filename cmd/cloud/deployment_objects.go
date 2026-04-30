@@ -44,7 +44,7 @@ func newDeploymentConnectionRootCmd(out io.Writer) *cobra.Command {
 		Use:     "connection",
 		Aliases: []string{"con", "connections"},
 		Short:   "Manage deployment connections",
-		Long:    "Manage connections for an Astro Deployment.",
+		Long:    "Manage connections in the running Airflow's metadata database for an Astro Deployment.",
 	}
 	cmd.AddCommand(
 		newDeploymentConnectionListCmd(out),

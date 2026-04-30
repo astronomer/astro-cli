@@ -12,8 +12,9 @@ import (
 var (
 	ErrorEntityIDNotSpecified = errors.New("workspace or deployment ID must be specified")
 
-	// Enhanced error message for secrets fetching permission issue
-	secretsFetchingNotAllowedErrMsg = `environment secrets fetching is not enabled for this organization.
+	// SecretsFetchingNotAllowedErrMsg is shown when the organization disallows
+	// reading secret values via the env-object API.
+	SecretsFetchingNotAllowedErrMsg = `environment secrets fetching is not enabled for this organization.
 
 To resolve this issue:
 • Ask an organization administrator to enable "Environment Secrets Fetching" in organization settings
@@ -25,8 +26,9 @@ This setting controls whether deployments can access organization environment se
 Without this setting enabled, you can still use 'astro dev start' without the --deployment-id flag for local development.`
 )
 
-// isSecretsFetchingNotAllowedError checks if the error is due to showSecrets not being allowed for the organization
-func isSecretsFetchingNotAllowedError(err error) bool {
+// IsSecretsFetchingNotAllowedError reports whether err originated from the
+// platform refusing showSecrets at the organization level.
+func IsSecretsFetchingNotAllowedError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -93,8 +95,8 @@ func listEnvironmentObjects(workspaceID, deploymentID string, objectType astroco
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		// Check for secrets fetching permission error and provide enhanced guidance
-		if isSecretsFetchingNotAllowedError(err) {
-			return nil, errors.New(secretsFetchingNotAllowedErrMsg)
+		if IsSecretsFetchingNotAllowedError(err) {
+			return nil, errors.New(SecretsFetchingNotAllowedErrMsg)
 		}
 		return nil, err
 	}

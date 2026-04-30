@@ -577,7 +577,7 @@ func TestIsCUID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expect, isCUID(tt.input))
+			assert.Equal(t, tt.expect, IsCUID(tt.input))
 		})
 	}
 }
