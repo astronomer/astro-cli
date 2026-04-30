@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: Renato66/auto-label@v2
+      - uses: Renato66/auto-label@1d91948c89f58b7073c8489db0ea88ea33e57e20 # v2.4.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           ignore-comments: false
