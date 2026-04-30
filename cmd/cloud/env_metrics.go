@@ -87,6 +87,7 @@ func newEnvMetricsCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envMetricsKey, "key", "k", "", "Metrics export key (required)")
 	metricsCommonFlags(cmd)
+	addAutoLinkFlag(cmd)
 	_ = cmd.MarkFlagRequired("key")
 	_ = cmd.MarkFlagRequired("endpoint")
 	_ = cmd.MarkFlagRequired("exporter-type")
@@ -104,6 +105,7 @@ func newEnvMetricsUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	metricsCommonFlags(cmd)
+	addAutoLinkFlag(cmd)
 	return cmd
 }
 
@@ -185,7 +187,7 @@ func runEnvMetricsCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	in, err := buildMetricsInput()
+	in, err := buildMetricsInput(cmd)
 	if err != nil {
 		return err
 	}
@@ -208,7 +210,7 @@ func runEnvMetricsUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	}
 	cmd.SilenceUsage = true
 
-	in, err := buildMetricsInput()
+	in, err := buildMetricsInput(cmd)
 	if err != nil {
 		return err
 	}
@@ -237,11 +239,12 @@ func runEnvMetricsDelete(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	return nil
 }
 
-func buildMetricsInput() (*env.MetricsInput, error) {
+func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
 	in := &env.MetricsInput{
-		Endpoint:     envMetricsEndpoint,
-		ExporterType: envMetricsExporterType,
-		AuthType:     envMetricsAuthType,
+		Endpoint:            envMetricsEndpoint,
+		ExporterType:        envMetricsExporterType,
+		AuthType:            envMetricsAuthType,
+		AutoLinkDeployments: autoLinkPtr(cmd),
 	}
 	if envMetricsBasicToken != "" {
 		in.BasicToken = &envMetricsBasicToken

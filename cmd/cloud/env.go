@@ -13,6 +13,22 @@ import (
 // dotenv/JSON output) whenever a list/export call sets --include-secrets.
 const includeSecretsWarning = "Warning: --include-secrets returns secret values in the response. Treat the output as sensitive: do not commit, paste into shared channels, or leave on disk longer than necessary." //nolint:gosec // user-facing warning text, not a credential
 
+// addAutoLinkFlag wires --auto-link onto a create/update subcommand.
+// At workspace scope, this toggles the platform's "auto-link to all
+// deployments" flag on the object. Has no effect at deployment scope.
+func addAutoLinkFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&envAutoLink, "auto-link", false, "Workspace scope only: automatically link this object to all deployments in the workspace, including future ones.")
+}
+
+// autoLinkPtr returns nil when --auto-link was not explicitly set (so the
+// platform leaves the field alone on update), otherwise &envAutoLink.
+func autoLinkPtr(cmd *cobra.Command) *bool {
+	if !cmd.Flags().Changed("auto-link") {
+		return nil
+	}
+	return &envAutoLink
+}
+
 // addScopePersistentFlags wires the workspace/deployment scope flags onto a
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
@@ -54,6 +70,9 @@ var (
 	envVarValue  string
 	envVarSecret bool
 	envVarStrict bool
+
+	// shared auto-link toggle for create + update across all four types
+	envAutoLink bool
 
 	// connection create + update inputs
 	envConnKey      string

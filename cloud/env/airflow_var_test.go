@@ -30,7 +30,7 @@ func (s *Suite) TestCreateAirflowVar() {
 		JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
 	}, nil).Once()
 
-	got, err := CreateAirflowVar(Scope{WorkspaceID: workspaceID}, "MY_VAR", "v", false, mc)
+	got, err := CreateAirflowVar(Scope{WorkspaceID: workspaceID}, "MY_VAR", "v", false, nil, mc)
 	s.NoError(err)
 	s.Equal("MY_VAR", got.ObjectKey)
 	s.NotNil(got.AirflowVariable)

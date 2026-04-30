@@ -164,7 +164,7 @@ func (s *Suite) TestCreateVar() {
 		JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
 	}, nil).Once()
 
-	got, err := CreateVar(Scope{WorkspaceID: workspaceID}, "FOO", value, isSecret, mc)
+	got, err := CreateVar(Scope{WorkspaceID: workspaceID}, "FOO", value, isSecret, nil, mc)
 	s.NoError(err)
 	s.Equal("FOO", got.ObjectKey)
 	s.NotNil(got.Id)
@@ -194,7 +194,7 @@ func (s *Suite) TestUpdateVar() {
 		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	got, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, mc)
+	got, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
 	s.NoError(err)
 	s.Equal("FOO", got.ObjectKey)
 	mc.AssertExpectations(s.T())

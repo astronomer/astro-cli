@@ -84,6 +84,7 @@ func newEnvConnCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	connFlags(cmd)
+	addAutoLinkFlag(cmd)
 	_ = cmd.MarkFlagRequired("key")
 	_ = cmd.MarkFlagRequired("type")
 	return cmd
@@ -100,6 +101,7 @@ func newEnvConnUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	connUpdateFlags(cmd)
+	addAutoLinkFlag(cmd)
 	_ = cmd.MarkFlagRequired("type")
 	return cmd
 }
@@ -237,7 +239,7 @@ func runEnvConnDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 }
 
 func buildConnInput(cmd *cobra.Command) (env.ConnInput, error) {
-	in := env.ConnInput{Type: envConnType}
+	in := env.ConnInput{Type: envConnType, AutoLinkDeployments: autoLinkPtr(cmd)}
 	if envConnHost != "" {
 		in.Host = &envConnHost
 	}

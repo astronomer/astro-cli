@@ -11,18 +11,20 @@ import (
 const objectTypeMetrics = astrocore.METRICSEXPORT
 
 // MetricsInput is the user-supplied data needed to create or update a metrics export.
-// Endpoint and ExporterType are required on create.
+// Endpoint and ExporterType are required on create. AutoLinkDeployments,
+// when non-nil, sets the workspace object's "auto-link to all deployments" flag.
 type MetricsInput struct {
-	Endpoint       string
-	ExporterType   string
-	AuthType       string
-	BasicToken     *string
-	Username       *string
-	Password       *string
-	SigV4AssumeArn *string
-	SigV4StsRegion *string
-	Headers        *map[string]string
-	Labels         *map[string]string
+	Endpoint            string
+	ExporterType        string
+	AuthType            string
+	BasicToken          *string
+	Username            *string
+	Password            *string
+	SigV4AssumeArn      *string
+	SigV4StsRegion      *string
+	Headers             *map[string]string
+	Labels              *map[string]string
+	AutoLinkDeployments *bool
 }
 
 // ListMetricsExports returns METRICS_EXPORT objects for the given scope.
@@ -38,6 +40,9 @@ func GetMetricsExport(idOrKey string, scope Scope, includeSecrets bool, coreClie
 // CreateMetricsExport creates a new METRICS_EXPORT object.
 func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
 		return nil, err
 	}
 	if in.Endpoint == "" {
@@ -67,6 +72,7 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 			Headers:        in.Headers,
 			Labels:         in.Labels,
 		},
+		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 	if in.AuthType != "" {
 		at := astrocore.CreateEnvironmentObjectMetricsExportRequestAuthType(in.AuthType)
@@ -109,6 +115,9 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 // UpdateMetricsExport updates an existing metrics export. All MetricsInput
 // fields are treated as a partial update.
 func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
+		return nil, err
+	}
 	id, err := resolveID(idOrKey, scope, objectTypeMetrics, coreClient)
 	if err != nil {
 		return nil, err
@@ -137,7 +146,10 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, coreClie
 		at := astrocore.UpdateEnvironmentObjectMetricsExportRequestAuthType(in.AuthType)
 		req.AuthType = &at
 	}
-	body := astrocore.UpdateEnvironmentObjectJSONRequestBody{MetricsExport: req}
+	body := astrocore.UpdateEnvironmentObjectJSONRequestBody{
+		MetricsExport:       req,
+		AutoLinkDeployments: in.AutoLinkDeployments,
+	}
 
 	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {

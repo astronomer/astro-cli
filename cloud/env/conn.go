@@ -14,15 +14,17 @@ var errConnTypeRequired = errors.New("connection type is required (e.g. --type p
 
 // ConnInput is the user-supplied data needed to create or update a connection.
 // Type is required on create. All other fields are optional and overlaid as a
-// partial update.
+// partial update. AutoLinkDeployments, when non-nil, sets the workspace
+// object's "auto-link to all deployments" flag.
 type ConnInput struct {
-	Type     string
-	Host     *string
-	Login    *string
-	Password *string
-	Schema   *string
-	Port     *int
-	Extra    *map[string]any
+	Type                string
+	Host                *string
+	Login               *string
+	Password            *string
+	Schema              *string
+	Port                *int
+	Extra               *map[string]any
+	AutoLinkDeployments *bool
 }
 
 // ListConns returns CONNECTION objects for the given scope.
@@ -38,6 +40,9 @@ func GetConn(idOrKey string, scope Scope, includeSecrets bool, coreClient astroc
 // CreateConn creates a new CONNECTION object in the given scope.
 func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
 		return nil, err
 	}
 	if in.Type == "" {
@@ -62,6 +67,7 @@ func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.Core
 			Port:     in.Port,
 			Extra:    in.Extra,
 		},
+		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 
 	resp, err := coreClient.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
@@ -96,6 +102,9 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.
 	if in.Type == "" {
 		return nil, errConnTypeRequired
 	}
+	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
+		return nil, err
+	}
 	id, err := resolveID(idOrKey, scope, objectTypeConn, coreClient)
 	if err != nil {
 		return nil, err
@@ -114,6 +123,7 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.
 			Port:     in.Port,
 			Extra:    in.Extra,
 		},
+		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {

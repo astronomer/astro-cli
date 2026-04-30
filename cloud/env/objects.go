@@ -145,6 +145,21 @@ func scopeRequest(scope Scope) (scopeType astrocore.CreateEnvironmentObjectReque
 	return astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE, scope.WorkspaceID
 }
 
+// ErrAutoLinkRequiresWorkspace is returned when a caller asks to auto-link an
+// object to all deployments while creating it at deployment scope. Auto-link
+// is a workspace-scope concept; deployment-scope objects are already pinned
+// to a single deployment.
+var ErrAutoLinkRequiresWorkspace = errors.New("--auto-link applies only to workspace-scoped objects")
+
+// validateAutoLink rejects auto-link=true on a deployment-scoped object. nil
+// (flag unset) and false are no-ops.
+func validateAutoLink(scope Scope, autoLink *bool) error {
+	if autoLink != nil && *autoLink && scope.DeploymentID != "" {
+		return ErrAutoLinkRequiresWorkspace
+	}
+	return nil
+}
+
 func buildListParams(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, objectKey *string, resolveLinked, includeSecrets bool, limit int) *astrocore.ListEnvironmentObjectsParams {
 	params := &astrocore.ListEnvironmentObjectsParams{
 		ObjectType:    &objectType,

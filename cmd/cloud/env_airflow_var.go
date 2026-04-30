@@ -85,6 +85,7 @@ func newEnvAirflowVarCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&envVarKey, "key", "k", "", "Variable key (required)")
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "Variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark this variable as secret")
+	addAutoLinkFlag(cmd)
 	_ = cmd.MarkFlagRequired("key")
 	return cmd
 }
@@ -103,6 +104,7 @@ func newEnvAirflowVarUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "New variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "If the variable does not exist (upsert path), mark it as secret on create. Has no effect when updating an existing variable.")
 	cmd.Flags().BoolVar(&envVarStrict, "strict", false, "Fail if the variable does not exist (default: upsert)")
+	addAutoLinkFlag(cmd)
 	return cmd
 }
 
@@ -175,7 +177,7 @@ func runEnvAirflowVarCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateAirflowVar(scope, envVarKey, value, envVarSecret, astroCoreClient)
+	obj, err := env.CreateAirflowVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroCoreClient)
 	if err != nil {
 		return err
 	}
@@ -198,10 +200,11 @@ func runEnvAirflowVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) e
 	if err != nil {
 		return err
 	}
-	obj, err := env.UpdateAirflowVar(idOrKey, scope, value, astroCoreClient)
+	autoLink := autoLinkPtr(cmd)
+	obj, err := env.UpdateAirflowVar(idOrKey, scope, value, autoLink, astroCoreClient)
 	if err != nil {
 		if errors.Is(err, env.ErrNotFound) && !envVarStrict {
-			obj, err = env.CreateAirflowVar(scope, idOrKey, value, envVarSecret, astroCoreClient)
+			obj, err = env.CreateAirflowVar(scope, idOrKey, value, envVarSecret, autoLink, astroCoreClient)
 			if err != nil {
 				return err
 			}

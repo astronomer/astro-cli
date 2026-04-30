@@ -22,11 +22,17 @@ func GetVar(idOrKey string, scope Scope, includeSecrets bool, coreClient astroco
 }
 
 // CreateVar creates a new ENVIRONMENT_VARIABLE object in the given scope.
+// autoLink, when non-nil, sets the object's "auto-link to all deployments"
+// flag (workspace scope only).
+//
 // Returns a minimal EnvironmentObject populated from inputs and the create
 // response ID; the platform's create endpoint only returns the ID, so the
 // full server-side object is not fetched.
-func CreateVar(scope Scope, key, value string, isSecret bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	if err := validateAutoLink(scope, autoLink); err != nil {
 		return nil, err
 	}
 	c, err := config.GetCurrentContext()
@@ -44,6 +50,7 @@ func CreateVar(scope Scope, key, value string, isSecret bool, coreClient astroco
 			Value:    &value,
 			IsSecret: &isSecret,
 		},
+		AutoLinkDeployments: autoLink,
 	}
 
 	resp, err := coreClient.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
@@ -69,8 +76,9 @@ func CreateVar(scope Scope, key, value string, isSecret bool, coreClient astroco
 
 // UpdateVar updates the value of an existing env var. The API does not allow
 // toggling IsSecret; callers wanting to change secret status must delete and
-// recreate.
-func UpdateVar(idOrKey string, scope Scope, value string, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+// recreate. autoLink, when non-nil, toggles the "auto-link to all deployments"
+// flag (workspace scope only).
+func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	id, err := resolveID(idOrKey, scope, objectTypeVar, coreClient)
 	if err != nil {
 		return nil, err
@@ -83,6 +91,7 @@ func UpdateVar(idOrKey string, scope Scope, value string, coreClient astrocore.C
 		EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableRequest{
 			Value: &value,
 		},
+		AutoLinkDeployments: autoLink,
 	}
 	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {

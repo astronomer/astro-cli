@@ -21,9 +21,13 @@ func GetAirflowVar(idOrKey string, scope Scope, includeSecrets bool, coreClient 
 	return getObject(idOrKey, scope, objectTypeAirflowVar, includeSecrets, coreClient)
 }
 
-// CreateAirflowVar creates a new AIRFLOW_VARIABLE object.
-func CreateAirflowVar(scope Scope, key, value string, isSecret bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+// CreateAirflowVar creates a new AIRFLOW_VARIABLE object. autoLink, when
+// non-nil, sets the "auto-link to all deployments" flag (workspace scope only).
+func CreateAirflowVar(scope Scope, key, value string, isSecret bool, autoLink *bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	if err := validateAutoLink(scope, autoLink); err != nil {
 		return nil, err
 	}
 	c, err := config.GetCurrentContext()
@@ -40,6 +44,7 @@ func CreateAirflowVar(scope Scope, key, value string, isSecret bool, coreClient 
 			Value:    &value,
 			IsSecret: &isSecret,
 		},
+		AutoLinkDeployments: autoLink,
 	}
 	resp, err := coreClient.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
 	if err != nil {
@@ -63,8 +68,9 @@ func CreateAirflowVar(scope Scope, key, value string, isSecret bool, coreClient 
 }
 
 // UpdateAirflowVar updates the value of an existing Airflow variable. The API
-// does not allow toggling IsSecret.
-func UpdateAirflowVar(idOrKey string, scope Scope, value string, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+// does not allow toggling IsSecret. autoLink, when non-nil, toggles the
+// "auto-link to all deployments" flag (workspace scope only).
+func UpdateAirflowVar(idOrKey string, scope Scope, value string, autoLink *bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	id, err := resolveID(idOrKey, scope, objectTypeAirflowVar, coreClient)
 	if err != nil {
 		return nil, err
@@ -77,6 +83,7 @@ func UpdateAirflowVar(idOrKey string, scope Scope, value string, coreClient astr
 		AirflowVariable: &astrocore.UpdateEnvironmentObjectAirflowVariableRequest{
 			Value: &value,
 		},
+		AutoLinkDeployments: autoLink,
 	}
 	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {

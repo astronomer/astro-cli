@@ -105,6 +105,7 @@ func newEnvVarCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&envVarKey, "key", "k", "", "Variable key (required)")
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "Variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark this variable as secret")
+	addAutoLinkFlag(cmd)
 	_ = cmd.MarkFlagRequired("key")
 	return cmd
 }
@@ -123,6 +124,7 @@ func newEnvVarUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "New variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "If the variable does not exist (upsert path), mark it as secret on create. Has no effect when updating an existing variable; the platform API does not allow toggling the secret flag.")
 	cmd.Flags().BoolVar(&envVarStrict, "strict", false, "Fail if the variable does not exist (default: upsert)")
+	addAutoLinkFlag(cmd)
 	return cmd
 }
 
@@ -198,7 +200,7 @@ func runEnvVarCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateVar(scope, envVarKey, value, envVarSecret, astroCoreClient)
+	obj, err := env.CreateVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroCoreClient)
 	if err != nil {
 		return err
 	}
@@ -221,11 +223,12 @@ func runEnvVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.UpdateVar(idOrKey, scope, value, astroCoreClient)
+	autoLink := autoLinkPtr(cmd)
+	obj, err := env.UpdateVar(idOrKey, scope, value, autoLink, astroCoreClient)
 	if err != nil {
 		// Upsert: if not found and not strict, fall through to create.
 		if errors.Is(err, env.ErrNotFound) && !envVarStrict {
-			obj, err = env.CreateVar(scope, idOrKey, value, envVarSecret, astroCoreClient)
+			obj, err = env.CreateVar(scope, idOrKey, value, envVarSecret, autoLink, astroCoreClient)
 			if err != nil {
 				return err
 			}
