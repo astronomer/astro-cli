@@ -346,7 +346,18 @@ func writeJSON(v any, out io.Writer) error {
 }
 
 func writeYAML(v any, out io.Writer) error {
+	// The generated env-object types only carry JSON tags, so a direct YAML
+	// encode would emit lowercased field names. Round-trip through JSON to
+	// preserve camelCase keys consistently with --format json.
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	var generic any
+	if err := json.Unmarshal(jsonBytes, &generic); err != nil {
+		return err
+	}
 	enc := yaml.NewEncoder(out)
 	defer enc.Close()
-	return enc.Encode(v)
+	return enc.Encode(generic)
 }

@@ -43,3 +43,10 @@ func confirmTTY(prompt string) bool {
 	ok, _ := input.Confirm(prompt)
 	return ok
 }
+
+// hasPipedStdin reports whether stdin appears to be a pipe rather than a TTY.
+// Used by opt-in secret prompts to distinguish "user piped a value" from
+// "user is at an interactive shell with no flag set".
+func hasPipedStdin() bool {
+	return !term.IsTerminal(int(os.Stdin.Fd()))
+}

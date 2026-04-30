@@ -184,7 +184,7 @@ func runEnvConnCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	in, err := buildConnInput()
+	in, err := buildConnInput(cmd)
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func runEnvConnUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	in, err := buildConnInput()
+	in, err := buildConnInput(cmd)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func runEnvConnDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	return nil
 }
 
-func buildConnInput() (env.ConnInput, error) {
+func buildConnInput(cmd *cobra.Command) (env.ConnInput, error) {
 	in := env.ConnInput{Type: envConnType}
 	if envConnHost != "" {
 		in.Host = &envConnHost
@@ -257,13 +257,17 @@ func buildConnInput() (env.ConnInput, error) {
 		}
 		in.Extra = &extra
 	}
-	// Password reads from stdin when piped or prompts on TTY (matches env var entry).
-	pw, err := readSecretValue(envConnPassword, "Connection password")
-	if err != nil {
-		return env.ConnInput{}, err
-	}
-	if pw != "" {
-		in.Password = &pw
+	// Password is opt-in: only resolve a value when the flag was set or stdin is
+	// piped. Many connection types (HTTP, SSH-via-key, etc.) are passwordless;
+	// prompting on TTY by default would block the common case.
+	if cmd.Flags().Changed("password") || hasPipedStdin() {
+		pw, err := readSecretValue(envConnPassword, "Connection password")
+		if err != nil {
+			return env.ConnInput{}, err
+		}
+		if pw != "" {
+			in.Password = &pw
+		}
 	}
 	return in, nil
 }
