@@ -27,6 +27,7 @@ func AddCmds(astroPlatformCoreClient astroplatformcore.CoreClient, coreClient as
 	return []*cobra.Command{
 		NewDeployCmd(),
 		newDeploymentRootCmd(out),
+		newEnvRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
 		newDbtCmd(),

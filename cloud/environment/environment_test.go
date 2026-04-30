@@ -123,7 +123,7 @@ func (s *Suite) TestListConnections() {
 		// This test focuses on verifying that the error detection logic works
 		// The integration will be tested end-to-end manually
 		secretsError := errors.New("showSecrets on organization with id someOrganization is not allowed")
-		result := isSecretsFetchingNotAllowedError(secretsError)
+		result := IsSecretsFetchingNotAllowedError(secretsError)
 		s.True(result)
 	})
 }
@@ -193,8 +193,8 @@ func (s *Suite) TestIsSecretsFetchingNotAllowedError() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			result := isSecretsFetchingNotAllowedError(tc.err)
-			s.Equal(tc.expectedResult, result, "Expected isSecretsFetchingNotAllowedError(%v) to be %v", tc.err, tc.expectedResult)
+			result := IsSecretsFetchingNotAllowedError(tc.err)
+			s.Equal(tc.expectedResult, result, "Expected IsSecretsFetchingNotAllowedError(%v) to be %v", tc.err, tc.expectedResult)
 		})
 	}
 }
