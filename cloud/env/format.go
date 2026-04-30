@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -23,7 +24,30 @@ const (
 	FormatDotenv Format = "dotenv"
 )
 
-const maskedSecret = "****"
+const (
+	maskedSecret = "****"
+
+	// tableValueMax caps the width of value-style columns in the table view.
+	// JSON/YAML/dotenv output is never truncated; this is a display concession
+	// so a single 5000-char value doesn't shred the layout.
+	tableValueMax = 60
+)
+
+// clampTableValue prepares a string for a single table cell: collapses
+// newlines to a visual marker and truncates over tableValueMax runes.
+func clampTableValue(s string) string {
+	if s == "" {
+		return ""
+	}
+	if strings.ContainsAny(s, "\r\n") {
+		s = strings.NewReplacer("\r\n", " ⏎ ", "\n", " ⏎ ", "\r", " ⏎ ").Replace(s)
+	}
+	r := []rune(s)
+	if len(r) > tableValueMax {
+		return string(r[:tableValueMax-1]) + "…"
+	}
+	return s
+}
 
 // ParseFormat parses a user-provided string into a Format. Empty string returns the zero value.
 func ParseFormat(s string) (Format, error) {
@@ -191,7 +215,7 @@ func writeVarTable(envObjs []astrocore.EnvironmentObject, includeSecrets bool, o
 		row := []string{
 			strconv.Itoa(i + 1),
 			o.ObjectKey,
-			value,
+			clampTableValue(value),
 			strconv.FormatBool(isSecret),
 			string(o.Scope),
 		}
@@ -248,7 +272,7 @@ func writeConnTable(envObjs []astrocore.EnvironmentObject, out io.Writer) error 
 				port = strconv.Itoa(*o.Connection.Port)
 			}
 		}
-		row := []string{strconv.Itoa(i + 1), o.ObjectKey, connType, host, port, login, schema, string(o.Scope)}
+		row := []string{strconv.Itoa(i + 1), o.ObjectKey, connType, clampTableValue(host), port, clampTableValue(login), schema, string(o.Scope)}
 		if showID {
 			row = append(row, ptrStr(o.Id))
 		}
@@ -282,7 +306,7 @@ func writeAirflowVarTable(envObjs []astrocore.EnvironmentObject, includeSecrets 
 				value = o.AirflowVariable.Value
 			}
 		}
-		row := []string{strconv.Itoa(i + 1), o.ObjectKey, value, strconv.FormatBool(isSecret), string(o.Scope)}
+		row := []string{strconv.Itoa(i + 1), o.ObjectKey, clampTableValue(value), strconv.FormatBool(isSecret), string(o.Scope)}
 		if showID {
 			row = append(row, ptrStr(o.Id))
 		}
@@ -313,7 +337,7 @@ func writeMetricsExportTable(envObjs []astrocore.EnvironmentObject, out io.Write
 				authType = string(*o.MetricsExport.AuthType)
 			}
 		}
-		row := []string{strconv.Itoa(i + 1), o.ObjectKey, exporter, endpoint, authType, string(o.Scope)}
+		row := []string{strconv.Itoa(i + 1), o.ObjectKey, exporter, clampTableValue(endpoint), authType, string(o.Scope)}
 		if showID {
 			row = append(row, ptrStr(o.Id))
 		}
