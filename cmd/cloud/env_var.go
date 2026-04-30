@@ -1,3 +1,6 @@
+// Sharing across types via callbacks would obscure the per-type flag set.
+//
+//nolint:dupl // Cobra wiring per env-object type is intentionally parallel.
 package cloud
 
 import (
@@ -40,10 +43,7 @@ func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 		Example: envVarExamples,
 	}
 	cmd.SetOut(out)
-	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace scope (mutually exclusive with --deployment-id). Defaults to the current workspace from context.")
-	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment scope (mutually exclusive with --workspace-id)")
-	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Surface secret values (requires org policy to allow)")
-	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include variables linked from another scope (e.g. workspace -> deployment). In this mode IDs are not returned, since they refer to resolved rows that aren't directly addressable. Use --resolve-linked=false to see IDs.")
+	addScopePersistentFlags(cmd)
 	cmd.AddCommand(
 		newEnvVarListCmd(out),
 		newEnvVarGetCmd(out),
@@ -162,7 +162,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride string) err
 		return err
 	}
 	if envIncludeSecrets {
-		fmt.Fprintln(os.Stderr, "Warning: --include-secrets returns secret values in the response. Treat the output as sensitive: do not commit, paste into shared channels, or leave on disk longer than necessary.")
+		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
 	w, closer, err := openOutput(out)
 	if err != nil {
@@ -256,22 +256,6 @@ func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
 	return nil
-}
-
-// envScope resolves the active scope, validating mutual exclusivity and falling
-// back to the current workspace from context when neither flag is set.
-func envScope() (env.Scope, error) {
-	if envWorkspaceID != "" && envDeploymentID != "" {
-		return env.Scope{}, env.ErrScopeAmbiguous
-	}
-	if envWorkspaceID == "" && envDeploymentID == "" {
-		ws, err := coalesceWorkspace()
-		if err != nil {
-			return env.Scope{}, env.ErrScopeNotSpecified
-		}
-		return env.Scope{WorkspaceID: ws}, nil
-	}
-	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID}, nil
 }
 
 func openOutput(out io.Writer) (io.Writer, func(), error) {
