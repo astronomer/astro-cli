@@ -68,7 +68,7 @@ func TestDeployImage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
+func TestDeployProjectDirCheckWithImageName(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
@@ -82,16 +82,22 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 		return nil
 	}
 
-	// With --image-name, the project-dir check should be skipped.
-	err := execDeployCmd("-f", "test-deployment-id", "--image-name", "custom-image:latest")
+	// --image --image-name is an explicit image-only push of a prebuilt image;
+	// no local project files are needed, so the check is skipped.
+	err := execDeployCmd("-f", "test-deployment-id", "--image", "--image-name", "custom-image:latest")
 	assert.NoError(t, err)
 
-	// Without --image-name, the project-dir check should still run and propagate.
+	// --image-name alone keeps the default image-and-dags behavior, which
+	// reads DAGs from the working directory and so still requires a project.
+	err = execDeployCmd("-f", "test-deployment-id", "--image-name", "custom-image:latest")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// No --image-name: check still runs and propagates.
 	err = execDeployCmd("-f", "test-deployment-id")
 	assert.ErrorIs(t, err, assert.AnError)
 }
 
-func TestDeployImageNameForcesImageOnly(t *testing.T) {
+func TestDeployImageNameDoesNotForceImageOnly(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
@@ -104,34 +110,6 @@ func TestDeployImageNameForcesImageOnly(t *testing.T) {
 
 	err := execDeployCmd("-f", "test-deployment-id", "--image-name", "custom-image:latest")
 	assert.NoError(t, err)
-	assert.True(t, captured.Image, "--image-name should force image-only deploy")
+	assert.False(t, captured.Image, "--image-name alone must not force image-only; default deploy type is image-and-dags")
 	assert.Equal(t, "custom-image:latest", captured.ImageName)
-}
-
-func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
-		return nil
-	}
-
-	cases := []struct {
-		name string
-		args []string
-	}{
-		{"dags", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--dags"}},
-		{"dags-path", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--dags-path", "./dags"}},
-		{"no-dags-base-dir", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--no-dags-base-dir"}},
-		{"pytest", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--pytest"}},
-		{"parse", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--parse"}},
-		{"build-secrets", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--build-secrets", "id=mysecret,src=secrets.txt"}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := execDeployCmd(tc.args...)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "--image-name")
-		})
-	}
 }

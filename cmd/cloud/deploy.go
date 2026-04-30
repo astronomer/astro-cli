@@ -61,7 +61,9 @@ func NewDeployCmd() *cobra.Command {
 		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed(imageNameFlag) {
+			// --image with --image-name pushes a prebuilt image only; no local
+			// project files (DAGs, Dockerfile) are needed, so skip the check.
+			if image && cmd.Flags().Changed(imageNameFlag) {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
@@ -131,15 +133,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 
 	if dags && image {
 		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
-	}
-
-	if cmd.Flags().Changed(imageNameFlag) {
-		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secrets"} {
-			if cmd.Flags().Changed(f) {
-				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
-			}
-		}
-		image = true
 	}
 
 	// Save deploymentId in config if specified
