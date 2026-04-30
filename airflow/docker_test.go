@@ -1956,6 +1956,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 	s.Run("success without container", func() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.0.0"}, nil).Once()
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
 		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
@@ -1975,6 +1976,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 	s.Run("error without container", func() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.0.0"}, nil).Once()
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
 		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
@@ -1994,6 +1996,7 @@ func (s *Suite) TestDockerComposeRunDAG() {
 	s.Run("build error without container", func() {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.0.0"}, nil).Once()
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
@@ -2019,6 +2022,26 @@ func (s *Suite) TestDockerComposeRunDAG() {
 		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
 		s.ErrorIs(err, errMockDocker)
 
+		composeMock.AssertExpectations(s.T())
+	})
+
+	s.Run("success without container - Airflow 3", func() {
+		noCache := false
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "3.0.0"}, nil).Once()
+		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: noCache}).Return(nil).Once()
+		imageHandler.On("RunDAG", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.RunDAG("", "", "", "", noCache, true)
+		s.NoError(err)
+
+		imageHandler.AssertExpectations(s.T())
 		composeMock.AssertExpectations(s.T())
 	})
 }

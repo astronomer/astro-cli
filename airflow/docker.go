@@ -1539,16 +1539,32 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 	if err != nil {
 		fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 	}
-	// add airflow db init
-	err = fileutil.AddLineToFile("./Dockerfile", "RUN airflow db init", "")
+
+	// Detect Airflow version to use the correct db command
+	airflowVersion, err := d.checkAirflowVersion()
 	if err != nil {
-		fmt.Printf("Adding line 'RUN airflow db init' to Dockerfile unsuccessful: %s\nYou may need to manually add this line for 'astro run' to work", err.Error())
+		fmt.Printf("Warning: unable to detect Airflow version, defaulting to 'airflow db init': %s\n", err.Error())
+		airflowVersion = defaultAirflowVersion
+	}
+
+	// Use 'airflow db migrate' for Airflow 3+, 'airflow db init' for Airflow 2
+	var dbCommand string
+	if airflowVersion >= 3 {
+		dbCommand = "RUN airflow db migrate"
+	} else {
+		dbCommand = "RUN airflow db init"
+	}
+
+	// add airflow db command
+	err = fileutil.AddLineToFile("./Dockerfile", dbCommand, "")
+	if err != nil {
+		fmt.Printf("Adding line '%s' to Dockerfile unsuccessful: %s\nYou may need to manually add this line for 'astro run' to work", dbCommand, err.Error())
 	}
 	defer func() {
-		// remove airflow db init
-		fileErr := fileutil.RemoveLineFromFile("./Dockerfile", "RUN airflow db init", "")
+		// remove airflow db command
+		fileErr := fileutil.RemoveLineFromFile("./Dockerfile", dbCommand, "")
 		if fileErr != nil {
-			fmt.Printf("Removing line 'RUN airflow db init' from Dockerfile unsuccessful: %s\n", err.Error())
+			fmt.Printf("Removing line '%s' from Dockerfile unsuccessful: %s\n", dbCommand, err.Error())
 		}
 		// remove astro-run-dag from requirments.txt
 		err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
