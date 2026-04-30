@@ -1,6 +1,4 @@
-// Sharing across types via callbacks would obscure the per-type flag set.
-//
-//nolint:dupl // Cobra wiring per env-object type is intentionally parallel.
+//nolint:dupl // Cobra wiring per env-object type is intentionally parallel; sharing across types via callbacks would obscure the per-type flag set.
 package cloud
 
 import (
@@ -75,7 +73,7 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 		Short: "Export environment variables in dotenv format",
 		Long:  "Export environment variables for the given scope as KEY=VALUE lines suitable for a .env file.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarList(cmd, out, string(env.FormatDotenv))
+			return runEnvVarList(cmd, out, env.FormatDotenv)
 		},
 	}
 	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
@@ -142,18 +140,17 @@ func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride string) error {
+func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
 	}
-	format := envFormat
-	if formatOverride != "" {
-		format = formatOverride
-	}
-	f, err := env.ParseFormat(format)
-	if err != nil {
-		return err
+	f := formatOverride
+	if f == "" {
+		f, err = env.ParseFormat(envFormat)
+		if err != nil {
+			return err
+		}
 	}
 	cmd.SilenceUsage = true
 

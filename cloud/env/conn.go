@@ -10,6 +10,8 @@ import (
 
 const objectTypeConn = astrocore.CONNECTION
 
+var errConnTypeRequired = errors.New("connection type is required (e.g. --type postgres)")
+
 // ConnInput is the user-supplied data needed to create or update a connection.
 // Type is required on create. All other fields are optional and overlaid as a
 // partial update.
@@ -39,7 +41,7 @@ func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.Core
 		return nil, err
 	}
 	if in.Type == "" {
-		return nil, errors.New("connection type is required (e.g. --type postgres)")
+		return nil, errConnTypeRequired
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -69,13 +71,30 @@ func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.Core
 	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
-	return followCreate(resp.JSON200.Id, coreClient)
+	id := resp.JSON200.Id
+	connection := &astrocore.EnvironmentObjectConnection{
+		Type:     in.Type,
+		Host:     in.Host,
+		Login:    in.Login,
+		Password: in.Password,
+		Schema:   in.Schema,
+		Port:     in.Port,
+		Extra:    in.Extra,
+	}
+	return &astrocore.EnvironmentObject{
+		Id:            &id,
+		ObjectKey:     key,
+		ObjectType:    astrocore.EnvironmentObjectObjectType(astrocore.CONNECTION),
+		Scope:         astrocore.EnvironmentObjectScope(scopeType),
+		ScopeEntityId: scopeEntityID,
+		Connection:    connection,
+	}, nil
 }
 
 // UpdateConn updates an existing connection. Type is required by the API.
 func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	if in.Type == "" {
-		return nil, errors.New("connection type is required (e.g. --type postgres)")
+		return nil, errConnTypeRequired
 	}
 	id, err := resolveID(idOrKey, scope, objectTypeConn, coreClient)
 	if err != nil {

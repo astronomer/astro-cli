@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/env"
 )
 
@@ -130,8 +130,8 @@ func metricsCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password (for BASIC auth). If omitted with --auth-type BASIC, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().StringVar(&envMetricsSigV4AssumeArn, "sigv4-assume-arn", "", "AWS IAM role to assume (for SIGV4 auth)")
 	cmd.Flags().StringVar(&envMetricsSigV4StsRegion, "sigv4-sts-region", "", "AWS STS region (for SIGV4 auth)")
-	cmd.Flags().StringSliceVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form. Repeatable.")
-	cmd.Flags().StringSliceVar(&envMetricsLabels, "label", nil, "Metric label in KEY=VALUE form. Repeatable.")
+	cmd.Flags().StringToStringVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form. Repeatable.")
+	cmd.Flags().StringToStringVar(&envMetricsLabels, "label", nil, "Metric label in KEY=VALUE form. Repeatable.")
 }
 
 func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
@@ -255,7 +255,7 @@ func buildMetricsInput() (*env.MetricsInput, error) {
 	if envMetricsSigV4StsRegion != "" {
 		in.SigV4StsRegion = &envMetricsSigV4StsRegion
 	}
-	if envMetricsAuthType == "BASIC" {
+	if envMetricsAuthType == string(astrocore.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC) {
 		// Read password from flag, stdin, or TTY prompt with echo off.
 		pw, err := readSecretValue(envMetricsPassword, "Password")
 		if err != nil {
@@ -268,30 +268,12 @@ func buildMetricsInput() (*env.MetricsInput, error) {
 		in.Password = &envMetricsPassword
 	}
 	if len(envMetricsHeaders) > 0 {
-		m, err := parseKVList(envMetricsHeaders, "--header")
-		if err != nil {
-			return nil, err
-		}
+		m := envMetricsHeaders
 		in.Headers = &m
 	}
 	if len(envMetricsLabels) > 0 {
-		m, err := parseKVList(envMetricsLabels, "--label")
-		if err != nil {
-			return nil, err
-		}
+		m := envMetricsLabels
 		in.Labels = &m
 	}
 	return in, nil
-}
-
-func parseKVList(raw []string, flagName string) (map[string]string, error) {
-	out := make(map[string]string, len(raw))
-	for _, kv := range raw {
-		parts := strings.SplitN(kv, "=", 2)
-		if len(parts) != 2 || parts[0] == "" {
-			return nil, fmt.Errorf("invalid %s value %q (expected KEY=VALUE)", flagName, kv)
-		}
-		out[parts[0]] = parts[1]
-	}
-	return out, nil
 }

@@ -80,7 +80,30 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
-	return followCreate(resp.JSON200.Id, coreClient)
+	id := resp.JSON200.Id
+	metrics := &astrocore.EnvironmentObjectMetricsExport{
+		Endpoint:       in.Endpoint,
+		ExporterType:   astrocore.EnvironmentObjectMetricsExportExporterType(in.ExporterType),
+		BasicToken:     in.BasicToken,
+		Username:       in.Username,
+		Password:       in.Password,
+		SigV4AssumeArn: in.SigV4AssumeArn,
+		SigV4StsRegion: in.SigV4StsRegion,
+		Headers:        in.Headers,
+		Labels:         in.Labels,
+	}
+	if in.AuthType != "" {
+		at := astrocore.EnvironmentObjectMetricsExportAuthType(in.AuthType)
+		metrics.AuthType = &at
+	}
+	return &astrocore.EnvironmentObject{
+		Id:            &id,
+		ObjectKey:     key,
+		ObjectType:    astrocore.EnvironmentObjectObjectType(astrocore.METRICSEXPORT),
+		Scope:         astrocore.EnvironmentObjectScope(scopeType),
+		ScopeEntityId: scopeEntityID,
+		MetricsExport: metrics,
+	}, nil
 }
 
 // UpdateMetricsExport updates an existing metrics export. All MetricsInput

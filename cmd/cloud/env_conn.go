@@ -271,5 +271,3 @@ func buildConnInput(cmd *cobra.Command) (env.ConnInput, error) {
 	}
 	return in, nil
 }
-
-const includeSecretsWarning = "Warning: --include-secrets returns secret values in the response. Treat the output as sensitive: do not commit, paste into shared channels, or leave on disk longer than necessary." //nolint:gosec // user-facing warning text, not a credential

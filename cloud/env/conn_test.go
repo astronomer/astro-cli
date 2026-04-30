@@ -37,10 +37,6 @@ func (s *Suite) TestCreateConn() {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
 	}, nil).Once()
-	mc.On("GetEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, createdID).Return(&astrocore.GetEnvironmentObjectResponse{
-		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &createdID, ObjectKey: "db_main"},
-	}, nil).Once()
 
 	got, err := CreateConn(Scope{WorkspaceID: workspaceID}, "db_main", ConnInput{Type: "postgres", Host: &host}, mc)
 	s.NoError(err)
@@ -54,7 +50,7 @@ func (s *Suite) TestDeleteConn() {
 	id := cuid.New()
 
 	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	// CUID path: no GetVar lookup, direct DELETE.
+	// CUID path: no key-to-ID lookup, direct DELETE.
 	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrocore.DeleteEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 204},
 	}, nil).Once()

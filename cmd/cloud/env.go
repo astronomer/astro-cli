@@ -1,12 +1,17 @@
 package cloud
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/env"
 )
+
+// includeSecretsWarning is printed to stderr (so it doesn't pollute piped
+// dotenv/JSON output) whenever a list/export call sets --include-secrets.
+const includeSecretsWarning = "Warning: --include-secrets returns secret values in the response. Treat the output as sensitive: do not commit, paste into shared channels, or leave on disk longer than necessary." //nolint:gosec // user-facing warning text, not a credential
 
 // addScopePersistentFlags wires the workspace/deployment scope flags onto a
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
@@ -27,7 +32,7 @@ func envScope() (env.Scope, error) {
 	if envWorkspaceID == "" && envDeploymentID == "" {
 		ws, err := coalesceWorkspace()
 		if err != nil {
-			return env.Scope{}, env.ErrScopeNotSpecified
+			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %s)", env.ErrScopeNotSpecified, err.Error())
 		}
 		return env.Scope{WorkspaceID: ws}, nil
 	}
@@ -70,8 +75,8 @@ var (
 	envMetricsPassword       string
 	envMetricsSigV4AssumeArn string
 	envMetricsSigV4StsRegion string
-	envMetricsHeaders        []string
-	envMetricsLabels         []string
+	envMetricsHeaders        map[string]string
+	envMetricsLabels         map[string]string
 )
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

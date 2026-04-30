@@ -23,7 +23,7 @@ func readSecretValue(flagValue, prompt string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
 	}
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
+	if hasPipedStdin() {
 		b, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return "", fmt.Errorf("reading stdin: %w", err)

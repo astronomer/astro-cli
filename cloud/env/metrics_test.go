@@ -41,10 +41,6 @@ func (s *Suite) TestCreateMetricsExport() {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
 	}, nil).Once()
-	mc.On("GetEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, createdID).Return(&astrocore.GetEnvironmentObjectResponse{
-		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &createdID, ObjectKey: "prom_main"},
-	}, nil).Once()
 
 	got, err := CreateMetricsExport(Scope{WorkspaceID: workspaceID}, "prom_main", &MetricsInput{
 		Endpoint:     "https://prom",

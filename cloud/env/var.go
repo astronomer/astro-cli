@@ -1,7 +1,4 @@
-// keeping the per-type service files parallel makes intent obvious and avoids
-// the indirection a generic helper would require.
-//
-//nolint:dupl // Each env-object type has its own typed Create/Update body shape;
+//nolint:dupl // Each env-object type has its own typed Create/Update body shape; keeping the per-type service files parallel makes intent obvious and avoids the indirection a generic helper would require.
 package env
 
 import (

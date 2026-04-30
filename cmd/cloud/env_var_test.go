@@ -38,10 +38,17 @@ func resetEnvFlags() {
 	envIncludeSecrets = false
 	envResolveLinked = false
 	envYes = false
-	envVarKey = ""
-	envVarValue = ""
-	envVarSecret = false
-	envVarStrict = false
+
+	envVarKey, envVarValue, envVarSecret, envVarStrict = "", "", false, false
+
+	envConnKey, envConnType, envConnHost, envConnLogin = "", "", "", ""
+	envConnPassword, envConnSchema, envConnExtra = "", "", ""
+	envConnPort = 0
+
+	envMetricsKey, envMetricsEndpoint, envMetricsExporterType = "", "", ""
+	envMetricsAuthType, envMetricsBasicToken, envMetricsUsername = "", "", ""
+	envMetricsPassword, envMetricsSigV4AssumeArn, envMetricsSigV4StsRegion = "", "", ""
+	envMetricsHeaders, envMetricsLabels = nil, nil
 }
 
 func TestEnvVarList(t *testing.T) {

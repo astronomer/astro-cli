@@ -42,7 +42,7 @@ func (s *Suite) TestListVars() {
 	ctx, _ := config.GetCurrentContext()
 	deploymentID := cuid.New()
 	objType := astrocore.ENVIRONMENTVARIABLE
-	limit := 1000
+	limit := defaultListLimit
 
 	s.Run("workspace scope", func() {
 		showSecrets := false

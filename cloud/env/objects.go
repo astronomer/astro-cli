@@ -145,24 +145,6 @@ func scopeRequest(scope Scope) (scopeType astrocore.CreateEnvironmentObjectReque
 	return astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE, scope.WorkspaceID
 }
 
-// followCreate fetches a created object via its returned ID. Used when the
-// caller wants the full object back from the platform rather than the
-// id-only synthesized one.
-func followCreate(id string, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return nil, err
-	}
-	resp, err := coreClient.GetEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return nil, err
-	}
-	return resp.JSON200, nil
-}
-
 func buildListParams(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, objectKey *string, resolveLinked, includeSecrets bool, limit int) *astrocore.ListEnvironmentObjectsParams {
 	params := &astrocore.ListEnvironmentObjectsParams{
 		ObjectType:    &objectType,
