@@ -119,14 +119,14 @@ func (s *UpdateSuite) TestHintUpdateAvailable_CacheUnparseable() {
 	s.Empty(buf.String())
 }
 
-// --- refreshUpdateCacheAsync ---
+// --- refreshUpdateCacheIfStale ---
 // `cdnBaseURL` is a const, so LatestVersion can't be pointed at a test server
 // without a refactor. The tests here cover the throttle-skip path and the
 // read/write helpers — the network-hit branch is exercised by the real-auth
 // smoke path.
 
 func (s *UpdateSuite) TestRefreshUpdateCache_SkipsWhenFresh() {
-	// Write a state with a recent LastCheck. refreshUpdateCacheAsync should
+	// Write a state with a recent LastCheck. refreshUpdateCacheIfStale should
 	// not touch the network and should leave the state alone.
 	fresh := updateState{
 		LastCheck:   time.Now().UTC().Format(time.RFC3339),
@@ -134,7 +134,7 @@ func (s *UpdateSuite) TestRefreshUpdateCache_SkipsWhenFresh() {
 	}
 	s.writeCache(fresh)
 
-	refreshUpdateCacheAsync()
+	refreshUpdateCacheIfStale()
 
 	got, err := readUpdateState()
 	s.NoError(err)
