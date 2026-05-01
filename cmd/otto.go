@@ -22,9 +22,10 @@ func hasHelpFlag(args []string) bool {
 }
 
 func printAstroSubcommands(w io.Writer) {
+	// Match Otto's help format: 2-space indent, description column at col 24.
 	fmt.Fprintln(w, "Subcommands:")
-	fmt.Fprintln(w, "  astro otto update    Download and install the latest Otto binary")
-	fmt.Fprintln(w, "  astro otto version   Print the installed Otto version")
+	fmt.Fprintln(w, "  astro otto update     Download and install the latest Otto binary")
+	fmt.Fprintln(w, "  astro otto version    Print the installed Otto version")
 	fmt.Fprintln(w)
 }
 
