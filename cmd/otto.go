@@ -22,7 +22,7 @@ func hasHelpFlag(args []string) bool {
 }
 
 func printAstroSubcommands(w io.Writer) {
-	fmt.Fprintln(w, "Subcommands handled by astro CLI (everything else is forwarded to Otto):")
+	fmt.Fprintln(w, "Subcommands:")
 	fmt.Fprintln(w, "  astro otto update    Download and install the latest Otto binary")
 	fmt.Fprintln(w, "  astro otto version   Print the installed Otto version")
 	fmt.Fprintln(w)
