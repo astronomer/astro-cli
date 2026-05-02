@@ -576,8 +576,18 @@ func ExportConnections(id string) error {
 	logger.Debugf("Export Connections logs:\n%s", out)
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
-	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:mnd
+	// remove extra warning text. Airflow 2 prefixed each entry with "- conn_id:";
+	// Airflow 3 omits that prefix, so just strip leading log lines until the
+	// first "-" list marker.
+	parts := strings.SplitN(plainOut, "- conn_id:", 2) //nolint:mnd
+	var yamlCons string
+	if len(parts) == 2 {
+		yamlCons = "- conn_id:" + parts[1]
+	} else if i := strings.Index(plainOut, "\n-"); i >= 0 {
+		yamlCons = plainOut[i+1:]
+	} else {
+		yamlCons = plainOut
+	}
 
 	var connections AirflowConnections
 
