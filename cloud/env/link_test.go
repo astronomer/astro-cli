@@ -128,8 +128,14 @@ func (s *Suite) TestLinkVarRejectsDuplicate() {
 
 func (s *Suite) TestLinkVarRejectsDeploymentScope() {
 	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	err := LinkVar("FOO", Scope{DeploymentID: cuid.New()}, "dep", nil, mc)
+	err := LinkVar("FOO", Scope{DeploymentID: cuid.New()}, cuid.New(), nil, mc)
 	s.ErrorContains(err, "workspace-id")
+}
+
+func (s *Suite) TestLinkVarRejectsBadDeploymentID() {
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	s.ErrorContains(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "", nil, mc), "cannot be empty")
+	s.ErrorContains(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "not-a-cuid", nil, mc), "valid deployment ID")
 }
 
 func (s *Suite) TestUnlinkVar() {

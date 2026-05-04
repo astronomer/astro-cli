@@ -6,8 +6,22 @@ import (
 	"fmt"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 )
+
+// validateDeploymentID rejects empty or obviously-malformed deployment IDs at
+// the CLI boundary so we surface a clean error instead of "Internal server
+// error" from the platform.
+func validateDeploymentID(depID string) error {
+	if depID == "" {
+		return errors.New("--deployment-id cannot be empty")
+	}
+	if !organization.IsCUID(depID) {
+		return fmt.Errorf("%q is not a valid deployment ID (expected a CUID)", depID)
+	}
+	return nil
+}
 
 // VarLinksReport is the consolidated view of how a workspace-scoped env var is
 // attached (or excluded) across deployments. Returned by ListVarLinks.
@@ -30,6 +44,9 @@ type VarLink struct {
 // LinkVar attaches a workspace-scoped env var to a specific deployment with
 // optional override value. Errors if the link already exists.
 func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, coreClient astrocore.CoreClient) error {
+	if err := validateDeploymentID(depID); err != nil {
+		return err
+	}
 	current, err := resolveWorkspaceVar(idOrKey, scope, coreClient)
 	if err != nil {
 		return err
@@ -60,6 +77,9 @@ func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, c
 
 // UnlinkVar removes an explicit deployment link from a workspace env var.
 func UnlinkVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
+	if err := validateDeploymentID(depID); err != nil {
+		return err
+	}
 	current, err := resolveWorkspaceVar(idOrKey, scope, coreClient)
 	if err != nil {
 		return err
@@ -75,6 +95,9 @@ func UnlinkVar(idOrKey string, scope Scope, depID string, coreClient astrocore.C
 // using the platform's dedicated POST .../exclude-linking endpoint. Useful for
 // auto-linked objects to opt out specific deployments.
 func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
+	if err := validateDeploymentID(depID); err != nil {
+		return err
+	}
 	current, err := resolveWorkspaceVar(idOrKey, scope, coreClient)
 	if err != nil {
 		return err
@@ -103,6 +126,9 @@ func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.
 // UnexcludeVar removes a deployment from a workspace env var's excludeLinks.
 // There's no dedicated endpoint for this, so it goes through PATCH.
 func UnexcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
+	if err := validateDeploymentID(depID); err != nil {
+		return err
+	}
 	current, err := resolveWorkspaceVar(idOrKey, scope, coreClient)
 	if err != nil {
 		return err
