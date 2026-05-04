@@ -123,20 +123,23 @@ func (c *Config) BuildEnv() []string {
 	// airflow subcommands already honor it alongside their `--no-browser` flag.
 	set("ASTRONOMER_NO_BROWSER", "1")
 
-	// Airflow connection
+	// Airflow connection. When we matched the cwd to a running astro-dev
+	// project, hand Otto its URL + the standard local-dev creds. When we
+	// didn't, leave Otto's environment alone so af 0.8.0's layered config
+	// (project-local > project-shared > global ~/.astro/config.yaml) can
+	// resolve whatever the user has saved. The previous behavior here was
+	// `AF_CONFIG=/dev/null` to keep an unrelated global current-instance
+	// from leaking in; af 0.8.0's project-aware resolution makes that
+	// guard counterproductive — it hides the team's committed deployment
+	// inventory in `<project>/.astro/config.yaml` from the model. Surfacing
+	// the resolved instance in Otto's UI is a better safety net than
+	// blanking the config.
 	set("AIRFLOW_API_URL", c.AirflowURL)
 
 	if c.AirflowURL != "" {
 		// Default local Airflow credentials for af CLI token exchange
 		set("AIRFLOW_USERNAME", "admin")
 		set("AIRFLOW_PASSWORD", "admin")
-	} else {
-		// We couldn't match the current project to a running Airflow.
-		// Point the af CLI at an empty config so it doesn't silently fall
-		// back to ~/.af/config.yaml's `current-instance`, which is a
-		// globally-scoped pointer that usually references whatever project
-		// last ran `astro dev start` — not this one.
-		set("AF_CONFIG", os.DevNull)
 	}
 
 	return env
