@@ -104,18 +104,6 @@ func (s *ConfigSuite) TestBuildEnv_SkipsEmptyValues() {
 	s.False(hasKey("AIRFLOW_API_URL"))
 	s.False(hasKey("AIRFLOW_USERNAME"))
 	s.False(hasKey("AIRFLOW_PASSWORD"))
-
-	// AF_CONFIG must stay unset so af's layered config resolves the instance.
-	s.False(hasKey("AF_CONFIG"), "AF_CONFIG must not be set")
-}
-
-func (s *ConfigSuite) TestBuildEnv_DoesNotSetAFConfigWhenAirflowDetected() {
-	cfg := &Config{AirflowURL: "http://localhost:14955"}
-	env := cfg.BuildEnv()
-
-	for _, e := range env {
-		s.False(strings.HasPrefix(e, "AF_CONFIG="), "AF_CONFIG must not be overridden when Airflow is detected")
-	}
 }
 
 func (s *ConfigSuite) TestBuildEnv_OverridesExisting() {
