@@ -105,13 +105,8 @@ func (s *ConfigSuite) TestBuildEnv_SkipsEmptyValues() {
 	s.False(hasKey("AIRFLOW_USERNAME"))
 	s.False(hasKey("AIRFLOW_PASSWORD"))
 
-	// When we couldn't associate an Airflow with the current project, we let
-	// af's own layered config (project-local > project-shared > global) drive
-	// instance resolution. The previous behavior set AF_CONFIG=/dev/null to
-	// blank the user's saved instances, but af 0.8.0's project-aware
-	// resolution makes that counterproductive — it hides the team's committed
-	// deployment inventory from the model.
-	s.False(hasKey("AF_CONFIG"), "AF_CONFIG must not be set; let af resolve via layered config")
+	// AF_CONFIG must stay unset so af's layered config resolves the instance.
+	s.False(hasKey("AF_CONFIG"), "AF_CONFIG must not be set")
 }
 
 func (s *ConfigSuite) TestBuildEnv_DoesNotSetAFConfigWhenAirflowDetected() {
