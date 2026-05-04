@@ -14,28 +14,28 @@ import (
 
 const envVarExamples = `
   # list workspace variables (table)
-  astro env var list --workspace-id <workspace-id>
+  astro env variable list --workspace-id <workspace-id>
 
   # export workspace variables as a dotenv file
-  astro env var export --workspace-id <workspace-id> > .env
+  astro env variable export --workspace-id <workspace-id> > .env
 
   # show actual secret values (requires org policy to allow)
-  astro env var export --workspace-id <workspace-id> --include-secrets > .env
+  astro env variable export --workspace-id <workspace-id> --include-secrets > .env
 
   # list deployment-resolved variables, including those linked from the workspace
-  astro env var list --deployment-id <deployment-id> --resolve-linked
+  astro env variable list --deployment-id <deployment-id> --resolve-linked
 
   # create / update / delete
-  astro env var create --workspace-id <ws-id> --key DBT_PROFILES_DIR --value /opt/profiles
-  astro env var create --workspace-id <ws-id> --key API_TOKEN --value $TOKEN --secret
-  astro env var update --workspace-id <ws-id> DBT_PROFILES_DIR --value /etc/profiles
-  astro env var delete --workspace-id <ws-id> DBT_PROFILES_DIR --yes
+  astro env variable create --workspace-id <ws-id> --key DBT_PROFILES_DIR --value /opt/profiles
+  astro env variable create --workspace-id <ws-id> --key API_TOKEN --value $TOKEN --secret
+  astro env variable update --workspace-id <ws-id> DBT_PROFILES_DIR --value /etc/profiles
+  astro env variable delete --workspace-id <ws-id> DBT_PROFILES_DIR --yes
 `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "var",
-		Aliases: []string{"variables", "vars"},
+		Use:     "variable",
+		Aliases: []string{"var", "variables", "vars"},
 		Short:   "Manage environment-manager environment variables",
 		Long:    "List, create, update, delete, or export environment variables managed through the platform's environment manager. Variables can be scoped to a workspace or a deployment.",
 		Example: envVarExamples,
@@ -114,8 +114,8 @@ func newEnvVarUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <id-or-key>",
 		Aliases: []string{"up"},
-		Short:   "Update an environment variable's value",
-		Long:    "Update the value of an existing environment variable. The platform API does not allow toggling the secret flag; delete and recreate to change it.",
+		Short:   "Set a variable's value (creates it if missing; use --strict to require existing)",
+		Long:    "Set the value of an environment variable. By default this upserts: if the key does not exist it is created. Pass --strict to fail when the key is missing. The platform API does not allow toggling the secret flag on an existing variable; delete and recreate to change it.",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvVarUpdate(cmd, out, args[0])

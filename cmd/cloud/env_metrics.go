@@ -240,41 +240,43 @@ func runEnvMetricsDelete(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 }
 
 func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
+	// Optional fields are sent only when the user explicitly set the flag, so
+	// passing --basic-token="" (etc.) is preserved as "clear this field"
+	// rather than being silently skipped.
 	in := &env.MetricsInput{
 		Endpoint:            envMetricsEndpoint,
 		ExporterType:        envMetricsExporterType,
 		AuthType:            envMetricsAuthType,
 		AutoLinkDeployments: autoLinkPtr(cmd),
 	}
-	if envMetricsBasicToken != "" {
+	if cmd.Flags().Changed("basic-token") {
 		in.BasicToken = &envMetricsBasicToken
 	}
-	if envMetricsUsername != "" {
+	if cmd.Flags().Changed("username") {
 		in.Username = &envMetricsUsername
 	}
-	if envMetricsSigV4AssumeArn != "" {
+	if cmd.Flags().Changed("sigv4-assume-arn") {
 		in.SigV4AssumeArn = &envMetricsSigV4AssumeArn
 	}
-	if envMetricsSigV4StsRegion != "" {
+	if cmd.Flags().Changed("sigv4-sts-region") {
 		in.SigV4StsRegion = &envMetricsSigV4StsRegion
 	}
-	if envMetricsAuthType == string(astrocore.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC) {
+	switch {
+	case envMetricsAuthType == string(astrocore.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC):
 		// Read password from flag, stdin, or TTY prompt with echo off.
 		pw, err := readSecretValue(envMetricsPassword, "Password")
 		if err != nil {
 			return nil, err
 		}
-		if pw != "" {
-			in.Password = &pw
-		}
-	} else if envMetricsPassword != "" {
+		in.Password = &pw
+	case cmd.Flags().Changed("password"):
 		in.Password = &envMetricsPassword
 	}
-	if len(envMetricsHeaders) > 0 {
+	if cmd.Flags().Changed("header") {
 		m := envMetricsHeaders
 		in.Headers = &m
 	}
-	if len(envMetricsLabels) > 0 {
+	if cmd.Flags().Changed("label") {
 		m := envMetricsLabels
 		in.Labels = &m
 	}

@@ -243,10 +243,37 @@ func writeVarDotenv(envObjs []astrocore.EnvironmentObject, includeSecrets bool, 
 		case isSecret && !includeSecrets:
 			fmt.Fprintf(out, "%s=  # secret, use --include-secrets\n", o.ObjectKey)
 		default:
-			fmt.Fprintf(out, "%s=%s\n", o.ObjectKey, o.EnvironmentVariable.Value)
+			fmt.Fprintf(out, "%s=%s\n", o.ObjectKey, dotenvQuote(o.EnvironmentVariable.Value))
 		}
 	}
 	return nil
+}
+
+// dotenvEscaper escapes characters that are special inside a double-quoted
+// dotenv value: `\`, `"`, `$` (which would otherwise be variable-expanded by
+// most parsers), and the standard whitespace escapes.
+var dotenvEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	`"`, `\"`,
+	`$`, `\$`,
+	"\n", `\n`,
+	"\r", `\r`,
+	"\t", `\t`,
+)
+
+// dotenvQuote renders a value safely for a dotenv line. Bare values are emitted
+// unquoted; values that contain whitespace, newlines, comment markers, quotes,
+// `$` (variable-expansion trigger), `\`, or a leading `export ` are wrapped in
+// double quotes with the special characters escaped. This matches what godotenv,
+// python-dotenv, and dotenvx accept and round-trip cleanly.
+func dotenvQuote(v string) string {
+	if v == "" {
+		return ""
+	}
+	if !strings.ContainsAny(v, " \t\r\n\"'#\\$") && !strings.HasPrefix(v, "export ") {
+		return v
+	}
+	return `"` + dotenvEscaper.Replace(v) + `"`
 }
 
 func writeConnTable(envObjs []astrocore.EnvironmentObject, out io.Writer) error {

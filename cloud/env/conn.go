@@ -32,6 +32,23 @@ func ListConns(scope Scope, resolveLinked, includeSecrets bool, coreClient astro
 	return listObjects(scope, objectTypeConn, resolveLinked, includeSecrets, coreClient)
 }
 
+// ListConnsByKey returns CONNECTION objects keyed by ObjectKey. Convenience
+// for callers that want O(1) key lookup (e.g. injecting connections into a
+// local Airflow container).
+func ListConnsByKey(scope Scope, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) (map[string]astrocore.EnvironmentObjectConnection, error) {
+	objs, err := ListConns(scope, resolveLinked, includeSecrets, coreClient)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]astrocore.EnvironmentObjectConnection, len(objs))
+	for i := range objs {
+		if objs[i].Connection != nil {
+			out[objs[i].ObjectKey] = *objs[i].Connection
+		}
+	}
+	return out, nil
+}
+
 // GetConn fetches a single connection by ID or key.
 func GetConn(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	return getObject(idOrKey, scope, objectTypeConn, includeSecrets, coreClient)

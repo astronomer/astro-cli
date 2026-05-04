@@ -14,22 +14,22 @@ import (
 
 const envAirflowVarExamples = `
   # List Airflow variables in a workspace
-  astro env airflow-var list --workspace-id <ws-id>
+  astro env airflow-variable list --workspace-id <ws-id>
 
   # Create
-  astro env airflow-var create --workspace-id <ws-id> --key MY_VAR --value some-value
+  astro env airflow-variable create --workspace-id <ws-id> --key MY_VAR --value some-value
 
   # Update
-  astro env airflow-var update MY_VAR --workspace-id <ws-id> --value new-value
+  astro env airflow-variable update MY_VAR --workspace-id <ws-id> --value new-value
 
   # Delete
-  astro env airflow-var delete MY_VAR --workspace-id <ws-id> --yes
+  astro env airflow-variable delete MY_VAR --workspace-id <ws-id> --yes
 `
 
 func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "airflow-var",
-		Aliases: []string{"airflow-variable", "airflow-vars", "airflow-variables"},
+		Use:     "airflow-variable",
+		Aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
 		Short:   "Manage environment-manager Airflow variables",
 		Long:    "List, create, update, or delete Airflow variables managed through the platform's environment manager. Variables can be scoped to a workspace or a deployment.",
 		Example: envAirflowVarExamples,
@@ -94,8 +94,8 @@ func newEnvAirflowVarUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <id-or-key>",
 		Aliases: []string{"up"},
-		Short:   "Update an Airflow variable's value",
-		Long:    "Update the value of an existing Airflow variable. The platform API does not allow toggling the secret flag; delete and recreate to change it.",
+		Short:   "Set an Airflow variable's value (creates it if missing; use --strict to require existing)",
+		Long:    "Set the value of an Airflow variable. By default this upserts: if the key does not exist it is created. Pass --strict to fail when the key is missing. The platform API does not allow toggling the secret flag on an existing variable; delete and recreate to change it.",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvAirflowVarUpdate(cmd, out, args[0])

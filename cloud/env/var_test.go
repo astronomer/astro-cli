@@ -48,19 +48,24 @@ func (s *Suite) TestListVars() {
 		showSecrets := false
 		resolveLinked := true
 		workspaceID := cuid.New()
+		offset := 0
 		params := &astrocore.ListEnvironmentObjectsParams{
 			WorkspaceId:   &workspaceID,
 			ObjectType:    &objType,
 			ShowSecrets:   &showSecrets,
 			ResolveLinked: &resolveLinked,
 			Limit:         &limit,
+			Offset:        &offset,
 		}
 		mc := new(astrocore_mocks.ClientWithResponsesInterface)
 		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, params).Return(&astrocore.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-				{ObjectKey: "FOO", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
-			}},
+			JSON200: &astrocore.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrocore.EnvironmentObject{
+					{ObjectKey: "FOO", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
+				},
+				TotalCount: 1,
+			},
 		}, nil).Once()
 
 		objs, err := ListVars(Scope{WorkspaceID: workspaceID}, true, false, mc)
@@ -73,12 +78,14 @@ func (s *Suite) TestListVars() {
 	s.Run("deployment scope passes ShowSecrets through", func() {
 		showSecrets := true
 		resolveLinked := false
+		offset := 0
 		params := &astrocore.ListEnvironmentObjectsParams{
 			DeploymentId:  &deploymentID,
 			ObjectType:    &objType,
 			ShowSecrets:   &showSecrets,
 			ResolveLinked: &resolveLinked,
 			Limit:         &limit,
+			Offset:        &offset,
 		}
 		mc := new(astrocore_mocks.ClientWithResponsesInterface)
 		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, params).Return(&astrocore.ListEnvironmentObjectsResponse{

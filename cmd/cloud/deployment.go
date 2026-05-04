@@ -551,7 +551,7 @@ func newDeploymentVariableRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Deployment environment variables",
 		Long: `Manage environment variables stored on the Deployment record. These variables can be used in DAGs or to customize your Airflow environment.
 
-For variables shared across deployments or scoped to a workspace, see 'astro env var'.`,
+For variables shared across deployments or scoped to a workspace, see 'astro env variable'.`,
 	}
 	cmd.AddCommand(
 		newDeploymentVariableListCmd(out),

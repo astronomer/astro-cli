@@ -15,22 +15,22 @@ import (
 
 const envConnExamples = `
   # List connections in a workspace
-  astro env conn list --workspace-id <ws-id>
+  astro env connection list --workspace-id <ws-id>
 
   # Create a Postgres connection
-  astro env conn create --workspace-id <ws-id> --key db_main --type postgres --host db.example.com --login admin --port 5432
+  astro env connection create --workspace-id <ws-id> --key db_main --type postgres --host db.example.com --login admin --port 5432
 
   # Update only the host
-  astro env conn update db_main --workspace-id <ws-id> --type postgres --host db-new.example.com
+  astro env connection update db_main --workspace-id <ws-id> --type postgres --host db-new.example.com
 
   # Delete
-  astro env conn delete db_main --workspace-id <ws-id> --yes
+  astro env connection delete db_main --workspace-id <ws-id> --yes
 `
 
 func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "conn",
-		Aliases: []string{"connection", "connections"},
+		Use:     "connection",
+		Aliases: []string{"conn", "connections"},
 		Short:   "Manage environment-manager connections",
 		Long:    "List, create, update, or delete connections managed through the platform's environment manager. Connections can be scoped to a workspace or a deployment.",
 		Example: envConnExamples,
@@ -239,23 +239,28 @@ func runEnvConnDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 }
 
 func buildConnInput(cmd *cobra.Command) (env.ConnInput, error) {
+	// Optional fields are sent only when the user explicitly set the flag, so
+	// passing --host="" (etc.) is preserved as "clear this field" rather than
+	// being silently skipped.
 	in := env.ConnInput{Type: envConnType, AutoLinkDeployments: autoLinkPtr(cmd)}
-	if envConnHost != "" {
+	if cmd.Flags().Changed("host") {
 		in.Host = &envConnHost
 	}
-	if envConnLogin != "" {
+	if cmd.Flags().Changed("login") {
 		in.Login = &envConnLogin
 	}
-	if envConnSchema != "" {
+	if cmd.Flags().Changed("schema") {
 		in.Schema = &envConnSchema
 	}
-	if envConnPort != 0 {
+	if cmd.Flags().Changed("port") {
 		in.Port = &envConnPort
 	}
-	if envConnExtra != "" {
+	if cmd.Flags().Changed("extra") {
 		var extra map[string]any
-		if err := json.Unmarshal([]byte(envConnExtra), &extra); err != nil {
-			return env.ConnInput{}, fmt.Errorf("--extra is not valid JSON: %w", err)
+		if envConnExtra != "" {
+			if err := json.Unmarshal([]byte(envConnExtra), &extra); err != nil {
+				return env.ConnInput{}, fmt.Errorf("--extra is not valid JSON: %w", err)
+			}
 		}
 		in.Extra = &extra
 	}
@@ -267,9 +272,7 @@ func buildConnInput(cmd *cobra.Command) (env.ConnInput, error) {
 		if err != nil {
 			return env.ConnInput{}, err
 		}
-		if pw != "" {
-			in.Password = &pw
-		}
+		in.Password = &pw
 	}
 	return in, nil
 }

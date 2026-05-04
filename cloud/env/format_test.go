@@ -49,6 +49,36 @@ func (s *Suite) TestWriteVarDotenv() {
 	})
 }
 
+func (s *Suite) TestWriteVarDotenvEscapesSpecialChars() {
+	objs := []astrocore.EnvironmentObject{
+		{ObjectKey: "PLAIN", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "simple"}},
+		{ObjectKey: "WITH_SPACES", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "two words"}},
+		{ObjectKey: "WITH_NEWLINE", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "line1\nline2"}},
+		{ObjectKey: "WITH_QUOTES", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: `say "hi"`}},
+		{ObjectKey: "WITH_HASH", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "value#notacomment"}},
+		{ObjectKey: "WITH_BACKSLASH", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: `path\to\thing`}},
+		{ObjectKey: "WITH_DOLLAR", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "user $HOME"}},
+	}
+	var buf bytes.Buffer
+	s.NoError(WriteVarList(objs, FormatDotenv, true, &buf))
+	out := buf.String()
+
+	s.Contains(out, "PLAIN=simple\n")
+	s.Contains(out, `WITH_SPACES="two words"`)
+	s.Contains(out, `WITH_NEWLINE="line1\nline2"`)
+	s.Contains(out, `WITH_QUOTES="say \"hi\""`)
+	s.Contains(out, `WITH_HASH="value#notacomment"`)
+	s.Contains(out, `WITH_BACKSLASH="path\\to\\thing"`)
+	s.Contains(out, `WITH_DOLLAR="user \$HOME"`)
+
+	// A literal newline must never appear inside a value, since that would
+	// silently split it across two lines for any dotenv parser.
+	s.NotContains(out, "line1\nline2")
+	// $ inside a double-quoted dotenv value is interpolated by most parsers
+	// unless escaped, so an unescaped "$HOME" would round-trip incorrectly.
+	s.NotContains(out, `"user $HOME"`)
+}
+
 func (s *Suite) TestClampTableValue() {
 	s.Equal("", clampTableValue(""))
 	s.Equal("short", clampTableValue("short"))

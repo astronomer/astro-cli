@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/cloud/environment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 )
@@ -18,9 +17,13 @@ var (
 	ErrNotFound          = errors.New("environment object not found")
 )
 
-// defaultListLimit is the page size we request from list endpoints. Org-wide
-// counts are typically well under this, so we don't paginate today.
-const defaultListLimit = 1000
+const (
+	// defaultListLimit is the page size requested from list endpoints.
+	defaultListLimit = 1000
+	// maxListPages caps a single list call at maxListPages*defaultListLimit
+	// rows as a safety bound against a server that mis-reports TotalCount.
+	maxListPages = 100
+)
 
 // Scope captures the target of an env-object operation. Exactly one of
 // WorkspaceID / DeploymentID is set.
@@ -39,9 +42,24 @@ func (s Scope) Validate() error {
 	return nil
 }
 
+// ScopeFromIDs builds a Scope from raw workspace/deployment IDs, applying the
+// "deployment wins when both are set" precedence used by the local-dev path.
+// Callers that want strict mutual-exclusion should construct Scope directly
+// and call Validate.
+func ScopeFromIDs(workspaceID, deploymentID string) Scope {
+	if deploymentID != "" {
+		return Scope{DeploymentID: deploymentID}
+	}
+	return Scope{WorkspaceID: workspaceID}
+}
+
 // listObjects returns env-objects of the given type within the scope.
 // resolveLinked includes inherited workspace objects when listing at deployment scope.
 // includeSecrets requests secret values from the server (subject to org policy).
+//
+// Pages through the list endpoint when the server reports more rows than fit
+// in a single response. Stops when the accumulated count reaches TotalCount,
+// when a short page is returned, or when maxListPages is hit (safety bound).
 func listObjects(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) ([]astrocore.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
@@ -50,16 +68,30 @@ func listObjects(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsO
 	if err != nil {
 		return nil, err
 	}
-	params := buildListParams(scope, objectType, nil, resolveLinked, includeSecrets, defaultListLimit)
 
-	resp, err := coreClient.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
-	if err != nil {
-		return nil, err
+	var (
+		all    []astrocore.EnvironmentObject
+		offset int
+	)
+	for page := 0; page < maxListPages; page++ {
+		params := buildListParams(scope, objectType, nil, resolveLinked, includeSecrets, defaultListLimit)
+		params.Offset = &offset
+
+		resp, err := coreClient.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
+		if err != nil {
+			return nil, err
+		}
+		if err := normalizeListErr(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, err
+		}
+		batch := resp.JSON200.EnvironmentObjects
+		all = append(all, batch...)
+		if len(batch) < defaultListLimit || len(all) >= resp.JSON200.TotalCount {
+			return all, nil
+		}
+		offset = len(all)
 	}
-	if err := normalizeListErr(resp.HTTPResponse, resp.Body); err != nil {
-		return nil, err
-	}
-	return resp.JSON200.EnvironmentObjects, nil
+	return all, fmt.Errorf("aborted listing %s objects after %d pages", objectType, maxListPages)
 }
 
 // getObject fetches a single env-object by ID or key.
@@ -86,6 +118,8 @@ func getObject(idOrKey string, scope Scope, objectType astrocore.ListEnvironment
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
+	// ObjectKey filtering returns at most one row per (scope, objectType);
+	// limit=2 catches server-side anomalies without forcing pagination.
 	params := buildListParams(scope, objectType, &idOrKey, false, includeSecrets, 2)
 
 	resp, err := coreClient.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
@@ -177,14 +211,14 @@ func buildListParams(scope Scope, objectType astrocore.ListEnvironmentObjectsPar
 }
 
 // normalizeListErr substitutes the friendlier org-level secrets-fetching
-// guidance from cloud/environment when applicable.
+// guidance when applicable.
 func normalizeListErr(httpResp *http.Response, body []byte) error {
 	err := astrocore.NormalizeAPIError(httpResp, body)
 	if err == nil {
 		return nil
 	}
-	if environment.IsSecretsFetchingNotAllowedError(err) {
-		return errors.New(environment.SecretsFetchingNotAllowedErrMsg)
+	if IsSecretsFetchingNotAllowedError(err) {
+		return errors.New(SecretsFetchingNotAllowedErrMsg)
 	}
 	return err
 }

@@ -20,7 +20,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/astronomer/astro-cli/cloud/environment"
+	"github.com/astronomer/astro-cli/cloud/env"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -834,7 +834,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroCoreClient astrocore.C
 	var envConns map[string]astrocore.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
-		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		envConns, err = env.ListConnsByKey(env.ScopeFromIDs(workspaceID, deploymentID), true, true, astroCoreClient)
 		if err != nil {
 			return err
 		}
@@ -1046,7 +1046,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroCoreClient astrocore
 	var envConns map[string]astrocore.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
-		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroCoreClient)
+		envConns, err = env.ListConnsByKey(env.ScopeFromIDs(workspaceID, deploymentID), true, true, astroCoreClient)
 		if err != nil {
 			return err
 		}
