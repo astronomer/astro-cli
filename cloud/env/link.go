@@ -41,8 +41,12 @@ type VarLink struct {
 	OverrideValue *string `json:"overrideValue,omitempty" yaml:"overrideValue,omitempty"`
 }
 
-// LinkVar attaches a workspace-scoped env var to a specific deployment with
-// optional override value. Errors if the link already exists.
+// LinkVar attaches a workspace-scoped env var to a specific deployment.
+// Upsert semantics: if the link doesn't exist it's created; if it does, only
+// the override field is touched, and only when overrideValue is non-nil.
+// Calling with overrideValue=nil on an existing link is a no-op for the
+// override (the platform's PATCH preserves omitted fields). To remove an
+// existing override, unlink then re-link without --value.
 func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, coreClient astrocore.CoreClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
@@ -51,27 +55,11 @@ func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, c
 	if err != nil {
 		return err
 	}
-	if linkExists(current.Links, depID) {
-		return fmt.Errorf("environment variable %q is already linked to deployment %s", current.ObjectKey, depID)
-	}
 	if excludeExists(current.ExcludeLinks, depID) {
 		return fmt.Errorf("environment variable %q has deployment %s in its exclude list; remove the exclude first", current.ObjectKey, depID)
 	}
 
-	links := buildUpdateLinks(current.Links)
-	newLink := astrocore.UpdateEnvironmentObjectLinkRequest{
-		Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT,
-		ScopeEntityId: depID,
-	}
-	if overrideValue != nil {
-		newLink.Overrides = &astrocore.UpdateEnvironmentObjectOverridesRequest{
-			EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{
-				Value: overrideValue,
-			},
-		}
-	}
-	links = append(links, newLink)
-
+	links := upsertLinkInUpdateList(current.Links, depID, overrideValue)
 	return patchVarLinks(*current.Id, current, &links, nil, coreClient)
 }
 
@@ -93,7 +81,8 @@ func UnlinkVar(idOrKey string, scope Scope, depID string, coreClient astrocore.C
 
 // ExcludeVar adds a deployment to the workspace env var's excludeLinks list,
 // using the platform's dedicated POST .../exclude-linking endpoint. Useful for
-// auto-linked objects to opt out specific deployments.
+// auto-linked objects to opt out specific deployments. Idempotent: re-running
+// against an already-excluded deployment is a no-op success.
 func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
@@ -106,7 +95,8 @@ func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.
 		return fmt.Errorf("environment variable %q is explicitly linked to deployment %s; unlink first to exclude", current.ObjectKey, depID)
 	}
 	if excludeExists(current.ExcludeLinks, depID) {
-		return fmt.Errorf("environment variable %q already excludes deployment %s", current.ObjectKey, depID)
+		// Already excluded — desired state matches actual, no-op success.
+		return nil
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -225,6 +215,55 @@ func excludeExists(excludes *[]astrocore.EnvironmentObjectExcludeLink, depID str
 		}
 	}
 	return false
+}
+
+// upsertLinkInUpdateList builds the PATCH-shape Links list with the entry for
+// depID created or updated. Other links round-trip with their existing
+// overrides intact. The platform PATCH merges per-entry rather than fully
+// replacing the array, so sending `overrides: nil` on an existing entry is a
+// no-op for the override (it's preserved). To clear an override, the caller
+// must unlink first.
+func upsertLinkInUpdateList(current *[]astrocore.EnvironmentObjectLink, depID string, overrideValue *string) []astrocore.UpdateEnvironmentObjectLinkRequest {
+	var newOverride *astrocore.UpdateEnvironmentObjectOverridesRequest
+	if overrideValue != nil {
+		newOverride = &astrocore.UpdateEnvironmentObjectOverridesRequest{
+			EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: overrideValue},
+		}
+	}
+	out := []astrocore.UpdateEnvironmentObjectLinkRequest{}
+	found := false
+	if current != nil {
+		for _, l := range *current {
+			if l.ScopeEntityId == depID {
+				found = true
+				out = append(out, astrocore.UpdateEnvironmentObjectLinkRequest{
+					Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
+					ScopeEntityId: l.ScopeEntityId,
+					Overrides:     newOverride,
+				})
+				continue
+			}
+			req := astrocore.UpdateEnvironmentObjectLinkRequest{
+				Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
+				ScopeEntityId: l.ScopeEntityId,
+			}
+			if l.EnvironmentVariableOverrides != nil {
+				v := l.EnvironmentVariableOverrides.Value
+				req.Overrides = &astrocore.UpdateEnvironmentObjectOverridesRequest{
+					EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: &v},
+				}
+			}
+			out = append(out, req)
+		}
+	}
+	if !found {
+		out = append(out, astrocore.UpdateEnvironmentObjectLinkRequest{
+			Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT,
+			ScopeEntityId: depID,
+			Overrides:     newOverride,
+		})
+	}
+	return out
 }
 
 // buildUpdateLinks converts the GET-shape Links into the PATCH-shape, copying

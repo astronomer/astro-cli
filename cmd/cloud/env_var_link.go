@@ -26,7 +26,9 @@ func newEnvVarLinkCmd(out io.Writer) *cobra.Command {
 		Short: "Link a workspace variable to a deployment, optionally with an override",
 		Long: `Attach a workspace-scoped environment variable to a specific deployment.
 If --value is provided, that value overrides the workspace default for the linked deployment only.
-Pass --exclude to add the deployment to the excludeLinks list instead (used with --auto-link to opt specific deployments out).`,
+Pass --exclude to add the deployment to the excludeLinks list instead (used with --auto-link to opt specific deployments out).
+
+Upsert semantics: if not already linked, the link is created; if already linked, the override is replaced when --value is passed. Re-running without --value is a no-op for an existing link's override (platform PATCH preserves omitted fields). To remove an existing override, unlink then re-link without --value.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvVarLink(cmd, out, args[0])

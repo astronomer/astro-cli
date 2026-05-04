@@ -105,7 +105,145 @@ func (s *Suite) TestLinkVarWithOverride() {
 	mc.AssertExpectations(s.T())
 }
 
-func (s *Suite) TestLinkVarRejectsDuplicate() {
+func (s *Suite) TestLinkVarUpsertsExistingLink() {
+	// Re-linking an existing link should replace its override, not error.
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	id := cuid.New()
+	depID := cuid.New()
+	oldOverride := "old"
+	newOverride := "new"
+
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
+				{
+					Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+					ScopeEntityId:                depID,
+					EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: oldOverride},
+				},
+			}, nil),
+		}},
+	}, nil).Once()
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
+		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+			if b.Links == nil || len(*b.Links) != 1 {
+				return false
+			}
+			l := (*b.Links)[0]
+			return l.ScopeEntityId == depID &&
+				l.Overrides != nil &&
+				l.Overrides.EnvironmentVariable != nil &&
+				l.Overrides.EnvironmentVariable.Value != nil &&
+				*l.Overrides.EnvironmentVariable.Value == newOverride
+		}),
+	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+	}, nil).Once()
+
+	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &newOverride, mc))
+	mc.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestLinkVarUpsertOmitsOverrideWhenNotProvided() {
+	// Re-linking without --value sends Overrides=nil for that entry, which the
+	// platform's per-entry PATCH merge interprets as "leave existing override
+	// alone." This is the no-op case we rely on for safe re-runs.
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	id := cuid.New()
+	depID := cuid.New()
+	oldOverride := "old"
+
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
+				{
+					Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+					ScopeEntityId:                depID,
+					EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: oldOverride},
+				},
+			}, nil),
+		}},
+	}, nil).Once()
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
+		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+			if b.Links == nil || len(*b.Links) != 1 {
+				return false
+			}
+			// Overrides is nil → field omitted → platform preserves existing override.
+			return (*b.Links)[0].ScopeEntityId == depID && (*b.Links)[0].Overrides == nil
+		}),
+	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+	}, nil).Once()
+
+	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, mc))
+	mc.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestLinkVarUpsertPreservesOtherLinks() {
+	// Upserting one link must not mangle other deployments' links/overrides.
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	id := cuid.New()
+	keepDep := cuid.New()
+	keepOverride := "keep"
+	upsertDep := cuid.New()
+	newOverride := "upsert"
+
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
+				{
+					Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+					ScopeEntityId:                keepDep,
+					EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: keepOverride},
+				},
+			}, nil),
+		}},
+	}, nil).Once()
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
+		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+			if b.Links == nil || len(*b.Links) != 2 {
+				return false
+			}
+			var sawKeep, sawUpsert bool
+			for _, l := range *b.Links {
+				switch l.ScopeEntityId {
+				case keepDep:
+					sawKeep = l.Overrides != nil &&
+						l.Overrides.EnvironmentVariable != nil &&
+						l.Overrides.EnvironmentVariable.Value != nil &&
+						*l.Overrides.EnvironmentVariable.Value == keepOverride
+				case upsertDep:
+					sawUpsert = l.Overrides != nil &&
+						l.Overrides.EnvironmentVariable != nil &&
+						l.Overrides.EnvironmentVariable.Value != nil &&
+						*l.Overrides.EnvironmentVariable.Value == newOverride
+				}
+			}
+			return sawKeep && sawUpsert
+		}),
+	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+	}, nil).Once()
+
+	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, upsertDep, &newOverride, mc))
+	mc.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestExcludeVarIdempotent() {
+	// Excluding an already-excluded deployment should succeed without a PATCH.
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, _ := config.GetCurrentContext()
 	id := cuid.New()
@@ -115,14 +253,14 @@ func (s *Suite) TestLinkVarRejectsDuplicate() {
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
-				{Scope: astrocore.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: depID},
-			}, nil),
+			envVarObj(id, "v", nil, nil, []astrocore.EnvironmentObjectExcludeLink{
+				{Scope: astrocore.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: depID},
+			}),
 		}},
 	}, nil).Once()
+	// Note: no ExcludeLinkingEnvironmentObjectWithResponse expectation - idempotent path skips the call entirely.
 
-	err := LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, mc)
-	s.ErrorContains(err, "already linked")
+	s.NoError(ExcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, mc))
 	mc.AssertExpectations(s.T())
 }
 
