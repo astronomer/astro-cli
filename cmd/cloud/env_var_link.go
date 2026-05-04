@@ -129,7 +129,7 @@ func runEnvVarLinks(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	report, err := env.ListVarLinks(idOrKey, scope, astroCoreClient)
+	report, err := env.ListVarLinks(idOrKey, scope, envIncludeSecrets, astroCoreClient)
 	if err != nil {
 		return err
 	}
@@ -151,6 +151,21 @@ func runEnvVarLinks(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	return fmt.Errorf("invalid format %q", f)
 }
 
+// overrideDisplay renders an override value for the table view, with a
+// special "(hidden)" marker for secret vars when --include-secrets is off
+// (in which case the platform redacts the override and we can't distinguish
+// "no override" from "redacted override" — flag the ambiguity instead of
+// quietly showing "-").
+func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
+	if isSecret && !includeSecrets {
+		return "(hidden, use --include-secrets)"
+	}
+	if override == nil {
+		return "-"
+	}
+	return *override
+}
+
 func writeLinksTable(report *env.VarLinksReport, out io.Writer) {
 	value := report.WorkspaceValue
 	if report.IsSecret {
@@ -167,13 +182,7 @@ func writeLinksTable(report *env.VarLinksReport, out io.Writer) {
 	} else {
 		linkTable := &printutil.Table{DynamicPadding: true, Header: []string{"#", "DEPLOYMENT", "OVERRIDE"}}
 		for i, l := range report.Links {
-			override := "-"
-			if l.OverrideValue != nil {
-				override = *l.OverrideValue
-				if report.IsSecret {
-					override = "****"
-				}
-			}
+			override := overrideDisplay(l.OverrideValue, report.IsSecret, envIncludeSecrets)
 			linkTable.AddRow([]string{strconv.Itoa(i + 1), l.DeploymentID, override}, false)
 		}
 		fmt.Fprintln(out, "LINKS:")

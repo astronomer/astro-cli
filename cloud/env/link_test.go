@@ -264,7 +264,7 @@ func (s *Suite) TestListVarLinksReportsAll() {
 		}},
 	}, nil).Once()
 
-	report, err := ListVarLinks("FOO", Scope{WorkspaceID: cuid.New()}, mc)
+	report, err := ListVarLinks("FOO", Scope{WorkspaceID: cuid.New()}, false, mc)
 	s.NoError(err)
 	s.Equal("FOO", report.ObjectKey)
 	s.Equal("ws-default", report.WorkspaceValue)

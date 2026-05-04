@@ -115,8 +115,11 @@ func UnexcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocor
 }
 
 // ListVarLinks returns the consolidated link state of a workspace env var.
-func ListVarLinks(idOrKey string, scope Scope, coreClient astrocore.CoreClient) (*VarLinksReport, error) {
-	current, err := resolveWorkspaceVar(idOrKey, scope, coreClient)
+// includeSecrets is forwarded to the platform; without it, the workspace
+// value and any per-link overrides for secret vars are redacted from the
+// response.
+func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*VarLinksReport, error) {
+	current, err := resolveWorkspaceVarWithSecrets(idOrKey, scope, includeSecrets, coreClient)
 	if err != nil {
 		return nil, err
 	}
@@ -154,10 +157,14 @@ func ListVarLinks(idOrKey string, scope Scope, coreClient astrocore.CoreClient) 
 // resolveWorkspaceVar fetches the workspace-scoped env var by ID or key and
 // validates that it is in fact workspace-scoped (linking is workspace-only).
 func resolveWorkspaceVar(idOrKey string, scope Scope, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+	return resolveWorkspaceVarWithSecrets(idOrKey, scope, false, coreClient)
+}
+
+func resolveWorkspaceVarWithSecrets(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
 	if scope.WorkspaceID == "" {
 		return nil, errors.New("linking commands require --workspace-id; deployment-scoped objects cannot be linked")
 	}
-	obj, err := getObject(idOrKey, scope, objectTypeVar, false, coreClient)
+	obj, err := getObject(idOrKey, scope, objectTypeVar, includeSecrets, coreClient)
 	if err != nil {
 		return nil, err
 	}
