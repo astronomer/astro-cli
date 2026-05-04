@@ -45,12 +45,9 @@ func Start(args []string) error {
 		return fmt.Errorf("setting up otto: %w", err)
 	}
 
-	// Refresh the cached latest version up-front so autoUpdate / hint paths
-	// see today's release, not yesterday's. Previously this ran post-autoUpdate
-	// in a goroutine, which meant the very first launch after a release missed
-	// the new version (cache only caught up by the *next* invocation). Bounded
-	// by LatestVersion's 5s timeout; offline launches soft-fall-through to the
-	// previously cached value.
+	// Refresh the cached latest version before autoUpdate and hintUpdateAvailable
+	// read it, so a launch on release day sees today's version. Bounded by
+	// LatestVersion's 5s timeout; offline launches keep the previous cache.
 	refreshUpdateCacheIfStale()
 
 	// Apply auto-update or fall back to the hint. Both must run before

@@ -241,7 +241,7 @@ func (s *UpdateSuite) TestAutoUpdate_NoCachedVersion_SkipsDownload() {
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
 
-	s.False(*called, "auto-update should wait for the async refresh to populate the cache")
+	s.False(*called, "auto-update should skip when no LatestKnown is cached")
 	s.Empty(buf.String())
 }
 

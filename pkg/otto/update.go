@@ -78,13 +78,11 @@ func autoUpdateEnabled() bool {
 }
 
 // refreshUpdateCacheIfStale refreshes the cached latest version when the
-// cache is older than updateCheckInterval. Synchronous — must run before
-// autoUpdate / hintUpdateAvailable read the cache so the very next launch
-// after a release picks up the new version. Bounded by LatestVersion's 5s
-// timeout; network failures still bump LastCheck so the same 5s wait does
-// not repeat on every launch when the CDN is unreachable (negative-cache).
-// LatestKnown is preserved on failure so downstream paths fall back to that
-// last-known answer.
+// cache is older than updateCheckInterval. Must run before autoUpdate and
+// hintUpdateAvailable read the cache so a launch right after a release picks
+// up the new version. On network failure, LastCheck is still bumped so the
+// 5s LatestVersion timeout does not repeat on every launch when the CDN is
+// unreachable; LatestKnown is preserved so the hint still works.
 func refreshUpdateCacheIfStale() {
 	state, _ := readUpdateState()
 	if t, err := time.Parse(time.RFC3339, state.LastCheck); err == nil {
@@ -92,19 +90,11 @@ func refreshUpdateCacheIfStale() {
 			return
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	latest, err := LatestVersion()
-	if err != nil {
-		// Negative cache: bump LastCheck to avoid 5s waits on every launch
-		// when the CDN is blocked. Keep LatestKnown so the hint still works.
-		state.LastCheck = now
-		_ = writeUpdateState(state)
-		return
+	state.LastCheck = time.Now().UTC().Format(time.RFC3339)
+	if latest, err := LatestVersion(); err == nil {
+		state.LatestKnown = latest
 	}
-	_ = writeUpdateState(updateState{
-		LastCheck:   now,
-		LatestKnown: latest,
-	})
+	_ = writeUpdateState(state)
 }
 
 func readUpdateState() (updateState, error) {
