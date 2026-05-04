@@ -40,7 +40,7 @@ func ParseDotenvFile(path string) (map[string]string, error) {
 
 // dotenvSource returns (os.Stdin, "<stdin>") when path is "-"; otherwise
 // (nil, path) and the caller opens the file.
-func dotenvSource(path string) (io.Reader, string) {
+func dotenvSource(path string) (reader io.Reader, displayName string) {
 	if path == "-" {
 		return os.Stdin, "<stdin>"
 	}

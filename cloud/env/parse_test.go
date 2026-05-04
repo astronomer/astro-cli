@@ -31,7 +31,8 @@ func (s *Suite) TestParseDotenvRoundTripsExport() {
 
 	parsed, err := ParseDotenvFile(path)
 	s.NoError(err)
-	for _, o := range objs {
+	for i := range objs {
+		o := &objs[i]
 		s.Equal(o.EnvironmentVariable.Value, parsed[o.ObjectKey], "mismatch for %s", o.ObjectKey)
 	}
 }
