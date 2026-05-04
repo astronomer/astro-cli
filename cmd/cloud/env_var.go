@@ -49,6 +49,9 @@ func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 		newEnvVarUpdateCmd(out),
 		newEnvVarDeleteCmd(out),
 		newEnvVarExportCmd(out),
+		newEnvVarLinkCmd(out),
+		newEnvVarUnlinkCmd(out),
+		newEnvVarLinksCmd(out),
 	)
 	return cmd
 }
