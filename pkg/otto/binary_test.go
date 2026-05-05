@@ -101,6 +101,51 @@ func (s *BinarySuite) TestDownloadURL() {
 	s.Contains(url, ".tar.gz")
 }
 
+// 404 + CDN reachable = unsupported platform. This is the customer-facing
+// case the regression on 32-bit Windows landed in: the asset URL 404s but
+// the CDN is up, so the only explanation is that we don't ship that platform.
+func (s *BinarySuite) TestClassifyDownloadFailure_UnsupportedPlatform() {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("v0.1.4"))
+	}))
+	defer probe.Close()
+
+	err := classifyDownloadFailure(http.StatusNotFound, "https://example/otto-windows-386.exe.zip", probe.URL)
+	s.Error(err)
+	s.Contains(err.Error(), "otto is not available for")
+	s.Contains(err.Error(), runtime.GOOS+"/"+runtime.GOARCH)
+	s.NotContains(err.Error(), "HTTP 404", "should rewrite the raw HTTP error into something actionable")
+}
+
+// 404 + CDN unreachable = report verbatim. We deliberately don't blame the
+// user for what might be a CDN outage or DNS hiccup.
+func (s *BinarySuite) TestClassifyDownloadFailure_CDNDown() {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer probe.Close()
+
+	err := classifyDownloadFailure(http.StatusNotFound, "https://example/otto-linux-x64.tar.gz", probe.URL)
+	s.Error(err)
+	s.Contains(err.Error(), "HTTP 404")
+	s.NotContains(err.Error(), "not available for", "should not assert unsupported platform when the CDN itself is down")
+}
+
+// Anything other than 404 passes through unchanged — 5xx is an outage, not a
+// platform decision.
+func (s *BinarySuite) TestClassifyDownloadFailure_NonNotFound() {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer probe.Close()
+
+	err := classifyDownloadFailure(http.StatusServiceUnavailable, "https://example/otto-linux-x64.tar.gz", probe.URL)
+	s.Error(err)
+	s.Contains(err.Error(), "HTTP 503")
+	s.NotContains(err.Error(), "not available for")
+}
+
 func (s *BinarySuite) TestIsUpdateAvailable_NotInstalled() {
 	// With no package.json, IsUpdateAvailable returns (false, "", nil) without
 	// contacting the CDN.

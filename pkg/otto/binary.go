@@ -138,9 +138,13 @@ func Update() error {
 }
 
 // downloadURL constructs the CDN URL for the latest Otto on this platform.
+// The URL is generated unconditionally — astro-cli has no static knowledge of
+// which platforms Otto publishes binaries for. If the platform is unsupported,
+// the CDN returns 404 and downloadAndInstall translates that into a friendly
+// error via classifyDownloadFailure.
 func downloadURL() string {
-	goos := runtime.GOOS   // "darwin", "linux", "windows"
-	arch := runtime.GOARCH // "arm64", "amd64"
+	goos := runtime.GOOS
+	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x64"
 	}
@@ -148,6 +152,33 @@ func downloadURL() string {
 		return fmt.Sprintf("%s/latest/%s-%s-%s.exe.zip", cdnBaseURL, binaryName, goos, arch)
 	}
 	return fmt.Sprintf("%s/latest/%s-%s-%s.tar.gz", cdnBaseURL, binaryName, goos, arch)
+}
+
+// classifyDownloadFailure turns a 404 from the asset URL into a clear
+// "your platform isn't supported" error, but only after confirming the CDN
+// itself is reachable — otherwise we'd blame the user for an outage. The probe
+// URL is /latest/version: a tiny static file that's published for every
+// release, so a 200 there is a reliable proxy for "the CDN has releases."
+// Any other status code is reported verbatim.
+func classifyDownloadFailure(status int, assetURL, probeURL string) error {
+	verbatim := fmt.Errorf("downloading otto: HTTP %d from %s", status, assetURL)
+	if status != http.StatusNotFound {
+		return verbatim
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(probeURL)
+	if err != nil {
+		return verbatim
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return verbatim
+	}
+	return fmt.Errorf(
+		"otto is not available for %s/%s. See https://github.com/astronomer/astro-cli/releases for supported platforms. "+
+			"If you are on 64-bit Windows but installed the 32-bit astro CLI, reinstall the x86_64 build",
+		runtime.GOOS, runtime.GOARCH,
+	)
 }
 
 // downloadAndInstall fetches the Otto archive and extracts it to BinDir().
@@ -160,7 +191,7 @@ func downloadAndInstall() error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("downloading otto: HTTP %d from %s", resp.StatusCode, url)
+		return classifyDownloadFailure(resp.StatusCode, url, cdnBaseURL+"/latest/version")
 	}
 
 	binDir := BinDir()
