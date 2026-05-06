@@ -25,6 +25,15 @@ hooks = [
     pass_filenames = false,
     additional_dependencies = ["github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4"],
   },
+  {
+    id = "deadcode",
+    name = "deadcode",
+    types = ["go"],
+    language = "golang",
+    entry = "scripts/check-deadcode.sh",
+    pass_filenames = false,
+    additional_dependencies = ["golang.org/x/tools/cmd/deadcode@v0.27.0"],
+  },
 ]
 
 [[repos]]

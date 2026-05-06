@@ -129,7 +129,10 @@ commands:
             git diff --exit-code
       - run:
           name: Run golangci-lint
-          command: make lint
+          command: make lint-go
+      - run:
+          name: Run deadcode
+          command: make lint-deadcode
       - save_cache:
           key: prek-v1-{{ checksum "prek.toml" }}
           paths:
