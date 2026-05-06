@@ -13,8 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
-func strPtr(s string) *string { return &s }
-
 // --- getTypeString -----------------------------------------------------------
 
 func TestGetTypeString(t *testing.T) {
