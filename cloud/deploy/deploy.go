@@ -133,17 +133,15 @@ const accessYourDeploymentFmt = `
 `
 
 func removeDagsFromDockerIgnore(fullpath string) error {
-	f, err := os.Open(fullpath)
+	original, err := os.ReadFile(fullpath)
 	if err != nil {
 		return err
 	}
 
-	defer f.Close()
+	hadTrailingNewline := len(original) > 0 && original[len(original)-1] == '\n'
 
-	var bs []byte
-	buf := bytes.NewBuffer(bs)
-
-	scanner := bufio.NewScanner(f)
+	var buf bytes.Buffer
+	scanner := bufio.NewScanner(bytes.NewReader(original))
 	for scanner.Scan() {
 		text := scanner.Text()
 		if text != "dags/" {
@@ -157,12 +155,13 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, mnd
-	if err != nil {
-		return err
+
+	result := bytes.TrimRight(buf.Bytes(), "\n")
+	if hadTrailingNewline && len(result) > 0 {
+		result = append(result, '\n')
 	}
 
-	return nil
+	return os.WriteFile(fullpath, result, 0o666) //nolint:gosec, mnd
 }
 
 func shouldIncludeMonitoringDag(deploymentType astroplatformcore.DeploymentType) bool {
@@ -663,6 +662,15 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	}
 	contains, _ := fileutil.Contains(lines, "dags/")
 	if !contains {
+		// Read raw bytes to check if the file ends with a newline before we modify it.
+		// We append in a way that preserves this state so removeDagsFromDockerIgnore
+		// can restore the file exactly.
+		rawContent, err := os.ReadFile(fullpath)
+		if err != nil {
+			return err
+		}
+		hadTrailingNewline := len(rawContent) > 0 && rawContent[len(rawContent)-1] == '\n'
+
 		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
 		if err != nil {
 			return err
@@ -670,7 +678,11 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 
 		defer f.Close()
 
-		if _, err := f.WriteString("\ndags/"); err != nil {
+		appendStr := "\ndags/"
+		if hadTrailingNewline {
+			appendStr = "dags/\n"
+		}
+		if _, err := f.WriteString(appendStr); err != nil {
 			return err
 		}
 

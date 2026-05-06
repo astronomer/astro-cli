@@ -2302,3 +2302,85 @@ func TestDeployDagsBundleLayout(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
+	tests := []struct {
+		name     string
+		original string
+	}{
+		{
+			name:     "file with trailing newline is restored exactly",
+			original: "some/path/\nother/\n",
+		},
+		{
+			name:     "file without trailing newline is restored exactly",
+			original: "some/path/\nother/",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			dockerignorePath := filepath.Join(dir, ".dockerignore")
+			err := os.WriteFile(dockerignorePath, []byte(tc.original), 0o644)
+			assert.NoError(t, err)
+
+			mockImageHandler := new(mocks.ImageHandler)
+			mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			err = buildImageWithoutDags(dir, "", mockImageHandler)
+			assert.NoError(t, err)
+
+			got, err := os.ReadFile(dockerignorePath)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.original, string(got))
+
+			mockImageHandler.AssertExpectations(t)
+		})
+	}
+}
+
+func TestRemoveDagsFromDockerIgnore(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "file with trailing newline preserves it",
+			input:    "some/path/\ndags/\nother/\n",
+			expected: "some/path/\nother/\n",
+		},
+		{
+			name:     "file without trailing newline preserves that",
+			input:    "some/path/\ndags/",
+			expected: "some/path/",
+		},
+		{
+			name:     "dags as last line with trailing newline",
+			input:    "some/path/\ndags/\n",
+			expected: "some/path/\n",
+		},
+		{
+			name:     "dags appended without trailing newline (buildImageWithoutDags case)",
+			input:    "some/path/\ndags/",
+			expected: "some/path/",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, ".dockerignore")
+			err := os.WriteFile(path, []byte(tc.input), 0o644)
+			assert.NoError(t, err)
+
+			err = removeDagsFromDockerIgnore(path)
+			assert.NoError(t, err)
+
+			got, err := os.ReadFile(path)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, string(got))
+		})
+	}
+}
