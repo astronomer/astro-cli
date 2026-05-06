@@ -268,10 +268,14 @@ func (rt PodmanRuntime) configureMachineForUsage(machine *types.InspectedMachine
 	}
 
 	// Set CONTAINER_HOST for native Podman commands (e.g., podman build)
-	// This ensures podman commands also use the machine socket
-	err = os.Setenv("CONTAINER_HOST", dockerHost)
-	if err != nil {
-		return fmt.Errorf("error setting CONTAINER_HOST: %s", err)
+	// on non-Windows platforms. On Windows, the npipe:// scheme is not
+	// supported by native Podman commands, and SetMachineAsDefault
+	// below is sufficient for routing Podman commands correctly.
+	if !rt.OSChecker.IsWindows() {
+		err = os.Setenv("CONTAINER_HOST", dockerHost)
+		if err != nil {
+			return fmt.Errorf("error setting CONTAINER_HOST: %s", err)
+		}
 	}
 
 	// Set the podman default connection to our machine.
