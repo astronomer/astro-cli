@@ -39,7 +39,7 @@ func resetEnvFlags() {
 	envResolveLinked = false
 	envYes = false
 
-	envVarKey, envVarValue, envVarSecret, envVarStrict = "", "", false, false
+	envVarKey, envVarValue, envVarSecret, envVarStrict, envVarFromFile = "", "", false, false, ""
 
 	envConnKey, envConnType, envConnHost, envConnLogin = "", "", "", ""
 	envConnPassword, envConnSchema, envConnExtra = "", "", ""
@@ -178,6 +178,112 @@ func TestEnvVarCreateRequiresKey(t *testing.T) {
 	astroCoreClient = mc
 
 	_, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--value", "bar")
-	assert.Error(t, err) // missing required --key
+	assert.Error(t, err) // missing --key (and no --from-file)
+	mc.AssertExpectations(t)
+}
+
+func TestEnvVarCreateFromFile(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	dir := t.TempDir()
+	envPath := dir + "/.env"
+	body := []byte("# header\nFOO=bar\nWITH_QUOTE=\"say \\\"hi\\\"\"\n\nBAZ=qux\n")
+	if err := os.WriteFile(envPath, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	createdID := "cabc12def0123456789012345"
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+
+	// Three creates in alphabetical order. Assert each carries IsSecret=true (from --secret).
+	for _, key := range []string{"BAZ", "FOO", "WITH_QUOTE"} {
+		k := key
+		mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, mock.Anything,
+			mock.MatchedBy(func(body astrocore.CreateEnvironmentObjectJSONRequestBody) bool {
+				return body.ObjectKey == k &&
+					body.EnvironmentVariable != nil &&
+					body.EnvironmentVariable.IsSecret != nil &&
+					*body.EnvironmentVariable.IsSecret
+			}),
+		).Return(&astrocore.CreateEnvironmentObjectResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
+		}, nil).Once()
+	}
+	astroCoreClient = mc
+
+	out, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--from-file", envPath, "--secret")
+	assert.NoError(t, err)
+	assert.Contains(t, out, "Created BAZ")
+	assert.Contains(t, out, "Created FOO")
+	assert.Contains(t, out, "Created WITH_QUOTE")
+	mc.AssertExpectations(t)
+}
+
+func TestEnvVarFromFileMutuallyExclusiveWithKey(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	astroCoreClient = mc
+
+	_, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--key", "FOO", "--from-file", "/tmp/whatever.env")
+	assert.Error(t, err)
+	// cobra phrases mutual-exclusion as "none of the others can be"
+	assert.Contains(t, err.Error(), "key from-file")
+	mc.AssertExpectations(t)
+}
+
+func TestEnvVarUpdateFromFileUpserts(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	dir := t.TempDir()
+	envPath := dir + "/.env"
+	if err := os.WriteFile(envPath, []byte("EXISTS=updated\nMISSING=new\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	id := cuid.New()
+	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+
+	// EXISTS: list lookup returns the row, then UPDATE.
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrocore.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ObjectKey != nil && *p.ObjectKey == "EXISTS"
+		}),
+	).Return(&astrocore.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+			{Id: &id, ObjectKey: "EXISTS"},
+		}},
+	}, nil).Once()
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, id, mock.Anything).Return(&astrocore.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "EXISTS"},
+	}, nil).Once()
+
+	// MISSING: list lookup is empty (404 path), then update returns ErrNotFound, then CREATE.
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrocore.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ObjectKey != nil && *p.ObjectKey == "MISSING"
+		}),
+	).Return(&astrocore.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
+	}, nil).Once()
+	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(body astrocore.CreateEnvironmentObjectJSONRequestBody) bool { return body.ObjectKey == "MISSING" }),
+	).Return(&astrocore.CreateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrocore.CreateEnvironmentObject{Id: cuid.New()},
+	}, nil).Once()
+	astroCoreClient = mc
+
+	out, err := execEnvCmd("var", "update", "--workspace-id", "ws-test", "--from-file", envPath)
+	assert.NoError(t, err)
+	assert.Contains(t, out, "Updated EXISTS")
+	assert.Contains(t, out, "Created MISSING")
 	mc.AssertExpectations(t)
 }

@@ -49,6 +49,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/itchyny/gojq v0.12.18
+	github.com/joho/godotenv v1.5.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neilotoole/jsoncolor v0.7.1
 	github.com/oapi-codegen/runtime v1.1.1
@@ -353,7 +354,7 @@ require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
-	github.com/gofrs/flock v0.12.1 // indirect
+	github.com/gofrs/flock v0.12.1
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
