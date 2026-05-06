@@ -234,7 +234,7 @@ func Deploy(deployInput InputDeploy, platformCoreClient astroplatformcore.CoreCl
 		return nil
 	}
 
-	if deployInput.Image {
+	if deployInput.Image && !deployInfo.isRemoteExecutionEnabled {
 		if !deployInfo.dagDeployEnabled {
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
