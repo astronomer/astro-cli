@@ -62,7 +62,7 @@ func TestDeriveHostname(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hostname, err := DeriveHostname(tt.projectDir)
+			hostname, err := DeriveHostname("", tt.projectDir)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, hostname)
 		})
@@ -77,7 +77,7 @@ func TestDeriveHostname_Empty(t *testing.T) {
 	defer func() { ReadDotGit = origReadDotGit }()
 
 	// A directory that results in an empty label after cleanup
-	_, err := DeriveHostname("/home/user/---")
+	_, err := DeriveHostname("", "/home/user/---")
 	assert.Error(t, err)
 }
 
@@ -89,7 +89,7 @@ func TestDeriveHostname_LongName(t *testing.T) {
 	defer func() { ReadDotGit = origReadDotGit }()
 
 	longName := strings.Repeat("a", 100)
-	hostname, err := DeriveHostname("/home/user/" + longName)
+	hostname, err := DeriveHostname("", "/home/user/" + longName)
 	require.NoError(t, err)
 	// Should be truncated to 63 chars + ".localhost"
 	label := strings.TrimSuffix(hostname, ".localhost")
@@ -106,7 +106,7 @@ func TestDeriveHostname_Worktree(t *testing.T) {
 		return []byte("gitdir: /home/user/my-repo/.git/worktrees/feature-branch\n"), false, nil
 	}
 
-	hostname, err := DeriveHostname("/home/user/worktrees/feature-branch")
+	hostname, err := DeriveHostname("", "/home/user/worktrees/feature-branch")
 	require.NoError(t, err)
 	assert.Equal(t, "feature-branch.my-repo.localhost", hostname)
 }
@@ -119,7 +119,7 @@ func TestDeriveHostname_WorktreeRelativePath(t *testing.T) {
 		return []byte("gitdir: ../../../.git/worktrees/my-worktree\n"), false, nil
 	}
 
-	hostname, err := DeriveHostname("/home/user/repos/my-repo/.claude/worktrees/my-worktree")
+	hostname, err := DeriveHostname("", "/home/user/repos/my-repo/.claude/worktrees/my-worktree")
 	require.NoError(t, err)
 	assert.Equal(t, "my-worktree.my-repo.localhost", hostname)
 }
@@ -133,7 +133,7 @@ func TestDeriveHostname_NormalRepo(t *testing.T) {
 		return nil, true, nil // isDir=true
 	}
 
-	hostname, err := DeriveHostname("/home/user/my-project")
+	hostname, err := DeriveHostname("", "/home/user/my-project")
 	require.NoError(t, err)
 	assert.Equal(t, "my-project.localhost", hostname)
 }
@@ -154,7 +154,75 @@ func TestDeriveHostname_RealWorktree(t *testing.T) {
 	gitFileContent := "gitdir: " + worktreesGitDir + "\n"
 	require.NoError(t, os.WriteFile(filepath.Join(worktreeDir, ".git"), []byte(gitFileContent), FilePermRW))
 
-	hostname, err := DeriveHostname(worktreeDir)
+	hostname, err := DeriveHostname("", worktreeDir)
 	require.NoError(t, err)
 	assert.Equal(t, "my-worktree.main-repo.localhost", hostname)
+}
+
+func TestDeriveHostname_ProjectNameOverridesDirName(t *testing.T) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
+		return nil, false, os.ErrNotExist
+	}
+	defer func() { ReadDotGit = origReadDotGit }()
+
+	// project.name is set, so it wins over the directory name.
+	hostname, err := DeriveHostname("circus", "/home/user/airflow")
+	require.NoError(t, err)
+	assert.Equal(t, "circus.localhost", hostname)
+}
+
+func TestDeriveHostname_ProjectNameSanitized(t *testing.T) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
+		return nil, false, os.ErrNotExist
+	}
+	defer func() { ReadDotGit = origReadDotGit }()
+
+	// project.name with mixed case and special chars should be normalized.
+	hostname, err := DeriveHostname("Acme Corp / Pipelines!", "/home/user/airflow")
+	require.NoError(t, err)
+	assert.Equal(t, "acme-corp-pipelines.localhost", hostname)
+}
+
+func TestDeriveHostname_EmptyProjectNameFallsThroughToDir(t *testing.T) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
+		return nil, false, os.ErrNotExist
+	}
+	defer func() { ReadDotGit = origReadDotGit }()
+
+	// Empty project.name should preserve previous (directory-name) behavior.
+	hostname, err := DeriveHostname("", "/home/user/my-project")
+	require.NoError(t, err)
+	assert.Equal(t, "my-project.localhost", hostname)
+}
+
+func TestDeriveHostname_ProjectNameSanitizesToEmptyFallsThroughToDir(t *testing.T) {
+	origReadDotGit := ReadDotGit
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
+		return nil, false, os.ErrNotExist
+	}
+	defer func() { ReadDotGit = origReadDotGit }()
+
+	// project.name made up entirely of separators sanitizes to empty,
+	// so we fall back to the directory name.
+	hostname, err := DeriveHostname("---", "/home/user/my-project")
+	require.NoError(t, err)
+	assert.Equal(t, "my-project.localhost", hostname)
+}
+
+func TestDeriveHostname_ProjectNameInWorktreeReplacesRepoSegment(t *testing.T) {
+	origReadDotGit := ReadDotGit
+	defer func() { ReadDotGit = origReadDotGit }()
+
+	ReadDotGit = func(_ string) ([]byte, bool, error) {
+		return []byte("gitdir: /home/user/my-repo/.git/worktrees/feature-branch\n"), false, nil
+	}
+
+	// In a worktree, project.name replaces the repo segment but the
+	// worktree segment is preserved for disambiguation across worktrees.
+	hostname, err := DeriveHostname("circus", "/home/user/worktrees/feature-branch")
+	require.NoError(t, err)
+	assert.Equal(t, "feature-branch.circus.localhost", hostname)
 }
