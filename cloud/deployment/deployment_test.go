@@ -915,7 +915,7 @@ func (s *Suite) TestLogs() {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 
 		mockPlatformCoreClient.AssertExpectations(s.T())
@@ -943,7 +943,7 @@ func (s *Suite) TestLogs() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Logs("", ws, "", "keyword", true, true, true, true, false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
+		err = Logs("", ws, "", "keyword", true, true, true, true, false, nil, false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 
 		mockPlatformCoreClient.AssertExpectations(s.T())
@@ -960,7 +960,7 @@ func (s *Suite) TestLogs() {
 		// Mock GetDeploymentLogsWithResponse to return an error
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, errMock).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		s.ErrorIs(err, errMock)
 
 		mockPlatformCoreClient.AssertExpectations(s.T())
@@ -968,7 +968,7 @@ func (s *Suite) TestLogs() {
 	})
 
 	s.Run("query for more than one log level error", func() {
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, true, true, logCount, mockPlatformCoreClient, mockCoreClient)
 		s.Error(err)
 		s.Equal(err.Error(), "cannot query for more than one log level and/or keyword at a time")
 	})
@@ -978,7 +978,7 @@ func (s *Suite) TestLogs() {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsMultipleComponentsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 
 		mockPlatformCoreClient.AssertExpectations(s.T())
@@ -1017,7 +1017,7 @@ func (s *Suite) TestLogs() {
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page1Response, nil).Once()
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page2Response, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 10, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, 10, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 
 		mockPlatformCoreClient.AssertExpectations(s.T())
@@ -1060,7 +1060,7 @@ func (s *Suite) TestLogs() {
 			mock.MatchedBy(func(p *astrocore.GetDeploymentLogsParams) bool { return p.Limit != nil && *p.Limit == 1 }),
 		).Return(&page2Response, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 3, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, 3, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 		mockPlatformCoreClient.AssertExpectations(s.T())
 		mockCoreClient.AssertExpectations(s.T())
@@ -1087,7 +1087,7 @@ func (s *Suite) TestLogs() {
 		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&oversizedResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 2, mockPlatformCoreClient, mockCoreClient)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, 2, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 		mockPlatformCoreClient.AssertExpectations(s.T())
 		mockCoreClient.AssertExpectations(s.T())
@@ -1105,7 +1105,50 @@ func (s *Suite) TestLogs() {
 		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&astrocore.GetDeploymentLogsResponse{JSON200: &astrocore.DeploymentLog{Results: []astrocore.DeploymentLogEntry{{Raw: "apiserver log", Timestamp: 1, Source: astrocore.DeploymentLogEntrySourceApiserver}}}, HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
 
-		err := Logs("test-id-1", ws, "", "", true, false, false, false, false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
+		err := Logs("test-id-1", ws, "", "", true, false, false, false, false, nil, false, false, false, 1, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
+	})
+	s.Run("dag-processor flag requests dag-processor source", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrocore.GetDeploymentLogsParams) bool {
+				return len(p.Sources) == 1 && p.Sources[0] == astrocore.GetDeploymentLogsParamsSourcesDagProcessor
+			}),
+		).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", false, false, false, false, true, nil, false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
+	})
+	s.Run("generic component flag passes through arbitrary sources", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrocore.GetDeploymentLogsParams) bool {
+				return len(p.Sources) == 2 &&
+					p.Sources[0] == astrocore.GetDeploymentLogsParamsSources("scheduler") &&
+					p.Sources[1] == astrocore.GetDeploymentLogsParamsSources("future-component")
+			}),
+		).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", false, false, false, false, false, []string{"scheduler", "future-component"}, false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
+		s.NoError(err)
+	})
+	s.Run("default sources include dag-processor when no flags set", func() {
+		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockCoreClient.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrocore.GetDeploymentLogsParams) bool {
+				for _, src := range p.Sources {
+					if src == astrocore.GetDeploymentLogsParamsSourcesDagProcessor {
+						return true
+					}
+				}
+				return false
+			}),
+		).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", false, false, false, false, false, nil, false, false, false, logCount, mockPlatformCoreClient, mockCoreClient)
 		s.NoError(err)
 	})
 }
