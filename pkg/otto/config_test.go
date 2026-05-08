@@ -113,6 +113,36 @@ func (s *ConfigSuite) TestBuildEnv_SkipsEmptyValues() {
 	s.Equal(os.DevNull, afConfig)
 }
 
+func (s *ConfigSuite) TestBuildEnv_ForwardsTelemetryDisabledFromEnv() {
+	// User exported ASTRO_TELEMETRY_DISABLED=1 — that should propagate to Otto
+	// via OTTO_TELEMETRY_DISABLE so the agent stops sending traces too.
+	os.Setenv("ASTRO_TELEMETRY_DISABLED", "1")
+	defer os.Unsetenv("ASTRO_TELEMETRY_DISABLED")
+
+	env := (&Config{Token: "t"}).BuildEnv()
+
+	for _, e := range env {
+		if strings.HasPrefix(e, "OTTO_TELEMETRY_DISABLE=") {
+			s.Equal("OTTO_TELEMETRY_DISABLE=1", e)
+			return
+		}
+	}
+	s.Fail("OTTO_TELEMETRY_DISABLE should be set when astro telemetry is disabled")
+}
+
+func (s *ConfigSuite) TestBuildEnv_DoesNotSetTelemetryDisableWhenEnabled() {
+	// Default test config has telemetry enabled and the env var unset, so Otto
+	// should NOT see OTTO_TELEMETRY_DISABLE — leaving its default (send) intact.
+	os.Unsetenv("ASTRO_TELEMETRY_DISABLED")
+
+	env := (&Config{Token: "t"}).BuildEnv()
+
+	for _, e := range env {
+		s.False(strings.HasPrefix(e, "OTTO_TELEMETRY_DISABLE="),
+			"OTTO_TELEMETRY_DISABLE must not be set when astro telemetry is enabled")
+	}
+}
+
 func (s *ConfigSuite) TestBuildEnv_DoesNotSetAFConfigWhenAirflowDetected() {
 	cfg := &Config{AirflowURL: "http://localhost:14955"}
 	env := cfg.BuildEnv()

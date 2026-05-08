@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 )
 
 // Config holds the environment configuration for spawning Otto.
@@ -115,6 +116,14 @@ func (c *Config) BuildEnv() []string {
 	set("ASTRO_TOKEN", c.Token)
 	set("ASTRO_DOMAIN", c.Domain)
 	set("ASTRO_ORGANIZATION", c.Organization)
+
+	// Forward the astro CLI's telemetry-disabled state. Users who ran
+	// `astro telemetry disable` (or set ASTRO_TELEMETRY_DISABLED=1) expect that
+	// to cover anything launched via `astro otto` too. Otto has its own
+	// OTTO_TELEMETRY_DISABLE env var as the kill switch; we just flip it on.
+	if !telemetry.IsEnabled() {
+		set("OTTO_TELEMETRY_DISABLE", "1")
+	}
 
 	// Stop `astro dev start` from popping a browser when Otto runs it.
 	// The user is already having a conversation in the TUI — surprise browser
