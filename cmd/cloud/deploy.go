@@ -139,7 +139,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
 			}
 		}
-		image = true
 	}
 
 	// Save deploymentId in config if specified

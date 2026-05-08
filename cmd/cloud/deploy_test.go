@@ -91,23 +91,6 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 	assert.ErrorIs(t, err, assert.AnError)
 }
 
-func TestDeployImageNameForcesImageOnly(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-
-	var captured cloud.InputDeploy
-	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
-		captured = deployInput
-		return nil
-	}
-
-	err := execDeployCmd("-f", "test-deployment-id", "--image-name", "custom-image:latest")
-	assert.NoError(t, err)
-	assert.True(t, captured.Image, "--image-name should force image-only deploy")
-	assert.Equal(t, "custom-image:latest", captured.ImageName)
-}
-
 func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
