@@ -1,0 +1,113 @@
+name: Create Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic version without v prefix (e.g. 1.43.0)'
+        required: true
+        type: string
+      rc:
+        description: 'Create a release candidate (RC) tag'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate branch and version
+        run: |
+          set -e
+          BRANCH="${GITHUB_REF_NAME}"
+          VERSION="${{ inputs.version }}"
+
+          # Ensure we are on a release branch
+          if [[ ! "$BRANCH" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::This workflow must be run from a release-X.Y branch. Current branch: $BRANCH"
+            exit 1
+          fi
+
+          BRANCH_MAJOR_MINOR="${BASH_REMATCH[1]}"
+
+          # Ensure the version input matches the branch major.minor
+          # Escape dots for regex matching (1.43 -> 1\.43)
+          ESCAPED_MM=$(echo "$BRANCH_MAJOR_MINOR" | sed 's/\./\\./g')
+          if [[ ! "$VERSION" =~ ^${ESCAPED_MM}\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' does not match branch '$BRANCH'. Expected ${BRANCH_MAJOR_MINOR}.Z"
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BRANCH_MAJOR_MINOR=$BRANCH_MAJOR_MINOR" >> $GITHUB_ENV
+          echo "Validated: version=$VERSION on branch=$BRANCH"
+
+      - name: Compute RC tag
+        if: inputs.rc == true
+        run: |
+          set -e
+          VERSION="${{ inputs.version }}"
+
+          # Find the highest existing RC number for this version
+          HIGHEST_RC=$(git tag -l "v${VERSION}-rc.*" | \
+            sed -n 's/.*-rc\.\([0-9]*\)$/\1/p' | \
+            sort -n | tail -1)
+
+          if [ -z "$HIGHEST_RC" ]; then
+            NEXT_RC=1
+          else
+            NEXT_RC=$((HIGHEST_RC + 1))
+          fi
+
+          TAG="v${VERSION}-rc.${NEXT_RC}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Computed RC tag: $TAG"
+
+      - name: Compute GA tag
+        if: inputs.rc == false
+        run: |
+          set -e
+          VERSION="${{ inputs.version }}"
+
+          # Safety check: ensure at least one RC exists for this version
+          RC_COUNT=$(git tag -l "v${VERSION}-rc.*" | wc -l)
+          if [ "$RC_COUNT" -eq 0 ]; then
+            echo "::error::No RC tags found for v${VERSION}. Create at least one RC before cutting a GA release."
+            exit 1
+          fi
+
+          echo "Found $RC_COUNT RC tag(s) for v${VERSION}"
+
+          # Ensure GA tag does not already exist
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${VERSION} already exists."
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Computed GA tag: $TAG"
+
+      - name: Create and push tag
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "Pushed tag: $TAG"
+          echo "## Release Tag Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`$GITHUB_REF_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`$(git rev-parse --short HEAD)\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** @$GITHUB_ACTOR" >> $GITHUB_STEP_SUMMARY

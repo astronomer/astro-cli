@@ -4,20 +4,47 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-  workflow_dispatch:
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      is_rc: ${{ steps.parse.outputs.is_rc }}
+      version: ${{ steps.parse.outputs.version }}
+      tag: ${{ steps.parse.outputs.tag }}
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+          if [[ "$TAG" =~ -rc\. ]]; then
+            echo "is_rc=true" >> $GITHUB_OUTPUT
+            # Strip v prefix and -rc.N suffix to get base version
+            VERSION=$(echo "$TAG" | sed 's/^v//; s/-rc\.[0-9]*$//')
+          else
+            echo "is_rc=false" >> $GITHUB_OUTPUT
+            VERSION=$(echo "$TAG" | sed 's/^v//')
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Parsed — Tag: $TAG | Version: $VERSION | RC: $([[ "$TAG" =~ -rc\. ]] && echo true || echo false)"
+
   release:
+    needs: detect
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
@@ -28,7 +55,7 @@ jobs:
 
       - name: Cache osxcross
         id: cache-osxcross
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@v4
         with:
           path: /tmp/osxcross
           key: osxcross-macos12.3-${{ runner.os }}
@@ -44,9 +71,99 @@ jobs:
       - name: Add osxcross to PATH
         run: echo "/tmp/osxcross/target/bin" >> $GITHUB_PATH
 
-      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+      - uses: goreleaser/goreleaser-action@v6
         with:
           version: v2.15.2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only pass the token for GA releases; RC builds skip homebrew upload via skip_upload: auto
+          # but GoReleaser still evaluates the template, so we pass GITHUB_TOKEN as a safe fallback.
+          HOMEBREW_TAP_TOKEN: ${{ needs.detect.outputs.is_rc == 'false' && secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
+
+  update-godownloader:
+    needs: [detect, release]
+    if: needs.detect.outputs.is_rc == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update LATEST_VERSION in godownloader.sh
+        run: |
+          TAG="v${{ needs.detect.outputs.version }}"
+          sed -i "s/^LATEST_VERSION=.*/LATEST_VERSION=${TAG}/" godownloader.sh
+
+      - name: Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.detect.outputs.version }}"
+          BRANCH="chore/update-godownloader-${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add godownloader.sh
+          git commit -m "chore: update godownloader to ${TAG}"
+          git push origin "${BRANCH}"
+          PR_BODY="Automated PR to update \`LATEST_VERSION\` in \`godownloader.sh\` to \`${TAG}\`."
+          PR_BODY+=$'\n\n'"Triggered by release [${TAG}](https://github.com/${{ github.repository }}/releases/tag/${TAG})."
+          gh pr create \
+            --base main \
+            --title "chore: update godownloader to ${TAG}" \
+            --body "$PR_BODY"
+
+  update-winget:
+    needs: [detect, release]
+    if: needs.detect.outputs.is_rc == 'false'
+    runs-on: windows-latest
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: Astronomer.Astro
+          version: ${{ needs.detect.outputs.version }}
+          installers-regex: '\.zip$'
+          token: ${{ secrets.WINGET_TOKEN }}
+
+  notify:
+    needs: [detect, release, update-godownloader, update-winget]
+    if: always() && needs.detect.outputs.is_rc == 'false' && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Post release summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.detect.outputs.version }}"
+
+          GODOWNLOADER_STATUS="${{ needs.update-godownloader.result }}"
+          WINGET_STATUS="${{ needs.update-winget.result }}"
+
+          SUMMARY="## Post-Release Automation Summary"$'\n\n'
+          SUMMARY+="| Task | Status |"$'\n'
+          SUMMARY+="|------|--------|"$'\n'
+          SUMMARY+="| Godownloader PR | ${GODOWNLOADER_STATUS} |"$'\n'
+          SUMMARY+="| Homebrew Tap PR | Handled by GoReleaser |"$'\n'
+          SUMMARY+="| Winget PR | ${WINGET_STATUS} |"
+
+          # Get the release ID by tag, then append the summary to the release body
+          RELEASE_ID=$(gh api "/repos/${{ github.repository }}/releases/tags/${TAG}" --jq '.id' 2>/dev/null) || true
+          if [ -n "$RELEASE_ID" ]; then
+            EXISTING_BODY=$(gh api "/repos/${{ github.repository }}/releases/${RELEASE_ID}" --jq '.body // ""')
+            UPDATED_BODY="${EXISTING_BODY}"$'\n\n'"${SUMMARY}"
+            gh api \
+              --method PATCH \
+              "/repos/${{ github.repository }}/releases/${RELEASE_ID}" \
+              -f body="${UPDATED_BODY}" || true
+          fi
+
+      - name: Notify Slack
+        if: env.SLACK_WEBHOOK_URL != ''
+        run: |
+          TAG="v${{ needs.detect.outputs.version }}"
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            -d "{\"text\":\"Astro CLI ${TAG} has been released: https://github.com/${{ github.repository }}/releases/tag/${TAG}\"}"
