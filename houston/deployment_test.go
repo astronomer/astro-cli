@@ -698,4 +698,58 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, RuntimeVersion: "6.0.0"})
 		s.Contains(err.Error(), "Internal Server Error")
 	})
+
+	s.Run("Uses upsertDeployment API for Houston >= 2.1.0", func() {
+		oldVersion := version
+		version = "2.1.0"
+		defer func() { version = oldVersion }()
+
+		var capturedBody string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			b, _ := io.ReadAll(req.Body)
+			capturedBody = string(b)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{
+			ReleaseName:    mockDeployment.Data.UpdateDeploymentImage.ReleaseName,
+			Image:          "registry.example.com/image:tag",
+			RuntimeVersion: "6.0.0",
+		})
+		s.NoError(err)
+		s.Contains(capturedBody, "upsertDeployment")
+		s.NotContains(capturedBody, "updateDeploymentImage")
+	})
+
+	s.Run("Uses updateDeploymentImage API for Houston < 2.1.0", func() {
+		oldVersion := version
+		version = "1.0.1"
+		defer func() { version = oldVersion }()
+
+		var capturedBody string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			b, _ := io.ReadAll(req.Body)
+			capturedBody = string(b)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{
+			ReleaseName:    mockDeployment.Data.UpdateDeploymentImage.ReleaseName,
+			Image:          "registry.example.com/image:tag",
+			RuntimeVersion: "6.0.0",
+		})
+		s.NoError(err)
+		s.Contains(capturedBody, "updateDeploymentImage")
+		s.NotContains(capturedBody, "upsertDeployment")
+	})
 }
