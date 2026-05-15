@@ -83,6 +83,8 @@ var (
 	logScheduler                  bool
 	logWorkers                    bool
 	logTriggerer                  bool
+	logDagProcessor               bool
+	logComponents                 []string
 	flagRemoteExecutionEnabled    bool
 	flagAllowedIPAddressRanges    string
 	flagTaskLogBucket             string
@@ -424,6 +426,8 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
 	cmd.Flags().BoolVar(&logWorkers, "workers", false, "Show logs from the workers")
 	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
+	cmd.Flags().BoolVar(&logDagProcessor, "dag-processor", false, "Show logs from the DAG processor")
+	cmd.Flags().StringSliceVar(&logComponents, "component", nil, "Show logs from a component by name (repeatable or comma-separated). Alternative to passing individual flags like --scheduler or --triggerer.")
 	return cmd
 }
 
@@ -712,7 +716,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	}
 	logServer := logWebserver || logApiserver
 
-	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo

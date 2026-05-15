@@ -49,6 +49,7 @@ func (s *PodmanRuntimeSuite) Unsetenv(key string) {
 func (s *PodmanRuntimeSuite) SetupTest() {
 	// Reset some variables to defaults.
 	s.Unsetenv("DOCKER_HOST")
+	s.Unsetenv("CONTAINER_HOST")
 	mockPodmanEngine = new(mocks.PodmanEngine)
 	mockPodmanOSChecker = new(mocks.OSChecker)
 	mockListedMachines = []types.ListedMachine{}
@@ -101,6 +102,8 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeInitialize() {
 		// Run our test and assert expectations.
 		err := rt.Initialize()
 		assert.Nil(s.T(), err)
+		assert.Equal(s.T(), "unix:///path/to/astro-machine.sock", os.Getenv("DOCKER_HOST"))
+		assert.Equal(s.T(), "unix:///path/to/astro-machine.sock", os.Getenv("CONTAINER_HOST"))
 		mockPodmanEngine.AssertExpectations(s.T())
 		mockPodmanOSChecker.AssertExpectations(s.T())
 	})
@@ -122,6 +125,8 @@ func (s *PodmanRuntimeSuite) TestPodmanRuntimeInitializeWindows() {
 		// Run our test and assert expectations.
 		err := rt.Initialize()
 		assert.Nil(s.T(), err)
+		assert.Equal(s.T(), "npipe:////./pipe/podman-astro-machine", os.Getenv("DOCKER_HOST"))
+		assert.Empty(s.T(), os.Getenv("CONTAINER_HOST"))
 		mockPodmanEngine.AssertExpectations(s.T())
 		mockPodmanOSChecker.AssertExpectations(s.T())
 	})
