@@ -2359,12 +2359,24 @@ func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
 		original string
 	}{
 		{
-			name:     "file with trailing newline is restored exactly",
+			name:     "LF file with trailing newline is restored exactly",
 			original: "some/path/\nother/\n",
 		},
 		{
-			name:     "file without trailing newline is restored exactly",
+			name:     "LF file without trailing newline is restored exactly",
 			original: "some/path/\nother/",
+		},
+		{
+			name:     "CRLF file is restored byte-for-byte (Windows)",
+			original: "some/path/\r\nother/\r\n",
+		},
+		{
+			name:     "file that already contains dags/ is restored exactly",
+			original: "some/path/\ndags/\nother/\n",
+		},
+		{
+			name:     "empty file is restored as empty",
+			original: "",
 		},
 	}
 
@@ -2384,6 +2396,67 @@ func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
 			got, err := os.ReadFile(dockerignorePath)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.original, string(got))
+
+			mockImageHandler.AssertExpectations(t)
+		})
+	}
+}
+
+func TestBuildImageWithoutDagsCleansUpCreatedDockerignore(t *testing.T) {
+	dir := t.TempDir()
+	dockerignorePath := filepath.Join(dir, ".dockerignore")
+
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	err := buildImageWithoutDags(dir, "", mockImageHandler)
+	assert.NoError(t, err)
+
+	_, statErr := os.Stat(dockerignorePath)
+	assert.True(t, os.IsNotExist(statErr), "expected .dockerignore not to exist, got: %v", statErr)
+
+	mockImageHandler.AssertExpectations(t)
+}
+
+func TestBuildImageWithoutDagsAppendsDagsDuringBuild(t *testing.T) {
+	tests := []struct {
+		name                string
+		original            string
+		expectedDuringBuild string
+	}{
+		{
+			name:                "appends dags/ when missing and file has trailing newline",
+			original:            "some/path/\n",
+			expectedDuringBuild: "some/path/\ndags/\n",
+		},
+		{
+			name:                "appends dags/ when missing and file has no trailing newline",
+			original:            "some/path/",
+			expectedDuringBuild: "some/path/\ndags/\n",
+		},
+		{
+			name:                "leaves file alone when dags/ already present",
+			original:            "some/path/\ndags/\n",
+			expectedDuringBuild: "some/path/\ndags/\n",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			dockerignorePath := filepath.Join(dir, ".dockerignore")
+			err := os.WriteFile(dockerignorePath, []byte(tc.original), 0o644)
+			assert.NoError(t, err)
+
+			mockImageHandler := new(mocks.ImageHandler)
+			mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
+				got, readErr := os.ReadFile(dockerignorePath)
+				assert.NoError(t, readErr)
+				assert.Equal(t, tc.expectedDuringBuild, string(got))
+			}).Return(nil)
+
+			err = buildImageWithoutDags(dir, "", mockImageHandler)
+			assert.NoError(t, err)
 
 			mockImageHandler.AssertExpectations(t)
 		})
@@ -2410,11 +2483,6 @@ func TestRemoveDagsFromDockerIgnore(t *testing.T) {
 			name:     "dags as last line with trailing newline",
 			input:    "some/path/\ndags/\n",
 			expected: "some/path/\n",
-		},
-		{
-			name:     "dags appended without trailing newline (buildImageWithoutDags case)",
-			input:    "some/path/\ndags/",
-			expected: "some/path/",
 		},
 	}
 

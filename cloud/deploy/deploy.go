@@ -630,78 +630,53 @@ func fetchDeploymentDetails(deploymentID, organizationID string, platformCoreCli
 }
 
 func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) error {
-	// flag to determine if we are setting the dags folder in dockerignore
-	dagsIgnoreSet := false
-	// flag to determine if dockerignore file was created on runtime
-	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	// Snapshot the original bytes so we can restore byte-for-byte after the build
+	// (preserves CRLF, trailing whitespace, etc.).
+	originalBytes, err := os.ReadFile(fullpath)
+	originalExisted := err == nil
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
 	defer func() {
-		// remove dags from .dockerignore file if we set it
-		if dagsIgnoreSet {
-			removeDagsFromDockerIgnore(fullpath) //nolint:errcheck
-		}
-		// remove created docker ignore file
-		if dockerIgnoreCreate {
-			os.Remove(fullpath)
+		if originalExisted {
+			_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
+		} else {
+			_ = os.Remove(fullpath)
 		}
 	}()
 
-	fileExist, _ := fileutil.Exists(fullpath, nil)
-	if !fileExist {
-		// Create a dockerignore file and add the dags folder entry
-		err := fileutil.WriteStringToFile(fullpath, "dags/")
-		if err != nil {
+	switch {
+	case !originalExisted:
+		if err := os.WriteFile(fullpath, []byte("dags/\n"), 0o644); err != nil { //nolint:gosec,mnd
 			return err
 		}
-		dockerIgnoreCreate = true
-	}
-	lines, err := fileutil.Read(fullpath)
-	if err != nil {
-		return err
-	}
-	contains, _ := fileutil.Contains(lines, "dags/")
-	if !contains {
-		// Read raw bytes to check if the file ends with a newline before we modify it.
-		// We append in a way that preserves this state so removeDagsFromDockerIgnore
-		// can restore the file exactly.
-		rawContent, err := os.ReadFile(fullpath)
-		if err != nil {
-			return err
+	case !dockerignoreContainsDags(originalBytes):
+		modified := append([]byte{}, originalBytes...)
+		if len(modified) > 0 && modified[len(modified)-1] != '\n' {
+			modified = append(modified, '\n')
 		}
-		hadTrailingNewline := len(rawContent) > 0 && rawContent[len(rawContent)-1] == '\n'
-
-		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		appendStr := "\ndags/"
-		if hadTrailingNewline {
-			appendStr = "dags/\n"
-		}
-		if _, err := f.WriteString(appendStr); err != nil {
-			return err
-		}
-
-		dagsIgnoreSet = true
-	}
-	err = imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
-	if err != nil {
-		return err
-	}
-
-	// remove dags from .dockerignore file if we set it
-	if dagsIgnoreSet {
-		err = removeDagsFromDockerIgnore(fullpath)
-		if err != nil {
+		modified = append(modified, []byte("dags/\n")...)
+		if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd
 			return err
 		}
 	}
 
-	return nil
+	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+}
+
+// dockerignoreContainsDags reports whether content has a line equal to "dags/".
+// Uses bufio.Scanner so CRLF line endings are handled identically to LF.
+func dockerignoreContainsDags(content []byte) bool {
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	for scanner.Scan() {
+		if scanner.Text() == "dags/" {
+			return true
+		}
+	}
+	return false
 }
 
 func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, platformCoreClient astroplatformcore.CoreClient) (version string, err error) {
