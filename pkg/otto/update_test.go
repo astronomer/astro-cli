@@ -169,37 +169,55 @@ func (s *UpdateSuite) TestUpdateStateFile_PathIsBinDirSibling() {
 // The gating on `otto.auto_update` lives in Start() and is covered by the
 // real-auth smoke path.
 
-// stubDownloader returns a downloader that records whether it was called and
-// returns a fixed error (nil for success). The install side-effect is
-// simulated by rewriting package.json to the given version.
-func (s *UpdateSuite) stubDownloader(installAs string, returnErr error) (download func() error, called *bool) {
+// stubDownloader returns a downloader that records whether it was called,
+// captures the version it was invoked with, and returns a fixed error (nil
+// for success). The install side-effect is simulated by rewriting
+// package.json to the given version.
+func (s *UpdateSuite) stubDownloader(installAs string, returnErr error) (download func(string) error, called *bool, requestedVersion *string) {
 	flag := false
-	return func() error {
+	ver := ""
+	return func(v string) error {
 		flag = true
+		ver = v
 		if returnErr != nil {
 			return returnErr
 		}
 		s.writeInstalled(installAs)
 		return nil
-	}, &flag
+	}, &flag, &ver
 }
 
 func (s *UpdateSuite) TestAutoUpdate_NewerCached_DownloadsAndReportsProgress() {
 	s.writeInstalled("0.0.5")
 	s.writeCache(updateState{LatestKnown: "0.0.9"})
-	download, called := s.stubDownloader("0.0.9", nil)
+	download, called, requested := s.stubDownloader("0.0.9", nil)
 
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
 
 	s.True(*called, "downloader should fire when cache is newer")
 	s.Contains(buf.String(), "Updating Otto 0.0.5 → 0.0.9")
+	s.Equal("0.0.9", *requested, "downloader should be pinned to the version we logged")
+}
+
+// Regression: the original bug logged "→ 0.1.8" but downloaded /latest/,
+// which by then had advanced to 0.1.10. Pinning the download to the cached
+// version keeps the log honest.
+func (s *UpdateSuite) TestAutoUpdate_PinsDownloadToCachedVersion() {
+	s.writeInstalled("0.1.7")
+	s.writeCache(updateState{LatestKnown: "0.1.8"})
+	download, _, requested := s.stubDownloader("0.1.8", nil)
+
+	var buf bytes.Buffer
+	autoUpdate(&buf, download)
+
+	s.Equal("0.1.8", *requested)
 }
 
 func (s *UpdateSuite) TestAutoUpdate_CacheEqualToInstalled_SkipsDownload() {
 	s.writeInstalled("0.0.5")
 	s.writeCache(updateState{LatestKnown: "0.0.5"})
-	download, called := s.stubDownloader("0.0.5", nil)
+	download, called, _ := s.stubDownloader("0.0.5", nil)
 
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
@@ -211,7 +229,7 @@ func (s *UpdateSuite) TestAutoUpdate_CacheEqualToInstalled_SkipsDownload() {
 func (s *UpdateSuite) TestAutoUpdate_CacheOlderThanInstalled_SkipsDownload() {
 	s.writeInstalled("0.0.7")
 	s.writeCache(updateState{LatestKnown: "0.0.5"})
-	download, called := s.stubDownloader("0.0.5", nil)
+	download, called, _ := s.stubDownloader("0.0.5", nil)
 
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
@@ -223,7 +241,7 @@ func (s *UpdateSuite) TestAutoUpdate_CacheOlderThanInstalled_SkipsDownload() {
 func (s *UpdateSuite) TestAutoUpdate_NoInstalled_SkipsDownload() {
 	// First-run case — EnsureBinary is responsible for the initial install.
 	s.writeCache(updateState{LatestKnown: "0.0.9"})
-	download, called := s.stubDownloader("0.0.9", nil)
+	download, called, _ := s.stubDownloader("0.0.9", nil)
 
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
@@ -236,7 +254,7 @@ func (s *UpdateSuite) TestAutoUpdate_NoCachedVersion_SkipsDownload() {
 	s.writeInstalled("0.0.5")
 	// cache has LastCheck but no LatestKnown (old schema)
 	s.writeCache(updateState{LastCheck: time.Now().UTC().Format(time.RFC3339)})
-	download, called := s.stubDownloader("0.0.9", nil)
+	download, called, _ := s.stubDownloader("0.0.9", nil)
 
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
@@ -248,7 +266,7 @@ func (s *UpdateSuite) TestAutoUpdate_NoCachedVersion_SkipsDownload() {
 func (s *UpdateSuite) TestAutoUpdate_DownloadFails_SoftFallsBack() {
 	s.writeInstalled("0.0.5")
 	s.writeCache(updateState{LatestKnown: "0.0.9"})
-	download, called := s.stubDownloader("", errStubNetwork)
+	download, called, _ := s.stubDownloader("", errStubNetwork)
 
 	var buf bytes.Buffer
 	autoUpdate(&buf, download)
