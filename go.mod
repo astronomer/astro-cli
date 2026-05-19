@@ -45,7 +45,7 @@ require (
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-git/go-billy/v5 v5.9.0
-	github.com/go-git/go-git/v5 v5.12.0
+	github.com/go-git/go-git/v5 v5.19.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/itchyny/gojq v0.12.18
@@ -358,7 +358,6 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gofrs/flock v0.12.1
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
