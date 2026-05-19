@@ -779,6 +779,55 @@ func TestNoDagsImageDeployForceSkipsPrompt(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
+// Regression test for v1.42.0: --image-name on a Remote Execution
+// deployment auto-set Image=true and tripped the dagDeployEnabled guard,
+// returning a bogus "DAG-only deploys are not enabled" error even though
+// RE deployments don't deploy DAGs to the orchestration plane.
+func TestImageDeployOnRemoteExecutionDeploymentSucceedsWithoutDagDeploy(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseRemoteExecution, nil)
+	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil)
+	mockV1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil)
+	mockV1Client.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil)
+
+	mockImageHandler := new(mocks.ImageHandler)
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("3.0-1", nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
+		return mockImageHandler
+	}
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+	ctx.Token = "test testing"
+	err = ctx.SetContext()
+	assert.NoError(t, err)
+
+	deployInput := InputDeploy{
+		Path:      "./testfiles/",
+		RuntimeID: deploymentID,
+		WsID:      ws,
+		EnvFile:   "./testfiles/.env",
+		ImageName: "custom-image",
+		Image:     true,
+		Force:     true,
+	}
+
+	err = Deploy(deployInput, mockV1Client)
+	assert.NoError(t, err)
+	if err != nil {
+		assert.NotContains(t, err.Error(), "DAG-only deploys are not enabled")
+	}
+
+	mockV1Client.AssertExpectations(t)
+}
+
 func TestDagsDeployFailed(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")

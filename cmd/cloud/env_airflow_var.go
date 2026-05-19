@@ -1,0 +1,269 @@
+//nolint:dupl // Mirror of env_var.go for AIRFLOW_VARIABLE; see comment there.
+package cloud
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cloud/env"
+)
+
+const envAirflowVarExamples = `
+  # List Airflow variables in a workspace
+  astro env airflow-variable list --workspace-id <ws-id>
+
+  # Create
+  astro env airflow-variable create --workspace-id <ws-id> --key MY_VAR --value some-value
+
+  # Update
+  astro env airflow-variable update MY_VAR --workspace-id <ws-id> --value new-value
+
+  # Delete
+  astro env airflow-variable delete MY_VAR --workspace-id <ws-id> --yes
+
+  # Bulk import from a dotenv file (POSIX-style keys only)
+  astro env airflow-variable create --workspace-id <ws-id> --from-file vars.env
+  astro env airflow-variable update --workspace-id <ws-id> --from-file vars.env
+`
+
+func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "airflow-variable",
+		Aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
+		Short:   "Manage environment-manager Airflow variables",
+		Long:    "List, create, update, or delete Airflow variables managed through the platform's environment manager. Variables can be scoped to a workspace or a deployment.",
+		Example: envAirflowVarExamples,
+	}
+	cmd.SetOut(out)
+	addScopePersistentFlags(cmd)
+	cmd.AddCommand(
+		newEnvAirflowVarListCmd(out),
+		newEnvAirflowVarGetCmd(out),
+		newEnvAirflowVarCreateCmd(out),
+		newEnvAirflowVarUpdateCmd(out),
+		newEnvAirflowVarDeleteCmd(out),
+	)
+	return cmd
+}
+
+func newEnvAirflowVarListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List Airflow variables",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runEnvAirflowVarList(cmd, out)
+		},
+	}
+	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	return cmd
+}
+
+func newEnvAirflowVarGetCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get <id-or-key>",
+		Short: "Get a single Airflow variable by ID or key",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runEnvAirflowVarGet(cmd, out, args[0])
+		},
+	}
+	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	return cmd
+}
+
+func newEnvAirflowVarCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create one or more Airflow variables",
+		Long:    "Create a single variable via --key/--value, or bulk-create from a dotenv file via --from-file. --secret and --auto-link apply uniformly to every entry in the file.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runEnvAirflowVarCreate(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&envVarKey, "key", "k", "", "Variable key (required unless --from-file is used)")
+	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "Variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
+	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark this variable as secret")
+	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Bulk-create variables from a dotenv file (KEY=VALUE per line; supports quoted and multi-line values). Pass '-' to read from stdin. Mutually exclusive with --key/--value.")
+	addAutoLinkFlag(cmd)
+	cmd.MarkFlagsMutuallyExclusive("key", "from-file")
+	cmd.MarkFlagsMutuallyExclusive("value", "from-file")
+	return cmd
+}
+
+func newEnvAirflowVarUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [<id-or-key>]",
+		Aliases: []string{"up"},
+		Short:   "Set an Airflow variable's value (creates it if missing; use --strict to require existing)",
+		Long:    "Set the value of an Airflow variable. By default this upserts: if the key does not exist it is created. Pass --strict to fail when the key is missing. Use --from-file to bulk-upsert from a dotenv file.",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if envVarFromFile != "" {
+				if len(args) > 0 {
+					return errors.New("cannot pass an <id-or-key> together with --from-file; --from-file upserts every entry in the file")
+				}
+				return runEnvAirflowVarUpdateFromFile(cmd, out)
+			}
+			if len(args) == 0 {
+				return errors.New("update requires <id-or-key> or --from-file")
+			}
+			return runEnvAirflowVarUpdate(cmd, out, args[0])
+		},
+	}
+	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "New variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
+	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "If the variable does not exist (upsert path), mark it as secret on create. Has no effect when updating an existing variable.")
+	cmd.Flags().BoolVar(&envVarStrict, "strict", false, "Fail if the variable does not exist (default: upsert)")
+	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Bulk-upsert variables from a dotenv file. Pass '-' to read from stdin. Mutually exclusive with --value and the positional <id-or-key>.")
+	addAutoLinkFlag(cmd)
+	cmd.MarkFlagsMutuallyExclusive("value", "from-file")
+	return cmd
+}
+
+func newEnvAirflowVarDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete <id-or-key>",
+		Aliases: []string{"rm"},
+		Short:   "Delete an Airflow variable",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runEnvAirflowVarDelete(cmd, out, args[0])
+		},
+	}
+	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
+	return cmd
+}
+
+func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	f, err := env.ParseFormat(envFormat)
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
+	if err != nil {
+		return err
+	}
+	if envIncludeSecrets {
+		fmt.Fprintln(os.Stderr, includeSecretsWarning)
+	}
+	w, closer, err := openOutput(out)
+	if err != nil {
+		return err
+	}
+	defer closer()
+	return env.WriteAirflowVarList(objs, f, envIncludeSecrets, w)
+}
+
+func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	f, err := env.ParseFormat(envFormat)
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	obj, err := env.GetAirflowVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return env.WriteAirflowVar(obj, f, envIncludeSecrets, out)
+}
+
+func runEnvAirflowVarCreate(cmd *cobra.Command, out io.Writer) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	if envVarFromFile != "" {
+		return runFromFileCreate(out, scope, autoLinkPtr(cmd), envVarSecret, envVarFromFile, env.CreateAirflowVar)
+	}
+	if envVarKey == "" {
+		return errors.New("--key is required (or use --from-file)")
+	}
+
+	value, err := readSecretValue(envVarValue, fmt.Sprintf("Value for %s", envVarKey))
+	if err != nil {
+		return err
+	}
+	obj, err := env.CreateAirflowVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroV1Client)
+	if err != nil {
+		return err
+	}
+	id := ""
+	if obj.Id != nil {
+		id = *obj.Id
+	}
+	fmt.Fprintf(out, "Created %s (id: %s)\n", obj.ObjectKey, id)
+	return nil
+}
+
+func runEnvAirflowVarUpdateFromFile(cmd *cobra.Command, out io.Writer) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+	return runFromFileUpdate(out, scope, autoLinkPtr(cmd), envVarSecret, envVarStrict, envVarFromFile, env.CreateAirflowVar, env.UpdateAirflowVar)
+}
+
+func runEnvAirflowVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	value, err := readSecretValue(envVarValue, fmt.Sprintf("New value for %s", idOrKey))
+	if err != nil {
+		return err
+	}
+	autoLink := autoLinkPtr(cmd)
+	obj, err := env.UpdateAirflowVar(idOrKey, scope, value, autoLink, astroV1Client)
+	if err != nil {
+		if errors.Is(err, env.ErrNotFound) && !envVarStrict {
+			obj, err = env.CreateAirflowVar(scope, idOrKey, value, envVarSecret, autoLink, astroV1Client)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "Created %s\n", obj.ObjectKey)
+			return nil
+		}
+		return err
+	}
+	fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
+	return nil
+}
+
+func runEnvAirflowVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	if !envYes && !confirmTTY(fmt.Sprintf("Delete Airflow variable %q?", idOrKey)) {
+		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
+	}
+	if err := env.DeleteAirflowVar(idOrKey, scope, astroV1Client); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
+	return nil
+}

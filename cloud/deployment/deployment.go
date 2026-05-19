@@ -226,7 +226,7 @@ func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.API
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logScheduler, logTriggerer, logWorkers, warnLogs, errorLogs, infoLogs bool, logCount int, astroV1Client astrov1.APIClient) error {
+func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor bool, extraComponents []string, warnLogs, errorLogs, infoLogs bool, logCount int, astroV1Client astrov1.APIClient) error {
 	var logLevel string
 	var i int
 	// log level
@@ -281,8 +281,18 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 	if logWorkers {
 		componentSources = append(componentSources, "worker")
 	}
+	if logDagProcessor {
+		componentSources = append(componentSources, astrov1.GetDeploymentLogsParamsSourcesDagProcessor)
+	}
+	for _, c := range extraComponents {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		componentSources = append(componentSources, astrov1.GetDeploymentLogsParamsSources(c))
+	}
 	if len(componentSources) == 0 {
-		componentSources = append(componentSources, serverComponent, "scheduler", "triggerer", "worker")
+		componentSources = append(componentSources, serverComponent, "scheduler", "triggerer", "worker", astrov1.GetDeploymentLogsParamsSourcesDagProcessor)
 	}
 
 	maxPerPage := 5000

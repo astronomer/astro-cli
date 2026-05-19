@@ -234,7 +234,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient) error { //
 		return nil
 	}
 
-	if deployInput.Image {
+	if deployInput.Image && !deployInfo.isRemoteExecutionEnabled {
 		if !deployInfo.dagDeployEnabled {
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
@@ -245,10 +245,12 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient) error { //
 		return err
 	}
 
-	// Check if git metadata is enabled (default: true)
+	// Check if git metadata is enabled (default: true).
+	// Skip when --image-name is provided: the local working directory does not necessarily
+	// reflect the contents of a prebuilt image, so attaching its git metadata would be misleading.
 	var deployGit *astrov1.CreateDeployGitRequest
 	var commitMessage string
-	if config.CFG.DeployGitMetadata.GetBool() {
+	if config.CFG.DeployGitMetadata.GetBool() && deployInput.ImageName == "" {
 		deployGit, commitMessage = retrieveLocalGitMetadata(deployInput.Path)
 	}
 

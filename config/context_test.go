@@ -208,6 +208,39 @@ func (s *Suite) TestSetContextKey() {
 	s.Equal("test", outCtx.Token)
 }
 
+// Regression: viper's Set on a nested path populates its override layer with
+// a partial tree, causing UnmarshalKey of the parent to drop any field not
+// touched by a Set (e.g. refreshtoken). See viper#1106.
+func (s *Suite) TestSetContextKey_PreservesSiblingFields() {
+	fs := afero.NewMemMapFs()
+	configRaw := []byte(`
+context: example.com
+contexts:
+  example_com:
+    domain: example.com
+    token: Bearer old
+    refreshtoken: original-refresh-token
+    organization: org-id
+    workspace: ws-id
+`)
+	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	s.Require().NoError(err)
+	InitConfig(fs)
+
+	ctx, err := GetCurrentContext()
+	s.Require().NoError(err)
+	s.Require().NoError(ctx.SetContextKey("token", "Bearer new"))
+	s.Require().NoError(ctx.SetExpiresIn(3600))
+
+	reread, err := GetCurrentContext()
+	s.Require().NoError(err)
+	s.Equal("Bearer new", reread.Token)
+	s.Equal("original-refresh-token", reread.RefreshToken)
+	s.Equal("org-id", reread.Organization)
+	s.Equal("ws-id", reread.Workspace)
+	s.Equal("example.com", reread.Domain)
+}
+
 func (s *Suite) TestSetOrganizationContext() {
 	initTestConfig()
 	s.Run("set organization context", func() {

@@ -19,7 +19,7 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/environment"
+	"github.com/astronomer/astro-cli/cloud/env"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -833,7 +833,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APICl
 	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
-		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroV1Client)
+		envConns, err = env.ListConnsByKey(env.ScopeFromIDs(workspaceID, deploymentID), true, true, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -1045,7 +1045,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroV1Client astrov1.API
 	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
-		envConns, err = environment.ListConnections(workspaceID, deploymentID, astroV1Client)
+		envConns, err = env.ListConnsByKey(env.ScopeFromIDs(workspaceID, deploymentID), true, true, astroV1Client)
 		if err != nil {
 			return err
 		}

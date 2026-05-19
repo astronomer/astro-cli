@@ -907,7 +907,7 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, logCount, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockV1Client)
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -935,7 +935,7 @@ func (s *Suite) TestLogs() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Logs("", ws, "", "keyword", true, true, true, true, false, false, false, 1, mockV1Client)
+		err = Logs("", ws, "", "keyword", true, true, true, true, false, nil, false, false, false, 1, mockV1Client)
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -952,7 +952,7 @@ func (s *Suite) TestLogs() {
 		// Mock GetDeploymentLogsWithResponse to return an error
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, errMock).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, false, false, logCount, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, false, false, false, logCount, mockV1Client)
 		s.ErrorIs(err, errMock)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -960,7 +960,7 @@ func (s *Suite) TestLogs() {
 	})
 
 	s.Run("query for more than one log level error", func() {
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, true, true, logCount, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, true, true, logCount, mockV1Client)
 		s.Error(err)
 		s.Equal(err.Error(), "cannot query for more than one log level and/or keyword at a time")
 	})
@@ -970,7 +970,7 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsMultipleComponentsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, logCount, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockV1Client)
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -1009,7 +1009,7 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page1Response, nil).Once()
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&page2Response, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 10, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, 10, mockV1Client)
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -1051,7 +1051,7 @@ func (s *Suite) TestLogs() {
 			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool { return p.Limit != nil && *p.Limit == 1 }),
 		).Return(&page2Response, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 3, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, 3, mockV1Client)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -1077,7 +1077,7 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&oversizedResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, true, false, false, 2, mockV1Client)
+		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, 2, mockV1Client)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -1094,7 +1094,50 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&astrov1.GetDeploymentLogsResponse{JSON200: &astrov1.DeploymentLog{Results: []astrov1.DeploymentLogEntry{{Raw: "apiserver log", Timestamp: 1, Source: astrov1.DeploymentLogEntrySourceApiserver}}}, HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
 
-		err := Logs("test-id-1", ws, "", "", true, false, false, false, false, false, false, 1, mockV1Client)
+		err := Logs("test-id-1", ws, "", "", true, false, false, false, false, nil, false, false, false, 1, mockV1Client)
+		s.NoError(err)
+	})
+	s.Run("dag-processor flag requests dag-processor source", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool {
+				return len(p.Sources) == 1 && p.Sources[0] == astrov1.GetDeploymentLogsParamsSourcesDagProcessor
+			}),
+		).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", false, false, false, false, true, nil, false, false, false, logCount, mockV1Client)
+		s.NoError(err)
+	})
+	s.Run("generic component flag passes through arbitrary sources", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool {
+				return len(p.Sources) == 2 &&
+					p.Sources[0] == astrov1.GetDeploymentLogsParamsSources("scheduler") &&
+					p.Sources[1] == astrov1.GetDeploymentLogsParamsSources("future-component")
+			}),
+		).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", false, false, false, false, false, []string{"scheduler", "future-component"}, false, false, false, logCount, mockV1Client)
+		s.NoError(err)
+	})
+	s.Run("default sources include dag-processor when no flags set", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool {
+				for _, src := range p.Sources {
+					if src == astrov1.GetDeploymentLogsParamsSourcesDagProcessor {
+						return true
+					}
+				}
+				return false
+			}),
+		).Return(&mockGetDeploymentLogsResponse, nil).Once()
+
+		err := Logs(deploymentID, ws, "", "", false, false, false, false, false, nil, false, false, false, logCount, mockV1Client)
 		s.NoError(err)
 	})
 }

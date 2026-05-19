@@ -552,9 +552,10 @@ func (e CreateEnvironmentObjectMetricsExportRequestExporterType) Valid() bool {
 
 // Defines values for CreateEnvironmentObjectRequestObjectType.
 const (
-	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
-	CreateEnvironmentObjectRequestObjectTypeCONNECTION      CreateEnvironmentObjectRequestObjectType = "CONNECTION"
-	CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT   CreateEnvironmentObjectRequestObjectType = "METRICS_EXPORT"
+	CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE     CreateEnvironmentObjectRequestObjectType = "AIRFLOW_VARIABLE"
+	CreateEnvironmentObjectRequestObjectTypeCONNECTION          CreateEnvironmentObjectRequestObjectType = "CONNECTION"
+	CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE CreateEnvironmentObjectRequestObjectType = "ENVIRONMENT_VARIABLE"
+	CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT       CreateEnvironmentObjectRequestObjectType = "METRICS_EXPORT"
 )
 
 // Valid indicates whether the value is a known member of the CreateEnvironmentObjectRequestObjectType enum.
@@ -563,6 +564,8 @@ func (e CreateEnvironmentObjectRequestObjectType) Valid() bool {
 	case CreateEnvironmentObjectRequestObjectTypeAIRFLOWVARIABLE:
 		return true
 	case CreateEnvironmentObjectRequestObjectTypeCONNECTION:
+		return true
+	case CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE:
 		return true
 	case CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT:
 		return true
@@ -1083,9 +1086,10 @@ func (e DeploymentLogEntrySource) Valid() bool {
 
 // Defines values for EnvironmentObjectObjectType.
 const (
-	EnvironmentObjectObjectTypeAIRFLOWVARIABLE EnvironmentObjectObjectType = "AIRFLOW_VARIABLE"
-	EnvironmentObjectObjectTypeCONNECTION      EnvironmentObjectObjectType = "CONNECTION"
-	EnvironmentObjectObjectTypeMETRICSEXPORT   EnvironmentObjectObjectType = "METRICS_EXPORT"
+	EnvironmentObjectObjectTypeAIRFLOWVARIABLE     EnvironmentObjectObjectType = "AIRFLOW_VARIABLE"
+	EnvironmentObjectObjectTypeCONNECTION          EnvironmentObjectObjectType = "CONNECTION"
+	EnvironmentObjectObjectTypeENVIRONMENTVARIABLE EnvironmentObjectObjectType = "ENVIRONMENT_VARIABLE"
+	EnvironmentObjectObjectTypeMETRICSEXPORT       EnvironmentObjectObjectType = "METRICS_EXPORT"
 )
 
 // Valid indicates whether the value is a known member of the EnvironmentObjectObjectType enum.
@@ -1094,6 +1098,8 @@ func (e EnvironmentObjectObjectType) Valid() bool {
 	case EnvironmentObjectObjectTypeAIRFLOWVARIABLE:
 		return true
 	case EnvironmentObjectObjectTypeCONNECTION:
+		return true
+	case EnvironmentObjectObjectTypeENVIRONMENTVARIABLE:
 		return true
 	case EnvironmentObjectObjectTypeMETRICSEXPORT:
 		return true
@@ -1384,6 +1390,7 @@ const (
 	OrganizationProductPlanProductPlanNameENTERPRISE                 OrganizationProductPlanProductPlanName = "ENTERPRISE"
 	OrganizationProductPlanProductPlanNameENTERPRISEBUSINESSCRITICAL OrganizationProductPlanProductPlanName = "ENTERPRISE_BUSINESS_CRITICAL"
 	OrganizationProductPlanProductPlanNameENTERPRISEV2               OrganizationProductPlanProductPlanName = "ENTERPRISE_V2"
+	OrganizationProductPlanProductPlanNameIBMENTERPRISE              OrganizationProductPlanProductPlanName = "IBM_ENTERPRISE"
 	OrganizationProductPlanProductPlanNameINACTIVE                   OrganizationProductPlanProductPlanName = "INACTIVE"
 	OrganizationProductPlanProductPlanNameINTERNAL                   OrganizationProductPlanProductPlanName = "INTERNAL"
 	OrganizationProductPlanProductPlanNamePOV                        OrganizationProductPlanProductPlanName = "POV"
@@ -1418,6 +1425,8 @@ func (e OrganizationProductPlanProductPlanName) Valid() bool {
 	case OrganizationProductPlanProductPlanNameENTERPRISEBUSINESSCRITICAL:
 		return true
 	case OrganizationProductPlanProductPlanNameENTERPRISEV2:
+		return true
+	case OrganizationProductPlanProductPlanNameIBMENTERPRISE:
 		return true
 	case OrganizationProductPlanProductPlanNameINACTIVE:
 		return true
@@ -2068,6 +2077,27 @@ func (e WorkerQueueRequestAstroMachine) Valid() bool {
 	}
 }
 
+// Defines values for WorkspaceDefaultCloudProvider.
+const (
+	WorkspaceDefaultCloudProviderAWS   WorkspaceDefaultCloudProvider = "AWS"
+	WorkspaceDefaultCloudProviderAZURE WorkspaceDefaultCloudProvider = "AZURE"
+	WorkspaceDefaultCloudProviderGCP   WorkspaceDefaultCloudProvider = "GCP"
+)
+
+// Valid indicates whether the value is a known member of the WorkspaceDefaultCloudProvider enum.
+func (e WorkspaceDefaultCloudProvider) Valid() bool {
+	switch e {
+	case WorkspaceDefaultCloudProviderAWS:
+		return true
+	case WorkspaceDefaultCloudProviderAZURE:
+		return true
+	case WorkspaceDefaultCloudProviderGCP:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkspaceRoleRole.
 const (
 	WORKSPACEACCESSOR WorkspaceRoleRole = "WORKSPACE_ACCESSOR"
@@ -2373,19 +2403,19 @@ func (e GetDeploymentOptionsParamsExecutor) Valid() bool {
 
 // Defines values for GetDeploymentOptionsParamsCloudProvider.
 const (
-	AWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
-	AZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
-	GCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
+	GetDeploymentOptionsParamsCloudProviderAWS   GetDeploymentOptionsParamsCloudProvider = "AWS"
+	GetDeploymentOptionsParamsCloudProviderAZURE GetDeploymentOptionsParamsCloudProvider = "AZURE"
+	GetDeploymentOptionsParamsCloudProviderGCP   GetDeploymentOptionsParamsCloudProvider = "GCP"
 )
 
 // Valid indicates whether the value is a known member of the GetDeploymentOptionsParamsCloudProvider enum.
 func (e GetDeploymentOptionsParamsCloudProvider) Valid() bool {
 	switch e {
-	case AWS:
+	case GetDeploymentOptionsParamsCloudProviderAWS:
 		return true
-	case AZURE:
+	case GetDeploymentOptionsParamsCloudProviderAZURE:
 		return true
-	case GCP:
+	case GetDeploymentOptionsParamsCloudProviderGCP:
 		return true
 	default:
 		return false
@@ -2544,9 +2574,10 @@ func (e ListEnvironmentObjectsParamsSorts) Valid() bool {
 
 // Defines values for ListEnvironmentObjectsParamsObjectType.
 const (
-	AIRFLOWVARIABLE ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
-	CONNECTION      ListEnvironmentObjectsParamsObjectType = "CONNECTION"
-	METRICSEXPORT   ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
+	AIRFLOWVARIABLE     ListEnvironmentObjectsParamsObjectType = "AIRFLOW_VARIABLE"
+	CONNECTION          ListEnvironmentObjectsParamsObjectType = "CONNECTION"
+	ENVIRONMENTVARIABLE ListEnvironmentObjectsParamsObjectType = "ENVIRONMENT_VARIABLE"
+	METRICSEXPORT       ListEnvironmentObjectsParamsObjectType = "METRICS_EXPORT"
 )
 
 // Valid indicates whether the value is a known member of the ListEnvironmentObjectsParamsObjectType enum.
@@ -2555,6 +2586,8 @@ func (e ListEnvironmentObjectsParamsObjectType) Valid() bool {
 	case AIRFLOWVARIABLE:
 		return true
 	case CONNECTION:
+		return true
+	case ENVIRONMENTVARIABLE:
 		return true
 	case METRICSEXPORT:
 		return true
@@ -2953,6 +2986,9 @@ type ApiToken struct {
 
 	// Kind The kind of the API token.
 	Kind ApiTokenKind `json:"kind"`
+
+	// LastRotatedAt The time when the API token was last rotated in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
+	LastRotatedAt *time.Time `json:"lastRotatedAt,omitempty"`
 
 	// LastUsedAt The time when the API token was last used in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
 	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
@@ -3734,6 +3770,21 @@ type CreateEnvironmentObjectConnectionRequest struct {
 	Type string `json:"type"`
 }
 
+// CreateEnvironmentObjectEnvironmentVariableOverridesRequest defines model for CreateEnvironmentObjectEnvironmentVariableOverridesRequest.
+type CreateEnvironmentObjectEnvironmentVariableOverridesRequest struct {
+	// Value The value of the environment variable
+	Value *string `json:"value,omitempty"`
+}
+
+// CreateEnvironmentObjectEnvironmentVariableRequest defines model for CreateEnvironmentObjectEnvironmentVariableRequest.
+type CreateEnvironmentObjectEnvironmentVariableRequest struct {
+	// IsSecret Whether the value is a secret or not
+	IsSecret *bool `json:"isSecret,omitempty"`
+
+	// Value The value of the environment variable
+	Value *string `json:"value,omitempty"`
+}
+
 // CreateEnvironmentObjectLinkRequest defines model for CreateEnvironmentObjectLinkRequest.
 type CreateEnvironmentObjectLinkRequest struct {
 	Overrides *CreateEnvironmentObjectOverridesRequest `json:"overrides,omitempty"`
@@ -3816,9 +3867,10 @@ type CreateEnvironmentObjectMetricsExportRequestExporterType string
 
 // CreateEnvironmentObjectOverridesRequest defines model for CreateEnvironmentObjectOverridesRequest.
 type CreateEnvironmentObjectOverridesRequest struct {
-	AirflowVariable *CreateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
-	Connection      *CreateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
-	MetricsExport   *CreateEnvironmentObjectMetricsExportOverridesRequest   `json:"metricsExport,omitempty"`
+	AirflowVariable     *CreateEnvironmentObjectAirflowVariableOverridesRequest     `json:"airflowVariable,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionOverridesRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *CreateEnvironmentObjectEnvironmentVariableOverridesRequest `json:"environmentVariable,omitempty"`
+	MetricsExport       *CreateEnvironmentObjectMetricsExportOverridesRequest       `json:"metricsExport,omitempty"`
 }
 
 // CreateEnvironmentObjectRequest defines model for CreateEnvironmentObjectRequest.
@@ -3826,8 +3878,9 @@ type CreateEnvironmentObjectRequest struct {
 	AirflowVariable *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 
 	// AutoLinkDeployments Whether or not to automatically link Deployments to the environment object. Only applicable for WORKSPACE scope
-	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
-	Connection          *CreateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
+	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *CreateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
 
 	// ExcludeLinks The links to exclude from the environment object. Only applicable for WORKSPACE scope
 	ExcludeLinks *[]ExcludeLinkEnvironmentObjectRequest `json:"excludeLinks,omitempty"`
@@ -4701,8 +4754,9 @@ type EnvironmentObject struct {
 	Connection          *EnvironmentObjectConnection `json:"connection,omitempty"`
 
 	// CreatedAt The time when the environment object was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`
-	CreatedAt *string              `json:"createdAt,omitempty"`
-	CreatedBy *BasicSubjectProfile `json:"createdBy,omitempty"`
+	CreatedAt           *string                               `json:"createdAt,omitempty"`
+	CreatedBy           *BasicSubjectProfile                  `json:"createdBy,omitempty"`
+	EnvironmentVariable *EnvironmentObjectEnvironmentVariable `json:"environmentVariable,omitempty"`
 
 	// ExcludeLinks The excluded links for the environment object
 	ExcludeLinks *[]EnvironmentObjectExcludeLink `json:"excludeLinks,omitempty"`
@@ -4811,6 +4865,21 @@ type EnvironmentObjectConnectionOverrides struct {
 	Type *string `json:"type,omitempty"`
 }
 
+// EnvironmentObjectEnvironmentVariable defines model for EnvironmentObjectEnvironmentVariable.
+type EnvironmentObjectEnvironmentVariable struct {
+	// IsSecret Whether the value is a secret or not
+	IsSecret bool `json:"isSecret"`
+
+	// Value The value of the environment variable. If the value is a secret, the value returned is empty
+	Value string `json:"value"`
+}
+
+// EnvironmentObjectEnvironmentVariableOverrides defines model for EnvironmentObjectEnvironmentVariableOverrides.
+type EnvironmentObjectEnvironmentVariableOverrides struct {
+	// Value The value of the environment variable
+	Value string `json:"value"`
+}
+
 // EnvironmentObjectExcludeLink defines model for EnvironmentObjectExcludeLink.
 type EnvironmentObjectExcludeLink struct {
 	// Scope Scope of the excluded entity for environment object
@@ -4825,9 +4894,10 @@ type EnvironmentObjectExcludeLinkScope string
 
 // EnvironmentObjectLink defines model for EnvironmentObjectLink.
 type EnvironmentObjectLink struct {
-	AirflowVariableOverrides *EnvironmentObjectAirflowVariableOverrides `json:"airflowVariableOverrides,omitempty"`
-	ConnectionOverrides      *EnvironmentObjectConnectionOverrides      `json:"connectionOverrides,omitempty"`
-	MetricsExportOverrides   *EnvironmentObjectMetricsExportOverrides   `json:"metricsExportOverrides,omitempty"`
+	AirflowVariableOverrides     *EnvironmentObjectAirflowVariableOverrides     `json:"airflowVariableOverrides,omitempty"`
+	ConnectionOverrides          *EnvironmentObjectConnectionOverrides          `json:"connectionOverrides,omitempty"`
+	EnvironmentVariableOverrides *EnvironmentObjectEnvironmentVariableOverrides `json:"environmentVariableOverrides,omitempty"`
+	MetricsExportOverrides       *EnvironmentObjectMetricsExportOverrides       `json:"metricsExportOverrides,omitempty"`
 
 	// Scope Scope of the linked entity for the environment object
 	Scope EnvironmentObjectLinkScope `json:"scope"`
@@ -5206,6 +5276,9 @@ type ProviderRegion struct {
 
 	// Limited Whether the region is limited.
 	Limited *bool `json:"limited,omitempty"`
+
+	// Location The multi-region location code for DR compatibility.
+	Location *string `json:"location,omitempty"`
 
 	// Name The name of the region.
 	Name string `json:"name"`
@@ -5804,6 +5877,18 @@ type UpdateEnvironmentObjectConnectionRequest struct {
 	Type string `json:"type"`
 }
 
+// UpdateEnvironmentObjectEnvironmentVariableOverridesRequest defines model for UpdateEnvironmentObjectEnvironmentVariableOverridesRequest.
+type UpdateEnvironmentObjectEnvironmentVariableOverridesRequest struct {
+	// Value The value of the environment variable
+	Value *string `json:"value,omitempty"`
+}
+
+// UpdateEnvironmentObjectEnvironmentVariableRequest defines model for UpdateEnvironmentObjectEnvironmentVariableRequest.
+type UpdateEnvironmentObjectEnvironmentVariableRequest struct {
+	// Value The value of the environment variable
+	Value *string `json:"value,omitempty"`
+}
+
 // UpdateEnvironmentObjectLinkRequest defines model for UpdateEnvironmentObjectLinkRequest.
 type UpdateEnvironmentObjectLinkRequest struct {
 	Overrides *UpdateEnvironmentObjectOverridesRequest `json:"overrides,omitempty"`
@@ -5886,9 +5971,10 @@ type UpdateEnvironmentObjectMetricsExportRequestExporterType string
 
 // UpdateEnvironmentObjectOverridesRequest defines model for UpdateEnvironmentObjectOverridesRequest.
 type UpdateEnvironmentObjectOverridesRequest struct {
-	AirflowVariable *UpdateEnvironmentObjectAirflowVariableOverridesRequest `json:"airflowVariable,omitempty"`
-	Connection      *UpdateEnvironmentObjectConnectionOverridesRequest      `json:"connection,omitempty"`
-	MetricsExport   *UpdateEnvironmentObjectMetricsExportOverridesRequest   `json:"metricsExport,omitempty"`
+	AirflowVariable     *UpdateEnvironmentObjectAirflowVariableOverridesRequest     `json:"airflowVariable,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionOverridesRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableOverridesRequest `json:"environmentVariable,omitempty"`
+	MetricsExport       *UpdateEnvironmentObjectMetricsExportOverridesRequest       `json:"metricsExport,omitempty"`
 }
 
 // UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
@@ -5896,8 +5982,9 @@ type UpdateEnvironmentObjectRequest struct {
 	AirflowVariable *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 
 	// AutoLinkDeployments Whether or not to automatically link Deployments to the environment object. Only applicable for WORKSPACE scope
-	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
-	Connection          *UpdateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
+	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
 
 	// ExcludeLinks The links to exclude from the environment object. Only applicable for WORKSPACE scope
 	ExcludeLinks *[]ExcludeLinkEnvironmentObjectRequest `json:"excludeLinks,omitempty"`
@@ -6368,7 +6455,7 @@ type Workspace struct {
 	CreatedBy *BasicSubjectProfile `json:"createdBy,omitempty"`
 
 	// DefaultCloudProvider The default cloud provider for new Deployments.
-	DefaultCloudProvider *string `json:"defaultCloudProvider,omitempty"`
+	DefaultCloudProvider *WorkspaceDefaultCloudProvider `json:"defaultCloudProvider,omitempty"`
 
 	// DefaultClusterId The ID of the default cluster for new Deployments.
 	DefaultClusterId *string `json:"defaultClusterId,omitempty"`
@@ -6395,6 +6482,9 @@ type Workspace struct {
 	UpdatedAt time.Time            `json:"updatedAt"`
 	UpdatedBy *BasicSubjectProfile `json:"updatedBy,omitempty"`
 }
+
+// WorkspaceDefaultCloudProvider The default cloud provider for new Deployments.
+type WorkspaceDefaultCloudProvider string
 
 // WorkspaceRole defines model for WorkspaceRole.
 type WorkspaceRole struct {

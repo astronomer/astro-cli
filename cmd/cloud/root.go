@@ -24,6 +24,7 @@ func AddCmds(v1Client astrov1.APIClient, airflowClient airflow.Client, v1Alpha1C
 	return []*cobra.Command{
 		NewDeployCmd(),
 		newDeploymentRootCmd(out),
+		newEnvRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
 		newDbtCmd(),
