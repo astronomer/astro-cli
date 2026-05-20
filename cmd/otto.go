@@ -37,6 +37,11 @@ func newOttoCmd() *cobra.Command {
 		SilenceUsage:       true,
 		DisableFlagParsing: true,
 		RunE:               ottoRun,
+		// ValidArgsFunction drives `astro otto <tab>` completion. Candidates
+		// come from a cache the Otto binary refreshes on every run, so new
+		// flags appear after the user's next `astro otto` call without an
+		// astro-cli release.
+		ValidArgsFunction: otto.Complete,
 	}
 
 	return cmd
