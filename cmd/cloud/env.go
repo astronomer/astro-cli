@@ -86,15 +86,17 @@ var (
 	envConnExtra    string
 
 	// metrics-export create + update inputs
-	envMetricsKey          string
-	envMetricsEndpoint     string
-	envMetricsExporterType string
-	envMetricsAuthType     string
-	envMetricsBasicToken   string
-	envMetricsUsername     string
-	envMetricsPassword     string
-	envMetricsHeaders      map[string]string
-	envMetricsLabels       map[string]string
+	envMetricsKey            string
+	envMetricsEndpoint       string
+	envMetricsExporterType   string
+	envMetricsAuthType       string
+	envMetricsBasicToken     string
+	envMetricsUsername       string
+	envMetricsPassword       string
+	envMetricsSigV4AssumeArn string
+	envMetricsSigV4StsRegion string
+	envMetricsHeaders        map[string]string
+	envMetricsLabels         map[string]string
 )
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

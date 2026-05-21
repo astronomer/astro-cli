@@ -130,8 +130,8 @@ func metricsCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&envMetricsBasicToken, "basic-token", "", "Bearer/auth token (for AUTH_TOKEN auth)")
 	cmd.Flags().StringVar(&envMetricsUsername, "username", "", "Username (for BASIC auth)")
 	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password (for BASIC auth). If omitted with --auth-type BASIC, read from stdin (piped) or prompted (TTY) with echo disabled.")
-	// SIGV4 auth params (--sigv4-assume-arn, --sigv4-sts-region) are not in the
-	// v1 spec yet — re-add once the server adds them. See env.MetricsInput.
+	cmd.Flags().StringVar(&envMetricsSigV4AssumeArn, "sigv4-assume-arn", "", "AWS IAM role to assume (for SIGV4 auth)")
+	cmd.Flags().StringVar(&envMetricsSigV4StsRegion, "sigv4-sts-region", "", "AWS STS region (for SIGV4 auth)")
 	cmd.Flags().StringToStringVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form. Repeatable.")
 	cmd.Flags().StringToStringVar(&envMetricsLabels, "label", nil, "Metric label in KEY=VALUE form. Repeatable.")
 }
@@ -254,6 +254,12 @@ func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
 	}
 	if cmd.Flags().Changed("username") {
 		in.Username = &envMetricsUsername
+	}
+	if cmd.Flags().Changed("sigv4-assume-arn") {
+		in.SigV4AssumeArn = &envMetricsSigV4AssumeArn
+	}
+	if cmd.Flags().Changed("sigv4-sts-region") {
+		in.SigV4StsRegion = &envMetricsSigV4StsRegion
 	}
 	switch {
 	case envMetricsAuthType == string(astrov1.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC):

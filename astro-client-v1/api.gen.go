@@ -488,6 +488,7 @@ func (e CreateEnvironmentObjectLinkRequestScope) Valid() bool {
 const (
 	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
 	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+	CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4     CreateEnvironmentObjectMetricsExportOverridesRequestAuthType = "SIGV4"
 )
 
 // Valid indicates whether the value is a known member of the CreateEnvironmentObjectMetricsExportOverridesRequestAuthType enum.
@@ -496,6 +497,8 @@ func (e CreateEnvironmentObjectMetricsExportOverridesRequestAuthType) Valid() bo
 	case CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN:
 		return true
 	case CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC:
+		return true
+	case CreateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4:
 		return true
 	default:
 		return false
@@ -521,6 +524,7 @@ func (e CreateEnvironmentObjectMetricsExportOverridesRequestExporterType) Valid(
 const (
 	CreateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN CreateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
 	CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     CreateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
+	CreateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4     CreateEnvironmentObjectMetricsExportRequestAuthType = "SIGV4"
 )
 
 // Valid indicates whether the value is a known member of the CreateEnvironmentObjectMetricsExportRequestAuthType enum.
@@ -529,6 +533,8 @@ func (e CreateEnvironmentObjectMetricsExportRequestAuthType) Valid() bool {
 	case CreateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN:
 		return true
 	case CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC:
+		return true
+	case CreateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4:
 		return true
 	default:
 		return false
@@ -1178,6 +1184,7 @@ func (e EnvironmentObjectLinkScope) Valid() bool {
 const (
 	EnvironmentObjectMetricsExportAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportAuthType = "AUTH_TOKEN"
 	EnvironmentObjectMetricsExportAuthTypeBASIC     EnvironmentObjectMetricsExportAuthType = "BASIC"
+	EnvironmentObjectMetricsExportAuthTypeSIGV4     EnvironmentObjectMetricsExportAuthType = "SIGV4"
 )
 
 // Valid indicates whether the value is a known member of the EnvironmentObjectMetricsExportAuthType enum.
@@ -1186,6 +1193,8 @@ func (e EnvironmentObjectMetricsExportAuthType) Valid() bool {
 	case EnvironmentObjectMetricsExportAuthTypeAUTHTOKEN:
 		return true
 	case EnvironmentObjectMetricsExportAuthTypeBASIC:
+		return true
+	case EnvironmentObjectMetricsExportAuthTypeSIGV4:
 		return true
 	default:
 		return false
@@ -1211,6 +1220,7 @@ func (e EnvironmentObjectMetricsExportExporterType) Valid() bool {
 const (
 	EnvironmentObjectMetricsExportOverridesAuthTypeAUTHTOKEN EnvironmentObjectMetricsExportOverridesAuthType = "AUTH_TOKEN"
 	EnvironmentObjectMetricsExportOverridesAuthTypeBASIC     EnvironmentObjectMetricsExportOverridesAuthType = "BASIC"
+	EnvironmentObjectMetricsExportOverridesAuthTypeSIGV4     EnvironmentObjectMetricsExportOverridesAuthType = "SIGV4"
 )
 
 // Valid indicates whether the value is a known member of the EnvironmentObjectMetricsExportOverridesAuthType enum.
@@ -1219,6 +1229,8 @@ func (e EnvironmentObjectMetricsExportOverridesAuthType) Valid() bool {
 	case EnvironmentObjectMetricsExportOverridesAuthTypeAUTHTOKEN:
 		return true
 	case EnvironmentObjectMetricsExportOverridesAuthTypeBASIC:
+		return true
+	case EnvironmentObjectMetricsExportOverridesAuthTypeSIGV4:
 		return true
 	default:
 		return false
@@ -1697,6 +1709,7 @@ func (e UpdateEnvironmentObjectLinkRequestScope) Valid() bool {
 const (
 	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "AUTH_TOKEN"
 	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "BASIC"
+	UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4     UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType = "SIGV4"
 )
 
 // Valid indicates whether the value is a known member of the UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType enum.
@@ -1705,6 +1718,8 @@ func (e UpdateEnvironmentObjectMetricsExportOverridesRequestAuthType) Valid() bo
 	case UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeAUTHTOKEN:
 		return true
 	case UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeBASIC:
+		return true
+	case UpdateEnvironmentObjectMetricsExportOverridesRequestAuthTypeSIGV4:
 		return true
 	default:
 		return false
@@ -1730,6 +1745,7 @@ func (e UpdateEnvironmentObjectMetricsExportOverridesRequestExporterType) Valid(
 const (
 	UpdateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN UpdateEnvironmentObjectMetricsExportRequestAuthType = "AUTH_TOKEN"
 	UpdateEnvironmentObjectMetricsExportRequestAuthTypeBASIC     UpdateEnvironmentObjectMetricsExportRequestAuthType = "BASIC"
+	UpdateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4     UpdateEnvironmentObjectMetricsExportRequestAuthType = "SIGV4"
 )
 
 // Valid indicates whether the value is a known member of the UpdateEnvironmentObjectMetricsExportRequestAuthType enum.
@@ -1738,6 +1754,8 @@ func (e UpdateEnvironmentObjectMetricsExportRequestAuthType) Valid() bool {
 	case UpdateEnvironmentObjectMetricsExportRequestAuthTypeAUTHTOKEN:
 		return true
 	case UpdateEnvironmentObjectMetricsExportRequestAuthTypeBASIC:
+		return true
+	case UpdateEnvironmentObjectMetricsExportRequestAuthTypeSIGV4:
 		return true
 	default:
 		return false
@@ -3822,6 +3840,12 @@ type CreateEnvironmentObjectMetricsExportOverridesRequest struct {
 	// Password The password to connect to the remote endpoint
 	Password *string `json:"password,omitempty"`
 
+	// SigV4AssumeArn The AWS IAM role ARN to assume for SigV4 authentication
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+
+	// SigV4StsRegion The AWS STS region to use for SigV4 authentication
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+
 	// Username The username to connect to the remote endpoint
 	Username *string `json:"username,omitempty"`
 }
@@ -3854,6 +3878,12 @@ type CreateEnvironmentObjectMetricsExportRequest struct {
 
 	// Password The password to connect to the remote endpoint
 	Password *string `json:"password,omitempty"`
+
+	// SigV4AssumeArn The AWS IAM role ARN to assume for SigV4 authentication
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+
+	// SigV4StsRegion The AWS STS region to use for SigV4 authentication
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
 
 	// Username The username to connect to the remote endpoint
 	Username *string `json:"username,omitempty"`
@@ -4932,6 +4962,12 @@ type EnvironmentObjectMetricsExport struct {
 	// Password The password to connect to the remote endpoint
 	Password *string `json:"password,omitempty"`
 
+	// SigV4AssumeArn The AWS IAM role ARN to assume for SigV4 authentication
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+
+	// SigV4StsRegion The AWS STS region to use for SigV4 authentication
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+
 	// Username The username to connect to the remote endpoint
 	Username *string `json:"username,omitempty"`
 }
@@ -4964,6 +5000,12 @@ type EnvironmentObjectMetricsExportOverrides struct {
 
 	// Password The password to connect to the remote endpoint
 	Password *string `json:"password,omitempty"`
+
+	// SigV4AssumeArn The AWS IAM role ARN to assume for SigV4 authentication
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+
+	// SigV4StsRegion The AWS STS region to use for SigV4 authentication
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
 
 	// Username The username to connect to the remote endpoint
 	Username *string `json:"username,omitempty"`
@@ -5926,6 +5968,12 @@ type UpdateEnvironmentObjectMetricsExportOverridesRequest struct {
 	// Password The password to connect to the remote endpoint
 	Password *string `json:"password,omitempty"`
 
+	// SigV4AssumeArn The AWS IAM role ARN to assume for SigV4 authentication
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+
+	// SigV4StsRegion The AWS STS region to use for SigV4 authentication
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
+
 	// Username The username to connect to the remote endpoint
 	Username *string `json:"username,omitempty"`
 }
@@ -5958,6 +6006,12 @@ type UpdateEnvironmentObjectMetricsExportRequest struct {
 
 	// Password The password to connect to the remote endpoint
 	Password *string `json:"password,omitempty"`
+
+	// SigV4AssumeArn The AWS IAM role ARN to assume for SigV4 authentication
+	SigV4AssumeArn *string `json:"sigV4AssumeArn,omitempty"`
+
+	// SigV4StsRegion The AWS STS region to use for SigV4 authentication
+	SigV4StsRegion *string `json:"sigV4StsRegion,omitempty"`
 
 	// Username The username to connect to the remote endpoint
 	Username *string `json:"username,omitempty"`

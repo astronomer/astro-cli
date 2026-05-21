@@ -20,6 +20,8 @@ type MetricsInput struct {
 	BasicToken          *string
 	Username            *string
 	Password            *string
+	SigV4AssumeArn      *string
+	SigV4StsRegion      *string
 	Headers             *map[string]string
 	Labels              *map[string]string
 	AutoLinkDeployments *bool
@@ -60,13 +62,15 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, astroV1Clien
 		Scope:         scopeType,
 		ScopeEntityId: scopeEntityID,
 		MetricsExport: &astrov1.CreateEnvironmentObjectMetricsExportRequest{
-			Endpoint:     in.Endpoint,
-			ExporterType: astrov1.CreateEnvironmentObjectMetricsExportRequestExporterType(in.ExporterType),
-			BasicToken:   in.BasicToken,
-			Username:     in.Username,
-			Password:     in.Password,
-			Headers:      in.Headers,
-			Labels:       in.Labels,
+			Endpoint:       in.Endpoint,
+			ExporterType:   astrov1.CreateEnvironmentObjectMetricsExportRequestExporterType(in.ExporterType),
+			BasicToken:     in.BasicToken,
+			Username:       in.Username,
+			Password:       in.Password,
+			SigV4AssumeArn: in.SigV4AssumeArn,
+			SigV4StsRegion: in.SigV4StsRegion,
+			Headers:        in.Headers,
+			Labels:         in.Labels,
 		},
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
@@ -84,13 +88,15 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, astroV1Clien
 	}
 	id := resp.JSON200.Id
 	metrics := &astrov1.EnvironmentObjectMetricsExport{
-		Endpoint:     in.Endpoint,
-		ExporterType: astrov1.EnvironmentObjectMetricsExportExporterType(in.ExporterType),
-		BasicToken:   in.BasicToken,
-		Username:     in.Username,
-		Password:     in.Password,
-		Headers:      in.Headers,
-		Labels:       in.Labels,
+		Endpoint:       in.Endpoint,
+		ExporterType:   astrov1.EnvironmentObjectMetricsExportExporterType(in.ExporterType),
+		BasicToken:     in.BasicToken,
+		Username:       in.Username,
+		Password:       in.Password,
+		SigV4AssumeArn: in.SigV4AssumeArn,
+		SigV4StsRegion: in.SigV4StsRegion,
+		Headers:        in.Headers,
+		Labels:         in.Labels,
 	}
 	if in.AuthType != "" {
 		at := astrov1.EnvironmentObjectMetricsExportAuthType(in.AuthType)
@@ -121,11 +127,13 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, astroV1C
 		return nil, err
 	}
 	req := &astrov1.UpdateEnvironmentObjectMetricsExportRequest{
-		BasicToken: in.BasicToken,
-		Username:   in.Username,
-		Password:   in.Password,
-		Headers:    in.Headers,
-		Labels:     in.Labels,
+		BasicToken:     in.BasicToken,
+		Username:       in.Username,
+		Password:       in.Password,
+		SigV4AssumeArn: in.SigV4AssumeArn,
+		SigV4StsRegion: in.SigV4StsRegion,
+		Headers:        in.Headers,
+		Labels:         in.Labels,
 	}
 	if in.Endpoint != "" {
 		req.Endpoint = &in.Endpoint

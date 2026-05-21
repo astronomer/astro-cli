@@ -47,7 +47,7 @@ func resetEnvFlags() {
 
 	envMetricsKey, envMetricsEndpoint, envMetricsExporterType = "", "", ""
 	envMetricsAuthType, envMetricsBasicToken, envMetricsUsername = "", "", ""
-	envMetricsPassword = ""
+	envMetricsPassword, envMetricsSigV4AssumeArn, envMetricsSigV4StsRegion = "", "", ""
 	envMetricsHeaders, envMetricsLabels = nil, nil
 }
 
