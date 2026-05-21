@@ -132,17 +132,15 @@ const accessYourDeploymentFmt = `
 `
 
 func removeDagsFromDockerIgnore(fullpath string) error {
-	f, err := os.Open(fullpath)
+	original, err := os.ReadFile(fullpath)
 	if err != nil {
 		return err
 	}
 
-	defer f.Close()
+	hadTrailingNewline := len(original) > 0 && original[len(original)-1] == '\n'
 
-	var bs []byte
-	buf := bytes.NewBuffer(bs)
-
-	scanner := bufio.NewScanner(f)
+	var buf bytes.Buffer
+	scanner := bufio.NewScanner(bytes.NewReader(original))
 	for scanner.Scan() {
 		text := scanner.Text()
 		if text != "dags/" {
@@ -156,12 +154,13 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, mnd
-	if err != nil {
-		return err
+
+	result := bytes.TrimRight(buf.Bytes(), "\n")
+	if hadTrailingNewline && len(result) > 0 {
+		result = append(result, '\n')
 	}
 
-	return nil
+	return os.WriteFile(fullpath, result, 0o666) //nolint:gosec, mnd
 }
 
 func shouldIncludeMonitoringDag(deploymentType astrov1.DeploymentType) bool {
@@ -617,65 +616,53 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 }
 
 func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) error {
-	// flag to determine if we are setting the dags folder in dockerignore
-	dagsIgnoreSet := false
-	// flag to determine if dockerignore file was created on runtime
-	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	// Snapshot the original bytes so we can restore byte-for-byte after the build
+	// (preserves CRLF, trailing whitespace, etc.).
+	originalBytes, err := os.ReadFile(fullpath)
+	originalExisted := err == nil
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
 	defer func() {
-		// remove dags from .dockerignore file if we set it
-		if dagsIgnoreSet {
-			removeDagsFromDockerIgnore(fullpath) //nolint:errcheck
-		}
-		// remove created docker ignore file
-		if dockerIgnoreCreate {
-			os.Remove(fullpath)
+		if originalExisted {
+			_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
+		} else {
+			_ = os.Remove(fullpath)
 		}
 	}()
 
-	fileExist, _ := fileutil.Exists(fullpath, nil)
-	if !fileExist {
-		// Create a dockerignore file and add the dags folder entry
-		err := fileutil.WriteStringToFile(fullpath, "dags/")
-		if err != nil {
+	switch {
+	case !originalExisted:
+		if err := os.WriteFile(fullpath, []byte("dags/\n"), 0o644); err != nil { //nolint:gosec,mnd
 			return err
 		}
-		dockerIgnoreCreate = true
-	}
-	lines, err := fileutil.Read(fullpath)
-	if err != nil {
-		return err
-	}
-	contains, _ := fileutil.Contains(lines, "dags/")
-	if !contains {
-		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
-		if err != nil {
-			return err
+	case !dockerignoreContainsDags(originalBytes):
+		modified := append([]byte{}, originalBytes...)
+		if len(modified) > 0 && modified[len(modified)-1] != '\n' {
+			modified = append(modified, '\n')
 		}
-
-		defer f.Close()
-
-		if _, err := f.WriteString("\ndags/"); err != nil {
-			return err
-		}
-
-		dagsIgnoreSet = true
-	}
-	err = imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
-	if err != nil {
-		return err
-	}
-
-	// remove dags from .dockerignore file if we set it
-	if dagsIgnoreSet {
-		err = removeDagsFromDockerIgnore(fullpath)
-		if err != nil {
+		modified = append(modified, []byte("dags/\n")...)
+		if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd
 			return err
 		}
 	}
 
-	return nil
+	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+}
+
+// dockerignoreContainsDags reports whether content has a line equal to "dags/".
+// Uses bufio.Scanner so CRLF line endings are handled identically to LF.
+func dockerignoreContainsDags(content []byte) bool {
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	for scanner.Scan() {
+		if scanner.Text() == "dags/" {
+			return true
+		}
+	}
+	return false
 }
 
 func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, astroV1Client astrov1.APIClient) (version string, err error) {
