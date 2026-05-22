@@ -545,6 +545,11 @@ func TestStripQuotes(t *testing.T) {
 }
 
 func (s *Suite) TestStandaloneBuildEnv() {
+	// Clear inherited PYTHONPATH so the assertion below is deterministic
+	// regardless of the developer's / CI's shell environment. buildEnv()
+	// prepends AIRFLOW_HOME to whatever PYTHONPATH is in the process env.
+	s.T().Setenv("PYTHONPATH", "")
+
 	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
 	s.NoError(err)
 	handler.airflowMajorVersion = "3"
@@ -569,6 +574,11 @@ func (s *Suite) TestStandaloneBuildEnv() {
 	s.Equal("d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw=", envMap["AIRFLOW__CORE__FERNET_KEY"])
 	s.NotEmpty(envMap["AIRFLOW__API__SECRET_KEY"])
 	s.NotEmpty(envMap["AIRFLOW__API_AUTH__JWT_SECRET"])
+
+	// PYTHONPATH must mirror the production runtime image, which sets
+	// PYTHONPATH=AIRFLOW_HOME so every subdirectory (dags/, include/, etc.)
+	// is importable as a namespace package.
+	s.Equal("/tmp/test-project", envMap["PYTHONPATH"], "PYTHONPATH should be exactly AIRFLOW_HOME")
 }
 
 func (s *Suite) TestStandaloneBuildEnv_NoDuplicateKeys() {
@@ -1780,9 +1790,9 @@ func (s *Suite) TestStandalonePytest_Success() {
 	s.Equal("", exitCode)
 	s.Equal([]string{"pytest", "tests/"}, capturedArgs)
 
-	// Verify PYTHONPATH includes the include/ directory so user modules
-	// in include/ are importable during test runs.
-	expectedInclude := filepath.Join(tmpDir, "include")
+	// Verify PYTHONPATH includes AIRFLOW_HOME so user modules under any
+	// subdirectory (dags/, include/, etc.) are importable as namespace
+	// packages during test runs — mirroring the production runtime image.
 	var pythonPath string
 	for _, kv := range capturedEnv {
 		if strings.HasPrefix(kv, "PYTHONPATH=") {
@@ -1791,7 +1801,7 @@ func (s *Suite) TestStandalonePytest_Success() {
 		}
 	}
 	s.NotEmpty(pythonPath, "PYTHONPATH should be set in pytest env")
-	s.Contains(pythonPath, expectedInclude, "PYTHONPATH should contain include/ directory")
+	s.Contains(strings.Split(pythonPath, ":"), tmpDir, "PYTHONPATH should contain AIRFLOW_HOME")
 }
 
 func (s *Suite) TestStandalonePytest_WithFileAndArgs() {
