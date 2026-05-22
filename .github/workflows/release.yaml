@@ -5,16 +5,18 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
+      - 'nightly-[0-9]*'
 
 permissions:
   contents: write
   pull-requests: write
+  id-token: write  # Required for Octo STS OIDC token exchange
 
 jobs:
   detect:
     runs-on: ubuntu-latest
     outputs:
-      is_rc: ${{ steps.parse.outputs.is_rc }}
+      type: ${{ steps.parse.outputs.type }}
       version: ${{ steps.parse.outputs.version }}
       tag: ${{ steps.parse.outputs.tag }}
     steps:
@@ -24,17 +26,20 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-          if [[ "$TAG" =~ -rc\. ]]; then
-            echo "is_rc=true" >> $GITHUB_OUTPUT
-            # Strip v prefix and -rc.N suffix to get base version
+          if [[ "$TAG" =~ ^nightly- ]]; then
+            echo "type=nightly" >> $GITHUB_OUTPUT
+            echo "version=$TAG" >> $GITHUB_OUTPUT
+          elif [[ "$TAG" =~ -rc\. ]]; then
+            echo "type=rc" >> $GITHUB_OUTPUT
             VERSION=$(echo "$TAG" | sed 's/^v//; s/-rc\.[0-9]*$//')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
           else
-            echo "is_rc=false" >> $GITHUB_OUTPUT
+            echo "type=ga" >> $GITHUB_OUTPUT
             VERSION=$(echo "$TAG" | sed 's/^v//')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Parsed — Tag: $TAG | Version: $VERSION | RC: $([[ "$TAG" =~ -rc\. ]] && echo true || echo false)"
+          echo "Parsed — Tag: $TAG | Type: $([[ "$TAG" =~ ^nightly- ]] && echo nightly || ([[ "$TAG" =~ -rc\. ]] && echo rc || echo ga))"
 
   release:
     needs: detect
@@ -71,19 +76,28 @@ jobs:
       - name: Add osxcross to PATH
         run: echo "/tmp/osxcross/target/bin" >> $GITHUB_PATH
 
+      - name: Get Homebrew token via Octo STS
+        if: needs.detect.outputs.type == 'ga'
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: homebrew-token
+        with:
+          scope: astronomer
+          identity: astro-cli-homebrew
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: v2.15.2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Only pass the token for GA releases; RC builds skip homebrew upload via skip_upload: auto
-          # but GoReleaser still evaluates the template, so we pass GITHUB_TOKEN as a safe fallback.
-          HOMEBREW_TAP_TOKEN: ${{ needs.detect.outputs.is_rc == 'false' && secrets.HOMEBREW_TAP_TOKEN || secrets.GITHUB_TOKEN }}
+          # For GA releases, use the short-lived Octo STS token scoped to astronomer/homebrew-tap.
+          # For RC/nightly builds, GoReleaser skips homebrew upload via skip_upload: auto
+          # but still evaluates the template, so we pass GITHUB_TOKEN as a safe fallback.
+          HOMEBREW_TAP_TOKEN: ${{ needs.detect.outputs.type == 'ga' && steps.homebrew-token.outputs.token || secrets.GITHUB_TOKEN }}
 
   update-godownloader:
     needs: [detect, release]
-    if: needs.detect.outputs.is_rc == 'false'
+    if: needs.detect.outputs.type == 'ga'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -116,19 +130,27 @@ jobs:
 
   update-winget:
     needs: [detect, release]
-    if: needs.detect.outputs.is_rc == 'false'
+    if: needs.detect.outputs.type == 'ga'
     runs-on: windows-latest
     steps:
+      - name: Get Winget token via Octo STS
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: winget-token
+        with:
+          scope: astronomer
+          identity: astro-cli-winget
+
       - uses: vedantmgoyal9/winget-releaser@v2
         with:
           identifier: Astronomer.Astro
           version: ${{ needs.detect.outputs.version }}
           installers-regex: '\.zip$'
-          token: ${{ secrets.WINGET_TOKEN }}
+          fork: astronomer/winget-pkgs
+          token: ${{ steps.winget-token.outputs.token }}
 
   notify:
     needs: [detect, release, update-godownloader, update-winget]
-    if: always() && needs.detect.outputs.is_rc == 'false' && needs.release.result == 'success'
+    if: always() && needs.detect.outputs.type == 'ga' && needs.release.result == 'success'
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

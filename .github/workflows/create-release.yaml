@@ -3,15 +3,19 @@ name: Create Release Tag
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Semantic version without v prefix (e.g. 1.43.0)'
+      type:
+        description: 'Release type'
         required: true
-        type: string
-      rc:
-        description: 'Create a release candidate (RC) tag'
+        type: choice
+        options:
+          - nightly
+          - rc
+          - ga
+        default: nightly
+      version:
+        description: 'Semantic version without v prefix (e.g. 1.43.0) — required for rc and ga, ignored for nightly'
         required: false
-        type: boolean
-        default: true
+        type: string
 
 permissions:
   contents: write
@@ -19,81 +23,66 @@ permissions:
 jobs:
   create-tag:
     runs-on: ubuntu-latest
-    environment: release
+    environment: ${{ inputs.type != 'nightly' && 'release' || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate branch and version
+      - name: Validate inputs
         run: |
           set -e
-          BRANCH="${GITHUB_REF_NAME}"
+          TYPE="${{ inputs.type }}"
           VERSION="${{ inputs.version }}"
+          BRANCH="${GITHUB_REF_NAME}"
 
-          # Ensure we are on a release branch
-          if [[ ! "$BRANCH" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
-            echo "::error::This workflow must be run from a release-X.Y branch. Current branch: $BRANCH"
-            exit 1
+          if [ "$TYPE" = "nightly" ]; then
+            # Nightlies must be created from main
+            if [ "$BRANCH" != "main" ]; then
+              echo "::error::Nightly tags must be created from the main branch. Current branch: $BRANCH"
+              exit 1
+            fi
+          else
+            # RC and GA must be created from a release-* branch
+            if [[ ! "$BRANCH" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+              echo "::error::RC and GA tags must be created from a release-X.Y branch. Current branch: $BRANCH"
+              exit 1
+            fi
+
+            if [ -z "$VERSION" ]; then
+              echo "::error::VERSION is required for $TYPE releases."
+              exit 1
+            fi
+
+            BRANCH_MAJOR_MINOR="${BASH_REMATCH[1]}"
+            ESCAPED_MM=$(echo "$BRANCH_MAJOR_MINOR" | sed 's/\./\\./g')
+            if [[ ! "$VERSION" =~ ^${ESCAPED_MM}\.[0-9]+$ ]]; then
+              echo "::error::Version '$VERSION' does not match branch '$BRANCH'. Expected ${BRANCH_MAJOR_MINOR}.Z"
+              exit 1
+            fi
           fi
 
-          BRANCH_MAJOR_MINOR="${BASH_REMATCH[1]}"
+          echo "TYPE=$TYPE" >> $GITHUB_ENV
+          echo "Validated: type=$TYPE branch=$BRANCH version=$VERSION"
 
-          # Ensure the version input matches the branch major.minor
-          # Escape dots for regex matching (1.43 -> 1\.43)
-          ESCAPED_MM=$(echo "$BRANCH_MAJOR_MINOR" | sed 's/\./\\./g')
-          if [[ ! "$VERSION" =~ ^${ESCAPED_MM}\.[0-9]+$ ]]; then
-            echo "::error::Version '$VERSION' does not match branch '$BRANCH'. Expected ${BRANCH_MAJOR_MINOR}.Z"
-            exit 1
-          fi
-
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "BRANCH_MAJOR_MINOR=$BRANCH_MAJOR_MINOR" >> $GITHUB_ENV
-          echo "Validated: version=$VERSION on branch=$BRANCH"
+      - name: Compute nightly tag
+        if: inputs.type == 'nightly'
+        run: |
+          TAG=$(make nightly-tag)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Computed nightly tag: $TAG"
 
       - name: Compute RC tag
-        if: inputs.rc == true
+        if: inputs.type == 'rc'
         run: |
-          set -e
-          VERSION="${{ inputs.version }}"
-
-          # Find the highest existing RC number for this version
-          HIGHEST_RC=$(git tag -l "v${VERSION}-rc.*" | \
-            sed -n 's/.*-rc\.\([0-9]*\)$/\1/p' | \
-            sort -n | tail -1)
-
-          if [ -z "$HIGHEST_RC" ]; then
-            NEXT_RC=1
-          else
-            NEXT_RC=$((HIGHEST_RC + 1))
-          fi
-
-          TAG="v${VERSION}-rc.${NEXT_RC}"
+          TAG=$(make rc-tag VERSION=${{ inputs.version }})
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "Computed RC tag: $TAG"
 
       - name: Compute GA tag
-        if: inputs.rc == false
+        if: inputs.type == 'ga'
         run: |
-          set -e
-          VERSION="${{ inputs.version }}"
-
-          # Safety check: ensure at least one RC exists for this version
-          RC_COUNT=$(git tag -l "v${VERSION}-rc.*" | wc -l)
-          if [ "$RC_COUNT" -eq 0 ]; then
-            echo "::error::No RC tags found for v${VERSION}. Create at least one RC before cutting a GA release."
-            exit 1
-          fi
-
-          echo "Found $RC_COUNT RC tag(s) for v${VERSION}"
-
-          # Ensure GA tag does not already exist
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::Tag v${VERSION} already exists."
-            exit 1
-          fi
-
-          TAG="v${VERSION}"
+          TAG=$(make release-tag VERSION=${{ inputs.version }})
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "Computed GA tag: $TAG"
 
@@ -108,6 +97,7 @@ jobs:
           echo "## Release Tag Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ inputs.type }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** \`$GITHUB_REF_NAME\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`$(git rev-parse --short HEAD)\`" >> $GITHUB_STEP_SUMMARY
           echo "**Actor:** @$GITHUB_ACTOR" >> $GITHUB_STEP_SUMMARY
