@@ -759,13 +759,15 @@ func (s *Standalone) buildEnv() []string {
 	// Layer 2: Standalone-critical settings — these MUST take precedence over
 	// both inherited env and .env to prevent standalone mode from breaking.
 	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
-	// Add include/ to PYTHONPATH so user modules are importable — mirrors
-	// the Docker image which bakes /usr/local/airflow/include into PYTHONPATH.
-	includePath := filepath.Join(s.airflowHome, "include")
+	// Mirror the production runtime image, which sets PYTHONPATH=AIRFLOW_HOME
+	// (see astro-runtime image/Dockerfile). This makes every subdirectory of
+	// the project root importable as a namespace package — e.g.
+	// `from include.utils import x` or `from dags.my_blueprints import Extract`
+	// — matching what users get at deploy time.
 	if existing := os.Getenv("PYTHONPATH"); existing != "" {
-		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", includePath, existing)
+		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", s.airflowHome, existing)
 	} else {
-		overrides["PYTHONPATH"] = includePath
+		overrides["PYTHONPATH"] = s.airflowHome
 	}
 	overrides["AIRFLOW_HOME"] = standaloneHome
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
