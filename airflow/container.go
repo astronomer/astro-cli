@@ -65,7 +65,7 @@ type ImageHandler interface {
 }
 
 type DockerComposeAPI interface {
-	api.Service
+	api.Compose
 }
 
 type DockerCLIClient interface {
@@ -73,7 +73,7 @@ type DockerCLIClient interface {
 }
 
 type DockerRegistryAPI interface {
-	client.CommonAPIClient
+	client.APIClient
 }
 
 func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string) (ContainerHandler, error) {

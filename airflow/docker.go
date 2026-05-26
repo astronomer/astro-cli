@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -645,11 +646,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 		return errors.New("exec ID is empty")
 	}
 
-	execStartCheck := container.ExecStartOptions{
-		Detach: execConfig.Detach,
-	}
-
-	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, execStartCheck)
+	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, container.ExecStartOptions{})
 
 	if err := docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		return err
@@ -1208,7 +1205,7 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
 			change, updateType, err := checkVersionChange(beforeVer, afterVer)
 			if err != nil {
-				if err.Error() == "Invalid Semantic Version" {
+				if stderrors.Is(err, semver.ErrInvalidSemVer) {
 					updateType = unknown
 				} else {
 					return err
