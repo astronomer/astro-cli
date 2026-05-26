@@ -36,7 +36,6 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.7.0
-	github.com/astronomer/astro-cli/astro-client-platform-core v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
@@ -51,8 +50,7 @@ require (
 	github.com/itchyny/gojq v0.12.18
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/neilotoole/jsoncolor v0.7.1
-	github.com/oapi-codegen/runtime v1.1.1
-	github.com/opencontainers/image-spec v1.1.1
+	github.com/oapi-codegen/runtime v1.4.0
 	github.com/pb33f/libopenapi v0.34.0
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/whilp/git-urls v1.0.0
@@ -250,6 +248,7 @@ require (
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pb33f/jsonpath v0.8.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
@@ -297,7 +296,6 @@ require (
 	github.com/tonistiigi/dchapes-mode v0.0.0-20250318174251-73d941a28323 // indirect
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0 // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
-	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ultraware/funlen v0.1.0 // indirect
 	github.com/ultraware/whitespace v0.1.1 // indirect
 	github.com/uudashr/gocognit v1.2.0 // indirect
@@ -391,7 +389,7 @@ require (
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/manifoldco/promptui v0.9.0
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
@@ -441,7 +439,5 @@ replace github.com/astronomer/astro-cli/pkg/proxy => ./pkg/proxy
 replace github.com/astronomer/astro-cli/pkg/airflowrt => ./pkg/airflowrt
 
 replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
-
-replace github.com/astronomer/astro-cli/astro-client-platform-core => ./astro-client-platform-core
 
 replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry

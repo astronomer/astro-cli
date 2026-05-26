@@ -4,7 +4,7 @@ import (
 	httpContext "context"
 	"io"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -12,15 +12,15 @@ import (
 var rolePaginationLimit = 100
 
 // Returns a list of all of an organizations roles
-func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([]astrocore.Role, []astrocore.DefaultRole, error) {
+func GetOrgRoles(client astrov1.APIClient, shouldIncludeDefaultRoles bool) ([]astrov1.Role, []astrov1.DefaultRole, error) {
 	offset := 0
-	var roles []astrocore.Role
+	var roles []astrov1.Role
 
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, nil, err
 	}
-	var defaultRoles []astrocore.DefaultRole
+	var defaultRoles []astrov1.DefaultRole
 	var includeDefaultRoles bool
 
 	for {
@@ -29,7 +29,7 @@ func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([
 		} else {
 			includeDefaultRoles = false
 		}
-		resp, err := client.ListRolesWithResponse(httpContext.Background(), ctx.Organization, &astrocore.ListRolesParams{
+		resp, err := client.ListRolesWithResponse(httpContext.Background(), ctx.Organization, &astrov1.ListRolesParams{
 			IncludeDefaultRoles: &includeDefaultRoles,
 			Offset:              &offset,
 			Limit:               &rolePaginationLimit,
@@ -37,7 +37,7 @@ func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([
 		if err != nil {
 			return nil, nil, err
 		}
-		err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -58,7 +58,7 @@ func GetOrgRoles(client astrocore.CoreClient, shouldIncludeDefaultRoles bool) ([
 }
 
 // Prints a list of all of an organizations roles
-func ListOrgRoles(out io.Writer, client astrocore.CoreClient, shouldIncludeDefaultRoles bool) error {
+func ListOrgRoles(out io.Writer, client astrov1.APIClient, shouldIncludeDefaultRoles bool) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,

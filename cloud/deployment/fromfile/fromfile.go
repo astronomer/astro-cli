@@ -13,8 +13,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
@@ -26,8 +25,6 @@ import (
 
 var (
 	errEmptyFile                      = errors.New("has no content")
-	errCreateFailed                   = errors.New("failed to create deployment with input")
-	errUpdateFailed                   = errors.New("failed to update deployment with input")
 	errRequiredField                  = errors.New("missing required field")
 	errInvalidEmail                   = errors.New("invalid email")
 	errCannotUpdateExistingDeployment = errors.New("already exists")
@@ -53,18 +50,18 @@ const (
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcore.CoreClient, coreClient astrocore.CoreClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
+func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
 	var (
 		err                                           error
 		errHelp, clusterID, workspaceID, outputFormat string
 		dataBytes                                     []byte
 		formattedDeployment                           inspect.FormattedDeployment
-		existingDeployment                            astroplatformcore.Deployment
-		existingDeployments                           []astroplatformcore.Deployment
-		nodePools                                     []astroplatformcore.NodePool
+		existingDeployment                            astrov1.Deployment
+		existingDeployments                           []astrov1.Deployment
+		nodePools                                     []astrov1.NodePool
 		jsonOutput                                    bool
 		dagDeploy                                     bool
-		envVars                                       []astroplatformcore.DeploymentEnvironmentVariableRequest
+		envVars                                       []astrov1.DeploymentEnvironmentVariableRequest
 	)
 
 	// get file contents as []byte
@@ -95,16 +92,16 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 	deploymentType := transformDeploymentType(formattedDeployment.Deployment.Configuration.DeploymentType)
 	if !deployment.IsDeploymentStandard(deploymentType) {
 		// map cluster name to id and collect node pools for cluster
-		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, astroPlatformCore)
+		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, astroV1Client)
 		if err != nil {
 			return err
 		}
 	}
-	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, coreClient)
+	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, astroV1Client)
 	if err != nil {
 		return err
 	}
-	existingDeployments, err = deployment.CoreGetDeployments(workspaceID, c.Organization, astroPlatformCore)
+	existingDeployments, err = deployment.ListDeployments(workspaceID, c.Organization, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -128,17 +125,18 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 		}
 		// this deployment does not exist so create it
 		// transform formattedDeployment to DeploymentCreateInput
-		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, createAction, &astroplatformcore.Deployment{}, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus, waitTime, force)
+		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, createAction, &astrov1.Deployment{}, nodePools, dagDeploy, envVars, astroV1Client, waitForStatus, waitTime, force)
 		if err != nil {
 			return err
 		}
-		// users can not creat a deployment with env vars or alert emails in v1beta1 so to create them with a deployment file we need update right after deployment creation
+		// the public v1 CreateDeployment API doesn't accept env vars or alert emails,
+		// so when a deployment file specifies them we follow up with an update call.
 		if hasEnvVarsOrAlertEmails(&formattedDeployment) {
 			action = updateAction
 		}
 	}
 	// get new existing deployments list
-	existingDeployments, err = deployment.CoreGetDeployments(workspaceID, c.Organization, astroPlatformCore)
+	existingDeployments, err = deployment.ListDeployments(workspaceID, c.Organization, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -151,7 +149,7 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 				errNotFound, errHelp)
 		}
 		// this deployment exists so update it
-		existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name, astroPlatformCore)
+		existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -171,23 +169,23 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 			return fmt.Errorf("%w \n failed to %s alert emails", err, action)
 		}
 		// transform formattedDeployment to DeploymentUpdateInput
-		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, envVars, coreClient, astroPlatformCore, waitForStatus, waitTime, force)
+		err = createOrUpdateDeployment(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, dagDeploy, envVars, astroV1Client, waitForStatus, waitTime, force)
 		if err != nil {
 			return err
 		}
 	}
 	// Get deployment created or updated
-	existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name, astroPlatformCore)
+	existingDeployment, err = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroPlatformCore, coreClient, out, "", false, true)
+	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroV1Client, out, "", false, true)
 }
 
-// createOrUpdateDeployment transforms an inspect.FormattedDeployment into astroplateformcore CreateDeploymentInput or
+// createOrUpdateDeployment transforms an inspect.FormattedDeployment into a v1 CreateDeploymentInput or
 // UpdateDeploymentInput based on the action requested. Then the deployment is created or updated
 // If worker-queues were requested, it gets node pool id work the workers and validates queue options.
 // If no queue options were specified, it sets default values.
@@ -196,14 +194,14 @@ func CreateOrUpdate(inputFile, action string, astroPlatformCore astroplatformcor
 // It returns an error if node pool id could not be found for the worker type.
 //
 //nolint:dupl
-func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astroplatformcore.Deployment, nodePools []astroplatformcore.NodePool, dagDeploy bool, envVars []astroplatformcore.DeploymentEnvironmentVariableRequest, coreClient astrocore.CoreClient, astroPlatformCore astroplatformcore.CoreClient, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
+func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astrov1.Deployment, nodePools []astrov1.NodePool, dagDeploy bool, envVars []astrov1.DeploymentEnvironmentVariableRequest, astroV1Client astrov1.APIClient, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
 	var (
-		defaultOptions          astroplatformcore.WorkerQueueOptions
-		configOptions           astroplatformcore.DeploymentOptions
-		listQueues              []astroplatformcore.WorkerQueue
-		astroMachine            astroplatformcore.WorkerMachine
-		listQueuesRequest       []astroplatformcore.WorkerQueueRequest
-		listHybridQueuesRequest []astroplatformcore.HybridWorkerQueueRequest
+		defaultOptions          astrov1.WorkerQueueOptions
+		configOptions           astrov1.DeploymentOptions
+		listQueues              []astrov1.WorkerQueue
+		astroMachine            astrov1.WorkerMachine
+		listQueuesRequest       []astrov1.WorkerQueueRequest
+		listHybridQueuesRequest []astrov1.HybridWorkerQueueRequest
 		err                     error
 	)
 	deploymentType := transformDeploymentType(deploymentFromFile.Deployment.Configuration.DeploymentType)
@@ -219,7 +217,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			return err
 		}
 		// get defaults for min-count, max-count and concurrency from API
-		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", astroplatformcore.GetDeploymentOptionsParams{}, astroPlatformCore)
+		deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", astrov1.GetDeploymentOptionsParams{}, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -234,14 +232,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 						astroMachine = astroMachines[j]
 					}
 				}
-				var workerQueue astroplatformcore.WorkerQueueRequest
+				var workerQueue astrov1.WorkerQueueRequest
 				workerQueue.Id = &listQueues[i].Id
 				workerQueue.Name = listQueues[i].Name
 				workerQueue.IsDefault = listQueues[i].IsDefault
 				workerQueue.MaxWorkerCount = listQueues[i].MaxWorkerCount
 				workerQueue.MinWorkerCount = listQueues[i].MinWorkerCount
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
-				workerQueue.AstroMachine = astroplatformcore.WorkerQueueRequestAstroMachine(strings.ToUpper(*listQueues[i].AstroMachine))
+				workerQueue.AstroMachine = astrov1.WorkerQueueRequestAstroMachine(strings.ToUpper(*listQueues[i].AstroMachine))
 				// set default values if none were specified
 				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions, &astroMachine)
 				// check if queue is valid
@@ -255,7 +253,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				// add it to the list of queues to be created
 				listQueuesRequest = append(listQueuesRequest, requestedWorkerQueue)
 			} else {
-				var workerQueue astroplatformcore.HybridWorkerQueueRequest
+				var workerQueue astrov1.HybridWorkerQueueRequest
 				workerQueue.Id = &listQueues[i].Id
 				workerQueue.Name = listQueues[i].Name
 				workerQueue.IsDefault = listQueues[i].IsDefault
@@ -281,22 +279,22 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 	}
 	switch action {
 	case createAction:
-		createDeploymentRequest := astroplatformcore.CreateDeploymentRequest{}
+		createDeploymentRequest := astrov1.CreateDeploymentRequest{}
 		var defaultTaskPodCPU *string
 		var defaultTaskPodMemory *string
 		var resourceQuotaCPU *string
 		var resourceQuotaMemory *string
-		var remoteExecution *astroplatformcore.DeploymentRemoteExecutionRequest
+		var remoteExecution *astrov1.DeploymentRemoteExecutionRequest
 		if deployment.IsDeploymentStandard(deploymentType) || deployment.IsDeploymentDedicated(deploymentType) {
 			coreCloudProvider := deployment.GetCoreCloudProvider(deploymentFromFile.Deployment.Configuration.CloudProvider)
-			coreDeploymentType := astrocore.GetDeploymentOptionsParamsDeploymentType(deploymentType)
+			coreDeploymentType := astrov1.GetDeploymentOptionsParamsDeploymentType(deploymentType)
 
-			deploymentOptionsParams := astrocore.GetDeploymentOptionsParams{
+			deploymentOptionsParams := astrov1.GetDeploymentOptionsParams{
 				DeploymentType: &coreDeploymentType,
 				CloudProvider:  &coreCloudProvider,
 			}
 
-			configOption, err := deployment.GetDeploymentOptions("", deploymentOptionsParams, coreClient)
+			configOption, err := deployment.GetDeploymentOptions("", deploymentOptionsParams, astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -306,7 +304,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			resourceQuotaCPU = deployment.CreateResourceQuotaCPU(deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU, remoteExecutionEnabled, &configOption)
 			resourceQuotaMemory = deployment.CreateResourceQuotaMemory(deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory, remoteExecutionEnabled, &configOption)
 			if remoteExecutionEnabled {
-				remoteExecution = &astroplatformcore.DeploymentRemoteExecutionRequest{
+				remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
 					Enabled:                true,
 					AllowedIpAddressRanges: deploymentFromFile.Deployment.Configuration.RemoteExecution.AllowedIPAddressRanges,
 					TaskLogBucket:          deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogBucket,
@@ -315,36 +313,36 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {
-			var requestedCloudProvider astroplatformcore.CreateStandardDeploymentRequestCloudProvider
+			var requestedCloudProvider astrov1.CreateStandardDeploymentRequestCloudProvider
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.CloudProvider) {
 			case "GCP":
-				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderGCP
+				requestedCloudProvider = astrov1.CreateStandardDeploymentRequestCloudProviderGCP
 			case "AWS":
-				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAWS
+				requestedCloudProvider = astrov1.CreateStandardDeploymentRequestCloudProviderAWS
 			case "AZURE":
-				requestedCloudProvider = astroplatformcore.CreateStandardDeploymentRequestCloudProviderAZURE
+				requestedCloudProvider = astrov1.CreateStandardDeploymentRequestCloudProviderAZURE
 			}
 
-			var requestedExecutor astroplatformcore.CreateStandardDeploymentRequestExecutor
+			var requestedExecutor astrov1.CreateStandardDeploymentRequestExecutor
 			switch deploymentFromFile.Deployment.Configuration.Executor {
 			case deployment.CeleryExecutor, deployment.CELERY:
-				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorCELERY
+				requestedExecutor = astrov1.CreateStandardDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorKUBERNETES
+				requestedExecutor = astrov1.CreateStandardDeploymentRequestExecutorKUBERNETES
 			case deployment.AstroExecutor, deployment.ASTRO:
-				requestedExecutor = astroplatformcore.CreateStandardDeploymentRequestExecutorASTRO
+				requestedExecutor = astrov1.CreateStandardDeploymentRequestExecutorASTRO
 			}
 
-			var schedulerSize astroplatformcore.CreateStandardDeploymentRequestSchedulerSize
+			var schedulerSize astrov1.CreateStandardDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL):
-				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeSMALL
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM):
-				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE):
-				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeLARGE
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
-				schedulerSize = astroplatformcore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeSMALL):
+				schedulerSize = astrov1.CreateStandardDeploymentRequestSchedulerSizeSMALL
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeMEDIUM):
+				schedulerSize = astrov1.CreateStandardDeploymentRequestSchedulerSizeMEDIUM
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeLARGE):
+				schedulerSize = astrov1.CreateStandardDeploymentRequestSchedulerSizeLARGE
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
+				schedulerSize = astrov1.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			var deplWorkloadIdentity *string
@@ -352,31 +350,35 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
 			}
 
-			standardDeploymentRequest := astroplatformcore.CreateStandardDeploymentRequest{
-				AstroRuntimeVersion:  deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+			standardDeploymentRequest := astrov1.CreateStandardDeploymentRequest{
+				AstroRuntimeVersion:  new(deploymentFromFile.Deployment.Configuration.RunTimeVersion),
 				CloudProvider:        &requestedCloudProvider,
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
-				Executor:             requestedExecutor,
-				IsCicdEnforced:       deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
+				Executor:             new(requestedExecutor),
+				IsCicdEnforced:       new(deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments),
 				Region:               &deploymentFromFile.Deployment.Configuration.Region,
-				IsDagDeployEnabled:   dagDeploy,
-				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
+				IsDagDeployEnabled:   new(dagDeploy),
+				IsHighAvailability:   new(deploymentFromFile.Deployment.Configuration.IsHighAvailability),
 				IsDevelopmentMode:    &deploymentFromFile.Deployment.Configuration.IsDevelopmentMode,
 				WorkspaceId:          workspaceID,
-				Type:                 astroplatformcore.CreateStandardDeploymentRequestTypeSTANDARD,
+				Type:                 new(astrov1.CreateStandardDeploymentRequestTypeSTANDARD),
 				DefaultTaskPodCpu:    defaultTaskPodCPU,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCPU,
 				ResourceQuotaMemory:  resourceQuotaMemory,
-				WorkerQueues:         &listQueuesRequest,
-				SchedulerSize:        schedulerSize,
 				WorkloadIdentity:     deplWorkloadIdentity,
+			}
+			if len(listQueuesRequest) > 0 {
+				standardDeploymentRequest.WorkerQueues = &listQueuesRequest
+			}
+			if schedulerSize != "" {
+				standardDeploymentRequest.SchedulerSize = &schedulerSize
 			}
 			if standardDeploymentRequest.IsDevelopmentMode != nil && *standardDeploymentRequest.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
-				standardDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
-					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+				standardDeploymentRequest.ScalingSpec = &astrov1.DeploymentScalingSpecRequest{
+					HibernationSpec: &astrov1.DeploymentHibernationSpecRequest{
 						Schedules: &hibernationSchedules,
 					},
 				}
@@ -387,26 +389,26 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
-			var requestedExecutor astroplatformcore.CreateDedicatedDeploymentRequestExecutor
+			var requestedExecutor astrov1.CreateDedicatedDeploymentRequestExecutor
 			switch deploymentFromFile.Deployment.Configuration.Executor {
 			case deployment.CeleryExecutor, deployment.CELERY:
-				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorCELERY
+				requestedExecutor = astrov1.CreateDedicatedDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorKUBERNETES
+				requestedExecutor = astrov1.CreateDedicatedDeploymentRequestExecutorKUBERNETES
 			case deployment.AstroExecutor, deployment.ASTRO:
-				requestedExecutor = astroplatformcore.CreateDedicatedDeploymentRequestExecutorASTRO
+				requestedExecutor = astrov1.CreateDedicatedDeploymentRequestExecutorASTRO
 			}
 
-			var schedulerSize astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSize
+			var schedulerSize astrov1.CreateDedicatedDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL):
-				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM):
-				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE):
-				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
-				schedulerSize = astroplatformcore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeSMALL):
+				schedulerSize = astrov1.CreateDedicatedDeploymentRequestSchedulerSizeSMALL
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM):
+				schedulerSize = astrov1.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeLARGE):
+				schedulerSize = astrov1.CreateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
+				schedulerSize = astrov1.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			var deplWorkloadIdentity *string
@@ -414,31 +416,35 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
 			}
 
-			dedicatedDeploymentRequest := astroplatformcore.CreateDedicatedDeploymentRequest{
-				AstroRuntimeVersion:  deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+			dedicatedDeploymentRequest := astrov1.CreateDedicatedDeploymentRequest{
+				AstroRuntimeVersion:  new(deploymentFromFile.Deployment.Configuration.RunTimeVersion),
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
-				Executor:             requestedExecutor,
-				IsCicdEnforced:       deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
-				IsDagDeployEnabled:   dagDeploy,
-				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
+				Executor:             new(requestedExecutor),
+				IsCicdEnforced:       new(deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments),
+				IsDagDeployEnabled:   new(dagDeploy),
+				IsHighAvailability:   new(deploymentFromFile.Deployment.Configuration.IsHighAvailability),
 				IsDevelopmentMode:    &deploymentFromFile.Deployment.Configuration.IsDevelopmentMode,
-				ClusterId:            clusterID,
+				ClusterId:            new(clusterID),
 				WorkspaceId:          workspaceID,
-				Type:                 astroplatformcore.CreateDedicatedDeploymentRequestTypeDEDICATED,
+				Type:                 new(astrov1.CreateDedicatedDeploymentRequestTypeDEDICATED),
 				DefaultTaskPodCpu:    defaultTaskPodCPU,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCPU,
 				ResourceQuotaMemory:  resourceQuotaMemory,
-				WorkerQueues:         &listQueuesRequest,
-				SchedulerSize:        schedulerSize,
 				WorkloadIdentity:     deplWorkloadIdentity,
 				RemoteExecution:      remoteExecution,
 			}
+			if len(listQueuesRequest) > 0 {
+				dedicatedDeploymentRequest.WorkerQueues = &listQueuesRequest
+			}
+			if schedulerSize != "" {
+				dedicatedDeploymentRequest.SchedulerSize = &schedulerSize
+			}
 			if dedicatedDeploymentRequest.IsDevelopmentMode != nil && *dedicatedDeploymentRequest.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
-				dedicatedDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
-					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+				dedicatedDeploymentRequest.ScalingSpec = &astrov1.DeploymentScalingSpecRequest{
+					HibernationSpec: &astrov1.DeploymentHibernationSpecRequest{
 						Schedules: &hibernationSchedules,
 					},
 				}
@@ -449,32 +455,41 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
-			var requestedExecutor astroplatformcore.CreateHybridDeploymentRequestExecutor
+			var requestedExecutor astrov1.CreateHybridDeploymentRequestExecutor
 			switch deploymentFromFile.Deployment.Configuration.Executor {
 			case deployment.CeleryExecutor, deployment.CELERY:
-				requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorCELERY
+				requestedExecutor = astrov1.CreateHybridDeploymentRequestExecutorCELERY
 			case deployment.KubeExecutor, deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES
+				requestedExecutor = astrov1.CreateHybridDeploymentRequestExecutorKUBERNETES
 			}
 
-			hybridDeploymentRequest := astroplatformcore.CreateHybridDeploymentRequest{
-				AstroRuntimeVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+			hybridDeploymentRequest := astrov1.CreateHybridDeploymentRequest{
+				AstroRuntimeVersion: new(deploymentFromFile.Deployment.Configuration.RunTimeVersion),
 				Description:         &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                deploymentFromFile.Deployment.Configuration.Name,
-				Executor:            requestedExecutor,
-				IsCicdEnforced:      deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
-				IsDagDeployEnabled:  dagDeploy,
-				ClusterId:           clusterID,
+				Executor:            new(requestedExecutor),
+				IsCicdEnforced:      new(deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments),
+				IsDagDeployEnabled:  new(dagDeploy),
+				ClusterId:           new(clusterID),
 				WorkspaceId:         workspaceID,
-				Scheduler: astroplatformcore.DeploymentInstanceSpecRequest{
-					Au:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
-				},
-				Type:             astroplatformcore.CreateHybridDeploymentRequestTypeHYBRID,
-				WorkerQueues:     &listHybridQueuesRequest,
-				WorkloadIdentity: &deploymentFromFile.Deployment.Configuration.WorkloadIdentity,
+				Type:                new(astrov1.CreateHybridDeploymentRequestTypeHYBRID),
+				WorkloadIdentity:    &deploymentFromFile.Deployment.Configuration.WorkloadIdentity,
 			}
-			if requestedExecutor == astroplatformcore.CreateHybridDeploymentRequestExecutorKUBERNETES {
+			if len(listHybridQueuesRequest) > 0 {
+				hybridDeploymentRequest.WorkerQueues = &listHybridQueuesRequest
+			}
+			schedulerAU := deploymentFromFile.Deployment.Configuration.SchedulerAU
+			schedulerReplicas := deploymentFromFile.Deployment.Configuration.SchedulerCount
+			if schedulerAU != 0 || schedulerReplicas != 0 {
+				hybridDeploymentRequest.Scheduler = &astrov1.CreateDeploymentInstanceSpecRequest{}
+				if schedulerAU != 0 {
+					hybridDeploymentRequest.Scheduler.Au = &schedulerAU
+				}
+				if schedulerReplicas != 0 {
+					hybridDeploymentRequest.Scheduler.Replicas = &schedulerReplicas
+				}
+			}
+			if requestedExecutor == astrov1.CreateHybridDeploymentRequestExecutorKUBERNETES {
 				// map worker type to node pool id
 				taskPodNodePoolID, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 				if err != nil {
@@ -488,7 +503,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 
-		deploymentResponse, err := deployment.CoreCreateDeployment("", createDeploymentRequest, astroPlatformCore)
+		deploymentResponse, err := deployment.CoreCreateDeployment("", createDeploymentRequest, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -500,7 +515,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deployment.SleepTime,
 				deployment.TickNum,
 				int(waitTime.Seconds()),
-				astroPlatformCore,
+				astroV1Client,
 			)
 			if err != nil {
 				return err
@@ -513,7 +528,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 
 	case updateAction:
 		// build query input
-		updateDeploymentRequest := astroplatformcore.UpdateDeploymentRequest{}
+		updateDeploymentRequest := astrov1.UpdateDeploymentRequest{}
 		// check if cluster is being changed
 		if existingDeployment.ClusterId != nil {
 			if clusterID != *existingDeployment.ClusterId {
@@ -524,9 +539,9 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		defaultTaskPodMemory := deployment.UpdateDefaultTaskPodMemory(deploymentFromFile.Deployment.Configuration.DefaultTaskPodMemory, existingDeployment, nil)
 		resourceQuotaCPU := deployment.UpdateResourceQuotaCPU(deploymentFromFile.Deployment.Configuration.ResourceQuotaCPU, existingDeployment)
 		resourceQuotaMemory := deployment.UpdateResourceQuotaMemory(deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory, existingDeployment)
-		var remoteExecution *astroplatformcore.DeploymentRemoteExecutionRequest
+		var remoteExecution *astrov1.DeploymentRemoteExecutionRequest
 		if deployment.IsRemoteExecutionEnabled(existingDeployment) {
-			remoteExecution = &astroplatformcore.DeploymentRemoteExecutionRequest{
+			remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
 				Enabled:                true,
 				AllowedIpAddressRanges: deploymentFromFile.Deployment.Configuration.RemoteExecution.AllowedIPAddressRanges,
 				TaskLogBucket:          deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogBucket,
@@ -534,26 +549,26 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {
-			var requestedExecutor astroplatformcore.UpdateStandardDeploymentRequestExecutor
+			var requestedExecutor astrov1.UpdateStandardDeploymentRequestExecutor
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
 			case strings.ToUpper(deployment.CeleryExecutor), deployment.CELERY:
-				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorCELERY
+				requestedExecutor = astrov1.UpdateStandardDeploymentRequestExecutorCELERY
 			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorKUBERNETES
+				requestedExecutor = astrov1.UpdateStandardDeploymentRequestExecutorKUBERNETES
 			case strings.ToUpper(deployment.AstroExecutor), deployment.ASTRO:
-				requestedExecutor = astroplatformcore.UpdateStandardDeploymentRequestExecutorASTRO
+				requestedExecutor = astrov1.UpdateStandardDeploymentRequestExecutorASTRO
 			}
 
-			var schedulerSize astroplatformcore.UpdateStandardDeploymentRequestSchedulerSize
+			var schedulerSize astrov1.UpdateStandardDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeSMALL):
-				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeSMALL
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeMEDIUM):
-				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeLARGE):
-				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeLARGE
-			case string(astrocore.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
-				schedulerSize = astroplatformcore.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeSMALL):
+				schedulerSize = astrov1.UpdateStandardDeploymentRequestSchedulerSizeSMALL
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeMEDIUM):
+				schedulerSize = astrov1.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeLARGE):
+				schedulerSize = astrov1.UpdateStandardDeploymentRequestSchedulerSizeLARGE
+			case string(astrov1.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE):
+				schedulerSize = astrov1.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			var deplWorkloadIdentity *string
@@ -561,7 +576,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
 			}
 
-			standardDeploymentRequest := astroplatformcore.UpdateStandardDeploymentRequest{
+			standardDeploymentRequest := astrov1.UpdateStandardDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
 				Executor:             requestedExecutor,
@@ -569,12 +584,12 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsDagDeployEnabled:   dagDeploy,
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
-				Type:                 astroplatformcore.UpdateStandardDeploymentRequestTypeSTANDARD,
+				Type:                 astrov1.UpdateStandardDeploymentRequestTypeSTANDARD,
 				DefaultTaskPodCpu:    defaultTaskPodCPU,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCPU,
 				ResourceQuotaMemory:  resourceQuotaMemory,
-				WorkerQueues:         &listQueuesRequest,
+				WorkerQueues:         new(deployment.ConvertCreateQueuesToUpdate(listQueuesRequest)),
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
@@ -582,8 +597,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
-				standardDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
-					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+				standardDeploymentRequest.ScalingSpec = &astrov1.DeploymentScalingSpecRequest{
+					HibernationSpec: &astrov1.DeploymentHibernationSpecRequest{
 						Schedules: &hibernationSchedules,
 					},
 				}
@@ -594,26 +609,26 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 		if deployment.IsDeploymentDedicated(deploymentType) {
-			var requestedExecutor astroplatformcore.UpdateDedicatedDeploymentRequestExecutor
+			var requestedExecutor astrov1.UpdateDedicatedDeploymentRequestExecutor
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
 			case strings.ToUpper(deployment.CeleryExecutor), deployment.CELERY:
-				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorCELERY
+				requestedExecutor = astrov1.UpdateDedicatedDeploymentRequestExecutorCELERY
 			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
+				requestedExecutor = astrov1.UpdateDedicatedDeploymentRequestExecutorKUBERNETES
 			case strings.ToUpper(deployment.AstroExecutor), deployment.ASTRO:
-				requestedExecutor = astroplatformcore.UpdateDedicatedDeploymentRequestExecutorASTRO
+				requestedExecutor = astrov1.UpdateDedicatedDeploymentRequestExecutorASTRO
 			}
 
-			var schedulerSize astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSize
+			var schedulerSize astrov1.UpdateDedicatedDeploymentRequestSchedulerSize
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.SchedulerSize) {
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeSMALL):
-				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM):
-				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeLARGE):
-				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
-			case string(astrocore.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
-				schedulerSize = astroplatformcore.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeSMALL):
+				schedulerSize = astrov1.UpdateDedicatedDeploymentRequestSchedulerSizeSMALL
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeMEDIUM):
+				schedulerSize = astrov1.UpdateDedicatedDeploymentRequestSchedulerSizeMEDIUM
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeLARGE):
+				schedulerSize = astrov1.UpdateDedicatedDeploymentRequestSchedulerSizeLARGE
+			case string(astrov1.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE):
+				schedulerSize = astrov1.UpdateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
 			}
 
 			var deplWorkloadIdentity *string
@@ -621,7 +636,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				deplWorkloadIdentity = &deploymentFromFile.Deployment.Configuration.WorkloadIdentity
 			}
 
-			dedicatedDeploymentRequest := astroplatformcore.UpdateDedicatedDeploymentRequest{
+			dedicatedDeploymentRequest := astrov1.UpdateDedicatedDeploymentRequest{
 				Description:          &deploymentFromFile.Deployment.Configuration.Description,
 				Name:                 deploymentFromFile.Deployment.Configuration.Name,
 				Executor:             requestedExecutor,
@@ -629,12 +644,12 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				IsDagDeployEnabled:   dagDeploy,
 				IsHighAvailability:   deploymentFromFile.Deployment.Configuration.IsHighAvailability,
 				WorkspaceId:          workspaceID,
-				Type:                 astroplatformcore.UpdateDedicatedDeploymentRequestTypeDEDICATED,
+				Type:                 astrov1.UpdateDedicatedDeploymentRequestTypeDEDICATED,
 				DefaultTaskPodCpu:    defaultTaskPodCPU,
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCPU,
 				ResourceQuotaMemory:  resourceQuotaMemory,
-				WorkerQueues:         &listQueuesRequest,
+				WorkerQueues:         new(deployment.ConvertCreateQueuesToUpdate(listQueuesRequest)),
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
@@ -643,8 +658,8 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
-				dedicatedDeploymentRequest.ScalingSpec = &astroplatformcore.DeploymentScalingSpecRequest{
-					HibernationSpec: &astroplatformcore.DeploymentHibernationSpecRequest{
+				dedicatedDeploymentRequest.ScalingSpec = &astrov1.DeploymentScalingSpecRequest{
+					HibernationSpec: &astrov1.DeploymentHibernationSpecRequest{
 						Schedules: &hibernationSchedules,
 					},
 				}
@@ -655,32 +670,32 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			}
 		}
 		if !deployment.IsDeploymentStandard(deploymentType) && !deployment.IsDeploymentDedicated(deploymentType) {
-			var requestedExecutor astroplatformcore.UpdateHybridDeploymentRequestExecutor
+			var requestedExecutor astrov1.UpdateHybridDeploymentRequestExecutor
 			switch strings.ToUpper(deploymentFromFile.Deployment.Configuration.Executor) {
 			case strings.ToUpper(deployment.CeleryExecutor), deployment.CELERY:
-				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorCELERY
+				requestedExecutor = astrov1.UpdateHybridDeploymentRequestExecutorCELERY
 			case strings.ToUpper(deployment.KubeExecutor), deployment.KUBERNETES:
-				requestedExecutor = astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES
+				requestedExecutor = astrov1.UpdateHybridDeploymentRequestExecutorKUBERNETES
 			}
 
-			hybridDeploymentRequest := astroplatformcore.UpdateHybridDeploymentRequest{
+			hybridDeploymentRequest := astrov1.UpdateHybridDeploymentRequest{
 				Description:        &deploymentFromFile.Deployment.Configuration.Description,
 				Name:               deploymentFromFile.Deployment.Configuration.Name,
 				Executor:           requestedExecutor,
 				IsCicdEnforced:     deploymentFromFile.Deployment.Configuration.APIKeyOnlyDeployments,
 				IsDagDeployEnabled: dagDeploy,
 				WorkspaceId:        workspaceID,
-				Scheduler: astroplatformcore.DeploymentInstanceSpecRequest{
+				Scheduler: astrov1.UpdateDeploymentInstanceSpecRequest{
 					Au:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
 				},
-				Type:                 astroplatformcore.UpdateHybridDeploymentRequestTypeHYBRID,
+				Type:                 astrov1.UpdateHybridDeploymentRequestTypeHYBRID,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
-				WorkerQueues:         &listHybridQueuesRequest,
+				WorkerQueues:         new(deployment.ConvertHybridQueuesToUpdate(listHybridQueuesRequest)),
 				WorkloadIdentity:     &deploymentFromFile.Deployment.Configuration.WorkloadIdentity,
 			}
-			if requestedExecutor == astroplatformcore.UpdateHybridDeploymentRequestExecutorKUBERNETES {
+			if requestedExecutor == astrov1.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 				taskPodNodePoolID, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 				if err != nil {
 					return err
@@ -709,7 +724,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				}
 			}
 		}
-		_, err := deployment.CoreUpdateDeployment("", existingDeployment.Id, updateDeploymentRequest, astroPlatformCore)
+		_, err := deployment.CoreUpdateDeployment("", existingDeployment.Id, updateDeploymentRequest, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -717,10 +732,10 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 	return nil
 }
 
-func ToDeploymentHibernationSchedules(hibernationSchedules []inspect.HibernationSchedule) []astroplatformcore.DeploymentHibernationSchedule {
-	schedules := make([]astroplatformcore.DeploymentHibernationSchedule, 0, len(hibernationSchedules))
+func ToDeploymentHibernationSchedules(hibernationSchedules []inspect.HibernationSchedule) []astrov1.DeploymentHibernationSchedule {
+	schedules := make([]astrov1.DeploymentHibernationSchedule, 0, len(hibernationSchedules))
 	for i := range hibernationSchedules {
-		var schedule astroplatformcore.DeploymentHibernationSchedule
+		var schedule astrov1.DeploymentHibernationSchedule
 		schedule.HibernateAtCron = hibernationSchedules[i].HibernateAt
 		schedule.WakeAtCron = hibernationSchedules[i].WakeAt
 		schedule.Description = &hibernationSchedules[i].Description
@@ -784,7 +799,7 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 // deploymentExists deploymentToCreate as its argument.
 // It returns true if deploymentToCreate exists.
 // It returns false if deploymentToCreate does not exist.
-func deploymentExists(existingDeployments []astroplatformcore.Deployment, deploymentNameToCreate string) bool {
+func deploymentExists(existingDeployments []astrov1.Deployment, deploymentNameToCreate string) bool {
 	for i := range existingDeployments {
 		if existingDeployments[i].Name == deploymentNameToCreate {
 			// deployment exists
@@ -796,8 +811,8 @@ func deploymentExists(existingDeployments []astroplatformcore.Deployment, deploy
 
 // deploymentFromName takes existingDeployments and deploymentName as its arguments.
 // It returns the existing deployment that matches deploymentName.
-func deploymentFromName(existingDeployments []astroplatformcore.Deployment, deploymentName string, platformCoreClient astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
-	var existingDeployment astroplatformcore.Deployment
+func deploymentFromName(existingDeployments []astrov1.Deployment, deploymentName string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	var existingDeployment astrov1.Deployment
 	var j int
 
 	for i := range existingDeployments {
@@ -808,16 +823,16 @@ func deploymentFromName(existingDeployments []astroplatformcore.Deployment, depl
 		}
 	}
 	if j > 1 {
-		return astroplatformcore.Deployment{}, errDeploymentsWithSameName
+		return astrov1.Deployment{}, errDeploymentsWithSameName
 	}
 
 	if j == 0 {
-		return astroplatformcore.Deployment{}, nil
+		return astrov1.Deployment{}, nil
 	}
 
-	existingDeployment, err := deployment.CoreGetDeployment("", existingDeployment.Id, platformCoreClient)
+	existingDeployment, err := deployment.GetDeploymentByID("", existingDeployment.Id, astroV1Client)
 	if err != nil {
-		return astroplatformcore.Deployment{}, err
+		return astrov1.Deployment{}, err
 	}
 	return existingDeployment, nil
 }
@@ -825,14 +840,14 @@ func deploymentFromName(existingDeployments []astroplatformcore.Deployment, depl
 // getClusterInfoFromName takes clusterName and org as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
-func getClusterInfoFromName(clusterName, organizationID string, platformCoreClient astroplatformcore.CoreClient) (string, []astroplatformcore.NodePool, error) {
+func getClusterInfoFromName(clusterName, organizationID string, astroV1Client astrov1.APIClient) (string, []astrov1.NodePool, error) {
 	var (
-		existingClusters []astroplatformcore.Cluster
+		existingClusters []astrov1.Cluster
 		err              error
-		nodePools        []astroplatformcore.NodePool
+		nodePools        []astrov1.NodePool
 	)
 
-	existingClusters, err = organization.ListClusters(organizationID, platformCoreClient)
+	existingClusters, err = organization.ListClusters(organizationID, astroV1Client)
 	if err != nil {
 		return "", nil, err
 	}
@@ -852,9 +867,9 @@ func getClusterInfoFromName(clusterName, organizationID string, platformCoreClie
 // getWorkspaceIDFromName takes workspaceName as its argument.
 // It returns the workspaceID if the workspace is found in the organization.
 // It returns an errWorkspaceNotFound if the workspace does not exist in the organization.
-func getWorkspaceIDFromName(workspaceName string, client astrocore.CoreClient) (string, error) {
+func getWorkspaceIDFromName(workspaceName string, client astrov1.APIClient) (string, error) {
 	var (
-		existingWorkspaces []astrocore.Workspace
+		existingWorkspaces []astrov1.Workspace
 		err                error
 	)
 
@@ -872,7 +887,7 @@ func getWorkspaceIDFromName(workspaceName string, client astrocore.CoreClient) (
 
 // getNodePoolIDFromWorkerType maps the node pool id in nodePools to a worker type.
 // It returns an error if the node pool id does not exist in any node pool in nodePools.
-func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []astroplatformcore.NodePool) (string, error) {
+func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []astrov1.NodePool) (string, error) {
 	if workerType == "" {
 		return nodePools[0].Id, nil
 	}
@@ -887,9 +902,9 @@ func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []ast
 
 // getQueues takes a deploymentFromFile as its arguments.
 // It returns a list of worker queues to be created or updated.
-func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astroplatformcore.NodePool, existingQueues []astroplatformcore.WorkerQueue) ([]astroplatformcore.WorkerQueue, error) {
+func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astrov1.NodePool, existingQueues []astrov1.WorkerQueue) ([]astrov1.WorkerQueue, error) {
 	var (
-		qList      []astroplatformcore.WorkerQueue
+		qList      []astrov1.WorkerQueue
 		nodePoolID string
 		err        error
 	)
@@ -907,7 +922,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 			return requestedQueues[i].Name < requestedQueues[j].Name
 		})
 	}
-	qList = make([]astroplatformcore.WorkerQueue, len(requestedQueues))
+	qList = make([]astrov1.WorkerQueue, len(requestedQueues))
 	for i := range requestedQueues {
 		// check if requested queue exists
 		if i < len(existingQueues) {
@@ -1008,10 +1023,10 @@ func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string
 	return nil
 }
 
-func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envVars []astroplatformcore.DeploymentEnvironmentVariableRequest) {
-	envVars = []astroplatformcore.DeploymentEnvironmentVariableRequest{}
+func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envVars []astrov1.DeploymentEnvironmentVariableRequest) {
+	envVars = []astrov1.DeploymentEnvironmentVariableRequest{}
 	for i := range deploymentFromFile.Deployment.EnvVars {
-		var envVar astroplatformcore.DeploymentEnvironmentVariableRequest
+		var envVar astrov1.DeploymentEnvironmentVariableRequest
 		envVar.IsSecret = deploymentFromFile.Deployment.EnvVars[i].IsSecret
 		envVar.Key = deploymentFromFile.Deployment.EnvVars[i].Key
 		envVar.Value = deploymentFromFile.Deployment.EnvVars[i].Value
@@ -1020,22 +1035,22 @@ func createEnvVarsRequest(deploymentFromFile *inspect.FormattedDeployment) (envV
 	return envVars
 }
 
-func transformDeploymentType(deploymentType string) astroplatformcore.DeploymentType {
-	var transformedDeploymentType astroplatformcore.DeploymentType
+func transformDeploymentType(deploymentType string) astrov1.DeploymentType {
+	var transformedDeploymentType astrov1.DeploymentType
 
 	switch strings.ToUpper(deploymentType) {
 	case "STANDARD":
-		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD
 	case HostedShared:
-		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD
 	case HostedStandard:
-		transformedDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD
 	case "DEDICATED":
-		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+		transformedDeploymentType = astrov1.DeploymentTypeDEDICATED
 	case HostedDedicated:
-		transformedDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+		transformedDeploymentType = astrov1.DeploymentTypeDEDICATED
 	case "HYBRID":
-		transformedDeploymentType = astroplatformcore.DeploymentTypeHYBRID
+		transformedDeploymentType = astrov1.DeploymentTypeHYBRID
 	}
 
 	return transformedDeploymentType

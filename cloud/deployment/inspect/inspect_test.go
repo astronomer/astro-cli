@@ -13,58 +13,56 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var (
-	mockPlatformCoreClient     = new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	executorKubernetes         = astroplatformcore.DeploymentExecutorKUBERNETES
-	executorAstro              = astroplatformcore.DeploymentExecutorASTRO
+	mockV1Client               = new(astrov1_mocks.ClientWithResponsesInterface)
+	executorKubernetes         = astrov1.DeploymentExecutorKUBERNETES
+	executorAstro              = astrov1.DeploymentExecutorASTRO
 	errGetDeployment           = errors.New("test get deployment error")
 	errMarshal                 = errors.New("test error")
 	workloadIdentity           = "astro-great-release-name@provider-account.iam.gserviceaccount.com"
 	deploymentID               = "test-deployment-id"
-	standardType               = astroplatformcore.DeploymentTypeSTANDARD
-	dedicatedType              = astroplatformcore.DeploymentTypeDEDICATED
-	hybridType                 = astroplatformcore.DeploymentTypeHYBRID
+	standardType               = astrov1.DeploymentTypeSTANDARD
+	dedicatedType              = astrov1.DeploymentTypeDEDICATED
+	hybridType                 = astrov1.DeploymentTypeHYBRID
 	region                     = "us-central1"
 	astroMachine               = "a5"
-	mockCoreDeploymentResponse = []astroplatformcore.Deployment{
+	mockCoreDeploymentResponse = []astrov1.Deployment{
 		{
-			Status:           "HEALTHY",
-			WorkloadIdentity: &workloadIdentity,
-			Id:               deploymentID,
+			Status:                    "HEALTHY",
+			EffectiveWorkloadIdentity: &workloadIdentity,
+			Id:                        deploymentID,
 		},
 	}
-	mockCoreDeploymentResponseAlpha = []astrocore.Deployment{
+	mockCoreDeploymentResponseAlpha = []astrov1.Deployment{
 		{
-			Status:           "HEALTHY",
-			Id:               deploymentID,
-			WorkloadIdentity: &workloadIdentity,
+			Status:                    "HEALTHY",
+			Id:                        deploymentID,
+			EffectiveWorkloadIdentity: &workloadIdentity,
 		},
 	}
-	mockListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
+	mockListDeploymentsResponse = astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
+		JSON200: &astrov1.DeploymentsPaginated{
 			Deployments: mockCoreDeploymentResponse,
 		},
 	}
-	mockListDeploymentsResponseAlpha = astrocore.ListDeploymentsResponse{
+	mockListDeploymentsResponseAlpha = astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.DeploymentsPaginated{
+		JSON200: &astrov1.DeploymentsPaginated{
 			Deployments: mockCoreDeploymentResponseAlpha,
 		},
 	}
-	executorCelery                = astroplatformcore.DeploymentExecutorCELERY
+	executorCelery                = astrov1.DeploymentExecutorCELERY
 	description                   = "description"
 	workspaceName                 = "test-ws"
 	clusterID                     = "cluster-id"
@@ -76,21 +74,23 @@ var (
 	envValue2                     = "baz"
 	nodePoolID                    = "test-wq-id"
 	nodePoolID1                   = "test-pool-id-1"
-	deploymentEnvironmentVariable = []astroplatformcore.DeploymentEnvironmentVariable{
+	envUpdatedAt                  = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
+	envUpdatedAtPlus              = time.Date(2023, time.February, 1, 13, 0, 0, 0, time.UTC)
+	deploymentEnvironmentVariable = []astrov1.DeploymentEnvironmentVariable{
 		{
 			Key:       "foo",
 			Value:     &envValue,
 			IsSecret:  false,
-			UpdatedAt: "NOW",
+			UpdatedAt: envUpdatedAt,
 		},
 		{
 			Key:       "bar",
 			Value:     &envValue2,
 			IsSecret:  true,
-			UpdatedAt: "NOW+1",
+			UpdatedAt: envUpdatedAtPlus,
 		},
 	}
-	workerqueue = []astroplatformcore.WorkerQueue{
+	workerqueue = []astrov1.WorkerQueue{
 		{
 			Id:                "test-wq-id",
 			Name:              "default",
@@ -116,7 +116,7 @@ var (
 			PodMemory:         "gigsOfRam",
 		},
 	}
-	nodePools = []astroplatformcore.NodePool{
+	nodePools = []astrov1.NodePool{
 		{
 			Id:               nodePoolID,
 			IsDefault:        false,
@@ -130,12 +130,12 @@ var (
 			CreatedAt:        time.Now(),
 		},
 	}
-	cluster = astroplatformcore.Cluster{
+	cluster = astrov1.Cluster{
 		Id:        clusterID,
 		Name:      "test-cluster",
 		NodePools: &nodePools,
 	}
-	mockGetClusterResponse = astroplatformcore.GetClusterResponse{
+	mockGetClusterResponse = astrov1.GetClusterResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -145,10 +145,10 @@ var (
 	defaultTaskPodMemory   = "defaultTaskPodMemory"
 	resourceQuotaCPU       = "resourceQuotaCPU"
 	resourceQuotaMemory    = "ResourceQuotaMemory"
-	cloudProvider          = astroplatformcore.DeploymentCloudProviderAWS
-	schedulerTestSize      = astroplatformcore.DeploymentSchedulerSizeSMALL
+	cloudProvider          = astrov1.DeploymentCloudProviderAWS
+	schedulerTestSize      = astrov1.DeploymentSchedulerSizeSMALL
 	hibernationDescription = "hibernation schedule 1"
-	hibernationSchedules   = []astroplatformcore.DeploymentHibernationSchedule{
+	hibernationSchedules   = []astrov1.DeploymentHibernationSchedule{
 		{
 			HibernateAtCron: "1 * * * *",
 			WakeAtCron:      "2 * * * *",
@@ -159,45 +159,45 @@ var (
 	hibernationIsActive      = true
 	hibernationIsHibernating = true
 	hibernationOverrideUntil = time.Now()
-	hibernationOverride      = astroplatformcore.DeploymentHibernationOverride{
+	hibernationOverride      = astrov1.DeploymentHibernationOverride{
 		IsActive:      &hibernationIsActive,
 		IsHibernating: &hibernationIsHibernating,
 		OverrideUntil: &hibernationOverrideUntil,
 	}
 	isDevelopmentMode = true
-	sourceDeployment  = astroplatformcore.Deployment{
-		Id:                     deploymentID,
-		Name:                   "test-deployment-label",
-		Description:            &description,
-		WorkspaceName:          &workspaceName,
-		WorkspaceId:            "test-ws-id",
-		Namespace:              "great-release-name",
-		ClusterId:              &clusterID,
-		ClusterName:            &ClusterName,
-		ContactEmails:          &contactEmails,
-		Type:                   &hybridType,
-		Executor:               &executorCelery,
-		Region:                 &region,
-		RuntimeVersion:         "6.0.0",
-		AirflowVersion:         "2.4.0",
-		SchedulerAu:            &schedulerAU,
-		SchedulerReplicas:      schedulerReplicas,
-		WebServerAirflowApiUrl: "some-url/api/v1",
-		EnvironmentVariables:   &deploymentEnvironmentVariable,
-		WorkerQueues:           &workerqueue,
-		UpdatedAt:              time.Now(),
-		Status:                 "UNHEALTHY",
-		IsDagDeployEnabled:     true,
-		DefaultTaskPodCpu:      &defaultTaskPodCPU,
-		DefaultTaskPodMemory:   &defaultTaskPodMemory,
-		ResourceQuotaCpu:       &resourceQuotaCPU,
-		ResourceQuotaMemory:    &resourceQuotaMemory,
-		SchedulerSize:          &schedulerTestSize,
-		CloudProvider:          &cloudProvider,
-		IsDevelopmentMode:      &isDevelopmentMode,
-		WorkloadIdentity:       &workloadIdentity,
-		ScalingSpec: &astroplatformcore.DeploymentScalingSpec{
-			HibernationSpec: &astroplatformcore.DeploymentHibernationSpec{
+	sourceDeployment  = astrov1.Deployment{
+		Id:                        deploymentID,
+		Name:                      "test-deployment-label",
+		Description:               &description,
+		WorkspaceName:             &workspaceName,
+		WorkspaceId:               "test-ws-id",
+		Namespace:                 "great-release-name",
+		ClusterId:                 &clusterID,
+		ClusterName:               &ClusterName,
+		ContactEmails:             &contactEmails,
+		Type:                      &hybridType,
+		Executor:                  &executorCelery,
+		Region:                    &region,
+		RuntimeVersion:            "6.0.0",
+		AirflowVersion:            "2.4.0",
+		SchedulerAu:               &schedulerAU,
+		SchedulerReplicas:         schedulerReplicas,
+		WebServerAirflowApiUrl:    "some-url/api/v1",
+		EnvironmentVariables:      &deploymentEnvironmentVariable,
+		WorkerQueues:              &workerqueue,
+		UpdatedAt:                 time.Now(),
+		Status:                    "UNHEALTHY",
+		IsDagDeployEnabled:        true,
+		DefaultTaskPodCpu:         &defaultTaskPodCPU,
+		DefaultTaskPodMemory:      &defaultTaskPodMemory,
+		ResourceQuotaCpu:          &resourceQuotaCPU,
+		ResourceQuotaMemory:       &resourceQuotaMemory,
+		SchedulerSize:             &schedulerTestSize,
+		CloudProvider:             &cloudProvider,
+		IsDevelopmentMode:         &isDevelopmentMode,
+		EffectiveWorkloadIdentity: &workloadIdentity,
+		ScalingSpec: &astrov1.DeploymentScalingSpec{
+			HibernationSpec: &astrov1.DeploymentHibernationSpec{
 				Override:  &hibernationOverride,
 				Schedules: &hibernationSchedules,
 			},
@@ -205,30 +205,30 @@ var (
 	}
 	taskLogBucket             = "task-log-bucket"
 	taskLogURLPattern         = "task-log-url-pattern"
-	sourceDeploymentDedicated = astroplatformcore.Deployment{
-		Id:                     deploymentID,
-		Name:                   "test-deployment-label",
-		Description:            &description,
-		WorkspaceName:          &workspaceName,
-		WorkspaceId:            "test-ws-id",
-		Namespace:              "great-release-name",
-		ClusterId:              &clusterID,
-		ClusterName:            &ClusterName,
-		ContactEmails:          &contactEmails,
-		Type:                   &dedicatedType,
-		Executor:               &executorAstro,
-		RuntimeVersion:         "3.0-1",
-		AirflowVersion:         "3.0.0",
-		SchedulerAu:            &schedulerAU,
-		SchedulerReplicas:      schedulerReplicas,
-		WebServerAirflowApiUrl: "some-url/api/v1",
-		EnvironmentVariables:   &deploymentEnvironmentVariable,
-		UpdatedAt:              time.Now(),
-		Status:                 "UNHEALTHY",
-		IsDagDeployEnabled:     false,
-		SchedulerSize:          &schedulerTestSize,
-		WorkloadIdentity:       &workloadIdentity,
-		RemoteExecution: &astroplatformcore.DeploymentRemoteExecution{
+	sourceDeploymentDedicated = astrov1.Deployment{
+		Id:                        deploymentID,
+		Name:                      "test-deployment-label",
+		Description:               &description,
+		WorkspaceName:             &workspaceName,
+		WorkspaceId:               "test-ws-id",
+		Namespace:                 "great-release-name",
+		ClusterId:                 &clusterID,
+		ClusterName:               &ClusterName,
+		ContactEmails:             &contactEmails,
+		Type:                      &dedicatedType,
+		Executor:                  &executorAstro,
+		RuntimeVersion:            "3.0-1",
+		AirflowVersion:            "3.0.0",
+		SchedulerAu:               &schedulerAU,
+		SchedulerReplicas:         schedulerReplicas,
+		WebServerAirflowApiUrl:    "some-url/api/v1",
+		EnvironmentVariables:      &deploymentEnvironmentVariable,
+		UpdatedAt:                 time.Now(),
+		Status:                    "UNHEALTHY",
+		IsDagDeployEnabled:        false,
+		SchedulerSize:             &schedulerTestSize,
+		EffectiveWorkloadIdentity: &workloadIdentity,
+		RemoteExecution: &astrov1.DeploymentRemoteExecution{
 			Enabled:                true,
 			AllowedIpAddressRanges: []string{"0.0.0.0/0"},
 			TaskLogBucket:          &taskLogBucket,
@@ -236,16 +236,16 @@ var (
 		},
 	}
 
-	getDeploymentResponse = astroplatformcore.GetDeploymentResponse{
+	getDeploymentResponse = astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &sourceDeployment,
 	}
-	emptyListDeploymentsResponse = astroplatformcore.ListDeploymentsResponse{
+	emptyListDeploymentsResponse = astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
-			Deployments: []astroplatformcore.Deployment{},
+		JSON200: &astrov1.DeploymentsPaginated{
+			Deployments: []astrov1.Deployment{},
 		},
 	}
 )
@@ -276,144 +276,144 @@ func restoreYAMLMarshal(replace func(v interface{}) ([]byte, error)) {
 
 func TestInspect(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	workspaceID := "test-ws-id"
 	deploymentName := "test-deployment-label"
 	deploymentResponse := sourceDeployment
 	t.Run("prints a deployment in yaml format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment template in yaml format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", true, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
 		assert.NotContains(t, out.String(), deploymentName)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment in json format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "json", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "json", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment template in json format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "json", mockPlatformCoreClient, mockCoreClient, out, "", true, false)
+		err := Inspect(workspaceID, "", deploymentID, "json", mockV1Client, out, "", true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
 		assert.NotContains(t, out.String(), deploymentName)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment's specific field to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.cluster_name", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.cluster_name", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), *deploymentResponse.ClusterName)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prompts for a deployment to inspect if no deployment name or id was provided", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "1")() // selecting test-deployment-id
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", "", "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", "", "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentName)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if core deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errGetDeployment).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errGetDeployment).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if listing deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if requested field is not found in deployment", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "no-exist-information", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "no-exist-information", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, "", out.String())
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if formatting deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		originalMarshal := yamlMarshal
 		yamlMarshal = errReturningYAMLMarshal
 		defer restoreYAMLMarshal(originalMarshal)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errMarshal)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if getting context fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		out := new(bytes.Buffer)
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("Display Cluster Region and hide Release Name if an org is hosted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -422,60 +422,60 @@ func TestInspect(t *testing.T) {
 		ctx.SetContextKey("organization_product", "HOSTED")
 		out := new(bytes.Buffer)
 		sourceDeployment.Type = &standardType
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err = Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		err = Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "N/A")
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), sourceDeployment.RuntimeVersion)
 		assert.Contains(t, out.String(), "us-central1")
 		assert.Contains(t, out.String(), "a5")
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("when no deployments in workspace", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
-		err := Inspect(workspaceID, "", "", "yaml", mockPlatformCoreClient, mockCoreClient, out, "", false, false)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+		err := Inspect(workspaceID, "", "", "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("returns an error when trying to fetch the workload identity field with flag set to false", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.workload_identity", false, false)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, out.String(), "")
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("returns actual workload identity when the flag is set to true", func(t *testing.T) {
 		out := new(bytes.Buffer)
-		mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockPlatformCoreClient, mockCoreClient, out, "configuration.workload_identity", false, true)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, true)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), workloadIdentity)
-		mockCoreClient.AssertExpectations(t)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 }
 
 func TestGetDeploymentInspectInfo(t *testing.T) {
-	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	description = ""
-	cloudProvider := astroplatformcore.DeploymentCloudProviderGCP
+	cloudProvider := astrov1.DeploymentCloudProviderGCP
 	sourceDeployment.Description = &description
 	sourceDeployment.CloudProvider = &cloudProvider
 	sourceDeployment.Executor = &executorCelery
@@ -491,7 +491,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		mockCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns deployment metadata for the requested local deployment", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
@@ -500,7 +500,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		mockCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns error if getting context fails", func(t *testing.T) {
 		var actualDeploymentMeta deploymentMetadata
@@ -512,15 +512,15 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
-		mockCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 }
 
 func TestGetDeploymentConfig(t *testing.T) {
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
-		sourceDeployment.WorkloadIdentity = &workloadIdentity
-		cloudProvider := astroplatformcore.DeploymentCloudProviderAWS
+		sourceDeployment.EffectiveWorkloadIdentity = &workloadIdentity
+		cloudProvider := astrov1.DeploymentCloudProviderAWS
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -539,21 +539,21 @@ func TestGetDeploymentConfig(t *testing.T) {
 			CloudProvider:     string(*sourceDeployment.CloudProvider),
 			IsDevelopmentMode: *sourceDeployment.IsDevelopmentMode,
 		}
-		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
 
 		// clear workload identity
-		sourceDeployment.WorkloadIdentity = nil
+		sourceDeployment.EffectiveWorkloadIdentity = nil
 	})
 
 	t.Run("returns deployment config for the requested cloud standard deployment", func(t *testing.T) {
 		sourceDeployment.Type = &standardType
 		taskPodNodePoolID := "task_node_id"
 		sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolID
-		cloudProvider := astroplatformcore.DeploymentCloudProviderAZURE
+		cloudProvider := astrov1.DeploymentCloudProviderAZURE
 		sourceDeployment.CloudProvider = &cloudProvider
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -576,7 +576,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			ResourceQuotaMemory:  *sourceDeployment.ResourceQuotaMemory,
 			IsDevelopmentMode:    *sourceDeployment.IsDevelopmentMode,
 		}
-		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
@@ -606,7 +606,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 				TaskLogURLPattern:      sourceDeploymentDedicated.RemoteExecution.TaskLogUrlPattern,
 			},
 		}
-		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeploymentDedicated, mockPlatformCoreClient, false)
+		rawDeploymentConfig, err := getDeploymentConfig(&sourceDeploymentDedicated, mockV1Client, false)
 		assert.NoError(t, err)
 		err = decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
@@ -621,8 +621,8 @@ func TestGetPrintableDeployment(t *testing.T) {
 	sourceDeployment.TaskPodNodePoolId = &taskPodNodePoolID
 	t.Run("returns a deployment map", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedDeployment := map[string]interface{}{
@@ -643,7 +643,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 func TestGetAdditionalNullableFields(t *testing.T) {
 	sourceDeployment.Type = &hybridType
 	sourceDeployment.TaskPodNodePoolId = nil
-	for _, exec := range []astroplatformcore.DeploymentExecutor{executorCelery, executorAstro} {
+	for _, exec := range []astrov1.DeploymentExecutor{executorCelery, executorAstro} {
 		t.Run(fmt.Sprintf("returns alert emails, queues and variables for the requested deployment with %s Executor", string(exec)), func(t *testing.T) {
 			var expectedAdditional, actualAdditional orderedPieces
 			sourceDeployment.Executor = &exec
@@ -718,7 +718,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 
@@ -736,11 +736,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
     environment_variables:
         - is_secret: false
           key: foo
-          updated_at: NOW
+          updated_at: "2023-02-01T12:00:00Z"
           value: bar
         - is_secret: true
           key: bar
-          updated_at: NOW+1
+          updated_at: "2023-02-01T13:00:00Z"
           value: baz
     configuration:
         name: test-deployment-label
@@ -813,7 +813,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 
@@ -831,7 +831,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
     environment_variables:
         - is_secret: false
           key: foo
-          updated_at: NOW
+          updated_at: "2023-02-01T12:00:00Z"
           value: bar
     configuration:
         name: ""
@@ -894,7 +894,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.WebServerUrl = "some-url"
 		sourceDeployment2.UpdatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
 		sourceDeployment2.CreatedAt = time.Date(2023, time.February, 1, 12, 0, 0, 0, time.UTC)
-		provider := astroplatformcore.DeploymentCloudProviderAZURE
+		provider := astrov1.DeploymentCloudProviderAZURE
 		sourceDeployment2.CloudProvider = &provider
 		sourceDeployment2.ImageTag = "some-tag"
 		sourceDeployment2.Status = "UNHEALTHY"
@@ -902,7 +902,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.ScalingSpec.HibernationSpec.Override.OverrideUntil = &overrideUntil
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 
@@ -920,11 +920,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
     environment_variables:
         - is_secret: false
           key: foo
-          updated_at: NOW
+          updated_at: "2023-02-01T12:00:00Z"
           value: bar
         - is_secret: true
           key: bar
-          updated_at: NOW+1
+          updated_at: "2023-02-01T13:00:00Z"
           value: baz
     configuration:
         name: test-deployment-label
@@ -1000,7 +1000,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment2.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment2, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
 		printableDeployment := map[string]interface{}{
@@ -1019,13 +1019,13 @@ func TestFormatPrintableDeployment(t *testing.T) {
             {
                 "is_secret": false,
                 "key": "foo",
-                "updated_at": "NOW",
+                "updated_at": "2023-02-01T12:00:00Z",
                 "value": "bar"
             },
             {
                 "is_secret": true,
                 "key": "bar",
-                "updated_at": "NOW+1",
+                "updated_at": "2023-02-01T13:00:00Z",
                 "value": "baz"
             }
         ],
@@ -1108,7 +1108,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		sourceDeployment.Region = &empty
 
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		printableDeployment := map[string]interface{}{
@@ -1128,7 +1128,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             {
                 "is_secret": false,
                 "key": "foo",
-                "updated_at": "NOW",
+                "updated_at": "2023-02-01T12:00:00Z",
                 "value": "bar"
             }
         ],
@@ -1178,7 +1178,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		decodeToStruct = errorReturningDecode
 		defer restoreDecode(originalDecode)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
@@ -1191,7 +1191,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		yamlMarshal = errReturningYAMLMarshal
 		defer restoreYAMLMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
@@ -1204,7 +1204,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		jsonMarshal = errReturningJSONMarshal
 		defer restoreJSONMarshal(originalMarshal)
 		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
@@ -1218,7 +1218,7 @@ func TestGetSpecificField(t *testing.T) {
 	sourceDeployment.Status = "UNHEALTHY"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+	config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 	assert.NoError(t, err)
 	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 	printableDeployment := map[string]interface{}{
@@ -1302,12 +1302,12 @@ func TestGetSpecificField(t *testing.T) {
 func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 	var (
 		expectedWorkerType, poolID, actualWorkerType string
-		existingPools                                []astroplatformcore.NodePool
+		existingPools                                []astrov1.NodePool
 	)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	expectedWorkerType = "worker-1"
 	poolID = "test-pool-id"
-	existingPools = []astroplatformcore.NodePool{
+	existingPools = []astrov1.NodePool{
 		{
 			Id:               "test-pool-id",
 			IsDefault:        false,
@@ -1334,7 +1334,7 @@ func TestGetTemplate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(&sourceDeployment, mockPlatformCoreClient, false)
+	config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
 	assert.NoError(t, err)
 	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 
@@ -1363,7 +1363,7 @@ func TestGetTemplate(t *testing.T) {
 		}
 		expected.Deployment.EnvVars = newEnvVars
 		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = "NOW"
+			expected.Deployment.EnvVars[i].UpdatedAt = "2023-02-01T12:00:00Z"
 		}
 
 		actual := getTemplate(&decoded)
@@ -1397,7 +1397,7 @@ func TestGetTemplate(t *testing.T) {
 			}
 		}
 		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = "NOW"
+			expected.Deployment.EnvVars[i].UpdatedAt = "2023-02-01T12:00:00Z"
 		}
 		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
@@ -1440,21 +1440,21 @@ func TestReturnSpecifiedValue(t *testing.T) {
 	deploymentName := "test-deployment-label"
 
 	t.Run("run function successfully", func(t *testing.T) {
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		value, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockPlatformCoreClient)
+		value, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockV1Client)
 		assert.NoError(t, err)
 		assert.Contains(t, value, deploymentName)
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("get deployment error", func(t *testing.T) {
 		// Mock an error when trying to get cluster information
 		clusterErr := errors.New("test cluster error")
-		mockPlatformCoreClient.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, clusterErr).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, clusterErr).Once()
 
-		_, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockPlatformCoreClient)
+		_, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockV1Client)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "test cluster error")
-		mockPlatformCoreClient.AssertExpectations(t)
+		mockV1Client.AssertExpectations(t)
 	})
 }

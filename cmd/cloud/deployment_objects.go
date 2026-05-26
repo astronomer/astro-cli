@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 )
@@ -383,7 +383,7 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -438,7 +438,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -470,7 +470,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which Deployment should connections be copied from?")
 	}
-	fromDeployment, err := deployment.GetDeployment(ws, fromDeploymentID, fromDeploymentName, false, nil, platformCoreClient, astroCoreClient)
+	fromDeployment, err := deployment.GetDeployment(ws, fromDeploymentID, fromDeploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source Deployment")
 	}
@@ -484,7 +484,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which Deployment should receive the connections?")
 	}
-	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, platformCoreClient, astroCoreClient)
+	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the target Deployment")
 	}
@@ -509,7 +509,7 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -532,7 +532,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -564,7 +564,7 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error { 
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -596,7 +596,7 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be copied from?")
 	}
-	fromDeployment, err := deployment.GetDeployment(ws, fromDeploymentID, fromDeploymentName, false, nil, platformCoreClient, astroCoreClient)
+	fromDeployment, err := deployment.GetDeployment(ws, fromDeploymentID, fromDeploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source Deployment")
 	}
@@ -610,7 +610,7 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be pasted to?")
 	}
-	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, platformCoreClient, astroCoreClient)
+	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the target Deployment")
 	}
@@ -635,7 +635,7 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -658,7 +658,7 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -697,7 +697,7 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
 	cmd.SilenceUsage = true
 
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, platformCoreClient, astroCoreClient)
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -743,7 +743,7 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should pools be copied from?")
 	}
-	fromDeployment, err := deployment.GetDeployment(ws, fromDeploymentID, fromDeploymentName, false, nil, platformCoreClient, astroCoreClient)
+	fromDeployment, err := deployment.GetDeployment(ws, fromDeploymentID, fromDeploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the source Deployment")
 	}
@@ -757,7 +757,7 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	if toDeploymentName == "" && toDeploymentID == "" {
 		fmt.Println("Which deployment should pools be pasted to?")
 	}
-	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, platformCoreClient, astroCoreClient)
+	toDeployment, err := deployment.GetDeployment(ws, toDeploymentID, toDeploymentName, false, nil, astroV1Client)
 	if err != nil {
 		return errors.Wrap(err, "failed to find the target Deployment")
 	}
@@ -770,8 +770,8 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	return deployment.CopyPool(fromAirflowURL, toAirflowURL, airflowAPIClient, out)
 }
 
-func getAirflowURL(depl *astroplatformcore.Deployment) (string, error) {
-	value, err := inspect.ReturnSpecifiedValue(depl, webserverURLField, platformCoreClient)
+func getAirflowURL(depl *astrov1.Deployment) (string, error) {
+	value, err := inspect.ReturnSpecifiedValue(depl, webserverURLField, astroV1Client)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to find a deployments airflow webserver URL")
 	}

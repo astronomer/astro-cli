@@ -146,7 +146,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	objs, err := env.ListConns(scope, envResolveLinked, envIncludeSecrets, astroCoreClient)
+	objs, err := env.ListConns(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	obj, err := env.GetConn(idOrKey, scope, envIncludeSecrets, astroCoreClient)
+	obj, err := env.GetConn(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func runEnvConnCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateConn(scope, envConnKey, in, astroCoreClient)
+	obj, err := env.CreateConn(scope, envConnKey, in, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func runEnvConnUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.UpdateConn(idOrKey, scope, in, astroCoreClient)
+	obj, err := env.UpdateConn(idOrKey, scope, in, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func runEnvConnDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if !envYes && !confirmTTY(fmt.Sprintf("Delete connection %q?", idOrKey)) {
 		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
 	}
-	if err := env.DeleteConn(idOrKey, scope, astroCoreClient); err != nil {
+	if err := env.DeleteConn(idOrKey, scope, astroV1Client); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)

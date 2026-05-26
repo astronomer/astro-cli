@@ -6,15 +6,15 @@ import (
 	"github.com/lucsky/cuid"
 	"github.com/stretchr/testify/mock"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 func (s *Suite) TestCreateConnRequiresType() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	_, err := CreateConn(Scope{WorkspaceID: cuid.New()}, "db_main", ConnInput{}, mc)
 	s.ErrorContains(err, "connection type is required")
 }
@@ -26,16 +26,16 @@ func (s *Suite) TestCreateConn() {
 	createdID := cuid.New()
 	host := "db.example.com"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, mock.MatchedBy(func(body astrocore.CreateEnvironmentObjectJSONRequestBody) bool {
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, mock.MatchedBy(func(body astrov1.CreateEnvironmentObjectJSONRequestBody) bool {
 		return body.ObjectKey == "db_main" &&
-			body.ObjectType == astrocore.CreateEnvironmentObjectRequestObjectTypeCONNECTION &&
+			body.ObjectType == astrov1.CreateEnvironmentObjectRequestObjectTypeCONNECTION &&
 			body.Connection != nil &&
 			body.Connection.Type == "postgres" &&
 			body.Connection.Host != nil && *body.Connection.Host == host
-	})).Return(&astrocore.CreateEnvironmentObjectResponse{
+	})).Return(&astrov1.CreateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
+		JSON200:      &astrov1.CreateEnvironmentObject{Id: createdID},
 	}, nil).Once()
 
 	got, err := CreateConn(Scope{WorkspaceID: workspaceID}, "db_main", ConnInput{Type: "postgres", Host: &host}, mc)
@@ -53,16 +53,16 @@ func (s *Suite) TestListConnsByKey() {
 	password := "p4ss"
 	port := 5432
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.MatchedBy(func(p *astrocore.ListEnvironmentObjectsParams) bool {
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
 		// astro dev start needs both the secret values and inherited workspace conns.
 		return p != nil && p.ShowSecrets != nil && *p.ShowSecrets && p.ResolveLinked != nil && *p.ResolveLinked
-	})).Return(&astrocore.ListEnvironmentObjectsResponse{
+	})).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{
 				ObjectKey: "db_main",
-				Connection: &astrocore.EnvironmentObjectConnection{
+				Connection: &astrov1.EnvironmentObjectConnection{
 					Type: "postgres", Host: &host, Login: &login, Password: &password, Port: &port,
 				},
 			},
@@ -87,9 +87,9 @@ func (s *Suite) TestDeleteConn() {
 	ctx, _ := config.GetCurrentContext()
 	id := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	// CUID path: no key-to-ID lookup, direct DELETE.
-	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrocore.DeleteEnvironmentObjectResponse{
+	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrov1.DeleteEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 204},
 	}, nil).Once()
 

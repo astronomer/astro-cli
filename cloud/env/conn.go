@@ -4,11 +4,11 @@ import (
 	httpcontext "context"
 	"errors"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
-const objectTypeConn = astrocore.CONNECTION
+const objectTypeConn = astrov1.CONNECTION
 
 var errConnTypeRequired = errors.New("connection type is required (e.g. --type postgres)")
 
@@ -28,19 +28,19 @@ type ConnInput struct {
 }
 
 // ListConns returns CONNECTION objects for the given scope.
-func ListConns(scope Scope, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) ([]astrocore.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeConn, resolveLinked, includeSecrets, coreClient)
+func ListConns(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(scope, objectTypeConn, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // ListConnsByKey returns CONNECTION objects keyed by ObjectKey. Convenience
 // for callers that want O(1) key lookup (e.g. injecting connections into a
 // local Airflow container).
-func ListConnsByKey(scope Scope, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) (map[string]astrocore.EnvironmentObjectConnection, error) {
-	objs, err := ListConns(scope, resolveLinked, includeSecrets, coreClient)
+func ListConnsByKey(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) (map[string]astrov1.EnvironmentObjectConnection, error) {
+	objs, err := ListConns(scope, resolveLinked, includeSecrets, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]astrocore.EnvironmentObjectConnection, len(objs))
+	out := make(map[string]astrov1.EnvironmentObjectConnection, len(objs))
 	for i := range objs {
 		if objs[i].Connection != nil {
 			out[objs[i].ObjectKey] = *objs[i].Connection
@@ -50,12 +50,12 @@ func ListConnsByKey(scope Scope, resolveLinked, includeSecrets bool, coreClient 
 }
 
 // GetConn fetches a single connection by ID or key.
-func GetConn(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
-	return getObject(idOrKey, scope, objectTypeConn, includeSecrets, coreClient)
+func GetConn(idOrKey string, scope Scope, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	return getObject(idOrKey, scope, objectTypeConn, includeSecrets, astroV1Client)
 }
 
 // CreateConn creates a new CONNECTION object in the given scope.
-func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func CreateConn(scope Scope, key string, in ConnInput, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
@@ -70,12 +70,12 @@ func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.Core
 		return nil, err
 	}
 	scopeType, scopeEntityID := scopeRequest(scope)
-	body := astrocore.CreateEnvironmentObjectJSONRequestBody{
+	body := astrov1.CreateEnvironmentObjectJSONRequestBody{
 		ObjectKey:     key,
-		ObjectType:    astrocore.CreateEnvironmentObjectRequestObjectTypeCONNECTION,
+		ObjectType:    astrov1.CreateEnvironmentObjectRequestObjectTypeCONNECTION,
 		Scope:         scopeType,
 		ScopeEntityId: scopeEntityID,
-		Connection: &astrocore.CreateEnvironmentObjectConnectionRequest{
+		Connection: &astrov1.CreateEnvironmentObjectConnectionRequest{
 			Type:     in.Type,
 			Host:     in.Host,
 			Login:    in.Login,
@@ -87,15 +87,15 @@ func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.Core
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 
-	resp, err := coreClient.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
+	resp, err := astroV1Client.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
 	id := resp.JSON200.Id
-	connection := &astrocore.EnvironmentObjectConnection{
+	connection := &astrov1.EnvironmentObjectConnection{
 		Type:     in.Type,
 		Host:     in.Host,
 		Login:    in.Login,
@@ -104,25 +104,25 @@ func CreateConn(scope Scope, key string, in ConnInput, coreClient astrocore.Core
 		Port:     in.Port,
 		Extra:    in.Extra,
 	}
-	return &astrocore.EnvironmentObject{
+	return &astrov1.EnvironmentObject{
 		Id:            &id,
 		ObjectKey:     key,
-		ObjectType:    astrocore.EnvironmentObjectObjectType(astrocore.CONNECTION),
-		Scope:         astrocore.EnvironmentObjectScope(scopeType),
+		ObjectType:    astrov1.EnvironmentObjectObjectType(astrov1.CONNECTION),
+		Scope:         astrov1.EnvironmentObjectScope(scopeType),
 		ScopeEntityId: scopeEntityID,
 		Connection:    connection,
 	}, nil
 }
 
 // UpdateConn updates an existing connection. Type is required by the API.
-func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if in.Type == "" {
 		return nil, errConnTypeRequired
 	}
 	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
 		return nil, err
 	}
-	id, err := resolveID(idOrKey, scope, objectTypeConn, coreClient)
+	id, err := resolveID(idOrKey, scope, objectTypeConn, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +130,8 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.
 	if err != nil {
 		return nil, err
 	}
-	body := astrocore.UpdateEnvironmentObjectJSONRequestBody{
-		Connection: &astrocore.UpdateEnvironmentObjectConnectionRequest{
+	body := astrov1.UpdateEnvironmentObjectJSONRequestBody{
+		Connection: &astrov1.UpdateEnvironmentObjectConnectionRequest{
 			Type:     in.Type,
 			Host:     in.Host,
 			Login:    in.Login,
@@ -142,11 +142,11 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.
 		},
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
-	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
+	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
 	if resp.JSON200 == nil {
@@ -156,6 +156,6 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, coreClient astrocore.
 }
 
 // DeleteConn deletes a connection by ID or key.
-func DeleteConn(idOrKey string, scope Scope, coreClient astrocore.CoreClient) error {
-	return deleteObject(idOrKey, scope, objectTypeConn, coreClient)
+func DeleteConn(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+	return deleteObject(idOrKey, scope, objectTypeConn, astroV1Client)
 }

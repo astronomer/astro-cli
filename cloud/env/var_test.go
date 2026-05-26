@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -41,7 +41,7 @@ func (s *Suite) TestListVars() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, _ := config.GetCurrentContext()
 	deploymentID := cuid.New()
-	objType := astrocore.ENVIRONMENTVARIABLE
+	objType := astrov1.ENVIRONMENTVARIABLE
 	limit := defaultListLimit
 
 	s.Run("workspace scope", func() {
@@ -49,7 +49,7 @@ func (s *Suite) TestListVars() {
 		resolveLinked := true
 		workspaceID := cuid.New()
 		offset := 0
-		params := &astrocore.ListEnvironmentObjectsParams{
+		params := &astrov1.ListEnvironmentObjectsParams{
 			WorkspaceId:   &workspaceID,
 			ObjectType:    &objType,
 			ShowSecrets:   &showSecrets,
@@ -57,12 +57,12 @@ func (s *Suite) TestListVars() {
 			Limit:         &limit,
 			Offset:        &offset,
 		}
-		mc := new(astrocore_mocks.ClientWithResponsesInterface)
-		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, params).Return(&astrocore.ListEnvironmentObjectsResponse{
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, params).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200: &astrocore.EnvironmentObjectsPaginated{
-				EnvironmentObjects: []astrocore.EnvironmentObject{
-					{ObjectKey: "FOO", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: []astrov1.EnvironmentObject{
+					{ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
 				},
 				TotalCount: 1,
 			},
@@ -79,7 +79,7 @@ func (s *Suite) TestListVars() {
 		showSecrets := true
 		resolveLinked := false
 		offset := 0
-		params := &astrocore.ListEnvironmentObjectsParams{
+		params := &astrov1.ListEnvironmentObjectsParams{
 			DeploymentId:  &deploymentID,
 			ObjectType:    &objType,
 			ShowSecrets:   &showSecrets,
@@ -87,10 +87,10 @@ func (s *Suite) TestListVars() {
 			Limit:         &limit,
 			Offset:        &offset,
 		}
-		mc := new(astrocore_mocks.ClientWithResponsesInterface)
-		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, params).Return(&astrocore.ListEnvironmentObjectsResponse{
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, params).Return(&astrov1.ListEnvironmentObjectsResponse{
 			HTTPResponse: &http.Response{StatusCode: 200},
-			JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
+			JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
 		}, nil).Once()
 
 		_, err := ListVars(Scope{DeploymentID: deploymentID}, false, true, mc)
@@ -99,13 +99,13 @@ func (s *Suite) TestListVars() {
 	})
 
 	s.Run("rejects empty scope", func() {
-		mc := new(astrocore_mocks.ClientWithResponsesInterface)
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
 		_, err := ListVars(Scope{}, true, false, mc)
 		s.ErrorIs(err, ErrScopeNotSpecified)
 	})
 
 	s.Run("rejects ambiguous scope", func() {
-		mc := new(astrocore_mocks.ClientWithResponsesInterface)
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
 		_, err := ListVars(Scope{WorkspaceID: "ws", DeploymentID: "dep"}, true, false, mc)
 		s.ErrorIs(err, ErrScopeAmbiguous)
 	})
@@ -117,11 +117,11 @@ func (s *Suite) TestGetVarByKey() {
 	workspaceID := cuid.New()
 	id := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
 		}},
 	}, nil).Once()
 
@@ -136,10 +136,10 @@ func (s *Suite) TestGetVarNotFound() {
 	ctx, _ := config.GetCurrentContext()
 	workspaceID := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
+		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
 	}, nil).Once()
 
 	_, err := GetVar("MISSING", Scope{WorkspaceID: workspaceID}, false, mc)
@@ -154,21 +154,21 @@ func (s *Suite) TestCreateVar() {
 	value := "bar"
 	isSecret := false
 
-	expectedBody := astrocore.CreateEnvironmentObjectJSONRequestBody{
+	expectedBody := astrov1.CreateEnvironmentObjectJSONRequestBody{
 		ObjectKey:     "FOO",
-		ObjectType:    astrocore.CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE,
-		Scope:         astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE,
+		ObjectType:    astrov1.CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE,
+		Scope:         astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE,
 		ScopeEntityId: workspaceID,
-		EnvironmentVariable: &astrocore.CreateEnvironmentObjectEnvironmentVariableRequest{
+		EnvironmentVariable: &astrov1.CreateEnvironmentObjectEnvironmentVariableRequest{
 			Value:    &value,
 			IsSecret: &isSecret,
 		},
 	}
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, expectedBody).Return(&astrocore.CreateEnvironmentObjectResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, expectedBody).Return(&astrov1.CreateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.CreateEnvironmentObject{Id: createdID},
+		JSON200:      &astrov1.CreateEnvironmentObject{Id: createdID},
 	}, nil).Once()
 
 	got, err := CreateVar(Scope{WorkspaceID: workspaceID}, "FOO", value, isSecret, nil, mc)
@@ -186,19 +186,19 @@ func (s *Suite) TestUpdateVar() {
 	id := cuid.New()
 	newValue := "newval"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	// GetVar fall-through (key lookup) -> list
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO"},
 		}},
 	}, nil).Once()
-	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, astrocore.UpdateEnvironmentObjectJSONRequestBody{
-		EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableRequest{Value: &newValue},
-	}).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, astrov1.UpdateEnvironmentObjectJSONRequestBody{
+		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{Value: &newValue},
+	}).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	got, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
@@ -213,14 +213,14 @@ func (s *Suite) TestDeleteVar() {
 	workspaceID := cuid.New()
 	id := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO"},
 		}},
 	}, nil).Once()
-	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrocore.DeleteEnvironmentObjectResponse{
+	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrov1.DeleteEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 204},
 	}, nil).Once()
 

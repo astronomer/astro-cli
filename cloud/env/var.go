@@ -5,20 +5,20 @@ import (
 	httpcontext "context"
 	"errors"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
-const objectTypeVar = astrocore.ENVIRONMENTVARIABLE
+const objectTypeVar = astrov1.ENVIRONMENTVARIABLE
 
 // ListVars returns ENVIRONMENT_VARIABLE objects for the given scope.
-func ListVars(scope Scope, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) ([]astrocore.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeVar, resolveLinked, includeSecrets, coreClient)
+func ListVars(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(scope, objectTypeVar, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // GetVar fetches a single env var by ID or key.
-func GetVar(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
-	return getObject(idOrKey, scope, objectTypeVar, includeSecrets, coreClient)
+func GetVar(idOrKey string, scope Scope, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	return getObject(idOrKey, scope, objectTypeVar, includeSecrets, astroV1Client)
 }
 
 // CreateVar creates a new ENVIRONMENT_VARIABLE object in the given scope.
@@ -28,7 +28,7 @@ func GetVar(idOrKey string, scope Scope, includeSecrets bool, coreClient astroco
 // Returns a minimal EnvironmentObject populated from inputs and the create
 // response ID; the platform's create endpoint only returns the ID, so the
 // full server-side object is not fetched.
-func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
@@ -41,33 +41,33 @@ func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, co
 	}
 	scopeType, scopeEntityID := scopeRequest(scope)
 
-	body := astrocore.CreateEnvironmentObjectJSONRequestBody{
+	body := astrov1.CreateEnvironmentObjectJSONRequestBody{
 		ObjectKey:     key,
-		ObjectType:    astrocore.CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE,
+		ObjectType:    astrov1.CreateEnvironmentObjectRequestObjectTypeENVIRONMENTVARIABLE,
 		Scope:         scopeType,
 		ScopeEntityId: scopeEntityID,
-		EnvironmentVariable: &astrocore.CreateEnvironmentObjectEnvironmentVariableRequest{
+		EnvironmentVariable: &astrov1.CreateEnvironmentObjectEnvironmentVariableRequest{
 			Value:    &value,
 			IsSecret: &isSecret,
 		},
 		AutoLinkDeployments: autoLink,
 	}
 
-	resp, err := coreClient.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
+	resp, err := astroV1Client.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
 	id := resp.JSON200.Id
-	return &astrocore.EnvironmentObject{
+	return &astrov1.EnvironmentObject{
 		Id:            &id,
 		ObjectKey:     key,
-		ObjectType:    astrocore.EnvironmentObjectObjectType(astrocore.ENVIRONMENTVARIABLE),
-		Scope:         astrocore.EnvironmentObjectScope(scopeType),
+		ObjectType:    astrov1.EnvironmentObjectObjectType(astrov1.ENVIRONMENTVARIABLE),
+		Scope:         astrov1.EnvironmentObjectScope(scopeType),
 		ScopeEntityId: scopeEntityID,
-		EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{
+		EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{
 			Value:    value,
 			IsSecret: isSecret,
 		},
@@ -78,8 +78,8 @@ func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, co
 // toggling IsSecret; callers wanting to change secret status must delete and
 // recreate. autoLink, when non-nil, toggles the "auto-link to all deployments"
 // flag (workspace scope only).
-func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
-	id, err := resolveID(idOrKey, scope, objectTypeVar, coreClient)
+func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	id, err := resolveID(idOrKey, scope, objectTypeVar, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -87,17 +87,17 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, coreCl
 	if err != nil {
 		return nil, err
 	}
-	body := astrocore.UpdateEnvironmentObjectJSONRequestBody{
-		EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableRequest{
+	body := astrov1.UpdateEnvironmentObjectJSONRequestBody{
+		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{
 			Value: &value,
 		},
 		AutoLinkDeployments: autoLink,
 	}
-	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
+	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
 	if resp.JSON200 == nil {
@@ -107,6 +107,6 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, coreCl
 }
 
 // DeleteVar deletes an env var by ID or key.
-func DeleteVar(idOrKey string, scope Scope, coreClient astrocore.CoreClient) error {
-	return deleteObject(idOrKey, scope, objectTypeVar, coreClient)
+func DeleteVar(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+	return deleteObject(idOrKey, scope, objectTypeVar, astroV1Client)
 }

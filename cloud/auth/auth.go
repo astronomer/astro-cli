@@ -15,9 +15,7 @@ import (
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	"github.com/astronomer/astro-cli/cloud/platformclient"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -30,8 +28,6 @@ import (
 )
 
 const (
-	authConfigEndpoint = "private/v1alpha1/cli/auth-config"
-
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
 
@@ -250,15 +246,15 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 // the same domain), so we fall through to list-and-pick-first to keep the user
 // usable. Properly scrubbing identity-scoped state on logout and hydrating it
 // on login would let us drop that fallback — see #2097.
-func resolveActiveOrg(c *config.Context, platformCoreClient astroplatformcore.CoreClient) (*astroplatformcore.Organization, error) {
+func resolveActiveOrg(c *config.Context, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
 	if c.Organization != "" {
-		orgResp, err := platformCoreClient.GetOrganizationWithResponse(http_context.Background(), c.Organization, &astroplatformcore.GetOrganizationParams{})
+		orgResp, err := astroV1Client.GetOrganizationWithResponse(http_context.Background(), c.Organization, &astrov1.GetOrganizationParams{})
 		if err != nil {
 			return nil, err
 		}
 		stale := orgResp.HTTPResponse != nil && (orgResp.HTTPResponse.StatusCode == http.StatusForbidden || orgResp.HTTPResponse.StatusCode == http.StatusNotFound)
 		if !stale {
-			if err := platformclient.NormalizeAPIError(orgResp.HTTPResponse, orgResp.Body); err != nil {
+			if err := astrov1.NormalizeAPIError(orgResp.HTTPResponse, orgResp.Body); err != nil {
 				return nil, err
 			}
 			if orgResp.JSON200 == nil {
@@ -269,11 +265,11 @@ func resolveActiveOrg(c *config.Context, platformCoreClient astroplatformcore.Co
 	}
 
 	limit := 100
-	orgsResp, err := platformCoreClient.ListOrganizationsWithResponse(http_context.Background(), &astroplatformcore.ListOrganizationsParams{Limit: &limit})
+	orgsResp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), &astrov1.ListOrganizationsParams{Limit: &limit})
 	if err != nil {
 		return nil, err
 	}
-	if err := platformclient.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body); err != nil {
 		return nil, err
 	}
 	orgs := orgsResp.JSON200.Organizations
@@ -283,37 +279,37 @@ func resolveActiveOrg(c *config.Context, platformCoreClient astroplatformcore.Co
 	return &orgs[0], nil
 }
 
-func switchToLastUsedWorkspace(c *config.Context, workspaces []astrocore.Workspace) (astrocore.Workspace, bool, error) {
+func switchToLastUsedWorkspace(c *config.Context, workspaces []astrov1.Workspace) (astrov1.Workspace, bool, error) {
 	if c.LastUsedWorkspace != "" {
 		for i := range workspaces {
 			if c.LastUsedWorkspace == workspaces[i].Id {
 				err := c.SetContextKey("workspace", workspaces[i].Id)
 				if err != nil {
-					return astrocore.Workspace{}, false, err
+					return astrov1.Workspace{}, false, err
 				}
 				return workspaces[i], true, nil
 			}
 		}
 	}
-	return astrocore.Workspace{}, false, nil
+	return astrov1.Workspace{}, false, nil
 }
 
 // check client status after a successfully login
-func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer) error {
+func CheckUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io.Writer) error {
 	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
-	selfResp, err := coreClient.GetSelfUserWithResponse(http_context.Background(), &astrocore.GetSelfUserParams{
+	selfResp, err := astroV1Client.GetSelfUserWithResponse(http_context.Background(), &astrov1.GetSelfUserParams{
 		CreateIfNotExist: &createIfNotExist,
 	})
 	if err != nil {
 		return err
 	}
-	err = astrocore.NormalizeAPIError(selfResp.HTTPResponse, selfResp.Body)
+	err = astrov1.NormalizeAPIError(selfResp.HTTPResponse, selfResp.Body)
 	if err != nil {
 		return err
 	}
-	activeOrg, err := resolveActiveOrg(c, platformCoreClient)
+	activeOrg, err := resolveActiveOrg(c, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -326,7 +322,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 	if err != nil {
 		return err
 	}
-	workspaces, err := workspace.GetWorkspaces(coreClient)
+	workspaces, err := workspace.GetWorkspaces(astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -352,7 +348,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + cliChooseWorkspace)
-			err := workspace.Switch("", coreClient, out)
+			err := workspace.Switch("", astroV1Client, out)
 			if err != nil {
 				fmt.Print(cliSetWorkspaceExample)
 			}
@@ -364,7 +360,7 @@ func CheckUserSession(c *config.Context, coreClient astrocore.CoreClient, platfo
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -418,7 +414,7 @@ func Login(domain, token string, coreClient astrocore.CoreClient, platformCoreCl
 
 	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
 
-	err = CheckUserSession(&c, coreClient, platformCoreClient, out)
+	err = CheckUserSession(&c, astroV1Client, out)
 	if err != nil {
 		return err
 	}
@@ -456,7 +452,7 @@ func FetchDomainAuthConfig(domain string) (Config, error) {
 			"Are you trying to authenticate to Astro Private Cloud? If so, please change your current context with 'astro context switch'")
 	}
 
-	addr := domainutil.GetURLToEndpoint("https", domain, authConfigEndpoint)
+	addr := domainutil.GetURLToEndpoint("https", domain, astroauth.AuthConfigEndpoint)
 
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{

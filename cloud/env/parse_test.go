@@ -5,22 +5,22 @@ import (
 	"os"
 	"path/filepath"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 )
 
 func (s *Suite) TestParseDotenvRoundTripsExport() {
 	// Round-trip: write a set of values via the dotenv writer, read them back
 	// via the parser, assert byte-identical values. Covers every escape path
 	// dotenvQuote produces (whitespace, newline, quote, $, #, \, export prefix).
-	objs := []astrocore.EnvironmentObject{
-		{ObjectKey: "PLAIN", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "simple"}},
-		{ObjectKey: "WITH_SPACES", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "two words"}},
-		{ObjectKey: "WITH_NL", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "line1\nline2"}},
-		{ObjectKey: "WITH_QUOTE", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: `say "hi"`}},
-		{ObjectKey: "WITH_DOLLAR", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "user $HOME"}},
-		{ObjectKey: "WITH_HASH", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "v#oops"}},
-		{ObjectKey: "WITH_BS", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: `path\to\thing`}},
-		{ObjectKey: "WITH_EXPORT", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "export ME"}},
+	objs := []astrov1.EnvironmentObject{
+		{ObjectKey: "PLAIN", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "simple"}},
+		{ObjectKey: "WITH_SPACES", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "two words"}},
+		{ObjectKey: "WITH_NL", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "line1\nline2"}},
+		{ObjectKey: "WITH_QUOTE", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: `say "hi"`}},
+		{ObjectKey: "WITH_DOLLAR", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "user $HOME"}},
+		{ObjectKey: "WITH_HASH", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "v#oops"}},
+		{ObjectKey: "WITH_BS", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: `path\to\thing`}},
+		{ObjectKey: "WITH_EXPORT", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "export ME"}},
 	}
 	var buf bytes.Buffer
 	s.NoError(WriteVarList(objs, FormatDotenv, true, &buf))

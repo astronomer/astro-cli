@@ -11,8 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/cloud/organization"
@@ -212,7 +211,7 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListDeploymentTeamsWithFormat(astroCoreClient, deploymentID, format, deploymentTeamListOutputFlags.Template, out)
+	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, format, deploymentTeamListOutputFlags.Template, out)
 }
 
 func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -226,7 +225,7 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.RemoveDeploymentTeam(id, deploymentID, out, astroCoreClient)
+	return team.RemoveDeploymentTeam(id, deploymentID, out, astroV1Client)
 }
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
@@ -257,7 +256,7 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.AddDeploymentTeam(id, addDeploymentRole, deploymentID, out, astroCoreClient)
+	return team.AddDeploymentTeam(id, addDeploymentRole, deploymentID, out, astroV1Client)
 }
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -294,7 +293,7 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return team.UpdateDeploymentTeamRole(id, updateDeploymentRole, deploymentID, out, astroCoreClient)
+	return team.UpdateDeploymentTeamRole(id, updateDeploymentRole, deploymentID, out, astroV1Client)
 }
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
@@ -701,7 +700,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.ListWithFormat(ws, allDeployments, platformCoreClient, format, deploymentListOutputFlags.Template, out)
+	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, format, deploymentListOutputFlags.Template, out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -716,7 +715,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	}
 	logServer := logWebserver || logApiserver
 
-	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, platformCoreClient, astroCoreClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, astroV1Client)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
@@ -797,16 +796,16 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if deploymentCreateEnforceCD {
 		cicdEnforcement = enable
 	}
-	var coreDeploymentType astroplatformcore.DeploymentType
+	var coreDeploymentType astrov1.DeploymentType
 	if deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared {
-		coreDeploymentType = astroplatformcore.DeploymentTypeSTANDARD
+		coreDeploymentType = astrov1.DeploymentTypeSTANDARD
 	}
 	if deploymentType == dedicated || deploymentType == fromfile.HostedDedicated {
-		coreDeploymentType = astroplatformcore.DeploymentTypeDEDICATED
+		coreDeploymentType = astrov1.DeploymentTypeDEDICATED
 	}
 
 	if !organization.IsOrgHosted() {
-		coreDeploymentType = astroplatformcore.DeploymentTypeHYBRID
+		coreDeploymentType = astrov1.DeploymentTypeHYBRID
 	}
 	// request is to create from a file
 	if inputFile != "" {
@@ -826,7 +825,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		if disallowedFlagSet {
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, waitForStatus, waitTimeForDeployment, forceUpdate)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, waitForStatus, waitTimeForDeployment, forceUpdate)
 	}
 
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
@@ -842,13 +841,13 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 
 	// validate cloudProvider
 	if cloudProvider != "" {
-		if !isValidCloudProvider(astrocore.SharedClusterCloudProvider(cloudProvider)) {
+		if !isValidCloudProvider(astrov1.ClusterCloudProvider(strings.ToUpper(cloudProvider))) {
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
 		}
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, platformCoreClient, astroCoreClient, waitForStatus, waitTimeForDeployment)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
@@ -875,7 +874,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), platformCoreClient, astroCoreClient, out, false, 0*time.Second, forceUpdate)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, false, 0*time.Second, forceUpdate)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
@@ -911,7 +910,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { 
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astroplatformcore.WorkerQueueRequest{}, []astroplatformcore.HybridWorkerQueueRequest{}, []astroplatformcore.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroCoreClient, platformCoreClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client)
 }
 
 func validateCICD() error {
@@ -944,7 +943,7 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, platformCoreClient)
+	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroV1Client)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -956,7 +955,7 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, platformCoreClient, out)
+	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroV1Client, out)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -970,7 +969,7 @@ func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroCoreClient, platformCoreClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroV1Client, out)
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -984,7 +983,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroCoreClient, platformCoreClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroV1Client, out)
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernating bool) error {
@@ -1002,7 +1001,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	cmd.SilenceUsage = true
 
 	if removeOverride {
-		return deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, platformCoreClient)
+		return deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
 	}
 
 	overrideUntil, err := getOverrideUntil(until, forDuration)
@@ -1010,12 +1009,12 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 		return err
 	}
 
-	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, platformCoreClient)
+	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
-func isValidCloudProvider(cloudProvider astrocore.SharedClusterCloudProvider) bool {
-	return cloudProvider == astrocore.SharedClusterCloudProviderGcp || cloudProvider == astrocore.SharedClusterCloudProviderAws || cloudProvider == astrocore.SharedClusterCloudProviderAzure
+func isValidCloudProvider(cloudProvider astrov1.ClusterCloudProvider) bool {
+	return cloudProvider == astrov1.ClusterCloudProviderGCP || cloudProvider == astrov1.ClusterCloudProviderAWS || cloudProvider == astrov1.ClusterCloudProviderAZURE
 }
 
 func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1031,7 +1030,7 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.AddDeploymentUser(email, addDeploymentRole, deploymentID, out, astroCoreClient)
+	return user.AddDeploymentUser(email, addDeploymentRole, deploymentID, out, astroV1Client)
 }
 
 func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
@@ -1045,7 +1044,7 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListDeploymentUsersWithFormat(astroCoreClient, deploymentID, format, deploymentUserListOutputFlags.Template, out)
+	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, format, deploymentUserListOutputFlags.Template, out)
 }
 
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1066,7 +1065,7 @@ func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateDeploymentUserRole(email, updateDeploymentRole, deploymentID, out, astroCoreClient)
+	return user.UpdateDeploymentUserRole(email, updateDeploymentRole, deploymentID, out, astroV1Client)
 }
 
 func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1082,7 +1081,7 @@ func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return user.RemoveDeploymentUser(email, deploymentID, out, astroCoreClient)
+	return user.RemoveDeploymentUser(email, deploymentID, out, astroV1Client)
 }
 
 //nolint:dupl
@@ -1338,7 +1337,7 @@ func addOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	cmd.SilenceUsage = true
 
-	return deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, "create", out, astroCoreClient, astroCoreIamClient)
+	return deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, "create", out, astroV1Client)
 }
 
 func updateOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1356,7 +1355,7 @@ func updateOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Wr
 	}
 	cmd.SilenceUsage = true
 
-	return deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, "update", out, astroCoreClient, astroCoreIamClient)
+	return deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, "update", out, astroV1Client)
 }
 
 func addWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1375,7 +1374,7 @@ func addWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.W
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, "create", out, astroCoreClient, astroCoreIamClient)
+	return deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, "create", out, astroV1Client)
 }
 
 func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1394,7 +1393,7 @@ func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, "update", out, astroCoreClient, astroCoreIamClient)
+	return deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, "update", out, astroV1Client)
 }
 
 func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
@@ -1442,7 +1441,7 @@ func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.RemoveOrgTokenDeploymentRole(orgTokenID, orgTokenName, deploymentID, out, astroCoreClient, astroCoreIamClient)
+	return deployment.RemoveOrgTokenDeploymentRole(orgTokenID, orgTokenName, deploymentID, out, astroV1Client)
 }
 
 func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1456,7 +1455,7 @@ func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, out, astroCoreClient, astroCoreIamClient)
+	return deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, out, astroV1Client)
 }
 
 func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
@@ -1496,10 +1495,8 @@ func listOrganizationTokensInDeployment(cmd *cobra.Command, out io.Writer) error
 	// if an id was provided in the args we use it
 
 	cmd.SilenceUsage = true
-	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
-		"ORGANIZATION",
-	}
-	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+	tokenTypes := []deployment.DeploymentTokenType{deployment.DeploymentTokenTypeORGANIZATION}
+	return deployment.ListTokens(astroV1Client, deploymentID, &tokenTypes, out)
 }
 
 func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
@@ -1509,10 +1506,8 @@ func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
 	// if an id was provided in the args we use it
 
 	cmd.SilenceUsage = true
-	tokenTypes := []astrocore.ListDeploymentApiTokensParamsTokenTypes{
-		"WORKSPACE",
-	}
-	return deployment.ListTokens(astroCoreClient, deploymentID, &tokenTypes, out)
+	tokenTypes := []deployment.DeploymentTokenType{deployment.DeploymentTokenTypeWORKSPACE}
+	return deployment.ListTokens(astroV1Client, deploymentID, &tokenTypes, out)
 }
 
 func listDeploymentToken(cmd *cobra.Command, out io.Writer) error {
@@ -1520,7 +1515,7 @@ func listDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
 	cmd.SilenceUsage = true
-	return deployment.ListTokens(astroCoreClient, deploymentID, nil, out)
+	return deployment.ListTokens(astroV1Client, deploymentID, nil, out)
 }
 
 func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
@@ -1538,7 +1533,7 @@ func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.CreateToken(tokenName, tokenDescription, tokenRole, deploymentID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+	return deployment.CreateToken(tokenName, tokenDescription, tokenRole, deploymentID, tokenExpiration, cleanTokenOutput, out, astroV1Client)
 }
 
 func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1552,7 +1547,7 @@ func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, deploymentID, out, astroCoreClient, astroCoreIamClient)
+	return deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, deploymentID, out, astroV1Client)
 }
 
 func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1565,7 +1560,7 @@ func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return deployment.RotateToken(tokenID, name, deploymentID, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
+	return deployment.RotateToken(tokenID, name, deploymentID, cleanTokenOutput, forceRotate, out, astroV1Client)
 }
 
 func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1579,7 +1574,7 @@ func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return deployment.DeleteToken(tokenID, name, deploymentID, forceDelete, out, astroCoreClient, astroCoreIamClient)
+	return deployment.DeleteToken(tokenID, name, deploymentID, forceDelete, out, astroV1Client)
 }
 
 func getOverrideUntil(until, forDuration string) (*time.Time, error) {
