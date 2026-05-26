@@ -394,29 +394,32 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	spinner.StopWithCheckmark(s, "Project started")
 
-	// Register route with the proxy and start the daemon. If either step fails
-	// (e.g. proxy daemon unsupported on Windows), fall back to printing the
-	// localhost URL using the actual webserver port that compose bound.
+	// Register route with the proxy and start the daemon. The route is always
+	// persisted to routes.json so that other tools can discover this project.
+	// If the daemon fails to start (e.g. on Windows where it is not supported),
+	// we fall back to printing the localhost URL.
 	proxyActive := useProxy && proxyHostname != ""
 	if proxyActive {
-		if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
-			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
+		services := map[string]string{}
+		if portOvr != nil && portOvr.PostgresPort != "" {
+			services["postgres"] = portOvr.PostgresPort
+		}
+		route := proxy.Route{
+			Hostname:   proxyHostname,
+			Port:       portOvr.WebserverPort,
+			ProjectDir: d.airflowHome,
+			PID:        0, // Docker routes don't track PID — CLI exits after start
+			Services:   services,
+			Mode:       "docker",
+		}
+		if addErr := proxy.AddRoute(&route); addErr != nil {
+			fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
 			proxyActive = false
-		} else {
-			services := map[string]string{}
-			if portOvr != nil && portOvr.PostgresPort != "" {
-				services["postgres"] = portOvr.PostgresPort
-			}
-			route := proxy.Route{
-				Hostname:   proxyHostname,
-				Port:       portOvr.WebserverPort,
-				ProjectDir: d.airflowHome,
-				PID:        0, // Docker routes don't track PID — CLI exits after start
-				Services:   services,
-				Mode:       "docker",
-			}
-			if addErr := proxy.AddRoute(&route); addErr != nil {
-				fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
+		}
+
+		if proxyActive {
+			if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
+				fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
 				proxyActive = false
 			}
 		}
