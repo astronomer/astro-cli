@@ -181,20 +181,9 @@ func Login(domain string, oAuthOnly bool, username, password, token, houstonVers
 		return err
 	}
 
-	if token == "" {
-		authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
-		if err != nil {
-			return err
-		}
-
-		if username == "" && !oAuthOnly && authConfig.LocalEnabled {
-			username = input.Text(inputUsername)
-		}
-
-		token, err = getAuthToken(username, password, authConfig, ctx, client)
-		if err != nil {
-			return err
-		}
+	token, err = resolveAuthToken(token, username, password, oAuthOnly, ctx, client)
+	if err != nil {
+		return err
 	}
 
 	// create cluster if no domain specified, else switch cluster
@@ -297,6 +286,22 @@ func checkClusterDomain(domain string) error {
 		}
 	}
 	return nil
+}
+
+// resolveAuthToken returns the provided token when non-empty; otherwise it
+// runs the interactive basic-auth/oAuth flow against Houston to obtain one.
+func resolveAuthToken(token, username, password string, oAuthOnly bool, ctx *config.Context, client houston.ClientInterface) (string, error) {
+	if token != "" {
+		return token, nil
+	}
+	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
+	if err != nil {
+		return "", err
+	}
+	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
+		username = input.Text(inputUsername)
+	}
+	return getAuthToken(username, password, authConfig, ctx, client)
 }
 
 func getAuthToken(username, password string, authConfig *houston.AuthConfig, ctx *config.Context, client houston.ClientInterface) (string, error) {
