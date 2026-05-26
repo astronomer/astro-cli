@@ -1216,10 +1216,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if schedulerReplicas == 0 {
 			schedulerReplicas = currentDeployment.SchedulerReplicas
 		}
-		if workloadIdentity == "" {
-			if currentDeployment.EffectiveWorkloadIdentity != nil {
-				workloadIdentity = *currentDeployment.EffectiveWorkloadIdentity
-			}
+		// Workload identity uses PATCH semantics on the server: a nil pointer
+		// omits the field, leaving the deployment's current value (user-set
+		// or platform-managed default) untouched. Do NOT fall back to
+		// currentDeployment.EffectiveWorkloadIdentity here — that would
+		// silently pin the platform-managed default as if it were
+		// user-configured.
+		var deplWorkloadIdentity *string
+		if workloadIdentity != "" {
+			deplWorkloadIdentity = &workloadIdentity
 		}
 		// validate au resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
@@ -1252,7 +1257,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			},
 			Type:                 astrov1.UpdateHybridDeploymentRequestTypeHYBRID,
 			EnvironmentVariables: deploymentEnvironmentVariablesRequest,
-			WorkloadIdentity:     &workloadIdentity,
+			WorkloadIdentity:     deplWorkloadIdentity,
 		}
 		cluster, err := GetClusterByID("", *currentDeployment.ClusterId, astroV1Client)
 		if err != nil {
