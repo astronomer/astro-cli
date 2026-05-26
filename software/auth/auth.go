@@ -162,8 +162,7 @@ func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
-	var token string
+func Login(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 	var err error
 	var pageSize int
 	var interactive bool
@@ -182,18 +181,20 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		return err
 	}
 
-	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
-	if err != nil {
-		return err
-	}
+	if token == "" {
+		authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
+		if err != nil {
+			return err
+		}
 
-	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
-		username = input.Text(inputUsername)
-	}
+		if username == "" && !oAuthOnly && authConfig.LocalEnabled {
+			username = input.Text(inputUsername)
+		}
 
-	token, err = getAuthToken(username, password, authConfig, ctx, client)
-	if err != nil {
-		return err
+		token, err = getAuthToken(username, password, authConfig, ctx, client)
+		if err != nil {
+			return err
+		}
 	}
 
 	// create cluster if no domain specified, else switch cluster
