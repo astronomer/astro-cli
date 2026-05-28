@@ -6,6 +6,7 @@ __pycache__/
 astro
 .venv
 .astro/standalone/
+.astro/worktrees/
 airflow-webserver.pid
 webserver_config.py
 airflow.cfg
