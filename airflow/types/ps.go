@@ -1,5 +1,10 @@
 package types
 
+const (
+	ModeDocker     = "docker"
+	ModeStandalone = "standalone"
+)
+
 // ContainerStatus represents the status of a single container
 type ContainerStatus struct {
 	Name  string   `json:"name"`
