@@ -413,7 +413,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 				ProjectDir: d.airflowHome,
 				PID:        0, // Docker routes don't track PID — CLI exits after start
 				Services:   services,
-				Mode:       "docker",
+				Mode:       types.ModeDocker,
 			}
 			if addErr := proxy.AddRoute(&route); addErr != nil {
 				fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
@@ -540,7 +540,7 @@ func (d *DockerCompose) PS() (*airflowTypes.PSStatus, error) {
 	}
 
 	status := &airflowTypes.PSStatus{
-		Mode:       "docker",
+		Mode:       types.ModeDocker,
 		Containers: make([]airflowTypes.ContainerStatus, 0, len(psInfo)),
 	}
 

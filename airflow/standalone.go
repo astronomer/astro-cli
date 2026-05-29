@@ -1000,7 +1000,7 @@ func (s *Standalone) Kill() error {
 func (s *Standalone) PS() (*types.PSStatus, error) {
 	pid, alive := s.readPID()
 	status := &types.PSStatus{
-		Mode:    "standalone",
+		Mode: types.ModeStandalone,
 		Running: &alive,
 	}
 	if alive {

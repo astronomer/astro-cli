@@ -33,7 +33,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-const modeStandalone = "standalone"
+const modeStandalone = airflowTypes.ModeStandalone
 
 var (
 	useAstronomerCertified bool
@@ -196,7 +196,7 @@ func resolveDevMode() string {
 		return modeStandalone
 	}
 	if dockerFlag {
-		return "docker"
+		return airflowTypes.ModeDocker
 	}
 	return config.CFG.DevMode.GetString()
 }
