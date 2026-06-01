@@ -227,7 +227,7 @@ func organizationList(cmd *cobra.Command, out io.Writer) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return organization.ListWithFormat(platformCoreClient, format, organizationListOutputFlags.Template, out)
+	return organization.ListWithFormat(astroV1Client, format, organizationListOutputFlags.Template, out)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -240,12 +240,12 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	if err := orgSwitch(organizationNameOrID, astroCoreClient, platformCoreClient, out, shouldDisplayLoginLink); err != nil {
+	if err := orgSwitch(organizationNameOrID, astroV1Client, out, shouldDisplayLoginLink); err != nil {
 		return err
 	}
 
 	if workspaceID != "" {
-		return wsSwitch(workspaceID, astroCoreClient, out)
+		return wsSwitch(workspaceID, astroV1Client, out)
 	}
 	return nil
 }
@@ -255,7 +255,7 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 	cmd.SilenceUsage = true
 
 	fmt.Println("This may take some time depending on how many days are being exported.")
-	return orgExportAuditLogs(astroCoreClient, platformCoreClient,
+	return orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 }
 
@@ -272,7 +272,7 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.CreateInvite(email, role, out, astroCoreClient)
+	return user.CreateInvite(email, role, out, astroV1Client)
 }
 
 func listUsers(cmd *cobra.Command, out io.Writer) error {
@@ -282,7 +282,7 @@ func listUsers(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListOrgUsersWithFormat(astroCoreClient, format, organizationUserListOutputFlags.Template, out)
+	return user.ListOrgUsersWithFormat(astroV1Client, format, organizationUserListOutputFlags.Template, out)
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -300,7 +300,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateUserRole(email, updateRole, out, astroCoreClient)
+	return user.UpdateUserRole(email, updateRole, out, astroV1Client)
 }
 
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
@@ -344,7 +344,7 @@ func listTeams(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListOrgTeamsWithFormat(astroCoreClient, format, organizationTeamListOutputFlags.Template, out)
+	return team.ListOrgTeamsWithFormat(astroV1Client, format, organizationTeamListOutputFlags.Template, out)
 }
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -381,7 +381,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, forceTeam, out, astroCoreClient)
+	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, forceTeam, out, astroV1Client)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {
@@ -417,7 +417,7 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 			return err
 		}
 	}
-	return team.CreateTeam(teamName, teamDescription, teamOrgRole, out, astroCoreClient)
+	return team.CreateTeam(teamName, teamDescription, teamOrgRole, out, astroV1Client)
 }
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
@@ -448,7 +448,7 @@ func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return team.Delete(id, forceTeam, out, astroCoreClient)
+	return team.Delete(id, forceTeam, out, astroV1Client)
 }
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
@@ -488,7 +488,7 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 
 func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.RemoveUser(teamID, userID, forceTeam, out, astroCoreClient)
+	return team.RemoveUser(teamID, userID, forceTeam, out, astroV1Client)
 }
 
 //nolint:dupl
@@ -512,7 +512,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 
 func addTeamUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.AddUser(teamID, userID, forceTeam, out, astroCoreClient)
+	return team.AddUser(teamID, userID, forceTeam, out, astroV1Client)
 }
 
 func newTeamListUsersCmd(out io.Writer) *cobra.Command {
@@ -534,7 +534,7 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 
 func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.ListTeamUsers(teamID, out, astroCoreClient)
+	return team.ListTeamUsers(teamID, out, astroV1Client)
 }
 
 // org tokens
@@ -688,7 +688,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 //nolint:dupl
 func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return organization.ListTokens(astroCoreClient, out)
+	return organization.ListTokens(astroV1Client, out)
 }
 
 //nolint:dupl
@@ -698,7 +698,7 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return organization.ListTokenRoles(tokenID, astroCoreClient, astroCoreIamClient, out)
+	return organization.ListTokenRoles(tokenID, astroV1Client, out)
 }
 
 //nolint:dupl
@@ -718,7 +718,7 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	return organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+	return organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, cleanTokenOutput, out, astroV1Client)
 }
 
 //nolint:dupl
@@ -730,7 +730,7 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroCoreClient, astroCoreIamClient)
+	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroV1Client)
 }
 
 //nolint:dupl
@@ -742,7 +742,7 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroCoreClient, astroCoreIamClient)
+	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroV1Client)
 }
 
 //nolint:dupl
@@ -754,7 +754,7 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 
 	cmd.SilenceUsage = true
-	return organization.DeleteToken(tokenID, name, forceDelete, out, astroCoreClient, astroCoreIamClient)
+	return organization.DeleteToken(tokenID, name, forceDelete, out, astroV1Client)
 }
 
 //nolint:dupl
@@ -817,5 +817,5 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 
 func listRoles(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return roleClient.ListOrgRoles(out, astroCoreClient, shouldIncludeDefaultRoles)
+	return roleClient.ListOrgRoles(out, astroV1Client, shouldIncludeDefaultRoles)
 }

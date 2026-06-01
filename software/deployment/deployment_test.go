@@ -900,13 +900,13 @@ func (s *Suite) Test_meetsAirflowUpgradeReqs() {
 	desiredAirflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	s.Error(err)
-	s.EqualError(err, "Invalid Semantic Version")
+	s.EqualError(err, "invalid semantic version")
 
 	airflowVersion = "1.10.12"
 	desiredAirflowVersion = "-2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	s.Error(err)
-	s.EqualError(err, "Invalid Semantic Version")
+	s.EqualError(err, "invalid semantic version")
 }
 
 func (s *Suite) TestGetDeploymentSelectionNamespaces() {
@@ -1515,12 +1515,12 @@ func (s *Suite) TestMeetsRuntimeUpgradeReqs() {
 		{
 			name:        "error parsing runtime version",
 			args:        args{runtimeVersion: "invalid version", desiredRuntimeVersion: "4.2.5"},
-			expectedErr: fmt.Errorf("Invalid Semantic Version"), //nolint
+			expectedErr: fmt.Errorf("invalid semantic version"), //nolint
 		},
 		{
 			name:        "error parsing desired runtime version",
 			args:        args{runtimeVersion: "4.2.5", desiredRuntimeVersion: "invalid version"},
-			expectedErr: fmt.Errorf("Invalid Semantic Version"), //nolint
+			expectedErr: fmt.Errorf("invalid semantic version"), //nolint
 		},
 	}
 	for _, tt := range tests {

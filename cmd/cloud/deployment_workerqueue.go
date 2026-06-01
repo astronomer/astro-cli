@@ -122,7 +122,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		minWorkerCount = -1
 	}
 
-	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, platformCoreClient, astroCoreClient, out)
+	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, out)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -133,5 +133,5 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 		return err
 	}
 
-	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, platformCoreClient, astroCoreClient, out)
+	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, out)
 }

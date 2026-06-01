@@ -24,8 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -455,7 +454,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 }
 
 // startForeground runs the airflow process in the foreground, streaming output to the terminal.
-func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("error creating stdout pipe: %w", err)
@@ -557,7 +556,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 // startBackground runs the airflow process in the background, writes a PID file,
 // runs the health check, and returns.
-func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	logPath := s.logFilePath()
 	logFile, err := os.Create(logPath)
 	if err != nil {
@@ -692,18 +691,29 @@ func (s *Standalone) buildEnv() []string {
 	// Layer 2: Standalone-critical settings — these MUST take precedence over
 	// both inherited env and .env to prevent standalone mode from breaking.
 	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
-	// Add include/ to PYTHONPATH so user modules are importable — mirrors
-	// the Docker image which bakes /usr/local/airflow/include into PYTHONPATH.
-	includePath := filepath.Join(s.airflowHome, "include")
+	// Mirror the production runtime image, which sets PYTHONPATH=AIRFLOW_HOME
+	// (see astro-runtime image/Dockerfile). This makes every subdirectory of
+	// the project root importable as a namespace package — e.g.
+	// `from include.utils import x` or `from dags.my_blueprints import Extract`
+	// — matching what users get at deploy time.
 	if existing := os.Getenv("PYTHONPATH"); existing != "" {
-		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", includePath, existing)
+		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", s.airflowHome, existing)
 	} else {
-		overrides["PYTHONPATH"] = includePath
+		overrides["PYTHONPATH"] = s.airflowHome
 	}
 	overrides["AIRFLOW_HOME"] = standaloneHome
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"
 	overrides["AIRFLOW__CORE__DAGS_FOLDER"] = filepath.Join(s.airflowHome, "dags")
+	// Stable Fernet key so encrypted connection extras survive restart.
+	// Same value the docker compose template ships.
+	overrides["AIRFLOW__CORE__FERNET_KEY"] = "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+	// Stable per-project signing secret so login sessions / JWTs survive
+	// restart. Falls back to a constant if the project hash isn't available.
+	signingSecret, err := ProjectNameUnique()
+	if err != nil {
+		signingSecret = "astro-standalone"
+	}
 	port := s.webserverPort()
 	if s.airflowMajorVersion == "3" {
 		overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
@@ -711,6 +721,8 @@ func (s *Standalone) buildEnv() []string {
 			overrides["AIRFLOW__API__PORT"] = port
 		}
 		overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
+		overrides["AIRFLOW__API__SECRET_KEY"] = signingSecret
+		overrides["AIRFLOW__API_AUTH__JWT_SECRET"] = signingSecret
 	} else {
 		// AF2: point plugins at the project directory so the pickle-fix plugin
 		// written during Start() is visible to Airflow.  AF3 intentionally
@@ -733,6 +745,11 @@ func (s *Standalone) buildEnv() []string {
 		overrides["AIRFLOW__CORE__EXECUTOR"] = "LocalExecutor"
 		overrides["_AIRFLOW__SKIP_DATABASE_EXECUTOR_COMPATIBILITY_CHECK"] = "1"
 		overrides["AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER"] = "True"
+		// AF2's upstream default is session-only API auth, which 403s
+		// basic-auth clients like `af`. Match the docker template.
+		overrides["AIRFLOW__API__AUTH_BACKEND"] = "airflow.api.auth.backend.basic_auth"
+		overrides["AIRFLOW__WEBSERVER__SECRET_KEY"] = signingSecret
+		overrides["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"] = "True"
 	}
 
 	// Layer 3: macOS fork-safety workarounds.
@@ -794,7 +811,7 @@ func (s *Standalone) standaloneAuthHeader(port string) string {
 }
 
 // applySettings imports airflow_settings.yaml using the Airflow REST API.
-func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	settingsExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil || !settingsExists {
 		if len(envConns) == 0 {
@@ -1210,7 +1227,7 @@ func (s *Standalone) Parse(_, _, _ string) error {
 	return nil
 }
 
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
 }
 

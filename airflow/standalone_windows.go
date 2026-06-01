@@ -9,7 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 )
 
 var (
@@ -51,6 +51,6 @@ func (s *Standalone) Pytest(_, _, _, _, _ string) (string, error) {
 	return "", errStandaloneWindows
 }
 func (s *Standalone) Parse(_, _, _ string) error { return errStandaloneWindows }
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errStandaloneWindows
 }

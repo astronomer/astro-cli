@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -38,8 +39,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -394,10 +394,14 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	spinner.StopWithCheckmark(s, "Project started")
 
-	// Register route with the proxy and start the daemon
-	if useProxy && proxyHostname != "" {
+	// Register route with the proxy and start the daemon. If either step fails
+	// (e.g. proxy daemon unsupported on Windows), fall back to printing the
+	// localhost URL using the actual webserver port that compose bound.
+	proxyActive := useProxy && proxyHostname != ""
+	if proxyActive {
 		if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
 			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
+			proxyActive = false
 		} else {
 			services := map[string]string{}
 			if portOvr != nil && portOvr.PostgresPort != "" {
@@ -413,15 +417,16 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			}
 			if addErr := proxy.AddRoute(&route); addErr != nil {
 				fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
+				proxyActive = false
 			}
 		}
 	}
 
 	// Print the status
-	if useProxy && proxyHostname != "" {
+	if proxyActive {
 		err = printProxyStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, portOvr)
 	} else {
-		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser)
+		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, portOvr)
 	}
 	if err != nil {
 		return err
@@ -641,11 +646,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 		return errors.New("exec ID is empty")
 	}
 
-	execStartCheck := container.ExecStartOptions{
-		Detach: execConfig.Detach,
-	}
-
-	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, execStartCheck)
+	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, container.ExecStartOptions{})
 
 	if err := docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		return err
@@ -704,7 +705,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -722,7 +723,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	}
 	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
-		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore)
+		err := d.pullImageFromDeployment(deploymentID, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -809,13 +810,13 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	return nil
 }
 
-func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, astroV1Client astrov1.APIClient) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 	ws := c.Workspace
-	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, platformCoreClient, nil)
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -1204,7 +1205,7 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
 			change, updateType, err := checkVersionChange(beforeVer, afterVer)
 			if err != nil {
-				if err.Error() == "Invalid Semantic Version" {
+				if stderrors.Is(err, semver.ErrInvalidSemVer) {
 					updateType = unknown
 				} else {
 					return err
@@ -1794,7 +1795,7 @@ func fetchAirflowJWTToken(baseURL string) (string, error) {
 }
 
 // printProxyStatus prints status information when the proxy is active.
-func printProxyStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
+func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
@@ -1832,14 +1833,14 @@ func printProxyStatus(settingsFile string, envConns map[string]astrocore.Environ
 	return nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool) error {
+func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, portOvr *PortOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion, nil)
-		authHeader := airflowAuthHeader(airflowMajorVersion, nil)
+		apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
+		authHeader := airflowAuthHeader(airflowMajorVersion, portOvr)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
@@ -1850,14 +1851,24 @@ func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentO
 	switch airflowMajorVersion {
 	case airflowMajorVersion2:
 		port = config.CFG.WebserverPort.GetString()
+		if portOvr != nil && portOvr.WebserverPort != "" {
+			port = portOvr.WebserverPort
+		}
 	case airflowMajorVersion3:
 		port = config.CFG.APIServerPort.GetString()
+		if portOvr != nil && portOvr.APIServerPort != "" {
+			port = portOvr.APIServerPort
+		}
 	}
 	parts := strings.Split(port, ":")
 	uiURL := "http://localhost:" + parts[len(parts)-1]
+	pgPort := config.CFG.PostgresPort.GetString()
+	if portOvr != nil && portOvr.PostgresPort != "" {
+		pgPort = portOvr.PostgresPort
+	}
 	bullet := ansi.Cyan("\u27A4") + " "
 	fmt.Printf(bullet+composeLinkUIMsg+"\n", ansi.Bold(uiURL))
-	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
+	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+pgPort+"/postgres"))
 	// The CLI configures Airflow 3 to run without UI credentials, so we don't want to print them out
 	if airflowMajorVersion == airflowMajorVersion2 {
 		fmt.Printf(bullet+composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))

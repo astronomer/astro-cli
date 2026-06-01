@@ -3,7 +3,13 @@
 package mocks
 
 import (
+	build "github.com/docker/docker/api/types/build"
 	checkpoint "github.com/docker/docker/api/types/checkpoint"
+
+	client "github.com/docker/docker/client"
+
+	common "github.com/docker/docker/api/types/common"
+
 	container "github.com/docker/docker/api/types/container"
 
 	context "context"
@@ -43,27 +49,27 @@ type DockerCLIClient struct {
 }
 
 // BuildCachePrune provides a mock function with given fields: ctx, opts
-func (_m *DockerCLIClient) BuildCachePrune(ctx context.Context, opts types.BuildCachePruneOptions) (*types.BuildCachePruneReport, error) {
+func (_m *DockerCLIClient) BuildCachePrune(ctx context.Context, opts build.CachePruneOptions) (*build.CachePruneReport, error) {
 	ret := _m.Called(ctx, opts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildCachePrune")
 	}
 
-	var r0 *types.BuildCachePruneReport
+	var r0 *build.CachePruneReport
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.BuildCachePruneOptions) (*types.BuildCachePruneReport, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, build.CachePruneOptions) (*build.CachePruneReport, error)); ok {
 		return rf(ctx, opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.BuildCachePruneOptions) *types.BuildCachePruneReport); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, build.CachePruneOptions) *build.CachePruneReport); ok {
 		r0 = rf(ctx, opts)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.BuildCachePruneReport)
+			r0 = ret.Get(0).(*build.CachePruneReport)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.BuildCachePruneOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, build.CachePruneOptions) error); ok {
 		r1 = rf(ctx, opts)
 	} else {
 		r1 = ret.Error(1)
@@ -193,22 +199,22 @@ func (_m *DockerCLIClient) Close() error {
 }
 
 // ConfigCreate provides a mock function with given fields: ctx, config
-func (_m *DockerCLIClient) ConfigCreate(ctx context.Context, config swarm.ConfigSpec) (types.ConfigCreateResponse, error) {
+func (_m *DockerCLIClient) ConfigCreate(ctx context.Context, config swarm.ConfigSpec) (swarm.ConfigCreateResponse, error) {
 	ret := _m.Called(ctx, config)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ConfigCreate")
 	}
 
-	var r0 types.ConfigCreateResponse
+	var r0 swarm.ConfigCreateResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, swarm.ConfigSpec) (types.ConfigCreateResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ConfigSpec) (swarm.ConfigCreateResponse, error)); ok {
 		return rf(ctx, config)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, swarm.ConfigSpec) types.ConfigCreateResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ConfigSpec) swarm.ConfigCreateResponse); ok {
 		r0 = rf(ctx, config)
 	} else {
-		r0 = ret.Get(0).(types.ConfigCreateResponse)
+		r0 = ret.Get(0).(swarm.ConfigCreateResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, swarm.ConfigSpec) error); ok {
@@ -258,7 +264,7 @@ func (_m *DockerCLIClient) ConfigInspectWithRaw(ctx context.Context, name string
 }
 
 // ConfigList provides a mock function with given fields: ctx, options
-func (_m *DockerCLIClient) ConfigList(ctx context.Context, options types.ConfigListOptions) ([]swarm.Config, error) {
+func (_m *DockerCLIClient) ConfigList(ctx context.Context, options swarm.ConfigListOptions) ([]swarm.Config, error) {
 	ret := _m.Called(ctx, options)
 
 	if len(ret) == 0 {
@@ -267,10 +273,10 @@ func (_m *DockerCLIClient) ConfigList(ctx context.Context, options types.ConfigL
 
 	var r0 []swarm.Config
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.ConfigListOptions) ([]swarm.Config, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ConfigListOptions) ([]swarm.Config, error)); ok {
 		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.ConfigListOptions) []swarm.Config); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ConfigListOptions) []swarm.Config); ok {
 		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
@@ -278,7 +284,7 @@ func (_m *DockerCLIClient) ConfigList(ctx context.Context, options types.ConfigL
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.ConfigListOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, swarm.ConfigListOptions) error); ok {
 		r1 = rf(ctx, options)
 	} else {
 		r1 = ret.Error(1)
@@ -352,22 +358,22 @@ func (_m *DockerCLIClient) ContainerAttach(ctx context.Context, _a1 string, opti
 }
 
 // ContainerCommit provides a mock function with given fields: ctx, _a1, options
-func (_m *DockerCLIClient) ContainerCommit(ctx context.Context, _a1 string, options container.CommitOptions) (types.IDResponse, error) {
+func (_m *DockerCLIClient) ContainerCommit(ctx context.Context, _a1 string, options container.CommitOptions) (common.IDResponse, error) {
 	ret := _m.Called(ctx, _a1, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerCommit")
 	}
 
-	var r0 types.IDResponse
+	var r0 common.IDResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, container.CommitOptions) (types.IDResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.CommitOptions) (common.IDResponse, error)); ok {
 		return rf(ctx, _a1, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, container.CommitOptions) types.IDResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.CommitOptions) common.IDResponse); ok {
 		r0 = rf(ctx, _a1, options)
 	} else {
-		r0 = ret.Get(0).(types.IDResponse)
+		r0 = ret.Get(0).(common.IDResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, container.CommitOptions) error); ok {
@@ -466,22 +472,22 @@ func (_m *DockerCLIClient) ContainerExecAttach(ctx context.Context, execID strin
 }
 
 // ContainerExecCreate provides a mock function with given fields: ctx, _a1, options
-func (_m *DockerCLIClient) ContainerExecCreate(ctx context.Context, _a1 string, options container.ExecOptions) (types.IDResponse, error) {
+func (_m *DockerCLIClient) ContainerExecCreate(ctx context.Context, _a1 string, options container.ExecOptions) (common.IDResponse, error) {
 	ret := _m.Called(ctx, _a1, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerExecCreate")
 	}
 
-	var r0 types.IDResponse
+	var r0 common.IDResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, container.ExecOptions) (types.IDResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.ExecOptions) (common.IDResponse, error)); ok {
 		return rf(ctx, _a1, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, container.ExecOptions) types.IDResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.ExecOptions) common.IDResponse); ok {
 		r0 = rf(ctx, _a1, options)
 	} else {
-		r0 = ret.Get(0).(types.IDResponse)
+		r0 = ret.Get(0).(common.IDResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, container.ExecOptions) error); ok {
@@ -588,22 +594,22 @@ func (_m *DockerCLIClient) ContainerExport(ctx context.Context, _a1 string) (io.
 }
 
 // ContainerInspect provides a mock function with given fields: ctx, _a1
-func (_m *DockerCLIClient) ContainerInspect(ctx context.Context, _a1 string) (types.ContainerJSON, error) {
+func (_m *DockerCLIClient) ContainerInspect(ctx context.Context, _a1 string) (container.InspectResponse, error) {
 	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerInspect")
 	}
 
-	var r0 types.ContainerJSON
+	var r0 container.InspectResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (types.ContainerJSON, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (container.InspectResponse, error)); ok {
 		return rf(ctx, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) types.ContainerJSON); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) container.InspectResponse); ok {
 		r0 = rf(ctx, _a1)
 	} else {
-		r0 = ret.Get(0).(types.ContainerJSON)
+		r0 = ret.Get(0).(container.InspectResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -616,23 +622,23 @@ func (_m *DockerCLIClient) ContainerInspect(ctx context.Context, _a1 string) (ty
 }
 
 // ContainerInspectWithRaw provides a mock function with given fields: ctx, _a1, getSize
-func (_m *DockerCLIClient) ContainerInspectWithRaw(ctx context.Context, _a1 string, getSize bool) (types.ContainerJSON, []byte, error) {
+func (_m *DockerCLIClient) ContainerInspectWithRaw(ctx context.Context, _a1 string, getSize bool) (container.InspectResponse, []byte, error) {
 	ret := _m.Called(ctx, _a1, getSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerInspectWithRaw")
 	}
 
-	var r0 types.ContainerJSON
+	var r0 container.InspectResponse
 	var r1 []byte
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (types.ContainerJSON, []byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (container.InspectResponse, []byte, error)); ok {
 		return rf(ctx, _a1, getSize)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, bool) types.ContainerJSON); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) container.InspectResponse); ok {
 		r0 = rf(ctx, _a1, getSize)
 	} else {
-		r0 = ret.Get(0).(types.ContainerJSON)
+		r0 = ret.Get(0).(container.InspectResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, bool) []byte); ok {
@@ -671,23 +677,23 @@ func (_m *DockerCLIClient) ContainerKill(ctx context.Context, _a1 string, signal
 }
 
 // ContainerList provides a mock function with given fields: ctx, options
-func (_m *DockerCLIClient) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
+func (_m *DockerCLIClient) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 	ret := _m.Called(ctx, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerList")
 	}
 
-	var r0 []types.Container
+	var r0 []container.Summary
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, container.ListOptions) ([]types.Container, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, container.ListOptions) ([]container.Summary, error)); ok {
 		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, container.ListOptions) []types.Container); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, container.ListOptions) []container.Summary); ok {
 		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.Container)
+			r0 = ret.Get(0).([]container.Summary)
 		}
 	}
 
@@ -941,22 +947,22 @@ func (_m *DockerCLIClient) ContainerStop(ctx context.Context, _a1 string, option
 }
 
 // ContainerTop provides a mock function with given fields: ctx, _a1, arguments
-func (_m *DockerCLIClient) ContainerTop(ctx context.Context, _a1 string, arguments []string) (container.ContainerTopOKBody, error) {
+func (_m *DockerCLIClient) ContainerTop(ctx context.Context, _a1 string, arguments []string) (container.TopResponse, error) {
 	ret := _m.Called(ctx, _a1, arguments)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerTop")
 	}
 
-	var r0 container.ContainerTopOKBody
+	var r0 container.TopResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string) (container.ContainerTopOKBody, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string) (container.TopResponse, error)); ok {
 		return rf(ctx, _a1, arguments)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string) container.ContainerTopOKBody); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string) container.TopResponse); ok {
 		r0 = rf(ctx, _a1, arguments)
 	} else {
-		r0 = ret.Get(0).(container.ContainerTopOKBody)
+		r0 = ret.Get(0).(container.TopResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, []string) error); ok {
@@ -987,22 +993,22 @@ func (_m *DockerCLIClient) ContainerUnpause(ctx context.Context, _a1 string) err
 }
 
 // ContainerUpdate provides a mock function with given fields: ctx, _a1, updateConfig
-func (_m *DockerCLIClient) ContainerUpdate(ctx context.Context, _a1 string, updateConfig container.UpdateConfig) (container.ContainerUpdateOKBody, error) {
+func (_m *DockerCLIClient) ContainerUpdate(ctx context.Context, _a1 string, updateConfig container.UpdateConfig) (container.UpdateResponse, error) {
 	ret := _m.Called(ctx, _a1, updateConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerUpdate")
 	}
 
-	var r0 container.ContainerUpdateOKBody
+	var r0 container.UpdateResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, container.UpdateConfig) (container.ContainerUpdateOKBody, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.UpdateConfig) (container.UpdateResponse, error)); ok {
 		return rf(ctx, _a1, updateConfig)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, container.UpdateConfig) container.ContainerUpdateOKBody); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, container.UpdateConfig) container.UpdateResponse); ok {
 		r0 = rf(ctx, _a1, updateConfig)
 	} else {
-		r0 = ret.Get(0).(container.ContainerUpdateOKBody)
+		r0 = ret.Get(0).(container.UpdateResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, container.UpdateConfig) error); ok {
@@ -1306,25 +1312,25 @@ func (_m *DockerCLIClient) HTTPClient() *http.Client {
 }
 
 // ImageBuild provides a mock function with given fields: ctx, _a1, options
-func (_m *DockerCLIClient) ImageBuild(ctx context.Context, _a1 io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error) {
+func (_m *DockerCLIClient) ImageBuild(ctx context.Context, _a1 io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error) {
 	ret := _m.Called(ctx, _a1, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImageBuild")
 	}
 
-	var r0 types.ImageBuildResponse
+	var r0 build.ImageBuildResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, types.ImageBuildOptions) (types.ImageBuildResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, build.ImageBuildOptions) (build.ImageBuildResponse, error)); ok {
 		return rf(ctx, _a1, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, types.ImageBuildOptions) types.ImageBuildResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, build.ImageBuildOptions) build.ImageBuildResponse); ok {
 		r0 = rf(ctx, _a1, options)
 	} else {
-		r0 = ret.Get(0).(types.ImageBuildResponse)
+		r0 = ret.Get(0).(build.ImageBuildResponse)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, io.Reader, types.ImageBuildOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, io.Reader, build.ImageBuildOptions) error); ok {
 		r1 = rf(ctx, _a1, options)
 	} else {
 		r1 = ret.Error(1)
@@ -1363,9 +1369,16 @@ func (_m *DockerCLIClient) ImageCreate(ctx context.Context, parentReference stri
 	return r0, r1
 }
 
-// ImageHistory provides a mock function with given fields: ctx, _a1
-func (_m *DockerCLIClient) ImageHistory(ctx context.Context, _a1 string) ([]image.HistoryResponseItem, error) {
-	ret := _m.Called(ctx, _a1)
+// ImageHistory provides a mock function with given fields: ctx, _a1, _a2
+func (_m *DockerCLIClient) ImageHistory(ctx context.Context, _a1 string, _a2 ...client.ImageHistoryOption) ([]image.HistoryResponseItem, error) {
+	_va := make([]interface{}, len(_a2))
+	for _i := range _a2 {
+		_va[_i] = _a2[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, _a1)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImageHistory")
@@ -1373,19 +1386,19 @@ func (_m *DockerCLIClient) ImageHistory(ctx context.Context, _a1 string) ([]imag
 
 	var r0 []image.HistoryResponseItem
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]image.HistoryResponseItem, error)); ok {
-		return rf(ctx, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...client.ImageHistoryOption) ([]image.HistoryResponseItem, error)); ok {
+		return rf(ctx, _a1, _a2...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []image.HistoryResponseItem); ok {
-		r0 = rf(ctx, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...client.ImageHistoryOption) []image.HistoryResponseItem); ok {
+		r0 = rf(ctx, _a1, _a2...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]image.HistoryResponseItem)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, _a1)
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...client.ImageHistoryOption) error); ok {
+		r1 = rf(ctx, _a1, _a2...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1423,24 +1436,59 @@ func (_m *DockerCLIClient) ImageImport(ctx context.Context, source image.ImportS
 	return r0, r1
 }
 
+// ImageInspect provides a mock function with given fields: ctx, _a1, _a2
+func (_m *DockerCLIClient) ImageInspect(ctx context.Context, _a1 string, _a2 ...client.ImageInspectOption) (image.InspectResponse, error) {
+	_va := make([]interface{}, len(_a2))
+	for _i := range _a2 {
+		_va[_i] = _a2[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, _a1)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ImageInspect")
+	}
+
+	var r0 image.InspectResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...client.ImageInspectOption) (image.InspectResponse, error)); ok {
+		return rf(ctx, _a1, _a2...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...client.ImageInspectOption) image.InspectResponse); ok {
+		r0 = rf(ctx, _a1, _a2...)
+	} else {
+		r0 = ret.Get(0).(image.InspectResponse)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...client.ImageInspectOption) error); ok {
+		r1 = rf(ctx, _a1, _a2...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ImageInspectWithRaw provides a mock function with given fields: ctx, _a1
-func (_m *DockerCLIClient) ImageInspectWithRaw(ctx context.Context, _a1 string) (types.ImageInspect, []byte, error) {
+func (_m *DockerCLIClient) ImageInspectWithRaw(ctx context.Context, _a1 string) (image.InspectResponse, []byte, error) {
 	ret := _m.Called(ctx, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImageInspectWithRaw")
 	}
 
-	var r0 types.ImageInspect
+	var r0 image.InspectResponse
 	var r1 []byte
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (types.ImageInspect, []byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (image.InspectResponse, []byte, error)); ok {
 		return rf(ctx, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) types.ImageInspect); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) image.InspectResponse); ok {
 		r0 = rf(ctx, _a1)
 	} else {
-		r0 = ret.Get(0).(types.ImageInspect)
+		r0 = ret.Get(0).(image.InspectResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) []byte); ok {
@@ -1490,9 +1538,16 @@ func (_m *DockerCLIClient) ImageList(ctx context.Context, options image.ListOpti
 	return r0, r1
 }
 
-// ImageLoad provides a mock function with given fields: ctx, input, quiet
-func (_m *DockerCLIClient) ImageLoad(ctx context.Context, input io.Reader, quiet bool) (image.LoadResponse, error) {
-	ret := _m.Called(ctx, input, quiet)
+// ImageLoad provides a mock function with given fields: ctx, input, _a2
+func (_m *DockerCLIClient) ImageLoad(ctx context.Context, input io.Reader, _a2 ...client.ImageLoadOption) (image.LoadResponse, error) {
+	_va := make([]interface{}, len(_a2))
+	for _i := range _a2 {
+		_va[_i] = _a2[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, input)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImageLoad")
@@ -1500,17 +1555,17 @@ func (_m *DockerCLIClient) ImageLoad(ctx context.Context, input io.Reader, quiet
 
 	var r0 image.LoadResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, bool) (image.LoadResponse, error)); ok {
-		return rf(ctx, input, quiet)
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, ...client.ImageLoadOption) (image.LoadResponse, error)); ok {
+		return rf(ctx, input, _a2...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, bool) image.LoadResponse); ok {
-		r0 = rf(ctx, input, quiet)
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, ...client.ImageLoadOption) image.LoadResponse); ok {
+		r0 = rf(ctx, input, _a2...)
 	} else {
 		r0 = ret.Get(0).(image.LoadResponse)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, io.Reader, bool) error); ok {
-		r1 = rf(ctx, input, quiet)
+	if rf, ok := ret.Get(1).(func(context.Context, io.Reader, ...client.ImageLoadOption) error); ok {
+		r1 = rf(ctx, input, _a2...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1608,9 +1663,16 @@ func (_m *DockerCLIClient) ImageRemove(ctx context.Context, _a1 string, options 
 	return r0, r1
 }
 
-// ImageSave provides a mock function with given fields: ctx, images
-func (_m *DockerCLIClient) ImageSave(ctx context.Context, images []string) (io.ReadCloser, error) {
-	ret := _m.Called(ctx, images)
+// ImageSave provides a mock function with given fields: ctx, images, _a2
+func (_m *DockerCLIClient) ImageSave(ctx context.Context, images []string, _a2 ...client.ImageSaveOption) (io.ReadCloser, error) {
+	_va := make([]interface{}, len(_a2))
+	for _i := range _a2 {
+		_va[_i] = _a2[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, images)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImageSave")
@@ -1618,19 +1680,19 @@ func (_m *DockerCLIClient) ImageSave(ctx context.Context, images []string) (io.R
 
 	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string) (io.ReadCloser, error)); ok {
-		return rf(ctx, images)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, ...client.ImageSaveOption) (io.ReadCloser, error)); ok {
+		return rf(ctx, images, _a2...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []string) io.ReadCloser); ok {
-		r0 = rf(ctx, images)
+	if rf, ok := ret.Get(0).(func(context.Context, []string, ...client.ImageSaveOption) io.ReadCloser); ok {
+		r0 = rf(ctx, images, _a2...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
-		r1 = rf(ctx, images)
+	if rf, ok := ret.Get(1).(func(context.Context, []string, ...client.ImageSaveOption) error); ok {
+		r1 = rf(ctx, images, _a2...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1995,7 +2057,7 @@ func (_m *DockerCLIClient) NodeInspectWithRaw(ctx context.Context, nodeID string
 }
 
 // NodeList provides a mock function with given fields: ctx, options
-func (_m *DockerCLIClient) NodeList(ctx context.Context, options types.NodeListOptions) ([]swarm.Node, error) {
+func (_m *DockerCLIClient) NodeList(ctx context.Context, options swarm.NodeListOptions) ([]swarm.Node, error) {
 	ret := _m.Called(ctx, options)
 
 	if len(ret) == 0 {
@@ -2004,10 +2066,10 @@ func (_m *DockerCLIClient) NodeList(ctx context.Context, options types.NodeListO
 
 	var r0 []swarm.Node
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.NodeListOptions) ([]swarm.Node, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.NodeListOptions) ([]swarm.Node, error)); ok {
 		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.NodeListOptions) []swarm.Node); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.NodeListOptions) []swarm.Node); ok {
 		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
@@ -2015,7 +2077,7 @@ func (_m *DockerCLIClient) NodeList(ctx context.Context, options types.NodeListO
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.NodeListOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, swarm.NodeListOptions) error); ok {
 		r1 = rf(ctx, options)
 	} else {
 		r1 = ret.Error(1)
@@ -2025,7 +2087,7 @@ func (_m *DockerCLIClient) NodeList(ctx context.Context, options types.NodeListO
 }
 
 // NodeRemove provides a mock function with given fields: ctx, nodeID, options
-func (_m *DockerCLIClient) NodeRemove(ctx context.Context, nodeID string, options types.NodeRemoveOptions) error {
+func (_m *DockerCLIClient) NodeRemove(ctx context.Context, nodeID string, options swarm.NodeRemoveOptions) error {
 	ret := _m.Called(ctx, nodeID, options)
 
 	if len(ret) == 0 {
@@ -2033,7 +2095,7 @@ func (_m *DockerCLIClient) NodeRemove(ctx context.Context, nodeID string, option
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.NodeRemoveOptions) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.NodeRemoveOptions) error); ok {
 		r0 = rf(ctx, nodeID, options)
 	} else {
 		r0 = ret.Error(0)
@@ -2366,22 +2428,22 @@ func (_m *DockerCLIClient) RegistryLogin(ctx context.Context, auth registry.Auth
 }
 
 // SecretCreate provides a mock function with given fields: ctx, secret
-func (_m *DockerCLIClient) SecretCreate(ctx context.Context, secret swarm.SecretSpec) (types.SecretCreateResponse, error) {
+func (_m *DockerCLIClient) SecretCreate(ctx context.Context, secret swarm.SecretSpec) (swarm.SecretCreateResponse, error) {
 	ret := _m.Called(ctx, secret)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SecretCreate")
 	}
 
-	var r0 types.SecretCreateResponse
+	var r0 swarm.SecretCreateResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, swarm.SecretSpec) (types.SecretCreateResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.SecretSpec) (swarm.SecretCreateResponse, error)); ok {
 		return rf(ctx, secret)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, swarm.SecretSpec) types.SecretCreateResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.SecretSpec) swarm.SecretCreateResponse); ok {
 		r0 = rf(ctx, secret)
 	} else {
-		r0 = ret.Get(0).(types.SecretCreateResponse)
+		r0 = ret.Get(0).(swarm.SecretCreateResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, swarm.SecretSpec) error); ok {
@@ -2431,7 +2493,7 @@ func (_m *DockerCLIClient) SecretInspectWithRaw(ctx context.Context, name string
 }
 
 // SecretList provides a mock function with given fields: ctx, options
-func (_m *DockerCLIClient) SecretList(ctx context.Context, options types.SecretListOptions) ([]swarm.Secret, error) {
+func (_m *DockerCLIClient) SecretList(ctx context.Context, options swarm.SecretListOptions) ([]swarm.Secret, error) {
 	ret := _m.Called(ctx, options)
 
 	if len(ret) == 0 {
@@ -2440,10 +2502,10 @@ func (_m *DockerCLIClient) SecretList(ctx context.Context, options types.SecretL
 
 	var r0 []swarm.Secret
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.SecretListOptions) ([]swarm.Secret, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.SecretListOptions) ([]swarm.Secret, error)); ok {
 		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.SecretListOptions) []swarm.Secret); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.SecretListOptions) []swarm.Secret); ok {
 		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
@@ -2451,7 +2513,7 @@ func (_m *DockerCLIClient) SecretList(ctx context.Context, options types.SecretL
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.SecretListOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, swarm.SecretListOptions) error); ok {
 		r1 = rf(ctx, options)
 	} else {
 		r1 = ret.Error(1)
@@ -2525,7 +2587,7 @@ func (_m *DockerCLIClient) ServerVersion(ctx context.Context) (types.Version, er
 }
 
 // ServiceCreate provides a mock function with given fields: ctx, service, options
-func (_m *DockerCLIClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options types.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
+func (_m *DockerCLIClient) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options swarm.ServiceCreateOptions) (swarm.ServiceCreateResponse, error) {
 	ret := _m.Called(ctx, service, options)
 
 	if len(ret) == 0 {
@@ -2534,16 +2596,16 @@ func (_m *DockerCLIClient) ServiceCreate(ctx context.Context, service swarm.Serv
 
 	var r0 swarm.ServiceCreateResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, swarm.ServiceSpec, types.ServiceCreateOptions) (swarm.ServiceCreateResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ServiceSpec, swarm.ServiceCreateOptions) (swarm.ServiceCreateResponse, error)); ok {
 		return rf(ctx, service, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, swarm.ServiceSpec, types.ServiceCreateOptions) swarm.ServiceCreateResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ServiceSpec, swarm.ServiceCreateOptions) swarm.ServiceCreateResponse); ok {
 		r0 = rf(ctx, service, options)
 	} else {
 		r0 = ret.Get(0).(swarm.ServiceCreateResponse)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, swarm.ServiceSpec, types.ServiceCreateOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, swarm.ServiceSpec, swarm.ServiceCreateOptions) error); ok {
 		r1 = rf(ctx, service, options)
 	} else {
 		r1 = ret.Error(1)
@@ -2553,7 +2615,7 @@ func (_m *DockerCLIClient) ServiceCreate(ctx context.Context, service swarm.Serv
 }
 
 // ServiceInspectWithRaw provides a mock function with given fields: ctx, serviceID, options
-func (_m *DockerCLIClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options types.ServiceInspectOptions) (swarm.Service, []byte, error) {
+func (_m *DockerCLIClient) ServiceInspectWithRaw(ctx context.Context, serviceID string, options swarm.ServiceInspectOptions) (swarm.Service, []byte, error) {
 	ret := _m.Called(ctx, serviceID, options)
 
 	if len(ret) == 0 {
@@ -2563,16 +2625,16 @@ func (_m *DockerCLIClient) ServiceInspectWithRaw(ctx context.Context, serviceID 
 	var r0 swarm.Service
 	var r1 []byte
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ServiceInspectOptions) (swarm.Service, []byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.ServiceInspectOptions) (swarm.Service, []byte, error)); ok {
 		return rf(ctx, serviceID, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ServiceInspectOptions) swarm.Service); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.ServiceInspectOptions) swarm.Service); ok {
 		r0 = rf(ctx, serviceID, options)
 	} else {
 		r0 = ret.Get(0).(swarm.Service)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, types.ServiceInspectOptions) []byte); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, swarm.ServiceInspectOptions) []byte); ok {
 		r1 = rf(ctx, serviceID, options)
 	} else {
 		if ret.Get(1) != nil {
@@ -2580,7 +2642,7 @@ func (_m *DockerCLIClient) ServiceInspectWithRaw(ctx context.Context, serviceID 
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, types.ServiceInspectOptions) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, string, swarm.ServiceInspectOptions) error); ok {
 		r2 = rf(ctx, serviceID, options)
 	} else {
 		r2 = ret.Error(2)
@@ -2590,7 +2652,7 @@ func (_m *DockerCLIClient) ServiceInspectWithRaw(ctx context.Context, serviceID 
 }
 
 // ServiceList provides a mock function with given fields: ctx, options
-func (_m *DockerCLIClient) ServiceList(ctx context.Context, options types.ServiceListOptions) ([]swarm.Service, error) {
+func (_m *DockerCLIClient) ServiceList(ctx context.Context, options swarm.ServiceListOptions) ([]swarm.Service, error) {
 	ret := _m.Called(ctx, options)
 
 	if len(ret) == 0 {
@@ -2599,10 +2661,10 @@ func (_m *DockerCLIClient) ServiceList(ctx context.Context, options types.Servic
 
 	var r0 []swarm.Service
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.ServiceListOptions) ([]swarm.Service, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ServiceListOptions) ([]swarm.Service, error)); ok {
 		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.ServiceListOptions) []swarm.Service); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.ServiceListOptions) []swarm.Service); ok {
 		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
@@ -2610,7 +2672,7 @@ func (_m *DockerCLIClient) ServiceList(ctx context.Context, options types.Servic
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.ServiceListOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, swarm.ServiceListOptions) error); ok {
 		r1 = rf(ctx, options)
 	} else {
 		r1 = ret.Error(1)
@@ -2668,7 +2730,7 @@ func (_m *DockerCLIClient) ServiceRemove(ctx context.Context, serviceID string) 
 }
 
 // ServiceUpdate provides a mock function with given fields: ctx, serviceID, version, service, options
-func (_m *DockerCLIClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options types.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
+func (_m *DockerCLIClient) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error) {
 	ret := _m.Called(ctx, serviceID, version, service, options)
 
 	if len(ret) == 0 {
@@ -2677,16 +2739,16 @@ func (_m *DockerCLIClient) ServiceUpdate(ctx context.Context, serviceID string, 
 
 	var r0 swarm.ServiceUpdateResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.Version, swarm.ServiceSpec, types.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.Version, swarm.ServiceSpec, swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error)); ok {
 		return rf(ctx, serviceID, version, service, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.Version, swarm.ServiceSpec, types.ServiceUpdateOptions) swarm.ServiceUpdateResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, swarm.Version, swarm.ServiceSpec, swarm.ServiceUpdateOptions) swarm.ServiceUpdateResponse); ok {
 		r0 = rf(ctx, serviceID, version, service, options)
 	} else {
 		r0 = ret.Get(0).(swarm.ServiceUpdateResponse)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, swarm.Version, swarm.ServiceSpec, types.ServiceUpdateOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, swarm.Version, swarm.ServiceSpec, swarm.ServiceUpdateOptions) error); ok {
 		r1 = rf(ctx, serviceID, version, service, options)
 	} else {
 		r1 = ret.Error(1)
@@ -2696,22 +2758,22 @@ func (_m *DockerCLIClient) ServiceUpdate(ctx context.Context, serviceID string, 
 }
 
 // SwarmGetUnlockKey provides a mock function with given fields: ctx
-func (_m *DockerCLIClient) SwarmGetUnlockKey(ctx context.Context) (types.SwarmUnlockKeyResponse, error) {
+func (_m *DockerCLIClient) SwarmGetUnlockKey(ctx context.Context) (swarm.UnlockKeyResponse, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SwarmGetUnlockKey")
 	}
 
-	var r0 types.SwarmUnlockKeyResponse
+	var r0 swarm.UnlockKeyResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (types.SwarmUnlockKeyResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (swarm.UnlockKeyResponse, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) types.SwarmUnlockKeyResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) swarm.UnlockKeyResponse); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(types.SwarmUnlockKeyResponse)
+		r0 = ret.Get(0).(swarm.UnlockKeyResponse)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -2889,7 +2951,7 @@ func (_m *DockerCLIClient) TaskInspectWithRaw(ctx context.Context, taskID string
 }
 
 // TaskList provides a mock function with given fields: ctx, options
-func (_m *DockerCLIClient) TaskList(ctx context.Context, options types.TaskListOptions) ([]swarm.Task, error) {
+func (_m *DockerCLIClient) TaskList(ctx context.Context, options swarm.TaskListOptions) ([]swarm.Task, error) {
 	ret := _m.Called(ctx, options)
 
 	if len(ret) == 0 {
@@ -2898,10 +2960,10 @@ func (_m *DockerCLIClient) TaskList(ctx context.Context, options types.TaskListO
 
 	var r0 []swarm.Task
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.TaskListOptions) ([]swarm.Task, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.TaskListOptions) ([]swarm.Task, error)); ok {
 		return rf(ctx, options)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.TaskListOptions) []swarm.Task); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, swarm.TaskListOptions) []swarm.Task); ok {
 		r0 = rf(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
@@ -2909,7 +2971,7 @@ func (_m *DockerCLIClient) TaskList(ctx context.Context, options types.TaskListO
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.TaskListOptions) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, swarm.TaskListOptions) error); ok {
 		r1 = rf(ctx, options)
 	} else {
 		r1 = ret.Error(1)

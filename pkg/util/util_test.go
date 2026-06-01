@@ -188,31 +188,21 @@ func (s *Suite) TestCheckEnvBool() {
 		args args
 		want bool
 	}{
-		{
-			name: "first false case",
-			args: args{"False"},
-			want: false,
-		},
-		{
-			name: "second false case",
-			args: args{"false"},
-			want: false,
-		},
-		{
-			name: "first true case",
-			args: args{"True"},
-			want: true,
-		},
-		{
-			name: "second true case",
-			args: args{"true"},
-			want: true,
-		},
-		{
-			name: "third false case",
-			args: args{""},
-			want: false,
-		},
+		{name: "False", args: args{"False"}, want: false},
+		{name: "false", args: args{"false"}, want: false},
+		{name: "True", args: args{"True"}, want: true},
+		{name: "true", args: args{"true"}, want: true},
+		{name: "empty", args: args{""}, want: false},
+		{name: "1", args: args{"1"}, want: true},
+		{name: "0", args: args{"0"}, want: false},
+		{name: "yes", args: args{"yes"}, want: true},
+		{name: "YES", args: args{"YES"}, want: true},
+		{name: "no", args: args{"no"}, want: false},
+		{name: "y", args: args{"y"}, want: true},
+		{name: "n", args: args{"n"}, want: false},
+		{name: "on", args: args{"on"}, want: true},
+		{name: "off", args: args{"off"}, want: false},
+		{name: "garbage", args: args{"banana"}, want: false},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

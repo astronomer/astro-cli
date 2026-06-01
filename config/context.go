@@ -148,15 +148,25 @@ func (c *Context) SetContextKey(key, value string) error {
 	if err != nil {
 		return err
 	}
+	return setContextField(cKey, key, value)
+}
 
-	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, key)
-	viperHome.Set(cfgPath, value)
-	err = saveConfig(viperHome, HomeConfigFile)
-	if err != nil {
-		return err
+// setContextField updates one field in the current context's map and persists
+// the config. It intentionally reads the full context map, mutates the single
+// field, and Sets the map back — rather than Set-ing the nested path directly —
+// because viper's override layer doesn't merge with the file layer on nested
+// Set. Subsequent UnmarshalKey calls on the parent key would otherwise return
+// a partial struct with every unset field zeroed out.
+// See https://github.com/spf13/viper/issues/1106.
+func setContextField(cKey, field string, value interface{}) error {
+	parentPath := fmt.Sprintf("%s.%s", contextsKey, cKey)
+	ctxMap := viperHome.GetStringMap(parentPath)
+	if ctxMap == nil {
+		ctxMap = map[string]interface{}{}
 	}
-
-	return nil
+	ctxMap[field] = value
+	viperHome.Set(parentPath, ctxMap)
+	return saveConfig(viperHome, HomeConfigFile)
 }
 
 // set organization id and short name in context config
@@ -212,17 +222,8 @@ func (c *Context) SetExpiresIn(value int64) error {
 	if err != nil {
 		return err
 	}
-
 	expiretime := time.Now().Add(time.Duration(value) * time.Second)
-
-	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
-	viperHome.Set(cfgPath, expiretime)
-	err = saveConfig(viperHome, HomeConfigFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return setContextField(cKey, "ExpiresIn", expiretime)
 }
 
 func (c *Context) GetExpiresIn() (time.Time, error) {

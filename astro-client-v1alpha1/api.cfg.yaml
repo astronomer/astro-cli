@@ -1,0 +1,9 @@
+---
+package: astrov1alpha1
+generate:
+  - types
+  - client
+include-tags:
+  - Polaris Project
+  - Polaris Session
+output: ./astro-client-v1alpha1/api.gen.go
