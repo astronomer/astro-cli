@@ -24,10 +24,28 @@ type DbtSuite struct {
 	origV1Client     astrov1.APIClient
 	origDeployBundle func(deployInput *cloud.DeployBundleInput) error
 	origDeleteBundle func(deleteInput *cloud.DeleteBundleInput) error
+	origWorkingPath  string
+	origWd           string
+	tmpWorkingDir    string
 }
 
 func (s *DbtSuite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	// Run each test from an isolated temp directory that is not within an Astro
+	// project. dbt deploy/delete default the project path to config.WorkingPath
+	// and reject paths nested under an Astro project (detected by walking up the
+	// real filesystem for a .astro/config.yaml). Relying on the package's own
+	// directory makes the suite fail whenever an ancestor of the repo happens to
+	// be an Astro project, so we point WorkingPath/cwd at a clean temp dir.
+	tmpDir, err := os.MkdirTemp("", "dbt-test")
+	s.Require().NoError(err)
+	s.tmpWorkingDir = tmpDir
+	s.origWd, err = os.Getwd()
+	s.Require().NoError(err)
+	s.Require().NoError(os.Chdir(tmpDir))
+	s.origWorkingPath = config.WorkingPath
+	config.WorkingPath = tmpDir
 
 	// the package depends on global variables so we need to manage overriding those
 	s.origV1Client = astroV1Client
@@ -42,6 +60,14 @@ func (s *DbtSuite) TearDownTest() {
 	astroV1Client = s.origV1Client
 	DeployBundle = s.origDeployBundle
 	DeleteBundle = s.origDeleteBundle
+
+	config.WorkingPath = s.origWorkingPath
+	if s.origWd != "" {
+		_ = os.Chdir(s.origWd)
+	}
+	if s.tmpWorkingDir != "" {
+		_ = os.RemoveAll(s.tmpWorkingDir)
+	}
 }
 
 func TestDbt(t *testing.T) {
