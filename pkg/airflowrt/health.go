@@ -10,8 +10,9 @@ import (
 // HealthCheckConfig holds version-specific options for CheckHealth.
 // Using a struct lets callers add new fields without changing the function signature.
 type HealthCheckConfig struct {
-	// AirflowMajorVersion selects the health endpoint: "2" uses /health (AF2),
-	// anything else (including empty string) uses /api/v2/monitor/health (AF3).
+	// AirflowMajorVersion selects the health endpoint(s): "2" tries both
+	// /api/v2/monitor/health and /health (AF2 fallback), anything else
+	// (including empty string) uses only /api/v2/monitor/health (AF3).
 	AirflowMajorVersion string
 }
 
