@@ -711,6 +711,55 @@ func TestGetAdditionalNullableFields(t *testing.T) {
 	})
 }
 
+func TestGetQMapPodEphemeralStorage(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	machine := astroMachine
+	ephemeral := "10Gi"
+	t.Run("includes pod_ephemeral_storage for Celery and Astro executor queues when set", func(t *testing.T) {
+		for _, exec := range []astrov1.DeploymentExecutor{executorCelery, executorAstro} {
+			execValue := exec
+			dep := astrov1.Deployment{
+				Type:     &standardType,
+				Executor: &execValue,
+				WorkerQueues: &[]astrov1.WorkerQueue{
+					{
+						Name:                "default",
+						IsDefault:           true,
+						MaxWorkerCount:      10,
+						MinWorkerCount:      1,
+						WorkerConcurrency:   20,
+						AstroMachine:        &machine,
+						PodEphemeralStorage: &ephemeral,
+					},
+				},
+			}
+			qMap := getQMap(&dep, nodePools)
+			assert.Len(t, qMap, 1)
+			assert.Equal(t, "10Gi", qMap[0]["pod_ephemeral_storage"])
+		}
+	})
+	t.Run("omits pod_ephemeral_storage when unset", func(t *testing.T) {
+		dep := astrov1.Deployment{
+			Type:     &standardType,
+			Executor: &executorCelery,
+			WorkerQueues: &[]astrov1.WorkerQueue{
+				{
+					Name:              "default",
+					IsDefault:         true,
+					MaxWorkerCount:    10,
+					MinWorkerCount:    1,
+					WorkerConcurrency: 20,
+					AstroMachine:      &machine,
+				},
+			},
+		}
+		qMap := getQMap(&dep, nodePools)
+		assert.Len(t, qMap, 1)
+		_, ok := qMap[0]["pod_ephemeral_storage"]
+		assert.False(t, ok)
+	})
+}
+
 func TestFormatPrintableDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	var expectedPrintableDeployment []byte

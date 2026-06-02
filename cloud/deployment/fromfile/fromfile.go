@@ -240,6 +240,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				workerQueue.MinWorkerCount = listQueues[i].MinWorkerCount
 				workerQueue.WorkerConcurrency = listQueues[i].WorkerConcurrency
 				workerQueue.AstroMachine = astrov1.WorkerQueueRequestAstroMachine(strings.ToUpper(*listQueues[i].AstroMachine))
+				workerQueue.PodEphemeralStorage = listQueues[i].PodEphemeralStorage
 				// set default values if none were specified
 				requestedWorkerQueue := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, workerQueue, defaultOptions, &astroMachine)
 				// check if queue is valid
@@ -943,6 +944,9 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
+		if requestedQueues[i].PodEphemeralStorage != "" {
+			qList[i].PodEphemeralStorage = &requestedQueues[i].PodEphemeralStorage
+		}
 		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentStandard(deploymentType) {
 			qList[i].AstroMachine = &requestedQueues[i].WorkerType
 		} else {

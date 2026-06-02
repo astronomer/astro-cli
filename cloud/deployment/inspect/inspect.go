@@ -71,13 +71,14 @@ type deploymentConfig struct {
 }
 
 type Workerq struct {
-	Name              string `mapstructure:"name" yaml:"name" json:"name"`
-	MaxWorkerCount    int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
-	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
-	WorkerConcurrency int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
-	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
-	PodCPU            string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`
-	PodRAM            string `mapstructure:"pod_ram,omitempty" yaml:"pod_ram,omitempty" json:"pod_ram,omitempty"`
+	Name                string `mapstructure:"name" yaml:"name" json:"name"`
+	MaxWorkerCount      int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
+	MinWorkerCount      int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
+	WorkerConcurrency   int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
+	WorkerType          string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
+	PodCPU              string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`
+	PodRAM              string `mapstructure:"pod_ram,omitempty" yaml:"pod_ram,omitempty" json:"pod_ram,omitempty"`
+	PodEphemeralStorage string `mapstructure:"pod_ephemeral_storage,omitempty" yaml:"pod_ephemeral_storage,omitempty" json:"pod_ephemeral_storage,omitempty"`
 }
 
 type EnvironmentVariable struct {
@@ -357,6 +358,9 @@ func getQMap(deploymentPointer *astrov1.Deployment, sourceNodePools []astrov1.No
 				"max_worker_count":   queue.MaxWorkerCount,
 				"min_worker_count":   queue.MinWorkerCount,
 				"worker_concurrency": queue.WorkerConcurrency,
+			}
+			if queue.PodEphemeralStorage != nil {
+				resources["pod_ephemeral_storage"] = *queue.PodEphemeralStorage
 			}
 		} else {
 			resources = map[string]interface{}{

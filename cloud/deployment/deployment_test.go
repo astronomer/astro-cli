@@ -284,6 +284,34 @@ func (s *Suite) TearDownSubTest() {
 	MockResponseInit()
 }
 
+func (s *Suite) TestConvertCreateQueuesToUpdatePodEphemeralStorage() {
+	ephemeral := "10Gi"
+	in := []astrov1.WorkerQueueRequest{
+		{
+			Name:                "default",
+			IsDefault:           true,
+			MaxWorkerCount:      10,
+			MinWorkerCount:      1,
+			WorkerConcurrency:   20,
+			AstroMachine:        astrov1.WorkerQueueRequestAstroMachine("A5"),
+			PodEphemeralStorage: &ephemeral,
+		},
+		{
+			Name:              "test-q-2",
+			MaxWorkerCount:    10,
+			MinWorkerCount:    1,
+			WorkerConcurrency: 20,
+			AstroMachine:      astrov1.WorkerQueueRequestAstroMachine("A5"),
+		},
+	}
+	out := ConvertCreateQueuesToUpdate(in)
+	s.Len(out, 2)
+	if s.NotNil(out[0].PodEphemeralStorage) {
+		s.Equal("10Gi", *out[0].PodEphemeralStorage)
+	}
+	s.Nil(out[1].PodEphemeralStorage)
+}
+
 func (s *Suite) TestList() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
