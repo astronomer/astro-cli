@@ -49,8 +49,10 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/itchyny/gojq v0.12.18
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/moby/patternmatcher v0.6.1
 	github.com/neilotoole/jsoncolor v0.7.1
 	github.com/oapi-codegen/runtime v1.4.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/pb33f/libopenapi v0.34.0
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/whilp/git-urls v1.0.0
@@ -228,7 +230,6 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
-	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
@@ -248,7 +249,6 @@ require (
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pb33f/jsonpath v0.8.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
