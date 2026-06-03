@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moby/patternmatcher"
+	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -861,8 +863,18 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 		return buildContext, fmt.Errorf("source directory does not exist: %s", sourcePath)
 	}
 
+	// Build a skip predicate from the project's .dockerignore so excluded
+	// paths (e.g. infra/ with terragrunt provider-cache symlinks) are not
+	// copied into the build context. This mirrors what the Docker builder does
+	// for in-place builds; the client deploy copies the context first, so it
+	// must honor .dockerignore itself.
+	skip, err := dockerignoreSkipFunc(sourcePath)
+	if err != nil {
+		return buildContext, fmt.Errorf("failed to read .dockerignore: %w", err)
+	}
+
 	// Copy all project files to the temporary directory
-	err = fileutil.CopyDirectory(sourcePath, tempBuildDir)
+	err = fileutil.CopyDirectoryFiltered(sourcePath, tempBuildDir, skip)
 	if err != nil {
 		return buildContext, fmt.Errorf("failed to copy project files to temporary directory: %w", err)
 	}
@@ -874,6 +886,58 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 	}
 
 	return buildContext, nil
+}
+
+// alwaysIncludedBuildFiles are never excluded from the client build context,
+// even if a user's .dockerignore would match them. The Docker builder applies
+// the same special-casing to the Dockerfile and .dockerignore, and the client
+// deploy additionally needs its client dependency files.
+var alwaysIncludedBuildFiles = map[string]bool{
+	"Dockerfile.client":       true,
+	".dockerignore":           true,
+	"requirements-client.txt": true,
+	"packages-client.txt":     true,
+}
+
+// dockerignoreSkipFunc parses the .dockerignore at sourcePath (if any) and
+// returns a predicate, suitable for fileutil.CopyDirectoryFiltered, that
+// reports whether a path should be excluded from the build context. It returns
+// nil (copy everything) when there is no .dockerignore file.
+func dockerignoreSkipFunc(sourcePath string) (func(relPath string, isDir bool) bool, error) {
+	f, err := os.Open(filepath.Join(sourcePath, ".dockerignore"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	patterns, err := ignorefile.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	pm, err := patternmatcher.New(patterns)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(relPath string, isDir bool) bool {
+		if alwaysIncludedBuildFiles[relPath] {
+			return false
+		}
+		matched, err := pm.MatchesOrParentMatches(relPath)
+		if err != nil || !matched {
+			return false
+		}
+		// When exclusion ("!") patterns exist, a child of a matched directory
+		// may be re-included, so we must descend rather than prune the dir.
+		if isDir && pm.Exclusions() {
+			return false
+		}
+		return true
+	}, nil
 }
 
 // setupClientDependencyFiles processes client-specific dependency files in the build context

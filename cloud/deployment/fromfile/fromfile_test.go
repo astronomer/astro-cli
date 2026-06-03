@@ -3563,6 +3563,39 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 	})
 }
 
+func (s *Suite) TestGetQueuesPodEphemeralStorage() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	s.Run("threads pod_ephemeral_storage into worker queue and leaves it nil when unset", func() {
+		deploymentFromFile := inspect.FormattedDeployment{}
+		deploymentFromFile.Deployment.Configuration.DeploymentType = "STANDARD"
+		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+		deploymentFromFile.Deployment.WorkerQs = []inspect.Workerq{
+			{
+				Name:                "default",
+				MaxWorkerCount:      10,
+				MinWorkerCount:      1,
+				WorkerConcurrency:   20,
+				WorkerType:          "a5",
+				PodEphemeralStorage: "10Gi",
+			},
+			{
+				Name:              "test-q-2",
+				MaxWorkerCount:    10,
+				MinWorkerCount:    1,
+				WorkerConcurrency: 20,
+				WorkerType:        "a5",
+			},
+		}
+		qList, err := getQueues(&deploymentFromFile, []astrov1.NodePool{}, []astrov1.WorkerQueue{})
+		s.NoError(err)
+		s.Len(qList, 2)
+		if s.NotNil(qList[0].PodEphemeralStorage) {
+			s.Equal("10Gi", *qList[0].PodEphemeralStorage)
+		}
+		s.Nil(qList[1].PodEphemeralStorage)
+	})
+}
+
 func (s *Suite) TestCheckRequiredFields() {
 	var (
 		err   error

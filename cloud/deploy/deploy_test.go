@@ -1867,6 +1867,131 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, regularPackagesContent, string(originalPackagesContent))
 	})
+
+	// Reproduces https://github.com/astronomer/astro-cli/issues/2161: a
+	// .dockerignore-excluded directory containing a symlink to a directory
+	// (e.g. terragrunt provider-cache symlinks under infra/) must not cause the
+	// build-context copy to fail with "is a directory".
+	t.Run("excludes dockerignored directory containing symlink to directory", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-client-dockerignore-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Required client/regular dependency files.
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte("FROM scratch"), 0o644))
+
+		// .dockerignore excludes infra/.
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, ".dockerignore"), []byte("infra/\n"), 0o644))
+
+		// A symlink-to-directory living outside the project, mirroring a
+		// terragrunt provider cache symlinked into .terragrunt-cache.
+		cacheDir := filepath.Join(tempDir, "provider-cache", "darwin_arm64")
+		assert.NoError(t, os.MkdirAll(cacheDir, 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(cacheDir, "terraform-provider"), []byte("binary"), 0o644))
+
+		linkDir := filepath.Join(tempDir, "infra", "agent", ".terragrunt-cache", "hash")
+		assert.NoError(t, os.MkdirAll(linkDir, 0o755))
+		assert.NoError(t, os.Symlink(cacheDir, filepath.Join(linkDir, "darwin_arm64")))
+
+		// Previously failed with "is a directory"; now succeeds.
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.NotNil(t, buildContext)
+		defer buildContext.CleanupFunc()
+		assert.NoError(t, err)
+
+		// infra/ is excluded entirely from the build context.
+		_, statErr := os.Stat(filepath.Join(buildContext.TempDir, "infra"))
+		assert.True(t, os.IsNotExist(statErr), "expected infra/ to be excluded from build context")
+
+		// The Dockerfile.client is preserved.
+		_, statErr = os.Stat(filepath.Join(buildContext.TempDir, "Dockerfile.client"))
+		assert.NoError(t, statErr)
+	})
+
+	// Even when .dockerignore does NOT exclude a symlink-to-directory, the copy
+	// must recreate it as a symlink rather than dereference it.
+	t.Run("copies symlink to directory without dereferencing when not ignored", func(t *testing.T) {
+		tempDir, err := os.MkdirTemp("", "test-client-symlink-*")
+		assert.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "requirements.txt"), []byte(""), 0o644))
+		assert.NoError(t, os.WriteFile(filepath.Join(tempDir, "packages.txt"), []byte(""), 0o644))
+
+		target := filepath.Join(tempDir, "target-dir")
+		assert.NoError(t, os.MkdirAll(target, 0o755))
+		assert.NoError(t, os.Symlink(target, filepath.Join(tempDir, "link-to-dir")))
+
+		buildContext, err := prepareClientBuildContext(tempDir)
+		assert.NotNil(t, buildContext)
+		defer buildContext.CleanupFunc()
+		assert.NoError(t, err)
+
+		info, lerr := os.Lstat(filepath.Join(buildContext.TempDir, "link-to-dir"))
+		assert.NoError(t, lerr)
+		assert.NotZero(t, info.Mode()&os.ModeSymlink, "expected link-to-dir to remain a symlink")
+	})
+}
+
+func TestDockerignoreSkipFunc(t *testing.T) {
+	t.Run("returns nil skip func when no .dockerignore exists", func(t *testing.T) {
+		dir := t.TempDir()
+		skip, err := dockerignoreSkipFunc(dir)
+		assert.NoError(t, err)
+		assert.Nil(t, skip)
+	})
+
+	t.Run("matches files and prunes directories", func(t *testing.T) {
+		dir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("infra/\n*.log\n"), 0o644))
+
+		skip, err := dockerignoreSkipFunc(dir)
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		assert.True(t, skip("infra", true))
+		assert.True(t, skip("infra/agent/main.tf", false))
+		assert.True(t, skip("debug.log", false))
+		assert.False(t, skip("dags/example.py", false))
+		assert.False(t, skip("requirements.txt", false))
+	})
+
+	t.Run("never excludes the Dockerfile and dependency files", func(t *testing.T) {
+		dir := t.TempDir()
+		// A pathological .dockerignore that would otherwise exclude build files.
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("Dockerfile*\n*.txt\n.dockerignore\n"), 0o644))
+
+		skip, err := dockerignoreSkipFunc(dir)
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		assert.False(t, skip("Dockerfile.client", false))
+		assert.False(t, skip(".dockerignore", false))
+		assert.False(t, skip("requirements-client.txt", false))
+		assert.False(t, skip("packages-client.txt", false))
+	})
+
+	t.Run("descends into matched directory when exclusion patterns exist", func(t *testing.T) {
+		dir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("infra/\n!infra/keep.txt\n"), 0o644))
+
+		skip, err := dockerignoreSkipFunc(dir)
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		// Directory is not pruned (so the re-included child can be reached)...
+		assert.False(t, skip("infra", true))
+		// ...the re-included file survives...
+		assert.False(t, skip("infra/keep.txt", false))
+		// ...but other files inside stay excluded.
+		assert.True(t, skip("infra/secret.tf", false))
+	})
 }
 
 func TestSetupClientDependencyFiles(t *testing.T) {

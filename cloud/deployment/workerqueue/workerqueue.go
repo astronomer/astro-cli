@@ -241,7 +241,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 }
 
 // SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
-func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astrov1.WorkerQueueRequest, workerQueueDefaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) astrov1.WorkerQueueRequest {
+func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astrov1.WorkerQueueRequest, workerQueueDefaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) astrov1.WorkerQueueRequest { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	// -1 is the CLI default to allow users to request wQueueMin=0
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
@@ -305,7 +305,7 @@ func IsWorkerQueueInputValid(requestedHybridWorkerQueue astrov1.HybridWorkerQueu
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
 // ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedWorkerQueueInputValid(requestedWorkerQueue astrov1.WorkerQueueRequest, defaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) error {
+func IsHostedWorkerQueueInputValid(requestedWorkerQueue astrov1.WorkerQueueRequest, defaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) error { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -352,7 +352,7 @@ func IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid astrov1.Hybri
 // QueueExists takes a []existingQueues and a queueToCreateOrUpdate as arguments
 // It returns true if queueToCreateOrUpdate exists in []existingQueues
 // It returns false if queueToCreateOrUpdate does not exist in []existingQueues
-func QueueExists(existingQueues []astrov1.WorkerQueue, queueToCreateOrUpdate astrov1.WorkerQueueRequest, queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) bool {
+func QueueExists(existingQueues []astrov1.WorkerQueue, queueToCreateOrUpdate astrov1.WorkerQueueRequest, queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) bool { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	for _, queue := range existingQueues { //nolint
 		if queue.Name == queueToCreateOrUpdateHybrid.Name {
 			// queueToCreateOrUpdate exists
@@ -642,7 +642,7 @@ func selectQueue(queueListIndex *[]astrov1.WorkerQueue, out io.Writer) (string, 
 // on the worker type.
 //
 //nolint:dupl
-func updateQueueList(existingQueues []astrov1.WorkerQueueRequest, queueToUpdate astrov1.WorkerQueueRequest, executor *astrov1.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astrov1.WorkerQueueRequest {
+func updateQueueList(existingQueues []astrov1.WorkerQueueRequest, queueToUpdate astrov1.WorkerQueueRequest, executor *astrov1.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astrov1.WorkerQueueRequest { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	for i, queue := range existingQueues { //nolint
 		if queue.Name != queueToUpdate.Name {
 			continue
