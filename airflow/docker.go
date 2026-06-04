@@ -415,13 +415,9 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 		if addErr := proxy.AddRoute(&route); addErr != nil {
 			fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
 			proxyActive = false
-		}
-
-		if proxyActive {
-			if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
-				fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
-				proxyActive = false
-			}
+		} else if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
+			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
+			proxyActive = false
 		}
 	}
 
