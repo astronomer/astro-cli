@@ -1370,13 +1370,14 @@ func ConvertCreateQueuesToUpdate(in []astrov1.WorkerQueueRequest) []astrov1.Upda
 	for i := range in {
 		machine := astrov1.UpdateWorkerQueueRequestAstroMachine(in[i].AstroMachine)
 		out[i] = astrov1.UpdateWorkerQueueRequest{
-			AstroMachine:      &machine,
-			Id:                in[i].Id,
-			IsDefault:         in[i].IsDefault,
-			MaxWorkerCount:    in[i].MaxWorkerCount,
-			MinWorkerCount:    in[i].MinWorkerCount,
-			Name:              in[i].Name,
-			WorkerConcurrency: in[i].WorkerConcurrency,
+			AstroMachine:        &machine,
+			Id:                  in[i].Id,
+			IsDefault:           in[i].IsDefault,
+			MaxWorkerCount:      in[i].MaxWorkerCount,
+			MinWorkerCount:      in[i].MinWorkerCount,
+			Name:                in[i].Name,
+			PodEphemeralStorage: in[i].PodEphemeralStorage,
+			WorkerConcurrency:   in[i].WorkerConcurrency,
 		}
 	}
 	return out

@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -442,17 +443,35 @@ func CopyFile(src, dst string) error {
 	return os.Chmod(dst, sourceInfo.Mode())
 }
 
-// CopyDirectory recursively copies a directory from src to dst
+// CopyDirectory recursively copies a directory from src to dst.
 func CopyDirectory(src, dst string) error {
-	// Get source directory info
-	srcInfo, err := os.Stat(src)
+	return CopyDirectoryFiltered(src, dst, nil)
+}
+
+// CopyDirectoryFiltered recursively copies a directory from src to dst.
+//
+// If skip is non-nil it is invoked for every entry with the entry's path
+// relative to the original src root (slash-delimited) and whether the entry is
+// a directory. Returning true skips that entry; skipping a directory also skips
+// its contents.
+//
+// Symlinks are recreated as symlinks rather than dereferenced. Following a
+// symlink that resolves to a directory previously caused a cryptic
+// "is a directory" read error (the link was treated as a regular file and
+// os.Open followed it to its target directory).
+func CopyDirectoryFiltered(src, dst string, skip func(relPath string, isDir bool) bool) error {
+	return copyDirectory(src, dst, "", skip)
+}
+
+func copyDirectory(src, dst, relBase string, skip func(relPath string, isDir bool) bool) error {
+	// Use Lstat so we do not dereference src itself if it is a symlink.
+	srcInfo, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
 
 	// Create destination directory
-	err = os.MkdirAll(dst, srcInfo.Mode())
-	if err != nil {
+	if err := os.MkdirAll(dst, srcInfo.Mode().Perm()); err != nil {
 		return err
 	}
 
@@ -465,21 +484,42 @@ func CopyDirectory(src, dst string) error {
 	for _, entry := range entries {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
+		relPath := path.Join(relBase, entry.Name())
+		isDir := entry.IsDir()
 
-		if entry.IsDir() {
-			// Recursively copy subdirectory
-			err = CopyDirectory(srcPath, dstPath)
-			if err != nil {
+		if skip != nil && skip(relPath, isDir) {
+			continue
+		}
+
+		switch {
+		case entry.Type()&os.ModeSymlink != 0:
+			// Recreate the symlink instead of following it. Dereferencing a
+			// symlink that points at a directory caused "is a directory" errors.
+			if err := copySymlink(srcPath, dstPath); err != nil {
 				return err
 			}
-		} else {
+		case isDir:
+			// Recursively copy subdirectory
+			if err := copyDirectory(srcPath, dstPath, relPath, skip); err != nil {
+				return err
+			}
+		default:
 			// Copy file
-			err = CopyFile(srcPath, dstPath)
-			if err != nil {
+			if err := CopyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+// copySymlink recreates the symlink at src as a symlink at dst, preserving its
+// target verbatim (without following it).
+func copySymlink(src, dst string) error {
+	target, err := os.Readlink(src)
+	if err != nil {
+		return err
+	}
+	return os.Symlink(target, dst)
 }
