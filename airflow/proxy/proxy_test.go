@@ -59,6 +59,48 @@ func TestProxy_NotFound(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "unknown.localhost")
 }
 
+func TestAddRoute_PersistsWhenDaemonFails(t *testing.T) {
+	setupTestDir(t)
+
+	// Simulate the docker.go flow where AddRoute is called before EnsureRunning.
+	// Even when the daemon cannot start (as on Windows), routes.json must be
+	// populated so other tools can discover the project.
+	origStartDaemon := StartDaemon
+	defer func() { StartDaemon = origStartDaemon }()
+	StartDaemon = func(_ string) error {
+		return fmt.Errorf("proxy daemon is not supported on Windows")
+	}
+
+	route := &Route{
+		Hostname:   "my-project.localhost",
+		Port:       "12345",
+		ProjectDir: "/home/user/my-project",
+		PID:        0,
+		Services:   map[string]string{"postgres": "15432"},
+		Mode:       "docker",
+	}
+	err := AddRoute(route)
+	require.NoError(t, err)
+
+	// EnsureRunning fails — but route must still be in routes.json.
+	_, err = EnsureRunning("6563")
+	assert.Error(t, err)
+
+	routes, err := ListRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, "my-project.localhost", routes[0].Hostname)
+	assert.Equal(t, "12345", routes[0].Port)
+	assert.Equal(t, "docker", routes[0].Mode)
+	assert.Equal(t, "15432", routes[0].Services["postgres"])
+
+	// GetRouteByProject should also find it.
+	found, err := GetRouteByProject("/home/user/my-project")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "my-project.localhost", found.Hostname)
+}
+
 func TestProxy_ReverseProxy(t *testing.T) {
 	setupTestDir(t)
 

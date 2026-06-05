@@ -248,6 +248,37 @@ func TestPruneStaleRoutes_DockerNotPruned(t *testing.T) {
 	assert.Equal(t, "docker.localhost", pruned[0].Hostname)
 }
 
+func TestAddRoute_DockerRouteSurvivesPruningWithDeadPID(t *testing.T) {
+	setupTestDir(t)
+
+	// Simulate the docker.go flow: AddRoute is called with PID 0 and Mode "docker".
+	// Even when IsPIDAlive returns false (as it does on Windows), docker routes
+	// must not be pruned — they are cleaned up explicitly via RemoveRoute.
+	origIsPIDAlive := IsPIDAlive
+	defer func() { IsPIDAlive = origIsPIDAlive }()
+	IsPIDAlive = func(_ int) bool { return false }
+
+	route := &Route{
+		Hostname:   "my-project.localhost",
+		Port:       "12345",
+		ProjectDir: "/home/user/my-project",
+		PID:        0,
+		Services:   map[string]string{"postgres": "15432"},
+		Mode:       "docker",
+	}
+	err := AddRoute(route)
+	require.NoError(t, err)
+
+	// ListRoutes prunes stale routes internally — docker routes must survive.
+	routes, err := ListRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, "my-project.localhost", routes[0].Hostname)
+	assert.Equal(t, "12345", routes[0].Port)
+	assert.Equal(t, "docker", routes[0].Mode)
+	assert.Equal(t, "15432", routes[0].Services["postgres"])
+}
+
 func TestAddRoute_WithServices(t *testing.T) {
 	setupTestDir(t)
 
