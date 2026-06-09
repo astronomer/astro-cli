@@ -19,15 +19,24 @@ on:
 
 permissions:
   contents: write
+  id-token: write  # Required for Octo STS OIDC token exchange
 
 jobs:
   create-tag:
     runs-on: ubuntu-latest
     environment: ${{ inputs.type != 'nightly' && 'release' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Get token via Octo STS
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: sts-token
+        with:
+          scope: astronomer
+          identity: astro-cli-release
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          token: ${{ steps.sts-token.outputs.token }}
 
       - name: Validate inputs
         run: |

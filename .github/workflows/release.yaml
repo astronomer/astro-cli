@@ -5,7 +5,7 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
-      - 'nightly-[0-9]*'
+      - 'v[0-9]+.[0-9]+.[0-9]+-nightly.[0-9]*'
 
 permissions:
   contents: write
@@ -26,30 +26,30 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-          if [[ "$TAG" =~ ^nightly- ]]; then
-            echo "type=nightly" >> $GITHUB_OUTPUT
-            echo "version=$TAG" >> $GITHUB_OUTPUT
-          elif [[ "$TAG" =~ -rc\. ]]; then
-            echo "type=rc" >> $GITHUB_OUTPUT
-            VERSION=$(echo "$TAG" | sed 's/^v//; s/-rc\.[0-9]*$//')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "type=ga" >> $GITHUB_OUTPUT
+          if [[ "$TAG" =~ -nightly\. ]]; then
+            TYPE="nightly"
             VERSION=$(echo "$TAG" | sed 's/^v//')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          elif [[ "$TAG" =~ -rc\. ]]; then
+            TYPE="rc"
+            VERSION=$(echo "$TAG" | sed 's/^v//; s/-rc\.[0-9]*$//')
+          else
+            TYPE="ga"
+            VERSION=$(echo "$TAG" | sed 's/^v//')
           fi
 
-          echo "Parsed — Tag: $TAG | Type: $([[ "$TAG" =~ ^nightly- ]] && echo nightly || ([[ "$TAG" =~ -rc\. ]] && echo rc || echo ga))"
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Parsed — Tag: $TAG | Type: $TYPE | Version: $VERSION"
 
   release:
     needs: detect
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -60,7 +60,7 @@ jobs:
 
       - name: Cache osxcross
         id: cache-osxcross
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: /tmp/osxcross
           key: osxcross-macos12.3-${{ runner.os }}
@@ -84,23 +84,20 @@ jobs:
           scope: astronomer
           identity: astro-cli-homebrew
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: v2.15.2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # For GA releases, use the short-lived Octo STS token scoped to astronomer/homebrew-tap.
-          # For RC/nightly builds, GoReleaser skips homebrew upload via skip_upload: auto
-          # but still evaluates the template, so we pass GITHUB_TOKEN as a safe fallback.
-          HOMEBREW_TAP_TOKEN: ${{ needs.detect.outputs.type == 'ga' && steps.homebrew-token.outputs.token || secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
 
   update-godownloader:
     needs: [detect, release]
     if: needs.detect.outputs.type == 'ga'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: main
 
@@ -125,7 +122,7 @@ jobs:
           PR_BODY+=$'\n\n'"Triggered by release [${TAG}](https://github.com/${{ github.repository }}/releases/tag/${TAG})."
           gh pr create \
             --base main \
-            --title "chore: update godownloader to ${TAG}" \
+            --title "CLI Release: update godownloader to ${TAG}" \
             --body "$PR_BODY"
 
   update-winget:
@@ -140,13 +137,45 @@ jobs:
           scope: astronomer
           identity: astro-cli-winget
 
-      - uses: vedantmgoyal9/winget-releaser@v2
+      - uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
         with:
           identifier: Astronomer.Astro
           version: ${{ needs.detect.outputs.version }}
+          release-tag: ${{ needs.detect.outputs.tag }}
           installers-regex: '\.zip$'
-          fork: astronomer/winget-pkgs
           token: ${{ steps.winget-token.outputs.token }}
+
+  cleanup-nightlies:
+    needs: [detect, release]
+    if: needs.detect.outputs.type == 'nightly'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old nightly releases and tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          KEEP=5
+
+          # List all nightly releases sorted by creation date (newest first)
+          NIGHTLY_TAGS=$(gh release list \
+            --repo "${{ github.repository }}" \
+            --limit 100 \
+            --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | test("-nightly\\.")) ] | sort_by(.createdAt) | reverse | .[].tagName')
+
+          COUNT=0
+          for TAG in $NIGHTLY_TAGS; do
+            COUNT=$((COUNT + 1))
+            if [ "$COUNT" -le "$KEEP" ]; then
+              echo "Keeping: $TAG"
+              continue
+            fi
+            echo "Deleting release and tag: $TAG"
+            gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
+          done
+
+          echo "Nightly cleanup complete. Kept $KEEP most recent, deleted $((COUNT - KEEP > 0 ? COUNT - KEEP : 0)) old nightlies."
 
   notify:
     needs: [detect, release, update-godownloader, update-winget]

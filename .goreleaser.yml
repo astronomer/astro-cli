@@ -8,7 +8,7 @@ release:
   github:
     owner: astronomer
     name: astro-cli
-  # "auto" marks RC tags (e.g. v1.43.0-rc.1) as prerelease,
+  # "auto" marks prerelease tags (e.g. v1.43.0-rc.1, v1.43.0-nightly.20260522) as prerelease,
   # and clean semver tags (e.g. v1.43.0) as full releases.
   prerelease: auto
 changelog:
@@ -51,7 +51,8 @@ builds:
       - amd64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
 brews:
-  - repository:
+  - name: astro
+    repository:
       owner: astronomer
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
@@ -62,7 +63,23 @@ brews:
           name: homebrew-tap
           branch: main
     directory: Formula
-    # "auto" skips upload for RC tags, creates a PR for GA tags.
+    skip_upload: auto
+    homepage: https://astronomer.io
+    description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    test: |
+      system "#{bin}/astro version"
+  - name: "astro@{{ .Version }}"
+    repository:
+      owner: astronomer
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: astronomer
+          name: homebrew-tap
+          branch: main
+    directory: Formula
     skip_upload: auto
     homepage: https://astronomer.io
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
