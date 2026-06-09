@@ -6,23 +6,23 @@ import (
 	"github.com/lucsky/cuid"
 	"github.com/stretchr/testify/mock"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // envVarObj returns a workspace-scoped env-var EnvironmentObject with the given
 // links / excludes / autoLink, sufficient for resolveWorkspaceVar to succeed.
-func envVarObj(id, value string, autoLink *bool, links []astrocore.EnvironmentObjectLink, excludes []astrocore.EnvironmentObjectExcludeLink) astrocore.EnvironmentObject {
-	o := astrocore.EnvironmentObject{
+func envVarObj(id, value string, autoLink *bool, links []astrov1.EnvironmentObjectLink, excludes []astrov1.EnvironmentObjectExcludeLink) astrov1.EnvironmentObject {
+	o := astrov1.EnvironmentObject{
 		Id:                  &id,
 		ObjectKey:           "FOO",
-		ObjectType:          astrocore.EnvironmentObjectObjectType(astrocore.ENVIRONMENTVARIABLE),
-		Scope:               astrocore.EnvironmentObjectScope(astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE),
+		ObjectType:          astrov1.EnvironmentObjectObjectType(astrov1.ENVIRONMENTVARIABLE),
+		Scope:               astrov1.EnvironmentObjectScope(astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE),
 		ScopeEntityId:       cuid.New(),
 		AutoLinkDeployments: autoLink,
-		EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: value},
+		EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: value},
 	}
 	if links != nil {
 		o.Links = &links
@@ -40,17 +40,17 @@ func (s *Suite) TestLinkVarPreservesAutoLink() {
 	depID := cuid.New()
 	autoTrue := true
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	// resolveWorkspaceVar -> getObject -> List by key
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			envVarObj(id, "ws-default", &autoTrue, nil, nil),
 		}},
 	}, nil).Once()
 
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			// AINF-1792: must echo autoLinkDeployments back as true.
 			if b.AutoLinkDeployments == nil || !*b.AutoLinkDeployments {
 				return false
@@ -61,9 +61,9 @@ func (s *Suite) TestLinkVarPreservesAutoLink() {
 			}
 			return (*b.Links)[0].ScopeEntityId == depID
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, mc))
@@ -77,15 +77,15 @@ func (s *Suite) TestLinkVarWithOverride() {
 	depID := cuid.New()
 	override := "deployment-override"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			envVarObj(id, "ws-default", nil, nil, nil),
 		}},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.Links == nil || len(*b.Links) != 1 {
 				return false
 			}
@@ -96,9 +96,9 @@ func (s *Suite) TestLinkVarWithOverride() {
 				l.Overrides.EnvironmentVariable.Value != nil &&
 				*l.Overrides.EnvironmentVariable.Value == override
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &override, mc))
@@ -114,21 +114,21 @@ func (s *Suite) TestLinkVarUpsertsExistingLink() {
 	oldOverride := "old"
 	newOverride := "new"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrov1.EnvironmentObjectLink{
 				{
-					Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+					Scope:                        astrov1.EnvironmentObjectLinkScopeDEPLOYMENT,
 					ScopeEntityId:                depID,
-					EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: oldOverride},
+					EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: oldOverride},
 				},
 			}, nil),
 		}},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.Links == nil || len(*b.Links) != 1 {
 				return false
 			}
@@ -139,9 +139,9 @@ func (s *Suite) TestLinkVarUpsertsExistingLink() {
 				l.Overrides.EnvironmentVariable.Value != nil &&
 				*l.Overrides.EnvironmentVariable.Value == newOverride
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &newOverride, mc))
@@ -158,30 +158,30 @@ func (s *Suite) TestLinkVarUpsertOmitsOverrideWhenNotProvided() {
 	depID := cuid.New()
 	oldOverride := "old"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrov1.EnvironmentObjectLink{
 				{
-					Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+					Scope:                        astrov1.EnvironmentObjectLinkScopeDEPLOYMENT,
 					ScopeEntityId:                depID,
-					EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: oldOverride},
+					EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: oldOverride},
 				},
 			}, nil),
 		}},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.Links == nil || len(*b.Links) != 1 {
 				return false
 			}
 			// Overrides is nil → field omitted → platform preserves existing override.
 			return (*b.Links)[0].ScopeEntityId == depID && (*b.Links)[0].Overrides == nil
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, mc))
@@ -198,21 +198,21 @@ func (s *Suite) TestLinkVarUpsertPreservesOtherLinks() {
 	upsertDep := cuid.New()
 	newOverride := "upsert"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrov1.EnvironmentObjectLink{
 				{
-					Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+					Scope:                        astrov1.EnvironmentObjectLinkScopeDEPLOYMENT,
 					ScopeEntityId:                keepDep,
-					EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: keepOverride},
+					EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: keepOverride},
 				},
 			}, nil),
 		}},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.Links == nil || len(*b.Links) != 2 {
 				return false
 			}
@@ -233,9 +233,9 @@ func (s *Suite) TestLinkVarUpsertPreservesOtherLinks() {
 			}
 			return sawKeep && sawUpsert
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, upsertDep, &newOverride, mc))
@@ -249,12 +249,12 @@ func (s *Suite) TestExcludeVarIdempotent() {
 	id := cuid.New()
 	depID := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", nil, nil, []astrocore.EnvironmentObjectExcludeLink{
-				{Scope: astrocore.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: depID},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "v", nil, nil, []astrov1.EnvironmentObjectExcludeLink{
+				{Scope: astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: depID},
 			}),
 		}},
 	}, nil).Once()
@@ -265,13 +265,13 @@ func (s *Suite) TestExcludeVarIdempotent() {
 }
 
 func (s *Suite) TestLinkVarRejectsDeploymentScope() {
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	err := LinkVar("FOO", Scope{DeploymentID: cuid.New()}, cuid.New(), nil, mc)
 	s.ErrorContains(err, "workspace-id")
 }
 
 func (s *Suite) TestLinkVarRejectsBadDeploymentID() {
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	s.ErrorContains(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "", nil, mc), "cannot be empty")
 	s.ErrorContains(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "not-a-cuid", nil, mc), "valid deployment ID")
 }
@@ -283,26 +283,26 @@ func (s *Suite) TestUnlinkVar() {
 	keepDep := cuid.New()
 	dropDep := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", nil, []astrocore.EnvironmentObjectLink{
-				{Scope: astrocore.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: keepDep},
-				{Scope: astrocore.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: dropDep},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "v", nil, []astrov1.EnvironmentObjectLink{
+				{Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: keepDep},
+				{Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: dropDep},
 			}, nil),
 		}},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.Links == nil || len(*b.Links) != 1 {
 				return false
 			}
 			return (*b.Links)[0].ScopeEntityId == keepDep
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(UnlinkVar("FOO", Scope{WorkspaceID: cuid.New()}, dropDep, mc))
@@ -315,19 +315,19 @@ func (s *Suite) TestExcludeVarUsesDedicatedEndpoint() {
 	id := cuid.New()
 	depID := cuid.New()
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			envVarObj(id, "v", nil, nil, nil),
 		}},
 	}, nil).Once()
 	mc.On("ExcludeLinkingEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		astrocore.ExcludeLinkingEnvironmentObjectJSONRequestBody{
-			Scope:         astrocore.ExcludeLinkEnvironmentObjectRequestScopeDEPLOYMENT,
+		astrov1.ExcludeLinkingEnvironmentObjectJSONRequestBody{
+			Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScopeDEPLOYMENT,
 			ScopeEntityId: depID,
 		},
-	).Return(&astrocore.ExcludeLinkingEnvironmentObjectResponse{
+	).Return(&astrov1.ExcludeLinkingEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
 	}, nil).Once()
 
@@ -343,18 +343,18 @@ func (s *Suite) TestUnexcludeVarPreservesAutoLink() {
 	dropDep := cuid.New()
 	autoTrue := true
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
-			envVarObj(id, "v", &autoTrue, nil, []astrocore.EnvironmentObjectExcludeLink{
-				{Scope: astrocore.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: keepDep},
-				{Scope: astrocore.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: dropDep},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "v", &autoTrue, nil, []astrov1.EnvironmentObjectExcludeLink{
+				{Scope: astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: keepDep},
+				{Scope: astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: dropDep},
 			}),
 		}},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
-		mock.MatchedBy(func(b astrocore.UpdateEnvironmentObjectJSONRequestBody) bool {
+		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.AutoLinkDeployments == nil || !*b.AutoLinkDeployments {
 				return false
 			}
@@ -363,9 +363,9 @@ func (s *Suite) TestUnexcludeVarPreservesAutoLink() {
 			}
 			return (*b.ExcludeLinks)[0].ScopeEntityId == keepDep
 		}),
-	).Return(&astrocore.UpdateEnvironmentObjectResponse{
+	).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrocore.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
 	s.NoError(UnexcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, dropDep, mc))
@@ -382,27 +382,27 @@ func (s *Suite) TestListVarLinksReportsAll() {
 	autoTrue := true
 	overrideVal := "override-for-dep2"
 
-	mc := new(astrocore_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrocore.ListEnvironmentObjectsResponse{
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrocore.EnvironmentObjectsPaginated{EnvironmentObjects: []astrocore.EnvironmentObject{
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{
 				Id:                  &id,
 				ObjectKey:           "FOO",
-				ObjectType:          astrocore.EnvironmentObjectObjectType(astrocore.ENVIRONMENTVARIABLE),
-				Scope:               astrocore.EnvironmentObjectScope(astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE),
+				ObjectType:          astrov1.EnvironmentObjectObjectType(astrov1.ENVIRONMENTVARIABLE),
+				Scope:               astrov1.EnvironmentObjectScope(astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE),
 				AutoLinkDeployments: &autoTrue,
-				EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "ws-default"},
-				Links: &[]astrocore.EnvironmentObjectLink{
-					{Scope: astrocore.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: dep1},
+				EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "ws-default"},
+				Links: &[]astrov1.EnvironmentObjectLink{
+					{Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: dep1},
 					{
-						Scope:                        astrocore.EnvironmentObjectLinkScopeDEPLOYMENT,
+						Scope:                        astrov1.EnvironmentObjectLinkScopeDEPLOYMENT,
 						ScopeEntityId:                dep2,
-						EnvironmentVariableOverrides: &astrocore.EnvironmentObjectEnvironmentVariableOverrides{Value: overrideVal},
+						EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: overrideVal},
 					},
 				},
-				ExcludeLinks: &[]astrocore.EnvironmentObjectExcludeLink{
-					{Scope: astrocore.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: dep3},
+				ExcludeLinks: &[]astrov1.EnvironmentObjectExcludeLink{
+					{Scope: astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: dep3},
 				},
 			},
 		}},

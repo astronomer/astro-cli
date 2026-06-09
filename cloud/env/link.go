@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 )
@@ -47,7 +47,7 @@ type VarLink struct {
 // Calling with overrideValue=nil on an existing link is a no-op for the
 // override (the platform's PATCH preserves omitted fields). To remove an
 // existing override, unlink then re-link without --value.
-func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, coreClient astrocore.CoreClient) error {
+func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, coreClient astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, c
 }
 
 // UnlinkVar removes an explicit deployment link from a workspace env var.
-func UnlinkVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
+func UnlinkVar(idOrKey string, scope Scope, depID string, coreClient astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func UnlinkVar(idOrKey string, scope Scope, depID string, coreClient astrocore.C
 // using the platform's dedicated POST .../exclude-linking endpoint. Useful for
 // auto-linked objects to opt out specific deployments. Idempotent: re-running
 // against an already-excluded deployment is a no-op success.
-func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
+func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
 	}
@@ -102,20 +102,20 @@ func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.
 	if err != nil {
 		return err
 	}
-	body := astrocore.ExcludeLinkingEnvironmentObjectJSONRequestBody{
-		Scope:         astrocore.ExcludeLinkEnvironmentObjectRequestScopeDEPLOYMENT,
+	body := astrov1.ExcludeLinkingEnvironmentObjectJSONRequestBody{
+		Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScopeDEPLOYMENT,
 		ScopeEntityId: depID,
 	}
 	resp, err := coreClient.ExcludeLinkingEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
 	if err != nil {
 		return err
 	}
-	return astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
 // UnexcludeVar removes a deployment from a workspace env var's excludeLinks.
 // There's no dedicated endpoint for this, so it goes through PATCH.
-func UnexcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocore.CoreClient) error {
+func UnexcludeVar(idOrKey string, scope Scope, depID string, coreClient astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func UnexcludeVar(idOrKey string, scope Scope, depID string, coreClient astrocor
 // includeSecrets is forwarded to the platform; without it, the workspace
 // value and any per-link overrides for secret vars are redacted from the
 // response.
-func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*VarLinksReport, error) {
+func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, coreClient astrov1.APIClient) (*VarLinksReport, error) {
 	current, err := resolveWorkspaceVarWithSecrets(idOrKey, scope, includeSecrets, coreClient)
 	if err != nil {
 		return nil, err
@@ -172,11 +172,11 @@ func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, coreClient a
 
 // resolveWorkspaceVar fetches the workspace-scoped env var by ID or key and
 // validates that it is in fact workspace-scoped (linking is workspace-only).
-func resolveWorkspaceVar(idOrKey string, scope Scope, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func resolveWorkspaceVar(idOrKey string, scope Scope, coreClient astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	return resolveWorkspaceVarWithSecrets(idOrKey, scope, false, coreClient)
 }
 
-func resolveWorkspaceVarWithSecrets(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func resolveWorkspaceVarWithSecrets(idOrKey string, scope Scope, includeSecrets bool, coreClient astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if scope.WorkspaceID == "" {
 		return nil, errors.New("linking commands require --workspace-id; deployment-scoped objects cannot be linked")
 	}
@@ -184,7 +184,7 @@ func resolveWorkspaceVarWithSecrets(idOrKey string, scope Scope, includeSecrets 
 	if err != nil {
 		return nil, err
 	}
-	if obj.Scope != astrocore.EnvironmentObjectScope(astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE) {
+	if obj.Scope != astrov1.EnvironmentObjectScope(astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE) {
 		return nil, fmt.Errorf("environment variable %q is %s-scoped; only workspace-scoped objects can be linked", obj.ObjectKey, obj.Scope)
 	}
 	if obj.Id == nil || *obj.Id == "" {
@@ -193,7 +193,7 @@ func resolveWorkspaceVarWithSecrets(idOrKey string, scope Scope, includeSecrets 
 	return obj, nil
 }
 
-func linkExists(links *[]astrocore.EnvironmentObjectLink, depID string) bool {
+func linkExists(links *[]astrov1.EnvironmentObjectLink, depID string) bool {
 	if links == nil {
 		return false
 	}
@@ -205,7 +205,7 @@ func linkExists(links *[]astrocore.EnvironmentObjectLink, depID string) bool {
 	return false
 }
 
-func excludeExists(excludes *[]astrocore.EnvironmentObjectExcludeLink, depID string) bool {
+func excludeExists(excludes *[]astrov1.EnvironmentObjectExcludeLink, depID string) bool {
 	if excludes == nil {
 		return false
 	}
@@ -223,42 +223,42 @@ func excludeExists(excludes *[]astrocore.EnvironmentObjectExcludeLink, depID str
 // replacing the array, so sending `overrides: nil` on an existing entry is a
 // no-op for the override (it's preserved). To clear an override, the caller
 // must unlink first.
-func upsertLinkInUpdateList(current *[]astrocore.EnvironmentObjectLink, depID string, overrideValue *string) []astrocore.UpdateEnvironmentObjectLinkRequest {
-	var newOverride *astrocore.UpdateEnvironmentObjectOverridesRequest
+func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID string, overrideValue *string) []astrov1.UpdateEnvironmentObjectLinkRequest {
+	var newOverride *astrov1.UpdateEnvironmentObjectOverridesRequest
 	if overrideValue != nil {
-		newOverride = &astrocore.UpdateEnvironmentObjectOverridesRequest{
-			EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: overrideValue},
+		newOverride = &astrov1.UpdateEnvironmentObjectOverridesRequest{
+			EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: overrideValue},
 		}
 	}
-	out := []astrocore.UpdateEnvironmentObjectLinkRequest{}
+	out := []astrov1.UpdateEnvironmentObjectLinkRequest{}
 	found := false
 	if current != nil {
 		for _, l := range *current {
 			if l.ScopeEntityId == depID {
 				found = true
-				out = append(out, astrocore.UpdateEnvironmentObjectLinkRequest{
-					Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
+				out = append(out, astrov1.UpdateEnvironmentObjectLinkRequest{
+					Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
 					ScopeEntityId: l.ScopeEntityId,
 					Overrides:     newOverride,
 				})
 				continue
 			}
-			req := astrocore.UpdateEnvironmentObjectLinkRequest{
-				Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
+			req := astrov1.UpdateEnvironmentObjectLinkRequest{
+				Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
 				ScopeEntityId: l.ScopeEntityId,
 			}
 			if l.EnvironmentVariableOverrides != nil {
 				v := l.EnvironmentVariableOverrides.Value
-				req.Overrides = &astrocore.UpdateEnvironmentObjectOverridesRequest{
-					EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: &v},
+				req.Overrides = &astrov1.UpdateEnvironmentObjectOverridesRequest{
+					EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: &v},
 				}
 			}
 			out = append(out, req)
 		}
 	}
 	if !found {
-		out = append(out, astrocore.UpdateEnvironmentObjectLinkRequest{
-			Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT,
+		out = append(out, astrov1.UpdateEnvironmentObjectLinkRequest{
+			Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT,
 			ScopeEntityId: depID,
 			Overrides:     newOverride,
 		})
@@ -268,20 +268,20 @@ func upsertLinkInUpdateList(current *[]astrocore.EnvironmentObjectLink, depID st
 
 // buildUpdateLinks converts the GET-shape Links into the PATCH-shape, copying
 // any existing overrides so a partial update doesn't drop them.
-func buildUpdateLinks(current *[]astrocore.EnvironmentObjectLink) []astrocore.UpdateEnvironmentObjectLinkRequest {
+func buildUpdateLinks(current *[]astrov1.EnvironmentObjectLink) []astrov1.UpdateEnvironmentObjectLinkRequest {
 	if current == nil {
 		return nil
 	}
-	out := make([]astrocore.UpdateEnvironmentObjectLinkRequest, 0, len(*current))
+	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(*current))
 	for _, l := range *current {
-		req := astrocore.UpdateEnvironmentObjectLinkRequest{
-			Scope:         astrocore.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
+		req := astrov1.UpdateEnvironmentObjectLinkRequest{
+			Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
 			ScopeEntityId: l.ScopeEntityId,
 		}
 		if l.EnvironmentVariableOverrides != nil {
 			v := l.EnvironmentVariableOverrides.Value
-			req.Overrides = &astrocore.UpdateEnvironmentObjectOverridesRequest{
-				EnvironmentVariable: &astrocore.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: &v},
+			req.Overrides = &astrov1.UpdateEnvironmentObjectOverridesRequest{
+				EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: &v},
 			}
 		}
 		out = append(out, req)
@@ -289,9 +289,9 @@ func buildUpdateLinks(current *[]astrocore.EnvironmentObjectLink) []astrocore.Up
 	return out
 }
 
-func buildUpdateLinksExcluding(current *[]astrocore.EnvironmentObjectLink, depID string) []astrocore.UpdateEnvironmentObjectLinkRequest {
+func buildUpdateLinksExcluding(current *[]astrov1.EnvironmentObjectLink, depID string) []astrov1.UpdateEnvironmentObjectLinkRequest {
 	all := buildUpdateLinks(current)
-	out := make([]astrocore.UpdateEnvironmentObjectLinkRequest, 0, len(all))
+	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(all))
 	for _, l := range all {
 		if l.ScopeEntityId == depID {
 			continue
@@ -301,17 +301,17 @@ func buildUpdateLinksExcluding(current *[]astrocore.EnvironmentObjectLink, depID
 	return out
 }
 
-func buildUpdateExcludesExcluding(current *[]astrocore.EnvironmentObjectExcludeLink, depID string) []astrocore.ExcludeLinkEnvironmentObjectRequest {
+func buildUpdateExcludesExcluding(current *[]astrov1.EnvironmentObjectExcludeLink, depID string) []astrov1.ExcludeLinkEnvironmentObjectRequest {
 	if current == nil {
 		return nil
 	}
-	out := make([]astrocore.ExcludeLinkEnvironmentObjectRequest, 0, len(*current))
+	out := make([]astrov1.ExcludeLinkEnvironmentObjectRequest, 0, len(*current))
 	for _, e := range *current {
 		if e.ScopeEntityId == depID {
 			continue
 		}
-		out = append(out, astrocore.ExcludeLinkEnvironmentObjectRequest{
-			Scope:         astrocore.ExcludeLinkEnvironmentObjectRequestScope(e.Scope),
+		out = append(out, astrov1.ExcludeLinkEnvironmentObjectRequest{
+			Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScope(e.Scope),
 			ScopeEntityId: e.ScopeEntityId,
 		})
 	}
@@ -323,16 +323,16 @@ func buildUpdateExcludesExcluding(current *[]astrocore.EnvironmentObjectExcludeL
 // omitted autoLinkDeployments is silently cleared.
 func patchVarLinks(
 	id string,
-	current *astrocore.EnvironmentObject,
-	links *[]astrocore.UpdateEnvironmentObjectLinkRequest,
-	excludes *[]astrocore.ExcludeLinkEnvironmentObjectRequest,
-	coreClient astrocore.CoreClient,
+	current *astrov1.EnvironmentObject,
+	links *[]astrov1.UpdateEnvironmentObjectLinkRequest,
+	excludes *[]astrov1.ExcludeLinkEnvironmentObjectRequest,
+	coreClient astrov1.APIClient,
 ) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	body := astrocore.UpdateEnvironmentObjectJSONRequestBody{
+	body := astrov1.UpdateEnvironmentObjectJSONRequestBody{
 		AutoLinkDeployments: current.AutoLinkDeployments,
 	}
 	// The platform requires the typed body field even when only mutating
@@ -340,7 +340,7 @@ func patchVarLinks(
 	// type-discriminator check without changing the workspace value.
 	if current.EnvironmentVariable != nil {
 		v := current.EnvironmentVariable.Value
-		body.EnvironmentVariable = &astrocore.UpdateEnvironmentObjectEnvironmentVariableRequest{
+		body.EnvironmentVariable = &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{
 			Value: &v,
 		}
 	}
@@ -362,17 +362,17 @@ func patchVarLinks(
 	if err != nil {
 		return err
 	}
-	return astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
-func buildExistingExcludes(current *[]astrocore.EnvironmentObjectExcludeLink) []astrocore.ExcludeLinkEnvironmentObjectRequest {
+func buildExistingExcludes(current *[]astrov1.EnvironmentObjectExcludeLink) []astrov1.ExcludeLinkEnvironmentObjectRequest {
 	if current == nil {
 		return nil
 	}
-	out := make([]astrocore.ExcludeLinkEnvironmentObjectRequest, 0, len(*current))
+	out := make([]astrov1.ExcludeLinkEnvironmentObjectRequest, 0, len(*current))
 	for _, e := range *current {
-		out = append(out, astrocore.ExcludeLinkEnvironmentObjectRequest{
-			Scope:         astrocore.ExcludeLinkEnvironmentObjectRequestScope(e.Scope),
+		out = append(out, astrov1.ExcludeLinkEnvironmentObjectRequest{
+			Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScope(e.Scope),
 			ScopeEntityId: e.ScopeEntityId,
 		})
 	}
