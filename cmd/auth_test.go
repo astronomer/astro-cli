@@ -7,8 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -26,7 +25,7 @@ func (s *CmdSuite) TestLogin() {
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain, token string, coreClient astrocore.CoreClient, platformCoreClient astroplatformcore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		s.Equal(cloudDomain, domain)
 		return nil
 	}
@@ -37,27 +36,27 @@ func (s *CmdSuite) TestLogin() {
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{cloudDomain}, nil, buf)
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
-	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{softwareDomain}, nil, buf)
 
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, buf)
 
 	// no domain, software login
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, buf)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	login(&cobra.Command{}, []string{}, nil, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	softwareDomain = "software.astronomer.io"
-	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
+	login(&cobra.Command{}, []string{softwareDomain}, nil, buf)
 	s.Contains(buf.String(), "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 }
 

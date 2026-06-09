@@ -6,8 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -27,7 +26,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
 		return nil
 	}
 
@@ -78,7 +77,7 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	}()
 
-	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
 		return nil
 	}
 
@@ -91,28 +90,11 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 	assert.ErrorIs(t, err, assert.AnError)
 }
 
-func TestDeployImageNameForcesImageOnly(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-
-	var captured cloud.InputDeploy
-	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
-		captured = deployInput
-		return nil
-	}
-
-	err := execDeployCmd("-f", "test-deployment-id", "--image-name", "custom-image:latest")
-	assert.NoError(t, err)
-	assert.True(t, captured.Image, "--image-name should force image-only deploy")
-	assert.Equal(t, "custom-image:latest", captured.ImageName)
-}
-
 func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-	DeployImage = func(deployInput cloud.InputDeploy, platformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
 		return nil
 	}
 

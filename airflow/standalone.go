@@ -4,7 +4,6 @@ package airflow
 
 import (
 	"bufio"
-	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -25,8 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -74,79 +72,13 @@ var (
 // parseRuntimeTagPython delegates to airflowrt.ParseRuntimeTagPython.
 var parseRuntimeTagPython = airflowrt.ParseRuntimeTagPython
 
-// writeDarwinForkSafetyPatch installs a .pth file into the venv's
-// site-packages that neutralizes macOS fork-safety hazards at Python
-// startup.  After os.fork() on macOS the Objective-C, CoreFoundation,
-// and Network framework runtimes are in a corrupt state, causing forked
-// children to spin at 100 % CPU on getaddrinfo, setproctitle, or any
-// call that touches os_log / libdispatch.
-//
-// The patch does two things (only on macOS):
-//
-//  1. Removes os.fork from the Python namespace so that Airflow's
-//     CAN_FORK = hasattr(os, "fork") evaluates to False.  This forces
-//     standard_task_runner to use subprocess (_start_by_exec) instead of
-//     the unsafe fork path (_start_by_fork).  subprocess.Popen uses
-//     C-level fork+exec via _posixsubprocess, not os.fork, so it is
-//     unaffected.
-//
-//  2. Replaces setproctitle.setproctitle with a no-op to prevent the
-//     CoreFoundation CFBundleGetFunctionPointerForName spin in any
-//     process that was still forked by other means.
-//
-// We use a .pth file (processed by Python's site module at startup)
-// rather than sitecustomize.py because the venv's lib/pythonX.Y/
-// directory is not on sys.path, whereas site-packages is.
-func writeDarwinForkSafetyPatch(venvPath string) error {
-	libDir := filepath.Join(venvPath, "lib")
-	entries, err := os.ReadDir(libDir)
-	if err != nil {
-		return err
-	}
-
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), "python") {
-			continue
-		}
-
-		sitePackages := filepath.Join(libDir, e.Name(), "site-packages")
-
-		// Skip if already patched. We treat the .pth file as the sentinel —
-		// both files are always written together, so its presence implies
-		// _fix_setproctitle.py is also in place.
-		if _, err := os.Stat(filepath.Join(sitePackages, "_fix_setproctitle.pth")); err == nil {
-			continue
-		}
-
-		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.py"), darwinForkSafetyPy, filePermissions); err != nil {
-			return err
-		}
-		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.pth"), darwinForkSafetyPth, filePermissions); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// af2DarwinShim is the macOS shim that replaces `airflow standalone` for AF2,
-// avoiding gunicorn's fork which crashes on macOS.
-//
-//go:embed standalone_scripts/af2_darwin_shim.py
-var af2DarwinShim []byte
-
-// af2PickleFixPlugin fixes QueuedLocalWorker pickling under macOS spawn-mode multiprocessing.
-//
-//go:embed standalone_scripts/af2_pickle_fix_plugin.py
-var af2PickleFixPlugin []byte
-
-// darwinForkSafetyPy / darwinForkSafetyPth are installed into the venv's
-// site-packages to neutralize macOS fork-safety hazards at Python startup.
-//
-//go:embed standalone_scripts/fix_setproctitle.py
-var darwinForkSafetyPy []byte
-
-//go:embed standalone_scripts/fix_setproctitle.pth
-var darwinForkSafetyPth []byte
+// af2DarwinShim, af2PickleFixPlugin, and writeDarwinForkSafetyPatch are
+// provided by the airflowrt package so they can be shared with astro-desktop.
+var (
+	af2DarwinShim              = airflowrt.AF2DarwinShim
+	af2PickleFixPlugin         = airflowrt.AF2PickleFixPlugin
+	writeDarwinForkSafetyPatch = airflowrt.WriteDarwinForkSafetyPatch
+)
 
 // af2RuntimePythonDefaults maps AF2 runtime major versions to their default
 // Python version.  The runtime versions JSON does not populate
@@ -522,7 +454,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 }
 
 // startForeground runs the airflow process in the foreground, streaming output to the terminal.
-func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("error creating stdout pipe: %w", err)
@@ -624,7 +556,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 // startBackground runs the airflow process in the background, writes a PID file,
 // runs the health check, and returns.
-func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	logPath := s.logFilePath()
 	logFile, err := os.Create(logPath)
 	if err != nil {
@@ -686,15 +618,12 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	return nil
 }
 
-// registerProxyRoute ensures the proxy daemon is running and registers a route
-// for this standalone instance. Returns the proxy URL on success, or "" if the
-// proxy is disabled or registration failed.
+// registerProxyRoute registers a route for this standalone instance so that
+// other tools can discover it via routes.json, then starts the proxy daemon.
+// Returns the proxy URL on success, or "" if the proxy is disabled or
+// registration failed.
 func (s *Standalone) registerProxyRoute(pid int) string {
 	if !s.useProxy || s.proxyHostname == "" {
-		return ""
-	}
-	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
-		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
 		return ""
 	}
 	route := &proxy.Route{
@@ -705,6 +634,10 @@ func (s *Standalone) registerProxyRoute(pid int) string {
 	}
 	if err := proxy.AddRoute(route); err != nil {
 		fmt.Printf("Warning: could not register proxy route: %s\n", err.Error())
+		return ""
+	}
+	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
+		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
 		return ""
 	}
 	return fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)
@@ -759,13 +692,15 @@ func (s *Standalone) buildEnv() []string {
 	// Layer 2: Standalone-critical settings — these MUST take precedence over
 	// both inherited env and .env to prevent standalone mode from breaking.
 	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
-	// Add include/ to PYTHONPATH so user modules are importable — mirrors
-	// the Docker image which bakes /usr/local/airflow/include into PYTHONPATH.
-	includePath := filepath.Join(s.airflowHome, "include")
+	// Mirror the production runtime image, which sets PYTHONPATH=AIRFLOW_HOME
+	// (see astro-runtime image/Dockerfile). This makes every subdirectory of
+	// the project root importable as a namespace package — e.g.
+	// `from include.utils import x` or `from dags.my_blueprints import Extract`
+	// — matching what users get at deploy time.
 	if existing := os.Getenv("PYTHONPATH"); existing != "" {
-		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", includePath, existing)
+		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", s.airflowHome, existing)
 	} else {
-		overrides["PYTHONPATH"] = includePath
+		overrides["PYTHONPATH"] = s.airflowHome
 	}
 	overrides["AIRFLOW_HOME"] = standaloneHome
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
@@ -877,7 +812,7 @@ func (s *Standalone) standaloneAuthHeader(port string) string {
 }
 
 // applySettings imports airflow_settings.yaml using the Airflow REST API.
-func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection) error {
+func (s *Standalone) applySettings(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection) error {
 	settingsExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil || !settingsExists {
 		if len(envConns) == 0 {
@@ -1293,7 +1228,7 @@ func (s *Standalone) Parse(_, _, _ string) error {
 	return nil
 }
 
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astroplatformcore.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
 }
 

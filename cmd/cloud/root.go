@@ -6,23 +6,20 @@ import (
 	"github.com/spf13/cobra"
 
 	airflow "github.com/astronomer/astro-cli/airflow-client"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroiamcore "github.com/astronomer/astro-cli/astro-client-iam-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 )
 
 var (
-	astroCoreClient    astrocore.CoreClient
-	astroCoreIamClient astroiamcore.CoreClient
-	platformCoreClient astroplatformcore.CoreClient
-	airflowAPIClient   airflow.Client
+	astroV1Client       astrov1.APIClient
+	astroV1Alpha1Client astrov1alpha1.APIClient
+	airflowAPIClient    airflow.Client
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
-func AddCmds(astroPlatformCoreClient astroplatformcore.CoreClient, coreClient astrocore.CoreClient, airflowClient airflow.Client, iamCoreClient astroiamcore.CoreClient, out io.Writer) []*cobra.Command {
-	astroCoreClient = coreClient
-	platformCoreClient = astroPlatformCoreClient
-	astroCoreIamClient = iamCoreClient
+func AddCmds(v1Client astrov1.APIClient, airflowClient airflow.Client, v1Alpha1Client astrov1alpha1.APIClient, out io.Writer) []*cobra.Command {
+	astroV1Client = v1Client
+	astroV1Alpha1Client = v1Alpha1Client
 	airflowAPIClient = airflowClient
 	return []*cobra.Command{
 		NewDeployCmd(),

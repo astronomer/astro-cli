@@ -11,10 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -22,36 +20,54 @@ import (
 
 type DbtSuite struct {
 	suite.Suite
-	mockPlatformCoreClient *astroplatformcore_mocks.ClientWithResponsesInterface
-	mockCoreClient         *astrocore_mocks.ClientWithResponsesInterface
-	origPlatformCoreClient astroplatformcore.CoreClient
-	origCoreClient         astrocore.CoreClient
-	origDeployBundle       func(deployInput *cloud.DeployBundleInput) error
-	origDeleteBundle       func(deleteInput *cloud.DeleteBundleInput) error
+	mockV1Client     *astrov1_mocks.ClientWithResponsesInterface
+	origV1Client     astrov1.APIClient
+	origDeployBundle func(deployInput *cloud.DeployBundleInput) error
+	origDeleteBundle func(deleteInput *cloud.DeleteBundleInput) error
+	origWorkingPath  string
+	origWd           string
+	tmpWorkingDir    string
 }
 
 func (s *DbtSuite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
+	// Run each test from an isolated temp directory that is not within an Astro
+	// project. dbt deploy/delete default the project path to config.WorkingPath
+	// and reject paths nested under an Astro project (detected by walking up the
+	// real filesystem for a .astro/config.yaml). Relying on the package's own
+	// directory makes the suite fail whenever an ancestor of the repo happens to
+	// be an Astro project, so we point WorkingPath/cwd at a clean temp dir.
+	tmpDir, err := os.MkdirTemp("", "dbt-test")
+	s.Require().NoError(err)
+	s.tmpWorkingDir = tmpDir
+	s.origWd, err = os.Getwd()
+	s.Require().NoError(err)
+	s.Require().NoError(os.Chdir(tmpDir))
+	s.origWorkingPath = config.WorkingPath
+	config.WorkingPath = tmpDir
+
 	// the package depends on global variables so we need to manage overriding those
-	s.origPlatformCoreClient = platformCoreClient
-	s.origCoreClient = astroCoreClient
+	s.origV1Client = astroV1Client
 	s.origDeployBundle = DeployBundle
 	s.origDeleteBundle = DeleteBundle
-	s.mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	s.mockCoreClient = new(astrocore_mocks.ClientWithResponsesInterface)
-	platformCoreClient = s.mockPlatformCoreClient
-	astroCoreClient = s.mockCoreClient
+	s.mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = s.mockV1Client
 }
 
 func (s *DbtSuite) TearDownTest() {
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
-	s.mockCoreClient.AssertExpectations(s.T())
-
-	platformCoreClient = s.origPlatformCoreClient
-	astroCoreClient = s.origCoreClient
+	s.mockV1Client.AssertExpectations(s.T())
+	astroV1Client = s.origV1Client
 	DeployBundle = s.origDeployBundle
 	DeleteBundle = s.origDeleteBundle
+
+	config.WorkingPath = s.origWorkingPath
+	if s.origWd != "" {
+		_ = os.Chdir(s.origWd)
+	}
+	if s.tmpWorkingDir != "" {
+		_ = os.RemoveAll(s.tmpWorkingDir)
+	}
 }
 
 func TestDbt(t *testing.T) {
@@ -238,12 +254,12 @@ func (s *DbtSuite) createDbtProjectFile(path string) {
 }
 
 func (s *DbtSuite) mockListTestDeployments() {
-	s.mockPlatformCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.ListDeploymentsResponse{
+	s.mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: http.StatusOK,
 		},
-		JSON200: &astroplatformcore.DeploymentsPaginated{
-			Deployments: []astroplatformcore.Deployment{
+		JSON200: &astrov1.DeploymentsPaginated{
+			Deployments: []astrov1.Deployment{
 				{
 					Id: "test-deployment-id",
 				},
@@ -253,11 +269,11 @@ func (s *DbtSuite) mockListTestDeployments() {
 }
 
 func (s *DbtSuite) mockGetTestDeployment() {
-	s.mockPlatformCoreClient.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
+	s.mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: http.StatusOK,
 		},
-		JSON200: &astroplatformcore.Deployment{
+		JSON200: &astrov1.Deployment{
 			Id: "test-deployment-id",
 		},
 	}, nil)

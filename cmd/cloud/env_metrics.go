@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/env"
 )
 
@@ -147,7 +147,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	objs, err := env.ListMetricsExports(scope, envResolveLinked, envIncludeSecrets, astroCoreClient)
+	objs, err := env.ListMetricsExports(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	obj, err := env.GetMetricsExport(idOrKey, scope, envIncludeSecrets, astroCoreClient)
+	obj, err := env.GetMetricsExport(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func runEnvMetricsCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateMetricsExport(scope, envMetricsKey, in, astroCoreClient)
+	obj, err := env.CreateMetricsExport(scope, envMetricsKey, in, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func runEnvMetricsUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	obj, err := env.UpdateMetricsExport(idOrKey, scope, in, astroCoreClient)
+	obj, err := env.UpdateMetricsExport(idOrKey, scope, in, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func runEnvMetricsDelete(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if !envYes && !confirmTTY(fmt.Sprintf("Delete metrics export %q?", idOrKey)) {
 		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
 	}
-	if err := env.DeleteMetricsExport(idOrKey, scope, astroCoreClient); err != nil {
+	if err := env.DeleteMetricsExport(idOrKey, scope, astroV1Client); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
@@ -262,7 +262,7 @@ func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
 		in.SigV4StsRegion = &envMetricsSigV4StsRegion
 	}
 	switch {
-	case envMetricsAuthType == string(astrocore.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC):
+	case envMetricsAuthType == string(astrov1.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC):
 		// Read password from flag, stdin, or TTY prompt with echo off.
 		pw, err := readSecretValue(envMetricsPassword, "Password")
 		if err != nil {

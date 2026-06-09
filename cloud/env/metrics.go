@@ -4,11 +4,11 @@ import (
 	httpcontext "context"
 	"errors"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
-const objectTypeMetrics = astrocore.METRICSEXPORT
+const objectTypeMetrics = astrov1.METRICSEXPORT
 
 // MetricsInput is the user-supplied data needed to create or update a metrics export.
 // Endpoint and ExporterType are required on create. AutoLinkDeployments,
@@ -28,17 +28,17 @@ type MetricsInput struct {
 }
 
 // ListMetricsExports returns METRICS_EXPORT objects for the given scope.
-func ListMetricsExports(scope Scope, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) ([]astrocore.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeMetrics, resolveLinked, includeSecrets, coreClient)
+func ListMetricsExports(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(scope, objectTypeMetrics, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // GetMetricsExport fetches a single metrics export by ID or key.
-func GetMetricsExport(idOrKey string, scope Scope, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
-	return getObject(idOrKey, scope, objectTypeMetrics, includeSecrets, coreClient)
+func GetMetricsExport(idOrKey string, scope Scope, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	return getObject(idOrKey, scope, objectTypeMetrics, includeSecrets, astroV1Client)
 }
 
 // CreateMetricsExport creates a new METRICS_EXPORT object.
-func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func CreateMetricsExport(scope Scope, key string, in *MetricsInput, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
@@ -56,14 +56,14 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 		return nil, err
 	}
 	scopeType, scopeEntityID := scopeRequest(scope)
-	body := astrocore.CreateEnvironmentObjectJSONRequestBody{
+	body := astrov1.CreateEnvironmentObjectJSONRequestBody{
 		ObjectKey:     key,
-		ObjectType:    astrocore.CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT,
+		ObjectType:    astrov1.CreateEnvironmentObjectRequestObjectTypeMETRICSEXPORT,
 		Scope:         scopeType,
 		ScopeEntityId: scopeEntityID,
-		MetricsExport: &astrocore.CreateEnvironmentObjectMetricsExportRequest{
+		MetricsExport: &astrov1.CreateEnvironmentObjectMetricsExportRequest{
 			Endpoint:       in.Endpoint,
-			ExporterType:   astrocore.CreateEnvironmentObjectMetricsExportRequestExporterType(in.ExporterType),
+			ExporterType:   astrov1.CreateEnvironmentObjectMetricsExportRequestExporterType(in.ExporterType),
 			BasicToken:     in.BasicToken,
 			Username:       in.Username,
 			Password:       in.Password,
@@ -75,21 +75,21 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 	if in.AuthType != "" {
-		at := astrocore.CreateEnvironmentObjectMetricsExportRequestAuthType(in.AuthType)
+		at := astrov1.CreateEnvironmentObjectMetricsExportRequestAuthType(in.AuthType)
 		body.MetricsExport.AuthType = &at
 	}
 
-	resp, err := coreClient.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
+	resp, err := astroV1Client.CreateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
 	id := resp.JSON200.Id
-	metrics := &astrocore.EnvironmentObjectMetricsExport{
+	metrics := &astrov1.EnvironmentObjectMetricsExport{
 		Endpoint:       in.Endpoint,
-		ExporterType:   astrocore.EnvironmentObjectMetricsExportExporterType(in.ExporterType),
+		ExporterType:   astrov1.EnvironmentObjectMetricsExportExporterType(in.ExporterType),
 		BasicToken:     in.BasicToken,
 		Username:       in.Username,
 		Password:       in.Password,
@@ -99,14 +99,14 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 		Labels:         in.Labels,
 	}
 	if in.AuthType != "" {
-		at := astrocore.EnvironmentObjectMetricsExportAuthType(in.AuthType)
+		at := astrov1.EnvironmentObjectMetricsExportAuthType(in.AuthType)
 		metrics.AuthType = &at
 	}
-	return &astrocore.EnvironmentObject{
+	return &astrov1.EnvironmentObject{
 		Id:            &id,
 		ObjectKey:     key,
-		ObjectType:    astrocore.EnvironmentObjectObjectType(astrocore.METRICSEXPORT),
-		Scope:         astrocore.EnvironmentObjectScope(scopeType),
+		ObjectType:    astrov1.EnvironmentObjectObjectType(astrov1.METRICSEXPORT),
+		Scope:         astrov1.EnvironmentObjectScope(scopeType),
 		ScopeEntityId: scopeEntityID,
 		MetricsExport: metrics,
 	}, nil
@@ -114,11 +114,11 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, coreClient a
 
 // UpdateMetricsExport updates an existing metrics export. All MetricsInput
 // fields are treated as a partial update.
-func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
 		return nil, err
 	}
-	id, err := resolveID(idOrKey, scope, objectTypeMetrics, coreClient)
+	id, err := resolveID(idOrKey, scope, objectTypeMetrics, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, coreClie
 	if err != nil {
 		return nil, err
 	}
-	req := &astrocore.UpdateEnvironmentObjectMetricsExportRequest{
+	req := &astrov1.UpdateEnvironmentObjectMetricsExportRequest{
 		BasicToken:     in.BasicToken,
 		Username:       in.Username,
 		Password:       in.Password,
@@ -139,23 +139,23 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, coreClie
 		req.Endpoint = &in.Endpoint
 	}
 	if in.ExporterType != "" {
-		et := astrocore.UpdateEnvironmentObjectMetricsExportRequestExporterType(in.ExporterType)
+		et := astrov1.UpdateEnvironmentObjectMetricsExportRequestExporterType(in.ExporterType)
 		req.ExporterType = &et
 	}
 	if in.AuthType != "" {
-		at := astrocore.UpdateEnvironmentObjectMetricsExportRequestAuthType(in.AuthType)
+		at := astrov1.UpdateEnvironmentObjectMetricsExportRequestAuthType(in.AuthType)
 		req.AuthType = &at
 	}
-	body := astrocore.UpdateEnvironmentObjectJSONRequestBody{
+	body := astrov1.UpdateEnvironmentObjectJSONRequestBody{
 		MetricsExport:       req,
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 
-	resp, err := coreClient.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
+	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
 	if resp.JSON200 == nil {
@@ -165,6 +165,6 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, coreClie
 }
 
 // DeleteMetricsExport deletes a metrics export by ID or key.
-func DeleteMetricsExport(idOrKey string, scope Scope, coreClient astrocore.CoreClient) error {
-	return deleteObject(idOrKey, scope, objectTypeMetrics, coreClient)
+func DeleteMetricsExport(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+	return deleteObject(idOrKey, scope, objectTypeMetrics, astroV1Client)
 }

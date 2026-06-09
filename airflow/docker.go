@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -38,8 +39,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/runtimes"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -394,31 +394,30 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	spinner.StopWithCheckmark(s, "Project started")
 
-	// Register route with the proxy and start the daemon. If either step fails
-	// (e.g. proxy daemon unsupported on Windows), fall back to printing the
-	// localhost URL using the actual webserver port that compose bound.
+	// Register route with the proxy and start the daemon. The route is always
+	// persisted to routes.json so that other tools can discover this project.
+	// If the daemon fails to start (e.g. on Windows where it is not supported),
+	// we fall back to printing the localhost URL.
 	proxyActive := useProxy && proxyHostname != ""
 	if proxyActive {
-		if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
+		services := map[string]string{}
+		if portOvr != nil && portOvr.PostgresPort != "" {
+			services["postgres"] = portOvr.PostgresPort
+		}
+		route := proxy.Route{
+			Hostname:   proxyHostname,
+			Port:       portOvr.WebserverPort,
+			ProjectDir: d.airflowHome,
+			PID:        0, // Docker routes don't track PID — CLI exits after start
+			Services:   services,
+			Mode:       "docker",
+		}
+		if addErr := proxy.AddRoute(&route); addErr != nil {
+			fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
+			proxyActive = false
+		} else if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
 			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
 			proxyActive = false
-		} else {
-			services := map[string]string{}
-			if portOvr != nil && portOvr.PostgresPort != "" {
-				services["postgres"] = portOvr.PostgresPort
-			}
-			route := proxy.Route{
-				Hostname:   proxyHostname,
-				Port:       portOvr.WebserverPort,
-				ProjectDir: d.airflowHome,
-				PID:        0, // Docker routes don't track PID — CLI exits after start
-				Services:   services,
-				Mode:       "docker",
-			}
-			if addErr := proxy.AddRoute(&route); addErr != nil {
-				fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
-				proxyActive = false
-			}
 		}
 	}
 
@@ -646,11 +645,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 		return errors.New("exec ID is empty")
 	}
 
-	execStartCheck := container.ExecStartOptions{
-		Detach: execConfig.Detach,
-	}
-
-	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, execStartCheck)
+	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, container.ExecStartOptions{})
 
 	if err := docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		return err
@@ -709,7 +704,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroPlatformCore astroplatformcore.CoreClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -727,7 +722,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	}
 	// if user supplies deployment id pull down current image
 	if deploymentID != "" {
-		err := d.pullImageFromDeployment(deploymentID, astroPlatformCore)
+		err := d.pullImageFromDeployment(deploymentID, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -814,13 +809,13 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	return nil
 }
 
-func (d *DockerCompose) pullImageFromDeployment(deploymentID string, platformCoreClient astroplatformcore.CoreClient) error {
+func (d *DockerCompose) pullImageFromDeployment(deploymentID string, astroV1Client astrov1.APIClient) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 	ws := c.Workspace
-	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, platformCoreClient, nil)
+	currentDeployment, err := deployment.GetDeployment(ws, deploymentID, "", true, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -1209,7 +1204,7 @@ func iteratePkgMap(pgkVersions map[string][2]string) error { //nolint:gocognit
 		if beforeVer != "" && afterVer != "" && beforeVer != afterVer {
 			change, updateType, err := checkVersionChange(beforeVer, afterVer)
 			if err != nil {
-				if err.Error() == "Invalid Semantic Version" {
+				if stderrors.Is(err, semver.ErrInvalidSemVer) {
 					updateType = unknown
 				} else {
 					return err
@@ -1799,7 +1794,7 @@ func fetchAirflowJWTToken(baseURL string) (string, error) {
 }
 
 // printProxyStatus prints status information when the proxy is active.
-func printProxyStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
+func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
@@ -1837,7 +1832,7 @@ func printProxyStatus(settingsFile string, envConns map[string]astrocore.Environ
 	return nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, portOvr *PortOverrides) error {
+func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, portOvr *PortOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 )
 
 func (s *Suite) TestParseFormat() {
@@ -26,9 +26,9 @@ func (s *Suite) TestParseFormat() {
 }
 
 func (s *Suite) TestWriteVarDotenv() {
-	objs := []astrocore.EnvironmentObject{
-		{ObjectKey: "FOO", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
-		{ObjectKey: "SECRET_KEY", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "shh", IsSecret: true}},
+	objs := []astrov1.EnvironmentObject{
+		{ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
+		{ObjectKey: "SECRET_KEY", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "shh", IsSecret: true}},
 	}
 
 	s.Run("hides secrets by default", func() {
@@ -50,14 +50,14 @@ func (s *Suite) TestWriteVarDotenv() {
 }
 
 func (s *Suite) TestWriteVarDotenvEscapesSpecialChars() {
-	objs := []astrocore.EnvironmentObject{
-		{ObjectKey: "PLAIN", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "simple"}},
-		{ObjectKey: "WITH_SPACES", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "two words"}},
-		{ObjectKey: "WITH_NEWLINE", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "line1\nline2"}},
-		{ObjectKey: "WITH_QUOTES", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: `say "hi"`}},
-		{ObjectKey: "WITH_HASH", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "value#notacomment"}},
-		{ObjectKey: "WITH_BACKSLASH", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: `path\to\thing`}},
-		{ObjectKey: "WITH_DOLLAR", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "user $HOME"}},
+	objs := []astrov1.EnvironmentObject{
+		{ObjectKey: "PLAIN", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "simple"}},
+		{ObjectKey: "WITH_SPACES", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "two words"}},
+		{ObjectKey: "WITH_NEWLINE", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "line1\nline2"}},
+		{ObjectKey: "WITH_QUOTES", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: `say "hi"`}},
+		{ObjectKey: "WITH_HASH", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "value#notacomment"}},
+		{ObjectKey: "WITH_BACKSLASH", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: `path\to\thing`}},
+		{ObjectKey: "WITH_DOLLAR", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "user $HOME"}},
 	}
 	var buf bytes.Buffer
 	s.NoError(WriteVarList(objs, FormatDotenv, true, &buf))
@@ -100,9 +100,9 @@ func (s *Suite) TestClampTableValue() {
 
 func (s *Suite) TestWriteVarTableTruncatesLongValues() {
 	long := strings.Repeat("x", 500)
-	objs := []astrocore.EnvironmentObject{
-		{ObjectKey: "LONG", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: long}},
-		{ObjectKey: "MULTI", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "a\nb"}},
+	objs := []astrov1.EnvironmentObject{
+		{ObjectKey: "LONG", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: long}},
+		{ObjectKey: "MULTI", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "a\nb"}},
 	}
 	var buf bytes.Buffer
 	s.NoError(WriteVarList(objs, FormatTable, false, &buf))
@@ -115,8 +115,8 @@ func (s *Suite) TestWriteVarTableTruncatesLongValues() {
 
 func (s *Suite) TestWriteVarJSONNotTruncated() {
 	long := strings.Repeat("x", 500)
-	objs := []astrocore.EnvironmentObject{
-		{ObjectKey: "LONG", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: long}},
+	objs := []astrov1.EnvironmentObject{
+		{ObjectKey: "LONG", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: long}},
 	}
 	var buf bytes.Buffer
 	s.NoError(WriteVarList(objs, FormatJSON, false, &buf))
@@ -131,8 +131,8 @@ func (s *Suite) TestWriteVarTableEmpty() {
 
 func (s *Suite) TestWriteVarJSON() {
 	id := "cabc12def0123456789012345"
-	objs := []astrocore.EnvironmentObject{
-		{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrocore.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
+	objs := []astrov1.EnvironmentObject{
+		{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
 	}
 	var buf bytes.Buffer
 	s.NoError(WriteVarList(objs, FormatJSON, false, &buf))

@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -62,7 +62,7 @@ func ParseFormat(s string) (Format, error) {
 }
 
 // WriteVarList renders a list of ENVIRONMENT_VARIABLE objects in the requested format.
-func WriteVarList(envObjs []astrocore.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
 	switch format {
 	case "", FormatTable:
 		return writeVarTable(envObjs, includeSecrets, out)
@@ -77,15 +77,15 @@ func WriteVarList(envObjs []astrocore.EnvironmentObject, format Format, includeS
 }
 
 // WriteVar renders a single ENVIRONMENT_VARIABLE object.
-func WriteVar(envObj *astrocore.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+func WriteVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
 	if envObj == nil {
 		return errors.New("nil environment object")
 	}
 	switch format {
 	case "", FormatTable:
-		return writeVarTable([]astrocore.EnvironmentObject{*envObj}, includeSecrets, out)
+		return writeVarTable([]astrov1.EnvironmentObject{*envObj}, includeSecrets, out)
 	case FormatDotenv:
-		return writeVarDotenv([]astrocore.EnvironmentObject{*envObj}, includeSecrets, out)
+		return writeVarDotenv([]astrov1.EnvironmentObject{*envObj}, includeSecrets, out)
 	case FormatJSON:
 		return writeJSON(envObj, out)
 	case FormatYAML:
@@ -95,7 +95,7 @@ func WriteVar(envObj *astrocore.EnvironmentObject, format Format, includeSecrets
 }
 
 // WriteConnList renders a list of CONNECTION objects.
-func WriteConnList(envObjs []astrocore.EnvironmentObject, format Format, out io.Writer) error {
+func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	switch format {
 	case "", FormatTable:
 		return writeConnTable(envObjs, out)
@@ -110,7 +110,7 @@ func WriteConnList(envObjs []astrocore.EnvironmentObject, format Format, out io.
 }
 
 // WriteConn renders a single CONNECTION object.
-func WriteConn(envObj *astrocore.EnvironmentObject, format Format, out io.Writer) error {
+func WriteConn(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	if envObj == nil {
 		return errors.New("nil environment object")
 	}
@@ -120,12 +120,12 @@ func WriteConn(envObj *astrocore.EnvironmentObject, format Format, out io.Writer
 	if format == FormatYAML {
 		return writeYAML(envObj, out)
 	}
-	return writeConnTable([]astrocore.EnvironmentObject{*envObj}, out)
+	return writeConnTable([]astrov1.EnvironmentObject{*envObj}, out)
 }
 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
-func WriteAirflowVarList(envObjs []astrocore.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
 	switch format {
 	case "", FormatTable:
 		return writeAirflowVarTable(envObjs, includeSecrets, out)
@@ -140,7 +140,7 @@ func WriteAirflowVarList(envObjs []astrocore.EnvironmentObject, format Format, i
 }
 
 // WriteAirflowVar renders a single AIRFLOW_VARIABLE object.
-func WriteAirflowVar(envObj *astrocore.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+func WriteAirflowVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
 	if envObj == nil {
 		return errors.New("nil environment object")
 	}
@@ -150,11 +150,11 @@ func WriteAirflowVar(envObj *astrocore.EnvironmentObject, format Format, include
 	if format == FormatYAML {
 		return writeYAML(envObj, out)
 	}
-	return writeAirflowVarTable([]astrocore.EnvironmentObject{*envObj}, includeSecrets, out)
+	return writeAirflowVarTable([]astrov1.EnvironmentObject{*envObj}, includeSecrets, out)
 }
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
-func WriteMetricsExportList(envObjs []astrocore.EnvironmentObject, format Format, out io.Writer) error {
+func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	switch format {
 	case "", FormatTable:
 		return writeMetricsExportTable(envObjs, out)
@@ -169,7 +169,7 @@ func WriteMetricsExportList(envObjs []astrocore.EnvironmentObject, format Format
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
-func WriteMetricsExport(envObj *astrocore.EnvironmentObject, format Format, out io.Writer) error {
+func WriteMetricsExport(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	if envObj == nil {
 		return errors.New("nil environment object")
 	}
@@ -179,10 +179,10 @@ func WriteMetricsExport(envObj *astrocore.EnvironmentObject, format Format, out 
 	if format == FormatYAML {
 		return writeYAML(envObj, out)
 	}
-	return writeMetricsExportTable([]astrocore.EnvironmentObject{*envObj}, out)
+	return writeMetricsExportTable([]astrov1.EnvironmentObject{*envObj}, out)
 }
 
-func writeVarTable(envObjs []astrocore.EnvironmentObject, includeSecrets bool, out io.Writer) error {
+func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
 	if len(envObjs) == 0 {
 		fmt.Fprintln(out, "No environment variables found")
 		return nil
@@ -232,7 +232,7 @@ func writeVarTable(envObjs []astrocore.EnvironmentObject, includeSecrets bool, o
 	return nil
 }
 
-func writeVarDotenv(envObjs []astrocore.EnvironmentObject, includeSecrets bool, out io.Writer) error {
+func writeVarDotenv(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
 	for i := range envObjs {
 		o := &envObjs[i]
 		if o.EnvironmentVariable == nil {
@@ -276,7 +276,7 @@ func dotenvQuote(v string) string {
 	return `"` + dotenvEscaper.Replace(v) + `"`
 }
 
-func writeConnTable(envObjs []astrocore.EnvironmentObject, out io.Writer) error {
+func writeConnTable(envObjs []astrov1.EnvironmentObject, out io.Writer) error {
 	if len(envObjs) == 0 {
 		fmt.Fprintln(out, "No connections found")
 		return nil
@@ -309,7 +309,7 @@ func writeConnTable(envObjs []astrocore.EnvironmentObject, out io.Writer) error 
 	return nil
 }
 
-func writeAirflowVarTable(envObjs []astrocore.EnvironmentObject, includeSecrets bool, out io.Writer) error {
+func writeAirflowVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
 	if len(envObjs) == 0 {
 		fmt.Fprintln(out, "No Airflow variables found")
 		return nil
@@ -343,7 +343,7 @@ func writeAirflowVarTable(envObjs []astrocore.EnvironmentObject, includeSecrets 
 	return nil
 }
 
-func writeMetricsExportTable(envObjs []astrocore.EnvironmentObject, out io.Writer) error {
+func writeMetricsExportTable(envObjs []astrov1.EnvironmentObject, out io.Writer) error {
 	if len(envObjs) == 0 {
 		fmt.Fprintln(out, "No metrics exports found")
 		return nil
@@ -374,7 +374,7 @@ func writeMetricsExportTable(envObjs []astrocore.EnvironmentObject, out io.Write
 	return nil
 }
 
-func anyHasID(envObjs []astrocore.EnvironmentObject) bool {
+func anyHasID(envObjs []astrov1.EnvironmentObject) bool {
 	for i := range envObjs {
 		if envObjs[i].Id != nil && *envObjs[i].Id != "" {
 			return true

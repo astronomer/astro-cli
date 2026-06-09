@@ -30,6 +30,10 @@ const envVarExamples = `
   astro env variable create --workspace-id <ws-id> --key API_TOKEN --value $TOKEN --secret
   astro env variable update --workspace-id <ws-id> DBT_PROFILES_DIR --value /etc/profiles
   astro env variable delete --workspace-id <ws-id> DBT_PROFILES_DIR --yes
+
+  # bulk import from a dotenv file (round-trips with 'astro env variable export')
+  astro env variable create --workspace-id <ws-id> --from-file .env
+  astro env variable update --workspace-id <ws-id> --from-file .env
 `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
@@ -100,34 +104,48 @@ func newEnvVarCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create an environment variable",
+		Short:   "Create one or more environment variables",
+		Long:    "Create a single variable via --key/--value, or bulk-create from a dotenv file via --from-file. --secret and --auto-link apply uniformly to every entry in the file.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&envVarKey, "key", "k", "", "Variable key (required)")
+	cmd.Flags().StringVarP(&envVarKey, "key", "k", "", "Variable key (required unless --from-file is used)")
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "Variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark this variable as secret")
+	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Bulk-create variables from a dotenv file (KEY=VALUE per line; supports quoted and multi-line values). Pass '-' to read from stdin. Mutually exclusive with --key/--value.")
 	addAutoLinkFlag(cmd)
-	_ = cmd.MarkFlagRequired("key")
+	cmd.MarkFlagsMutuallyExclusive("key", "from-file")
+	cmd.MarkFlagsMutuallyExclusive("value", "from-file")
 	return cmd
 }
 
 func newEnvVarUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update <id-or-key>",
+		Use:     "update [<id-or-key>]",
 		Aliases: []string{"up"},
 		Short:   "Set a variable's value (creates it if missing; use --strict to require existing)",
-		Long:    "Set the value of an environment variable. By default this upserts: if the key does not exist it is created. Pass --strict to fail when the key is missing. The platform API does not allow toggling the secret flag on an existing variable; delete and recreate to change it.",
-		Args:    cobra.ExactArgs(1),
+		Long:    "Set the value of an environment variable. By default this upserts: if the key does not exist it is created. Pass --strict to fail when the key is missing. Use --from-file to bulk-upsert from a dotenv file. The platform API does not allow toggling the secret flag on an existing variable; delete and recreate to change it.",
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if envVarFromFile != "" {
+				if len(args) > 0 {
+					return errors.New("cannot pass an <id-or-key> together with --from-file; --from-file upserts every entry in the file")
+				}
+				return runEnvVarUpdateFromFile(cmd, out)
+			}
+			if len(args) == 0 {
+				return errors.New("update requires <id-or-key> or --from-file")
+			}
 			return runEnvVarUpdate(cmd, out, args[0])
 		},
 	}
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "New variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "If the variable does not exist (upsert path), mark it as secret on create. Has no effect when updating an existing variable; the platform API does not allow toggling the secret flag.")
 	cmd.Flags().BoolVar(&envVarStrict, "strict", false, "Fail if the variable does not exist (default: upsert)")
+	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Bulk-upsert variables from a dotenv file. Pass '-' to read from stdin. Mutually exclusive with --value and the positional <id-or-key>.")
 	addAutoLinkFlag(cmd)
+	cmd.MarkFlagsMutuallyExclusive("value", "from-file")
 	return cmd
 }
 
@@ -159,7 +177,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format)
 	}
 	cmd.SilenceUsage = true
 
-	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroCoreClient)
+	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -185,7 +203,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroCoreClient)
+	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -199,11 +217,18 @@ func runEnvVarCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
+	if envVarFromFile != "" {
+		return runFromFileCreate(out, scope, autoLinkPtr(cmd), envVarSecret, envVarFromFile, env.CreateVar)
+	}
+	if envVarKey == "" {
+		return errors.New("--key is required (or use --from-file)")
+	}
+
 	value, err := readSecretValue(envVarValue, fmt.Sprintf("Value for %s", envVarKey))
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroCoreClient)
+	obj, err := env.CreateVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -213,6 +238,15 @@ func runEnvVarCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	fmt.Fprintf(out, "Created %s (id: %s)\n", obj.ObjectKey, id)
 	return nil
+}
+
+func runEnvVarUpdateFromFile(cmd *cobra.Command, out io.Writer) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+	return runFromFileUpdate(out, scope, autoLinkPtr(cmd), envVarSecret, envVarStrict, envVarFromFile, env.CreateVar, env.UpdateVar)
 }
 
 func runEnvVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -227,11 +261,11 @@ func runEnvVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	autoLink := autoLinkPtr(cmd)
-	obj, err := env.UpdateVar(idOrKey, scope, value, autoLink, astroCoreClient)
+	obj, err := env.UpdateVar(idOrKey, scope, value, autoLink, astroV1Client)
 	if err != nil {
 		// Upsert: if not found and not strict, fall through to create.
 		if errors.Is(err, env.ErrNotFound) && !envVarStrict {
-			obj, err = env.CreateVar(scope, idOrKey, value, envVarSecret, autoLink, astroCoreClient)
+			obj, err = env.CreateVar(scope, idOrKey, value, envVarSecret, autoLink, astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -254,7 +288,7 @@ func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if !envYes && !confirmTTY(fmt.Sprintf("Delete environment variable %q?", idOrKey)) {
 		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
 	}
-	if err := env.DeleteVar(idOrKey, scope, astroCoreClient); err != nil {
+	if err := env.DeleteVar(idOrKey, scope, astroV1Client); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)

@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/suite"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -17,7 +17,7 @@ type Suite struct {
 	suite.Suite
 	origCmdExec              func(cmd string, stdout, stderr io.Writer, args ...string) error
 	origGetDockerClient      func() (client.APIClient, error)
-	origInitSettings         func(airflowURL, authHeader, settingsFile string, envConns map[string]astrocore.EnvironmentObjectConnection, connections, variables, pools bool) error
+	origInitSettings         func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error
 	origCheckWebserverHealth func(url string, timeout time.Duration, component string) error
 	origCheckPortAvailable   func(port string) error
 	origResolveFloatingTag   func(tag string) (string, error)

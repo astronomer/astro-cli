@@ -66,10 +66,11 @@ var (
 	envYes            bool
 
 	// var / airflow-var create + update inputs
-	envVarKey    string
-	envVarValue  string
-	envVarSecret bool
-	envVarStrict bool
+	envVarKey      string
+	envVarValue    string
+	envVarSecret   bool
+	envVarStrict   bool
+	envVarFromFile string
 
 	// shared auto-link toggle for create + update across all four types
 	envAutoLink bool
