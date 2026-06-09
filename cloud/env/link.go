@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/organization"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // validateDeploymentID rejects empty or obviously-malformed deployment IDs at
@@ -17,7 +17,7 @@ func validateDeploymentID(depID string) error {
 	if depID == "" {
 		return errors.New("--deployment-id cannot be empty")
 	}
-	if !organization.IsCUID(depID) {
+	if !util.IsCUID(depID) {
 		return fmt.Errorf("%q is not a valid deployment ID (expected a CUID)", depID)
 	}
 	return nil

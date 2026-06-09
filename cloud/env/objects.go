@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/organization"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (
@@ -104,7 +104,7 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 	if err != nil {
 		return nil, err
 	}
-	if organization.IsCUID(idOrKey) {
+	if util.IsCUID(idOrKey) {
 		resp, err := astroV1Client.GetEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, idOrKey)
 		if err != nil {
 			return nil, err
@@ -158,7 +158,7 @@ func deleteObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmen
 // otherwise looks up the ID by key. Used by Update / Delete paths so callers
 // passing an ID don't pay for a redundant GET.
 func resolveID(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) (string, error) {
-	if organization.IsCUID(idOrKey) {
+	if util.IsCUID(idOrKey) {
 		return idOrKey, nil
 	}
 	existing, err := getObject(idOrKey, scope, objectType, false, astroV1Client)
