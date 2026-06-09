@@ -34,6 +34,10 @@ const envVarExamples = `
   # bulk import from a dotenv file (round-trips with 'astro env variable export')
   astro env variable create --workspace-id <ws-id> --from-file .env
   astro env variable update --workspace-id <ws-id> --from-file .env
+
+  # manage per-deployment links (see 'astro env variable link --help')
+  astro env variable link create --variable-key DBT_PROFILES_DIR --workspace-id <ws-id> --deployment-id <dep-id> --value /etc/profiles
+  astro env variable link list --variable-key DBT_PROFILES_DIR --workspace-id <ws-id>
 `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
@@ -53,9 +57,7 @@ func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 		newEnvVarUpdateCmd(out),
 		newEnvVarDeleteCmd(out),
 		newEnvVarExportCmd(out),
-		newEnvVarLinkCmd(out),
-		newEnvVarUnlinkCmd(out),
-		newEnvVarLinksCmd(out),
+		newEnvVarLinkRootCmd(out),
 	)
 	return cmd
 }

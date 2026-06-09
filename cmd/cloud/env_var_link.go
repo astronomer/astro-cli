@@ -15,25 +15,79 @@ import (
 )
 
 var (
+	envLinkVariableID   string
+	envLinkVariableKey  string
 	envLinkDeploymentID string
 	envLinkValue        string
 	envLinkExclude      bool
 )
 
-func newEnvVarLinkCmd(out io.Writer) *cobra.Command {
+const envVarLinkExamples = `
+  # link a workspace variable to a deployment
+  astro env variable link create --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id>
+
+  # link with a per-deployment override value
+  astro env variable link create --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id> --value postgres://prod
+
+  # exclude a deployment from an auto-linked variable
+  astro env variable link create --variable-key LOG_LEVEL --workspace-id <ws-id> --deployment-id <dep-id> --exclude
+
+  # remove a link (or an exclude, with --exclude)
+  astro env variable link delete --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id>
+
+  # show every deployment a variable is linked to or excluded from
+  astro env variable link list --variable-key DATABASE_URL --workspace-id <ws-id>
+`
+
+func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "link <id-or-key>",
-		Short: "Link a workspace variable to a deployment, optionally with an override",
+		Use:     "link",
+		Aliases: []string{"links"},
+		Short:   "Manage deployment links for workspace variables",
+		Long:    "Create, delete, or list the explicit per-deployment links (and auto-link excludes) of a workspace-scoped environment variable. Identify the variable with --variable-id or --variable-key.",
+		Example: envVarLinkExamples,
+	}
+	cmd.AddCommand(
+		newEnvVarLinkCreateCmd(out),
+		newEnvVarLinkDeleteCmd(out),
+		newEnvVarLinkListCmd(out),
+	)
+	return cmd
+}
+
+// addLinkVariableFlags wires the parent-variable identifier flags onto a link
+// subcommand: exactly one of --variable-id / --variable-key is required.
+func addLinkVariableFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&envLinkVariableID, "variable-id", "", "ID of the workspace variable")
+	cmd.Flags().StringVar(&envLinkVariableKey, "variable-key", "", "Key of the workspace variable")
+	cmd.MarkFlagsMutuallyExclusive("variable-id", "variable-key")
+	cmd.MarkFlagsOneRequired("variable-id", "variable-key")
+}
+
+// linkVariableIDOrKey returns whichever variable identifier flag was set; the
+// env package resolves IDs and keys uniformly.
+func linkVariableIDOrKey() string {
+	if envLinkVariableID != "" {
+		return envLinkVariableID
+	}
+	return envLinkVariableKey
+}
+
+func newEnvVarLinkCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Link a workspace variable to a deployment, optionally with an override",
 		Long: `Attach a workspace-scoped environment variable to a specific deployment.
 If --value is provided, that value overrides the workspace default for the linked deployment only.
 Pass --exclude to add the deployment to the excludeLinks list instead (used with --auto-link to opt specific deployments out).
 
-Upsert semantics: if not already linked, the link is created; if already linked, the override is replaced when --value is passed. Re-running without --value is a no-op for an existing link's override (platform PATCH preserves omitted fields). To remove an existing override, unlink then re-link without --value.`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvVarLink(cmd, out, args[0])
+Upsert semantics: if not already linked, the link is created; if already linked, the override is replaced when --value is passed. Re-running without --value is a no-op for an existing link's override (platform PATCH preserves omitted fields). To remove an existing override, delete the link then re-create it without --value.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runEnvVarLinkCreate(cmd, out)
 		},
 	}
+	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to link (required)")
 	cmd.Flags().StringVar(&envLinkValue, "value", "", "Override value to use for the linked deployment (only the linked deployment sees this value)")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Add to excludeLinks instead of links (auto-link only)")
@@ -42,41 +96,44 @@ Upsert semantics: if not already linked, the link is created; if already linked,
 	return cmd
 }
 
-func newEnvVarUnlinkCmd(out io.Writer) *cobra.Command {
+func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "unlink <id-or-key>",
-		Short: "Remove an explicit link or exclude between a workspace variable and a deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvVarUnlink(cmd, out, args[0])
+		Use:     "delete",
+		Aliases: []string{"rm"},
+		Short:   "Remove an explicit link or exclude between a workspace variable and a deployment",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runEnvVarLinkDelete(cmd, out)
 		},
 	}
+	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Remove from excludeLinks instead of links")
 	_ = cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
 
-func newEnvVarLinksCmd(out io.Writer) *cobra.Command {
+func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "links <id-or-key>",
-		Short: "Show every deployment a workspace variable is linked to or excluded from",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvVarLinks(cmd, out, args[0])
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "Show every deployment a workspace variable is linked to or excluded from",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runEnvVarLinkList(cmd, out)
 		},
 	}
+	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
 	return cmd
 }
 
-func runEnvVarLink(cmd *cobra.Command, out io.Writer, idOrKey string) error {
+func runEnvVarLinkCreate(cmd *cobra.Command, out io.Writer) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
 	}
 	cmd.SilenceUsage = true
 
+	idOrKey := linkVariableIDOrKey()
 	if envLinkExclude {
 		if err := env.ExcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
 			return err
@@ -99,13 +156,14 @@ func runEnvVarLink(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	return nil
 }
 
-func runEnvVarUnlink(cmd *cobra.Command, out io.Writer, idOrKey string) error {
+func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
 	}
 	cmd.SilenceUsage = true
 
+	idOrKey := linkVariableIDOrKey()
 	if envLinkExclude {
 		if err := env.UnexcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
 			return err
@@ -120,7 +178,7 @@ func runEnvVarUnlink(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	return nil
 }
 
-func runEnvVarLinks(cmd *cobra.Command, out io.Writer, idOrKey string) error {
+func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
@@ -131,7 +189,7 @@ func runEnvVarLinks(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	report, err := env.ListVarLinks(idOrKey, scope, envIncludeSecrets, astroV1Client)
+	report, err := env.ListVarLinks(linkVariableIDOrKey(), scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -156,7 +214,7 @@ func runEnvVarLinks(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 // overrideDisplay renders an override value for the table view, with a
 // special "(hidden)" marker for secret vars when --include-secrets is off
 // (in which case the platform redacts the override and we can't distinguish
-// "no override" from "redacted override" — flag the ambiguity instead of
+// "no override" from "redacted override"; flag the ambiguity instead of
 // quietly showing "-").
 func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
 	if isSecret && !includeSecrets {
