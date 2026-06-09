@@ -97,9 +97,17 @@ jobs:
     if: needs.detect.outputs.type == 'ga'
     runs-on: ubuntu-latest
     steps:
+      - name: Get token via Octo STS
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: godownloader-token
+        with:
+          scope: astronomer
+          identity: astro-cli-release
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: main
+          token: ${{ steps.godownloader-token.outputs.token }}
 
       - name: Update LATEST_VERSION in godownloader.sh
         run: |
@@ -108,7 +116,7 @@ jobs:
 
       - name: Create PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.godownloader-token.outputs.token }}
         run: |
           TAG="v${{ needs.detect.outputs.version }}"
           BRANCH="chore/update-godownloader-${TAG}"
