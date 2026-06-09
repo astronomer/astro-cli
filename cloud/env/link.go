@@ -46,7 +46,7 @@ type VarLink struct {
 // the override field is touched, and only when overrideValue is non-nil.
 // Calling with overrideValue=nil on an existing link is a no-op for the
 // override (the platform's PATCH preserves omitted fields). To remove an
-// existing override, unlink then re-link without --value.
+// existing override, delete the link then re-create it without --value.
 func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, coreClient astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
@@ -92,7 +92,7 @@ func ExcludeVar(idOrKey string, scope Scope, depID string, coreClient astrov1.AP
 		return err
 	}
 	if linkExists(current.Links, depID) {
-		return fmt.Errorf("environment variable %q is explicitly linked to deployment %s; unlink first to exclude", current.ObjectKey, depID)
+		return fmt.Errorf("environment variable %q is explicitly linked to deployment %s; delete the link first to exclude", current.ObjectKey, depID)
 	}
 	if excludeExists(current.ExcludeLinks, depID) {
 		// Already excluded — desired state matches actual, no-op success.
@@ -222,7 +222,7 @@ func excludeExists(excludes *[]astrov1.EnvironmentObjectExcludeLink, depID strin
 // overrides intact. The platform PATCH merges per-entry rather than fully
 // replacing the array, so sending `overrides: nil` on an existing entry is a
 // no-op for the override (it's preserved). To clear an override, the caller
-// must unlink first.
+// must delete the link first.
 func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID string, overrideValue *string) []astrov1.UpdateEnvironmentObjectLinkRequest {
 	var newOverride *astrov1.UpdateEnvironmentObjectOverridesRequest
 	if overrideValue != nil {
