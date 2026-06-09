@@ -1,17 +1,12 @@
 package cloud
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/cloud/env"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -193,69 +188,5 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	switch f {
-	case env.FormatJSON:
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		return enc.Encode(report)
-	case env.FormatYAML:
-		enc := yaml.NewEncoder(out)
-		defer enc.Close()
-		return enc.Encode(report)
-	case env.FormatDotenv:
-		return errors.New("dotenv format is not supported for links")
-	case env.FormatTable, "":
-		writeLinksTable(report, out)
-		return nil
-	}
-	return fmt.Errorf("invalid format %q", f)
-}
-
-// overrideDisplay renders an override value for the table view, with a
-// special "(hidden)" marker for secret vars when --include-secrets is off
-// (in which case the platform redacts the override and we can't distinguish
-// "no override" from "redacted override"; flag the ambiguity instead of
-// quietly showing "-").
-func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
-	if isSecret && !includeSecrets {
-		return "(hidden, use --include-secrets)"
-	}
-	if override == nil {
-		return "-"
-	}
-	return *override
-}
-
-func writeLinksTable(report *env.VarLinksReport, out io.Writer) {
-	value := report.WorkspaceValue
-	if report.IsSecret {
-		value = "**** (secret)"
-	}
-	fmt.Fprintf(out, "KEY:                %s\n", report.ObjectKey)
-	fmt.Fprintf(out, "ID:                 %s\n", report.ObjectID)
-	fmt.Fprintf(out, "WORKSPACE VALUE:    %s\n", value)
-	fmt.Fprintf(out, "AUTO-LINK:          %t\n", report.AutoLinkDeployments)
-	fmt.Fprintln(out)
-
-	if len(report.Links) == 0 {
-		fmt.Fprintln(out, "LINKS:              (none)")
-	} else {
-		linkTable := &printutil.Table{DynamicPadding: true, Header: []string{"#", "DEPLOYMENT", "OVERRIDE"}}
-		for i, l := range report.Links {
-			override := overrideDisplay(l.OverrideValue, report.IsSecret, envIncludeSecrets)
-			linkTable.AddRow([]string{strconv.Itoa(i + 1), l.DeploymentID, override}, false)
-		}
-		fmt.Fprintln(out, "LINKS:")
-		linkTable.Print(out)
-	}
-
-	fmt.Fprintln(out)
-	if len(report.ExcludeLinks) == 0 {
-		fmt.Fprintln(out, "EXCLUDES:           (none)")
-	} else {
-		fmt.Fprintln(out, "EXCLUDES:")
-		for i, depID := range report.ExcludeLinks {
-			fmt.Fprintf(out, "  %d. %s\n", i+1, depID)
-		}
-	}
+	return env.WriteVarLinks(report, f, envIncludeSecrets, out)
 }

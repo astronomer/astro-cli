@@ -94,6 +94,22 @@ func WriteVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets b
 	return fmt.Errorf("invalid format %q", format)
 }
 
+// WriteVarLinks renders a VarLinksReport in the requested format.
+func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, out io.Writer) error {
+	switch format {
+	case "", FormatTable:
+		writeVarLinksTable(report, includeSecrets, out)
+		return nil
+	case FormatJSON:
+		return writeJSON(report, out)
+	case FormatYAML:
+		return writeYAML(report, out)
+	case FormatDotenv:
+		return errors.New("dotenv format is not supported for links")
+	}
+	return fmt.Errorf("invalid format %q", format)
+}
+
 // WriteConnList renders a list of CONNECTION objects.
 func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	switch format {
@@ -274,6 +290,55 @@ func dotenvQuote(v string) string {
 		return v
 	}
 	return `"` + dotenvEscaper.Replace(v) + `"`
+}
+
+// overrideDisplay renders a per-link override value for the table view, with a
+// special "(hidden)" marker for secret vars when --include-secrets is off
+// (in which case the platform redacts the override and we can't distinguish
+// "no override" from "redacted override"; flag the ambiguity instead of
+// quietly showing "-").
+func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
+	if isSecret && !includeSecrets {
+		return "(hidden, use --include-secrets)"
+	}
+	if override == nil {
+		return "-"
+	}
+	return *override
+}
+
+func writeVarLinksTable(report *VarLinksReport, includeSecrets bool, out io.Writer) {
+	value := report.WorkspaceValue
+	if report.IsSecret {
+		value = maskedSecret + " (secret)"
+	}
+	fmt.Fprintf(out, "KEY:                %s\n", report.ObjectKey)
+	fmt.Fprintf(out, "ID:                 %s\n", report.ObjectID)
+	fmt.Fprintf(out, "WORKSPACE VALUE:    %s\n", value)
+	fmt.Fprintf(out, "AUTO-LINK:          %t\n", report.AutoLinkDeployments)
+	fmt.Fprintln(out)
+
+	if len(report.Links) == 0 {
+		fmt.Fprintln(out, "LINKS:              (none)")
+	} else {
+		linkTable := &printutil.Table{DynamicPadding: true, Header: []string{"#", "DEPLOYMENT", "OVERRIDE"}}
+		for i, l := range report.Links {
+			override := overrideDisplay(l.OverrideValue, report.IsSecret, includeSecrets)
+			linkTable.AddRow([]string{strconv.Itoa(i + 1), l.DeploymentID, override}, false)
+		}
+		fmt.Fprintln(out, "LINKS:")
+		linkTable.Print(out)
+	}
+
+	fmt.Fprintln(out)
+	if len(report.ExcludeLinks) == 0 {
+		fmt.Fprintln(out, "EXCLUDES:           (none)")
+	} else {
+		fmt.Fprintln(out, "EXCLUDES:")
+		for i, depID := range report.ExcludeLinks {
+			fmt.Fprintf(out, "  %d. %s\n", i+1, depID)
+		}
+	}
 }
 
 func writeConnTable(envObjs []astrov1.EnvironmentObject, out io.Writer) error {
