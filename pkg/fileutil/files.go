@@ -47,13 +47,13 @@ type UploadFileArguments struct {
 }
 
 // Exists returns a boolean indicating if the given path already exists
-func Exists(path string, fs afero.Fs) (bool, error) {
-	if path == "" {
+func Exists(filePath string, fs afero.Fs) (bool, error) {
+	if filePath == "" {
 		return false, nil
 	}
 
 	if fs == nil {
-		_, err := os.Stat(path)
+		_, err := os.Stat(filePath)
 		if err == nil {
 			return true, nil
 		}
@@ -62,7 +62,7 @@ func Exists(path string, fs afero.Fs) (bool, error) {
 			return false, errors.Wrap(err, "cannot determine if path exists, error ambiguous")
 		}
 	} else {
-		res, err := afero.Exists(fs, path)
+		res, err := afero.Exists(fs, filePath)
 		if res {
 			return true, nil
 		}
@@ -75,20 +75,20 @@ func Exists(path string, fs afero.Fs) (bool, error) {
 }
 
 // WriteStringToFile write a string to a file
-func WriteStringToFile(path, s string) error {
-	return WriteToFile(path, strings.NewReader(s))
+func WriteStringToFile(filePath, s string) error {
+	return WriteToFile(filePath, strings.NewReader(s))
 }
 
 // WriteToFile writes an io.Reader to a file if it does not exst
-func WriteToFile(path string, r io.Reader) error {
-	dir := filepath.Dir(path)
+func WriteToFile(filePath string, r io.Reader) error {
+	dir := filepath.Dir(filePath)
 	if dir != "" {
 		if err := os.MkdirAll(dir, perm); err != nil {
 			return err
 		}
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
@@ -185,8 +185,8 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 }
 
 // this functions reads a whole file into memory and returns a slice of its lines.
-func Read(path string) ([]string, error) {
-	file, err := os.Open(path)
+func Read(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -406,8 +406,8 @@ func GzipFile(srcFilePath, destFilePath string) error {
 	return err
 }
 
-func IsHidden(path string) bool {
-	components := strings.Split(path, string(filepath.Separator))
+func IsHidden(filePath string) bool {
+	components := strings.Split(filePath, string(filepath.Separator))
 	for _, component := range components {
 		if strings.HasPrefix(component, ".") {
 			return true
