@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	semver "github.com/Masterminds/semver/v3"
@@ -15,6 +16,33 @@ import (
 )
 
 var CurrVersion string
+
+const shortSHALen = 7
+
+func init() {
+	if CurrVersion != "" {
+		return
+	}
+	// CurrVersion was not set via -ldflags (e.g. a plain `go build` or
+	// `go install` outside the Makefile). Fall back to metadata embedded by
+	// the Go toolchain so `astro version` never prints an empty version.
+	// The SNAPSHOT prefix keeps CompareVersions treating it as a local build.
+	CurrVersion = "SNAPSHOT"
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	if v := info.Main.Version; v != "" && v != "(devel)" {
+		CurrVersion = v
+		return
+	}
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" && len(s.Value) >= shortSHALen {
+			CurrVersion = "SNAPSHOT-" + s.Value[:shortSHALen]
+			return
+		}
+	}
+}
 
 const (
 	cliCurrentVersion  = "Astro CLI Version: "
