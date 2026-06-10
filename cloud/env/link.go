@@ -46,8 +46,10 @@ type VarLink struct {
 // Upsert semantics: if the link doesn't exist it's created; if it does, only
 // the override field is touched, and only when overrideValue is non-nil.
 // Calling with overrideValue=nil on an existing link is a no-op for the
-// override (the platform's PATCH preserves omitted fields). To remove an
-// existing override, delete the link then re-create it without --value.
+// override (the platform preserves fields omitted from a link entry; note it
+// does NOT preserve the Links/ExcludeLinks arrays themselves when a PATCH
+// omits them -- see echoLinksAndExcludes). To remove an existing override,
+// delete the link then re-create it without --value.
 func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, astroV1Client astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
@@ -319,6 +321,26 @@ func buildExistingExcludes(current *[]astrov1.EnvironmentObjectExcludeLink) []as
 	return out
 }
 
+// echoLinksAndExcludes round-trips the object's current Links and
+// ExcludeLinks into an update body. The platform treats Links/ExcludeLinks
+// arrays omitted from a PATCH as "remove them all" (while still preserving
+// omitted fields *within* a present link entry), so every update body must
+// carry the existing arrays even when the caller only means to change the
+// value -- otherwise the object is silently unlinked from every deployment.
+// nil slices are normalized to empty so the JSON carries [] rather than null.
+func echoLinksAndExcludes(body *astrov1.UpdateEnvironmentObjectJSONRequestBody, current *astrov1.EnvironmentObject) {
+	links := buildUpdateLinks(current.Links)
+	if links == nil {
+		links = []astrov1.UpdateEnvironmentObjectLinkRequest{}
+	}
+	body.Links = &links
+	excludes := buildExistingExcludes(current.ExcludeLinks)
+	if excludes == nil {
+		excludes = []astrov1.ExcludeLinkEnvironmentObjectRequest{}
+	}
+	body.ExcludeLinks = &excludes
+}
+
 // patchVarLinks PATCHes the env-object with new Links and/or ExcludeLinks,
 // preserving AutoLinkDeployments to dodge the AINF-1792 server bug where an
 // omitted autoLinkDeployments is silently cleared.
@@ -345,19 +367,12 @@ func patchVarLinks(
 			Value: &v,
 		}
 	}
+	echoLinksAndExcludes(&body, current)
 	if links != nil {
 		body.Links = links
-	} else {
-		// Caller didn't touch Links; round-trip the existing ones so the server
-		// doesn't drop them on a partial PATCH.
-		existing := buildUpdateLinks(current.Links)
-		body.Links = &existing
 	}
 	if excludes != nil {
 		body.ExcludeLinks = excludes
-	} else {
-		existing := buildExistingExcludes(current.ExcludeLinks)
-		body.ExcludeLinks = &existing
 	}
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {

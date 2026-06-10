@@ -194,8 +194,12 @@ func (s *Suite) TestUpdateVar() {
 			{Id: &id, ObjectKey: "FOO"},
 		}},
 	}, nil).Once()
+	emptyLinks := []astrov1.UpdateEnvironmentObjectLinkRequest{}
+	emptyExcludes := []astrov1.ExcludeLinkEnvironmentObjectRequest{}
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, astrov1.UpdateEnvironmentObjectJSONRequestBody{
 		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{Value: &newValue},
+		Links:               &emptyLinks,
+		ExcludeLinks:        &emptyExcludes,
 	}).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
@@ -204,6 +208,64 @@ func (s *Suite) TestUpdateVar() {
 	got, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
 	s.NoError(err)
 	s.Equal("FOO", got.ObjectKey)
+	mc.AssertExpectations(s.T())
+}
+
+// Regression: a value-only update must round-trip the object's existing
+// Links/ExcludeLinks. Omitting the arrays makes the platform drop every
+// deployment link on the var (and with it any override the deployment had).
+func (s *Suite) TestUpdateVarRoundTripsLinks() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	workspaceID := cuid.New()
+	id := cuid.New()
+	depID := cuid.New()
+	exDepID := cuid.New()
+	newValue := "newval"
+
+	obj := envVarObj(id, "oldval", nil, []astrov1.EnvironmentObjectLink{
+		{
+			Scope:                        astrov1.EnvironmentObjectLinkScopeDEPLOYMENT,
+			ScopeEntityId:                depID,
+			EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: "prod-override"},
+		},
+	}, []astrov1.EnvironmentObjectExcludeLink{
+		{
+			Scope:         astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT,
+			ScopeEntityId: exDepID,
+		},
+	})
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{obj}},
+	}, nil).Once()
+
+	expectedLinks := []astrov1.UpdateEnvironmentObjectLinkRequest{
+		{
+			Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScope(astrov1.EnvironmentObjectLinkScopeDEPLOYMENT),
+			ScopeEntityId: depID,
+			Overrides:     newOverrideRequest("prod-override"),
+		},
+	}
+	expectedExcludes := []astrov1.ExcludeLinkEnvironmentObjectRequest{
+		{
+			Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScope(astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT),
+			ScopeEntityId: exDepID,
+		},
+	}
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, astrov1.UpdateEnvironmentObjectJSONRequestBody{
+		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{Value: &newValue},
+		Links:               &expectedLinks,
+		ExcludeLinks:        &expectedExcludes,
+	}).Return(&astrov1.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+	}, nil).Once()
+
+	_, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
+	s.NoError(err)
 	mc.AssertExpectations(s.T())
 }
 

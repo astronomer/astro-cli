@@ -77,7 +77,7 @@ func newEnvVarLinkCreateCmd(out io.Writer) *cobra.Command {
 If --value is provided, that value overrides the workspace default for the linked deployment only.
 Pass --exclude to add the deployment to the excludeLinks list instead (used with --auto-link to opt specific deployments out).
 
-Upsert semantics: if not already linked, the link is created; if already linked, the override is replaced when --value is passed. Re-running without --value is a no-op for an existing link's override (platform PATCH preserves omitted fields). To remove an existing override, delete the link then re-create it without --value.`,
+Upsert semantics: if not already linked, the link is created; if already linked, the override is replaced when --value is passed. Re-running without --value is a no-op for an existing link's override (the platform preserves fields omitted from a link entry). To remove an existing override, delete the link then re-create it without --value.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarLinkCreate(cmd, out)
 		},

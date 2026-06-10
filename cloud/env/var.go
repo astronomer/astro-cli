@@ -4,6 +4,7 @@ package env
 import (
 	httpcontext "context"
 	"errors"
+	"fmt"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
@@ -79,9 +80,15 @@ func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, as
 // recreate. autoLink, when non-nil, toggles the "auto-link to all deployments"
 // flag (workspace scope only).
 func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
-	id, err := resolveID(idOrKey, scope, objectTypeVar, astroV1Client)
+	// Fetch the full object (not just the ID): the update body must round-trip
+	// the existing Links/ExcludeLinks or the platform drops them. See
+	// echoLinksAndExcludes.
+	current, err := getObject(idOrKey, scope, objectTypeVar, false, astroV1Client)
 	if err != nil {
 		return nil, err
+	}
+	if current.Id == nil || *current.Id == "" {
+		return nil, fmt.Errorf("environment object %q has no id", idOrKey)
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -93,7 +100,8 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 		},
 		AutoLinkDeployments: autoLink,
 	}
-	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
+	echoLinksAndExcludes(&body, current)
+	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
 	if err != nil {
 		return nil, err
 	}
