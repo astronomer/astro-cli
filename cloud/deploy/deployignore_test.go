@@ -105,6 +105,38 @@ func TestDeployIgnoreSkipFunc(t *testing.T) {
 		assert.False(t, skip("docs/keep.md"))
 	})
 
+	t.Run("anchors a relative bundle path against an absolute root", func(t *testing.T) {
+		// resolve symlinks so the cwd-based Abs of the relative bundle path
+		// agrees with dir (macOS tempdirs live under the /var -> /private/var symlink)
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		require.NoError(t, err)
+		require.NoError(t, os.Mkdir(filepath.Join(dir, "dags"), 0o755))
+		writeDeployIgnore(t, dir, "dags/docs/\n")
+		t.Chdir(dir)
+
+		// e.g. astro deploy --dags --dags-path dags
+		skip, err := deployIgnoreSkipFunc(dir, "dags")
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		assert.True(t, skip("docs/internal.md"))
+		assert.False(t, skip("my_dag.py"))
+	})
+
+	t.Run("treats a directory whose name starts with dots as inside the root", func(t *testing.T) {
+		dir := t.TempDir()
+		bundlePath := filepath.Join(dir, "..dotted-dags")
+		require.NoError(t, os.Mkdir(bundlePath, 0o755))
+		writeDeployIgnore(t, dir, "..dotted-dags/docs/\n")
+
+		skip, err := deployIgnoreSkipFunc(dir, bundlePath)
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		assert.True(t, skip("docs/internal.md"))
+		assert.False(t, skip("my_dag.py"))
+	})
+
 	t.Run("matches relative to the bundle root when the bundle is outside the root", func(t *testing.T) {
 		dir := t.TempDir()
 		outsidePath := filepath.Join(t.TempDir(), "external-dags")

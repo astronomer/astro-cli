@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/moby/patternmatcher"
-	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -169,9 +168,12 @@ func shouldIncludeMonitoringDag(deploymentType astrov1.DeploymentType) bool {
 	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
+const monitoringDagFileName = "astronomer_monitoring_dag.py"
+
 func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, deploymentType astrov1.DeploymentType, noDagsBaseDir bool) (string, error) {
-	if shouldIncludeMonitoringDag(deploymentType) {
-		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
+	includeMonitoringDag := shouldIncludeMonitoringDag(deploymentType)
+	if includeMonitoringDag {
+		monitoringDagPath := filepath.Join(dagsPath, monitoringDagFileName)
 
 		// Create monitoring dag file
 		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.Af2MonitoringDag)
@@ -189,7 +191,15 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 		return "", err
 	}
 	if skipFiles != nil {
-		fmt.Printf("Excluding files matching %s from the DAG bundle\n", DeployIgnoreFilePath)
+		fmt.Printf("Excluding files matching %s from the DAG bundle\n", deployIgnoreFilePath)
+		if includeMonitoringDag {
+			// the monitoring DAG the CLI itself just added must not be
+			// excluded by user patterns
+			userSkip := skipFiles
+			skipFiles = func(relPath string) bool {
+				return relPath != monitoringDagFileName && userSkip(relPath)
+			}
+		}
 	}
 
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
@@ -626,70 +636,53 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 	}, nil
 }
 
-// buildImageWithIgnorePatterns builds the image with extraIgnorePatterns
-// temporarily appended to the project's .dockerignore so the Docker builder
-// excludes the matching files from the build context.
-func buildImageWithIgnorePatterns(path, buildSecretString string, extraIgnorePatterns []string, imageHandler airflow.ImageHandler) error {
-	return withDockerignoreAdditions(path, extraIgnorePatterns, func() error {
+// buildImageWithIgnorePatterns builds the image with ignorePatterns appended
+// to the project's .dockerignore (creating the file if absent) so the Docker
+// builder excludes the matching files from the build context. The original
+// file is restored byte-for-byte after the build (preserving CRLF, trailing
+// whitespace, etc.).
+//
+// Patterns are appended in order, without deduplication: .dockerignore
+// semantics are last-match-wins, so plain concatenation preserves the meaning
+// of the existing patterns while giving the appended patterns (including
+// their "!" negations) precedence — the same ordering dockerignoreSkipFunc
+// uses for client deploys. Deduplicating against existing lines would break
+// this, e.g. by re-appending only part of a pattern/negation pair.
+func buildImageWithIgnorePatterns(path, buildSecretString string, ignorePatterns []string, imageHandler airflow.ImageHandler) error {
+	build := func() error {
 		return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
-	})
-}
+	}
+	if len(ignorePatterns) == 0 {
+		return build()
+	}
 
-// withDockerignoreAdditions appends patterns to the .dockerignore at path
-// (creating the file if absent) for the duration of fn, then restores the
-// original byte-for-byte (preserving CRLF, trailing whitespace, etc.).
-// Patterns already present as exact lines are not duplicated; if nothing needs
-// to be added, the file is left untouched.
-func withDockerignoreAdditions(path string, patterns []string, fn func() error) error {
 	fullpath := filepath.Join(path, ".dockerignore")
-
 	originalBytes, err := os.ReadFile(fullpath)
 	originalExisted := err == nil
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	toAdd := []string{}
-	for _, pattern := range patterns {
-		if !dockerignoreContainsLine(originalBytes, pattern) {
-			toAdd = append(toAdd, pattern)
+	defer func() {
+		if originalExisted {
+			_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
+		} else {
+			_ = os.Remove(fullpath)
 		}
+	}()
+
+	modified := append([]byte{}, originalBytes...)
+	if len(modified) > 0 && modified[len(modified)-1] != '\n' {
+		modified = append(modified, '\n')
+	}
+	for _, pattern := range ignorePatterns {
+		modified = append(modified, []byte(pattern+"\n")...)
+	}
+	if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd
+		return err
 	}
 
-	if len(toAdd) > 0 {
-		defer func() {
-			if originalExisted {
-				_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
-			} else {
-				_ = os.Remove(fullpath)
-			}
-		}()
-
-		modified := append([]byte{}, originalBytes...)
-		if len(modified) > 0 && modified[len(modified)-1] != '\n' {
-			modified = append(modified, '\n')
-		}
-		for _, pattern := range toAdd {
-			modified = append(modified, []byte(pattern+"\n")...)
-		}
-		if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd
-			return err
-		}
-	}
-
-	return fn()
-}
-
-// dockerignoreContainsLine reports whether content has a line equal to line.
-// Uses bufio.Scanner so CRLF line endings are handled identically to LF.
-func dockerignoreContainsLine(content []byte, line string) bool {
-	scanner := bufio.NewScanner(bytes.NewReader(content))
-	for scanner.Scan() {
-		if scanner.Text() == line {
-			return true
-		}
-	}
-	return false
+	return build()
 }
 
 func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, astroV1Client astrov1.APIClient) (version string, err error) {
@@ -705,7 +698,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 			return "", err
 		}
 		if len(ignorePatterns) > 0 {
-			fmt.Printf("Excluding files matching %s from the image\n", DeployIgnoreFilePath)
+			fmt.Printf("Excluding files matching %s from the image\n", deployIgnoreFilePath)
 		}
 
 		// DAGs are delivered via the DAG bundle when DAG deploys or remote
@@ -896,14 +889,15 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 		return buildContext, fmt.Errorf("source directory does not exist: %s", sourcePath)
 	}
 
-	// Build a skip predicate from the project's .dockerignore so excluded
-	// paths (e.g. infra/ with terragrunt provider-cache symlinks) are not
-	// copied into the build context. This mirrors what the Docker builder does
-	// for in-place builds; the client deploy copies the context first, so it
-	// must honor .dockerignore itself.
+	// Build a skip predicate from the project's .dockerignore and deploy
+	// ignore file so excluded paths (e.g. infra/ with terragrunt
+	// provider-cache symlinks) are not copied into the build context. This
+	// mirrors what the Docker builder does for in-place builds; the client
+	// deploy copies the context first, so it must honor the ignore files
+	// itself.
 	skip, err := dockerignoreSkipFunc(sourcePath)
 	if err != nil {
-		return buildContext, fmt.Errorf("failed to read .dockerignore: %w", err)
+		return buildContext, fmt.Errorf("failed to process ignore files: %w", err)
 	}
 
 	// Copy all project files to the temporary directory
@@ -938,18 +932,9 @@ var alwaysIncludedBuildFiles = map[string]bool{
 // excluded from the build context. It returns nil (copy everything) when
 // neither file has any patterns.
 func dockerignoreSkipFunc(sourcePath string) (func(relPath string, isDir bool) bool, error) {
-	var patterns []string
-
-	f, err := os.Open(filepath.Join(sourcePath, ".dockerignore"))
-	switch {
-	case err == nil:
-		defer f.Close()
-		patterns, err = ignorefile.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-	case !os.IsNotExist(err):
-		return nil, err
+	patterns, err := readIgnorePatternsFile(filepath.Join(sourcePath, ".dockerignore"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read .dockerignore: %w", err)
 	}
 
 	// the deploy ignore patterns come last so their negations ("!") take

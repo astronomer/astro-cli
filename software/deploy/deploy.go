@@ -576,7 +576,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, dagsTarPath, true, nil, nil)
+	err = fileutil.Tar(dagsPath, dagsTarPath, true, nil)
 	if err != nil {
 		return err
 	}

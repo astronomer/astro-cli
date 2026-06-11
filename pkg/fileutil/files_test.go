@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -181,7 +182,6 @@ func (s *Suite) TestTar() {
 		source         string
 		target         string
 		prependBaseDir bool
-		excludePaths   []string
 		skip           func(relPath string) bool
 	}
 	tests := []struct {
@@ -219,12 +219,14 @@ func (s *Suite) TestTar() {
 			},
 		},
 		{
-			name: "exclude paths",
+			name: "skip predicate excludes a directory prefix",
 			args: args{
 				source:         testSourceDirPath,
 				target:         filepath.Join(testDirPath, "test_exclude.tar"),
 				prependBaseDir: false,
-				excludePaths:   []string{testSubDirName},
+				skip: func(relPath string) bool {
+					return strings.HasPrefix(relPath, testSubDirName+"/")
+				},
 			},
 			errAssertion: assert.NoError,
 			expectPaths: []string{
@@ -232,6 +234,15 @@ func (s *Suite) TestTar() {
 				symlinkFileName,
 				// testSubDirFileName excluded
 			},
+		},
+		{
+			name: "missing source directory is an error",
+			args: args{
+				source: filepath.Join(testDirPath, "does-not-exist"),
+				target: filepath.Join(testDirPath, "test_missing.tar"),
+			},
+			errAssertion: assert.Error,
+			expectPaths:  []string{},
 		},
 		{
 			name: "skip predicate receives source-relative paths",
@@ -256,7 +267,7 @@ func (s *Suite) TestTar() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			// check that the tar operation was successful
-			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths, tt.args.skip)))
+			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.skip)))
 
 			// check that all the files are in the tar at the correct paths
 			file, err := os.Open(tt.args.target)

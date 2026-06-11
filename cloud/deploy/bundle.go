@@ -80,7 +80,7 @@ func DeployBundle(input *DeployBundleInput) error {
 		return err
 	}
 	if skipFiles != nil {
-		fmt.Printf("Excluding files matching %s from the bundle\n", DeployIgnoreFilePath)
+		fmt.Printf("Excluding files matching %s from the bundle\n", deployIgnoreFilePath)
 	}
 
 	// upload the bundle
@@ -225,8 +225,14 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Generate the bundle tar
-	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, skipFiles)
+	// Generate the bundle tar, never including any .git directory
+	skip := func(relPath string) bool {
+		if relPath == ".git" || strings.HasPrefix(relPath, ".git/") {
+			return true
+		}
+		return skipFiles != nil && skipFiles(relPath)
+	}
+	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, skip)
 	if err != nil {
 		return "", err
 	}

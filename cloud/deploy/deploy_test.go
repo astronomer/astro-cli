@@ -2570,9 +2570,9 @@ func TestBuildImageWithIgnorePatternsAppendsDagsDuringBuild(t *testing.T) {
 			expectedDuringBuild: "some/path/\ndags/\n",
 		},
 		{
-			name:                "leaves file alone when dags/ already present",
+			name:                "appends dags/ even when already present (concatenation preserves last-match-wins ordering)",
 			original:            "some/path/\ndags/\n",
-			expectedDuringBuild: "some/path/\ndags/\n",
+			expectedDuringBuild: "some/path/\ndags/\ndags/\n",
 		},
 	}
 
@@ -2608,17 +2608,35 @@ func TestBuildImageWithIgnorePatternsAppendsMultiplePatterns(t *testing.T) {
 	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
 		got, readErr := os.ReadFile(dockerignorePath)
 		assert.NoError(t, readErr)
-		// docs/ is already present so only the missing patterns are appended
-		assert.Equal(t, "some/path/\ndocs/\n*.md\ndags/\n", string(got))
+		// all patterns are appended in order, even restated ones, so that
+		// last-match-wins ordering relative to existing negations holds
+		assert.Equal(t, "some/path/\ndocs/\ndocs\n*.md\ndags/\n", string(got))
 	}).Return(nil)
 
-	err := buildImageWithIgnorePatterns(dir, "", []string{"docs/", "*.md", "dags/"}, mockImageHandler)
+	err := buildImageWithIgnorePatterns(dir, "", []string{"docs", "*.md", "dags/"}, mockImageHandler)
 	assert.NoError(t, err)
 
 	// the original file is restored after the build
 	got, err := os.ReadFile(dockerignorePath)
 	assert.NoError(t, err)
 	assert.Equal(t, original, string(got))
+
+	mockImageHandler.AssertExpectations(t)
+}
+
+func TestBuildImageWithIgnorePatternsNoPatternsLeavesFileUntouched(t *testing.T) {
+	dir := t.TempDir()
+	dockerignorePath := filepath.Join(dir, ".dockerignore")
+
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	err := buildImageWithIgnorePatterns(dir, "", nil, mockImageHandler)
+	assert.NoError(t, err)
+
+	// no .dockerignore is created when there is nothing to append
+	_, statErr := os.Stat(dockerignorePath)
+	assert.True(t, os.IsNotExist(statErr), "expected .dockerignore not to exist, got: %v", statErr)
 
 	mockImageHandler.AssertExpectations(t)
 }
