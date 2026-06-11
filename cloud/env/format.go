@@ -314,7 +314,7 @@ func writeVarLinksTable(report *VarLinksReport, includeSecrets bool, out io.Writ
 	}
 	fmt.Fprintf(out, "KEY:                %s\n", report.ObjectKey)
 	fmt.Fprintf(out, "ID:                 %s\n", report.ObjectID)
-	fmt.Fprintf(out, "WORKSPACE VALUE:    %s\n", value)
+	fmt.Fprintf(out, "WORKSPACE VALUE:    %s\n", clampTableValue(value))
 	fmt.Fprintf(out, "AUTO-LINK:          %t\n", report.AutoLinkDeployments)
 	fmt.Fprintln(out)
 
@@ -323,7 +323,7 @@ func writeVarLinksTable(report *VarLinksReport, includeSecrets bool, out io.Writ
 	} else {
 		linkTable := &printutil.Table{DynamicPadding: true, Header: []string{"#", "DEPLOYMENT", "OVERRIDE"}}
 		for i, l := range report.Links {
-			override := overrideDisplay(l.OverrideValue, report.IsSecret, includeSecrets)
+			override := clampTableValue(overrideDisplay(l.OverrideValue, report.IsSecret, includeSecrets))
 			linkTable.AddRow([]string{strconv.Itoa(i + 1), l.DeploymentID, override}, false)
 		}
 		fmt.Fprintln(out, "LINKS:")

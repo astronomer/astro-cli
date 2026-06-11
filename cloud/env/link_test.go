@@ -1,6 +1,7 @@
 package env
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/lucsky/cuid"
@@ -417,5 +418,29 @@ func (s *Suite) TestListVarLinksReportsAll() {
 	s.Nil(report.Links[0].OverrideValue) // dep1 has no override
 	s.Equal(overrideVal, *report.Links[1].OverrideValue)
 	s.Equal([]string{dep3}, report.ExcludeLinks)
+	mc.AssertExpectations(s.T())
+}
+
+// The report's Links/ExcludeLinks must marshal as [] rather than null so
+// scripted consumers can iterate .links[] without null guards.
+func (s *Suite) TestListVarLinksEmptyMarshalsAsArrays() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	id := cuid.New()
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			envVarObj(id, "ws-default", nil, nil, nil),
+		}},
+	}, nil).Once()
+
+	report, err := ListVarLinks("FOO", Scope{WorkspaceID: cuid.New()}, false, mc)
+	s.NoError(err)
+	b, err := json.Marshal(report)
+	s.NoError(err)
+	s.Contains(string(b), `"links":[]`)
+	s.Contains(string(b), `"excludeLinks":[]`)
 	mc.AssertExpectations(s.T())
 }

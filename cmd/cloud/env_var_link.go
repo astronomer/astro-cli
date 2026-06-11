@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -60,12 +61,16 @@ func addLinkVariableFlags(cmd *cobra.Command) {
 }
 
 // linkVariableIDOrKey returns whichever variable identifier flag was set; the
-// env package resolves IDs and keys uniformly.
-func linkVariableIDOrKey() string {
+// env package resolves IDs and keys uniformly. Errors when the set flag is
+// empty (cobra's one-required group counts --variable-id "" as set).
+func linkVariableIDOrKey() (string, error) {
 	if envLinkVariableID != "" {
-		return envLinkVariableID
+		return envLinkVariableID, nil
 	}
-	return envLinkVariableKey
+	if envLinkVariableKey != "" {
+		return envLinkVariableKey, nil
+	}
+	return "", errors.New("--variable-id or --variable-key cannot be empty")
 }
 
 func newEnvVarLinkCreateCmd(out io.Writer) *cobra.Command {
@@ -128,7 +133,10 @@ func runEnvVarLinkCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	idOrKey := linkVariableIDOrKey()
+	idOrKey, err := linkVariableIDOrKey()
+	if err != nil {
+		return err
+	}
 	if envLinkExclude {
 		if err := env.ExcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
 			return err
@@ -158,7 +166,10 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	idOrKey := linkVariableIDOrKey()
+	idOrKey, err := linkVariableIDOrKey()
+	if err != nil {
+		return err
+	}
 	if envLinkExclude {
 		if err := env.UnexcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
 			return err
@@ -184,7 +195,11 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	report, err := env.ListVarLinks(linkVariableIDOrKey(), scope, envIncludeSecrets, astroV1Client)
+	idOrKey, err := linkVariableIDOrKey()
+	if err != nil {
+		return err
+	}
+	report, err := env.ListVarLinks(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}

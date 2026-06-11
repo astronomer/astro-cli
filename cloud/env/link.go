@@ -142,8 +142,12 @@ func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, astroV1Clien
 	if err != nil {
 		return nil, err
 	}
+	// Links/ExcludeLinks start non-nil so an empty list marshals as [] rather
+	// than null; scripted consumers iterate .links[] without null guards.
 	report := &VarLinksReport{
-		ObjectKey: current.ObjectKey,
+		ObjectKey:    current.ObjectKey,
+		Links:        []VarLink{},
+		ExcludeLinks: []string{},
 	}
 	if current.Id != nil {
 		report.ObjectID = *current.Id

@@ -169,3 +169,22 @@ func (s *Suite) TestWriteVarLinksTableSecrets() {
 		s.NotContains(out, maskedSecret)
 	})
 }
+
+// Hostile link values must not shred the table: long overrides are truncated
+// and newlines are collapsed, same as the var list table.
+func (s *Suite) TestWriteVarLinksTableClampsValues() {
+	long := strings.Repeat("x", 500)
+	report := &VarLinksReport{
+		ObjectKey:      "FOO",
+		WorkspaceValue: "line1\nline2",
+		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &long}},
+	}
+	var buf bytes.Buffer
+	s.NoError(WriteVarLinks(report, FormatTable, false, &buf))
+	out := buf.String()
+	s.NotContains(out, long)
+	s.Contains(out, "line1 ⏎ line2")
+	for _, line := range strings.Split(out, "\n") {
+		s.LessOrEqual(len([]rune(line)), 120, "rendered line exceeds bounded width: %q", line)
+	}
+}

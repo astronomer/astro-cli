@@ -106,5 +106,13 @@ func TestEnvVarLinkVariableFlagValidation(t *testing.T) {
 	resetEnvFlags()
 	_, err = execEnvCmd("var", "link", "create", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", cuid.New(), "--value", "x", "--exclude")
 	assert.ErrorContains(t, err, "none of the others can be")
+
+	// empty identifier values satisfy cobra's one-required group but are rejected
+	resetEnvFlags()
+	_, err = execEnvCmd("var", "link", "list", "--variable-id", "", "--workspace-id", cuid.New())
+	assert.ErrorContains(t, err, "--variable-id or --variable-key cannot be empty")
+	resetEnvFlags()
+	_, err = execEnvCmd("var", "link", "create", "--variable-key", "", "--workspace-id", cuid.New(), "--deployment-id", cuid.New())
+	assert.ErrorContains(t, err, "--variable-id or --variable-key cannot be empty")
 	resetEnvFlags()
 }
