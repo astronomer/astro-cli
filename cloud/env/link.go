@@ -155,20 +155,16 @@ func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, astroV1Clien
 		report.WorkspaceValue = current.EnvironmentVariable.Value
 		report.IsSecret = current.EnvironmentVariable.IsSecret
 	}
-	if current.Links != nil {
-		for _, l := range *current.Links {
-			vl := VarLink{DeploymentID: l.ScopeEntityId}
-			if l.EnvironmentVariableOverrides != nil {
-				v := l.EnvironmentVariableOverrides.Value
-				vl.OverrideValue = &v
-			}
-			report.Links = append(report.Links, vl)
+	for _, l := range derefSlice(current.Links) {
+		vl := VarLink{DeploymentID: l.ScopeEntityId}
+		if l.EnvironmentVariableOverrides != nil {
+			v := l.EnvironmentVariableOverrides.Value
+			vl.OverrideValue = &v
 		}
+		report.Links = append(report.Links, vl)
 	}
-	if current.ExcludeLinks != nil {
-		for _, e := range *current.ExcludeLinks {
-			report.ExcludeLinks = append(report.ExcludeLinks, e.ScopeEntityId)
-		}
+	for _, e := range derefSlice(current.ExcludeLinks) {
+		report.ExcludeLinks = append(report.ExcludeLinks, e.ScopeEntityId)
 	}
 	return report, nil
 }
@@ -186,20 +182,29 @@ func resolveWorkspaceVar(idOrKey string, scope Scope, includeSecrets bool, astro
 	if obj.Scope != astrov1.EnvironmentObjectScope(astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE) {
 		return nil, fmt.Errorf("environment variable %q is %s-scoped; only workspace-scoped objects can be linked", obj.ObjectKey, obj.Scope)
 	}
-	if obj.Id == nil || *obj.Id == "" {
-		return nil, fmt.Errorf("environment variable %q has no addressable ID", obj.ObjectKey)
+	if _, err := objectID(obj, idOrKey); err != nil {
+		return nil, err
 	}
 	return obj, nil
 }
 
+// derefSlice unwraps the generated client's optional-array pointers; nil
+// means "absent" and is treated as empty.
+func derefSlice[T any](p *[]T) []T {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 func linkExists(links *[]astrov1.EnvironmentObjectLink, depID string) bool {
-	return links != nil && slices.ContainsFunc(*links, func(l astrov1.EnvironmentObjectLink) bool {
+	return slices.ContainsFunc(derefSlice(links), func(l astrov1.EnvironmentObjectLink) bool {
 		return l.ScopeEntityId == depID
 	})
 }
 
 func excludeExists(excludes *[]astrov1.EnvironmentObjectExcludeLink, depID string) bool {
-	return excludes != nil && slices.ContainsFunc(*excludes, func(e astrov1.EnvironmentObjectExcludeLink) bool {
+	return slices.ContainsFunc(derefSlice(excludes), func(e astrov1.EnvironmentObjectExcludeLink) bool {
 		return e.ScopeEntityId == depID
 	})
 }
@@ -243,21 +248,16 @@ func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID stri
 	if overrideValue != nil {
 		newOverride = newOverrideRequest(*overrideValue)
 	}
-	n := 0
-	if current != nil {
-		n = len(*current)
-	}
-	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, n+1)
+	links := derefSlice(current)
+	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links)+1)
 	found := false
-	if current != nil {
-		for _, l := range *current {
-			req := toUpdateLink(l)
-			if l.ScopeEntityId == depID {
-				found = true
-				req.Overrides = newOverride
-			}
-			out = append(out, req)
+	for _, l := range links {
+		req := toUpdateLink(l)
+		if l.ScopeEntityId == depID {
+			found = true
+			req.Overrides = newOverride
 		}
+		out = append(out, req)
 	}
 	if !found {
 		out = append(out, astrov1.UpdateEnvironmentObjectLinkRequest{
@@ -270,24 +270,22 @@ func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID stri
 }
 
 // buildUpdateLinks converts the GET-shape Links into the PATCH-shape, copying
-// any existing overrides so a partial update doesn't drop them.
+// any existing overrides so a partial update doesn't drop them. Like the
+// other build* helpers, it always returns a non-nil slice so an empty list
+// marshals as [] rather than null.
 func buildUpdateLinks(current *[]astrov1.EnvironmentObjectLink) []astrov1.UpdateEnvironmentObjectLinkRequest {
-	if current == nil {
-		return nil
-	}
-	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(*current))
-	for _, l := range *current {
+	links := derefSlice(current)
+	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links))
+	for _, l := range links {
 		out = append(out, toUpdateLink(l))
 	}
 	return out
 }
 
 func buildUpdateLinksExcluding(current *[]astrov1.EnvironmentObjectLink, depID string) []astrov1.UpdateEnvironmentObjectLinkRequest {
-	out := []astrov1.UpdateEnvironmentObjectLinkRequest{}
-	if current == nil {
-		return out
-	}
-	for _, l := range *current {
+	links := derefSlice(current)
+	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links))
+	for _, l := range links {
 		if l.ScopeEntityId == depID {
 			continue
 		}
@@ -297,11 +295,9 @@ func buildUpdateLinksExcluding(current *[]astrov1.EnvironmentObjectLink, depID s
 }
 
 func buildUpdateExcludesExcluding(current *[]astrov1.EnvironmentObjectExcludeLink, depID string) []astrov1.ExcludeLinkEnvironmentObjectRequest {
-	if current == nil {
-		return nil
-	}
-	out := make([]astrov1.ExcludeLinkEnvironmentObjectRequest, 0, len(*current))
-	for _, e := range *current {
+	excludes := derefSlice(current)
+	out := make([]astrov1.ExcludeLinkEnvironmentObjectRequest, 0, len(excludes))
+	for _, e := range excludes {
 		if e.ScopeEntityId == depID {
 			continue
 		}
@@ -311,25 +307,24 @@ func buildUpdateExcludesExcluding(current *[]astrov1.EnvironmentObjectExcludeLin
 }
 
 func buildExistingExcludes(current *[]astrov1.EnvironmentObjectExcludeLink) []astrov1.ExcludeLinkEnvironmentObjectRequest {
-	if current == nil {
-		return nil
-	}
-	out := make([]astrov1.ExcludeLinkEnvironmentObjectRequest, 0, len(*current))
-	for _, e := range *current {
+	excludes := derefSlice(current)
+	out := make([]astrov1.ExcludeLinkEnvironmentObjectRequest, 0, len(excludes))
+	for _, e := range excludes {
 		out = append(out, toExcludeRequest(e))
 	}
 	return out
 }
 
-// echoPreservedFields round-trips the parts of the object's current state
-// that the platform would otherwise drop from a partial update:
+// echoPreservedFields fills in the fields of an update body the caller
+// didn't set, echoing the object's current state. The platform drops state
+// omitted from a partial update:
 //
 //   - Links/ExcludeLinks arrays omitted from a PATCH are treated as "remove
 //     them all" (while omitted fields *within* a present link entry are
 //     preserved), so every update body must carry the existing arrays even
 //     when the caller only means to change the value -- otherwise the object
-//     is silently unlinked from every deployment. nil slices are normalized
-//     to empty so the JSON carries [] rather than null.
+//     is silently unlinked from every deployment. Empty arrays marshal as []
+//     rather than null.
 //   - autoLinkDeployments is cleared when omitted (AINF-1792), so when the
 //     caller isn't explicitly setting it, the current flag is echoed back.
 //
@@ -342,16 +337,14 @@ func echoPreservedFields(body *astrov1.UpdateEnvironmentObjectJSONRequestBody, c
 	if body.AutoLinkDeployments == nil {
 		body.AutoLinkDeployments = current.AutoLinkDeployments
 	}
-	links := buildUpdateLinks(current.Links)
-	if links == nil {
-		links = []astrov1.UpdateEnvironmentObjectLinkRequest{}
+	if body.Links == nil {
+		links := buildUpdateLinks(current.Links)
+		body.Links = &links
 	}
-	body.Links = &links
-	excludes := buildExistingExcludes(current.ExcludeLinks)
-	if excludes == nil {
-		excludes = []astrov1.ExcludeLinkEnvironmentObjectRequest{}
+	if body.ExcludeLinks == nil {
+		excludes := buildExistingExcludes(current.ExcludeLinks)
+		body.ExcludeLinks = &excludes
 	}
-	body.ExcludeLinks = &excludes
 }
 
 // patchVarLinks PATCHes the env-object with new Links and/or ExcludeLinks,
@@ -380,13 +373,9 @@ func patchVarLinks(
 			Value: &v,
 		}
 	}
+	body.Links = links
+	body.ExcludeLinks = excludes
 	echoPreservedFields(&body, current)
-	if links != nil {
-		body.Links = links
-	}
-	if excludes != nil {
-		body.ExcludeLinks = excludes
-	}
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return err

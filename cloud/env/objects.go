@@ -165,10 +165,16 @@ func resolveID(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 	if err != nil {
 		return "", err
 	}
-	if existing.Id == nil || *existing.Id == "" {
+	return objectID(existing, idOrKey)
+}
+
+// objectID extracts the object's addressable ID, erroring when the platform
+// returned an object without one.
+func objectID(obj *astrov1.EnvironmentObject, idOrKey string) (string, error) {
+	if obj.Id == nil || *obj.Id == "" {
 		return "", fmt.Errorf("environment object %q has no id", idOrKey)
 	}
-	return *existing.Id, nil
+	return *obj.Id, nil
 }
 
 // scopeRequest converts a Scope into the create-request scope enum + entity ID.

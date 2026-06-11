@@ -4,9 +4,8 @@ package env
 import (
 	httpcontext "context"
 	"errors"
-	"fmt"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -87,8 +86,9 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 	if err != nil {
 		return nil, err
 	}
-	if current.Id == nil || *current.Id == "" {
-		return nil, fmt.Errorf("environment object %q has no id", idOrKey)
+	id, err := objectID(current, idOrKey)
+	if err != nil {
+		return nil, err
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -101,7 +101,7 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 		AutoLinkDeployments: autoLink,
 	}
 	echoPreservedFields(&body, current)
-	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
+	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return nil, err
 	}

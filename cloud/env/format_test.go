@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 )
 
 func (s *Suite) TestParseFormat() {
