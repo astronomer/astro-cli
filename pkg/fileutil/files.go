@@ -99,7 +99,10 @@ func WriteToFile(filePath string, r io.Reader) error {
 	return err
 }
 
-func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []string) error {
+// Tar archives the source directory into the target file. Entries matching
+// excludePathPrefixes (compared against the final tar path) or the optional
+// skip predicate (given the source-relative, slash-separated path) are omitted.
+func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []string, skip func(relPath string) bool) error {
 	tarfile, err := os.Create(target)
 	if err != nil {
 		return err
@@ -145,8 +148,15 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			}
 
 			// set the tar file path to be relative to the source directory
-			headerName := strings.TrimPrefix(path, filepath.Clean(source))
-			headerName = strings.TrimPrefix(headerName, string(filepath.Separator))
+			relName := strings.TrimPrefix(path, filepath.Clean(source))
+			relName = strings.TrimPrefix(relName, string(filepath.Separator))
+
+			if skip != nil && skip(filepath.ToSlash(relName)) {
+				logger.Debugf("Excluding tarball path: %s", relName)
+				return nil
+			}
+
+			headerName := relName
 			if prependBaseDir {
 				// prepend the base of the source directory to the tar file path, e.g. prepend "dags/" to "my_dag.py"
 				baseDir := filepath.Base(source)
@@ -156,11 +166,9 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			headerName = filepath.ToSlash(headerName)
 
 			// ignore excluded paths
-			for _, excludePathPrefix := range excludePathPrefixes {
-				if strings.HasPrefix(headerName, excludePathPrefix) {
-					logger.Debugf("Excluding tarball path: %s", headerName)
-					return nil
-				}
+			if hasAnyPrefix(headerName, excludePathPrefixes) {
+				logger.Debugf("Excluding tarball path: %s", headerName)
+				return nil
 			}
 
 			header.Name = headerName
@@ -182,6 +190,15 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			_, err = io.Copy(tarball, file)
 			return err
 		})
+}
+
+func hasAnyPrefix(s string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(s, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // this functions reads a whole file into memory and returns a slice of its lines.

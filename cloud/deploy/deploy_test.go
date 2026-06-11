@@ -1992,6 +1992,33 @@ func TestDockerignoreSkipFunc(t *testing.T) {
 		// ...but other files inside stay excluded.
 		assert.True(t, skip("infra/secret.tf", false))
 	})
+
+	t.Run("uses deploy ignore patterns when no .dockerignore exists", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDeployIgnore(t, dir, "docs/\n")
+
+		skip, err := dockerignoreSkipFunc(dir)
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		assert.True(t, skip("docs/internal.md", false))
+		assert.False(t, skip("dags/example.py", false))
+	})
+
+	t.Run("combines .dockerignore and deploy ignore patterns", func(t *testing.T) {
+		dir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("infra/\n"), 0o644))
+		writeDeployIgnore(t, dir, "docs/\n!infra/keep.txt\n")
+
+		skip, err := dockerignoreSkipFunc(dir)
+		assert.NoError(t, err)
+		assert.NotNil(t, skip)
+
+		assert.True(t, skip("infra/secret.tf", false))
+		assert.True(t, skip("docs/internal.md", false))
+		// deploy ignore patterns come last, so their negations win
+		assert.False(t, skip("infra/keep.txt", false))
+	})
 }
 
 func TestSetupClientDependencyFiles(t *testing.T) {
@@ -2461,7 +2488,7 @@ func TestDeployDagsBundleLayout(t *testing.T) {
 	}
 }
 
-func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
+func TestBuildImageWithIgnorePatternsPreservesDockerignore(t *testing.T) {
 	tests := []struct {
 		name     string
 		original string
@@ -2498,7 +2525,7 @@ func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
 			mockImageHandler := new(mocks.ImageHandler)
 			mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-			err = buildImageWithoutDags(dir, "", mockImageHandler)
+			err = buildImageWithIgnorePatterns(dir, "", []string{"dags/"}, mockImageHandler)
 			assert.NoError(t, err)
 
 			got, err := os.ReadFile(dockerignorePath)
@@ -2510,14 +2537,14 @@ func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
 	}
 }
 
-func TestBuildImageWithoutDagsCleansUpCreatedDockerignore(t *testing.T) {
+func TestBuildImageWithIgnorePatternsCleansUpCreatedDockerignore(t *testing.T) {
 	dir := t.TempDir()
 	dockerignorePath := filepath.Join(dir, ".dockerignore")
 
 	mockImageHandler := new(mocks.ImageHandler)
 	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	err := buildImageWithoutDags(dir, "", mockImageHandler)
+	err := buildImageWithIgnorePatterns(dir, "", []string{"dags/"}, mockImageHandler)
 	assert.NoError(t, err)
 
 	_, statErr := os.Stat(dockerignorePath)
@@ -2526,7 +2553,7 @@ func TestBuildImageWithoutDagsCleansUpCreatedDockerignore(t *testing.T) {
 	mockImageHandler.AssertExpectations(t)
 }
 
-func TestBuildImageWithoutDagsAppendsDagsDuringBuild(t *testing.T) {
+func TestBuildImageWithIgnorePatternsAppendsDagsDuringBuild(t *testing.T) {
 	tests := []struct {
 		name                string
 		original            string
@@ -2563,12 +2590,37 @@ func TestBuildImageWithoutDagsAppendsDagsDuringBuild(t *testing.T) {
 				assert.Equal(t, tc.expectedDuringBuild, string(got))
 			}).Return(nil)
 
-			err = buildImageWithoutDags(dir, "", mockImageHandler)
+			err = buildImageWithIgnorePatterns(dir, "", []string{"dags/"}, mockImageHandler)
 			assert.NoError(t, err)
 
 			mockImageHandler.AssertExpectations(t)
 		})
 	}
+}
+
+func TestBuildImageWithIgnorePatternsAppendsMultiplePatterns(t *testing.T) {
+	dir := t.TempDir()
+	dockerignorePath := filepath.Join(dir, ".dockerignore")
+	original := "some/path/\ndocs/\n"
+	assert.NoError(t, os.WriteFile(dockerignorePath, []byte(original), 0o644))
+
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
+		got, readErr := os.ReadFile(dockerignorePath)
+		assert.NoError(t, readErr)
+		// docs/ is already present so only the missing patterns are appended
+		assert.Equal(t, "some/path/\ndocs/\n*.md\ndags/\n", string(got))
+	}).Return(nil)
+
+	err := buildImageWithIgnorePatterns(dir, "", []string{"docs/", "*.md", "dags/"}, mockImageHandler)
+	assert.NoError(t, err)
+
+	// the original file is restored after the build
+	got, err := os.ReadFile(dockerignorePath)
+	assert.NoError(t, err)
+	assert.Equal(t, original, string(got))
+
+	mockImageHandler.AssertExpectations(t)
 }
 
 func TestRemoveDagsFromDockerIgnore(t *testing.T) {

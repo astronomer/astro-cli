@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -181,6 +182,7 @@ func (s *Suite) TestTar() {
 		target         string
 		prependBaseDir bool
 		excludePaths   []string
+		skip           func(relPath string) bool
 	}
 	tests := []struct {
 		name         string
@@ -231,12 +233,30 @@ func (s *Suite) TestTar() {
 				// testSubDirFileName excluded
 			},
 		},
+		{
+			name: "skip predicate receives source-relative paths",
+			args: args{
+				source:         testSourceDirPath,
+				target:         filepath.Join(testDirPath, "test_skip.tar"),
+				prependBaseDir: true,
+				skip: func(relPath string) bool {
+					// relPath must not include the prepended base dir
+					return relPath == path.Join(testSubDirName, testSubDirFileName)
+				},
+			},
+			errAssertion: assert.NoError,
+			expectPaths: []string{
+				filepath.Join(testSourceDirName, testFileName),
+				filepath.Join(testSourceDirName, symlinkFileName),
+				// testSubDirFileName skipped
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			// check that the tar operation was successful
-			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths)))
+			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths, tt.args.skip)))
 
 			// check that all the files are in the tar at the correct paths
 			file, err := os.Open(tt.args.target)

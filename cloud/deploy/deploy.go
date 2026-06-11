@@ -183,10 +183,19 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 		defer os.Remove(monitoringDagPath)
 	}
 
+	// exclude any files matching the project's deploy ignore file, if it has one
+	skipFiles, err := deployIgnoreSkipFunc(path, dagsPath)
+	if err != nil {
+		return "", err
+	}
+	if skipFiles != nil {
+		fmt.Printf("Excluding files matching %s from the DAG bundle\n", DeployIgnoreFilePath)
+	}
+
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
 	prependBaseDir := !noDagsBaseDir
-	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion)
+	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion, skipFiles)
 	if err != nil {
 		return "", err
 	}
@@ -617,50 +626,66 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 	}, nil
 }
 
-func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) error {
+// buildImageWithIgnorePatterns builds the image with extraIgnorePatterns
+// temporarily appended to the project's .dockerignore so the Docker builder
+// excludes the matching files from the build context.
+func buildImageWithIgnorePatterns(path, buildSecretString string, extraIgnorePatterns []string, imageHandler airflow.ImageHandler) error {
+	return withDockerignoreAdditions(path, extraIgnorePatterns, func() error {
+		return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+	})
+}
+
+// withDockerignoreAdditions appends patterns to the .dockerignore at path
+// (creating the file if absent) for the duration of fn, then restores the
+// original byte-for-byte (preserving CRLF, trailing whitespace, etc.).
+// Patterns already present as exact lines are not duplicated; if nothing needs
+// to be added, the file is left untouched.
+func withDockerignoreAdditions(path string, patterns []string, fn func() error) error {
 	fullpath := filepath.Join(path, ".dockerignore")
 
-	// Snapshot the original bytes so we can restore byte-for-byte after the build
-	// (preserves CRLF, trailing whitespace, etc.).
 	originalBytes, err := os.ReadFile(fullpath)
 	originalExisted := err == nil
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	defer func() {
-		if originalExisted {
-			_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
-		} else {
-			_ = os.Remove(fullpath)
+	toAdd := []string{}
+	for _, pattern := range patterns {
+		if !dockerignoreContainsLine(originalBytes, pattern) {
+			toAdd = append(toAdd, pattern)
 		}
-	}()
+	}
 
-	switch {
-	case !originalExisted:
-		if err := os.WriteFile(fullpath, []byte("dags/\n"), 0o644); err != nil { //nolint:gosec,mnd
-			return err
-		}
-	case !dockerignoreContainsDags(originalBytes):
+	if len(toAdd) > 0 {
+		defer func() {
+			if originalExisted {
+				_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
+			} else {
+				_ = os.Remove(fullpath)
+			}
+		}()
+
 		modified := append([]byte{}, originalBytes...)
 		if len(modified) > 0 && modified[len(modified)-1] != '\n' {
 			modified = append(modified, '\n')
 		}
-		modified = append(modified, []byte("dags/\n")...)
+		for _, pattern := range toAdd {
+			modified = append(modified, []byte(pattern+"\n")...)
+		}
 		if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd
 			return err
 		}
 	}
 
-	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+	return fn()
 }
 
-// dockerignoreContainsDags reports whether content has a line equal to "dags/".
+// dockerignoreContainsLine reports whether content has a line equal to line.
 // Uses bufio.Scanner so CRLF line endings are handled identically to LF.
-func dockerignoreContainsDags(content []byte) bool {
+func dockerignoreContainsLine(content []byte, line string) bool {
 	scanner := bufio.NewScanner(bytes.NewReader(content))
 	for scanner.Scan() {
-		if scanner.Text() == "dags/" {
+		if scanner.Text() == line {
 			return true
 		}
 	}
@@ -674,16 +699,24 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
+		// exclude any files matching the project's deploy ignore file, if it has one
+		ignorePatterns, err := readDeployIgnorePatterns(path)
+		if err != nil {
+			return "", err
+		}
+		if len(ignorePatterns) > 0 {
+			fmt.Printf("Excluding files matching %s from the image\n", DeployIgnoreFilePath)
+		}
+
+		// DAGs are delivered via the DAG bundle when DAG deploys or remote
+		// execution are enabled, so exclude them from the image build context.
 		if dagDeployEnabled || isRemoteExecutionEnabled {
-			err := buildImageWithoutDags(path, buildSecretString, imageHandler)
-			if err != nil {
-				return "", err
-			}
-		} else {
-			err := imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
-			if err != nil {
-				return "", err
-			}
+			ignorePatterns = append(ignorePatterns, "dags/")
+		}
+
+		err = buildImageWithIgnorePatterns(path, buildSecretString, ignorePatterns, imageHandler)
+		if err != nil {
+			return "", err
 		}
 	} else {
 		// skip build if an imageName is passed
@@ -899,23 +932,37 @@ var alwaysIncludedBuildFiles = map[string]bool{
 	"packages-client.txt":     true,
 }
 
-// dockerignoreSkipFunc parses the .dockerignore at sourcePath (if any) and
-// returns a predicate, suitable for fileutil.CopyDirectoryFiltered, that
-// reports whether a path should be excluded from the build context. It returns
-// nil (copy everything) when there is no .dockerignore file.
+// dockerignoreSkipFunc parses the .dockerignore and deploy ignore file at
+// sourcePath (if any) and returns a predicate, suitable for
+// fileutil.CopyDirectoryFiltered, that reports whether a path should be
+// excluded from the build context. It returns nil (copy everything) when
+// neither file has any patterns.
 func dockerignoreSkipFunc(sourcePath string) (func(relPath string, isDir bool) bool, error) {
+	var patterns []string
+
 	f, err := os.Open(filepath.Join(sourcePath, ".dockerignore"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
+	switch {
+	case err == nil:
+		defer f.Close()
+		patterns, err = ignorefile.ReadAll(f)
+		if err != nil {
+			return nil, err
 		}
+	case !os.IsNotExist(err):
 		return nil, err
 	}
-	defer f.Close()
 
-	patterns, err := ignorefile.ReadAll(f)
+	// the deploy ignore patterns come last so their negations ("!") take
+	// precedence over .dockerignore patterns, matching the image deploy path
+	// where they are appended to .dockerignore
+	deployIgnorePatterns, err := readDeployIgnorePatterns(sourcePath)
 	if err != nil {
 		return nil, err
+	}
+	patterns = append(patterns, deployIgnorePatterns...)
+
+	if len(patterns) == 0 {
+		return nil, nil
 	}
 
 	pm, err := patternmatcher.New(patterns)
