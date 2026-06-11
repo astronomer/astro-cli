@@ -3,6 +3,7 @@ package env
 import (
 	httpcontext "context"
 	"errors"
+	"fmt"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
@@ -118,9 +119,15 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, astroV1C
 	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
 		return nil, err
 	}
-	id, err := resolveID(idOrKey, scope, objectTypeMetrics, astroV1Client)
+	// Fetch the full object (not just the ID): the update body must round-trip
+	// the existing Links/ExcludeLinks and auto-link flag or the platform drops
+	// them. See echoPreservedFields.
+	current, err := getObject(idOrKey, scope, objectTypeMetrics, false, astroV1Client)
 	if err != nil {
 		return nil, err
+	}
+	if current.Id == nil || *current.Id == "" {
+		return nil, fmt.Errorf("environment object %q has no id", idOrKey)
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -150,8 +157,9 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, astroV1C
 		MetricsExport:       req,
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
+	echoPreservedFields(&body, current)
 
-	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
+	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
 	if err != nil {
 		return nil, err
 	}

@@ -81,8 +81,8 @@ func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, as
 // flag (workspace scope only).
 func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	// Fetch the full object (not just the ID): the update body must round-trip
-	// the existing Links/ExcludeLinks or the platform drops them. See
-	// echoLinksAndExcludes.
+	// the existing Links/ExcludeLinks and auto-link flag or the platform drops
+	// them. See echoPreservedFields.
 	current, err := getObject(idOrKey, scope, objectTypeVar, false, astroV1Client)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 		},
 		AutoLinkDeployments: autoLink,
 	}
-	echoLinksAndExcludes(&body, current)
+	echoPreservedFields(&body, current)
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
 	if err != nil {
 		return nil, err

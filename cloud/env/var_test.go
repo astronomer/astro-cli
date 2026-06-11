@@ -269,6 +269,52 @@ func (s *Suite) TestUpdateVarRoundTripsLinks() {
 	mc.AssertExpectations(s.T())
 }
 
+// Regression: a value-only update must echo the object's current
+// autoLinkDeployments flag. The platform clears the flag when it is omitted
+// from a PATCH (AINF-1792), which silently turned off auto-linking.
+func (s *Suite) TestUpdateVarPreservesAutoLink() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	workspaceID := cuid.New()
+	id := cuid.New()
+	autoTrue := true
+	newValue := "newval"
+
+	mockUpdate := func(match func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool) *astrov1_mocks.ClientWithResponsesInterface {
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+				envVarObj(id, "oldval", &autoTrue, nil, nil),
+			}},
+		}, nil).Once()
+		mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, mock.MatchedBy(match)).Return(&astrov1.UpdateEnvironmentObjectResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		}, nil).Once()
+		return mc
+	}
+
+	s.Run("flag unset echoes current value", func() {
+		mc := mockUpdate(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
+			return b.AutoLinkDeployments != nil && *b.AutoLinkDeployments
+		})
+		_, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
+		s.NoError(err)
+		mc.AssertExpectations(s.T())
+	})
+
+	s.Run("explicit flag wins over current value", func() {
+		autoFalse := false
+		mc := mockUpdate(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
+			return b.AutoLinkDeployments != nil && !*b.AutoLinkDeployments
+		})
+		_, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, &autoFalse, mc)
+		s.NoError(err)
+		mc.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestDeleteVar() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, _ := config.GetCurrentContext()

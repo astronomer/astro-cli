@@ -48,7 +48,7 @@ type VarLink struct {
 // Calling with overrideValue=nil on an existing link is a no-op for the
 // override (the platform preserves fields omitted from a link entry; note it
 // does NOT preserve the Links/ExcludeLinks arrays themselves when a PATCH
-// omits them -- see echoLinksAndExcludes). To remove an existing override,
+// omits them -- see echoPreservedFields). To remove an existing override,
 // delete the link then re-create it without --value.
 func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, astroV1Client astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
@@ -321,14 +321,27 @@ func buildExistingExcludes(current *[]astrov1.EnvironmentObjectExcludeLink) []as
 	return out
 }
 
-// echoLinksAndExcludes round-trips the object's current Links and
-// ExcludeLinks into an update body. The platform treats Links/ExcludeLinks
-// arrays omitted from a PATCH as "remove them all" (while still preserving
-// omitted fields *within* a present link entry), so every update body must
-// carry the existing arrays even when the caller only means to change the
-// value -- otherwise the object is silently unlinked from every deployment.
-// nil slices are normalized to empty so the JSON carries [] rather than null.
-func echoLinksAndExcludes(body *astrov1.UpdateEnvironmentObjectJSONRequestBody, current *astrov1.EnvironmentObject) {
+// echoPreservedFields round-trips the parts of the object's current state
+// that the platform would otherwise drop from a partial update:
+//
+//   - Links/ExcludeLinks arrays omitted from a PATCH are treated as "remove
+//     them all" (while omitted fields *within* a present link entry are
+//     preserved), so every update body must carry the existing arrays even
+//     when the caller only means to change the value -- otherwise the object
+//     is silently unlinked from every deployment. nil slices are normalized
+//     to empty so the JSON carries [] rather than null.
+//   - autoLinkDeployments is cleared when omitted (AINF-1792), so when the
+//     caller isn't explicitly setting it, the current flag is echoed back.
+//
+// current is safe to fetch without secrets (so this works regardless of the
+// org's secrets-fetching policy): the platform omits per-link override values
+// for secret objects rather than blanking them, so the echoed entries omit
+// overrides and the platform's per-entry merge preserves the real ones
+// (verified live against the platform).
+func echoPreservedFields(body *astrov1.UpdateEnvironmentObjectJSONRequestBody, current *astrov1.EnvironmentObject) {
+	if body.AutoLinkDeployments == nil {
+		body.AutoLinkDeployments = current.AutoLinkDeployments
+	}
 	links := buildUpdateLinks(current.Links)
 	if links == nil {
 		links = []astrov1.UpdateEnvironmentObjectLinkRequest{}
@@ -342,8 +355,7 @@ func echoLinksAndExcludes(body *astrov1.UpdateEnvironmentObjectJSONRequestBody, 
 }
 
 // patchVarLinks PATCHes the env-object with new Links and/or ExcludeLinks,
-// preserving AutoLinkDeployments to dodge the AINF-1792 server bug where an
-// omitted autoLinkDeployments is silently cleared.
+// echoing the rest of the object's state via echoPreservedFields.
 func patchVarLinks(
 	id string,
 	current *astrov1.EnvironmentObject,
@@ -355,19 +367,20 @@ func patchVarLinks(
 	if err != nil {
 		return err
 	}
-	body := astrov1.UpdateEnvironmentObjectJSONRequestBody{
-		AutoLinkDeployments: current.AutoLinkDeployments,
-	}
+	var body astrov1.UpdateEnvironmentObjectJSONRequestBody
 	// The platform requires the typed body field even when only mutating
 	// links/excludes. Echo the existing value back to satisfy the
-	// type-discriminator check without changing the workspace value.
+	// type-discriminator check without changing the workspace value. For
+	// secret vars the fetched value is redacted to "", which the platform
+	// treats as "no change" for a secret -- the stored value survives the
+	// PATCH (verified live).
 	if current.EnvironmentVariable != nil {
 		v := current.EnvironmentVariable.Value
 		body.EnvironmentVariable = &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{
 			Value: &v,
 		}
 	}
-	echoLinksAndExcludes(&body, current)
+	echoPreservedFields(&body, current)
 	if links != nil {
 		body.Links = links
 	}

@@ -309,7 +309,7 @@ func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
 
 func writeVarLinksTable(report *VarLinksReport, includeSecrets bool, out io.Writer) {
 	value := report.WorkspaceValue
-	if report.IsSecret {
+	if report.IsSecret && !includeSecrets {
 		value = maskedSecret + " (secret)"
 	}
 	fmt.Fprintf(out, "KEY:                %s\n", report.ObjectKey)

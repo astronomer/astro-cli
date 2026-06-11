@@ -140,3 +140,32 @@ func (s *Suite) TestWriteVarJSON() {
 	s.Contains(out, `"objectKey": "FOO"`)
 	s.Contains(out, id)
 }
+
+func (s *Suite) TestWriteVarLinksTableSecrets() {
+	override := "secret-override"
+	report := &VarLinksReport{
+		ObjectKey:      "FOO",
+		WorkspaceValue: "secret-value",
+		IsSecret:       true,
+		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &override}},
+	}
+
+	s.Run("masks workspace value and override without --include-secrets", func() {
+		var buf bytes.Buffer
+		s.NoError(WriteVarLinks(report, FormatTable, false, &buf))
+		out := buf.String()
+		s.Contains(out, maskedSecret+" (secret)")
+		s.Contains(out, "(hidden, use --include-secrets)")
+		s.NotContains(out, "secret-value")
+		s.NotContains(out, "secret-override")
+	})
+
+	s.Run("shows both with --include-secrets", func() {
+		var buf bytes.Buffer
+		s.NoError(WriteVarLinks(report, FormatTable, true, &buf))
+		out := buf.String()
+		s.Contains(out, "secret-value")
+		s.Contains(out, "secret-override")
+		s.NotContains(out, maskedSecret)
+	})
+}

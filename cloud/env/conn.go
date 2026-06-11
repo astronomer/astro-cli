@@ -124,8 +124,8 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1
 		return nil, err
 	}
 	// Fetch the full object (not just the ID): the update body must round-trip
-	// the existing Links/ExcludeLinks or the platform drops them. See
-	// echoLinksAndExcludes.
+	// the existing Links/ExcludeLinks and auto-link flag or the platform drops
+	// them. See echoPreservedFields.
 	current, err := getObject(idOrKey, scope, objectTypeConn, false, astroV1Client)
 	if err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1
 		},
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
-	echoLinksAndExcludes(&body, current)
+	echoPreservedFields(&body, current)
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
 	if err != nil {
 		return nil, err
