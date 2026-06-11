@@ -150,7 +150,7 @@ jobs:
           identifier: Astronomer.Astro
           version: ${{ needs.detect.outputs.version }}
           release-tag: ${{ needs.detect.outputs.tag }}
-          installers-regex: '\.zip$'
+          installers-regex: '\.exe$'
           token: ${{ steps.winget-token.outputs.token }}
 
   cleanup-nightlies:
