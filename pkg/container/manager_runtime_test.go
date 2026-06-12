@@ -39,6 +39,7 @@ func (p *scriptedPodman) SetMachineAsDefault(name string) error {
 	p.defaultCalls = append(p.defaultCalls, name)
 	return nil
 }
+
 func (p *scriptedPodman) InspectMachine(string) (*InspectedMachine, error) {
 	return p.inspect, p.inspectErr
 }
