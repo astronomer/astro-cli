@@ -65,19 +65,7 @@ func (m *Manager) ConnectionEnv() ([]string, error) {
 		return nil, ErrMachineNotRunning
 	}
 
-	dockerHost := "unix://" + machine.ConnectionInfo.PodmanSocket.Path
-	if m.host.isWindows() {
-		dockerHost = "npipe:////./pipe/podman-" + machine.Name
-	}
-
-	env := []string{"DOCKER_HOST=" + dockerHost}
-	// CONTAINER_HOST routes native podman commands (e.g. `podman build`) to the
-	// machine. The npipe:// scheme isn't supported by native podman on Windows,
-	// where the default-connection setting handles routing instead.
-	if !m.host.isWindows() {
-		env = append(env, "CONTAINER_HOST="+dockerHost)
-	}
-	return env, nil
+	return connectionEnvFor(machine, m.host.isWindows()), nil
 }
 
 // MachineState reports the astro-machine's lifecycle state. For non-Podman

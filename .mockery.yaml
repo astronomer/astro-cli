@@ -45,15 +45,8 @@ packages:
       dir: pkg/azure/mocks
     interfaces:
       Azure:
-  github.com/astronomer/astro-cli/airflow/runtimes:
-    config:
-      dir: airflow/runtimes/mocks
-      outpkg: mocks
-    interfaces:
-      OSChecker:
-      EnvChecker:
-      FileChecker:
-      HostInspector:
-      ContainerRuntime:
-      PodmanEngine:
-      DockerEngine:
+  # Container-runtime interfaces (OSChecker, PodmanEngine, DockerEngine,
+  # ContainerRuntime) now live in the pkg/container submodule
+  # (github.com/astronomer/astro-cli/pkg/container). Their mocks are hand-written
+  # under pkg/container/mocks because mockery is not wired up for the submodule,
+  # so there is no airflow/runtimes entry here anymore.
