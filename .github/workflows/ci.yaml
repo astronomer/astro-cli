@@ -84,9 +84,33 @@ jobs:
       - name: Run unit tests
         run: go test -count=1 -cover -covermode=atomic -test.v ./...
 
+  detect-changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.filter.outputs.src }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'integration-test/**'
+
   integration-test:
-    if: github.ref == 'refs/heads/main'
-    needs: [lint, test, test-windows]
+    needs: [lint, test, test-windows, detect-changes]
+    if: >-
+      always() &&
+      !failure() &&
+      !cancelled() &&
+      (
+        github.ref == 'refs/heads/main' ||
+        (github.event_name == 'pull_request' && needs.detect-changes.outputs.src == 'true')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
