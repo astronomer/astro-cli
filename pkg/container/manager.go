@@ -132,13 +132,14 @@ func (m *Manager) EnsureMachine() error {
 			return err
 		}
 		return m.podman.SetMachineAsDefault(podmanMachineName)
-	default: // MachineAbsent
+	case MachineAbsent:
 		if err := m.podman.InitializeMachine(podmanMachineName, m.cfg, m.fb); err != nil {
 			return err
 		}
 		m.fb.Success("Astro machine initialized")
 		return m.podman.SetMachineAsDefault(podmanMachineName)
 	}
+	return nil
 }
 
 // StartMachine starts the astro-machine (no-op for non-Podman engines).

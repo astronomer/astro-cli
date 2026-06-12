@@ -17,10 +17,10 @@ type fakePodman struct {
 }
 
 func (f fakePodman) InitializeMachine(string, Config, Feedback) error { return nil }
-func (f fakePodman) StartMachine(string) error                       { return nil }
-func (f fakePodman) StopMachine(string) error                        { return nil }
-func (f fakePodman) RemoveMachine(string) error                      { return nil }
-func (f fakePodman) SetMachineAsDefault(string) error                { return nil }
+func (f fakePodman) StartMachine(string) error                        { return nil }
+func (f fakePodman) StopMachine(string) error                         { return nil }
+func (f fakePodman) RemoveMachine(string) error                       { return nil }
+func (f fakePodman) SetMachineAsDefault(string) error                 { return nil }
 func (f fakePodman) InspectMachine(string) (*InspectedMachine, error) {
 	return f.inspect, f.inspectErr
 }

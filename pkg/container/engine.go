@@ -53,10 +53,10 @@ type host interface {
 
 type defaultHost struct{}
 
-func (defaultHost) isWindows() bool         { return runtime.GOOS == "windows" }
-func (defaultHost) isMac() bool             { return runtime.GOOS == "darwin" }
+func (defaultHost) isWindows() bool          { return runtime.GOOS == "windows" }
+func (defaultHost) isMac() bool              { return runtime.GOOS == "darwin" }
 func (defaultHost) fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
-func (defaultHost) pathEnv() string         { return os.Getenv("PATH") }
+func (defaultHost) pathEnv() string          { return os.Getenv("PATH") }
 
 // Resolve picks the engine: honor cfg.Binary when it names a supported runtime,
 // otherwise search $PATH (docker first, then podman). When docker is selected
