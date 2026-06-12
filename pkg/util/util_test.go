@@ -369,3 +369,26 @@ func (s *Suite) TestIsAstronomerRegistry() {
 		})
 	}
 }
+
+func (s *Suite) TestIsCUID() {
+	tests := []struct {
+		name   string
+		input  string
+		expect bool
+	}{
+		{"valid CUID", "clh1rai0g000008l50d5hahbc", true},
+		{"valid CUID all zeros", "c000000000000000000000000", true},
+		{"too short", "clh1rai0g000008l50d5hahb", false},
+		{"too long", "clh1rai0g000008l50d5hahbcc", false},
+		{"wrong prefix", "xlh1rai0g000008l50d5hahbc", false},
+		{"uppercase chars", "cLH1RAI0G000008L50D5HAHBC", false},
+		{"org name", "my-organization", false},
+		{"empty string", "", false},
+		{"name containing cuid substring", "clh1rai0g000008l50d5hahbc-prod", false},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.expect, IsCUID(tt.input))
+		})
+	}
+}
