@@ -303,6 +303,33 @@ func (s *Suite) TestCreateConnection() {
 		s.Error(err)
 		s.Contains(err.Error(), "API error (400): Bad Request")
 	})
+
+	s.Run("upsert - falls back to update on 409 conflict", func() {
+		var methods []string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			methods = append(methods, req.Method)
+			if req.Method == http.MethodPost {
+				return &http.Response{
+					StatusCode: 409,
+					Body:       io.NopCloser(bytes.NewBufferString("Conflict")),
+					Header:     make(http.Header),
+				}
+			}
+			s.Equal("https://test-airflow-url/connections/test-id", req.URL.String())
+			responseJSON, err := json.Marshal(mockConnResponse)
+			s.NoError(err)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(responseJSON)),
+				Header:     make(http.Header),
+			}
+		})
+		airflowClient := NewAirflowClient(client)
+
+		err := airflowClient.CreateConnection("test-airflow-url", mockConn)
+		s.NoError(err)
+		s.Equal([]string{http.MethodPost, http.MethodPatch}, methods)
+	})
 }
 
 func (s *Suite) TestCreateVariable() {
@@ -364,6 +391,33 @@ func (s *Suite) TestCreateVariable() {
 		err := airflowClient.CreateVariable("test-airflow-url", Variable{Key: "", Value: "test-value"})
 		s.Error(err)
 		s.Contains(err.Error(), "failed to decode response from API")
+	})
+
+	s.Run("upsert - falls back to update on 409 conflict", func() {
+		var methods []string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			methods = append(methods, req.Method)
+			if req.Method == http.MethodPost {
+				return &http.Response{
+					StatusCode: 409,
+					Body:       io.NopCloser(bytes.NewBufferString("Conflict")),
+					Header:     make(http.Header),
+				}
+			}
+			s.Equal("https://test-airflow-url/variables/test-key", req.URL.String())
+			responseJSON, err := json.Marshal(mockVarResponse)
+			s.NoError(err)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(responseJSON)),
+				Header:     make(http.Header),
+			}
+		})
+		airflowClient := NewAirflowClient(client)
+
+		err := airflowClient.CreateVariable("test-airflow-url", *mockVar)
+		s.NoError(err)
+		s.Equal([]string{http.MethodPost, http.MethodPatch}, methods)
 	})
 }
 
@@ -564,6 +618,33 @@ func (s *Suite) TestCreatePool() {
 		err := airflowClient.CreatePool("test-airflow-url", *mockPool)
 		s.Error(err)
 		s.Contains(err.Error(), "API error (400): Bad Request")
+	})
+
+	s.Run("upsert - falls back to update on 409 conflict", func() {
+		var methods []string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			methods = append(methods, req.Method)
+			if req.Method == http.MethodPost {
+				return &http.Response{
+					StatusCode: 409,
+					Body:       io.NopCloser(bytes.NewBufferString("Conflict")),
+					Header:     make(http.Header),
+				}
+			}
+			s.Equal(fmt.Sprintf("https://test-airflow-url/pools/%s", mockPool.Name), req.URL.String())
+			responseJSON, err := json.Marshal(mockPoolResponse)
+			s.NoError(err)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(responseJSON)),
+				Header:     make(http.Header),
+			}
+		})
+		airflowClient := NewAirflowClient(client)
+
+		err := airflowClient.CreatePool("test-airflow-url", *mockPool)
+		s.NoError(err)
+		s.Equal([]string{http.MethodPost, http.MethodPatch}, methods)
 	})
 }
 
@@ -819,13 +900,71 @@ func (s *Suite) TestDoAirflowClientRetry() {
 		s.Equal(1, callCount)
 	})
 
-	s.Run("does not retry non-GET requests", func() {
+	s.Run("retries non-GET requests on 503 then succeeds", func() {
+		synctest.Test(s.T(), func(_ *testing.T) {
+			callCount := 0
+			jsonResponse, err := json.Marshal(mockConnResponse)
+			s.NoError(err)
+
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				callCount++
+				if callCount < 3 {
+					return &http.Response{
+						StatusCode: 503,
+						Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
+						Header:     make(http.Header),
+					}
+				}
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+					Header:     make(http.Header),
+				}
+			})
+			airflowClient := NewAirflowClient(client)
+
+			doOpts := &httputil.DoOptions{
+				Path:   "/test",
+				Method: http.MethodPost,
+			}
+			_, err = airflowClient.DoAirflowClient(doOpts)
+			s.NoError(err)
+			s.Equal(3, callCount)
+		})
+	})
+
+	s.Run("exhausts write retries on persistent 503", func() {
+		synctest.Test(s.T(), func(_ *testing.T) {
+			callCount := 0
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				callCount++
+				return &http.Response{
+					StatusCode: 503,
+					Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
+					Header:     make(http.Header),
+				}
+			})
+			airflowClient := NewAirflowClient(client)
+
+			doOpts := &httputil.DoOptions{
+				Path:   "/test",
+				Method: http.MethodPost,
+			}
+			_, err := airflowClient.DoAirflowClient(doOpts)
+			s.Error(err)
+			s.Contains(err.Error(), "API error (503)")
+			// 1 initial attempt + writeMaxRetries retries
+			s.Equal(writeMaxRetries+1, callCount)
+		})
+	})
+
+	s.Run("does not retry non-GET requests on 500", func() {
 		callCount := 0
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			callCount++
 			return &http.Response{
-				StatusCode: 503,
-				Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -837,7 +976,7 @@ func (s *Suite) TestDoAirflowClientRetry() {
 		}
 		_, err := airflowClient.DoAirflowClient(doOpts)
 		s.Error(err)
-		s.Contains(err.Error(), "API error (503)")
+		s.Contains(err.Error(), "API error (500)")
 		s.Equal(1, callCount)
 	})
 
