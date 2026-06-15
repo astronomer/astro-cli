@@ -17,8 +17,7 @@ import (
 
 var errDecode = errors.New("failed to decode response from API")
 
-// isConflict reports whether err is an HTTP 409 Conflict returned by the
-// Airflow API, which indicates the resource being created already exists.
+// isConflict reports whether err is an HTTP 409 Conflict.
 func isConflict(err error) bool {
 	var httpErr *httputil.Error
 	if errors.As(err, &httpErr) {
@@ -27,14 +26,20 @@ func isConflict(err error) bool {
 	return false
 }
 
+// isReadMethod reports whether method is a safe, read-only HTTP method.
+func isReadMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
-	pageLimit    = 100
-	maxRetries   = 10
-	retryBackoff = time.Second
-	// writeMaxRetries and writeRetryBackoff govern retries for non-GET (write)
-	// requests. They retry fewer times with a longer delay than GETs, since a
-	// write that keeps returning 5xx is less likely to recover quickly and we
-	// want to avoid hammering the API for non-idempotent operations.
+	pageLimit         = 100
+	readMaxRetries    = 10
+	readRetryBackoff  = time.Second
 	writeMaxRetries   = 3
 	writeRetryBackoff = 5 * time.Second
 )
@@ -113,8 +118,7 @@ func (c *HTTPClient) CreateConnection(airflowURL string, conn *Connection) error
 
 	_, err = c.DoAirflowClient(doOpts)
 	if isConflict(err) {
-		// The connection already exists (e.g. a retried create whose original
-		// response was lost). Reconcile by updating it to the desired state.
+		// already exists: reconcile to the desired state
 		return c.UpdateConnection(airflowURL, conn)
 	}
 	return err
@@ -163,8 +167,7 @@ func (c *HTTPClient) CreateVariable(airflowURL string, variable Variable) error 
 
 	_, err = c.DoAirflowClient(doOpts)
 	if isConflict(err) {
-		// The variable already exists (e.g. a retried create whose original
-		// response was lost). Reconcile by updating it to the desired state.
+		// already exists: reconcile to the desired state
 		return c.UpdateVariable(airflowURL, variable)
 	}
 	return err
@@ -213,8 +216,7 @@ func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
 
 	_, err = c.DoAirflowClient(doOpts)
 	if isConflict(err) {
-		// The pool already exists (e.g. a retried create whose original
-		// response was lost). Reconcile by updating it to the desired state.
+		// already exists: reconcile to the desired state
 		return c.UpdatePool(airflowURL, pool)
 	}
 	return err
@@ -247,15 +249,7 @@ func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	return nil
 }
 
-// checkRetryPolicy returns a retry policy that skips retries when the error
-// wraps context.Canceled or context.DeadlineExceeded. GET requests use the
-// default policy (transport errors and 5xx). Non-GET (write) requests are
-// retried only on transient gateway responses where the server has not applied
-// the change (see isRetryableWriteStatus), so the individual call can be safely
-// retried without re-running the command. Transport errors, 500 and 504 are not
-// retried for writes since the request may already have been applied; those
-// cases are reconciled at the operation layer instead (create falls back to
-// update on 409).
+// checkRetryPolicy retries read methods with the default policy and writes only on transient statuses.
 func checkRetryPolicy(method string) retryablehttp.CheckRetry {
 	return func(ctx stdctx.Context, resp *http.Response, err error) (bool, error) {
 		if err != nil {
@@ -263,7 +257,7 @@ func checkRetryPolicy(method string) retryablehttp.CheckRetry {
 				return false, err
 			}
 		}
-		if method != http.MethodGet {
+		if !isReadMethod(method) {
 			if err != nil {
 				return false, err
 			}
@@ -273,11 +267,6 @@ func checkRetryPolicy(method string) retryablehttp.CheckRetry {
 	}
 }
 
-// isRetryableWriteStatus reports whether a write request that received resp
-// should be retried. Only transient responses where the server did not apply
-// the change are retryable: 502 Bad Gateway, 503 Service Unavailable and 429
-// Too Many Requests. 500 and 504 are intentionally excluded because the write
-// may have been applied before the error was returned.
 func isRetryableWriteStatus(resp *http.Response) bool {
 	if resp == nil {
 		return false
@@ -315,11 +304,10 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 
 	retryClient := retryablehttp.NewClient()
 	retryClient.HTTPClient = c.HTTPClient.HTTPClient
-	retryClient.RetryMax = maxRetries
-	retryClient.RetryWaitMin = retryBackoff
-	retryClient.RetryWaitMax = retryBackoff
-	if doOpts.Method != http.MethodGet {
-		// Writes retry fewer times with a longer delay than GETs.
+	retryClient.RetryMax = readMaxRetries
+	retryClient.RetryWaitMin = readRetryBackoff
+	retryClient.RetryWaitMax = readRetryBackoff
+	if !isReadMethod(doOpts.Method) {
 		retryClient.RetryMax = writeMaxRetries
 		retryClient.RetryWaitMin = writeRetryBackoff
 		retryClient.RetryWaitMax = writeRetryBackoff

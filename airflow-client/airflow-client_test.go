@@ -873,8 +873,8 @@ func (s *Suite) TestDoAirflowClientRetry() {
 			_, err := airflowClient.DoAirflowClient(doOpts)
 			s.Error(err)
 			s.Contains(err.Error(), "API error (503)")
-			// 1 initial attempt + maxRetries retries
-			s.Equal(maxRetries+1, callCount)
+			// 1 initial attempt + readMaxRetries retries
+			s.Equal(readMaxRetries+1, callCount)
 		})
 	})
 
