@@ -2,19 +2,6 @@
 
 package proxy
 
-import (
-	"os"
-
-	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
-)
-
-func acquireLock() (*os.File, error) {
-	ensureInit()
-	return pkgproxy.AcquireLock()
-}
-
-func releaseLock(f *os.File) {
-	pkgproxy.ReleaseLock(f)
-}
+import pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 
 var isPIDAlive = pkgproxy.IsPIDAlive

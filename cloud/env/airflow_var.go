@@ -5,7 +5,7 @@ import (
 	httpcontext "context"
 	"errors"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -71,7 +71,14 @@ func CreateAirflowVar(scope Scope, key, value string, isSecret bool, autoLink *b
 // does not allow toggling IsSecret. autoLink, when non-nil, toggles the
 // "auto-link to all deployments" flag (workspace scope only).
 func UpdateAirflowVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
-	id, err := resolveID(idOrKey, scope, objectTypeAirflowVar, astroV1Client)
+	// Fetch the full object (not just the ID): the update body must round-trip
+	// the existing Links/ExcludeLinks and auto-link flag or the platform drops
+	// them. See echoPreservedFields.
+	current, err := getObject(idOrKey, scope, objectTypeAirflowVar, false, astroV1Client)
+	if err != nil {
+		return nil, err
+	}
+	id, err := objectID(current, idOrKey)
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +92,7 @@ func UpdateAirflowVar(idOrKey string, scope Scope, value string, autoLink *bool,
 		},
 		AutoLinkDeployments: autoLink,
 	}
+	echoPreservedFields(&body, current)
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return nil, err

@@ -618,15 +618,12 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	return nil
 }
 
-// registerProxyRoute ensures the proxy daemon is running and registers a route
-// for this standalone instance. Returns the proxy URL on success, or "" if the
-// proxy is disabled or registration failed.
+// registerProxyRoute registers a route for this standalone instance so that
+// other tools can discover it via routes.json, then starts the proxy daemon.
+// Returns the proxy URL on success, or "" if the proxy is disabled or
+// registration failed.
 func (s *Standalone) registerProxyRoute(pid int) string {
 	if !s.useProxy || s.proxyHostname == "" {
-		return ""
-	}
-	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
-		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
 		return ""
 	}
 	route := &proxy.Route{
@@ -637,6 +634,10 @@ func (s *Standalone) registerProxyRoute(pid int) string {
 	}
 	if err := proxy.AddRoute(route); err != nil {
 		fmt.Printf("Warning: could not register proxy route: %s\n", err.Error())
+		return ""
+	}
+	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
+		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
 		return ""
 	}
 	return fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)

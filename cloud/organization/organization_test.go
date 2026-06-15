@@ -9,7 +9,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -523,27 +522,4 @@ func (s *Suite) TestExportAuditLogs() {
 		s.Contains(err.Error(), "failed to fetch organizations audit logs")
 		mockV1Client.AssertExpectations(s.T())
 	})
-}
-
-func TestIsCUID(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  string
-		expect bool
-	}{
-		{"valid CUID", "clh1rai0g000008l50d5hahbc", true},
-		{"valid CUID all zeros", "c000000000000000000000000", true},
-		{"too short", "clh1rai0g000008l50d5hahb", false},
-		{"too long", "clh1rai0g000008l50d5hahbcc", false},
-		{"wrong prefix", "xlh1rai0g000008l50d5hahbc", false},
-		{"uppercase chars", "cLH1RAI0G000008L50D5HAHBC", false},
-		{"org name", "my-organization", false},
-		{"empty string", "", false},
-		{"name containing cuid substring", "clh1rai0g000008l50d5hahbc-prod", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expect, IsCUID(tt.input))
-		})
-	}
 }
