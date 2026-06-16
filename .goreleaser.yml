@@ -1,18 +1,16 @@
-# This is an example goreleaser.yaml file with some sane defaults.
-# Make sure to check the documentation at http://goreleaser.com
 project_name: astro
 version: 2
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod download
     - go mod tidy
 release:
   github:
     owner: astronomer
     name: astro-cli
-  # If set to auto, will mark the release as not ready for production
-  prerelease: true
+  # "auto" marks prerelease tags (e.g. v1.43.0-rc.1, v1.43.0-nightly.20260522) as prerelease,
+  # and clean semver tags (e.g. v1.43.0) as full releases.
+  prerelease: auto
 changelog:
   sort: asc
   use: github
@@ -27,58 +25,97 @@ builds:
     goos:
       - darwin
     goarch:
-      - 386
       - arm64
       - amd64
-    goarm:
-      - 7
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
-  - id: linux-windows-build
+  - id: linux-build
     main: main.go
     binary: astro
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - windows
     goarch:
       - 386
       - arm64
       - amd64
-    goarm:
-      - 7
+    ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
+  - id: windows-build
+    main: main.go
+    binary: astro
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
 brews:
-  - repository:
+  - name: astro
+    repository:
       owner: astronomer
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: astronomer
+          name: homebrew-tap
+          branch: main
     directory: Formula
-    # Setting this will prevent goreleaser to actually try to commit the updated
-    # formula - instead, the formula file will be stored on the dist folder only,
-    # leaving the responsibility of publishing it to the user.
-    # If set to auto, the release will not be uploaded to the homebrew tap
-    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
-    # Default is false.
-    skip_upload: true
+    skip_upload: auto
     homepage: https://astronomer.io
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    dependencies:
+      - name: podman
+        type: recommended
+        os: mac
+    test: |
+      system "#{bin}/astro version"
+  - name: "astro@{{ .Version }}"
+    repository:
+      owner: astronomer
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: astronomer
+          name: homebrew-tap
+          branch: main
+    directory: Formula
+    skip_upload: auto
+    homepage: https://astronomer.io
+    description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    dependencies:
+      - name: podman
+        type: recommended
+        os: mac
     test: |
       system "#{bin}/astro version"
 archives:
-  - format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: binary
+  - id: unix-archives
+    builds:
+      - darwin-build
+      - linux-build
+    format: tar.gz
     name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - licence*
-      - LICENCE*
-      - license*
       - LICENSE*
-      - readme*
       - README*
-      - changelog*
-      - CHANGELOG*
+  - id: windows-exe
+    builds:
+      - windows-build
+    format: binary
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: windows-zip
+    builds:
+      - windows-build
+    format: zip
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE*
+      - README*
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 checksum:

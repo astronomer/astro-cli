@@ -1,0 +1,112 @@
+name: Create Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - nightly
+          - rc
+          - ga
+        default: nightly
+      version:
+        description: 'Semantic version without v prefix (e.g. 1.43.0) — required for rc and ga, ignored for nightly'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  id-token: write  # Required for Octo STS OIDC token exchange
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.type != 'nightly' && 'release' || '' }}
+    steps:
+      - name: Get token via Octo STS
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: sts-token
+        with:
+          scope: astronomer
+          identity: astro-cli-release
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.sts-token.outputs.token }}
+
+      - name: Validate inputs
+        run: |
+          set -e
+          TYPE="${{ inputs.type }}"
+          VERSION="${{ inputs.version }}"
+          BRANCH="${GITHUB_REF_NAME}"
+
+          if [ "$TYPE" = "nightly" ]; then
+            # Nightlies must be created from main
+            if [ "$BRANCH" != "main" ]; then
+              echo "::error::Nightly tags must be created from the main branch. Current branch: $BRANCH"
+              exit 1
+            fi
+          else
+            # RC and GA must be created from a release-* branch
+            if [[ ! "$BRANCH" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+              echo "::error::RC and GA tags must be created from a release-X.Y branch. Current branch: $BRANCH"
+              exit 1
+            fi
+
+            if [ -z "$VERSION" ]; then
+              echo "::error::VERSION is required for $TYPE releases."
+              exit 1
+            fi
+
+            BRANCH_MAJOR_MINOR="${BASH_REMATCH[1]}"
+            ESCAPED_MM=$(echo "$BRANCH_MAJOR_MINOR" | sed 's/\./\\./g')
+            if [[ ! "$VERSION" =~ ^${ESCAPED_MM}\.[0-9]+$ ]]; then
+              echo "::error::Version '$VERSION' does not match branch '$BRANCH'. Expected ${BRANCH_MAJOR_MINOR}.Z"
+              exit 1
+            fi
+          fi
+
+          echo "TYPE=$TYPE" >> $GITHUB_ENV
+          echo "Validated: type=$TYPE branch=$BRANCH version=$VERSION"
+
+      - name: Compute nightly tag
+        if: inputs.type == 'nightly'
+        run: |
+          TAG=$(make nightly-tag)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Computed nightly tag: $TAG"
+
+      - name: Compute RC tag
+        if: inputs.type == 'rc'
+        run: |
+          TAG=$(make rc-tag VERSION=${{ inputs.version }})
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Computed RC tag: $TAG"
+
+      - name: Compute GA tag
+        if: inputs.type == 'ga'
+        run: |
+          TAG=$(make release-tag VERSION=${{ inputs.version }})
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Computed GA tag: $TAG"
+
+      - name: Create and push tag
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "Pushed tag: $TAG"
+          echo "## Release Tag Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ inputs.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`$GITHUB_REF_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`$(git rev-parse --short HEAD)\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** @$GITHUB_ACTOR" >> $GITHUB_STEP_SUMMARY

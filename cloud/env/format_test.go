@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 )
 
 func (s *Suite) TestParseFormat() {
@@ -139,4 +139,52 @@ func (s *Suite) TestWriteVarJSON() {
 	out := buf.String()
 	s.Contains(out, `"objectKey": "FOO"`)
 	s.Contains(out, id)
+}
+
+func (s *Suite) TestWriteVarLinksTableSecrets() {
+	override := "secret-override"
+	report := &VarLinksReport{
+		ObjectKey:      "FOO",
+		WorkspaceValue: "secret-value",
+		IsSecret:       true,
+		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &override}},
+	}
+
+	s.Run("masks workspace value and override without --include-secrets", func() {
+		var buf bytes.Buffer
+		s.NoError(WriteVarLinks(report, FormatTable, false, &buf))
+		out := buf.String()
+		s.Contains(out, maskedSecret+" (secret)")
+		s.Contains(out, "(hidden, use --include-secrets)")
+		s.NotContains(out, "secret-value")
+		s.NotContains(out, "secret-override")
+	})
+
+	s.Run("shows both with --include-secrets", func() {
+		var buf bytes.Buffer
+		s.NoError(WriteVarLinks(report, FormatTable, true, &buf))
+		out := buf.String()
+		s.Contains(out, "secret-value")
+		s.Contains(out, "secret-override")
+		s.NotContains(out, maskedSecret)
+	})
+}
+
+// Hostile link values must not shred the table: long overrides are truncated
+// and newlines are collapsed, same as the var list table.
+func (s *Suite) TestWriteVarLinksTableClampsValues() {
+	long := strings.Repeat("x", 500)
+	report := &VarLinksReport{
+		ObjectKey:      "FOO",
+		WorkspaceValue: "line1\nline2",
+		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &long}},
+	}
+	var buf bytes.Buffer
+	s.NoError(WriteVarLinks(report, FormatTable, false, &buf))
+	out := buf.String()
+	s.NotContains(out, long)
+	s.Contains(out, "line1 ⏎ line2")
+	for _, line := range strings.Split(out, "\n") {
+		s.LessOrEqual(len([]rune(line)), 120, "rendered line exceeds bounded width: %q", line)
+	}
 }

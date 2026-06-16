@@ -1641,6 +1641,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	project, err := loader.LoadWithContext(context.Background(), composetypes.ConfigDetails{
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
+		Environment: composetypes.NewMapping(os.Environ()),
 	}, loadOptions...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load project")
@@ -1702,6 +1703,7 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 	project, err := loader.LoadWithContext(context.Background(), composetypes.ConfigDetails{
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
+		Environment: composetypes.NewMapping(os.Environ()),
 	}, loadOptions...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load project")

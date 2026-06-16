@@ -8,6 +8,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/lucsky/cuid"
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/pkg/astroauth"
@@ -155,4 +156,14 @@ func IsAstronomerRegistry(registry string) bool {
 		}
 	}
 	return false
+}
+
+// IsCUID reports whether s is a syntactically valid CUID
+// (c + 24 lowercase alphanumerics).
+//
+// lucsky/cuid.IsCuid uses an unanchored regex, so it matches a CUID-shaped
+// substring anywhere in s. We gate on the exact length so callers passing
+// strings that merely contain a CUID don't get false positives.
+func IsCUID(s string) bool {
+	return len(s) == 25 && cuid.IsCuid(s) == nil
 }
