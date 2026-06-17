@@ -8,3 +8,8 @@ import "os/exec"
 func longSleepCommand() *exec.Cmd {
 	return exec.Command("cmd", "/C", "timeout", "/T", "60", "/NOBREAK")
 }
+
+// failCommand returns a command that exits with code 1 to produce an *exec.ExitError.
+func failCommand() *exec.Cmd {
+	return exec.Command("cmd", "/C", "exit", "1") //nolint:gosec
+}
