@@ -1842,6 +1842,55 @@ func (s *AirflowSuite) TestResolveDevMode() {
 	})
 }
 
+func (s *AirflowSuite) TestStopStandaloneIfSwitching() {
+	s.Run("stops standalone when docker flag is set", func() {
+		dockerFlag = true
+		defer func() { dockerFlag = false }()
+
+		mockHandler := new(mocks.ContainerHandler)
+		mockHandler.On("Stop", false).Return(nil).Once()
+
+		origInit := localHandlerInit
+		localHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			return mockHandler, nil
+		}
+		defer func() { localHandlerInit = origInit }()
+
+		// Create a live PID file
+		pidDir := filepath.Join(s.tempDir, airflowrt.StandaloneDir)
+		s.Require().NoError(os.MkdirAll(pidDir, 0o755))
+		pidFile := filepath.Join(pidDir, airflowrt.StandalonePIDFile)
+		s.Require().NoError(os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0o644))
+		defer os.RemoveAll(filepath.Join(s.tempDir, ".astro"))
+
+		err := stopStandaloneIfSwitching(nil, nil)
+		s.NoError(err)
+		mockHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("no-op when docker flag is not set", func() {
+		dockerFlag = false
+
+		// Create a live PID file — should be ignored
+		pidDir := filepath.Join(s.tempDir, airflowrt.StandaloneDir)
+		s.Require().NoError(os.MkdirAll(pidDir, 0o755))
+		pidFile := filepath.Join(pidDir, airflowrt.StandalonePIDFile)
+		s.Require().NoError(os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0o644))
+		defer os.RemoveAll(filepath.Join(s.tempDir, ".astro"))
+
+		err := stopStandaloneIfSwitching(nil, nil)
+		s.NoError(err)
+	})
+
+	s.Run("no-op when no standalone process running", func() {
+		dockerFlag = true
+		defer func() { dockerFlag = false }()
+
+		err := stopStandaloneIfSwitching(nil, nil)
+		s.NoError(err)
+	})
+}
+
 func (s *AirflowSuite) TestSetDevModeAnnotation() {
 	s.Run("sets standalone annotation", func() {
 		standaloneFlag = true

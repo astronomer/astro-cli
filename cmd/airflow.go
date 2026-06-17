@@ -163,6 +163,7 @@ func newDevRootCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 		// clobber it with a no-op function.
 		PersistentPreRunE: utils.ChainRunEs(
 			SetupLogging,
+			stopStandaloneIfSwitching,
 			ConfigureContainerRuntime,
 			setDevModeAnnotation,
 			telemetry.CreateTrackingHook(),
@@ -219,6 +220,23 @@ func standaloneIsRunning() bool {
 	pidPath := filepath.Join(config.WorkingPath, airflowrt.StandaloneDir, airflowrt.StandalonePIDFile)
 	_, alive := airflowrt.ReadPID(pidPath)
 	return alive
+}
+
+// stopStandaloneIfSwitching stops a running standalone process when the user
+// explicitly passes --docker, preventing a zombie standalone process.
+func stopStandaloneIfSwitching(_ *cobra.Command, _ []string) error {
+	if !dockerFlag || !standaloneIsRunning() {
+		return nil
+	}
+	fmt.Println("Stopping standalone Airflow before switching to Docker mode…")
+	handler, err := localHandlerInit(config.WorkingPath, "", "", "")
+	if err != nil {
+		return fmt.Errorf("could not initialize standalone handler: %w", err)
+	}
+	if err := handler.Stop(false); err != nil {
+		return fmt.Errorf("could not stop standalone Airflow: %w", err)
+	}
+	return nil
 }
 
 // setDevModeAnnotation writes the resolved dev mode into a cobra annotation
