@@ -300,7 +300,7 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 		pageURL := addOffsetToURL(requestURL, currentOffset)
 
 		// Make request
-		respBody, totalCount, limit, err := fetchPage(opts, method, pageURL, token, params)
+		respBody, total, pageSize, err := fetchPage(opts, method, pageURL, token, params)
 		if err != nil {
 			return err
 		}
@@ -326,15 +326,15 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 		}
 
 		// Check if there are more pages
-		if totalCount <= 0 {
+		if total <= 0 {
 			break
 		}
-		if limit <= 0 {
-			fmt.Fprintf(opts.GetErrOut(), "\nWarning: server returned totalCount=%d but no limit; stopping pagination\n", totalCount)
+		if pageSize <= 0 {
+			fmt.Fprintf(opts.GetErrOut(), "\nWarning: server reported %d total records but returned an empty page; stopping pagination\n", total)
 			break
 		}
-		currentOffset += limit
-		if currentOffset >= totalCount {
+		currentOffset += pageSize
+		if currentOffset >= total {
 			break
 		}
 
@@ -363,8 +363,9 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 	return nil
 }
 
-// fetchPage fetches a single page and returns the body, totalCount, and limit.
-func fetchPage(opts *RequestOptions, method, requestURL, token string, params map[string]interface{}) (body []byte, totalCount, limit int, err error) {
+// fetchPage fetches a single page and returns the body, the total number of
+// records, and the number of items on this page (the effective page size).
+func fetchPage(opts *RequestOptions, method, requestURL, token string, params map[string]interface{}) (body []byte, total, pageSize int, err error) {
 	// Add params as query string for GET
 	if len(params) > 0 {
 		requestURL = addQueryParams(requestURL, params)
@@ -384,18 +385,81 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 		return nil, 0, 0, &SilentError{StatusCode: result.StatusCode}
 	}
 
-	// Parse response to get pagination info
-	var pageInfo struct {
-		TotalCount int `json:"totalCount"`
-		Offset     int `json:"offset"`
-		Limit      int `json:"limit"`
-	}
-	if err := json.Unmarshal(result.Body, &pageInfo); err == nil {
-		return result.Body, pageInfo.TotalCount, pageInfo.Limit, nil
+	total, pageSize = extractPageInfo(result.Body)
+	return result.Body, total, pageSize, nil
+}
+
+// paginationFields are response keys that hold pagination metadata rather than
+// the list of records. The Astro/Houston platform envelope uses
+// totalCount/offset/limit; the Airflow REST API envelope uses total_entries
+// (limit/offset are request parameters, not response fields).
+var paginationFields = map[string]bool{
+	"totalCount":    true,
+	"total_entries": true,
+	"offset":        true,
+	"limit":         true,
+}
+
+// extractPageInfo inspects a paginated response body and returns the total
+// number of records and the number of items on this page.
+//
+// The total is read from "totalCount" (Astro/Houston) or "total_entries"
+// (Airflow). The page size is read from the "limit" response field when present
+// (Astro/Houston), otherwise derived from the length of the page's array field
+// (e.g. "dags") since the Airflow envelope does not echo limit in the body.
+func extractPageInfo(body []byte) (total, pageSize int) {
+	var obj map[string]interface{}
+	if err := json.Unmarshal(body, &obj); err != nil {
+		// Not a JSON object (e.g. a bare array) — no pagination info available.
+		return 0, 0
 	}
 
-	// No pagination info found
-	return result.Body, 0, 0, nil
+	total = intFromJSON(obj["totalCount"])
+	if total == 0 {
+		total = intFromJSON(obj["total_entries"])
+	}
+
+	pageSize = intFromJSON(obj["limit"])
+	if pageSize == 0 {
+		if field := findArrayField(obj); field != "" {
+			if items, ok := obj[field].([]interface{}); ok {
+				pageSize = len(items)
+			}
+		}
+	}
+
+	return total, pageSize
+}
+
+// intFromJSON coerces a value decoded from JSON (numbers decode to float64) to
+// an int, returning 0 for missing or non-numeric values.
+func intFromJSON(v interface{}) int {
+	if f, ok := v.(float64); ok {
+		return int(f)
+	}
+	return 0
+}
+
+// findArrayField returns the name of the first array-valued field that is not a
+// pagination metadata field (e.g. "organizations", "deployments", "dags").
+// Keys are sorted so the selection is deterministic when multiple array fields
+// exist.
+func findArrayField(obj map[string]interface{}) string {
+	keys := make([]string, 0, len(obj))
+	for key := range obj {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		if paginationFields[key] {
+			continue
+		}
+		if _, ok := obj[key].([]interface{}); ok {
+			return key
+		}
+	}
+	return ""
 }
 
 // addOffsetToURL adds or updates the offset query parameter.
@@ -433,23 +497,7 @@ func combinePages(pages []json.RawMessage) ([]byte, error) {
 	}
 
 	// Find the array field (skip pagination fields).
-	// Sort keys so the selection is deterministic when multiple array fields exist.
-	keys := make([]string, 0, len(firstPage))
-	for key := range firstPage {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	var arrayField string
-	for _, key := range keys {
-		if key == "totalCount" || key == "offset" || key == "limit" {
-			continue
-		}
-		if _, ok := firstPage[key].([]interface{}); ok {
-			arrayField = key
-			break
-		}
-	}
+	arrayField := findArrayField(firstPage)
 
 	if arrayField == "" {
 		// No array field found, return array of pages
