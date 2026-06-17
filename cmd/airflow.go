@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -190,7 +191,10 @@ func newDevRootCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	return cmd
 }
 
-// resolveDevMode returns "docker" or "standalone" based on flag priority then config.
+// resolveDevMode returns "docker" or "standalone" based on flag priority, then config,
+// then auto-detection. When no flag is set and the config is "docker" (default),
+// we check for a live standalone PID file so that stop/kill/restart work without
+// the user having to re-specify --standalone.
 func resolveDevMode() string {
 	if standaloneFlag {
 		return modeStandalone
@@ -198,7 +202,23 @@ func resolveDevMode() string {
 	if dockerFlag {
 		return "docker"
 	}
-	return config.CFG.DevMode.GetString()
+	mode := config.CFG.DevMode.GetString()
+	if mode != "docker" {
+		return mode
+	}
+	if standaloneIsRunning() {
+		return modeStandalone
+	}
+	return mode
+}
+
+// standaloneIsRunning checks whether a standalone Airflow process is currently
+// alive by reading the PID file. This enables auto-detection of standalone mode
+// so that stop/kill/restart/ps/logs commands work without --standalone.
+func standaloneIsRunning() bool {
+	pidPath := filepath.Join(config.WorkingPath, airflowrt.StandaloneDir, airflowrt.StandalonePIDFile)
+	_, alive := airflowrt.ReadPID(pidPath)
+	return alive
 }
 
 // setDevModeAnnotation writes the resolved dev mode into a cobra annotation
@@ -843,6 +863,12 @@ func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APICl
 	containerHandler, err := handlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
+	}
+
+	if standaloneFlag {
+		fmt.Printf("%s To make standalone mode the default, run: %s\n\n",
+			ansi.Cyan("➤"),
+			ansi.Bold("astro config set -g dev.mode standalone"))
 	}
 
 	buildSecretString = util.GetbuildSecretString(buildSecrets)

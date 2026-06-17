@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	v1Mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -1779,6 +1781,64 @@ func (s *AirflowSuite) TestResolveDevMode() {
 		dockerFlag = false
 		// Default config value is "docker"
 		s.Equal("docker", resolveDevMode())
+	})
+
+	s.Run("auto-detects standalone when PID file has live process", func() {
+		standaloneFlag = false
+		dockerFlag = false
+		// Default config is "docker", but a live PID file should auto-detect standalone.
+		pidDir := filepath.Join(s.tempDir, airflowrt.StandaloneDir)
+		s.Require().NoError(os.MkdirAll(pidDir, 0o755))
+		// Use our own PID — it's guaranteed to be alive.
+		pidFile := filepath.Join(pidDir, airflowrt.StandalonePIDFile)
+		s.Require().NoError(os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0o644))
+		defer os.RemoveAll(filepath.Join(s.tempDir, ".astro"))
+
+		s.Equal("standalone", resolveDevMode())
+	})
+
+	s.Run("no auto-detect when PID file is missing", func() {
+		standaloneFlag = false
+		dockerFlag = false
+		s.Equal("docker", resolveDevMode())
+	})
+
+	s.Run("no auto-detect when PID file has dead process", func() {
+		standaloneFlag = false
+		dockerFlag = false
+		pidDir := filepath.Join(s.tempDir, airflowrt.StandaloneDir)
+		s.Require().NoError(os.MkdirAll(pidDir, 0o755))
+		// PID 99999999 is almost certainly not alive.
+		pidFile := filepath.Join(pidDir, airflowrt.StandalonePIDFile)
+		s.Require().NoError(os.WriteFile(pidFile, []byte("99999999"), 0o644))
+		defer os.RemoveAll(filepath.Join(s.tempDir, ".astro"))
+
+		s.Equal("docker", resolveDevMode())
+	})
+
+	s.Run("docker flag overrides auto-detect", func() {
+		standaloneFlag = false
+		dockerFlag = true
+		defer func() { dockerFlag = false }()
+		// Even with a live PID file, --docker should force docker mode.
+		pidDir := filepath.Join(s.tempDir, airflowrt.StandaloneDir)
+		s.Require().NoError(os.MkdirAll(pidDir, 0o755))
+		pidFile := filepath.Join(pidDir, airflowrt.StandalonePIDFile)
+		s.Require().NoError(os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0o644))
+		defer os.RemoveAll(filepath.Join(s.tempDir, ".astro"))
+
+		s.Equal("docker", resolveDevMode())
+	})
+
+	s.Run("no auto-detect when config is standalone", func() {
+		standaloneFlag = false
+		dockerFlag = false
+		// When the config explicitly says standalone, use it directly
+		// (no need to check PID).
+		s.Require().NoError(config.CFG.DevMode.SetHomeString("standalone"))
+		defer func() { _ = config.CFG.DevMode.SetHomeString("docker") }()
+
+		s.Equal("standalone", resolveDevMode())
 	})
 }
 
