@@ -33,3 +33,13 @@ func interruptSignals() []os.Signal {
 func venvBinDir() string {
 	return "bin"
 }
+
+// shellCommand returns an *exec.Cmd that executes a shell command string.
+func shellCommand(command string) *exec.Cmd {
+	return exec.Command("bash", "-c", command) //nolint:gosec
+}
+
+// interactiveShellArgs returns the command and arguments for an interactive shell.
+func interactiveShellArgs() []string {
+	return []string{"bash"}
+}

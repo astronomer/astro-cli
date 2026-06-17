@@ -751,12 +751,12 @@ func (s *Standalone) buildEnv() []string {
 	}
 
 	// Layer 3: macOS fork-safety workarounds.
-	// a) Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
-	//    When Airflow forks, this can spin at 100% CPU indefinitely.
-	//    Setting NO_PROXY=* tells Python to skip _scproxy entirely.
-	//    We only do this when no proxy is configured so corporate proxy users
-	//    aren't affected.
-	if !airflowrt.HasProxyConfigured(overrides) {
+	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
+	// When Airflow forks on macOS, this can spin at 100% CPU indefinitely.
+	// Setting NO_PROXY=* tells Python to skip _scproxy entirely.
+	// This is only needed on macOS (_scproxy doesn't exist on other platforms)
+	// and only when no proxy is explicitly configured.
+	if runtime.GOOS == osDarwin && !airflowrt.HasProxyConfigured(overrides) {
 		overrides["NO_PROXY"] = "*"
 		overrides["no_proxy"] = "*"
 		logger.Debugf("No proxy detected — setting NO_PROXY=* to avoid macOS _scproxy hang")
@@ -827,8 +827,8 @@ func (s *Standalone) applySettings(settingsFile string, envConns map[string]astr
 func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, error) {
 	env := s.buildEnv()
 
-	// Use system bash — Python venvs don't include bash; venv bin/ is on PATH.
-	cmd := exec.Command("bash", "-c", command) //nolint:gosec
+	// Use the platform shell — venv bin/ is on PATH via buildEnv().
+	cmd := shellCommand(command)
 	cmd.Dir = s.airflowHome
 	cmd.Env = env
 
@@ -1081,7 +1081,7 @@ func (s *Standalone) Bash(_ string) error {
 		return err
 	}
 	env := s.buildEnv()
-	return standaloneExec(s.airflowHome, env, []string{"bash"}, os.Stdin, os.Stdout, os.Stderr)
+	return standaloneExec(s.airflowHome, env, interactiveShellArgs(), os.Stdin, os.Stdout, os.Stderr)
 }
 
 func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {

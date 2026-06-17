@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 // setProcGroup configures the command to start in a new process group on Windows
@@ -17,9 +19,12 @@ func setProcGroup(cmd *exec.Cmd) {
 	}
 }
 
-// terminateProcessGroup kills the process tree rooted at pid using taskkill /T.
+// terminateProcessGroup sends CTRL_BREAK_EVENT to the process group led by pid.
+// This is the Windows equivalent of Unix SIGTERM for console processes.
+// CREATE_NEW_PROCESS_GROUP (set in setProcGroup) makes the child the leader of
+// its own console group, so the event reaches the entire Airflow process tree.
 func terminateProcessGroup(pid int) {
-	exec.Command("taskkill", "/T", "/PID", fmt.Sprintf("%d", pid)).Run() //nolint:errcheck,gosec
+	windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(pid)) //nolint:errcheck
 }
 
 // killProcessGroup forcefully kills the process tree rooted at pid.
@@ -35,4 +40,14 @@ func interruptSignals() []os.Signal {
 // venvBinDir returns the subdirectory name for executables inside a Python venv.
 func venvBinDir() string {
 	return "Scripts"
+}
+
+// shellCommand returns an *exec.Cmd that executes a shell command string.
+func shellCommand(command string) *exec.Cmd {
+	return exec.Command("cmd", "/C", command) //nolint:gosec
+}
+
+// interactiveShellArgs returns the command and arguments for an interactive shell.
+func interactiveShellArgs() []string {
+	return []string{"cmd"}
 }
