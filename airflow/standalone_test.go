@@ -1,5 +1,3 @@
-//go:build !windows
-
 package airflow
 
 import (
@@ -11,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -54,7 +51,7 @@ func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
 	s.NoError(err)
 
 	// Create fake airflow and python binaries (python needed for macOS shim path)
-	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	venvBin := filepath.Join(tmpDir, ".venv", venvBinDir())
 	err = os.MkdirAll(venvBin, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
@@ -207,7 +204,7 @@ func (s *Suite) TestStandaloneStart_FloatingTag() {
 	s.NoError(err)
 
 	// Create a fake airflow binary
-	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	venvBin := filepath.Join(tmpDir, ".venv", venvBinDir())
 	err = os.MkdirAll(venvBin, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
@@ -870,7 +867,7 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 	s.NoError(err)
 
 	// Create a fake airflow binary that exits immediately
-	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	venvBin := filepath.Join(tmpDir, ".venv", venvBinDir())
 	err = os.MkdirAll(venvBin, 0o755)
 	s.NoError(err)
 	airflowScript := filepath.Join(venvBin, "airflow")
@@ -936,7 +933,7 @@ func (s *Suite) TestStandaloneStart_Background() {
 	s.NoError(err)
 
 	// Create a fake airflow binary that sleeps until killed
-	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	venvBin := filepath.Join(tmpDir, ".venv", venvBinDir())
 	err = os.MkdirAll(venvBin, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\necho 'standalone running'\nsleep 30\n"), 0o755)
@@ -1003,7 +1000,7 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	err = os.WriteFile(filepath.Join(constraintsDir, "freeze-3.1-12-python-3.12.txt"), []byte("apache-airflow==3.0.1\n"), 0o644)
 	s.NoError(err)
 
-	venvBin := filepath.Join(tmpDir, ".venv", "bin")
+	venvBin := filepath.Join(tmpDir, ".venv", venvBinDir())
 	err = os.MkdirAll(venvBin, 0o755)
 	s.NoError(err)
 	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nsleep 30\n"), 0o755)
@@ -1095,11 +1092,11 @@ func (s *Suite) TestStandaloneStop_Running() {
 	err = os.MkdirAll(standaloneStateDir, 0o755)
 	s.NoError(err)
 
-	// Start a sleep process and reap it in the background so it doesn't
-	// become a zombie after SIGTERM (zombies still respond to signal 0,
-	// which would cause the Stop poll loop to spin for the full timeout).
-	cmd := exec.Command("sleep", "60")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Start a long-running process and reap it in the background so it
+	// doesn't become a zombie after termination (zombies still respond to
+	// signal 0, which would cause the Stop poll loop to spin for the full timeout).
+	cmd := longSleepCommand()
+	setProcGroup(cmd)
 	err = cmd.Start()
 	s.NoError(err)
 	go cmd.Wait() //nolint:errcheck
@@ -1605,7 +1602,7 @@ func (s *Suite) TestStandaloneEnsureVenv_WithVenv() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -1635,7 +1632,7 @@ func (s *Suite) TestStandaloneRun_Success() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1678,7 +1675,7 @@ func (s *Suite) TestStandaloneBash_Success() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1768,7 +1765,7 @@ func (s *Suite) TestStandalonePytest_Success() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1809,7 +1806,7 @@ func (s *Suite) TestStandalonePytest_WithFileAndArgs() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1835,7 +1832,7 @@ func (s *Suite) TestStandalonePytest_DefaultTestPath() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1862,7 +1859,7 @@ func (s *Suite) TestStandalonePytest_FileInTestsDir() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1889,7 +1886,7 @@ func (s *Suite) TestStandalonePytest_Failure() {
 	s.NoError(err)
 	defer os.RemoveAll(tmpDir)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1937,7 +1934,7 @@ func (s *Suite) TestStandaloneParse_Success() {
 	s.NoError(err)
 
 	// Create venv
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec
@@ -1964,7 +1961,7 @@ func (s *Suite) TestStandaloneParse_DagErrors() {
 	err = os.WriteFile(filepath.Join(tmpDir, DefaultTestPath), []byte("test"), 0o644)
 	s.NoError(err)
 
-	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", venvBinDir()), 0o755)
 	s.NoError(err)
 
 	origExec := standaloneExec

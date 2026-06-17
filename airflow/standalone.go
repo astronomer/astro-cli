@@ -1,5 +1,3 @@
-//go:build !windows
-
 package airflow
 
 import (
@@ -14,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/pkg/browser"
@@ -358,7 +355,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	// 6. Install dependencies (2-step install)
 	// --python explicitly targets the project venv so uv never installs into
 	// a parent venv even if VIRTUAL_ENV leaks through the environment.
-	venvPython := filepath.Join(s.airflowHome, ".venv", "bin", "python")
+	venvPython := filepath.Join(s.airflowHome, ".venv", venvBinDir(), "python")
 
 	// Step 1: Install airflow with full freeze constraints (reproduces runtime env exactly)
 	installArgs := []string{
@@ -402,7 +399,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	// 9. Start airflow standalone
 	fmt.Println("\nStarting Airflow in standalone mode…")
 
-	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
+	venvBin := filepath.Join(s.airflowHome, ".venv", venvBinDir())
 	airflowBin := filepath.Join(venvBin, "airflow")
 
 	var cmd *exec.Cmd
@@ -445,7 +442,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	cmd.Env = env
 	// Start the subprocess in its own process group so we can kill the entire
 	// tree (scheduler, triggerer, api-server, etc.) when the user sends Ctrl+C.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcGroup(cmd)
 
 	if s.foreground {
 		return s.startForeground(cmd, waitTime, settingsFile, envConns)
@@ -473,12 +470,12 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 	// (scheduler, triggerer, api-server, etc.) are also terminated.
 	sigChan := make(chan os.Signal, 1)
 	done := make(chan struct{})
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, interruptSignals()...)
 	go func() {
 		select {
 		case <-sigChan:
 			if cmd.Process != nil {
-				syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+				terminateProcessGroup(cmd.Process.Pid)
 			}
 		case <-done:
 		}
@@ -581,7 +578,7 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	err = os.WriteFile(s.pidFilePath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), filePermissions)
 	if err != nil {
 		// Kill the process if we can't write the PID file
-		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+		terminateProcessGroup(cmd.Process.Pid)
 		return fmt.Errorf("error writing PID file: %w", err)
 	}
 	// Run health check (blocking — wait for healthy or timeout)
@@ -667,7 +664,7 @@ func (s *Standalone) getConstraints(tag, pythonVersion string) (freezePath, airf
 
 // buildEnv constructs the environment variables for the standalone process.
 func (s *Standalone) buildEnv() []string {
-	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
+	venvBin := filepath.Join(s.airflowHome, ".venv", venvBinDir())
 
 	// Point AIRFLOW_HOME at .astro/standalone/ so all Airflow-generated files
 	// (airflow.cfg, airflow.db, logs/) land there rather than in the project root.
@@ -691,14 +688,14 @@ func (s *Standalone) buildEnv() []string {
 
 	// Layer 2: Standalone-critical settings — these MUST take precedence over
 	// both inherited env and .env to prevent standalone mode from breaking.
-	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
+	overrides["PATH"] = fmt.Sprintf("%s%c%s", venvBin, os.PathListSeparator, os.Getenv("PATH"))
 	// Mirror the production runtime image, which sets PYTHONPATH=AIRFLOW_HOME
 	// (see astro-runtime image/Dockerfile). This makes every subdirectory of
 	// the project root importable as a namespace package — e.g.
 	// `from include.utils import x` or `from dags.my_blueprints import Extract`
 	// — matching what users get at deploy time.
 	if existing := os.Getenv("PYTHONPATH"); existing != "" {
-		overrides["PYTHONPATH"] = fmt.Sprintf("%s:%s", s.airflowHome, existing)
+		overrides["PYTHONPATH"] = fmt.Sprintf("%s%c%s", s.airflowHome, os.PathListSeparator, existing)
 	} else {
 		overrides["PYTHONPATH"] = s.airflowHome
 	}
@@ -866,7 +863,7 @@ func (s *Standalone) Stop(_ bool) error {
 	}
 
 	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
-	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
+	terminateProcessGroup(pid)
 
 	// Poll for process exit
 	deadline := time.Now().Add(stopTimeout)
@@ -877,9 +874,9 @@ func (s *Standalone) Stop(_ bool) error {
 		}
 	}
 
-	// If still alive, send SIGKILL
+	// If still alive, force kill
 	if _, stillAlive := s.readPID(); stillAlive {
-		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
+		killProcessGroup(pid)
 		time.Sleep(stopPollInterval)
 	}
 
@@ -1030,7 +1027,7 @@ func (s *Standalone) Logs(follow bool, containerNames ...string) error {
 
 	// Set up signal handling so Ctrl+C exits cleanly
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, interruptSignals()...)
 	defer signal.Stop(sigChan)
 
 	for {
@@ -1052,7 +1049,7 @@ func (s *Standalone) Logs(follow bool, containerNames ...string) error {
 
 // ensureVenv validates the venv exists before running commands.
 func (s *Standalone) ensureVenv() error {
-	venvBin := filepath.Join(s.airflowHome, ".venv", "bin")
+	venvBin := filepath.Join(s.airflowHome, ".venv", venvBinDir())
 	if _, err := os.Stat(venvBin); os.IsNotExist(err) {
 		return fmt.Errorf("no virtual environment found — run 'astro dev start' first")
 	}
