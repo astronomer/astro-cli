@@ -85,32 +85,38 @@ func (s *ManagerRuntimeSuite) TestInitializeDockerHostAlreadySet() {
 
 func (s *ManagerRuntimeSuite) TestInitializeNoMachines() {
 	s.Run("No machines, initialize podman and set default", func() {
-		pe := &scriptedPodman{machines: nil}
+		pe := &scriptedPodman{machines: nil, inspect: astroInspected(podmanStatusRunning)}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Equal(s.T(), 1, pe.initCalls)
 		assert.Equal(s.T(), []string{podmanMachineName}, pe.defaultCalls)
+		// Regression (pritt20): Initialize must point this process at the machine
+		// (set DOCKER_HOST), not just start it — else compose hits the default
+		// docker daemon and fails with "pull access denied".
+		assert.Equal(s.T(), "unix:///path/to/astro-machine.sock", os.Getenv("DOCKER_HOST"))
 	})
 }
 
 func (s *ManagerRuntimeSuite) TestInitializeAstroMachineAlreadyRunning() {
 	s.Run("Astro machine already running, just set default", func() {
-		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: true}}}
+		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: true}}, inspect: astroInspected(podmanStatusRunning)}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Equal(s.T(), 0, pe.initCalls)
 		assert.Equal(s.T(), 0, pe.startCalls)
 		assert.Equal(s.T(), []string{podmanMachineName}, pe.defaultCalls)
+		assert.Equal(s.T(), "unix:///path/to/astro-machine.sock", os.Getenv("DOCKER_HOST"))
 	})
 }
 
 func (s *ManagerRuntimeSuite) TestInitializeAstroMachineStopped() {
 	s.Run("Astro machine stopped, start it and set default", func() {
-		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: false}}}
+		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: false}}, inspect: astroInspected(podmanStatusRunning)}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Equal(s.T(), 1, pe.startCalls)
 		assert.Equal(s.T(), []string{podmanMachineName}, pe.defaultCalls)
+		assert.Equal(s.T(), "unix:///path/to/astro-machine.sock", os.Getenv("DOCKER_HOST"))
 	})
 }
 
@@ -119,11 +125,13 @@ func (s *ManagerRuntimeSuite) TestInitializeAnotherMachineRunningOnMac() {
 		pe := &scriptedPodman{
 			machines:   []ListedMachine{{Name: "other-machine", Running: true}},
 			containers: nil,
+			inspect:    astroInspected(podmanStatusRunning),
 		}
 		m := newPodmanManager(pe, fakeHost{mac: true})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Contains(s.T(), pe.stopCalls, "other-machine")
 		assert.Equal(s.T(), 1, pe.initCalls)
+		assert.Equal(s.T(), "unix:///path/to/astro-machine.sock", os.Getenv("DOCKER_HOST"))
 	})
 }
 

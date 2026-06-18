@@ -14,11 +14,29 @@ const projectNotRunningErrMsg = "this astro project is not running"
 // configures when running and tears the machine down otherwise; Kill stops and
 // removes the machine when DOCKER_HOST points at it.
 
-// Initialize brings the astro-machine up so the project can run. It is the
-// ContainerRuntime entry point and delegates to EnsureMachine (which is itself a
-// no-op when DOCKER_HOST is already set or the engine isn't Podman).
+// Initialize brings the astro-machine up AND points this process at it. It is
+// the ContainerRuntime entry point (the dev-start pre-run hook): EnsureMachine
+// starts the machine and sets it as the default podman connection, but the
+// current process still needs DOCKER_HOST/CONTAINER_HOST set to its socket so the
+// compose build/up reaches that machine instead of the default docker daemon
+// (without this, `astro dev start` under podman fails with "pull access
+// denied"). No-op for non-Podman engines or when the user already has DOCKER_HOST
+// set — ConnectionEnv returns nil in both cases.
 func (m *Manager) Initialize() error {
-	return m.EnsureMachine()
+	if err := m.EnsureMachine(); err != nil {
+		return err
+	}
+	env, err := m.ConnectionEnv()
+	if err != nil {
+		return err
+	}
+	for _, kv := range env {
+		key, value, _ := strings.Cut(kv, "=")
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("error setting %s: %w", key, err)
+		}
+	}
+	return nil
 }
 
 // Configure points the current process at the running astro-machine by setting
