@@ -21,9 +21,9 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/pkg/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"

@@ -14,7 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/cloud/apiclient"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -473,7 +473,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken strin
 	}
 
 	// Create platform client
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
+	astroV1Client := apiclient.NewV1Client(httputil.NewHTTPClient())
 
 	// Fetch deployment
 	dep, err := deployment.GetDeploymentByID(orgID, opts.DeploymentID, astroV1Client)

@@ -6,7 +6,7 @@ import (
 	context "context"
 	io "io"
 
-	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/pkg/astro-client-v1alpha1"
 	mock "github.com/stretchr/testify/mock"
 )
 

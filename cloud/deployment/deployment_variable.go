@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 

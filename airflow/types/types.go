@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 )
 
 // ImageBuildConfig defines options when building a container image

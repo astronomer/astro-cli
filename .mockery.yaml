@@ -26,16 +26,16 @@ packages:
       outpkg: airflow_mocks
     interfaces:
       Client:
-  github.com/astronomer/astro-cli/astro-client-v1:
+  github.com/astronomer/astro-cli/pkg/astro-client-v1:
     config:
-      dir: astro-client-v1/mocks
+      dir: pkg/astro-client-v1/mocks
     interfaces:
       ClientWithResponsesInterface:
         config:
           filename: client.go
-  github.com/astronomer/astro-cli/astro-client-v1alpha1:
+  github.com/astronomer/astro-cli/pkg/astro-client-v1alpha1:
     config:
-      dir: astro-client-v1alpha1/mocks
+      dir: pkg/astro-client-v1alpha1/mocks
     interfaces:
       ClientWithResponsesInterface:
         config:

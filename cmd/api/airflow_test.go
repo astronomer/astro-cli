@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )

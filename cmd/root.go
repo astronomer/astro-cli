@@ -8,8 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
+	"github.com/astronomer/astro-cli/cloud/apiclient"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
@@ -39,8 +38,8 @@ func NewRootCmd() *cobra.Command {
 	houstonClient = houston.NewClient(httpClient)
 
 	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
-	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient())
+	astroV1Client := apiclient.NewV1Client(httputil.NewHTTPClient())
+	v1Alpha1Client := apiclient.NewV1Alpha1Client(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()

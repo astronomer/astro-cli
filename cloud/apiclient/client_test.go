@@ -1,4 +1,4 @@
-package astrov1alpha1
+package apiclient
 
 import (
 	"testing"
@@ -7,6 +7,11 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
+
+func TestNewV1Client(t *testing.T) {
+	client := NewV1Client(httputil.NewHTTPClient())
+	assert.NotNil(t, client, "Can't create new Astro v1 client")
+}
 
 func TestNewV1Alpha1Client(t *testing.T) {
 	client := NewV1Alpha1Client(httputil.NewHTTPClient())

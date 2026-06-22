@@ -13,13 +13,13 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 

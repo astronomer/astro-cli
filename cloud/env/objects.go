@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
+	astrov1 "github.com/astronomer/astro-cli/pkg/astro-client-v1"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 

@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

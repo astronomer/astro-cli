@@ -9,7 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 )
 
 var (

@@ -52,7 +52,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/patternmatcher v0.6.1
 	github.com/neilotoole/jsoncolor v0.7.1
-	github.com/oapi-codegen/runtime v1.4.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pb33f/libopenapi v0.34.0
 	github.com/pelletier/go-toml/v2 v2.3.0
@@ -247,6 +246,7 @@ require (
 	github.com/nunnatsa/ginkgolinter v0.18.3 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.0 // indirect
+	github.com/oapi-codegen/runtime v1.4.0 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -356,6 +356,8 @@ require (
 	github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29 // indirect
 	github.com/Microsoft/hcsshim v0.14.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/astronomer/astro-cli/pkg/astro-client-v1 v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/astro-client-v1alpha1 v0.0.0-00010101000000-000000000000
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/bugsnag/bugsnag-go v1.5.0 // indirect
@@ -444,3 +446,7 @@ replace github.com/astronomer/astro-cli/pkg/container => ./pkg/container
 replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
 
 replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry
+
+replace github.com/astronomer/astro-cli/pkg/astro-client-v1 => ./pkg/astro-client-v1
+
+replace github.com/astronomer/astro-cli/pkg/astro-client-v1alpha1 => ./pkg/astro-client-v1alpha1

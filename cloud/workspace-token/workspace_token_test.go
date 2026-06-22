@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
-	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
+	astrov1 "github.com/astronomer/astro-cli/pkg/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/pkg/astro-client-v1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

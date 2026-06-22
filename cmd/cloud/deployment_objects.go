@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 )
 
 var (

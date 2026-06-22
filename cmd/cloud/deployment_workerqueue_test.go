@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/pkg/astro-client-v1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

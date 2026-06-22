@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
+	"github.com/astronomer/astro-cli/pkg/astro-client-v1"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
