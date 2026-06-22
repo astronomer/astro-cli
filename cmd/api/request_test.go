@@ -250,6 +250,7 @@ func TestExecutePaginatedRequest(t *testing.T) {
 	var buf bytes.Buffer
 	opts := newTestOpts(&buf)
 	opts.Paginate = true
+	opts.TotalCountField = "totalCount"
 	err := executeRequest(opts, "GET", ts.URL, "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, 2, page)
@@ -272,6 +273,7 @@ func TestExecutePaginatedRequest_Slurp(t *testing.T) {
 	opts := newTestOpts(&buf)
 	opts.Paginate = true
 	opts.Slurp = true
+	opts.TotalCountField = "totalCount"
 	opts.FilterOutput = ".items | length"
 	err := executeRequest(opts, "GET", ts.URL, "", nil)
 	require.NoError(t, err)
@@ -310,6 +312,7 @@ func TestExecutePaginatedRequest_AirflowEnvelope(t *testing.T) {
 	opts := newTestOpts(&buf)
 	opts.Paginate = true
 	opts.Slurp = true
+	opts.TotalCountField = "total_entries"
 	opts.FilterOutput = ".dags | length"
 	err := executeRequest(opts, "GET", ts.URL, "", nil)
 	require.NoError(t, err)
@@ -320,39 +323,44 @@ func TestExecutePaginatedRequest_AirflowEnvelope(t *testing.T) {
 
 func TestExtractPageInfo(t *testing.T) {
 	tests := []struct {
-		name         string
-		body         string
-		wantTotal    int
-		wantPageSize int
+		name            string
+		body            string
+		totalCountField string
+		wantTotal       int
+		wantPageSize    int
 	}{
 		{
-			name:         "astro envelope",
-			body:         `{"items":[{"id":1},{"id":2}],"totalCount":4,"limit":2,"offset":0}`,
-			wantTotal:    4,
-			wantPageSize: 2,
+			name:            "astro envelope",
+			body:            `{"items":[{"id":1},{"id":2}],"totalCount":4,"limit":2,"offset":0}`,
+			totalCountField: "totalCount",
+			wantTotal:       4,
+			wantPageSize:    2,
 		},
 		{
-			name:         "airflow envelope derives page size from items",
-			body:         `{"dags":[{"dag_id":"a"},{"dag_id":"b"},{"dag_id":"c"}],"total_entries":1037}`,
-			wantTotal:    1037,
-			wantPageSize: 3,
+			name:            "airflow envelope derives page size from items",
+			body:            `{"dags":[{"dag_id":"a"},{"dag_id":"b"},{"dag_id":"c"}],"total_entries":1037}`,
+			totalCountField: "total_entries",
+			wantTotal:       1037,
+			wantPageSize:    3,
 		},
 		{
-			name:         "no pagination info",
-			body:         `{"dag_id":"single"}`,
-			wantTotal:    0,
-			wantPageSize: 0,
+			name:            "no pagination info",
+			body:            `{"dag_id":"single"}`,
+			totalCountField: "totalCount",
+			wantTotal:       0,
+			wantPageSize:    0,
 		},
 		{
-			name:         "bare array",
-			body:         `[{"id":1}]`,
-			wantTotal:    0,
-			wantPageSize: 0,
+			name:            "bare array",
+			body:            `[{"id":1}]`,
+			totalCountField: "totalCount",
+			wantTotal:       0,
+			wantPageSize:    0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			total, pageSize := extractPageInfo([]byte(tt.body))
+			total, pageSize := extractPageInfo([]byte(tt.body), tt.totalCountField)
 			assert.Equal(t, tt.wantTotal, total)
 			assert.Equal(t, tt.wantPageSize, pageSize)
 		})

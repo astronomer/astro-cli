@@ -83,6 +83,7 @@ type RequestOptions struct {
 	ShowResponseHeaders bool
 	Paginate            bool
 	Slurp               bool
+	TotalCountField     string
 	Silent              bool
 	Template            string
 	FilterOutput        string
@@ -325,7 +326,7 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 			}
 		}
 
-		// Check if there are more pages
+		// Check if there are more pages, advancing by the records returned.
 		if total <= 0 {
 			break
 		}
@@ -385,65 +386,36 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 		return nil, 0, 0, &SilentError{StatusCode: result.StatusCode}
 	}
 
-	total, pageSize = extractPageInfo(result.Body)
+	total, pageSize = extractPageInfo(result.Body, opts.TotalCountField)
 	return result.Body, total, pageSize, nil
 }
 
-// paginationFields are response keys that hold pagination metadata rather than
-// the list of records. The Astro/Houston platform envelope uses
-// totalCount/offset/limit; the Airflow REST API envelope uses total_entries
-// (limit/offset are request parameters, not response fields).
-var paginationFields = map[string]bool{
-	"totalCount":    true,
-	"total_entries": true,
-	"offset":        true,
-	"limit":         true,
-}
-
 // extractPageInfo inspects a paginated response body and returns the total
-// number of records and the number of items on this page.
-//
-// The total is read from "totalCount" (Astro/Houston) or "total_entries"
-// (Airflow). The page size is read from the "limit" response field when present
-// (Astro/Houston), otherwise derived from the length of the page's array field
-// (e.g. "dags") since the Airflow envelope does not echo limit in the body.
-func extractPageInfo(body []byte) (total, pageSize int) {
+// number of records (read from totalCountField) and the number of items on this
+// page (the length of the response's array field).
+func extractPageInfo(body []byte, totalCountField string) (total, pageSize int) {
 	var obj map[string]interface{}
 	if err := json.Unmarshal(body, &obj); err != nil {
-		// Not a JSON object (e.g. a bare array) — no pagination info available.
 		return 0, 0
 	}
 
-	total = intFromJSON(obj["totalCount"])
-	if total == 0 {
-		total = intFromJSON(obj["total_entries"])
+	// JSON numbers decode to float64 when unmarshaled into interface{}.
+	if f, ok := obj[totalCountField].(float64); ok {
+		total = int(f)
 	}
 
-	pageSize = intFromJSON(obj["limit"])
-	if pageSize == 0 {
-		if field := findArrayField(obj); field != "" {
-			if items, ok := obj[field].([]interface{}); ok {
-				pageSize = len(items)
-			}
+	if field := findArrayField(obj); field != "" {
+		if items, ok := obj[field].([]interface{}); ok {
+			pageSize = len(items)
 		}
 	}
 
 	return total, pageSize
 }
 
-// intFromJSON coerces a value decoded from JSON (numbers decode to float64) to
-// an int, returning 0 for missing or non-numeric values.
-func intFromJSON(v interface{}) int {
-	if f, ok := v.(float64); ok {
-		return int(f)
-	}
-	return 0
-}
-
-// findArrayField returns the name of the first array-valued field that is not a
-// pagination metadata field (e.g. "organizations", "deployments", "dags").
-// Keys are sorted so the selection is deterministic when multiple array fields
-// exist.
+// findArrayField returns the name of the first array-valued field (e.g.
+// "organizations", "deployments", "dags"). Keys are sorted so the selection is
+// deterministic when multiple array fields exist.
 func findArrayField(obj map[string]interface{}) string {
 	keys := make([]string, 0, len(obj))
 	for key := range obj {
@@ -452,9 +424,6 @@ func findArrayField(obj map[string]interface{}) string {
 	sort.Strings(keys)
 
 	for _, key := range keys {
-		if paginationFields[key] {
-			continue
-		}
 		if _, ok := obj[key].([]interface{}); ok {
 			return key
 		}
@@ -496,7 +465,6 @@ func combinePages(pages []json.RawMessage) ([]byte, error) {
 		return result, nil
 	}
 
-	// Find the array field (skip pagination fields).
 	arrayField := findArrayField(firstPage)
 
 	if arrayField == "" {

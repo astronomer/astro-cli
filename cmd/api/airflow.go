@@ -51,8 +51,9 @@ type AirflowOptions struct {
 func NewAirflowCmd(out io.Writer) *cobra.Command {
 	opts := &AirflowOptions{
 		RequestOptions: RequestOptions{
-			Out:    out,
-			ErrOut: os.Stderr,
+			Out:             out,
+			ErrOut:          os.Stderr,
+			TotalCountField: "total_entries",
 			// specCache is initialized lazily when we know the Airflow version
 		},
 	}
