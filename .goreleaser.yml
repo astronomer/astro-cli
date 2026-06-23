@@ -49,6 +49,7 @@ builds:
       - windows
     goarch:
       - amd64
+      - arm64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
 brews:
   - name: astro
