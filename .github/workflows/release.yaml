@@ -91,6 +91,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
+          GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
 
   update-godownloader:
     needs: [detect, release]
