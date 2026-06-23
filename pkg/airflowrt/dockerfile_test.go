@@ -21,6 +21,9 @@ func TestParseRuntimeTagPython(t *testing.T) {
 		{"3.1-12-base", "3.1-12", ""},
 		{"12.0.0", "12.0.0", ""},
 		{"12.0.0-python-3.12", "12.0.0", "3.12"},
+		{"13.7.0-slim", "13.7.0", ""},
+		{"13.7.0-slim-python-3.12", "13.7.0", "3.12"},
+		{"3.1-12-slim", "3.1-12", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.tag, func(t *testing.T) {
