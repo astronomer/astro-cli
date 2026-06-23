@@ -38,13 +38,14 @@ var (
 )
 
 const (
-	jsonFormat      = "json"
-	createAction    = "create"
-	updateAction    = "update"
-	defaultQueue    = "default"
-	HostedDedicated = "HOSTED_DEDICATED"
-	HostedStandard  = "HOSTED_STANDARD"
-	HostedShared    = "HOSTED_SHARED"
+	jsonFormat             = "json"
+	createAction           = "create"
+	updateAction           = "update"
+	defaultQueue           = "default"
+	standardDeploymentType = "STANDARD"
+	HostedDedicated        = "HOSTED_DEDICATED"
+	HostedStandard         = "HOSTED_STANDARD"
+	HostedShared           = "HOSTED_SHARED"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
@@ -1043,7 +1044,7 @@ func transformDeploymentType(deploymentType string) astrov1.DeploymentType {
 	var transformedDeploymentType astrov1.DeploymentType
 
 	switch strings.ToUpper(deploymentType) {
-	case "STANDARD":
+	case standardDeploymentType:
 		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD
 	case HostedShared:
 		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD

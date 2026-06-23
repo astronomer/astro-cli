@@ -1420,7 +1420,7 @@ deployment:
             "scheduler_count": 3,
 			"scheduler_size": "large",
             "workspace_name": "test-workspace",
-			"deployment_type": "STANDARD",
+			"deployment_type": standardDeploymentType,
 			"region": "test-region",
 			"cloud_provider": "aws",
 			"is_development_mode": true,
@@ -1521,7 +1521,7 @@ deployment:
             "scheduler_count": 3,
 			"scheduler_size": "large",
             "workspace_name": "test-workspace",
-			"deployment_type": "STANDARD",
+			"deployment_type": standardDeploymentType,
 			"region": "test-region",
 			"cloud_provider": "aws",
 			"is_development_mode": true,
@@ -3397,7 +3397,7 @@ func (s *Suite) TestGetCreateOrUpdateInput() {
 		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
-		deploymentFromFile.Deployment.Configuration.DeploymentType = "STANDARD"
+		deploymentFromFile.Deployment.Configuration.DeploymentType = standardDeploymentType
 		dagDeploy := true
 		deploymentFromFile.Deployment.Configuration.DagDeployEnabled = &dagDeploy
 		deploymentFromFile.Deployment.Configuration.DefaultWorkerType = "test-worker-1"
@@ -3567,7 +3567,7 @@ func (s *Suite) TestGetQueuesPodEphemeralStorage() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	s.Run("threads pod_ephemeral_storage into worker queue and leaves it nil when unset", func() {
 		deploymentFromFile := inspect.FormattedDeployment{}
-		deploymentFromFile.Deployment.Configuration.DeploymentType = "STANDARD"
+		deploymentFromFile.Deployment.Configuration.DeploymentType = standardDeploymentType
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		deploymentFromFile.Deployment.WorkerQs = []inspect.Workerq{
 			{
