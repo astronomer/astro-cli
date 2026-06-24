@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type AfSuite struct {
@@ -22,6 +23,10 @@ type AfSuite struct {
 func (s *AfSuite) SetupTest() {
 	s.origHomeConfigPath = config.HomeConfigPath
 	s.tmpDir = s.T().TempDir()
+	// Initialize viper before overriding HomeConfigPath — BuildEnv now calls
+	// telemetry.IsEnabled(), which reads config.CFG.TelemetryEnabled and panics
+	// if viper hasn't been initialized.
+	testUtil.InitTestConfig(config.CloudPlatform)
 	config.HomeConfigPath = s.tmpDir
 }
 
