@@ -274,10 +274,8 @@ func (s *Suite) SetupTest() {
 func (s *Suite) TearDownSubTest() {
 	// assert expectations
 	mockV1Client.AssertExpectations(s.T())
-	mockV1Client.AssertExpectations(s.T())
 
 	// reset mocks
-	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 
 	// reset responses object
