@@ -844,8 +844,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 }
 
 func coalesceWorkspace() (string, error) {
-	// An explicit --workspace-id takes precedence and must be honored even when
-	// there is no current workspace context (e.g. an org-scoped API token in CI).
+	// An explicit --workspace-id takes precedence/honored even when there is no current workspace context
 	if wsFlag := workspaceID; wsFlag != "" {
 		return wsFlag, nil
 	}
