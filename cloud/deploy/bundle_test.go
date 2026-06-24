@@ -1,6 +1,8 @@
 package deploy
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"io"
 	"net/http"
 	"os"
@@ -74,6 +76,70 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 
 	s.mockV1Client.AssertExpectations(s.T())
 	s.mockV1Client.AssertExpectations(s.T())
+}
+
+func (s *BundleSuite) TestBundleDeploy_DeployIgnoreApplied() {
+	canCiCdDeploy = func(token string) bool {
+		return true
+	}
+
+	// Create a bundle with files that should and should not be uploaded
+	tmpDir := s.T().TempDir()
+	testBundlePath := filepath.Join(tmpDir, "test-bundle-path")
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(testBundlePath, ".astro"), 0o755))
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(testBundlePath, "docs"), 0o755))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(testBundlePath, "model.sql"), []byte("select 1"), 0o644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(testBundlePath, "notes.md"), []byte("internal"), 0o644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(testBundlePath, "docs", "readme.md"), []byte("internal"), 0o644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(testBundlePath, ".astro", "deployignore"), []byte("docs/\n*.md\n"), 0o644))
+
+	input := &DeployBundleInput{
+		BundlePath:    testBundlePath,
+		MountPath:     "test-mount-path",
+		DeploymentID:  "test-deployment-id",
+		BundleType:    "test-bundle-type",
+		Description:   "test-description",
+		AstroV1Client: s.mockV1Client,
+	}
+
+	mockGetDeployment(s.mockV1Client, true, true)
+	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", nil)
+	mockUpdateDeploy(s.mockV1Client, "version-id")
+
+	var uploadedPaths []string
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		uploadedPaths = readTarGzPaths(s.T(), file)
+		return "version-id", nil
+	}
+
+	err := DeployBundle(input)
+	assert.NoError(s.T(), err)
+
+	assert.Contains(s.T(), uploadedPaths, "model.sql")
+	assert.NotContains(s.T(), uploadedPaths, "notes.md")
+	assert.NotContains(s.T(), uploadedPaths, "docs/readme.md")
+
+	s.mockV1Client.AssertExpectations(s.T())
+}
+
+// readTarGzPaths returns the entry names of a gzipped tarball.
+func readTarGzPaths(t *testing.T, file io.Reader) []string {
+	t.Helper()
+	gzReader, err := gzip.NewReader(file)
+	require.NoError(t, err)
+	defer gzReader.Close()
+
+	var paths []string
+	tarReader := tar.NewReader(gzReader)
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		paths = append(paths, header.Name)
+	}
+	return paths
 }
 
 func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {

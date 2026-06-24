@@ -74,8 +74,17 @@ func DeployBundle(input *DeployBundleInput) error {
 		return errors.New("no bundle upload URL received from Astro")
 	}
 
+	// exclude any files matching the bundle's deploy ignore file, if it has one
+	skipFiles, err := deployIgnoreSkipFunc(input.BundlePath, input.BundlePath)
+	if err != nil {
+		return err
+	}
+	if skipFiles != nil {
+		fmt.Printf("Excluding files matching %s from the bundle\n", deployIgnoreFilePath)
+	}
+
 	// upload the bundle
-	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.RuntimeVersion)
+	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.RuntimeVersion, skipFiles)
 	if err != nil {
 		return err
 	}
@@ -191,7 +200,7 @@ func ValidateBundleSymlinks(bundlePath string) error {
 	return nil
 }
 
-func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string) (string, error) {
+func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string, skipFiles func(relPath string) bool) (string, error) {
 	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
@@ -216,8 +225,14 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Generate the bundle tar
-	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})
+	// Generate the bundle tar, never including any .git directory
+	skip := func(relPath string) bool {
+		if relPath == ".git" || strings.HasPrefix(relPath, ".git/") {
+			return true
+		}
+		return skipFiles != nil && skipFiles(relPath)
+	}
+	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, skip)
 	if err != nil {
 		return "", err
 	}

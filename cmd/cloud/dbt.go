@@ -47,7 +47,7 @@ func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy DEPLOYMENT-ID",
 		Short: "Deploy your dbt project to a Deployment on Astro",
-		Long:  "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment.",
+		Long:  "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment. To exclude files from the bundle, add patterns (.dockerignore syntax, relative to the dbt project root) to a .astro/deployignore file in your dbt project.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  deployDbt,
 		Example: `
