@@ -488,21 +488,21 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		close(done)
 	}()
 
+	// Pump child output with io.Copy rather than a line scanner: bufio.Scanner
+	// silently stops at the first line over its 64KB token limit (Airflow can
+	// log more than that on one line), and a stopped pump lets the child's
+	// stdout pipe fill until its next write() blocks forever. io.Copy reads
+	// until EOF. Copy errors are ignored: output pumping is best-effort and
+	// child failures are surfaced by Wait().
 	var wg sync.WaitGroup
 	wg.Add(2) //nolint:mnd
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			fmt.Println(scanner.Text())
-		}
+		io.Copy(os.Stdout, stdout) //nolint:errcheck
 	}()
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			fmt.Fprintln(os.Stderr, scanner.Text())
-		}
+		io.Copy(os.Stderr, stderr) //nolint:errcheck
 	}()
 
 	// Run health check in background
