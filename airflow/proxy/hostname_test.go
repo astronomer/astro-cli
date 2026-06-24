@@ -14,10 +14,10 @@ import (
 
 func TestDeriveHostname_Delegates(t *testing.T) {
 	// Verify the wrapper produces the same result as the pkg function.
-	hostname, err := DeriveHostname("/home/user/my-project")
+	hostname, err := DeriveHostname("circus", "/home/user/my-project")
 	require.NoError(t, err)
 
-	expected, err := pkgproxy.DeriveHostname("/home/user/my-project")
+	expected, err := pkgproxy.DeriveHostname("circus", "/home/user/my-project")
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, hostname)

@@ -304,7 +304,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 			proxyPort = proxy.DefaultPort
 		}
 
-		hostname, hErr := proxy.DeriveHostname(s.airflowHome)
+		hostname, hErr := proxy.DeriveHostname(config.CFG.ProjectName.GetString(), s.airflowHome)
 		if hErr != nil {
 			// Fall back to non-proxy mode if hostname derivation fails
 			useProxy = false
@@ -891,7 +891,7 @@ func (s *Standalone) Stop(_ bool) error {
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
 func (s *Standalone) removeProxyRoute() {
-	hostname, err := proxy.DeriveHostname(s.airflowHome)
+	hostname, err := proxy.DeriveHostname(config.CFG.ProjectName.GetString(), s.airflowHome)
 	if err != nil {
 		logger.Debugf("could not derive proxy hostname: %s", err)
 		return

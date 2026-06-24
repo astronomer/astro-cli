@@ -219,7 +219,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
 func (d *DockerCompose) removeProxyRoute() {
-	hostname, err := proxy.DeriveHostname(d.airflowHome)
+	hostname, err := proxy.DeriveHostname(config.CFG.ProjectName.GetString(), d.airflowHome)
 	if err != nil {
 		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
@@ -290,7 +290,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			proxyPort = proxy.DefaultPort
 		}
 
-		hostname, hErr := proxy.DeriveHostname(d.airflowHome)
+		hostname, hErr := proxy.DeriveHostname(config.CFG.ProjectName.GetString(), d.airflowHome)
 		if hErr != nil {
 			// Fall back to non-proxy mode if hostname derivation fails
 			useProxy = false

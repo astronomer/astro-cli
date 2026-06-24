@@ -30,23 +30,35 @@ func SanitizeLabel(name string) string {
 	return name
 }
 
-// DeriveHostname converts a project directory path into a valid DNS hostname.
+// DeriveHostname converts a project name and directory into a valid DNS hostname.
 //
-// If the project is inside a git worktree, the hostname includes both the
-// worktree name and the repo name: <worktree>.<repo>.localhost.
-// Otherwise, it uses just the directory name: <dir>.localhost.
-func DeriveHostname(projectDir string) (string, error) {
-	// Try worktree detection first
-	if hostname, err := deriveWorktreeHostname(projectDir); err == nil && hostname != "" {
+// projectName comes from .astro/config.yaml (project.name) and is preferred
+// over the directory name when set. This matches the help text for
+// `astro dev proxy`, which advertises `<project>.localhost` URLs.
+//
+// If projectName is empty (or sanitizes to empty), the directory name is used
+// as a fallback.
+//
+// When the project lives inside a git worktree, the worktree name is prepended
+// for disambiguation: <worktree>.<projectLabel>.localhost.
+func DeriveHostname(projectName, projectDir string) (string, error) {
+	projectLabel := SanitizeLabel(projectName)
+
+	// Try worktree detection first; projectLabel fills in the project segment
+	// when set, otherwise the main repo's directory name is used.
+	if hostname, err := deriveWorktreeHostname(projectDir, projectLabel); err == nil && hostname != "" {
 		return hostname, nil
 	}
 
-	// Fallback: use directory name
-	label := SanitizeLabel(filepath.Base(projectDir))
-	if label == "" {
+	// Non-worktree: prefer project name, fall back to directory name.
+	if projectLabel != "" {
+		return projectLabel + LocalhostSuffix, nil
+	}
+	dirLabel := SanitizeLabel(filepath.Base(projectDir))
+	if dirLabel == "" {
 		return "", fmt.Errorf("could not derive a valid hostname from project directory %q", projectDir)
 	}
-	return label + LocalhostSuffix, nil
+	return dirLabel + LocalhostSuffix, nil
 }
 
 // ReadDotGit reads the .git file/directory at the given path. It is a variable
@@ -69,9 +81,12 @@ var ReadDotGit = func(projectDir string) ([]byte, bool, error) {
 
 // deriveWorktreeHostname detects if projectDir is a git worktree by checking
 // whether .git is a file (worktrees have a .git file pointing to the main
-// repo's .git/worktrees/<name> directory). Returns <worktree>.<repo>.localhost
-// or ("", nil) if not a worktree.
-func deriveWorktreeHostname(projectDir string) (string, error) {
+// repo's .git/worktrees/<name> directory). Returns
+// <worktree>.<projectLabelOrRepo>.localhost or ("", nil) if not a worktree.
+//
+// If projectLabel is non-empty it is used as the project segment; otherwise
+// the main repo's directory name is used.
+func deriveWorktreeHostname(projectDir, projectLabel string) (string, error) {
 	data, isDir, err := ReadDotGit(projectDir)
 	if err != nil {
 		return "", err
@@ -99,7 +114,10 @@ func deriveWorktreeHostname(projectDir string) (string, error) {
 	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(gitdir)))
 
 	worktreeLabel := SanitizeLabel(filepath.Base(projectDir))
-	repoLabel := SanitizeLabel(filepath.Base(repoRoot))
+	repoLabel := projectLabel
+	if repoLabel == "" {
+		repoLabel = SanitizeLabel(filepath.Base(repoRoot))
+	}
 
 	if worktreeLabel == "" || repoLabel == "" {
 		return "", nil
