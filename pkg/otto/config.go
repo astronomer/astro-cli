@@ -123,20 +123,15 @@ func (c *Config) BuildEnv() []string {
 	// airflow subcommands already honor it alongside their `--no-browser` flag.
 	set("ASTRONOMER_NO_BROWSER", "1")
 
-	// Airflow connection
+	// Airflow connection. Set when we matched the cwd to a project;
+	// otherwise leave the env alone so af's layered config (project-local
+	// > project-shared > global) resolves the user's saved instance.
 	set("AIRFLOW_API_URL", c.AirflowURL)
 
 	if c.AirflowURL != "" {
 		// Default local Airflow credentials for af CLI token exchange
 		set("AIRFLOW_USERNAME", "admin")
 		set("AIRFLOW_PASSWORD", "admin")
-	} else {
-		// We couldn't match the current project to a running Airflow.
-		// Point the af CLI at an empty config so it doesn't silently fall
-		// back to ~/.af/config.yaml's `current-instance`, which is a
-		// globally-scoped pointer that usually references whatever project
-		// last ran `astro dev start` — not this one.
-		set("AF_CONFIG", os.DevNull)
 	}
 
 	return env

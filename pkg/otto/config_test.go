@@ -104,22 +104,6 @@ func (s *ConfigSuite) TestBuildEnv_SkipsEmptyValues() {
 	s.False(hasKey("AIRFLOW_API_URL"))
 	s.False(hasKey("AIRFLOW_USERNAME"))
 	s.False(hasKey("AIRFLOW_PASSWORD"))
-
-	// When we couldn't associate an Airflow with the current project, we point
-	// the af CLI at an empty config so it doesn't fall through to
-	// ~/.af/config.yaml and silently query a different project's Airflow.
-	afConfig, ok := findEnv("AF_CONFIG")
-	s.True(ok, "AF_CONFIG should be set when AirflowURL is empty")
-	s.Equal(os.DevNull, afConfig)
-}
-
-func (s *ConfigSuite) TestBuildEnv_DoesNotSetAFConfigWhenAirflowDetected() {
-	cfg := &Config{AirflowURL: "http://localhost:14955"}
-	env := cfg.BuildEnv()
-
-	for _, e := range env {
-		s.False(strings.HasPrefix(e, "AF_CONFIG="), "AF_CONFIG must not be overridden when Airflow is detected")
-	}
 }
 
 func (s *ConfigSuite) TestBuildEnv_OverridesExisting() {
