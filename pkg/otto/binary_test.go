@@ -101,6 +101,43 @@ func (s *BinarySuite) TestDownloadURL() {
 	s.Contains(url, ".tar.gz")
 }
 
+func (s *BinarySuite) TestClassifyDownloadFailure_UnsupportedPlatform() {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer probe.Close()
+
+	err := classifyDownloadFailure(http.StatusNotFound, "https://example/otto-windows-386.exe.zip", probe.URL)
+	s.Error(err)
+	s.Contains(err.Error(), "otto is not available for")
+	s.Contains(err.Error(), runtime.GOOS+"/"+runtime.GOARCH)
+	s.NotContains(err.Error(), "HTTP 404")
+}
+
+func (s *BinarySuite) TestClassifyDownloadFailure_CDNDown() {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer probe.Close()
+
+	err := classifyDownloadFailure(http.StatusNotFound, "https://example/otto-linux-x64.tar.gz", probe.URL)
+	s.Error(err)
+	s.Contains(err.Error(), "HTTP 404")
+	s.NotContains(err.Error(), "not available for")
+}
+
+func (s *BinarySuite) TestClassifyDownloadFailure_NonNotFound() {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer probe.Close()
+
+	err := classifyDownloadFailure(http.StatusServiceUnavailable, "https://example/otto-linux-x64.tar.gz", probe.URL)
+	s.Error(err)
+	s.Contains(err.Error(), "HTTP 503")
+	s.NotContains(err.Error(), "not available for")
+}
+
 func (s *BinarySuite) TestIsUpdateAvailable_NotInstalled() {
 	// With no package.json, IsUpdateAvailable returns (false, "", nil) without
 	// contacting the CDN.

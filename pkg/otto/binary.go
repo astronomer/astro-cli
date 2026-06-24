@@ -25,6 +25,7 @@ const (
 	MinVersion = "0.0.2"
 
 	cdnBaseURL    = "https://install.astronomer.io/otto"
+	versionURL    = cdnBaseURL + "/latest/version"
 	binaryName    = "otto"
 	pkgJSON       = "package.json"
 	windowsGOOS   = "windows"
@@ -73,7 +74,7 @@ func InstalledVersion() (string, error) {
 // LatestVersion fetches the latest version string from the CDN.
 func LatestVersion() (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(cdnBaseURL + "/latest/version")
+	resp, err := client.Get(versionURL)
 	if err != nil {
 		return "", fmt.Errorf("checking latest otto version: %w", err)
 	}
@@ -139,8 +140,8 @@ func Update() error {
 
 // downloadURL constructs the CDN URL for the latest Otto on this platform.
 func downloadURL() string {
-	goos := runtime.GOOS   // "darwin", "linux", "windows"
-	arch := runtime.GOARCH // "arm64", "amd64"
+	goos := runtime.GOOS
+	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x64"
 	}
@@ -148,6 +149,30 @@ func downloadURL() string {
 		return fmt.Sprintf("%s/latest/%s-%s-%s.exe.zip", cdnBaseURL, binaryName, goos, arch)
 	}
 	return fmt.Sprintf("%s/latest/%s-%s-%s.tar.gz", cdnBaseURL, binaryName, goos, arch)
+}
+
+// classifyDownloadFailure rewrites a 404 from the asset URL into an
+// unsupported-platform error if the CDN is reachable, otherwise reports the
+// failure verbatim. Non-404 statuses pass through unchanged.
+func classifyDownloadFailure(status int, assetURL, probeURL string) error {
+	verbatim := fmt.Errorf("downloading otto: HTTP %d from %s", status, assetURL)
+	if status != http.StatusNotFound {
+		return verbatim
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Head(probeURL)
+	if err != nil {
+		return verbatim
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return verbatim
+	}
+	format := "otto is not available for %s/%s. See https://github.com/astronomer/astro-cli/releases for supported platforms"
+	if runtime.GOOS == windowsGOOS {
+		format += ". If you are on 64-bit Windows but installed the 32-bit astro CLI, reinstall the x86_64 build"
+	}
+	return fmt.Errorf(format, runtime.GOOS, runtime.GOARCH)
 }
 
 // downloadAndInstall fetches the Otto archive and extracts it to BinDir().
@@ -160,7 +185,7 @@ func downloadAndInstall() error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("downloading otto: HTTP %d from %s", resp.StatusCode, url)
+		return classifyDownloadFailure(resp.StatusCode, url, versionURL)
 	}
 
 	binDir := BinDir()
