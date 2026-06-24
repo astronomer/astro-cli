@@ -13,6 +13,7 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/cloud/workspace"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -24,6 +25,51 @@ func execWorkspaceCmd(args ...string) (string, error) {
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
+}
+
+func TestCoalesceWorkspace(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	origWorkspaceID := workspaceID
+	defer func() { workspaceID = origWorkspaceID }()
+
+	setWorkspaceContext := func(ws string) {
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.NoError(t, c.SetContextKey("workspace", ws))
+	}
+
+	t.Run("honors --workspace-id flag when no current workspace context", func(t *testing.T) {
+		setWorkspaceContext("")
+		workspaceID = "flag-ws-id"
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
+		assert.Equal(t, "flag-ws-id", ws)
+	})
+
+	t.Run("honors --workspace-id flag over current workspace context", func(t *testing.T) {
+		setWorkspaceContext("ctx-ws-id")
+		workspaceID = "flag-ws-id"
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
+		assert.Equal(t, "flag-ws-id", ws)
+	})
+
+	t.Run("falls back to current workspace context when no flag", func(t *testing.T) {
+		setWorkspaceContext("ctx-ws-id")
+		workspaceID = ""
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
+		assert.Equal(t, "ctx-ws-id", ws)
+	})
+
+	t.Run("errors when no flag and no current workspace context", func(t *testing.T) {
+		setWorkspaceContext("")
+		workspaceID = ""
+		_, err := coalesceWorkspace()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "current workspace context not set")
+	})
 }
 
 func TestWorkspaceRootCommand(t *testing.T) {

@@ -844,14 +844,15 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 }
 
 func coalesceWorkspace() (string, error) {
-	wsFlag := workspaceID
+	// An explicit --workspace-id takes precedence and must be honored even when
+	// there is no current workspace context (e.g. an org-scoped API token in CI).
+	if wsFlag := workspaceID; wsFlag != "" {
+		return wsFlag, nil
+	}
+
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get current Workspace")
-	}
-
-	if wsFlag != "" {
-		return wsFlag, nil
 	}
 
 	if wsCfg != "" {
