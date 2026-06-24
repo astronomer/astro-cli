@@ -93,12 +93,26 @@ func (s *BinarySuite) TestInstalledVersion_InvalidJSON() {
 	s.Contains(err.Error(), "parsing otto metadata")
 }
 
-func (s *BinarySuite) TestDownloadURL() {
-	url := downloadURL()
+func (s *BinarySuite) TestDownloadURL_Latest() {
+	url := downloadURL(latestVersion)
 	s.Contains(url, cdnBaseURL)
 	s.Contains(url, "/latest/")
 	s.Contains(url, "otto-")
 	s.Contains(url, ".tar.gz")
+}
+
+func (s *BinarySuite) TestDownloadURL_PinnedVersion() {
+	url := downloadURL("0.1.8")
+	s.Contains(url, cdnBaseURL)
+	s.Contains(url, "/v0.1.8/")
+	s.NotContains(url, "/latest/")
+}
+
+// Already-prefixed versions must not double up to /vv0.1.8/.
+func (s *BinarySuite) TestDownloadURL_PinnedVersion_AlreadyPrefixed() {
+	url := downloadURL("v0.1.8")
+	s.Contains(url, "/v0.1.8/")
+	s.NotContains(url, "/vv0.1.8/")
 }
 
 func (s *BinarySuite) TestIsUpdateAvailable_NotInstalled() {

@@ -50,10 +50,12 @@ func hintUpdateAvailable(w io.Writer) {
 // disk) prints a notice and returns, letting the caller continue with the
 // existing binary.
 //
-// `download` is parameterized so tests can swap in a stub — production
-// callers pass downloadAndInstall. Gating on the `otto.auto_update` flag
-// is the caller's responsibility; this function always applies when called.
-func autoUpdate(w io.Writer, download func() error) {
+// `download` is passed the target version so the "Updating Otto X → Y" log
+// line matches what lands on disk: the CDN's /latest/ alias can race past
+// the cached value when a release ships between refreshes. Gating on the
+// `otto.auto_update` flag is the caller's responsibility; this function
+// always applies when called.
+func autoUpdate(w io.Writer, download func(version string) error) {
 	installed, err := InstalledVersion()
 	if err != nil || installed == "" {
 		return // first-run case — EnsureBinary already fetched latest
@@ -66,7 +68,7 @@ func autoUpdate(w io.Writer, download func() error) {
 		return
 	}
 	fmt.Fprintf(w, "Updating Otto %s → %s...\n", installed, state.LatestKnown)
-	if err := download(); err != nil {
+	if err := download(state.LatestKnown); err != nil {
 		fmt.Fprintf(w, "Otto update failed (%v); continuing with %s\n", err, installed)
 	}
 }

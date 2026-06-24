@@ -28,6 +28,7 @@ const (
 	binaryName    = "otto"
 	pkgJSON       = "package.json"
 	windowsGOOS   = "windows"
+	latestVersion = "latest"
 	dirPerm       = 0o755
 	binPerm       = 0o755
 	logFilePerm   = 0o644
@@ -117,16 +118,16 @@ func EnsureBinary() error {
 	}
 	if version == "" {
 		fmt.Println("Downloading Otto...")
-		return downloadAndInstall()
+		return downloadAndInstall(latestVersion)
 	}
 	iv, err := semver.NewVersion(version)
 	if err != nil {
-		return downloadAndInstall()
+		return downloadAndInstall(latestVersion)
 	}
 	minVer, _ := semver.NewVersion(MinVersion)
 	if iv.LessThan(minVer) {
 		fmt.Printf("Otto %s is below minimum required version %s, updating...\n", version, MinVersion)
-		return downloadAndInstall()
+		return downloadAndInstall(latestVersion)
 	}
 	return nil
 }
@@ -134,25 +135,30 @@ func EnsureBinary() error {
 // Update downloads and installs the latest Otto binary.
 func Update() error {
 	fmt.Println("Updating Otto...")
-	return downloadAndInstall()
+	return downloadAndInstall(latestVersion)
 }
 
-// downloadURL constructs the CDN URL for the latest Otto on this platform.
-func downloadURL() string {
+// downloadURL constructs the CDN URL for an Otto release on this platform.
+// version is "latest" or a semver (with or without the v prefix).
+func downloadURL(version string) string {
 	goos := runtime.GOOS   // "darwin", "linux", "windows"
 	arch := runtime.GOARCH // "arm64", "amd64"
 	if arch == "amd64" {
 		arch = "x64"
 	}
-	if goos == windowsGOOS {
-		return fmt.Sprintf("%s/latest/%s-%s-%s.exe.zip", cdnBaseURL, binaryName, goos, arch)
+	versionPath := version
+	if version != latestVersion && !strings.HasPrefix(version, "v") {
+		versionPath = "v" + version
 	}
-	return fmt.Sprintf("%s/latest/%s-%s-%s.tar.gz", cdnBaseURL, binaryName, goos, arch)
+	if goos == windowsGOOS {
+		return fmt.Sprintf("%s/%s/%s-%s-%s.exe.zip", cdnBaseURL, versionPath, binaryName, goos, arch)
+	}
+	return fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", cdnBaseURL, versionPath, binaryName, goos, arch)
 }
 
 // downloadAndInstall fetches the Otto archive and extracts it to BinDir().
-func downloadAndInstall() error {
-	url := downloadURL()
+func downloadAndInstall(version string) error {
+	url := downloadURL(version)
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
