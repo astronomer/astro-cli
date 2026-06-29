@@ -96,6 +96,8 @@ var (
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
 		DevMode:                 newCfg("dev.mode", "docker"),
 		DevBuildSecrets:         newCfg("dev.build_secrets", ""),
+		DevWorkspaceID:          newCfg("dev.workspace_id", ""),
+		DevDeploymentID:         newCfg("dev.deployment_id", ""),
 		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),

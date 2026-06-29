@@ -830,6 +830,15 @@ func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APICl
 		envFile = args[0]
 	}
 
+	// Fall back to project config (dev.workspace_id / dev.deployment_id) when the
+	// flags aren't passed, so `astro dev start`/`restart` can sync connections
+	// from the Environment Manager without flags.
+	if workspaceID == "" {
+		workspaceID = config.CFG.DevWorkspaceID.GetString()
+	}
+	if deploymentID == "" {
+		deploymentID = config.CFG.DevDeploymentID.GetString()
+	}
 	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
@@ -1042,6 +1051,15 @@ func airflowRestart(cmd *cobra.Command, args []string, astroV1Client astrov1.API
 	// don't startup browser on restart
 	noBrowser = true
 
+	// Fall back to project config (dev.workspace_id / dev.deployment_id) when the
+	// flags aren't passed, so `astro dev start`/`restart` can sync connections
+	// from the Environment Manager without flags.
+	if workspaceID == "" {
+		workspaceID = config.CFG.DevWorkspaceID.GetString()
+	}
+	if deploymentID == "" {
+		deploymentID = config.CFG.DevDeploymentID.GetString()
+	}
 	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
