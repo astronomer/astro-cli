@@ -57,6 +57,9 @@ type cfgs struct {
 	RemoteBaseImageRegistry cfg
 	DeployGitMetadata       cfg
 	DevMode                 cfg
+	DevBuildSecrets         cfg
+	DevWorkspaceID          cfg
+	DevDeploymentID         cfg
 	TelemetryEnabled        cfg
 	TelemetryAnonymousID    cfg
 	TelemetryNoticeShown    cfg

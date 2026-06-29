@@ -103,12 +103,20 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	return claims, nil
 }
 
-func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
+func GetbuildSecretString(buildSecret []string, fallbacks ...string) (buildSecretString string) {
 	for i, secret := range buildSecret {
 		if i == 0 {
 			buildSecretString = secret
 		} else {
 			buildSecretString = buildSecretString + "," + secret
+		}
+	}
+	if buildSecretString == "" {
+		for _, fb := range fallbacks {
+			if fb != "" {
+				buildSecretString = fb
+				break
+			}
 		}
 	}
 	if os.Getenv("BUILD_SECRET_INPUT") != "" && buildSecretString == "" {

@@ -241,6 +241,22 @@ func (s *Suite) TestGetbuildSecretString() {
 		s.Equal("secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
 	})
 
+	s.Run("uses fallback when buildSecret is empty and fallback is provided", func() {
+		s.Equal("fallback-secret", GetbuildSecretString([]string{}, "fallback-secret"))
+	})
+
+	s.Run("flag takes priority over fallback", func() {
+		s.Equal("flag-secret", GetbuildSecretString([]string{"flag-secret"}, "fallback-secret"))
+	})
+
+	s.Run("fallback takes priority over BUILD_SECRET_INPUT", func() {
+		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
+		defer os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
+		os.Setenv("BUILD_SECRET_INPUT", "env-secret")
+
+		s.Equal("fallback-secret", GetbuildSecretString([]string{}, "fallback-secret"))
+	})
+
 	s.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func() {
 		// Save the original value of BUILD_SECRET_INPUT
 		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")

@@ -810,7 +810,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) err
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
 
-	buildSecretString = util.GetbuildSecretString(buildSecrets)
+	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
 	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, astroV1Client)
 	if err != nil {
@@ -830,6 +830,15 @@ func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APICl
 		envFile = args[0]
 	}
 
+	// Fall back to project config (dev.workspace_id / dev.deployment_id) when the
+	// flags aren't passed, so `astro dev start`/`restart` can sync connections
+	// from the Environment Manager without flags.
+	if workspaceID == "" {
+		workspaceID = config.CFG.DevWorkspaceID.GetString()
+	}
+	if deploymentID == "" {
+		deploymentID = config.CFG.DevDeploymentID.GetString()
+	}
 	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
@@ -845,7 +854,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APICl
 		return err
 	}
 
-	buildSecretString = util.GetbuildSecretString(buildSecrets)
+	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
 	return containerHandler.Start(&airflow.StartOptions{
 		ImageName:         customImageName,
@@ -1042,6 +1051,15 @@ func airflowRestart(cmd *cobra.Command, args []string, astroV1Client astrov1.API
 	// don't startup browser on restart
 	noBrowser = true
 
+	// Fall back to project config (dev.workspace_id / dev.deployment_id) when the
+	// flags aren't passed, so `astro dev start`/`restart` can sync connections
+	// from the Environment Manager without flags.
+	if workspaceID == "" {
+		workspaceID = config.CFG.DevWorkspaceID.GetString()
+	}
+	if deploymentID == "" {
+		deploymentID = config.CFG.DevDeploymentID.GetString()
+	}
 	var envConns map[string]astrov1.EnvironmentObjectConnection
 	if workspaceID != "" || deploymentID != "" {
 		var err error
@@ -1051,7 +1069,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroV1Client astrov1.API
 		}
 	}
 
-	buildSecretString = util.GetbuildSecretString(buildSecrets)
+	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
 	return containerHandler.Start(&airflow.StartOptions{
 		ImageName:         customImageName,
@@ -1105,7 +1123,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	buildSecretString = util.GetbuildSecretString(buildSecrets)
+	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
 	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs, buildSecretString)
 	if err != nil {
@@ -1134,7 +1152,7 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	buildSecretString = util.GetbuildSecretString(buildSecrets)
+	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
 	return containerHandler.Parse(customImageName, "", buildSecretString)
 }
@@ -1155,7 +1173,7 @@ func airflowBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	buildSecretString = util.GetbuildSecretString(buildSecrets)
+	buildSecretString = util.GetbuildSecretString(buildSecrets, config.CFG.DevBuildSecrets.GetString())
 
 	return containerHandler.Build(customImageName, buildSecretString, noCache)
 }
