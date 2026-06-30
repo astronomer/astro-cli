@@ -17,7 +17,7 @@ const (
 	kubernetesExecutorArg = "kubernetes"
 	k8sExecutorArg        = "k8s"
 
-	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
+	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
 	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
 	continueSubMsg                             = " for more details. Do you want to continue?"
 	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
@@ -224,9 +224,11 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentDelete(cmd, args, out)
 		},
 	}
-	if appConfig != nil && appConfig.Flags.HardDeleteDeployment {
-		cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
-	}
+	// Deprecated (PLX-575): deletions are always hard deletes now, so --hard is a
+	// no-op. It is kept (hidden + deprecation notice) so existing scripts that
+	// pass --hard keep working; remove it in a future major release.
+	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deprecated: deletions always remove all infrastructure and records for the Deployment")
+	_ = cmd.Flags().MarkDeprecated("hard", "deletions are always hard deletes; the --hard flag no longer has any effect")
 	return cmd
 }
 
@@ -484,15 +486,15 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	if hardDelete {
-		i, _ := input.Confirm(cliDeploymentHardDeletePrompt)
-
-		if !i {
-			fmt.Println("Exit: This command was not executed and your Deployment was not hard deleted.\n If you want to delete your Deployment but not permanently, try\n $ astro deployment delete without the --hard flag.")
-			return nil
-		}
+	// Deletions are always hard deletes now (PLX-575): all data associated with
+	// the Deployment, including the database, is permanently removed. Confirm
+	// before proceeding.
+	i, _ := input.Confirm(cliDeploymentHardDeletePrompt)
+	if !i {
+		fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
+		return nil
 	}
-	return deployment.Delete(args[0], hardDelete, houstonClient, out)
+	return deployment.Delete(args[0], true, houstonClient, out)
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
