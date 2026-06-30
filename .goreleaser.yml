@@ -57,6 +57,7 @@ brews:
       owner: astronomer
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      branch: "bump-astro-{{ .Version }}"
       pull_request:
         enabled: true
         base:
@@ -78,6 +79,7 @@ brews:
       owner: astronomer
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      branch: "bump-astro-versioned-{{ .Version }}"
       pull_request:
         enabled: true
         base:

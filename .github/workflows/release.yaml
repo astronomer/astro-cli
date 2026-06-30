@@ -76,6 +76,21 @@ jobs:
       - name: Add osxcross to PATH
         run: echo "/tmp/osxcross/target/bin" >> $GITHUB_PATH
 
+      - name: Find previous GA tag for changelog
+        id: prev-tag
+        run: |
+          # Find the latest GA tag (excluding the current tag and any prereleases).
+          # All release types (nightly/RC/GA) compare against the last GA for changelog continuity.
+          PREV_GA=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" \
+            | grep -v -- '-' \
+            | grep -v "^${{ needs.detect.outputs.tag }}$" \
+            | sed 's/^v//' \
+            | sort -t. -k1,1n -k2,2n -k3,3n \
+            | tail -1 \
+            | sed 's/^/v/')
+          echo "tag=$PREV_GA" >> $GITHUB_OUTPUT
+          echo "Previous GA tag for changelog: $PREV_GA"
+
       - name: Get Homebrew token via Octo STS
         if: needs.detect.outputs.type == 'ga'
         uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
@@ -92,12 +107,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
           GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
+          GORELEASER_PREVIOUS_TAG: ${{ steps.prev-tag.outputs.tag }}
 
   update-godownloader:
     needs: [detect, release]
-    if: needs.detect.outputs.type == 'ga'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
+      - name: Verify GitHub release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.detect.outputs.tag }}"
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::GitHub release $TAG does not exist. Skipping godownloader update."
+            exit 1
+          fi
+          echo "Release $TAG confirmed."
+
       - name: Get token via Octo STS
         uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
         id: godownloader-token
@@ -136,9 +163,21 @@ jobs:
 
   update-winget:
     needs: [detect, release]
-    if: needs.detect.outputs.type == 'ga'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
     runs-on: windows-latest
     steps:
+      - name: Verify GitHub release exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.detect.outputs.tag }}"
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::GitHub release $TAG does not exist. Skipping winget update."
+            exit 1
+          fi
+          echo "Release $TAG confirmed."
+
       - name: Get Winget token via Octo STS
         uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
         id: winget-token
@@ -188,25 +227,37 @@ jobs:
 
   notify:
     needs: [detect, release, update-godownloader, update-winget]
-    if: always() && needs.detect.outputs.type == 'ga' && needs.release.result == 'success'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
+      - name: Verify GitHub release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.detect.outputs.tag }}"
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::GitHub release $TAG does not exist. Skipping notification."
+            exit 1
+          fi
+          echo "Release $TAG confirmed."
+
       - name: Post release summary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ needs.detect.outputs.version }}"
 
+          RELEASE_STATUS="${{ needs.release.result }}"
           GODOWNLOADER_STATUS="${{ needs.update-godownloader.result }}"
           WINGET_STATUS="${{ needs.update-winget.result }}"
 
           SUMMARY="## Post-Release Automation Summary"$'\n\n'
           SUMMARY+="| Task | Status |"$'\n'
           SUMMARY+="|------|--------|"$'\n'
+          SUMMARY+="| GoReleaser (binaries + Homebrew PR) | ${RELEASE_STATUS} |"$'\n'
           SUMMARY+="| Godownloader PR | ${GODOWNLOADER_STATUS} |"$'\n'
-          SUMMARY+="| Homebrew Tap PR | Handled by GoReleaser |"$'\n'
           SUMMARY+="| Winget PR | ${WINGET_STATUS} |"
 
           # Get the release ID by tag, then append the summary to the release body
