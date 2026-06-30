@@ -17,10 +17,31 @@ import (
 
 var errDecode = errors.New("failed to decode response from API")
 
+// isConflict reports whether err is an HTTP 409 Conflict.
+func isConflict(err error) bool {
+	var httpErr *httputil.Error
+	if errors.As(err, &httpErr) {
+		return httpErr.Status == http.StatusConflict
+	}
+	return false
+}
+
+// isReadMethod reports whether method is a safe, read-only HTTP method.
+func isReadMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
-	pageLimit    = 100
-	maxRetries   = 10
-	retryBackoff = time.Second
+	pageLimit         = 100
+	readMaxRetries    = 10
+	readRetryBackoff  = time.Second
+	writeMaxRetries   = 3
+	writeRetryBackoff = 5 * time.Second
 )
 
 type Client interface {
@@ -96,10 +117,11 @@ func (c *HTTPClient) CreateConnection(airflowURL string, conn *Connection) error
 	}
 
 	_, err = c.DoAirflowClient(doOpts)
-	if err != nil {
-		return err
+	if isConflict(err) {
+		// already exists: reconcile to the desired state
+		return c.UpdateConnection(airflowURL, conn)
 	}
-	return nil
+	return err
 }
 
 func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error {
@@ -144,10 +166,11 @@ func (c *HTTPClient) CreateVariable(airflowURL string, variable Variable) error 
 	}
 
 	_, err = c.DoAirflowClient(doOpts)
-	if err != nil {
-		return err
+	if isConflict(err) {
+		// already exists: reconcile to the desired state
+		return c.UpdateVariable(airflowURL, variable)
 	}
-	return nil
+	return err
 }
 
 func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error {
@@ -192,10 +215,11 @@ func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
 	}
 
 	_, err = c.DoAirflowClient(doOpts)
-	if err != nil {
-		return err
+	if isConflict(err) {
+		// already exists: reconcile to the desired state
+		return c.UpdatePool(airflowURL, pool)
 	}
-	return nil
+	return err
 }
 
 func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
@@ -225,19 +249,33 @@ func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	return nil
 }
 
-// checkRetryPolicy returns a retry policy that only retries GET requests and
-// skips retries when the error wraps context.Canceled or context.DeadlineExceeded.
+// checkRetryPolicy retries read methods with the default policy and writes only on transient statuses.
 func checkRetryPolicy(method string) retryablehttp.CheckRetry {
 	return func(ctx stdctx.Context, resp *http.Response, err error) (bool, error) {
-		if method != http.MethodGet {
-			return false, nil
-		}
 		if err != nil {
 			if errors.Is(err, stdctx.Canceled) || errors.Is(err, stdctx.DeadlineExceeded) {
 				return false, err
 			}
 		}
+		if !isReadMethod(method) {
+			if err != nil {
+				return false, err
+			}
+			return isRetryableWriteStatus(resp), nil
+		}
 		return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
+	}
+}
+
+func isRetryableWriteStatus(resp *http.Response) bool {
+	if resp == nil {
+		return false
+	}
+	switch resp.StatusCode {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusTooManyRequests:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -266,9 +304,14 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 
 	retryClient := retryablehttp.NewClient()
 	retryClient.HTTPClient = c.HTTPClient.HTTPClient
-	retryClient.RetryMax = maxRetries
-	retryClient.RetryWaitMin = retryBackoff
-	retryClient.RetryWaitMax = retryBackoff
+	retryClient.RetryMax = readMaxRetries
+	retryClient.RetryWaitMin = readRetryBackoff
+	retryClient.RetryWaitMax = readRetryBackoff
+	if !isReadMethod(doOpts.Method) {
+		retryClient.RetryMax = writeMaxRetries
+		retryClient.RetryWaitMin = writeRetryBackoff
+		retryClient.RetryWaitMax = writeRetryBackoff
+	}
 	retryClient.CheckRetry = checkRetryPolicy(doOpts.Method)
 	retryClient.ErrorHandler = retryablehttp.PassthroughErrorHandler
 	retryClient.Logger = nil // suppress retryablehttp's default stderr logging on retries
