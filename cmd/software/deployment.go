@@ -17,7 +17,7 @@ const (
 	kubernetesExecutorArg = "kubernetes"
 	k8sExecutorArg        = "k8s"
 
-	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with hard delete?"
+	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
 	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
 	continueSubMsg                             = " for more details. Do you want to continue?"
 	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
