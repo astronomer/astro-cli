@@ -225,6 +225,23 @@ func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
 }
 
+// printLoginHint prints a hint about the default Airflow UI credentials.
+// AF2 requires FAB auth: on macOS we seed admin/admin, and on other
+// platforms `airflow standalone` generates a random password into
+// standalone_admin_password.txt under $AIRFLOW_HOME. AF3 uses the simple auth
+// manager (any username is admin), so no hint is needed.
+func (s *Standalone) printLoginHint(bullet string) {
+	if s.airflowMajorVersion != "2" {
+		return
+	}
+	if runtime.GOOS == osDarwin {
+		fmt.Printf("%sLogin:      %s\n", bullet, ansi.Bold("admin / admin"))
+		return
+	}
+	passwordFile := filepath.Join(standaloneDir, "standalone_admin_password.txt")
+	fmt.Printf("%sLogin:      username %s, password in %s\n", bullet, ansi.Bold("admin"), ansi.Bold(passwordFile))
+}
+
 // Start runs airflow standalone locally without Docker.
 //
 //nolint:gocognit,gocyclo
@@ -527,6 +544,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
+		s.printLoginHint(bullet)
 		fmt.Println()
 
 		if !(s.noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
@@ -608,6 +626,7 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev logs -f"))
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
+	s.printLoginHint(bullet)
 
 	if !(s.noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
 		if err := standaloneOpenURL(uiURL); err != nil {
