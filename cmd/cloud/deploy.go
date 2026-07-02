@@ -2,6 +2,8 @@ package cloud
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,6 +23,7 @@ var (
 	pytest            bool
 	parse             bool
 	dags              bool
+	includeBundle     bool
 	waitForDeploy     bool
 	waitTime          time.Duration
 	image             bool
@@ -52,6 +55,10 @@ const (
 	deployWaitTime = 300 * time.Second
 
 	imageNameFlag = "image-name"
+
+	includeDirName    = "include"
+	includeMountPath  = "/usr/local/airflow/include"
+	includeBundleType = "include"
 )
 
 func NewDeployCmd() *cobra.Command {
@@ -78,6 +85,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
+	cmd.Flags().BoolVar(&includeBundle, "include", false, "Push only the include/ directory to your Astro Deployment as a bundle, without an image build")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
@@ -115,6 +123,17 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Get deploymentId from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
+	}
+
+	// astro deploy --include: bundle-deploy the include/ directory only, no image build.
+	// Routes through the same non-DAG bundle flow used by 'astro dbt deploy'.
+	if includeBundle {
+		for _, f := range []string{"dags", "image", imageNameFlag, "dags-path"} {
+			if cmd.Flags().Changed(f) {
+				return fmt.Errorf("cannot use --%s with --include", f)
+			}
+		}
+		return deployInclude(cmd, args)
 	}
 
 	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
@@ -187,4 +206,48 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 
 	return DeployImage(deployInput, astroV1Client)
+}
+
+// deployInclude bundle-deploys the project's include/ directory to
+// /usr/local/airflow/include, so shared utility code can be updated without a
+// full image build. It reuses the non-DAG bundle flow (see 'astro dbt deploy').
+func deployInclude(cmd *cobra.Command, args []string) error {
+	cmd.SilenceUsage = true
+
+	// The include/ directory lives inside the Astro project, unlike dbt projects.
+	includePath := filepath.Join(config.WorkingPath, includeDirName)
+	if info, err := os.Stat(includePath); err != nil || !info.IsDir() {
+		return fmt.Errorf("include directory not found at %s. Run this command from the root of your Astro project", includePath)
+	}
+
+	// if the workspace ID is not provided, try to find a valid workspace
+	if workspaceID == "" {
+		var err error
+		workspaceID, err = coalesceWorkspace()
+		if err != nil {
+			return errors.Wrap(err, "failed to find a valid workspace")
+		}
+	}
+
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return errors.New("cannot use --wait-time with --wait=false")
+	}
+
+	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Initiating include deploy for deployment ID: " + deploymentID)
+
+	deployBundleInput := &cloud.DeployBundleInput{
+		BundlePath:    includePath,
+		MountPath:     includeMountPath,
+		DeploymentID:  deploymentID,
+		BundleType:    includeBundleType,
+		Description:   deployDescription,
+		Wait:          waitForDeploy,
+		WaitTime:      waitTime,
+		AstroV1Client: astroV1Client,
+	}
+	return DeployBundle(deployBundleInput)
 }
