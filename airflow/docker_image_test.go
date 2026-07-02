@@ -204,6 +204,59 @@ func (s *Suite) TestDockerImagePytest() {
 		s.Error(err)
 	})
 
+	s.Run("copies include/ back to host after test run", func() {
+		// Docs contract: artifacts written to include/ must be accessible on
+		// the host after pytest finishes.
+		// https://www.astronomer.io/docs/astro/cli/astro-dev-pytest
+		airflowHome := s.T().TempDir()
+		includeDir := airflowHome + "/include"
+		s.NoError(os.MkdirAll(includeDir, os.ModePerm))
+
+		var cpArgs [][]string
+		started := false
+		reverseIncludeAfterStart := false
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "start" {
+				started = true
+			}
+			if args[0] == "cp" {
+				snapshot := make([]string, len(args))
+				copy(snapshot, args)
+				cpArgs = append(cpArgs, snapshot)
+				if started && args[1] == "astro-pytest:/usr/local/airflow/include/." && args[2] == includeDir {
+					reverseIncludeAfterStart = true
+				}
+			}
+			return nil
+		}
+		_, err = handler.Pytest("", airflowHome, "", "", []string{}, false, options)
+		s.NoError(err)
+
+		// The reverse copy must happen after the container has been started,
+		// otherwise artifacts written during the run would not be captured.
+		s.True(reverseIncludeAfterStart, "expected include/ to be copied from the pytest container back to the host after start, got: %v", cpArgs)
+	})
+
+	s.Run("skips reverse include/ copy when host include/ does not exist", func() {
+		airflowHome := s.T().TempDir()
+
+		cpArgs := [][]string{}
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "cp" {
+				snapshot := make([]string, len(args))
+				copy(snapshot, args)
+				cpArgs = append(cpArgs, snapshot)
+			}
+			return nil
+		}
+		_, err = handler.Pytest("", airflowHome, "", "", []string{}, false, options)
+		s.NoError(err)
+
+		for _, a := range cpArgs {
+			s.NotEqual("astro-pytest:/usr/local/airflow/include/.", a[1], "reverse cp should be skipped when host include/ is absent")
+		}
+	})
+
 	s.Run("pytest error", func() {
 		options = airflowTypes.ImageBuildConfig{
 			Path:            cwd,
