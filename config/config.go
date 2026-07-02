@@ -101,6 +101,8 @@ var (
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
 		ProxyPort:               newCfg("proxy.port", "6563"),
 		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
+		CosmosBoostPrecompute:   newCfg("cosmos_boost.precompute", "false"),
+		CosmosBoostBaseURL:      newCfg("cosmos_boost.base_url", ""),
 	}
 
 	// viperHome is the viper object in the users home directory
