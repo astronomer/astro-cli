@@ -1,6 +1,8 @@
 package cloud
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -8,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -65,6 +68,85 @@ func TestDeployImage(t *testing.T) {
 
 	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--parse", "--pytest")
 	assert.NoError(t, err)
+}
+
+func TestDeployInclude(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+
+	// Isolated project dir containing an include/ directory.
+	projectDir, err := os.MkdirTemp("", "include-deploy")
+	assert.NoError(t, err)
+	defer os.RemoveAll(projectDir)
+	assert.NoError(t, os.Mkdir(filepath.Join(projectDir, includeDirName), 0o755))
+
+	origWorkingPath := config.WorkingPath
+	config.WorkingPath = projectDir
+	defer func() { config.WorkingPath = origWorkingPath }()
+
+	origDeployBundle := DeployBundle
+	defer func() { DeployBundle = origDeployBundle }()
+
+	var captured *cloud.DeployBundleInput
+	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+		captured = deployInput
+		return nil
+	}
+
+	err = execDeployCmd("test-deployment-id", "--include", "--workspace-id", "test-ws")
+	assert.NoError(t, err)
+	if assert.NotNil(t, captured) {
+		assert.Equal(t, includeBundleType, captured.BundleType)
+		assert.Equal(t, includeMountPath, captured.MountPath)
+		assert.Equal(t, filepath.Join(projectDir, includeDirName), captured.BundlePath)
+		assert.Equal(t, "test-deployment-id", captured.DeploymentID)
+	}
+}
+
+func TestDeployIncludeMissingDir(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+
+	// Project dir without an include/ directory.
+	projectDir, err := os.MkdirTemp("", "include-deploy-missing")
+	assert.NoError(t, err)
+	defer os.RemoveAll(projectDir)
+
+	origWorkingPath := config.WorkingPath
+	config.WorkingPath = projectDir
+	defer func() { config.WorkingPath = origWorkingPath }()
+
+	err = execDeployCmd("test-deployment-id", "--include", "--workspace-id", "test-ws")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "include directory not found")
+}
+
+func TestDeployIncludeRejectsIncompatibleFlags(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
+		return nil
+	}
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"dags", []string{"-f", "test-deployment-id", "--include", "--dags"}},
+		{"image", []string{"-f", "test-deployment-id", "--include", "--image"}},
+		{"image-name", []string{"-f", "test-deployment-id", "--include", "--image-name", "img:1"}},
+		{"dags-path", []string{"-f", "test-deployment-id", "--include", "--dags-path", "./dags"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := execDeployCmd(tc.args...)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "--include")
+		})
+	}
 }
 
 func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
