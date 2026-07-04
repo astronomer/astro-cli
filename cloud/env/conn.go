@@ -4,7 +4,7 @@ import (
 	httpcontext "context"
 	"errors"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -122,7 +122,14 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1
 	if err := validateAutoLink(scope, in.AutoLinkDeployments); err != nil {
 		return nil, err
 	}
-	id, err := resolveID(idOrKey, scope, objectTypeConn, astroV1Client)
+	// Fetch the full object (not just the ID): the update body must round-trip
+	// the existing Links/ExcludeLinks and auto-link flag or the platform drops
+	// them. See echoPreservedFields.
+	current, err := getObject(idOrKey, scope, objectTypeConn, false, astroV1Client)
+	if err != nil {
+		return nil, err
+	}
+	id, err := objectID(current, idOrKey)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +149,7 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1
 		},
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
+	echoPreservedFields(&body, current)
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
 		return nil, err

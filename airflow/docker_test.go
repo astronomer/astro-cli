@@ -2246,6 +2246,18 @@ func (s *Suite) TestCreateDockerProject() {
 		s.Equal("postgres", postgresService.Name)
 		s.Equal("5433", postgresService.Ports[len(prj.Services["postgres"].Ports)-1].Published)
 	})
+
+	s.Run("bare host-env passthrough in an override resolves from the process env", func() {
+		s.T().Setenv("ASTRO_TEST_PASSTHROUGH", "from-host")
+		prev := composeOverrideFilename
+		composeOverrideFilename = "./testfiles/docker-compose.passthrough.override.yml"
+		defer func() { composeOverrideFilename = prev }()
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", "", labels)
+		s.NoError(err)
+		got := prj.Services["webserver"].Environment["ASTRO_TEST_PASSTHROUGH"]
+		s.Require().NotNil(got)
+		s.Equal("from-host", *got)
+	})
 }
 
 func (s *Suite) TestUpgradeDockerfile() {

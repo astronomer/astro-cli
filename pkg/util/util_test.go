@@ -241,6 +241,22 @@ func (s *Suite) TestGetbuildSecretString() {
 		s.Equal("secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
 	})
 
+	s.Run("uses fallback when buildSecret is empty and fallback is provided", func() {
+		s.Equal("fallback-secret", GetbuildSecretString([]string{}, "fallback-secret"))
+	})
+
+	s.Run("flag takes priority over fallback", func() {
+		s.Equal("flag-secret", GetbuildSecretString([]string{"flag-secret"}, "fallback-secret"))
+	})
+
+	s.Run("fallback takes priority over BUILD_SECRET_INPUT", func() {
+		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
+		defer os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
+		os.Setenv("BUILD_SECRET_INPUT", "env-secret")
+
+		s.Equal("fallback-secret", GetbuildSecretString([]string{}, "fallback-secret"))
+	})
+
 	s.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func() {
 		// Save the original value of BUILD_SECRET_INPUT
 		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
@@ -366,6 +382,29 @@ func (s *Suite) TestIsAstronomerRegistry() {
 		s.Run(tt.name, func() {
 			got := IsAstronomerRegistry(tt.args.registry)
 			s.Equal(tt.want, got)
+		})
+	}
+}
+
+func (s *Suite) TestIsCUID() {
+	tests := []struct {
+		name   string
+		input  string
+		expect bool
+	}{
+		{"valid CUID", "clh1rai0g000008l50d5hahbc", true},
+		{"valid CUID all zeros", "c000000000000000000000000", true},
+		{"too short", "clh1rai0g000008l50d5hahb", false},
+		{"too long", "clh1rai0g000008l50d5hahbcc", false},
+		{"wrong prefix", "xlh1rai0g000008l50d5hahbc", false},
+		{"uppercase chars", "cLH1RAI0G000008L50D5HAHBC", false},
+		{"org name", "my-organization", false},
+		{"empty string", "", false},
+		{"name containing cuid substring", "clh1rai0g000008l50d5hahbc-prod", false},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.expect, IsCUID(tt.input))
 		})
 	}
 }

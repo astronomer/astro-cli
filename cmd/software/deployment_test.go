@@ -905,8 +905,21 @@ func (s *Suite) TestDeploymentDelete() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
-	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(mockDeployment, nil)
+	// Deletions are always hard deletes now (PLX-575).
+	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+
+	// Delete now always prompts for confirmation; answer "y".
+	input := []byte("y")
+	r, w, err := os.Pipe()
+	s.Require().NoError(err)
+	_, err = w.Write(input)
+	s.NoError(err)
+	w.Close()
+	stdin := os.Stdin
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", mockDeployment.ID)
 	s.NoError(err)

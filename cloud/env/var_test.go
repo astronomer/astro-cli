@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -194,8 +194,12 @@ func (s *Suite) TestUpdateVar() {
 			{Id: &id, ObjectKey: "FOO"},
 		}},
 	}, nil).Once()
+	emptyLinks := []astrov1.UpdateEnvironmentObjectLinkRequest{}
+	emptyExcludes := []astrov1.ExcludeLinkEnvironmentObjectRequest{}
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, astrov1.UpdateEnvironmentObjectJSONRequestBody{
 		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{Value: &newValue},
+		Links:               &emptyLinks,
+		ExcludeLinks:        &emptyExcludes,
 	}).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
@@ -205,6 +209,110 @@ func (s *Suite) TestUpdateVar() {
 	s.NoError(err)
 	s.Equal("FOO", got.ObjectKey)
 	mc.AssertExpectations(s.T())
+}
+
+// Regression: a value-only update must round-trip the object's existing
+// Links/ExcludeLinks. Omitting the arrays makes the platform drop every
+// deployment link on the var (and with it any override the deployment had).
+func (s *Suite) TestUpdateVarRoundTripsLinks() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	workspaceID := cuid.New()
+	id := cuid.New()
+	depID := cuid.New()
+	exDepID := cuid.New()
+	newValue := "newval"
+
+	obj := envVarObj(id, "oldval", nil, []astrov1.EnvironmentObjectLink{
+		{
+			Scope:                        astrov1.EnvironmentObjectLinkScopeDEPLOYMENT,
+			ScopeEntityId:                depID,
+			EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: "prod-override"},
+		},
+	}, []astrov1.EnvironmentObjectExcludeLink{
+		{
+			Scope:         astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT,
+			ScopeEntityId: exDepID,
+		},
+	})
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{obj}},
+	}, nil).Once()
+
+	expectedLinks := []astrov1.UpdateEnvironmentObjectLinkRequest{
+		{
+			Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScope(astrov1.EnvironmentObjectLinkScopeDEPLOYMENT),
+			ScopeEntityId: depID,
+			Overrides:     newOverrideRequest("prod-override"),
+		},
+	}
+	expectedExcludes := []astrov1.ExcludeLinkEnvironmentObjectRequest{
+		{
+			Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScope(astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT),
+			ScopeEntityId: exDepID,
+		},
+	}
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, astrov1.UpdateEnvironmentObjectJSONRequestBody{
+		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableRequest{Value: &newValue},
+		Links:               &expectedLinks,
+		ExcludeLinks:        &expectedExcludes,
+	}).Return(&astrov1.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+	}, nil).Once()
+
+	_, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
+	s.NoError(err)
+	mc.AssertExpectations(s.T())
+}
+
+// Regression: a value-only update must echo the object's current
+// autoLinkDeployments flag. The platform clears the flag when it is omitted
+// from a PATCH (AINF-1792), which silently turned off auto-linking.
+func (s *Suite) TestUpdateVarPreservesAutoLink() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, _ := config.GetCurrentContext()
+	workspaceID := cuid.New()
+	id := cuid.New()
+	autoTrue := true
+	newValue := "newval"
+
+	mockUpdate := func(match func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool) *astrov1_mocks.ClientWithResponsesInterface {
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+				envVarObj(id, "oldval", &autoTrue, nil, nil),
+			}},
+		}, nil).Once()
+		mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id, mock.MatchedBy(match)).Return(&astrov1.UpdateEnvironmentObjectResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+		}, nil).Once()
+		return mc
+	}
+
+	s.Run("flag unset echoes current value", func() {
+		mc := mockUpdate(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
+			return b.AutoLinkDeployments != nil && *b.AutoLinkDeployments
+		})
+		_, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, nil, mc)
+		s.NoError(err)
+		mc.AssertExpectations(s.T())
+	})
+
+	s.Run("explicit flag wins over current value", func() {
+		autoFalse := false
+		mc := mockUpdate(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
+			return b.AutoLinkDeployments != nil && !*b.AutoLinkDeployments
+		})
+		_, err := UpdateVar("FOO", Scope{WorkspaceID: workspaceID}, newValue, &autoFalse, mc)
+		s.NoError(err)
+		mc.AssertExpectations(s.T())
+	})
 }
 
 func (s *Suite) TestDeleteVar() {

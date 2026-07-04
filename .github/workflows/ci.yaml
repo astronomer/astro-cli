@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cache prek tools
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/prek
+          key: prek-v1-${{ hashFiles('prek.toml') }}
+
+      - name: Install prek
+        run: |
+          PREK_VERSION="0.3.8"
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64)  SHA256="732cfb03960e6dfd5df2cb67906797aa8831750ef3a6f6340ec2b90ee8b7a59f" ;;
+            aarch64) SHA256="b88d96aef4ea84999d12958c390611d3a26194ee57225fe2ff15a9855e3a71bf" ;;
+            *) echo "Unsupported arch: $ARCH" && exit 1 ;;
+          esac
+          curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${ARCH}-unknown-linux-musl.tar.gz" \
+            -o /tmp/prek.tar.gz
+          echo "${SHA256}  /tmp/prek.tar.gz" | sha256sum -c
+          mkdir -p ~/bin
+          tar -xz --strip-components=1 -C ~/bin -f /tmp/prek.tar.gz
+          echo "$HOME/bin" >> $GITHUB_PATH
+          ~/bin/prek --version
+
+      - name: Check formatting
+        run: |
+          make fmt
+          git diff --exit-code
+
+      - name: Run golangci-lint
+        run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run unit tests
+        env:
+          HOUSTON_HOST: houston
+        run: make test
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
+        continue-on-error: true
+        with:
+          file: coverage.txt
+          format: golang
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run unit tests
+        run: go test -count=1 -cover -covermode=atomic -test.v ./...
+
+  detect-changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.filter.outputs.src }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'integration-test/**'
+
+  integration-test:
+    needs: [lint, test, test-windows, detect-changes]
+    if: >-
+      always() &&
+      !failure() &&
+      !cancelled() &&
+      (
+        github.ref == 'refs/heads/main' ||
+        (github.event_name == 'pull_request' && needs.detect-changes.outputs.src == 'true')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install poetry
+        run: pip install poetry
+
+      - name: Build astro cli
+        run: make build
+
+      - name: Run integration tests
+        run: |
+          python -m venv penv
+          . penv/bin/activate
+          cd integration-test && poetry install --no-root
+          pytest -x -s -v dev_test.py

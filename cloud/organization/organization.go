@@ -10,15 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lucsky/cuid"
-
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (
@@ -72,16 +71,6 @@ func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Or
 		return nil, err
 	}
 	return resp.JSON200, nil
-}
-
-// IsCUID reports whether s is a syntactically valid CUID
-// (c + 24 lowercase alphanumerics).
-//
-// lucsky/cuid.IsCuid uses an unanchored regex, so it matches a CUID-shaped
-// substring anywhere in s. We gate on the exact length so callers passing
-// strings that merely contain a CUID don't get false positives.
-func IsCUID(s string) bool {
-	return len(s) == 25 && cuid.IsCuid(s) == nil
 }
 
 func findOrganizationByName(name string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
@@ -228,7 +217,7 @@ func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, 
 		if err != nil {
 			return err
 		}
-	case IsCUID(orgNameOrID):
+	case util.IsCUID(orgNameOrID):
 		// Input looks like a CUID — fetch directly by ID
 		targetOrg, err = GetOrganization(orgNameOrID, astroV1Client)
 		if err != nil {

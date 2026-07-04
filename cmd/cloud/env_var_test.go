@@ -41,6 +41,9 @@ func resetEnvFlags() {
 
 	envVarKey, envVarValue, envVarSecret, envVarStrict, envVarFromFile = "", "", false, false, ""
 
+	envLinkVariableID, envLinkVariableKey = "", ""
+	envLinkDeploymentID, envLinkValue, envLinkExclude = "", "", false
+
 	envConnKey, envConnType, envConnHost, envConnLogin = "", "", "", ""
 	envConnPassword, envConnSchema, envConnExtra = "", "", ""
 	envConnPort = 0

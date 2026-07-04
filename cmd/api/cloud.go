@@ -30,8 +30,9 @@ type CloudOptions struct {
 func NewCloudCmd(out io.Writer) *cobra.Command {
 	opts := &CloudOptions{
 		RequestOptions: RequestOptions{
-			Out:    out,
-			ErrOut: os.Stderr,
+			Out:             out,
+			ErrOut:          os.Stderr,
+			TotalCountField: "totalCount",
 			// specCache is initialized lazily when the domain is known
 		},
 	}
