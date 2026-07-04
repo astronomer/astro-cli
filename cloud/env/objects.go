@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/cloud/organization"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (
@@ -60,7 +60,7 @@ func ScopeFromIDs(workspaceID, deploymentID string) Scope {
 // Pages through the list endpoint when the server reports more rows than fit
 // in a single response. Stops when the accumulated count reaches TotalCount,
 // when a short page is returned, or when maxListPages is hit (safety bound).
-func listObjects(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, coreClient astrocore.CoreClient) ([]astrocore.EnvironmentObject, error) {
+func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
@@ -70,14 +70,14 @@ func listObjects(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsO
 	}
 
 	var (
-		all    []astrocore.EnvironmentObject
+		all    []astrov1.EnvironmentObject
 		offset int
 	)
 	for page := 0; page < maxListPages; page++ {
 		params := buildListParams(scope, objectType, nil, resolveLinked, includeSecrets, defaultListLimit)
 		params.Offset = &offset
 
-		resp, err := coreClient.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
+		resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
 		if err != nil {
 			return nil, err
 		}
@@ -99,17 +99,17 @@ func listObjects(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsO
 // The platform has no GET-by-key endpoint; for keys, we filter the list endpoint
 // server-side via ObjectKey and force resolveLinked=false so the returned ID is
 // addressable in subsequent CRUD calls.
-func getObject(idOrKey string, scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, includeSecrets bool, coreClient astrocore.CoreClient) (*astrocore.EnvironmentObject, error) {
+func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	if organization.IsCUID(idOrKey) {
-		resp, err := coreClient.GetEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, idOrKey)
+	if util.IsCUID(idOrKey) {
+		resp, err := astroV1Client.GetEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, idOrKey)
 		if err != nil {
 			return nil, err
 		}
-		if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, err
 		}
 		return resp.JSON200, nil
@@ -122,7 +122,7 @@ func getObject(idOrKey string, scope Scope, objectType astrocore.ListEnvironment
 	// limit=2 catches server-side anomalies without forcing pagination.
 	params := buildListParams(scope, objectType, &idOrKey, false, includeSecrets, 2)
 
-	resp, err := coreClient.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
+	resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +138,8 @@ func getObject(idOrKey string, scope Scope, objectType astrocore.ListEnvironment
 }
 
 // deleteObject deletes an env-object by ID or key.
-func deleteObject(idOrKey string, scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, coreClient astrocore.CoreClient) error {
-	id, err := resolveID(idOrKey, scope, objectType, coreClient)
+func deleteObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) error {
+	id, err := resolveID(idOrKey, scope, objectType, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -147,36 +147,42 @@ func deleteObject(idOrKey string, scope Scope, objectType astrocore.ListEnvironm
 	if err != nil {
 		return err
 	}
-	resp, err := coreClient.DeleteEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id)
+	resp, err := astroV1Client.DeleteEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id)
 	if err != nil {
 		return err
 	}
-	return astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
 // resolveID returns idOrKey unchanged when it's already a CUID (no network call),
 // otherwise looks up the ID by key. Used by Update / Delete paths so callers
 // passing an ID don't pay for a redundant GET.
-func resolveID(idOrKey string, scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, coreClient astrocore.CoreClient) (string, error) {
-	if organization.IsCUID(idOrKey) {
+func resolveID(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) (string, error) {
+	if util.IsCUID(idOrKey) {
 		return idOrKey, nil
 	}
-	existing, err := getObject(idOrKey, scope, objectType, false, coreClient)
+	existing, err := getObject(idOrKey, scope, objectType, false, astroV1Client)
 	if err != nil {
 		return "", err
 	}
-	if existing.Id == nil || *existing.Id == "" {
+	return objectID(existing, idOrKey)
+}
+
+// objectID extracts the object's addressable ID, erroring when the platform
+// returned an object without one.
+func objectID(obj *astrov1.EnvironmentObject, idOrKey string) (string, error) {
+	if obj.Id == nil || *obj.Id == "" {
 		return "", fmt.Errorf("environment object %q has no id", idOrKey)
 	}
-	return *existing.Id, nil
+	return *obj.Id, nil
 }
 
 // scopeRequest converts a Scope into the create-request scope enum + entity ID.
-func scopeRequest(scope Scope) (scopeType astrocore.CreateEnvironmentObjectRequestScope, scopeEntityID string) {
+func scopeRequest(scope Scope) (scopeType astrov1.CreateEnvironmentObjectRequestScope, scopeEntityID string) {
 	if scope.DeploymentID != "" {
-		return astrocore.CreateEnvironmentObjectRequestScopeDEPLOYMENT, scope.DeploymentID
+		return astrov1.CreateEnvironmentObjectRequestScopeDEPLOYMENT, scope.DeploymentID
 	}
-	return astrocore.CreateEnvironmentObjectRequestScopeWORKSPACE, scope.WorkspaceID
+	return astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE, scope.WorkspaceID
 }
 
 // ErrAutoLinkRequiresWorkspace is returned when a caller asks to auto-link an
@@ -194,8 +200,8 @@ func validateAutoLink(scope Scope, autoLink *bool) error {
 	return nil
 }
 
-func buildListParams(scope Scope, objectType astrocore.ListEnvironmentObjectsParamsObjectType, objectKey *string, resolveLinked, includeSecrets bool, limit int) *astrocore.ListEnvironmentObjectsParams {
-	params := &astrocore.ListEnvironmentObjectsParams{
+func buildListParams(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, objectKey *string, resolveLinked, includeSecrets bool, limit int) *astrov1.ListEnvironmentObjectsParams {
+	params := &astrov1.ListEnvironmentObjectsParams{
 		ObjectType:    &objectType,
 		ObjectKey:     objectKey,
 		ShowSecrets:   &includeSecrets,
@@ -213,7 +219,7 @@ func buildListParams(scope Scope, objectType astrocore.ListEnvironmentObjectsPar
 // normalizeListErr substitutes the friendlier org-level secrets-fetching
 // guidance when applicable.
 func normalizeListErr(httpResp *http.Response, body []byte) error {
-	err := astrocore.NormalizeAPIError(httpResp, body)
+	err := astrov1.NormalizeAPIError(httpResp, body)
 	if err == nil {
 		return nil
 	}

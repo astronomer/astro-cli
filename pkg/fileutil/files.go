@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -46,13 +47,13 @@ type UploadFileArguments struct {
 }
 
 // Exists returns a boolean indicating if the given path already exists
-func Exists(path string, fs afero.Fs) (bool, error) {
-	if path == "" {
+func Exists(filePath string, fs afero.Fs) (bool, error) {
+	if filePath == "" {
 		return false, nil
 	}
 
 	if fs == nil {
-		_, err := os.Stat(path)
+		_, err := os.Stat(filePath)
 		if err == nil {
 			return true, nil
 		}
@@ -61,7 +62,7 @@ func Exists(path string, fs afero.Fs) (bool, error) {
 			return false, errors.Wrap(err, "cannot determine if path exists, error ambiguous")
 		}
 	} else {
-		res, err := afero.Exists(fs, path)
+		res, err := afero.Exists(fs, filePath)
 		if res {
 			return true, nil
 		}
@@ -74,20 +75,20 @@ func Exists(path string, fs afero.Fs) (bool, error) {
 }
 
 // WriteStringToFile write a string to a file
-func WriteStringToFile(path, s string) error {
-	return WriteToFile(path, strings.NewReader(s))
+func WriteStringToFile(filePath, s string) error {
+	return WriteToFile(filePath, strings.NewReader(s))
 }
 
 // WriteToFile writes an io.Reader to a file if it does not exst
-func WriteToFile(path string, r io.Reader) error {
-	dir := filepath.Dir(path)
+func WriteToFile(filePath string, r io.Reader) error {
+	dir := filepath.Dir(filePath)
 	if dir != "" {
 		if err := os.MkdirAll(dir, perm); err != nil {
 			return err
 		}
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
@@ -184,8 +185,8 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 }
 
 // this functions reads a whole file into memory and returns a slice of its lines.
-func Read(path string) ([]string, error) {
-	file, err := os.Open(path)
+func Read(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -405,8 +406,8 @@ func GzipFile(srcFilePath, destFilePath string) error {
 	return err
 }
 
-func IsHidden(path string) bool {
-	components := strings.Split(path, string(filepath.Separator))
+func IsHidden(filePath string) bool {
+	components := strings.Split(filePath, string(filepath.Separator))
 	for _, component := range components {
 		if strings.HasPrefix(component, ".") {
 			return true
@@ -442,17 +443,35 @@ func CopyFile(src, dst string) error {
 	return os.Chmod(dst, sourceInfo.Mode())
 }
 
-// CopyDirectory recursively copies a directory from src to dst
+// CopyDirectory recursively copies a directory from src to dst.
 func CopyDirectory(src, dst string) error {
-	// Get source directory info
-	srcInfo, err := os.Stat(src)
+	return CopyDirectoryFiltered(src, dst, nil)
+}
+
+// CopyDirectoryFiltered recursively copies a directory from src to dst.
+//
+// If skip is non-nil it is invoked for every entry with the entry's path
+// relative to the original src root (slash-delimited) and whether the entry is
+// a directory. Returning true skips that entry; skipping a directory also skips
+// its contents.
+//
+// Symlinks are recreated as symlinks rather than dereferenced. Following a
+// symlink that resolves to a directory previously caused a cryptic
+// "is a directory" read error (the link was treated as a regular file and
+// os.Open followed it to its target directory).
+func CopyDirectoryFiltered(src, dst string, skip func(relPath string, isDir bool) bool) error {
+	return copyDirectory(src, dst, "", skip)
+}
+
+func copyDirectory(src, dst, relBase string, skip func(relPath string, isDir bool) bool) error {
+	// Use Lstat so we do not dereference src itself if it is a symlink.
+	srcInfo, err := os.Lstat(src)
 	if err != nil {
 		return err
 	}
 
 	// Create destination directory
-	err = os.MkdirAll(dst, srcInfo.Mode())
-	if err != nil {
+	if err := os.MkdirAll(dst, srcInfo.Mode().Perm()); err != nil {
 		return err
 	}
 
@@ -465,21 +484,42 @@ func CopyDirectory(src, dst string) error {
 	for _, entry := range entries {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
+		relPath := path.Join(relBase, entry.Name())
+		isDir := entry.IsDir()
 
-		if entry.IsDir() {
-			// Recursively copy subdirectory
-			err = CopyDirectory(srcPath, dstPath)
-			if err != nil {
+		if skip != nil && skip(relPath, isDir) {
+			continue
+		}
+
+		switch {
+		case entry.Type()&os.ModeSymlink != 0:
+			// Recreate the symlink instead of following it. Dereferencing a
+			// symlink that points at a directory caused "is a directory" errors.
+			if err := copySymlink(srcPath, dstPath); err != nil {
 				return err
 			}
-		} else {
+		case isDir:
+			// Recursively copy subdirectory
+			if err := copyDirectory(srcPath, dstPath, relPath, skip); err != nil {
+				return err
+			}
+		default:
 			// Copy file
-			err = CopyFile(srcPath, dstPath)
-			if err != nil {
+			if err := CopyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+// copySymlink recreates the symlink at src as a symlink at dst, preserving its
+// target verbatim (without following it).
+func copySymlink(src, dst string) error {
+	target, err := os.Readlink(src)
+	if err != nil {
+		return err
+	}
+	return os.Symlink(target, dst)
 }

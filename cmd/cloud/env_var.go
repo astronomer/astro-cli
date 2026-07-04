@@ -34,6 +34,10 @@ const envVarExamples = `
   # bulk import from a dotenv file (round-trips with 'astro env variable export')
   astro env variable create --workspace-id <ws-id> --from-file .env
   astro env variable update --workspace-id <ws-id> --from-file .env
+
+  # manage per-deployment links (see 'astro env variable link --help')
+  astro env variable link create --variable-key DBT_PROFILES_DIR --workspace-id <ws-id> --deployment-id <dep-id> --value /etc/profiles
+  astro env variable link list --variable-key DBT_PROFILES_DIR --workspace-id <ws-id>
 `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
@@ -53,6 +57,7 @@ func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 		newEnvVarUpdateCmd(out),
 		newEnvVarDeleteCmd(out),
 		newEnvVarExportCmd(out),
+		newEnvVarLinkRootCmd(out),
 	)
 	return cmd
 }
@@ -174,7 +179,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format)
 	}
 	cmd.SilenceUsage = true
 
-	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroCoreClient)
+	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -200,7 +205,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroCoreClient)
+	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -225,7 +230,7 @@ func runEnvVarCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroCoreClient)
+	obj, err := env.CreateVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -258,11 +263,11 @@ func runEnvVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	autoLink := autoLinkPtr(cmd)
-	obj, err := env.UpdateVar(idOrKey, scope, value, autoLink, astroCoreClient)
+	obj, err := env.UpdateVar(idOrKey, scope, value, autoLink, astroV1Client)
 	if err != nil {
 		// Upsert: if not found and not strict, fall through to create.
 		if errors.Is(err, env.ErrNotFound) && !envVarStrict {
-			obj, err = env.CreateVar(scope, idOrKey, value, envVarSecret, autoLink, astroCoreClient)
+			obj, err = env.CreateVar(scope, idOrKey, value, envVarSecret, autoLink, astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -285,7 +290,7 @@ func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if !envYes && !confirmTTY(fmt.Sprintf("Delete environment variable %q?", idOrKey)) {
 		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
 	}
-	if err := env.DeleteVar(idOrKey, scope, astroCoreClient); err != nil {
+	if err := env.DeleteVar(idOrKey, scope, astroV1Client); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)

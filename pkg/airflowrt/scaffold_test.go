@@ -44,8 +44,10 @@ func TestScaffold_Airflow3_Minimal(t *testing.T) {
 	// Dockerfile content
 	assert.Equal(t, "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n", fileMap["Dockerfile"])
 
-	// Gitignore includes standalone dir
+	// Gitignore includes standalone + worktrees dirs (the .astro/ paths
+	// astro-desktop and the otto CLI write into per-project state).
 	assert.Contains(t, fileMap[".gitignore"], ".astro/standalone/")
+	assert.Contains(t, fileMap[".gitignore"], ".astro/worktrees/")
 }
 
 func TestScaffold_Airflow3_Full(t *testing.T) {

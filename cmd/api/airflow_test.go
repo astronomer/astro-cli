@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/openapi"
@@ -154,15 +154,15 @@ func TestResolveAirflowAPIURL_DeploymentID_Success(t *testing.T) {
 	err = ctx.SetContext()
 	require.NoError(t, err)
 
-	// Mock CoreGetDeployment
+	// Mock GetDeploymentByID
 	expectedURL := "https://deployment.airflow.astronomer.io/api/v2"
-	origCoreGetDeployment := deployment.CoreGetDeployment
-	defer func() { deployment.CoreGetDeployment = origCoreGetDeployment }()
+	origGetDeploymentByID := deployment.GetDeploymentByID
+	defer func() { deployment.GetDeploymentByID = origGetDeploymentByID }()
 
-	deployment.CoreGetDeployment = func(orgID, deploymentID string, client astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+	deployment.GetDeploymentByID = func(orgID, deploymentID string, client astrov1.APIClient) (astrov1.Deployment, error) {
 		assert.Equal(t, "test-org", orgID)
 		assert.Equal(t, "test-deployment-id", deploymentID)
-		return astroplatformcore.Deployment{
+		return astrov1.Deployment{
 			Id:                     deploymentID,
 			WebServerAirflowApiUrl: expectedURL,
 		}, nil
@@ -191,16 +191,16 @@ func TestResolveAirflowAPIURL_DeploymentID_WithOrgOverride(t *testing.T) {
 	err = ctx.SetContext()
 	require.NoError(t, err)
 
-	// Mock CoreGetDeployment
+	// Mock GetDeploymentByID
 	expectedURL := "https://deployment.airflow.astronomer.io/api/v2"
-	origCoreGetDeployment := deployment.CoreGetDeployment
-	defer func() { deployment.CoreGetDeployment = origCoreGetDeployment }()
+	origGetDeploymentByID := deployment.GetDeploymentByID
+	defer func() { deployment.GetDeploymentByID = origGetDeploymentByID }()
 
-	deployment.CoreGetDeployment = func(orgID, deploymentID string, client astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
+	deployment.GetDeploymentByID = func(orgID, deploymentID string, client astrov1.APIClient) (astrov1.Deployment, error) {
 		// Should use the override org, not context org
 		assert.Equal(t, "override-org", orgID)
 		assert.Equal(t, "test-deployment-id", deploymentID)
-		return astroplatformcore.Deployment{
+		return astrov1.Deployment{
 			Id:                     deploymentID,
 			WebServerAirflowApiUrl: expectedURL,
 		}, nil
@@ -230,12 +230,12 @@ func TestResolveAirflowAPIURL_DeploymentID_NoAirflowURL(t *testing.T) {
 	err = ctx.SetContext()
 	require.NoError(t, err)
 
-	// Mock CoreGetDeployment to return deployment without Airflow URL
-	origCoreGetDeployment := deployment.CoreGetDeployment
-	defer func() { deployment.CoreGetDeployment = origCoreGetDeployment }()
+	// Mock GetDeploymentByID to return deployment without Airflow URL
+	origGetDeploymentByID := deployment.GetDeploymentByID
+	defer func() { deployment.GetDeploymentByID = origGetDeploymentByID }()
 
-	deployment.CoreGetDeployment = func(orgID, deploymentID string, client astroplatformcore.CoreClient) (astroplatformcore.Deployment, error) {
-		return astroplatformcore.Deployment{
+	deployment.GetDeploymentByID = func(orgID, deploymentID string, client astrov1.APIClient) (astrov1.Deployment, error) {
+		return astrov1.Deployment{
 			Id:                     deploymentID,
 			WebServerAirflowApiUrl: "", // empty string means no URL configured
 		}, nil

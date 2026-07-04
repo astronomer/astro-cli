@@ -32,7 +32,7 @@ hooks = [
     language = "golang",
     entry = "scripts/check-deadcode.sh",
     pass_filenames = false,
-    additional_dependencies = ["golang.org/x/tools/cmd/deadcode@v0.27.0"],
+    additional_dependencies = ["golang.org/x/tools/cmd/deadcode@v0.44.0"],
   },
 ]
 

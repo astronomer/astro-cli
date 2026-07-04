@@ -110,7 +110,7 @@ astro ide project export --project-id <project-id> --force
 
 func listIDEProjects(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return ide.List(astroCoreClient, out)
+	return ide.List(astroV1Alpha1Client, out)
 }
 
 func importIDEProject(cmd *cobra.Command, out io.Writer) error {
@@ -125,7 +125,7 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return ide.ImportProject(astroCoreClient, ideProjectID, ideSessionID, orgID, wsID, out)
+	return ide.ImportProject(astroV1Alpha1Client, ideProjectID, ideSessionID, orgID, wsID, out)
 }
 
 func exportProject(cmd *cobra.Command, out io.Writer) error {
@@ -140,7 +140,7 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return ide.ExportProject(astroCoreClient, ideProjectID, orgID, wsID, ctx.Domain, force, out)
+	return ide.ExportProject(astroV1Alpha1Client, astroV1Client, ideProjectID, orgID, wsID, ctx.Domain, force, out)
 }
 
 func validateWorkspaceAndOrgID(ctx *config.Context) (orgID, wsID string, err error) {

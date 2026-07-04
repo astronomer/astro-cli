@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
@@ -177,7 +177,7 @@ func (s *Suite) TestAddConnectionsWithEnvConns() {
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
-	envConns := map[string]astrocore.EnvironmentObjectConnection{
+	envConns := map[string]astrov1.EnvironmentObjectConnection{
 		"test-env-id": {
 			Type:     "test-env-type",
 			Host:     ptr("test-env-host"),

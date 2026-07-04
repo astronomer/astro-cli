@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/term"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/env"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -56,10 +56,10 @@ func hasPipedStdin() bool {
 }
 
 // createFn matches the per-type CreateVar / CreateAirflowVar signature.
-type createFn func(scope env.Scope, key, value string, isSecret bool, autoLink *bool, client astrocore.CoreClient) (*astrocore.EnvironmentObject, error)
+type createFn func(scope env.Scope, key, value string, isSecret bool, autoLink *bool, client astrov1.APIClient) (*astrov1.EnvironmentObject, error)
 
 // updateFn matches the per-type UpdateVar / UpdateAirflowVar signature.
-type updateFn func(idOrKey string, scope env.Scope, value string, autoLink *bool, client astrocore.CoreClient) (*astrocore.EnvironmentObject, error)
+type updateFn func(idOrKey string, scope env.Scope, value string, autoLink *bool, client astrov1.APIClient) (*astrov1.EnvironmentObject, error)
 
 // runFromFileCreate parses a dotenv file and calls create for each entry,
 // printing per-entry status to out. Stops at the first error.
@@ -73,7 +73,7 @@ func runFromFileCreate(out io.Writer, scope env.Scope, autoLink *bool, isSecret 
 		return nil
 	}
 	for _, k := range sortedKeys(parsed) {
-		obj, err := create(scope, k, parsed[k], isSecret, autoLink, astroCoreClient)
+		obj, err := create(scope, k, parsed[k], isSecret, autoLink, astroV1Client)
 		if err != nil {
 			return fmt.Errorf("create %s: %w", k, err)
 		}
@@ -99,10 +99,10 @@ func runFromFileUpdate(out io.Writer, scope env.Scope, autoLink *bool, isSecret,
 		return nil
 	}
 	for _, k := range sortedKeys(parsed) {
-		obj, err := update(k, scope, parsed[k], autoLink, astroCoreClient)
+		obj, err := update(k, scope, parsed[k], autoLink, astroV1Client)
 		if err != nil {
 			if errors.Is(err, env.ErrNotFound) && !strict {
-				obj, err = create(scope, k, parsed[k], isSecret, autoLink, astroCoreClient)
+				obj, err = create(scope, k, parsed[k], isSecret, autoLink, astroV1Client)
 				if err != nil {
 					return fmt.Errorf("create %s: %w", k, err)
 				}

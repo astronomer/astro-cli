@@ -17,7 +17,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/pkg/browser"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -44,7 +45,7 @@ func newTableOut() *printutil.Table {
 }
 
 // List all IDE projects
-func List(client astrocore.CoreClient, out io.Writer) error {
+func List(client astrov1alpha1.APIClient, out io.Writer) error {
 	projects, err := ListProjects(client)
 	if err != nil {
 		return err
@@ -64,26 +65,26 @@ func List(client astrocore.CoreClient, out io.Writer) error {
 	return nil
 }
 
-func ListProjects(client astrocore.CoreClient) ([]astrocore.AstroIdeProject, error) {
+func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProject, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return []astrocore.AstroIdeProject{}, err
+		return []astrov1alpha1.AstroIdeProject{}, err
 	}
 
-	sorts := []astrocore.ListAstroIdeProjectsParamsSorts{"name:asc"}
+	sorts := []astrov1alpha1.ListAstroIdeProjectsParamsSorts{"name:asc"}
 	limit := 1000
-	workspaceListParams := &astrocore.ListAstroIdeProjectsParams{
+	workspaceListParams := &astrov1alpha1.ListAstroIdeProjectsParams{
 		Limit: &limit,
 		Sorts: &sorts,
 	}
 
 	resp, err := client.ListAstroIdeProjectsWithResponse(httpContext.Background(), ctx.Organization, ctx.Workspace, workspaceListParams)
 	if err != nil {
-		return []astrocore.AstroIdeProject{}, err
+		return []astrov1alpha1.AstroIdeProject{}, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	err = astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return []astrocore.AstroIdeProject{}, err
+		return []astrov1alpha1.AstroIdeProject{}, err
 	}
 
 	projects := resp.JSON200.Projects
@@ -91,9 +92,9 @@ func ListProjects(client astrocore.CoreClient) ([]astrocore.AstroIdeProject, err
 	return projects, nil
 }
 
-func selectIDEProject(projects []astrocore.AstroIdeProject) (astrocore.AstroIdeProject, error) {
+func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.AstroIdeProject, error) {
 	if len(projects) == 0 {
-		return astrocore.AstroIdeProject{}, ErrNoProjectsFound
+		return astrov1alpha1.AstroIdeProject{}, ErrNoProjectsFound
 	}
 
 	if len(projects) == 1 {
@@ -124,17 +125,17 @@ func selectIDEProject(projects []astrocore.AstroIdeProject) (astrocore.AstroIdeP
 	choice := input.Text("\n> ")
 	choiceInt, err := strconv.Atoi(choice)
 	if err != nil || choiceInt < 1 || choiceInt > len(projects) {
-		return astrocore.AstroIdeProject{}, ErrInvalidProjectSelection
+		return astrov1alpha1.AstroIdeProject{}, ErrInvalidProjectSelection
 	}
 	return projects[choiceInt-1], nil
 }
 
 // createNewProject creates a new project and returns its ID
-func createNewProject(client astrocore.CoreClient, organizationID, workspaceID string, out io.Writer) (string, error) {
+func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, organizationID, workspaceID string, out io.Writer) (string, error) {
 	fmt.Println("Enter project name:")
 	name := input.Text("\n> ")
 
-	req := astrocore.CreateAstroIdeProjectRequest{
+	req := astrov1alpha1.CreateAstroIdeProjectRequest{
 		Name: &name,
 	}
 
@@ -143,81 +144,81 @@ func createNewProject(client astrocore.CoreClient, organizationID, workspaceID s
 		return "", fmt.Errorf("failed to create project: %w", err)
 	}
 
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+	if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return "", err
 	}
 
-	workspaceName, err := getWorkspaceName(client, organizationID, workspaceID)
+	workspaceName, err := getWorkspaceName(v1Client, organizationID, workspaceID)
 	if err != nil {
-		// Fall back to workspace ID if we can't get the name
 		workspaceName = workspaceID
 	}
 	fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, workspaceName)
 	return resp.JSON200.Id, nil
 }
 
+// getWorkspaceName resolves a workspace's display name via the v1 public API.
+// The IDE client (v1alpha1) does not expose workspace reads, so the v1 client is used here.
+func getWorkspaceName(v1Client astrov1.APIClient, organizationID, workspaceID string) (string, error) {
+	resp, err := v1Client.GetWorkspaceWithResponse(httpContext.Background(), organizationID, workspaceID)
+	if err != nil {
+		return "", err
+	}
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return "", err
+	}
+	return resp.JSON200.Name, nil
+}
+
 // createSession creates a new session with the specified permission
-func createSession(client astrocore.CoreClient, organizationID, workspaceID, projectID string) (*astrocore.CreateAstroIdeSessionResponse, error) {
-	sessionResp, err := client.CreateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionJSONRequestBody{})
+func createSession(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID string) (*astrov1alpha1.CreateAstroIdeSessionResponse, error) {
+	sessionResp, err := client.CreateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrov1alpha1.CreateAstroIdeSessionJSONRequestBody{})
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
+	if err := astrov1alpha1.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
 		return nil, err
 	}
 	return sessionResp, nil
 }
 
-func createSessionWithPermission(client astrocore.CoreClient, organizationID, workspaceID, projectID string, permission astrocore.CreateAstroIdeSessionRequestPermission) (*astrocore.CreateAstroIdeSessionResponse, error) {
-	sessionResp, err := client.CreateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionJSONRequestBody{
+func createSessionWithPermission(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID string, permission astrov1alpha1.CreateAstroIdeSessionRequestPermission) (*astrov1alpha1.CreateAstroIdeSessionResponse, error) {
+	sessionResp, err := client.CreateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, astrov1alpha1.CreateAstroIdeSessionJSONRequestBody{
 		Permission: &permission,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
+	if err := astrov1alpha1.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
 		return nil, err
 	}
 	return sessionResp, nil
 }
 
 // getProject retrieves project details by ID
-func getProject(client astrocore.CoreClient, organizationID, workspaceID, projectID string) (*astrocore.GetAstroIdeProjectResponse, error) {
+func getProject(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID string) (*astrov1alpha1.GetAstroIdeProjectResponse, error) {
 	projectResp, err := client.GetAstroIdeProjectWithResponse(httpContext.Background(), organizationID, workspaceID, projectID)
 	if err != nil {
 		return nil, err
 	}
-	if err := astrocore.NormalizeAPIError(projectResp.HTTPResponse, projectResp.Body); err != nil {
+	if err := astrov1alpha1.NormalizeAPIError(projectResp.HTTPResponse, projectResp.Body); err != nil {
 		return nil, err
 	}
 	return projectResp, nil
 }
 
-// getWorkspaceName retrieves the workspace name for a given workspace ID
-func getWorkspaceName(client astrocore.CoreClient, organizationID, workspaceID string) (string, error) {
-	resp, err := client.GetWorkspaceWithResponse(httpContext.Background(), organizationID, workspaceID)
-	if err != nil {
-		return "", err
-	}
-	if err := astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return "", err
-	}
-	return resp.JSON200.Name, nil
-}
-
 // updateSessionPermission updates the session permission
-func updateSessionPermission(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID string, permission astrocore.UpdateAstroIdeSessionRequestPermission) error {
-	updateResp, err := client.UpdateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrocore.UpdateAstroIdeSessionJSONRequestBody{
+func updateSessionPermission(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID, sessionID string, permission astrov1alpha1.UpdateAstroIdeSessionRequestPermission) error {
+	updateResp, err := client.UpdateAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrov1alpha1.UpdateAstroIdeSessionJSONRequestBody{
 		Permission: permission,
 	})
 	if err != nil {
 		return err
 	}
-	return astrocore.NormalizeAPIError(updateResp.HTTPResponse, updateResp.Body)
+	return astrov1alpha1.NormalizeAPIError(updateResp.HTTPResponse, updateResp.Body)
 }
 
 // uploadAndImportArchive handles archive upload and import logic
-func importArchiveToIde(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID, archivePath string) error {
+func importArchiveToIde(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID, sessionID, archivePath string) error {
 	// Upload the archive
 	file, err := os.Open(archivePath)
 	if err != nil {
@@ -226,35 +227,35 @@ func importArchiveToIde(client astrocore.CoreClient, organizationID, workspaceID
 	defer file.Close()
 
 	// Import the package
-	mode := astrocore.ImportAstroIdeSessionTarParamsModeOVERWRITE
-	importParams := &astrocore.ImportAstroIdeSessionTarParams{
+	mode := astrov1alpha1.ImportAstroIdeSessionTarParamsModeOVERWRITE
+	importParams := &astrov1alpha1.ImportAstroIdeSessionTarParams{
 		Mode: &mode,
 	}
 	importResp, err := client.ImportAstroIdeSessionTarWithBodyWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, importParams, "application/gzip", file)
 	if err != nil {
 		return err
 	}
-	return astrocore.NormalizeAPIError(importResp.HTTPResponse, importResp.Body)
+	return astrov1alpha1.NormalizeAPIError(importResp.HTTPResponse, importResp.Body)
 }
 
 // saveSessionAndCleanup handles session saving and cleanup
-func saveSessionAndCleanup(client astrocore.CoreClient, organizationID, workspaceID, projectID, sessionID string) error {
+func saveSessionAndCleanup(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID, sessionID string) error {
 	// Save the session
-	saveResp, err := client.SaveAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrocore.SaveAstroIdeSessionJSONRequestBody{
+	saveResp, err := client.SaveAstroIdeSessionWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, astrov1alpha1.SaveAstroIdeSessionJSONRequestBody{
 		Message: "Imported from Astro CLI",
 	})
 	if err != nil {
 		return err
 	}
-	if err := astrocore.NormalizeAPIError(saveResp.HTTPResponse, saveResp.Body); err != nil {
+	if err := astrov1alpha1.NormalizeAPIError(saveResp.HTTPResponse, saveResp.Body); err != nil {
 		return err
 	}
 
-	return updateSessionPermission(client, organizationID, workspaceID, projectID, sessionID, astrocore.UpdateAstroIdeSessionRequestPermissionREADONLY)
+	return updateSessionPermission(client, organizationID, workspaceID, projectID, sessionID, astrov1alpha1.UpdateAstroIdeSessionRequestPermissionREADONLY)
 }
 
 // openProjectInBrowser opens the project URL in the default browser
-func openProjectInBrowser(client astrocore.CoreClient, organizationID, workspaceID, projectID string, out io.Writer) {
+func openProjectInBrowser(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID string, out io.Writer) {
 	projectResp, err := getProject(client, organizationID, workspaceID, projectID)
 	var url string
 	if err == nil && projectResp != nil && projectResp.JSON200 != nil && projectResp.JSON200.Url != nil && *projectResp.JSON200.Url != "" {
@@ -270,13 +271,13 @@ func openProjectInBrowser(client astrocore.CoreClient, organizationID, workspace
 }
 
 // resolveProjectID handles project creation or selection when projectID is not provided
-func resolveProjectID(client astrocore.CoreClient, projectID, organizationID, workspaceID string, force bool, out io.Writer) (string, error) {
+func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID string, force bool, out io.Writer) (string, error) {
 	// Handle project creation or selection
 	if projectID == "" && !force {
 		fmt.Println("Do you want to create a new project? (y/n)")
 		choice := input.Text("\n> ")
 		if choice == "y" || choice == "Y" {
-			return createNewProject(client, organizationID, workspaceID, out)
+			return createNewProject(client, v1Client, organizationID, workspaceID, out)
 		}
 	}
 
@@ -297,7 +298,7 @@ func resolveProjectID(client astrocore.CoreClient, projectID, organizationID, wo
 }
 
 // handleProjectLock checks for project locks and handles permission upgrades
-func handleProjectLock(client astrocore.CoreClient, sessionResp *astrocore.CreateAstroIdeSessionResponse, organizationID, workspaceID, projectID string, force bool) (*astrocore.CreateAstroIdeSessionResponse, error) {
+func handleProjectLock(client astrov1alpha1.APIClient, sessionResp *astrov1alpha1.CreateAstroIdeSessionResponse, organizationID, workspaceID, projectID string, force bool) (*astrov1alpha1.CreateAstroIdeSessionResponse, error) {
 	if sessionResp.JSON200.Permission != "READ_ONLY" {
 		return sessionResp, nil
 	}
@@ -321,15 +322,15 @@ func handleProjectLock(client astrocore.CoreClient, sessionResp *astrocore.Creat
 	}
 
 	// Create a new session with READWRITE permission
-	return createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADWRITE)
+	return createSessionWithPermission(client, organizationID, workspaceID, projectID, astrov1alpha1.CreateAstroIdeSessionRequestPermissionREADWRITE)
 }
 
 // ExportProject exports a project from CLI to Astro IDE
-func ExportProject(client astrocore.CoreClient, projectID, organizationID, workspaceID, domain string, force bool, out io.Writer) error {
+func ExportProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID, domain string, force bool, out io.Writer) error {
 	var err error
 
 	// Resolve project ID (create or select)
-	projectID, err = resolveProjectID(client, projectID, organizationID, workspaceID, force, out)
+	projectID, err = resolveProjectID(client, v1Client, projectID, organizationID, workspaceID, force, out)
 	if err != nil {
 		return err
 	}
@@ -495,7 +496,7 @@ func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.
 }
 
 // ImportProject imports a project from Astro IDE to the local directory
-func ImportProject(client astrocore.CoreClient, projectID, sessionID, organizationID, workspaceID string, out io.Writer) error {
+func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organizationID, workspaceID string, out io.Writer) error {
 	// Validate current directory is empty
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -524,7 +525,7 @@ func ImportProject(client astrocore.CoreClient, projectID, sessionID, organizati
 
 	if sessionID == "" {
 		// Create a new session with READ_ONLY permission.
-		sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrocore.CreateAstroIdeSessionRequestPermissionREADONLY)
+		sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrov1alpha1.CreateAstroIdeSessionRequestPermissionREADONLY)
 		if err != nil {
 			return err
 		}
@@ -540,12 +541,12 @@ func ImportProject(client astrocore.CoreClient, projectID, sessionID, organizati
 	defer tempFile.Close()
 
 	// Export the project
-	exportParams := &astrocore.ExportAstroIdeSessionTarParams{}
+	exportParams := &astrov1alpha1.ExportAstroIdeSessionTarParams{}
 	exportResp, err := client.ExportAstroIdeSessionTarWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, exportParams)
 	if err != nil {
 		return err
 	}
-	if err := astrocore.NormalizeAPIError(exportResp.HTTPResponse, exportResp.Body); err != nil {
+	if err := astrov1alpha1.NormalizeAPIError(exportResp.HTTPResponse, exportResp.Body); err != nil {
 		return err
 	}
 

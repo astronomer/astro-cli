@@ -151,7 +151,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroCoreClient)
+	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	}
 	cmd.SilenceUsage = true
 
-	obj, err := env.GetAirflowVar(idOrKey, scope, envIncludeSecrets, astroCoreClient)
+	obj, err := env.GetAirflowVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func runEnvAirflowVarCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	obj, err := env.CreateAirflowVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroCoreClient)
+	obj, err := env.CreateAirflowVar(scope, envVarKey, value, envVarSecret, autoLinkPtr(cmd), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -235,10 +235,10 @@ func runEnvAirflowVarUpdate(cmd *cobra.Command, out io.Writer, idOrKey string) e
 		return err
 	}
 	autoLink := autoLinkPtr(cmd)
-	obj, err := env.UpdateAirflowVar(idOrKey, scope, value, autoLink, astroCoreClient)
+	obj, err := env.UpdateAirflowVar(idOrKey, scope, value, autoLink, astroV1Client)
 	if err != nil {
 		if errors.Is(err, env.ErrNotFound) && !envVarStrict {
-			obj, err = env.CreateAirflowVar(scope, idOrKey, value, envVarSecret, autoLink, astroCoreClient)
+			obj, err = env.CreateAirflowVar(scope, idOrKey, value, envVarSecret, autoLink, astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -261,7 +261,7 @@ func runEnvAirflowVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) e
 	if !envYes && !confirmTTY(fmt.Sprintf("Delete Airflow variable %q?", idOrKey)) {
 		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
 	}
-	if err := env.DeleteAirflowVar(idOrKey, scope, astroCoreClient); err != nil {
+	if err := env.DeleteAirflowVar(idOrKey, scope, astroV1Client); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)

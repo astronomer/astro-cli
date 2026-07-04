@@ -33,22 +33,20 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
 
     `make lint` runs two layers in sequence:
 
-    - `make lint-go` — `golangci-lint`, which catches in-package issues
+    - `make lint-go` runs `golangci-lint`, which catches in-package issues
       (unused identifiers, formatting, etc.) inline.
-    - `make lint-deadcode` — runs [`golang.org/x/tools/cmd/deadcode`][deadcode]
-      across the whole program (`-test` mode) and fails if any exported
-      function is unreachable from `main`. Catches cross-package orphans
+    - `make lint-deadcode` runs [`golang.org/x/tools/cmd/deadcode`][deadcode]
+      across the whole program (`-test` mode) and fails if any function is
+      unreachable from the cli entry point. Catches cross-package orphans
       that `golangci-lint` cannot, e.g. an exported helper that no caller
       imports.
 
-    The deadcode scope is restricted to the cli's binary-style directories
-    (`cmd/`, `airflow/`, `cloud/`, `software/`, `config/`, `settings/`,
-    `houston/`, etc.) — see `scripts/check-deadcode.sh`. The library
-    sub-modules (`pkg/airflowrt`, `pkg/proxy`, `pkg/astroauth`,
-    `pkg/telemetry`, `astro-client-platform-core`) and the rest of `pkg/`
-    are excluded because they are consumed by external Go modules
-    (e.g. astro-desktop), so reachability from `cmd/astro/main` is not a
-    correctness signal for them.
+    The deadcode check is restricted to the cli's binary-style directories;
+    library code with external Go consumers (the `pkg/` tree and its
+    independently versioned sub-modules) is excluded because reachability
+    from the cli entry point is not a correctness signal for it. The
+    authoritative scope list and the rationale live in
+    `scripts/check-deadcode.sh`.
 
     [deadcode]: https://pkg.go.dev/golang.org/x/tools/cmd/deadcode
 

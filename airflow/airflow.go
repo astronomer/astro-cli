@@ -19,79 +19,18 @@ var perm os.FileMode = 0o777
 
 var ExtractTemplate = InitFromTemplate
 
-// Airflow 2 files
+// Embedded templates consumed within this repo. Scaffolding templates
+// (gitignore, dockerfile, exampledag, etc.) live in pkg/airflowrt/include
+// and are read via airflowrt.Scaffold — do not duplicate them here.
 var (
 	//go:embed include/airflow2/astronomermonitoringdag.py
 	Af2MonitoringDag string
 
-	//go:embed include/airflow2/exampledag.py
-	Af2ExampleDag string
-
 	//go:embed include/airflow2/composeyml.go.tmpl
 	Af2Composeyml string
 
-	//go:embed include/airflow2/dagexampletest.py
-	Af2DagExampleTest string
-
-	//go:embed include/airflow2/dagintegritytestdefault.py
-	Af2DagIntegrityTestDefault string
-
-	//go:embed include/airflow2/dockerfile
-	Af2Dockerfile string
-
-	//go:embed include/airflow2/dockerignore
-	Af2Dockerignore string
-
-	//go:embed include/airflow2/gitignore
-	Af2Gitignore string
-
-	//go:embed include/airflow2/readme
-	Af2Readme string
-
-	//go:embed include/airflow2/settingsyml.yml
-	Af2Settingsyml string
-
-	//go:embed include/airflow2/requirements.txt
-	Af2RequirementsTxt string
-)
-
-// Airflow 3 files
-var (
-	//go:embed include/airflow3/exampledag.py
-	Af3ExampleDag string
-
 	//go:embed include/airflow3/composeyml.go.tmpl
 	Af3Composeyml string
-
-	//go:embed include/airflow3/dagexampletest.py
-	Af3DagExampleTest string
-
-	//go:embed include/airflow3/dagintegritytestdefault.py
-	Af3DagIntegrityTestDefault string
-
-	//go:embed include/airflow3/dockerfile
-	Af3Dockerfile string
-
-	//go:embed include/airflow3/dockerfile.client
-	Af3DockerfileClient string
-
-	//go:embed include/airflow3/dockerignore
-	Af3Dockerignore string
-
-	//go:embed include/airflow3/gitignore
-	Af3Gitignore string
-
-	//go:embed include/airflow3/readme
-	Af3Readme string
-
-	//go:embed include/airflow3/settingsyml.yml
-	Af3Settingsyml string
-
-	//go:embed include/airflow3/requirements.txt
-	Af3RequirementsTxt string
-
-	//go:embed include/airflow3/requirements-client.txt
-	Af3RequirementsTxtClient string
 )
 
 func initDirs(root string, dirs []string) error {

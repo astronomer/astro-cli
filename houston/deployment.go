@@ -849,6 +849,25 @@ var (
 				}
 			}`,
 		},
+		{
+			version: "2.1.0",
+			query: `
+			mutation upsertDeployment(
+				$releaseName: String!,
+				$image: String!,
+				$runtimeVersion: String!,
+			){
+				upsertDeployment(
+					releaseName: $releaseName,
+					image: $image,
+					runtimeVersion: $runtimeVersion,
+				){
+					id
+					releaseName
+					runtimeVersion
+				}
+			}`,
+		},
 	}
 
 	UpdateDeploymentRuntimeRequest = `

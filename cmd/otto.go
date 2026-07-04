@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 
@@ -10,6 +11,23 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/otto"
 )
+
+func hasHelpFlag(args []string) bool {
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
+func printAstroSubcommands(w io.Writer) {
+	// Match Otto's help format: 2-space indent, description column at col 24.
+	fmt.Fprintln(w, "Subcommands:")
+	fmt.Fprintln(w, "  astro otto update     Download and install the latest Otto binary")
+	fmt.Fprintln(w, "  astro otto version    Print the installed Otto version")
+	fmt.Fprintln(w)
+}
 
 func newOttoCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -26,10 +44,12 @@ func newOttoCmd() *cobra.Command {
 
 func ottoRun(cmd *cobra.Command, args []string) error {
 	// With DisableFlagParsing, cobra won't route to subcommands,
-	// so we dispatch "update" and "version" ourselves.
+	// so we dispatch "update" and "version" ourselves. "upgrade" is
+	// aliased to "update" — otherwise it falls through to Otto and gets
+	// interpreted as a prompt asking it to upgrade the Astro project.
 	if len(args) > 0 {
 		switch args[0] {
-		case "update":
+		case "update", "upgrade":
 			return otto.Update()
 		case "version":
 			installed, err := otto.InstalledVersion()
@@ -48,6 +68,13 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 			}
 			return nil
 		}
+	}
+
+	// `astro otto --help` forwards to Otto's own help, which doesn't know
+	// about the astro CLI's `update` / `version` subcommands. Prepend a short
+	// banner so they're discoverable.
+	if hasHelpFlag(args) {
+		printAstroSubcommands(os.Stdout)
 	}
 
 	// Everything else (flags, prompt, etc.) is forwarded directly to Otto.

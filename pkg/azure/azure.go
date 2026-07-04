@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 )
 
 var azureUploader = Upload
@@ -18,11 +18,11 @@ func azureUpload(sasLink string, dagFileReader io.Reader) (string, error) {
 }
 
 func Upload(sasLink string, dagFileReader io.Reader) (string, error) {
-	blobClient, err := azblob.NewBlockBlobClientWithNoCredential(sasLink, nil)
+	blobClient, err := blockblob.NewClientWithNoCredential(sasLink, nil)
 	if err != nil {
 		return "", err
 	}
-	uploadRes, err := blobClient.UploadStream(context.TODO(), dagFileReader, azblob.UploadStreamOptions{})
+	uploadRes, err := blobClient.UploadStream(context.TODO(), dagFileReader, &blockblob.UploadStreamOptions{})
 	if err != nil {
 		return "", err
 	}

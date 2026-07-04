@@ -83,6 +83,7 @@ type RequestOptions struct {
 	ShowResponseHeaders bool
 	Paginate            bool
 	Slurp               bool
+	TotalCountField     string
 	Silent              bool
 	Template            string
 	FilterOutput        string
@@ -300,7 +301,7 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 		pageURL := addOffsetToURL(requestURL, currentOffset)
 
 		// Make request
-		respBody, totalCount, limit, err := fetchPage(opts, method, pageURL, token, params)
+		respBody, total, pageSize, err := fetchPage(opts, method, pageURL, token, params)
 		if err != nil {
 			return err
 		}
@@ -325,16 +326,16 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 			}
 		}
 
-		// Check if there are more pages
-		if totalCount <= 0 {
+		// Check if there are more pages, advancing by the records returned.
+		if total <= 0 {
 			break
 		}
-		if limit <= 0 {
-			fmt.Fprintf(opts.GetErrOut(), "\nWarning: server returned totalCount=%d but no limit; stopping pagination\n", totalCount)
+		if pageSize <= 0 {
+			fmt.Fprintf(opts.GetErrOut(), "\nWarning: server reported %d total records but returned an empty page; stopping pagination\n", total)
 			break
 		}
-		currentOffset += limit
-		if currentOffset >= totalCount {
+		currentOffset += pageSize
+		if currentOffset >= total {
 			break
 		}
 
@@ -363,8 +364,9 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 	return nil
 }
 
-// fetchPage fetches a single page and returns the body, totalCount, and limit.
-func fetchPage(opts *RequestOptions, method, requestURL, token string, params map[string]interface{}) (body []byte, totalCount, limit int, err error) {
+// fetchPage fetches a single page and returns the body, the total number of
+// records, and the number of items on this page (the effective page size).
+func fetchPage(opts *RequestOptions, method, requestURL, token string, params map[string]interface{}) (body []byte, total, pageSize int, err error) {
 	// Add params as query string for GET
 	if len(params) > 0 {
 		requestURL = addQueryParams(requestURL, params)
@@ -384,18 +386,49 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 		return nil, 0, 0, &SilentError{StatusCode: result.StatusCode}
 	}
 
-	// Parse response to get pagination info
-	var pageInfo struct {
-		TotalCount int `json:"totalCount"`
-		Offset     int `json:"offset"`
-		Limit      int `json:"limit"`
-	}
-	if err := json.Unmarshal(result.Body, &pageInfo); err == nil {
-		return result.Body, pageInfo.TotalCount, pageInfo.Limit, nil
+	total, pageSize = extractPageInfo(result.Body, opts.TotalCountField)
+	return result.Body, total, pageSize, nil
+}
+
+// extractPageInfo inspects a paginated response body and returns the total
+// number of records (read from totalCountField) and the number of items on this
+// page (the length of the response's array field).
+func extractPageInfo(body []byte, totalCountField string) (total, pageSize int) {
+	var obj map[string]interface{}
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return 0, 0
 	}
 
-	// No pagination info found
-	return result.Body, 0, 0, nil
+	// JSON numbers decode to float64 when unmarshaled into interface{}.
+	if f, ok := obj[totalCountField].(float64); ok {
+		total = int(f)
+	}
+
+	if field := findArrayField(obj); field != "" {
+		if items, ok := obj[field].([]interface{}); ok {
+			pageSize = len(items)
+		}
+	}
+
+	return total, pageSize
+}
+
+// findArrayField returns the name of the first array-valued field (e.g.
+// "organizations", "deployments", "dags"). Keys are sorted so the selection is
+// deterministic when multiple array fields exist.
+func findArrayField(obj map[string]interface{}) string {
+	keys := make([]string, 0, len(obj))
+	for key := range obj {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		if _, ok := obj[key].([]interface{}); ok {
+			return key
+		}
+	}
+	return ""
 }
 
 // addOffsetToURL adds or updates the offset query parameter.
@@ -432,24 +465,7 @@ func combinePages(pages []json.RawMessage) ([]byte, error) {
 		return result, nil
 	}
 
-	// Find the array field (skip pagination fields).
-	// Sort keys so the selection is deterministic when multiple array fields exist.
-	keys := make([]string, 0, len(firstPage))
-	for key := range firstPage {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	var arrayField string
-	for _, key := range keys {
-		if key == "totalCount" || key == "offset" || key == "limit" {
-			continue
-		}
-		if _, ok := firstPage[key].([]interface{}); ok {
-			arrayField = key
-			break
-		}
-	}
+	arrayField := findArrayField(firstPage)
 
 	if arrayField == "" {
 		// No array field found, return array of pages

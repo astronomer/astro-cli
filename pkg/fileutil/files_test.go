@@ -955,4 +955,59 @@ func (s *Suite) TestCopyDirectory() {
 		err := CopyDirectory(srcDir, dstDir)
 		s.Error(err)
 	})
+
+	s.Run("copies symlink to directory without dereferencing it", func() {
+		root := s.T().TempDir()
+		srcDir := filepath.Join(root, "src")
+		dstDir := filepath.Join(root, "dst")
+
+		// A real directory the symlink points at, plus the symlink itself.
+		// This reproduces terragrunt provider-cache symlinks that previously
+		// triggered "read ...: is a directory".
+		target := filepath.Join(root, "target-dir")
+		s.NoError(os.MkdirAll(target, 0o755))
+		s.NoError(os.WriteFile(filepath.Join(target, "inside.txt"), []byte("hi"), 0o644))
+
+		s.NoError(os.MkdirAll(srcDir, 0o755))
+		s.NoError(os.WriteFile(filepath.Join(srcDir, "regular.txt"), []byte("ok"), 0o644))
+		s.NoError(os.Symlink(target, filepath.Join(srcDir, "link-to-dir")))
+
+		err := CopyDirectory(srcDir, dstDir)
+		s.NoError(err)
+
+		// The regular file is copied.
+		content, err := os.ReadFile(filepath.Join(dstDir, "regular.txt"))
+		s.NoError(err)
+		s.Equal("ok", string(content))
+
+		// The symlink is recreated as a symlink, not dereferenced.
+		info, err := os.Lstat(filepath.Join(dstDir, "link-to-dir"))
+		s.NoError(err)
+		s.NotZero(info.Mode()&os.ModeSymlink, "expected link-to-dir to remain a symlink")
+		linkTarget, err := os.Readlink(filepath.Join(dstDir, "link-to-dir"))
+		s.NoError(err)
+		s.Equal(target, linkTarget)
+	})
+
+	s.Run("skip predicate excludes matching files and prunes directories", func() {
+		root := s.T().TempDir()
+		srcDir := filepath.Join(root, "src")
+		dstDir := filepath.Join(root, "dst")
+
+		s.NoError(os.MkdirAll(filepath.Join(srcDir, "infra", "agent"), 0o755))
+		s.NoError(os.WriteFile(filepath.Join(srcDir, "keep.txt"), []byte("keep"), 0o644))
+		s.NoError(os.WriteFile(filepath.Join(srcDir, "infra", "agent", "secret.tf"), []byte("x"), 0o644))
+
+		skip := func(relPath string, isDir bool) bool {
+			return relPath == "infra"
+		}
+
+		err := CopyDirectoryFiltered(srcDir, dstDir, skip)
+		s.NoError(err)
+
+		_, err = os.Stat(filepath.Join(dstDir, "keep.txt"))
+		s.NoError(err)
+		_, err = os.Stat(filepath.Join(dstDir, "infra"))
+		s.True(os.IsNotExist(err), "expected infra/ to be pruned")
+	})
 }

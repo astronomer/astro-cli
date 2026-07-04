@@ -14,10 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
-	astroplatformcore "github.com/astronomer/astro-cli/astro-client-platform-core"
-	astroplatformcore_mocks "github.com/astronomer/astro-cli/astro-client-platform-core/mocks"
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/git"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -25,14 +23,12 @@ import (
 
 type BundleSuite struct {
 	suite.Suite
-	mockPlatformCoreClient *astroplatformcore_mocks.ClientWithResponsesInterface
-	mockCoreClient         *astrocore_mocks.ClientWithResponsesInterface
+	mockV1Client *astrov1_mocks.ClientWithResponsesInterface
 }
 
 func (s *BundleSuite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.mockPlatformCoreClient = new(astroplatformcore_mocks.ClientWithResponsesInterface)
-	s.mockCoreClient = new(astrocore_mocks.ClientWithResponsesInterface)
+	s.mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 }
 
 func TestBundles(t *testing.T) {
@@ -50,25 +46,24 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 	require.NoError(s.T(), os.Mkdir(testBundlePath, 0o755))
 
 	input := &DeployBundleInput{
-		BundlePath:         testBundlePath,
-		MountPath:          "test-mount-path",
-		DeploymentID:       "test-deployment-id",
-		BundleType:         "test-bundle-type",
-		Description:        "test-description",
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		BundlePath:    testBundlePath,
+		MountPath:     "test-mount-path",
+		DeploymentID:  "test-deployment-id",
+		BundleType:    "test-bundle-type",
+		Description:   "test-description",
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, true, true)
+	mockGetDeployment(s.mockV1Client, true, true)
 
-	expectedDeploy := &astrocore.CreateDeployRequest{
-		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
+	expectedDeploy := &astrov1.CreateDeployRequest{
+		Type:            astrov1.CreateDeployRequestTypeBUNDLE,
 		BundleType:      &input.BundleType,
 		BundleMountPath: &input.MountPath,
 		Description:     &input.Description,
 	}
-	mockCreateDeploy(s.mockCoreClient, "http://bundle-upload-url", expectedDeploy)
-	mockUpdateDeploy(s.mockCoreClient, "version-id")
+	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
+	mockUpdateDeploy(s.mockV1Client, "version-id")
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -77,8 +72,8 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 	err := DeployBundle(input)
 	assert.NoError(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
@@ -87,66 +82,66 @@ func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
 	}
 
 	input := &DeployBundleInput{
-		DeploymentID:       "test-deployment-id",
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		DeploymentID:  "test-deployment-id",
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, true, true)
+	mockGetDeployment(s.mockV1Client, true, true)
 
 	err := DeployBundle(input)
 	assert.Error(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDeploy_DagDeployDisabled() {
 	input := &DeployBundleInput{
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, false, false)
+	mockGetDeployment(s.mockV1Client, false, false)
 
 	err := DeployBundle(input)
 	assert.Error(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
-	sha, gitPath := s.createTestGitRepository(false)
+	gitPath := s.createTestGitRepository(false)
 	defer os.RemoveAll(gitPath)
 
 	input := &DeployBundleInput{
-		BundlePath:         gitPath,
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		BundlePath:    gitPath,
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, true, false)
+	mockGetDeployment(s.mockV1Client, true, false)
 
-	expectedAuthorName := "Test"
 	expectedDescription := strings.Repeat("a", git.MaxCommitMessageLineLength)
-	expectedDeploy := &astrocore.CreateDeployRequest{
-		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
-		BundleType:      &input.BundleType,
-		BundleMountPath: &input.MountPath,
-		Description:     &expectedDescription,
-		Git: &astrocore.CreateDeployGitRequest{
-			Provider:   astrocore.CreateDeployGitRequestProviderGITHUB,
-			Account:    "account",
-			Repo:       "repo",
-			Branch:     "main",
-			CommitSha:  sha,
-			CommitUrl:  "https://github.com/account/repo/commit/" + sha,
-			AuthorName: &expectedAuthorName,
-		},
-	}
-	mockCreateDeploy(s.mockCoreClient, "http://bundle-upload-url", expectedDeploy)
-	mockUpdateDeploy(s.mockCoreClient, "version-id")
+	mockCreateDeployMatch(s.mockV1Client, "http://bundle-upload-url", func(req astrov1.CreateDeployRequest) bool {
+		if req.Type != astrov1.CreateDeployRequestTypeBUNDLE {
+			return false
+		}
+		if req.Description == nil || *req.Description != expectedDescription {
+			return false
+		}
+		if req.Git == nil {
+			return false
+		}
+		g := req.Git
+		return g.Provider == astrov1.CreateDeployGitRequestProviderGITHUB &&
+			g.Account != nil && *g.Account == "account" &&
+			g.Repo != nil && *g.Repo == "repo" &&
+			g.Branch != nil && *g.Branch == "main" &&
+			g.CommitSha != "" &&
+			g.CommitUrl != nil && strings.HasPrefix(*g.CommitUrl, "https://github.com/account/repo/commit/") &&
+			g.AuthorName != nil && *g.AuthorName == "Test" &&
+			g.RemoteUrl == nil
+	})
+	mockUpdateDeploy(s.mockV1Client, "version-id")
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -155,31 +150,64 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 	err := DeployBundle(input)
 	assert.NoError(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+}
+
+func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProvider() {
+	gitPath := s.createTestGitRepositoryWithRemote(false, "git@gitlab.com:team/project.git")
+	defer os.RemoveAll(gitPath)
+
+	input := &DeployBundleInput{
+		BundlePath:    gitPath,
+		AstroV1Client: s.mockV1Client,
+	}
+
+	mockGetDeployment(s.mockV1Client, true, false)
+
+	mockCreateDeployMatch(s.mockV1Client, "http://bundle-upload-url", func(req astrov1.CreateDeployRequest) bool {
+		if req.Git == nil {
+			return false
+		}
+		g := req.Git
+		return g.Provider == astrov1.CreateDeployGitRequestProviderGENERIC &&
+			g.RemoteUrl != nil && *g.RemoteUrl == "git@gitlab.com:team/project.git" &&
+			g.Account == nil &&
+			g.Repo == nil &&
+			g.CommitUrl == nil &&
+			g.Branch != nil && *g.Branch == "main" &&
+			g.CommitSha != ""
+	})
+	mockUpdateDeploy(s.mockV1Client, "version-id")
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	err := DeployBundle(input)
+	assert.NoError(s.T(), err)
+
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
-	_, gitPath := s.createTestGitRepository(true)
+	gitPath := s.createTestGitRepository(true)
 	defer os.RemoveAll(gitPath)
 
 	input := &DeployBundleInput{
-		BundlePath:         gitPath,
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		BundlePath:    gitPath,
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, true, false)
+	mockGetDeployment(s.mockV1Client, true, false)
 
-	expectedDeploy := &astrocore.CreateDeployRequest{
-		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
+	expectedDeploy := &astrov1.CreateDeployRequest{
+		Type:            astrov1.CreateDeployRequestTypeBUNDLE,
 		BundleType:      &input.BundleType,
 		BundleMountPath: &input.MountPath,
 		Description:     &input.Description,
-		Git:             nil,
 	}
-	mockCreateDeploy(s.mockCoreClient, "http://bundle-upload-url", expectedDeploy)
-	mockUpdateDeploy(s.mockCoreClient, "version-id")
+	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
+	mockUpdateDeploy(s.mockV1Client, "version-id")
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -188,13 +216,13 @@ func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 	err := DeployBundle(input)
 	assert.NoError(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 	// Create a git repo that would normally have metadata retrieved
-	_, gitPath := s.createTestGitRepository(false)
+	gitPath := s.createTestGitRepository(false)
 	defer os.RemoveAll(gitPath)
 
 	// Disable git metadata via config
@@ -203,23 +231,21 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 	defer config.CFG.DeployGitMetadata.SetHomeString("true") // Reset after test
 
 	input := &DeployBundleInput{
-		BundlePath:         gitPath,
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		BundlePath:    gitPath,
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, true, false)
+	mockGetDeployment(s.mockV1Client, true, false)
 
-	// Expect deploy request WITHOUT git metadata (Git: nil)
-	expectedDeploy := &astrocore.CreateDeployRequest{
-		Type:            astrocore.CreateDeployRequestTypeBUNDLE,
+	// Expect deploy request WITHOUT git metadata
+	expectedDeploy := &astrov1.CreateDeployRequest{
+		Type:            astrov1.CreateDeployRequestTypeBUNDLE,
 		BundleType:      &input.BundleType,
 		BundleMountPath: &input.MountPath,
 		Description:     &input.Description,
-		Git:             nil,
 	}
-	mockCreateDeploy(s.mockCoreClient, "http://bundle-upload-url", expectedDeploy)
-	mockUpdateDeploy(s.mockCoreClient, "version-id")
+	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
+	mockUpdateDeploy(s.mockV1Client, "version-id")
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -228,19 +254,18 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 	err = DeployBundle(input)
 	assert.NoError(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 	input := &DeployBundleInput{
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockGetDeployment(s.mockPlatformCoreClient, true, false)
+	mockGetDeployment(s.mockV1Client, true, false)
 
-	mockCreateDeploy(s.mockCoreClient, "", nil)
+	mockCreateDeploy(s.mockV1Client, "", nil)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -249,26 +274,25 @@ func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 	err := DeployBundle(input)
 	assert.Error(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestBundleDelete_Success() {
 	input := &DeleteBundleInput{
-		DeploymentID:       "test-deployment-id",
-		MountPath:          "test-mount-path",
-		PlatformCoreClient: s.mockPlatformCoreClient,
-		CoreClient:         s.mockCoreClient,
+		DeploymentID:  "test-deployment-id",
+		MountPath:     "test-mount-path",
+		AstroV1Client: s.mockV1Client,
 	}
 
-	mockCreateDeploy(s.mockCoreClient, "", nil)
-	mockUpdateDeploy(s.mockCoreClient, "")
+	mockCreateDeploy(s.mockV1Client, "", nil)
+	mockUpdateDeploy(s.mockV1Client, "")
 
 	err := DeleteBundle(input)
 	assert.NoError(s.T(), err)
 
-	s.mockCoreClient.AssertExpectations(s.T())
-	s.mockPlatformCoreClient.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
+	s.mockV1Client.AssertExpectations(s.T())
 }
 
 func (s *BundleSuite) TestValidateBundleSymlinks() {
@@ -382,18 +406,18 @@ func (s *BundleSuite) TestValidateBundleSymlinks() {
 	})
 }
 
-func mockCreateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, bundleUploadURL string, expectedDeploy *astrocore.CreateDeployRequest) {
+func mockCreateDeploy(client *astrov1_mocks.ClientWithResponsesInterface, bundleUploadURL string, expectedDeploy *astrov1.CreateDeployRequest) {
 	var request any
 	if expectedDeploy != nil {
 		request = *expectedDeploy
 	} else {
 		request = mock.Anything
 	}
-	response := &astrocore.CreateDeployResponse{
+	response := &astrov1.CreateDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: http.StatusOK,
 		},
-		JSON200: &astrocore.Deploy{
+		JSON200: &astrov1.Deploy{
 			Id: "test-deploy-id",
 		},
 	}
@@ -403,23 +427,39 @@ func mockCreateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, bund
 	client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, request).Return(response, nil)
 }
 
-func mockUpdateDeploy(client *astrocore_mocks.ClientWithResponsesInterface, expectedBundleVersion string) {
-	request := astrocore.UpdateDeployRequest{
+func mockCreateDeployMatch(client *astrov1_mocks.ClientWithResponsesInterface, bundleUploadURL string, match func(astrov1.CreateDeployRequest) bool) {
+	response := &astrov1.CreateDeployResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: http.StatusOK,
+		},
+		JSON200: &astrov1.Deploy{
+			Id: "test-deploy-id",
+		},
+	}
+	if bundleUploadURL != "" {
+		response.JSON200.BundleUploadUrl = &bundleUploadURL
+	}
+	matcher := mock.MatchedBy(func(req astrov1.CreateDeployRequest) bool { return match(req) })
+	client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, matcher).Return(response, nil)
+}
+
+func mockUpdateDeploy(client *astrov1_mocks.ClientWithResponsesInterface, expectedBundleVersion string) {
+	request := astrov1.FinalizeDeployRequest{
 		BundleTarballVersion: &expectedBundleVersion,
 	}
-	client.On("UpdateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, request).Return(&astrocore.UpdateDeployResponse{
+	client.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, request).Return(&astrov1.FinalizeDeployResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: http.StatusOK,
 		},
 	}, nil)
 }
 
-func mockGetDeployment(client *astroplatformcore_mocks.ClientWithResponsesInterface, isDagDeployEnabled, isCicdEnforced bool) {
-	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astroplatformcore.GetDeploymentResponse{
+func mockGetDeployment(client *astrov1_mocks.ClientWithResponsesInterface, isDagDeployEnabled, isCicdEnforced bool) {
+	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: http.StatusOK,
 		},
-		JSON200: &astroplatformcore.Deployment{
+		JSON200: &astrov1.Deployment{
 			Id:                 "test-deployment-id",
 			IsDagDeployEnabled: isDagDeployEnabled,
 			IsCicdEnforced:     isCicdEnforced,
@@ -427,7 +467,11 @@ func mockGetDeployment(client *astroplatformcore_mocks.ClientWithResponsesInterf
 	}, nil)
 }
 
-func (s *BundleSuite) createTestGitRepository(withUncommittedFile bool) (sha, path string) {
+func (s *BundleSuite) createTestGitRepository(withUncommittedFile bool) string {
+	return s.createTestGitRepositoryWithRemote(withUncommittedFile, "https://github.com/account/repo.git")
+}
+
+func (s *BundleSuite) createTestGitRepositoryWithRemote(withUncommittedFile bool, remoteURL string) string {
 	dir, err := os.MkdirTemp("", "test-git-repo")
 	require.NoError(s.T(), err)
 
@@ -444,10 +488,7 @@ func (s *BundleSuite) createTestGitRepository(withUncommittedFile bool) (sha, pa
 	err = exec.Command("git", "-C", dir, "commit", "--allow-empty", "-m", commitMessage).Run()
 	require.NoError(s.T(), err)
 
-	err = exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/account/repo.git").Run()
-	require.NoError(s.T(), err)
-
-	shaBytes, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	err = exec.Command("git", "-C", dir, "remote", "add", "origin", remoteURL).Run()
 	require.NoError(s.T(), err)
 
 	if withUncommittedFile {
@@ -458,5 +499,5 @@ func (s *BundleSuite) createTestGitRepository(withUncommittedFile bool) (sha, pa
 		require.NoError(s.T(), err)
 	}
 
-	return strings.TrimSpace(string(shaBytes)), dir
+	return dir
 }

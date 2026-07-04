@@ -1,0 +1,4 @@
+services:
+  webserver:
+    environment:
+      - ASTRO_TEST_PASSTHROUGH
