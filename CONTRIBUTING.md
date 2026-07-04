@@ -33,22 +33,10 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
 
     `make lint` runs two layers in sequence:
 
-    - `make lint-go` runs `golangci-lint`, which catches in-package issues
-      (unused identifiers, formatting, etc.) inline.
-    - `make lint-deadcode` runs [`golang.org/x/tools/cmd/deadcode`][deadcode]
-      across the whole program (`-test` mode) and fails if any function is
-      unreachable from the cli entry point. Catches cross-package orphans
-      that `golangci-lint` cannot, e.g. an exported helper that no caller
-      imports.
+    - `make lint-go` runs `golangci-lint`, which catches in-package issues (unused identifiers, formatting, etc.) inline.
+    - `make lint-deadcode` runs [`golang.org/x/tools/cmd/deadcode`](https://pkg.go.dev/golang.org/x/tools/cmd/deadcode) across the whole program (`-test` mode) and fails if any function is unreachable from the CLI entry point or any test binary. Catches cross-package orphans that `golangci-lint` cannot, e.g. an exported helper that no caller imports.
 
-    The deadcode check is restricted to the cli's binary-style directories;
-    library code with external Go consumers (the `pkg/` tree and its
-    independently versioned sub-modules) is excluded because reachability
-    from the cli entry point is not a correctness signal for it. The
-    authoritative scope list and the rationale live in
-    `scripts/check-deadcode.sh`.
-
-    [deadcode]: https://pkg.go.dev/golang.org/x/tools/cmd/deadcode
+    The deadcode check covers the whole main module except the `pkg/` tree; the exclusion and its rationale live in `scripts/check-deadcode.sh`.
 
 ## Test locally
 
