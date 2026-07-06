@@ -51,7 +51,7 @@ func (s *PrecomputeSuite) TestPrecomputeRunsHelperOnPath() {
 
 	content, err := os.ReadFile(marker)
 	require.NoError(s.T(), err)
-	s.Contains(string(content), "precompute /some/dbt/project")
+	s.Contains(string(content), "pre-deploy /some/dbt/project")
 }
 
 func (s *PrecomputeSuite) TestPrecomputeSurfacesFailureOutput() {

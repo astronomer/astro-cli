@@ -8,15 +8,15 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
-// Precompute runs `astro-cosmos-boost precompute <path>`, which discovers
+// Precompute runs `astro-cosmos-boost pre-deploy <path>`, which discovers
 // every dbt project (dbt_project.yml) and dbt manifest under path and writes
 // a .astro/dbt_metadata.json sidecar beside each, carrying the content hash
 // the parse-time consumer uses as its cache version key.
 func Precompute(path string) error {
-	out, err := exec.Command(BinaryPath(), "precompute", path).CombinedOutput()
-	logger.Debugf("astro-cosmos-boost precompute output:\n%s", out)
+	out, err := exec.Command(BinaryPath(), "pre-deploy", path).CombinedOutput()
+	logger.Debugf("astro-cosmos-boost pre-deploy output:\n%s", out)
 	if err != nil {
-		return fmt.Errorf("running astro-cosmos-boost precompute: %w (output: %s)", err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("running astro-cosmos-boost pre-deploy: %w (output: %s)", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
