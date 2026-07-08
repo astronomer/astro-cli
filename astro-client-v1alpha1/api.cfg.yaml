@@ -6,4 +6,6 @@ generate:
 include-tags:
   - Polaris Project
   - Polaris Session
+  - Deploy
+  - Bundle
 output: ./astro-client-v1alpha1/api.gen.go

@@ -223,7 +223,7 @@ func newOverrideRequest(value string) *astrov1.UpdateEnvironmentObjectOverridesR
 
 // toUpdateLink converts one GET-shape link into the PATCH shape, copying any
 // existing override so a partial update doesn't drop it.
-func toUpdateLink(l astrov1.EnvironmentObjectLink) astrov1.UpdateEnvironmentObjectLinkRequest {
+func toUpdateLink(l *astrov1.EnvironmentObjectLink) astrov1.UpdateEnvironmentObjectLinkRequest {
 	req := astrov1.UpdateEnvironmentObjectLinkRequest{
 		Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScope(l.Scope),
 		ScopeEntityId: l.ScopeEntityId,
@@ -255,9 +255,9 @@ func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID stri
 	links := derefSlice(current)
 	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links)+1)
 	found := false
-	for _, l := range links {
-		req := toUpdateLink(l)
-		if l.ScopeEntityId == depID {
+	for i := range links {
+		req := toUpdateLink(&links[i])
+		if links[i].ScopeEntityId == depID {
 			found = true
 			req.Overrides = newOverride
 		}
@@ -280,8 +280,8 @@ func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID stri
 func buildUpdateLinks(current *[]astrov1.EnvironmentObjectLink) []astrov1.UpdateEnvironmentObjectLinkRequest {
 	links := derefSlice(current)
 	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links))
-	for _, l := range links {
-		out = append(out, toUpdateLink(l))
+	for i := range links {
+		out = append(out, toUpdateLink(&links[i]))
 	}
 	return out
 }
@@ -289,11 +289,11 @@ func buildUpdateLinks(current *[]astrov1.EnvironmentObjectLink) []astrov1.Update
 func buildUpdateLinksExcluding(current *[]astrov1.EnvironmentObjectLink, depID string) []astrov1.UpdateEnvironmentObjectLinkRequest {
 	links := derefSlice(current)
 	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links))
-	for _, l := range links {
-		if l.ScopeEntityId == depID {
+	for i := range links {
+		if links[i].ScopeEntityId == depID {
 			continue
 		}
-		out = append(out, toUpdateLink(l))
+		out = append(out, toUpdateLink(&links[i]))
 	}
 	return out
 }
