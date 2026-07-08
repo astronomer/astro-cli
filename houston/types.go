@@ -28,6 +28,8 @@ type ResponseData struct {
 	CreateUser                     *AuthUser                   `json:"createUser,omitempty"`
 	CreateWorkspace                *Workspace                  `json:"createWorkspace,omitempty"`
 	DeleteDeployment               *Deployment                 `json:"deleteDeployment,omitempty"`
+	AdoptDeployment                *Deployment                 `json:"adoptDeployment,omitempty"`
+	UnadoptDeployment              *Deployment                 `json:"unadoptDeployment,omitempty"`
 	DeleteWorkspaceServiceAccount  *ServiceAccount             `json:"deleteWorkspaceServiceAccount,omitempty"`
 	DeleteDeploymentServiceAccount *ServiceAccount             `json:"deleteDeploymentServiceAccount,omitempty"`
 	DeleteWorkspace                *Workspace                  `json:"deleteWorkspace,omitempty"`
@@ -108,6 +110,7 @@ type Deployment struct {
 	Type                  string              `json:"type"`
 	Label                 string              `json:"label"`
 	ReleaseName           string              `json:"releaseName"`
+	Namespace             string              `json:"namespace"`
 	Version               string              `json:"version"`
 	AirflowVersion        string              `json:"airflowVersion"`
 	DesiredAirflowVersion string              `json:"desiredAirflowVersion"`

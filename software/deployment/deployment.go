@@ -189,6 +189,38 @@ func Delete(id string, hardDelete bool, client houston.ClientInterface, out io.W
 	return nil
 }
 
+// Adopt an existing operator-managed Airflow custom resource into Houston
+func Adopt(req *houston.AdoptDeploymentRequest, client houston.ClientInterface, out io.Writer) error {
+	d, err := houston.Call(client.AdoptDeployment)(req)
+	if err != nil {
+		return err
+	}
+
+	tab := &printutil.Table{
+		Padding:        []int{30, 30, 30, 40, 40},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "NAMESPACE", "CLUSTER ID", "DEPLOYMENT ID"},
+	}
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Namespace, d.ClusterID, d.ID}, false)
+	tab.SuccessMsg = "\n Successfully adopted deployment"
+	tab.Print(out)
+
+	return nil
+}
+
+// Unadopt releases an adopted deployment back to operator-only management, without touching
+// the underlying Airflow custom resource, namespace, or metadata database.
+func Unadopt(id string, client houston.ClientInterface, out io.Writer) error {
+	_, err := houston.Call(client.UnadoptDeployment)(houston.UnadoptDeploymentRequest{DeploymentID: id})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(out, "\n Successfully unadopted deployment")
+
+	return nil
+}
+
 // list all available namespaces
 func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer, clusterID string) (string, error) {
 	tab := &printutil.Table{
