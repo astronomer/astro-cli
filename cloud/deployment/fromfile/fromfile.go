@@ -590,11 +590,14 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCPU,
 				ResourceQuotaMemory:  resourceQuotaMemory,
-				WorkerQueues:         new(deployment.ConvertCreateQueuesToUpdate(listQueuesRequest)),
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
 				WorkloadIdentity:     deplWorkloadIdentity,
+			}
+			if len(listQueuesRequest) > 0 {
+				updateQueues := deployment.ConvertCreateQueuesToUpdate(listQueuesRequest)
+				standardDeploymentRequest.WorkerQueues = &updateQueues
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -650,12 +653,15 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				DefaultTaskPodMemory: defaultTaskPodMemory,
 				ResourceQuotaCpu:     resourceQuotaCPU,
 				ResourceQuotaMemory:  resourceQuotaMemory,
-				WorkerQueues:         new(deployment.ConvertCreateQueuesToUpdate(listQueuesRequest)),
 				SchedulerSize:        schedulerSize,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
 				WorkloadIdentity:     deplWorkloadIdentity,
 				RemoteExecution:      remoteExecution,
+			}
+			if len(listQueuesRequest) > 0 {
+				updateQueues := deployment.ConvertCreateQueuesToUpdate(listQueuesRequest)
+				dedicatedDeploymentRequest.WorkerQueues = &updateQueues
 			}
 			if existingDeployment.IsDevelopmentMode != nil && *existingDeployment.IsDevelopmentMode {
 				hibernationSchedules := ToDeploymentHibernationSchedules(deploymentFromFile.Deployment.HibernationSchedules)
@@ -693,8 +699,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 				Type:                 astrov1.UpdateHybridDeploymentRequestTypeHYBRID,
 				ContactEmails:        &deploymentFromFile.Deployment.AlertEmails,
 				EnvironmentVariables: envVars,
-				WorkerQueues:         new(deployment.ConvertHybridQueuesToUpdate(listHybridQueuesRequest)),
 				WorkloadIdentity:     &deploymentFromFile.Deployment.Configuration.WorkloadIdentity,
+			}
+			if len(listHybridQueuesRequest) > 0 {
+				updateQueues := deployment.ConvertHybridQueuesToUpdate(listHybridQueuesRequest)
+				hybridDeploymentRequest.WorkerQueues = &updateQueues
 			}
 			if requestedExecutor == astrov1.UpdateHybridDeploymentRequestExecutorKUBERNETES {
 				taskPodNodePoolID, err := getNodePoolIDFromWorkerType(deploymentFromFile.Deployment.Configuration.DefaultWorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
