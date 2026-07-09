@@ -103,4 +103,25 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 		assert.Contains(t, out, "Deleted bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
 	})
+
+	t.Run("resolves the bundle ID from --name", func(t *testing.T) {
+		mockAlpha := setupBundleCmdMocks(t)
+		isDag := true
+		name := "my-dags"
+		mockAlpha.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundlesPaginated{
+				TotalCount: 1,
+				Bundles:    []astrov1alpha1.DeploymentBundle{{Id: "bundle-1", Name: &name, IsDagBundle: &isDag}},
+			},
+		}, nil).Once()
+		mockAlpha.On("DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.DeleteBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		}, nil).Once()
+
+		out, err := execDeploymentCmd("bundle", "delete", "--deployment-id", "test-id-1", "--name", "my-dags", "--force")
+		assert.NoError(t, err)
+		assert.Contains(t, out, "Deleted bundle bundle-1")
+		mockAlpha.AssertExpectations(t)
+	})
 }

@@ -100,7 +100,7 @@ func (s *Suite) TestUpdateBundle() {
 		out := &bytes.Buffer{}
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
-		err := UpdateBundle("bundle-1", "", nil, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
+		err := UpdateBundle("bundle-1", "", "", "", nil, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
 		s.ErrorIs(err, errUpdateBundleNoOp)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "UpdateBundleWithResponse")
 	})
@@ -117,9 +117,46 @@ func (s *Suite) TestUpdateBundle() {
 			JSON200:      &astrov1alpha1.DeploymentBundle{Id: "bundle-1"},
 		}, nil).Once()
 
-		err := UpdateBundle("bundle-1", "new desc", []string{"dag-1"}, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
+		err := UpdateBundle("bundle-1", "", "", "new desc", []string{"dag-1"}, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Updated bundle bundle-1")
+		mockV1Alpha1Client.AssertExpectations(s.T())
+	})
+
+	s.Run("requires exactly one identifier", func() {
+		out := &bytes.Buffer{}
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+
+		err := UpdateBundle("", "", "", "new desc", nil, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
+		s.ErrorIs(err, errBundleSelector)
+
+		err = UpdateBundle("bundle-1", "my-dags", "", "new desc", nil, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
+		s.ErrorIs(err, errBundleSelector)
+
+		mockV1Alpha1Client.AssertNotCalled(s.T(), "UpdateBundleWithResponse")
+	})
+
+	s.Run("resolves a DAG bundle by name", func() {
+		out := &bytes.Buffer{}
+		s.mockGetDeployment()
+		isDag := true
+		name := "my-dags"
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundlesPaginated{
+				TotalCount: 1,
+				Bundles:    []astrov1alpha1.DeploymentBundle{{Id: "bundle-9", Name: &name, IsDagBundle: &isDag}},
+			},
+		}, nil).Once()
+		mockV1Alpha1Client.On("UpdateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-9", mock.Anything).Return(&astrov1alpha1.UpdateBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1alpha1.DeploymentBundle{Id: "bundle-9"},
+		}, nil).Once()
+
+		err := UpdateBundle("", "my-dags", "", "new desc", nil, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client)
+		s.NoError(err)
+		s.Contains(out.String(), "Updated bundle bundle-9")
 		mockV1Alpha1Client.AssertExpectations(s.T())
 	})
 }
@@ -214,7 +251,7 @@ func (s *Suite) TestDeleteBundle() {
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		}, nil).Once()
 
-		err := DeleteBundle("bundle-1", ws, testBundleDeploymentID, true, out, mockV1Client, mockV1Alpha1Client)
+		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, true, out, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Deleted bundle bundle-1")
 		mockV1Alpha1Client.AssertExpectations(s.T())
@@ -226,9 +263,45 @@ func (s *Suite) TestDeleteBundle() {
 		s.mockGetDeployment()
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
-		err := DeleteBundle("bundle-1", ws, testBundleDeploymentID, false, out, mockV1Client, mockV1Alpha1Client)
+		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, false, out, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Canceling bundle deletion")
+		mockV1Alpha1Client.AssertNotCalled(s.T(), "DeleteBundleWithResponse")
+	})
+
+	s.Run("resolves a non-DAG bundle by mount path", func() {
+		out := &bytes.Buffer{}
+		s.mockGetDeployment()
+		mountPath := "/usr/local/airflow/dbt"
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundlesPaginated{
+				TotalCount: 1,
+				Bundles:    []astrov1alpha1.DeploymentBundle{{Id: "bundle-7", NonDagMountPath: &mountPath}},
+			},
+		}, nil).Once()
+		mockV1Alpha1Client.On("DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-7").Return(&astrov1alpha1.DeleteBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		}, nil).Once()
+
+		err := DeleteBundle("", "", mountPath, ws, testBundleDeploymentID, true, out, mockV1Client, mockV1Alpha1Client)
+		s.NoError(err)
+		s.Contains(out.String(), "Deleted bundle bundle-7")
+		mockV1Alpha1Client.AssertExpectations(s.T())
+	})
+
+	s.Run("errors when the selector matches no bundle", func() {
+		out := &bytes.Buffer{}
+		s.mockGetDeployment()
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1alpha1.BundlesPaginated{TotalCount: 0},
+		}, nil).Once()
+
+		err := DeleteBundle("", "missing", "", ws, testBundleDeploymentID, true, out, mockV1Client, mockV1Alpha1Client)
+		s.ErrorContains(err, `no DAG bundle named "missing"`)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "DeleteBundleWithResponse")
 	})
 }

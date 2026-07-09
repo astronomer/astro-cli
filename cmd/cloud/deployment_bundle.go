@@ -93,24 +93,33 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update BUNDLE-ID",
+		Use:   "update [BUNDLE-ID]",
 		Short: "Update a bundle on an Astro Deployment",
-		Long:  "Update a bundle's description or, for a non-DAG bundle, the DAG bundles it is served alongside.",
-		Example: `  # Update a bundle's description
+		Long:  "Update a bundle's description or, for a non-DAG bundle, the DAG bundles it is served alongside. Identify the bundle by its ID argument, its DAG bundle --name, or its non-DAG --mount-path.",
+		Example: `  # Update a bundle's description, identified by ID
   astro deployment bundle update <bundle-id> --deployment-id <id> --description "my bundle"
 
-  # Re-associate a non-DAG bundle with a different set of DAG bundles
-  astro deployment bundle update <bundle-id> --deployment-id <id> --dag-bundle-ids <dag-bundle-id>`,
-		Args: cobra.ExactArgs(1),
+  # Identify a DAG bundle by name instead of ID
+  astro deployment bundle update --deployment-id <id> --name my-dags --description "my bundle"
+
+  # Re-associate a non-DAG bundle (identified by mount path) with a different set of DAG bundles
+  astro deployment bundle update --deployment-id <id> --mount-path /usr/local/airflow/dbt --dag-bundle-ids <dag-bundle-id>`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.UpdateBundle(args[0], bundleDescription, bundleDagBundleIDs, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client)
+			var bundleID string
+			if len(args) > 0 {
+				bundleID = args[0]
+			}
+			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client)
 		},
 	}
+	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the DAG bundle to update by name, instead of by ID")
+	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-DAG bundle to update by mount path, instead of by ID")
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "New description for the bundle")
 	cmd.Flags().StringSliceVar(&bundleDagBundleIDs, "dag-bundle-ids", nil, "DAG bundle IDs a non-DAG bundle is served alongside. Replaces the existing set")
 	return cmd
@@ -118,21 +127,34 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete BUNDLE-ID",
+		Use:     "delete [BUNDLE-ID]",
 		Aliases: []string{"rm"},
 		Short:   "Delete a bundle from an Astro Deployment",
-		Long:    "Delete a DAG or non-DAG bundle from an Astro Deployment.",
-		Example: `  astro deployment bundle delete <bundle-id> --deployment-id <id>`,
-		Args:    cobra.ExactArgs(1),
+		Long:    "Delete a DAG or non-DAG bundle from an Astro Deployment. Identify the bundle by its ID argument, its DAG bundle --name, or its non-DAG --mount-path.",
+		Example: `  # Delete a bundle identified by ID
+  astro deployment bundle delete <bundle-id> --deployment-id <id>
+
+  # Identify a DAG bundle by name
+  astro deployment bundle delete --deployment-id <id> --name my-dags
+
+  # Identify a non-DAG bundle by mount path
+  astro deployment bundle delete --deployment-id <id> --mount-path /usr/local/airflow/dbt`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.DeleteBundle(args[0], ws, deploymentID, forceBundleDelete, out, astroV1Client, astroV1Alpha1Client)
+			var bundleID string
+			if len(args) > 0 {
+				bundleID = args[0]
+			}
+			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, out, astroV1Client, astroV1Alpha1Client)
 		},
 	}
+	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the DAG bundle to delete by name, instead of by ID")
+	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-DAG bundle to delete by mount path, instead of by ID")
 	cmd.Flags().BoolVarP(&forceBundleDelete, "force", "f", false, "Delete the bundle without confirmation")
 	return cmd
 }

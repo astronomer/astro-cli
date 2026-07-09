@@ -24,6 +24,7 @@ var (
 	errCreateBundleTarget   = errors.New("specify exactly one of --name (DAG bundle) or --mount-path (non-DAG bundle)")
 	errDagBundleNonDagFlags = errors.New("--bundle-type and --dag-bundle-ids are only valid for non-DAG bundles (--mount-path)")
 	errUpdateBundleNoOp     = errors.New("specify at least one of --description or --dag-bundle-ids")
+	errBundleSelector       = errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (DAG bundle), or --mount-path (non-DAG bundle)")
 )
 
 // BundleList is the wire shape for `bundle list` output.
@@ -120,13 +121,22 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 }
 
 // UpdateBundle changes a bundle's description and, for non-DAG bundles, the set of
-// DAG bundles it is served alongside.
-func UpdateBundle(bundleID, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// DAG bundles it is served alongside. The bundle is identified by id, DAG bundle
+// name, or non-DAG mount path.
+func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
+		return err
+	}
 	if bundleDescription == "" && len(dagBundleIDs) == 0 {
 		return errUpdateBundleNoOp
 	}
 
 	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	if err != nil {
+		return err
+	}
+
+	bundleID, err = resolveBundleID(dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
 	if err != nil {
 		return err
 	}
@@ -160,12 +170,22 @@ func ListBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient,
 		return nil, err
 	}
 
+	bundles, err := listAllBundles(dep.OrganizationId, dep.Id, astroV1Alpha1Client)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BundleList{Bundles: bundles}, nil
+}
+
+// listAllBundles pages through every bundle on a deployment.
+func listAllBundles(orgID, deploymentID string, astroV1Alpha1Client astrov1alpha1.APIClient) ([]astrov1alpha1.DeploymentBundle, error) {
 	var bundles []astrov1alpha1.DeploymentBundle
 	limit := bundleListLimit
 	for {
 		offset := len(bundles)
 		params := &astrov1alpha1.ListBundlesParams{Limit: &limit, Offset: &offset}
-		resp, err := astroV1Alpha1Client.ListBundlesWithResponse(httpContext.Background(), dep.OrganizationId, dep.Id, params)
+		resp, err := astroV1Alpha1Client.ListBundlesWithResponse(httpContext.Background(), orgID, deploymentID, params)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +200,53 @@ func ListBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient,
 		}
 	}
 
-	return &BundleList{Bundles: bundles}, nil
+	return bundles, nil
+}
+
+// validateBundleSelector requires exactly one of the bundle id, DAG bundle name,
+// or non-DAG mount path to identify a bundle.
+func validateBundleSelector(bundleID, bundleName, bundleMountPath string) error {
+	selectors := 0
+	for _, s := range []string{bundleID, bundleName, bundleMountPath} {
+		if s != "" {
+			selectors++
+		}
+	}
+	if selectors != 1 {
+		return errBundleSelector
+	}
+	return nil
+}
+
+// resolveBundleID turns a user-supplied bundle identifier into a bundle id. An
+// explicit id is returned as-is; a DAG bundle name or a non-DAG mount path is
+// resolved to its id by listing the deployment's bundles, both of which are
+// unique within a deployment.
+func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (string, error) {
+	if bundleID != "" {
+		return bundleID, nil
+	}
+
+	bundles, err := listAllBundles(orgID, deploymentID, astroV1Alpha1Client)
+	if err != nil {
+		return "", err
+	}
+
+	for i := range bundles {
+		bundle := &bundles[i]
+		isDagBundle := bundle.IsDagBundle != nil && *bundle.IsDagBundle
+		if bundleName != "" && isDagBundle && bundle.Name != nil && *bundle.Name == bundleName {
+			return bundle.Id, nil
+		}
+		if bundleMountPath != "" && !isDagBundle && bundle.NonDagMountPath != nil && *bundle.NonDagMountPath == bundleMountPath {
+			return bundle.Id, nil
+		}
+	}
+
+	if bundleName != "" {
+		return "", fmt.Errorf("no DAG bundle named %q on deployment %s", bundleName, deploymentID)
+	}
+	return "", fmt.Errorf("no non-DAG bundle mounted at %q on deployment %s", bundleMountPath, deploymentID)
 }
 
 // ListBundlesWithFormat prints every bundle on a deployment in the requested format.
@@ -193,9 +259,19 @@ func ListBundlesWithFormat(wsID, deploymentID string, format output.Format, tmpl
 	)
 }
 
-// DeleteBundle removes a bundle from a deployment.
-func DeleteBundle(bundleID, wsID, deploymentID string, force bool, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// DeleteBundle removes a bundle from a deployment. The bundle is identified by id,
+// DAG bundle name, or non-DAG mount path.
+func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
+		return err
+	}
+
 	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	if err != nil {
+		return err
+	}
+
+	bundleID, err = resolveBundleID(dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
 	if err != nil {
 		return err
 	}
