@@ -48,7 +48,7 @@ func setupCosmosBoostEnv(t *testing.T) {
 func TestUploadBundleStampsSidecarWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	installFakeCosmosBoostHelper(t)
-	require.NoError(t, config.CFG.CosmosBoostPrecompute.SetHomeString("true"))
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
 
 	bundleDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "dbt_project.yml"), []byte("name: shop\n"), 0o644))
@@ -67,7 +67,7 @@ func TestUploadBundleStampsSidecarWhenEnabled(t *testing.T) {
 func TestUploadBundleDoesNotStampByDefault(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	installFakeCosmosBoostHelper(t)
-	// cosmos_boost.precompute defaults to false — the hook must be a no-op.
+	// cosmos_boost.pre_deploy defaults to false — the hook must be a no-op.
 
 	bundleDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "dbt_project.yml"), []byte("name: shop\n"), 0o644))
@@ -89,7 +89,7 @@ func TestUploadBundleDoesNotStampByDefault(t *testing.T) {
 func TestDeployBundleDbtPathStampsSidecarWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	installFakeCosmosBoostHelper(t)
-	require.NoError(t, config.CFG.CosmosBoostPrecompute.SetHomeString("true"))
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
 
 	canCiCdDeploy = func(token string) bool { return true }
 
@@ -120,7 +120,7 @@ func TestDeployBundleDbtPathStampsSidecarWhenEnabled(t *testing.T) {
 func TestBuildImageStampsBuildContextWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	installFakeCosmosBoostHelper(t)
-	require.NoError(t, config.CFG.CosmosBoostPrecompute.SetHomeString("true"))
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
 
 	projectDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "dbt_project.yml"), []byte("name: shop\n"), 0o644))

@@ -63,7 +63,7 @@ type cfgs struct {
 	TelemetryNoticeShown    cfg
 	ProxyPort               cfg
 	OttoAutoUpdate          cfg
-	CosmosBoostPrecompute   cfg
+	CosmosBoostPreDeploy    cfg
 	CosmosBoostBaseURL      cfg
 }
 

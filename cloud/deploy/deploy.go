@@ -717,7 +717,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// sidecars so `docker build` bakes them into the image, letting the
 		// parse-time consumer skip hashing the project tree on every DAG parse.
 		// Opt-in and best-effort: a failure warns and never blocks the build.
-		if config.CFG.CosmosBoostPrecompute.GetBool() {
+		if config.CFG.CosmosBoostPreDeploy.GetBool() {
 			cosmosboost.BestEffortStamp(path)
 		}
 

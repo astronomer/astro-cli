@@ -101,7 +101,7 @@ var (
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
 		ProxyPort:               newCfg("proxy.port", "6563"),
 		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
-		CosmosBoostPrecompute:   newCfg("cosmos_boost.precompute", "false"),
+		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
 		CosmosBoostBaseURL:      newCfg("cosmos_boost.base_url", ""),
 	}
 

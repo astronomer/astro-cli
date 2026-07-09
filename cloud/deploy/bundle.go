@@ -217,11 +217,12 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Pre-compute dbt project hashes into .astro/dbt_metadata.json sidecars so
+	// Pre-deploy step: compute dbt project hashes into .astro/dbt_metadata.json
+	// sidecars so
 	// they ship inside the bundle, letting the parse-time consumer skip hashing
 	// the project tree on every DAG parse. Opt-in and best-effort: a missing or
 	// failing helper warns and never blocks the deploy.
-	if config.CFG.CosmosBoostPrecompute.GetBool() {
+	if config.CFG.CosmosBoostPreDeploy.GetBool() {
 		cosmosboost.BestEffortStamp(bundlePath)
 	}
 

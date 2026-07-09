@@ -8,11 +8,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
-// Precompute runs `astro-cosmos-boost pre-deploy <path>`, which discovers
+// PreDeploy runs `astro-cosmos-boost pre-deploy <path>`, which discovers
 // every dbt project (dbt_project.yml) and dbt manifest under path and writes
 // a .astro/dbt_metadata.json sidecar beside each, carrying the content hash
 // the parse-time consumer uses as its cache version key.
-func Precompute(path string) error {
+func PreDeploy(path string) error {
 	out, err := exec.Command(BinaryPath(), "pre-deploy", path).CombinedOutput()
 	logger.Debugf("astro-cosmos-boost pre-deploy output:\n%s", out)
 	if err != nil {
@@ -27,12 +27,12 @@ func Precompute(path string) error {
 // parse time, so an unavailable or failing helper must not block a deploy.
 func BestEffortStamp(path string) {
 	if err := EnsureBinary(); err != nil {
-		fmt.Printf("Warning: skipping dbt project hash precompute: %s\n", err)
+		fmt.Printf("Warning: skipping the dbt pre-deploy stamping step: %s\n", err)
 		return
 	}
-	if err := Precompute(path); err != nil {
-		fmt.Printf("Warning: dbt project hash precompute failed, continuing deploy: %s\n", err)
+	if err := PreDeploy(path); err != nil {
+		fmt.Printf("Warning: dbt pre-deploy stamping failed, continuing deploy: %s\n", err)
 		return
 	}
-	fmt.Println("Precomputed dbt project metadata (.astro/dbt_metadata.json)")
+	fmt.Println("Pre-deploy: stamped dbt project metadata (.astro/dbt_metadata.json)")
 }
