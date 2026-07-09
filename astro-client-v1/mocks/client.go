@@ -4,9 +4,11 @@ package astrov1_mocks
 
 import (
 	context "context"
-	io "io"
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
+
+	io "io"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -82,6 +84,154 @@ func (_m *ClientWithResponsesInterface) AddTeamMembersWithResponse(ctx context.C
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrov1.AddTeamMembersRequest, ...astrov1.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, teamId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BulkCreateAllowedIpAddressRangesWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) BulkCreateAllowedIpAddressRangesWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...astrov1.RequestEditorFn) (*astrov1.BulkCreateAllowedIpAddressRangesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkCreateAllowedIpAddressRangesWithBodyWithResponse")
+	}
+
+	var r0 *astrov1.BulkCreateAllowedIpAddressRangesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrov1.RequestEditorFn) (*astrov1.BulkCreateAllowedIpAddressRangesResponse, error)); ok {
+		return rf(ctx, organizationId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrov1.RequestEditorFn) *astrov1.BulkCreateAllowedIpAddressRangesResponse); ok {
+		r0 = rf(ctx, organizationId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1.BulkCreateAllowedIpAddressRangesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrov1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BulkCreateAllowedIpAddressRangesWithResponse provides a mock function with given fields: ctx, organizationId, body, reqEditors
+func (_m *ClientWithResponsesInterface) BulkCreateAllowedIpAddressRangesWithResponse(ctx context.Context, organizationId string, body astrov1.BulkCreateAllowedIpAddressRangesRequest, reqEditors ...astrov1.RequestEditorFn) (*astrov1.BulkCreateAllowedIpAddressRangesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkCreateAllowedIpAddressRangesWithResponse")
+	}
+
+	var r0 *astrov1.BulkCreateAllowedIpAddressRangesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrov1.BulkCreateAllowedIpAddressRangesRequest, ...astrov1.RequestEditorFn) (*astrov1.BulkCreateAllowedIpAddressRangesResponse, error)); ok {
+		return rf(ctx, organizationId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrov1.BulkCreateAllowedIpAddressRangesRequest, ...astrov1.RequestEditorFn) *astrov1.BulkCreateAllowedIpAddressRangesResponse); ok {
+		r0 = rf(ctx, organizationId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1.BulkCreateAllowedIpAddressRangesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrov1.BulkCreateAllowedIpAddressRangesRequest, ...astrov1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BulkDeleteAllowedIpAddressRangesWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) BulkDeleteAllowedIpAddressRangesWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...astrov1.RequestEditorFn) (*astrov1.BulkDeleteAllowedIpAddressRangesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkDeleteAllowedIpAddressRangesWithBodyWithResponse")
+	}
+
+	var r0 *astrov1.BulkDeleteAllowedIpAddressRangesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrov1.RequestEditorFn) (*astrov1.BulkDeleteAllowedIpAddressRangesResponse, error)); ok {
+		return rf(ctx, organizationId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrov1.RequestEditorFn) *astrov1.BulkDeleteAllowedIpAddressRangesResponse); ok {
+		r0 = rf(ctx, organizationId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1.BulkDeleteAllowedIpAddressRangesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrov1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BulkDeleteAllowedIpAddressRangesWithResponse provides a mock function with given fields: ctx, organizationId, body, reqEditors
+func (_m *ClientWithResponsesInterface) BulkDeleteAllowedIpAddressRangesWithResponse(ctx context.Context, organizationId string, body astrov1.BulkDeleteAllowedIpAddressRangesRequest, reqEditors ...astrov1.RequestEditorFn) (*astrov1.BulkDeleteAllowedIpAddressRangesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkDeleteAllowedIpAddressRangesWithResponse")
+	}
+
+	var r0 *astrov1.BulkDeleteAllowedIpAddressRangesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrov1.BulkDeleteAllowedIpAddressRangesRequest, ...astrov1.RequestEditorFn) (*astrov1.BulkDeleteAllowedIpAddressRangesResponse, error)); ok {
+		return rf(ctx, organizationId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrov1.BulkDeleteAllowedIpAddressRangesRequest, ...astrov1.RequestEditorFn) *astrov1.BulkDeleteAllowedIpAddressRangesResponse); ok {
+		r0 = rf(ctx, organizationId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1.BulkDeleteAllowedIpAddressRangesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrov1.BulkDeleteAllowedIpAddressRangesRequest, ...astrov1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}

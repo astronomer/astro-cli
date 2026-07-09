@@ -17,6 +17,8 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
+	astrov1alpha1_mocks "github.com/astronomer/astro-cli/astro-client-v1alpha1/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -227,34 +229,34 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "1")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	// test custom image
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	sleepTime = 1
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
 	mockV1Client.AssertExpectations(t)
@@ -325,34 +327,34 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "1")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	// test custom image
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	sleepTime = 1
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
 	mockV1Client.AssertExpectations(t)
@@ -389,7 +391,7 @@ func TestDeployOnCiCdEnforcedDeployment(t *testing.T) {
 	mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseCICD, nil).Twice()
 
 	defer testUtil.MockUserInput(t, "1")()
-	err := Deploy(deployInput, mockV1Client)
+	err := Deploy(deployInput, mockV1Client, nil)
 	assert.Contains(t, err.Error(), "cannot deploy since ci/cd enforcement is enabled for the deployment test-deployment. Please use API Tokens instead")
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -467,37 +469,37 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Stdin = r
 
 	defer testUtil.MockUserInput(t, "1")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = "test-id"
 	deployInput.Pytest = "pytest"
 	deployInput.Prompt = false
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	// test custom image with dag deploy enabled
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	os.Mkdir("./testfiles1/", os.ModePerm)
@@ -518,7 +520,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Dags:           false,
 	}
 	defer testUtil.MockUserInput(t, "1")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles1/")
@@ -559,7 +561,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "1")()
-	err := Deploy(deployInput, mockV1Client)
+	err := Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -581,30 +583,30 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 	// image deploy
 	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Image = true
 
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "1")()
 	deployInput.Pytest = ""
 	deployInput.WaitForStatus = true
 	dagOnlyDeploySleepTime = 1
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.ErrorIs(t, err, deployment.ErrTimedOut)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -656,7 +658,7 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "1")()
-	err := Deploy(deployInput, mockV1Client)
+	err := Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -693,7 +695,7 @@ func TestNoDagsDeploy(t *testing.T) {
 		Dags:           true,
 	}
 	defer testUtil.MockUserInput(t, "1")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	mockV1Client.AssertExpectations(t)
@@ -726,7 +728,7 @@ func TestNoDagsDeployForceSkipsPrompt(t *testing.T) {
 		Dags:      true,
 		Force:     true,
 	}
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -772,7 +774,7 @@ func TestNoDagsImageDeployForceSkipsPrompt(t *testing.T) {
 		Dags:      false,
 		Force:     true,
 	}
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	mockV1Client.AssertExpectations(t)
@@ -819,7 +821,7 @@ func TestImageDeployOnRemoteExecutionDeploymentSucceedsWithoutDagDeploy(t *testi
 		Force:     true,
 	}
 
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 	if err != nil {
 		assert.NotContains(t, err.Error(), "DAG-only deploys are not enabled")
@@ -851,7 +853,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	mockV1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Times(3)
 
 	defer testUtil.MockUserInput(t, "y")()
-	err := Deploy(deployInput, mockV1Client)
+	err := Deploy(deployInput, mockV1Client, nil)
 	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-deployment-id --dag-deploy enable' to enable DAG-only deploys")
 
 	mockImageHandler := new(mocks.ImageHandler)
@@ -870,12 +872,12 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.Error(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.Error(t, err)
 
 	mockV1Client.AssertExpectations(t)
@@ -909,7 +911,7 @@ func TestDeployFailure(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -949,19 +951,19 @@ func TestDeployFailure(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "1")()
 	deployInput.RuntimeID = ""
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = deploymentID
 	deployInput.WsID = "invalid-workspace"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.WsID = ws
 	deployInput.EnvFile = "invalid-path"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.ErrorIs(t, err, envFileMissing)
 
 	mockV1Client.AssertExpectations(t)
@@ -1007,7 +1009,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -1029,17 +1031,17 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -1089,7 +1091,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	// Test pytest with dags deploy
@@ -1111,17 +1113,17 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = "parse"
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = allTests
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.Pytest = parseAndPytest
-	err = Deploy(deployInput, mockV1Client)
+	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -2609,4 +2611,89 @@ func TestRemoveDagsFromDockerIgnore(t *testing.T) {
 			assert.Equal(t, tc.expected, string(got))
 		})
 	}
+}
+
+func TestCreateDeployWithDagBundle(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	t.Run("maps a plain deploy to the IMAGE type", func(t *testing.T) {
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("CreateDeployWithResponse", mock.Anything, "org-id", "deployment-id", mock.MatchedBy(func(req astrov1alpha1.CreateDeployRequest) bool {
+			return req.Type == astrov1alpha1.CreateDeployRequestTypeIMAGE &&
+				req.DagBundleName != nil && *req.DagBundleName == "finance"
+		})).Return(&astrov1alpha1.CreateDeployResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1alpha1.Deploy{Id: "deploy-1", ImageRepository: "repo"},
+		}, nil).Once()
+
+		deploy, err := createDeployWithDagBundle("org-id", "deployment-id", "desc", "finance", false, nil, mockV1Alpha1Client)
+		assert.NoError(t, err)
+		assert.Equal(t, "deploy-1", deploy.Id)
+		assert.Equal(t, "repo", deploy.ImageRepository)
+		mockV1Alpha1Client.AssertExpectations(t)
+	})
+
+	t.Run("maps a --dags deploy to the DAG type", func(t *testing.T) {
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(req astrov1alpha1.CreateDeployRequest) bool {
+			return req.Type == astrov1alpha1.CreateDeployRequestTypeDAG
+		})).Return(&astrov1alpha1.CreateDeployResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1alpha1.Deploy{Id: "deploy-2"},
+		}, nil).Once()
+
+		deploy, err := createDeployWithDagBundle("org-id", "deployment-id", "desc", "finance", true, nil, mockV1Alpha1Client)
+		assert.NoError(t, err)
+		assert.Equal(t, "deploy-2", deploy.Id)
+		mockV1Alpha1Client.AssertExpectations(t)
+	})
+
+	t.Run("surfaces a transport error", func(t *testing.T) {
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
+
+		_, err := createDeployWithDagBundle("org-id", "deployment-id", "desc", "finance", false, nil, mockV1Alpha1Client)
+		assert.ErrorIs(t, err, errMock)
+		mockV1Alpha1Client.AssertExpectations(t)
+	})
+
+	t.Run("surfaces an API error response", func(t *testing.T) {
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.CreateDeployResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusBadRequest},
+			Body:         []byte(`{"message":"the targeted DAG bundle no longer exists"}`),
+		}, nil).Once()
+
+		_, err := createDeployWithDagBundle("org-id", "deployment-id", "desc", "finance", false, nil, mockV1Alpha1Client)
+		assert.ErrorContains(t, err, "the targeted DAG bundle no longer exists")
+		mockV1Alpha1Client.AssertExpectations(t)
+	})
+}
+
+func TestToV1Alpha1GitRequest(t *testing.T) {
+	t.Run("returns nil for nil input", func(t *testing.T) {
+		assert.Nil(t, toV1Alpha1GitRequest(nil))
+	})
+
+	t.Run("maps every field including the provider", func(t *testing.T) {
+		account := "acme"
+		branch := "main"
+		sha := "abc123"
+		repo := "dags"
+		git := &astrov1.CreateDeployGitRequest{
+			Account:   &account,
+			Branch:    &branch,
+			CommitSha: sha,
+			Repo:      &repo,
+			Provider:  astrov1.CreateDeployGitRequestProviderGITHUB,
+		}
+
+		got := toV1Alpha1GitRequest(git)
+		assert.NotNil(t, got)
+		assert.Equal(t, &account, got.Account)
+		assert.Equal(t, &branch, got.Branch)
+		assert.Equal(t, sha, got.CommitSha)
+		assert.Equal(t, &repo, got.Repo)
+		assert.Equal(t, astrov1alpha1.CreateDeployGitRequestProvider(astrov1.CreateDeployGitRequestProviderGITHUB), got.Provider)
+	})
 }

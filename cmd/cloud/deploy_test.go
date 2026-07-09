@@ -1,13 +1,19 @@
 package cloud
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -26,7 +32,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -77,7 +83,7 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	}()
 
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -94,7 +100,7 @@ func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient) error {
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -116,4 +122,118 @@ func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 			assert.Contains(t, err.Error(), "--image-name")
 		})
 	}
+}
+
+type NonDagsDeploySuite struct {
+	suite.Suite
+	mockV1Client     *astrov1_mocks.ClientWithResponsesInterface
+	origV1Client     astrov1.APIClient
+	origDeployBundle func(deployInput *cloud.DeployBundleInput) error
+	origWorkingPath  string
+	origWd           string
+	tmpWorkingDir    string
+}
+
+func (s *NonDagsDeploySuite) SetupTest() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	// Run from an isolated temp directory that is not within an Astro project, so
+	// the non-DAG bundle path validation (which walks up to a .astro/config.yaml)
+	// is deterministic regardless of where the repo lives.
+	tmpDir, err := os.MkdirTemp("", "non-dags-test")
+	s.Require().NoError(err)
+	s.tmpWorkingDir = tmpDir
+	s.origWd, err = os.Getwd()
+	s.Require().NoError(err)
+	s.Require().NoError(os.Chdir(tmpDir))
+	s.origWorkingPath = config.WorkingPath
+	config.WorkingPath = tmpDir
+
+	s.origV1Client = astroV1Client
+	s.origDeployBundle = DeployBundle
+	s.mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = s.mockV1Client
+}
+
+func (s *NonDagsDeploySuite) TearDownTest() {
+	s.mockV1Client.AssertExpectations(s.T())
+	astroV1Client = s.origV1Client
+	DeployBundle = s.origDeployBundle
+	config.WorkingPath = s.origWorkingPath
+	if s.origWd != "" {
+		_ = os.Chdir(s.origWd)
+	}
+	if s.tmpWorkingDir != "" {
+		_ = os.RemoveAll(s.tmpWorkingDir)
+	}
+}
+
+func TestNonDagsDeploy(t *testing.T) {
+	suite.Run(t, new(NonDagsDeploySuite))
+}
+
+func (s *NonDagsDeploySuite) TestRequiresMountPath() {
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags")
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "--non-dags-mount-path is required")
+}
+
+func (s *NonDagsDeploySuite) TestBundleTypeDefaultsToNone() {
+	var captured *cloud.DeployBundleInput
+	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+		captured = deployInput
+		return nil
+	}
+
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x")
+	assert.NoError(s.T(), err)
+	s.Require().NotNil(captured)
+	assert.Equal(s.T(), "none", captured.BundleType)
+}
+
+func (s *NonDagsDeploySuite) TestRejectsIncompatibleFlag() {
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt", "--dags")
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "cannot use --dags with --non-dags")
+}
+
+func (s *NonDagsDeploySuite) TestProvidedDeploymentId() {
+	var captured *cloud.DeployBundleInput
+	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+		captured = deployInput
+		return nil
+	}
+
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt")
+	assert.NoError(s.T(), err)
+	s.Require().NotNil(captured)
+	assert.Equal(s.T(), "test-deployment-id", captured.DeploymentID)
+	assert.Equal(s.T(), "/usr/local/airflow/x", captured.MountPath)
+	assert.Equal(s.T(), "dbt", captured.BundleType)
+	assert.Equal(s.T(), s.tmpWorkingDir, captured.BundlePath)
+}
+
+func (s *NonDagsDeploySuite) TestWithinAstroProject() {
+	projectDir, cleanup, err := config.CreateTempProject()
+	assert.NoError(s.T(), err)
+	defer cleanup()
+
+	err = testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt", "--non-dags-local-path", projectDir)
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "within an Astro project")
+}
+
+func (s *NonDagsDeploySuite) TestBundlePathDoesNotExist() {
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-local-path", filepath.Join(s.tmpWorkingDir, "missing"))
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "does not exist")
+}
+
+func (s *NonDagsDeploySuite) TestBundlePathNotADirectory() {
+	file := filepath.Join(s.tmpWorkingDir, "a-file")
+	s.Require().NoError(os.WriteFile(file, []byte("x"), 0o600))
+
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-local-path", file)
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "is not a directory")
 }
