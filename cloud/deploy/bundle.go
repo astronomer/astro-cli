@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -215,6 +216,14 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 			}
 		}
 	}()
+
+	// Pre-compute dbt project hashes into .astro/dbt_metadata.json sidecars so
+	// they ship inside the bundle, letting the parse-time consumer skip hashing
+	// the project tree on every DAG parse. Opt-in and best-effort: a missing or
+	// failing helper warns and never blocks the deploy.
+	if config.CFG.CosmosBoostPrecompute.GetBool() {
+		cosmosboost.BestEffortStamp(bundlePath)
+	}
 
 	// Generate the bundle tar
 	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})

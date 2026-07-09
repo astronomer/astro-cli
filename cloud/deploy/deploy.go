@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -711,6 +712,14 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 	if imageName == "" {
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
+
+		// Stamp dbt projects in the build context with .astro/dbt_metadata.json
+		// sidecars so `docker build` bakes them into the image, letting the
+		// parse-time consumer skip hashing the project tree on every DAG parse.
+		// Opt-in and best-effort: a failure warns and never blocks the build.
+		if config.CFG.CosmosBoostPrecompute.GetBool() {
+			cosmosboost.BestEffortStamp(path)
+		}
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {
 			err := buildImageWithoutDags(path, buildSecrets, imageHandler)

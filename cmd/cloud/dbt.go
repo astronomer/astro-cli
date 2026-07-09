@@ -13,7 +13,6 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 )
 
 var (
@@ -126,14 +125,6 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	if mountPath == "" {
 		mountPath = dbtDefaultMountPathPrefix + dbtProjectName
 		fmt.Printf("Generated mount path from dbt project name: %s\n", mountPath)
-	}
-
-	// Pre-compute the dbt project hash into a .astro/dbt_metadata.json
-	// sidecar so the parse-time consumer can skip hashing the project tree
-	// on every DAG parse. Opt-in while the read-side rolls out;
-	// best-effort — failures must never block the deploy.
-	if config.CFG.CosmosBoostPrecompute.GetBool() {
-		cosmosboost.BestEffortStamp(dbtProjectPath)
 	}
 
 	// deploy the dbt project as a bundle
