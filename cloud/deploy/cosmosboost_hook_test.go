@@ -83,6 +83,40 @@ func TestUploadBundleDoesNotStampByDefault(t *testing.T) {
 		"opt-in gate is off by default; nothing may be written")
 }
 
+// TestDeployBundleDbtPathStampsSidecarWhenEnabled drives the full
+// `astro dbt deploy` bundle path (DeployBundle → UploadBundle) to pin that
+// moving the hook out of cmd/cloud/dbt.go did not lose dbt-deploy coverage.
+func TestDeployBundleDbtPathStampsSidecarWhenEnabled(t *testing.T) {
+	setupCosmosBoostEnv(t)
+	installFakeCosmosBoostHelper(t)
+	require.NoError(t, config.CFG.CosmosBoostPrecompute.SetHomeString("true"))
+
+	canCiCdDeploy = func(token string) bool { return true }
+
+	bundleDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "dbt_project.yml"), []byte("name: shop\n"), 0o644))
+
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockGetDeployment(mockV1Client, true, false)
+	mockCreateDeploy(mockV1Client, "http://bundle-upload-url", nil)
+	mockUpdateDeploy(mockV1Client, "version-id")
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	err := DeployBundle(&DeployBundleInput{
+		BundlePath:    bundleDir,
+		MountPath:     "dbt/shop",
+		DeploymentID:  "test-deployment-id",
+		BundleType:    "dbt",
+		AstroV1Client: mockV1Client,
+	})
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(bundleDir, ".astro", "dbt_metadata.json"),
+		"astro dbt deploy must still stamp the dbt project after the hook moved into UploadBundle")
+}
+
 func TestBuildImageStampsBuildContextWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	installFakeCosmosBoostHelper(t)
