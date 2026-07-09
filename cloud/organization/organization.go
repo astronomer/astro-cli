@@ -1,6 +1,8 @@
 package organization
 
 import (
+	"bytes"
+	"compress/gzip"
 	http_context "context"
 	"errors"
 	"fmt"
@@ -293,14 +295,43 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 		return err
 	}
 
+	// The v1 audit-logs endpoint responds with Content-Encoding: gzip, so Go's
+	// HTTP transport transparently decompresses the body and resp.Body is raw
+	// NDJSON. Re-compress it here so the exported .gz file is a valid gzip, as
+	// it was before the v1 migration. Guard against an already-gzipped body in
+	// case the transport does not decompress it (e.g. a proxy strips the header).
+	body, err := ensureGzip(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	filePerms := 0o644
-	err = os.WriteFile(filePath, resp.Body, os.FileMode(filePerms))
+	err = os.WriteFile(filePath, body, os.FileMode(filePerms))
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
+}
+
+// ensureGzip returns a gzip-compressed copy of body, unless body is already
+// gzip-compressed (identified by the 0x1f 0x8b magic bytes), in which case it
+// is returned unchanged.
+func ensureGzip(body []byte) ([]byte, error) {
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		return body, nil
+	}
+
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(body); err != nil {
+		return nil, err
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func pluralize(count int) string {
