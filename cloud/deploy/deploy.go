@@ -719,6 +719,10 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// Opt-in and best-effort: a failure warns and never blocks the build.
 		if config.CFG.CosmosBoostPreDeploy.GetBool() {
 			cosmosboost.BestEffortStamp(path)
+		} else {
+			// Disabled must also mean no stale sidecars from an earlier enabled
+			// deploy get baked into the image.
+			cosmosboost.BestEffortCleanup(path)
 		}
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {

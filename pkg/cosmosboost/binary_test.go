@@ -190,3 +190,15 @@ func (s *BinarySuite) TestEnsureBinaryFailsWhenCDNUnreachable() {
 	err := EnsureBinary()
 	require.Error(s.T(), err)
 }
+
+func (s *BinarySuite) TestEnsureBinaryErrorsWhenCDNServesBelowMinVersion() {
+	s.skipOnWindows()
+	// The CDN's latest lags below MinVersion (e.g. mid-rollback): the install
+	// itself succeeds, but EnsureBinary must not report the gate as satisfied.
+	old := "0.0.1-alpha.1"
+	s.fakeCDN(old, buildTarGz(s.T(), fakeBinary(old)), false)
+
+	err := EnsureBinary()
+	require.Error(s.T(), err)
+	s.Contains(err.Error(), "below minimum required version")
+}

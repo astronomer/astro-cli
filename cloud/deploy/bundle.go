@@ -224,6 +224,10 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 	// failing helper warns and never blocks the deploy.
 	if config.CFG.CosmosBoostPreDeploy.GetBool() {
 		cosmosboost.BestEffortStamp(bundlePath)
+	} else {
+		// Disabled must also mean no stale sidecars from an earlier enabled
+		// deploy ship in the bundle — the consumer can't tell stale from fresh.
+		cosmosboost.BestEffortCleanup(bundlePath)
 	}
 
 	// Generate the bundle tar

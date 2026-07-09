@@ -91,21 +91,39 @@ func LatestVersion() (string, error) {
 	return strings.TrimSpace(string(body)), nil
 }
 
-// EnsureBinary downloads the helper if it's missing or below MinVersion.
-func EnsureBinary() error {
-	installed := InstalledVersion()
+// meetsMinVersion reports whether an installed version string satisfies
+// MinVersion. Empty or unparseable versions do not.
+func meetsMinVersion(installed string) bool {
 	if installed == "" {
-		fmt.Println("Downloading astro-cosmos-boost...")
-		return downloadAndInstall()
+		return false
 	}
 	iv, err := semver.NewVersion(installed)
 	if err != nil {
-		return downloadAndInstall()
+		return false
 	}
 	minVer, _ := semver.NewVersion(MinVersion)
-	if iv.LessThan(minVer) {
+	return !iv.LessThan(minVer)
+}
+
+// EnsureBinary downloads the helper if it's missing or below MinVersion, and
+// re-checks the gate after installing: if the CDN's latest release is itself
+// below MinVersion (e.g. mid-rollback), succeeding silently would defeat the
+// version gate, so that is an error.
+func EnsureBinary() error {
+	installed := InstalledVersion()
+	if meetsMinVersion(installed) {
+		return nil
+	}
+	if installed == "" {
+		fmt.Println("Downloading astro-cosmos-boost...")
+	} else {
 		fmt.Printf("astro-cosmos-boost %s is below minimum required version %s, updating...\n", installed, MinVersion)
-		return downloadAndInstall()
+	}
+	if err := downloadAndInstall(); err != nil {
+		return err
+	}
+	if v := InstalledVersion(); !meetsMinVersion(v) {
+		return fmt.Errorf("installed astro-cosmos-boost %s is still below minimum required version %s (the CDN may be serving an older release)", v, MinVersion)
 	}
 	return nil
 }

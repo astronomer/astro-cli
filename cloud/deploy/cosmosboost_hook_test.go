@@ -141,3 +141,23 @@ func TestBuildImageStampsBuildContextWhenEnabled(t *testing.T) {
 		"the sidecar must be written into the build context before docker build")
 	mockImageHandler.AssertExpectations(t)
 }
+
+func TestUploadBundleRemovesStaleSidecarWhenDisabled(t *testing.T) {
+	setupCosmosBoostEnv(t)
+	// Gate off (default). A sidecar left behind by an earlier enabled deploy
+	// must be removed from the bundle, not shipped with a stale hash.
+	bundleDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "dbt_project.yml"), []byte("name: shop\n"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(bundleDir, ".astro"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, ".astro", "dbt_metadata.json"), []byte(`{"stale": true}`), 0o644))
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, filepath.Join(bundleDir, ".astro", "dbt_metadata.json"),
+		"disabling the feature must actively remove stale sidecars from the bundle")
+}
