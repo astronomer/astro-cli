@@ -140,10 +140,9 @@ jobs:
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: v2.15.2
-          args: release --snapshot --clean --skip=publish --parallelism=3
+          args: release --snapshot --clean --skip=publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GOMAXPROCS: 1
 
   update-godownloader:
     needs: [detect, release]

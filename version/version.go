@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
+// CurrVersion is injected at build time with the release version.
 var CurrVersion string
 
 const (
