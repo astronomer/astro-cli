@@ -263,7 +263,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
 	cmd.Flags().StringVarP(&adoptName, "name", "", "", "metadata.name of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
-	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; defaults to --name when omitted")
+	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --name value")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
