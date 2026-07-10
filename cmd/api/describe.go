@@ -321,7 +321,7 @@ func printResponseSchema(out io.Writer, entry *openapi.ResponseEntry, resolver *
 	if refName != "" {
 		fmt.Fprintf(out, "    Schema: %s\n", color.CyanString(refName))
 	}
-	if resolved != nil && hasExpandableFields(resolved) {
+	if resolved != nil && hasExpandableFields(resolved, resolver) {
 		printSchema(out, mt.Schema, resolver, baseResponseDepth, make(map[string]bool), responseSchemaPrintOpts())
 	}
 }
@@ -380,30 +380,12 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 	// Handle oneOf / anyOf / allOf when composition is enabled
 	if opts.ShowComposition {
 		if len(schema.OneOf) > 0 {
-			fmt.Fprintf(out, "%s%s\n", prefix, color.HiBlackString("One of the following:"))
-			for i, childRef := range schema.OneOf {
-				_, childName := resolver.ResolveSchema(childRef)
-				if childName != "" {
-					fmt.Fprintf(out, "\n%s%s %s\n", prefix, color.CyanString("Option %d:", i+1), childName)
-				} else {
-					fmt.Fprintf(out, "\n%s%s\n", prefix, color.CyanString("Option %d:", i+1))
-				}
-				printSchema(out, childRef, resolver, indent+2, ancestors, opts)
-			}
+			printSchemaOptions(out, "One of the following:", schema.OneOf, resolver, indent, ancestors, opts)
 			return
 		}
 
 		if len(schema.AnyOf) > 0 {
-			fmt.Fprintf(out, "%s%s\n", prefix, color.HiBlackString("Any of the following:"))
-			for i, childRef := range schema.AnyOf {
-				_, childName := resolver.ResolveSchema(childRef)
-				if childName != "" {
-					fmt.Fprintf(out, "\n%s%s %s\n", prefix, color.CyanString("Option %d:", i+1), childName)
-				} else {
-					fmt.Fprintf(out, "\n%s%s\n", prefix, color.CyanString("Option %d:", i+1))
-				}
-				printSchema(out, childRef, resolver, indent+2, ancestors, opts)
-			}
+			printSchemaOptions(out, "Any of the following:", schema.AnyOf, resolver, indent, ancestors, opts)
 			return
 		}
 
@@ -420,7 +402,7 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 	// Arrays can appear at the schema root or as nested properties. Render their
 	// element fields at the array's current indentation level.
 	if schema.Type == schemaTypeArray && schema.Items != nil {
-		if item, _ := resolver.ResolveSchema(schema.Items); hasExpandableFields(item) {
+		if item, _ := resolver.ResolveSchema(schema.Items); hasExpandableFields(item, resolver) {
 			printSchema(out, schema.Items, resolver, indent, ancestors, opts)
 		}
 	}
@@ -484,20 +466,62 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 				continue
 			}
 
-			if hasExpandableFields(prop) {
+			if hasExpandableFields(prop, resolver) {
 				printSchema(out, propRef, resolver, indent+indentIncrement, ancestors, opts)
 			}
 		}
 	}
 }
 
+// printSchemaOptions prints composition branches and expands branches with
+// nested fields. Leaf branches still include their type, such as "null".
+func printSchemaOptions(out io.Writer, heading string, children []*openapi.SchemaRef, resolver *openapi.SchemaResolver, indent int, ancestors map[string]bool, opts schemaPrintOpts) {
+	prefix := strings.Repeat(" ", indent)
+	fmt.Fprintf(out, "%s%s\n", prefix, color.HiBlackString(heading))
+	for i, childRef := range children {
+		child, childName := resolver.ResolveSchema(childRef)
+		childType := getTypeString(child, childName)
+		fmt.Fprintf(out, "\n%s%s %s\n", prefix, color.CyanString("Option %d:", i+1), childType)
+		if (childName != "" && ancestors[childName]) || hasExpandableFields(child, resolver) {
+			printSchema(out, childRef, resolver, indent+2, ancestors, opts)
+		}
+	}
+}
+
 // hasExpandableFields reports whether a schema has nested structure worth
 // printing.
-func hasExpandableFields(s *openapi.Schema) bool {
+func hasExpandableFields(s *openapi.Schema, resolver *openapi.SchemaResolver) bool {
+	return hasExpandableFieldsSeen(s, resolver, make(map[*openapi.Schema]bool))
+}
+
+func hasExpandableFieldsSeen(s *openapi.Schema, resolver *openapi.SchemaResolver, seen map[*openapi.Schema]bool) bool {
 	if s == nil {
 		return false
 	}
-	return len(s.Properties) > 0 || s.Items != nil || len(s.OneOf) > 0 || len(s.AnyOf) > 0 || len(s.AllOf) > 0
+	if seen[s] {
+		return false
+	}
+	seen[s] = true
+	defer delete(seen, s)
+
+	if len(s.Properties) > 0 || len(s.AllOf) > 0 {
+		return true
+	}
+	if s.Items != nil {
+		item, _ := resolver.ResolveSchema(s.Items)
+		if hasExpandableFieldsSeen(item, resolver, seen) {
+			return true
+		}
+	}
+	for _, children := range [][]*openapi.SchemaRef{s.OneOf, s.AnyOf} {
+		for _, childRef := range children {
+			child, _ := resolver.ResolveSchema(childRef)
+			if hasExpandableFieldsSeen(child, resolver, seen) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // getTypeString returns a human-readable type string for a schema.
@@ -508,6 +532,9 @@ func getTypeString(schema *openapi.Schema, refName string) string {
 
 	if schema == nil {
 		return "any"
+	}
+	if typeStr := getCompositionTypeString(schema); typeStr != "" {
+		return typeStr
 	}
 
 	typeStr := schema.Type
@@ -536,4 +563,35 @@ func getTypeString(schema *openapi.Schema, refName string) string {
 	}
 
 	return typeStr
+}
+
+// getCompositionTypeString returns a compact type union for oneOf/anyOf leaf
+// branches, such as "string or null" or "TaskInstanceState or null".
+func getCompositionTypeString(schema *openapi.Schema) string {
+	children := schema.OneOf
+	if len(children) == 0 {
+		children = schema.AnyOf
+	}
+	if len(children) == 0 {
+		return ""
+	}
+
+	types := make([]string, 0, len(children))
+	seen := make(map[string]bool, len(children))
+	for _, childRef := range children {
+		if childRef == nil {
+			continue
+		}
+		childName := ""
+		if childRef.Ref != "" {
+			parts := strings.Split(childRef.Ref, "/")
+			childName = parts[len(parts)-1]
+		}
+		childType := getTypeString(childRef.Value, childName)
+		if childType != "any" && !seen[childType] {
+			types = append(types, childType)
+			seen[childType] = true
+		}
+	}
+	return strings.Join(types, " or ")
 }

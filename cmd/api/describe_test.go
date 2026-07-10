@@ -34,6 +34,9 @@ func TestGetTypeString(t *testing.T) {
 		{"array of strings", &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}, "", "array of string"},
 		{"array with ref items", &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Ref: "#/components/schemas/DAG"}}, "", "array of DAG"},
 		{"array with empty items", &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{}}}, "", "array of object"},
+		{"nullable string", &openapi.Schema{AnyOf: []*openapi.SchemaRef{{Value: &openapi.Schema{Type: "string"}}, {Value: &openapi.Schema{Type: "null"}}}}, "", "string or null"},
+		{"nullable string array", &openapi.Schema{AnyOf: []*openapi.SchemaRef{{Value: &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}}, {Value: &openapi.Schema{Type: "null"}}}}, "", "array of string or null"},
+		{"nullable ref", &openapi.Schema{AnyOf: []*openapi.SchemaRef{{Ref: "#/components/schemas/TaskState"}, {Value: &openapi.Schema{Type: "null"}}}}, "", "TaskState or null"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1008,6 +1011,65 @@ func TestPrintSchema_ExpandsSiblingRefsIndependently(t *testing.T) {
 
 	assert.Equal(t, 2, strings.Count(buf.String(), "value"), buf.String())
 	assert.NotContains(t, buf.String(), "(see Common above)")
+}
+
+func TestPrintSchema_NullablePrimitiveUsesCompactType(t *testing.T) {
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "cursor", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+				AnyOf: []*openapi.SchemaRef{
+					{Value: &openapi.Schema{Type: "string"}},
+					{Value: &openapi.Schema{Type: "null"}},
+				},
+			}}},
+			{Name: "choices", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+				AnyOf: []*openapi.SchemaRef{
+					{Value: &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}},
+					{Value: &openapi.Schema{Type: "null"}},
+				},
+			}}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, openapi.NewSchemaResolver(), 0, map[string]bool{}, responseSchemaPrintOpts())
+
+	assert.Contains(t, buf.String(), "cursor  string or null")
+	assert.Contains(t, buf.String(), "choices  array of string or null")
+	assert.NotContains(t, buf.String(), "Any of the following")
+	assert.NotContains(t, buf.String(), "Option 1")
+}
+
+func TestPrintSchema_NullableObjectLabelsAndExpandsBranches(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{
+		"Detail": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "id", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	})
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "detail", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+				AnyOf: []*openapi.SchemaRef{
+					{Ref: "#/components/schemas/Detail"},
+					{Value: &openapi.Schema{Type: "null"}},
+				},
+			}}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+	out := buf.String()
+
+	assert.Contains(t, out, "detail  Detail or null")
+	assert.Contains(t, out, "Option 1: Detail")
+	assert.Contains(t, out, "Option 2: null")
+	assert.Contains(t, out, "id  string")
 }
 
 // TestPrintSchema_UnresolvedRefKeepsName verifies a property whose $ref cannot be
