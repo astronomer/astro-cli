@@ -20,7 +20,7 @@ Usage: $this [-t tag] [-c cachedir] [-f] [-n] [-d] [args...]
                Defaults to the most recent nightly release. Any release
                tag from https://github.com/astronomer/astro-cli/releases works.
   -c cachedir  directory to cache downloaded binaries.
-               Defaults to \$ASTRO_NIGHTLY_CACHE_DIR, then ~/.cache/astro-nightly
+               Defaults to \$ASTRO_NIGHTLY_CACHE_DIR, then ~/.astro/nightly
   -f           force re-download even if the binary is already cached
   -n           resolve the tag and print the cached binary path, but do not run it
   -d           turn on debug logging
@@ -41,7 +41,8 @@ EOF
 
 parse_args() {
   TAG=${ASTRO_NIGHTLY_TAG:-}
-  CACHE_DIR=${ASTRO_NIGHTLY_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/astro-nightly}
+  # cache under the CLI's home directory, alongside its other local state
+  CACHE_DIR=${ASTRO_NIGHTLY_CACHE_DIR:-$HOME/.astro/nightly}
   FORCE=0
   RESOLVE_ONLY=0
   while getopts "t:c:fndxh?" arg; do
