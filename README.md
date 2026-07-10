@@ -138,6 +138,22 @@ curl -sSL install.astronomer.io | sudo bash -s -- v1.1.0
 >$ cat godownloader.sh | bash -s -- -b /usr/local/bin
 >```
 
+### Nightly builds
+
+To try out a nightly build without installing it, use the [run-nightly](https://raw.githubusercontent.com/astronomer/astro-cli/main/run-nightly.sh) script. It downloads the most recent nightly release for your OS and CPU architecture, caches it locally, and runs it with any arguments you pass:
+
+```sh
+curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/run-nightly.sh | bash -s -- version
+```
+
+To run a specific release instead of the latest nightly, pass its tag with `-t`:
+
+```sh
+curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/run-nightly.sh | bash -s -- -t v1.44.0-nightly.20260710 version
+```
+
+Run the script with `-h` to see all options. Nightly builds are cut daily from `main` and are not recommended for production use.
+
 #### Troubleshoot installation issues
 
 If you encounter issues when installing the Astro CLI:
