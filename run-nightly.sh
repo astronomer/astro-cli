@@ -64,13 +64,13 @@ parse_args() {
 # resolve TAG to the most recent nightly release when not specified
 resolve_tag() {
   if [ -z "${TAG}" ]; then
-    log_info "resolving latest nightly release"
+    log_debug "resolving latest nightly release"
     TAG=$(github_latest_nightly "$OWNER/$REPO")
     if test -z "$TAG"; then
       log_crit "unable to find a nightly release - see https://github.com/${PREFIX}/releases for details"
       exit 1
     fi
-    log_info "using latest nightly: ${TAG}"
+    log_debug "using latest nightly: ${TAG}"
   else
     # accept tags with or without the leading v
     case "$TAG" in
@@ -143,7 +143,7 @@ fetch() {
   install "${tmpdir}/${BINEXE}" "${BINDIR}/"
   rm -rf "${tmpdir}"
   trap - EXIT
-  log_info "cached ${BIN}"
+  log_debug "cached ${BIN}"
 }
 
 run() {
@@ -400,7 +400,7 @@ shift "$ASTRO_ARGS_SHIFT"
 
 resolve_tag
 
-log_info "using version ${VERSION} (${TAG}) for ${OS}/${ARCH}"
+log_debug "using version ${VERSION} (${TAG}) for ${OS}/${ARCH}"
 
 fetch
 
