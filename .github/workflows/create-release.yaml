@@ -1,8 +1,11 @@
 name: Create Release Tag
 
-run-name: "${{ inputs.type }} release${{ inputs.version && format(' v{0}', inputs.version) || '' }} from ${{ github.ref_name }} (by @${{ github.actor }})"
+run-name: "${{ inputs.type || 'nightly' }} release${{ inputs.version && format(' v{0}', inputs.version) || '' }} from ${{ github.ref_name }} (by @${{ github.actor }})"
 
 on:
+  schedule:
+    # Nightly, from main. Manual dispatch below still covers on-demand nightly/rc/ga.
+    - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
       type:
@@ -30,15 +33,20 @@ jobs:
     outputs:
       tag: ${{ steps.compute.outputs.tag }}
       prev_ga: ${{ steps.compute.outputs.prev_ga }}
+      type: ${{ steps.resolve-type.outputs.type }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
+      - name: Resolve type
+        id: resolve-type
+        run: echo "type=${{ inputs.type || 'nightly' }}" >> "$GITHUB_OUTPUT"
+
       - name: Validate inputs
         run: |
           set -e
-          TYPE="${{ inputs.type }}"
+          TYPE="${{ steps.resolve-type.outputs.type }}"
           VERSION="${{ inputs.version }}"
           BRANCH="${GITHUB_REF_NAME}"
 
@@ -69,7 +77,7 @@ jobs:
         id: compute
         run: |
           set -e
-          case "${{ inputs.type }}" in
+          case "${{ steps.resolve-type.outputs.type }}" in
             nightly) TAG=$(make nightly-tag) ;;
             rc)      TAG=$(make rc-tag VERSION=${{ inputs.version }}) ;;
             ga)      TAG=$(make release-tag VERSION=${{ inputs.version }}) ;;
@@ -102,17 +110,17 @@ jobs:
             echo "| Field | Value |"
             echo "|-------|-------|"
             echo "| Tag | \`$TAG\` |"
-            echo "| Type | **${{ inputs.type }}** |"
+            echo "| Type | **${{ steps.resolve-type.outputs.type }}** |"
             echo "| Branch | \`${GITHUB_REF_NAME}\` |"
             echo "| Commit | [\`$COMMIT_SHORT\`]($REPO_URL/commit/$COMMIT_FULL) |"
             echo "| Triggered by | @${{ github.actor }} |"
-            if [ "${{ inputs.type }}" = "ga" ]; then
+            if [ "${{ steps.resolve-type.outputs.type }}" = "ga" ]; then
               echo "| Previous GA | [\`$PREV_GA\`]($REPO_URL/releases/tag/$PREV_GA) |"
             fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{ inputs.type }}" = "ga" ]; then
+          if [ "${{ steps.resolve-type.outputs.type }}" = "ga" ]; then
             {
               echo "### Approver checklist"
               echo ""
@@ -156,7 +164,7 @@ jobs:
             echo "## Release Tag Created"
             echo ""
             echo "**Tag:** \`$TAG\`"
-            echo "**Type:** ${{ inputs.type }}"
+            echo "**Type:** ${{ needs.preflight.outputs.type }}"
             echo "**Branch:** \`$GITHUB_REF_NAME\`"
             echo "**Commit:** \`$(git rev-parse --short HEAD)\`"
             echo "**Actor:** @$GITHUB_ACTOR"
