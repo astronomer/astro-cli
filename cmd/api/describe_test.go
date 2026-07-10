@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -679,9 +680,10 @@ func TestRunDescribe_JSONOutput(t *testing.T) {
 	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment", JSON: true}
 	require.NoError(t, runDescribe(opts))
 
-	// A single match must be a JSON object, not an array.
-	var ep map[string]any
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &ep), "output must be valid JSON")
+	var endpoints []map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &endpoints), "output must be a JSON array")
+	require.Len(t, endpoints, 1)
+	ep := endpoints[0]
 
 	assert.Equal(t, "POST", ep["method"])
 	assert.Equal(t, "CreateDeployment", ep["operationId"])
@@ -701,6 +703,22 @@ func TestRunDescribe_JSONOutput(t *testing.T) {
 	assert.Equal(t, "Executor", byName["executor"]["ref"])                                  // nested $ref resolved
 	assert.NotEmpty(t, byName["executor"]["properties"])                                    // ...with its fields
 	assert.Equal(t, "WorkerQueue", byName["workerQueues"]["items"].(map[string]any)["ref"]) // array-of-$ref resolved
+}
+
+func TestRunDescribe_JSONOutputMultipleMatches(t *testing.T) {
+	ts := newTestSpecServerJSON(t, testSpecJSON())
+	defer ts.Close()
+
+	var buf bytes.Buffer
+	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", JSON: true}
+	require.NoError(t, runDescribe(opts))
+
+	var endpoints []map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &endpoints), "output must be a JSON array")
+	require.Len(t, endpoints, 2)
+	assert.Equal(t, "GET", endpoints[0]["method"])
+	assert.Equal(t, "POST", endpoints[1]["method"])
 }
 
 func TestResolveSchemaJSON_CutsCycles(t *testing.T) {
@@ -912,6 +930,84 @@ func TestPrintSchema_AllOfPlusProperties(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "baseField", "allOf base fields must print")
 	assert.Contains(t, out, "ownField", "sibling properties must also print")
+}
+
+func TestPrintSchema_NestedAllOfPlusPropertiesPrintsOnce(t *testing.T) {
+	child := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		AllOf: []*openapi.SchemaRef{{Value: &openapi.Schema{
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "baseField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		}}},
+		Properties: []openapi.SchemaProperty{
+			{Name: "ownField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+		},
+	}}
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "child", Schema: child},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, openapi.NewSchemaResolver(), 0, map[string]bool{}, responseSchemaPrintOpts())
+
+	assert.Equal(t, 1, strings.Count(buf.String(), "baseField"), buf.String())
+	assert.Equal(t, 1, strings.Count(buf.String(), "ownField"), buf.String())
+}
+
+func TestPrintResponseSchema_ExpandsTopLevelArrayItems(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{
+		"Things": {
+			Type:  schemaTypeArray,
+			Items: &openapi.SchemaRef{Ref: "#/components/schemas/Thing"},
+		},
+		"Thing": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "id", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	})
+	entry := &openapi.ResponseEntry{
+		Code: "200",
+		Content: map[string]*openapi.MediaType{
+			"application/json": {Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Things"}},
+		},
+	}
+
+	var buf bytes.Buffer
+	printResponseSchema(&buf, entry, resolver)
+
+	assert.Contains(t, buf.String(), "Schema: Things")
+	assert.Contains(t, buf.String(), "id")
+}
+
+func TestPrintSchema_ExpandsSiblingRefsIndependently(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{
+		"Common": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "value", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	})
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "a", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Common"}},
+			{Name: "b", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Common"}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+
+	assert.Equal(t, 2, strings.Count(buf.String(), "value"), buf.String())
+	assert.NotContains(t, buf.String(), "(see Common above)")
 }
 
 // TestPrintSchema_UnresolvedRefKeepsName verifies a property whose $ref cannot be

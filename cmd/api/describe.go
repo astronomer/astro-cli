@@ -321,7 +321,7 @@ func printResponseSchema(out io.Writer, entry *openapi.ResponseEntry, resolver *
 	if refName != "" {
 		fmt.Fprintf(out, "    Schema: %s\n", color.CyanString(refName))
 	}
-	if resolved != nil && len(resolved.Properties) > 0 {
+	if resolved != nil && hasExpandableFields(resolved) {
 		printSchema(out, mt.Schema, resolver, baseResponseDepth, make(map[string]bool), responseSchemaPrintOpts())
 	}
 }
@@ -355,7 +355,7 @@ func printResponses(out io.Writer, responses *openapi.Responses, resolver *opena
 // The schemaPrintOpts control which features (composition, defaults, etc.) are rendered.
 //
 //nolint:gocognit,gocyclo // Complex but necessary for comprehensive schema display
-func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.SchemaResolver, indent int, visited map[string]bool, opts schemaPrintOpts) {
+func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.SchemaResolver, indent int, ancestors map[string]bool, opts schemaPrintOpts) {
 	if schemaRef == nil {
 		return
 	}
@@ -369,11 +369,12 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 
 	// Handle $ref (cycle detection)
 	if refName != "" {
-		if visited[refName] {
+		if ancestors[refName] {
 			fmt.Fprintf(out, "%s(see %s above)\n", prefix, refName)
 			return
 		}
-		visited[refName] = true
+		ancestors[refName] = true
+		defer delete(ancestors, refName)
 	}
 
 	// Handle oneOf / anyOf / allOf when composition is enabled
@@ -387,7 +388,7 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 				} else {
 					fmt.Fprintf(out, "\n%s%s\n", prefix, color.CyanString("Option %d:", i+1))
 				}
-				printSchema(out, childRef, resolver, indent+2, visited, opts)
+				printSchema(out, childRef, resolver, indent+2, ancestors, opts)
 			}
 			return
 		}
@@ -401,7 +402,7 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 				} else {
 					fmt.Fprintf(out, "\n%s%s\n", prefix, color.CyanString("Option %d:", i+1))
 				}
-				printSchema(out, childRef, resolver, indent+2, visited, opts)
+				printSchema(out, childRef, resolver, indent+2, ancestors, opts)
 			}
 			return
 		}
@@ -409,10 +410,18 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 		if len(schema.AllOf) > 0 {
 			fmt.Fprintf(out, "%s%s\n", prefix, color.HiBlackString("All of the following:"))
 			for _, childRef := range schema.AllOf {
-				printSchema(out, childRef, resolver, indent, visited, opts)
+				printSchema(out, childRef, resolver, indent, ancestors, opts)
 			}
 			// Fall through: an allOf schema commonly also defines its own
 			// top-level properties (extend-a-base pattern), which must print too.
+		}
+	}
+
+	// Arrays can appear at the schema root or as nested properties. Render their
+	// element fields at the array's current indentation level.
+	if schema.Type == schemaTypeArray && schema.Items != nil {
+		if item, _ := resolver.ResolveSchema(schema.Items); hasExpandableFields(item) {
+			printSchema(out, schema.Items, resolver, indent, ancestors, opts)
 		}
 	}
 
@@ -475,33 +484,20 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 				continue
 			}
 
-			// Expand nested object properties, including those reached via $ref.
-			if len(prop.Properties) > 0 {
-				printSchema(out, propRef, resolver, indent+indentIncrement, visited, opts)
-			}
-
-			// Expand the element schema of arrays of objects (including $ref items).
-			if prop.Type == schemaTypeArray && prop.Items != nil {
-				if item, _ := resolver.ResolveSchema(prop.Items); item != nil && hasExpandableFields(item) {
-					printSchema(out, prop.Items, resolver, indent+indentIncrement, visited, opts)
-				}
-			}
-
-			// Handle nested composition in properties.
-			if opts.ShowComposition && (len(prop.OneOf) > 0 || len(prop.AnyOf) > 0 || len(prop.AllOf) > 0) {
-				printSchema(out, propRef, resolver, indent+indentIncrement, visited, opts)
+			if hasExpandableFields(prop) {
+				printSchema(out, propRef, resolver, indent+indentIncrement, ancestors, opts)
 			}
 		}
 	}
 }
 
 // hasExpandableFields reports whether a schema has nested structure worth
-// printing (properties or a composition of sub-schemas).
+// printing.
 func hasExpandableFields(s *openapi.Schema) bool {
 	if s == nil {
 		return false
 	}
-	return len(s.Properties) > 0 || len(s.OneOf) > 0 || len(s.AnyOf) > 0 || len(s.AllOf) > 0
+	return len(s.Properties) > 0 || s.Items != nil || len(s.OneOf) > 0 || len(s.AnyOf) > 0 || len(s.AllOf) > 0
 }
 
 // getTypeString returns a human-readable type string for a schema.

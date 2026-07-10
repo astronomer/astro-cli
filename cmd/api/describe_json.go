@@ -13,8 +13,8 @@ import (
 // actual fields without needing the spec; genuine cycles are cut and marked
 // with "circular": true rather than recursing forever.
 //
-// A single matched endpoint is emitted as a JSON object; a path matching
-// multiple methods is emitted as an array of objects.
+// Matched endpoints are always emitted as an array so callers can rely on a
+// stable top-level shape.
 
 // maxJSONSchemaDepth bounds resolveSchemaJSON's recursion. Cycles are already
 // cut via the ancestry set; this is a backstop against pathologically deep or
@@ -80,23 +80,16 @@ type propertyJSON struct {
 	Schema *schemaJSON `json:"schema"`
 }
 
-// writeEndpointsJSON marshals the matched endpoints as JSON. A single match is
-// emitted as an object; multiple matches (e.g. a path with several methods) are
-// emitted as an array.
+// writeEndpointsJSON marshals the matched endpoints as a JSON array.
 func writeEndpointsJSON(out io.Writer, matches []openapi.Endpoint, resolver *openapi.SchemaResolver) error {
 	eps := make([]endpointJSON, 0, len(matches))
 	for i := range matches {
 		eps = append(eps, buildEndpointJSON(&matches[i], resolver))
 	}
 
-	var payload any = eps
-	if len(eps) == 1 {
-		payload = eps[0]
-	}
-
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(payload); err != nil {
+	if err := enc.Encode(eps); err != nil {
 		return fmt.Errorf("encoding describe output as JSON: %w", err)
 	}
 	return nil
