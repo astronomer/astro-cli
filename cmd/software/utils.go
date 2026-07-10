@@ -37,6 +37,7 @@ func VersionMatchCmds(rootCmd *cobra.Command, parent []string) {
 func removeCmd(c *cobra.Command) {
 	c.Hidden = true                                   // hide the command in help output
 	c.RunE = nil                                      // cobra prefers RunE over Run when both are set, so clear it for leaf commands (e.g. "team update", "deployment adopt") that define their own RunE
+	c.Args = cobra.ArbitraryArgs                      // clear any Args validator (e.g. cobra.ExactArgs) so a missing/extra positional arg doesn't error out before our custom Run handler below
 	c.Run = func(cmd *cobra.Command, args []string) { // define the error response when the command is executed
 		fmt.Printf("Error: unknown command \"%s\" for \"astro\" \nRun 'astro --help' for usage.\n\nAstro Private Cloud Version: %s\nMake sure you are using right set of commands for the connected platform version\n\n", c.Name(), houstonVersion)
 	}

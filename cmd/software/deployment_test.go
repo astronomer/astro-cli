@@ -1048,8 +1048,9 @@ func (s *Suite) TestDeploymentUnadopt() {
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		houstonClient = api
-		_, err := execDeploymentCmd("unadopt", "--deployment-id", mockDeployment.ID)
+		output, err := execDeploymentCmd("unadopt", "--deployment-id", mockDeployment.ID)
 		s.NoError(err)
+		s.Contains(output, "was not executed and your Deployment was not unadopted")
 		api.AssertNotCalled(s.T(), "UnadoptDeployment", mock.Anything)
 	})
 

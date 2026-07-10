@@ -41,6 +41,38 @@ func (s *Suite) TestVersionMatchCmds() {
 		s.Contains(b.String(), "unknown command \"team\" for \"astro\"")
 	})
 
+	s.Run("0.29.0 platform with team update command and no TEAM ID arg", func() {
+		// "astro team" is gated at 0.28.0 (so it stays visible here), but "astro team
+		// update" specifically is gated at 0.29.2, so it should be the one removed. Its
+		// Args: cobra.ExactArgs(1) validator must not run before removeCmd's "unknown
+		// command" handler, even though no TEAM ID positional arg is supplied.
+		buf := new(bytes.Buffer)
+		mockAPI := new(houston_mocks.ClientInterface)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "0.29.0"}, nil)
+		mockAPI.On("GetPlatformVersion", nil).Return("0.29.0", nil)
+		cmd := &cobra.Command{Use: "astro"}
+		childCMDs := AddCmds(mockAPI, buf)
+		cmd.AddCommand(childCMDs...)
+
+		VersionMatchCmds(cmd, []string{"astro"})
+		buf.Reset()
+		b := new(bytes.Buffer)
+		cmd.SetArgs([]string{"team", "update"})
+
+		r, w, err := os.Pipe()
+		s.NoError(err)
+
+		realStdout := os.Stdout
+		os.Stdout = w
+		defer func() { os.Stdout = realStdout }()
+
+		_, err = cmd.ExecuteC()
+		w.Close()
+		s.NoError(err)
+		io.Copy(b, r)
+		s.Contains(b.String(), "unknown command \"update\" for \"astro\"")
+	})
+
 	s.Run("0.30.0 platform with teams command", func() {
 		buf := new(bytes.Buffer)
 		mockAPI := new(houston_mocks.ClientInterface)

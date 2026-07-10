@@ -583,7 +583,7 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 
 	i, _ := input.Confirm(cliDeploymentUnadoptPrompt)
 	if !i {
-		fmt.Println("Exit: This command was not executed and your Deployment was not unadopted.")
+		fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
 		return nil
 	}
 	return deployment.Unadopt(deploymentID, houstonClient, out)
