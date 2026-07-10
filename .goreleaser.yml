@@ -19,8 +19,8 @@ builds:
     binary: astro
     env:
       - CGO_ENABLED=1
-      - CC=o64-clang
-      - CXX=o64-clang++
+      - CC=clang
+      - CXX=clang++
     goos:
       - darwin
     goarch:

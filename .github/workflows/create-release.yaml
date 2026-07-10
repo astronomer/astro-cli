@@ -23,6 +23,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: write
   id-token: write  # Required for Octo STS OIDC token exchange
 
@@ -31,23 +32,37 @@ jobs:
     name: Pre-flight summary (review before approving)
     runs-on: ubuntu-latest
     outputs:
+      type: ${{ steps.release-inputs.outputs.type }}
+      version: ${{ steps.release-inputs.outputs.version }}
       tag: ${{ steps.compute.outputs.tag }}
       prev_ga: ${{ steps.compute.outputs.prev_ga }}
-      type: ${{ steps.resolve-type.outputs.type }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
-      - name: Resolve type
-        id: resolve-type
-        run: echo "type=${{ inputs.type || 'nightly' }}" >> "$GITHUB_OUTPUT"
+      - name: Resolve release inputs
+        id: release-inputs
+        env:
+          REQUESTED_TYPE: ${{ inputs.type }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            TYPE="nightly"
+            VERSION=""
+          else
+            TYPE="$REQUESTED_TYPE"
+            VERSION="$REQUESTED_VERSION"
+          fi
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Validate inputs
+        env:
+          TYPE: ${{ steps.release-inputs.outputs.type }}
+          VERSION: ${{ steps.release-inputs.outputs.version }}
         run: |
           set -e
-          TYPE="${{ steps.resolve-type.outputs.type }}"
-          VERSION="${{ inputs.version }}"
           BRANCH="${GITHUB_REF_NAME}"
 
           if [ "$TYPE" = "nightly" ]; then
@@ -65,7 +80,7 @@ jobs:
               exit 1
             fi
             BRANCH_MAJOR_MINOR="${BASH_REMATCH[1]}"
-            ESCAPED_MM=$(echo "$BRANCH_MAJOR_MINOR" | sed 's/\./\\./g')
+            ESCAPED_MM="${BRANCH_MAJOR_MINOR//./\\.}"
             if [[ ! "$VERSION" =~ ^${ESCAPED_MM}\.[0-9]+$ ]]; then
               echo "::error::Version '$VERSION' does not match branch '$BRANCH'. Expected ${BRANCH_MAJOR_MINOR}.Z"
               exit 1
@@ -73,16 +88,48 @@ jobs:
           fi
           echo "Validated: type=$TYPE branch=$BRANCH version=$VERSION"
 
-      - name: Compute tag
-        id: compute
+      - name: Require successful CI for the nightly commit
+        if: steps.release-inputs.outputs.type == 'nightly'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          case "${{ steps.resolve-type.outputs.type }}" in
+          CI_RUN=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow ci.yaml \
+            --commit "$GITHUB_SHA" \
+            --event push \
+            --limit 1 \
+            --json status,conclusion,url \
+            --jq '.[0] // empty')
+
+          if [ -z "$CI_RUN" ]; then
+            echo "::error::No push CI run found for commit $GITHUB_SHA."
+            exit 1
+          fi
+
+          STATUS=$(jq -r '.status' <<< "$CI_RUN")
+          CONCLUSION=$(jq -r '.conclusion' <<< "$CI_RUN")
+          URL=$(jq -r '.url' <<< "$CI_RUN")
+          if [ "$STATUS" != "completed" ] || [ "$CONCLUSION" != "success" ]; then
+            echo "::error::CI for commit $GITHUB_SHA is $STATUS/$CONCLUSION: $URL"
+            exit 1
+          fi
+          echo "CI passed for commit $GITHUB_SHA: $URL"
+
+      - name: Compute tag
+        id: compute
+        env:
+          TYPE: ${{ steps.release-inputs.outputs.type }}
+          VERSION: ${{ steps.release-inputs.outputs.version }}
+        run: |
+          set -e
+          case "$TYPE" in
             nightly) TAG=$(make nightly-tag) ;;
-            rc)      TAG=$(make rc-tag VERSION=${{ inputs.version }}) ;;
-            ga)      TAG=$(make release-tag VERSION=${{ inputs.version }}) ;;
+            rc)      TAG=$(make rc-tag VERSION="$VERSION") ;;
+            ga)      TAG=$(make release-tag VERSION="$VERSION") ;;
           esac
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Computed tag: $TAG"
 
           PREV_GA=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" \
@@ -91,13 +138,14 @@ jobs:
             | sort -t. -k1,1n -k2,2n -k3,3n \
             | tail -1 \
             | sed 's/^/v/')
-          echo "prev_ga=$PREV_GA" >> $GITHUB_OUTPUT
+          echo "prev_ga=$PREV_GA" >> "$GITHUB_OUTPUT"
           echo "Previous GA tag: $PREV_GA"
 
       - name: Write release summary
         env:
           TAG: ${{ steps.compute.outputs.tag }}
           PREV_GA: ${{ steps.compute.outputs.prev_ga }}
+          TYPE: ${{ steps.release-inputs.outputs.type }}
         run: |
           set -e
           COMMIT_SHORT=$(git rev-parse --short HEAD)
@@ -110,17 +158,17 @@ jobs:
             echo "| Field | Value |"
             echo "|-------|-------|"
             echo "| Tag | \`$TAG\` |"
-            echo "| Type | **${{ steps.resolve-type.outputs.type }}** |"
+            echo "| Type | **$TYPE** |"
             echo "| Branch | \`${GITHUB_REF_NAME}\` |"
             echo "| Commit | [\`$COMMIT_SHORT\`]($REPO_URL/commit/$COMMIT_FULL) |"
             echo "| Triggered by | @${{ github.actor }} |"
-            if [ "${{ steps.resolve-type.outputs.type }}" = "ga" ]; then
+            if [ "$TYPE" = "ga" ]; then
               echo "| Previous GA | [\`$PREV_GA\`]($REPO_URL/releases/tag/$PREV_GA) |"
             fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{ steps.resolve-type.outputs.type }}" = "ga" ]; then
+          if [ "$TYPE" = "ga" ]; then
             {
               echo "### Approver checklist"
               echo ""
@@ -133,10 +181,48 @@ jobs:
 
           echo "_Full changelog will be auto-generated on the GitHub release page once the tag is pushed._" >> "$GITHUB_STEP_SUMMARY"
 
-  create-tag:
+  warm-release-cache:
+    name: Warm macOS release cache
     needs: preflight
+    if: needs.preflight.outputs.type == 'nightly'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        id: setup-go
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache Go build outputs
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/Library/Caches/go-build
+          key: release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ steps.source.outputs.sha }}
+          restore-keys: |
+            release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-
+
+      - name: Build release artifacts without publishing
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: v2.15.2
+          args: release --snapshot --clean --skip=publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-tag:
+    needs: [preflight, warm-release-cache]
+    if: always() && needs.preflight.result == 'success' && (needs.warm-release-cache.result == 'success' || needs.warm-release-cache.result == 'skipped')
     runs-on: ubuntu-latest
-    environment: ${{ inputs.type == 'ga' && 'release' || '' }}
+    environment: ${{ needs.preflight.outputs.type == 'ga' && 'release' || '' }}
     steps:
       - name: Get token via Octo STS
         uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
