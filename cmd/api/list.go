@@ -22,6 +22,7 @@ type ListOptions struct {
 	Filter    string
 	Verbose   bool
 	Refresh   bool
+	JSON      bool
 }
 
 // runList executes the list command.
@@ -30,7 +31,7 @@ func runList(opts *ListOptions) error {
 		return fmt.Errorf("API specification not initialized. Ensure you are logged in and try again")
 	}
 
-	if opts.Verbose {
+	if opts.Verbose && !opts.JSON {
 		fmt.Fprintf(opts.Out, "Spec URL: %s\n\n", opts.specCache.GetSpecURL())
 	}
 
@@ -47,10 +48,16 @@ func runList(opts *ListOptions) error {
 	// Filter endpoints if a filter was provided
 	if opts.Filter != "" {
 		endpoints = openapi.FilterEndpoints(endpoints, opts.Filter)
-		if len(endpoints) == 0 {
-			fmt.Fprintf(opts.Out, "No endpoints found matching '%s'\n", opts.Filter)
-			return nil
-		}
+	}
+
+	// JSON output: emit the (possibly empty) list as an array and stop.
+	if opts.JSON {
+		return writeEndpointListJSON(opts.Out, endpoints)
+	}
+
+	if len(endpoints) == 0 {
+		fmt.Fprintf(opts.Out, "No endpoints found matching '%s'\n", opts.Filter)
+		return nil
 	}
 
 	// Print endpoints

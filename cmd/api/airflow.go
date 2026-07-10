@@ -578,6 +578,7 @@ func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 	var filter string
 	var verbose bool
 	var refresh bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:     "ls [filter]",
@@ -615,7 +616,9 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 				return err
 			}
 
-			fmt.Fprintf(out, "Airflow version: %s\n\n", parentOpts.detectedVersion)
+			if !jsonOut {
+				fmt.Fprintf(out, "Airflow version: %s\n\n", parentOpts.detectedVersion)
+			}
 
 			// Create list options
 			listOpts := &ListOptions{
@@ -624,6 +627,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 				Filter:    filter,
 				Verbose:   verbose,
 				Refresh:   refresh,
+				JSON:      jsonOut,
 			}
 
 			return runList(listOpts)
@@ -632,6 +636,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint list as JSON")
 
 	return cmd
 }
@@ -641,6 +646,7 @@ func NewAirflowDescribeCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Com
 	var method string
 	var refresh bool
 	var verbose bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "describe <endpoint>",
@@ -680,6 +686,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 				Method:    method,
 				Refresh:   refresh,
 				Verbose:   verbose,
+				JSON:      jsonOut,
 			}
 
 			return runDescribe(descOpts)
@@ -689,6 +696,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint schema as JSON")
 
 	return cmd
 }

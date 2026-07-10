@@ -43,6 +43,22 @@ func v2MethodOps(pi *v2high.PathItem) []v2MethodOp {
 	}
 }
 
+// ExtractDefinitionsV2 returns a registry of all named Swagger 2.0 definitions
+// (#/definitions/*) keyed by name, the v2 equivalent of component schemas. Nested
+// $refs are left unresolved for lazy resolution via SchemaResolver.
+func ExtractDefinitionsV2(doc *v2high.Swagger) map[string]*Schema {
+	if doc == nil || doc.Definitions == nil || doc.Definitions.Definitions == nil {
+		return nil
+	}
+	schemas := make(map[string]*Schema)
+	for name, proxy := range doc.Definitions.Definitions.FromOldest() {
+		if ref := convertSchemaProxy(proxy); ref != nil && ref.Value != nil {
+			schemas[name] = ref.Value
+		}
+	}
+	return schemas
+}
+
 // newEndpointV2 creates an Endpoint from a Swagger 2.0 Operation.
 func newEndpointV2(method, path string, op *v2high.Operation) Endpoint {
 	ep := Endpoint{

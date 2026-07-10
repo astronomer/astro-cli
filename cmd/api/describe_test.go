@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,9 @@ func TestGetTypeString(t *testing.T) {
 		{"array of strings", &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}, "", "array of string"},
 		{"array with ref items", &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Ref: "#/components/schemas/DAG"}}, "", "array of DAG"},
 		{"array with empty items", &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{}}}, "", "array of object"},
+		{"nullable string", &openapi.Schema{AnyOf: []*openapi.SchemaRef{{Value: &openapi.Schema{Type: "string"}}, {Value: &openapi.Schema{Type: "null"}}}}, "", "string or null"},
+		{"nullable string array", &openapi.Schema{AnyOf: []*openapi.SchemaRef{{Value: &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}}, {Value: &openapi.Schema{Type: "null"}}}}, "", "array of string or null"},
+		{"nullable ref", &openapi.Schema{AnyOf: []*openapi.SchemaRef{{Ref: "#/components/schemas/TaskState"}, {Value: &openapi.Schema{Type: "null"}}}}, "", "TaskState or null"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -594,6 +598,162 @@ func testSpecJSON() []byte {
 	return data
 }
 
+// refSpecJSON returns a spec whose request/response bodies are $refs into
+// components.schemas, including a nested $ref and an array of $ref items, so the
+// full parse -> extract -> resolve -> print chain is exercised.
+func refSpecJSON() []byte {
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]any{"title": "Test", "version": "1.0"},
+		"paths": map[string]any{
+			"/deployments": map[string]any{
+				"post": map[string]any{
+					"operationId": "CreateDeployment",
+					"summary":     "Create a deployment",
+					"requestBody": map[string]any{
+						"required": true,
+						"content": map[string]any{
+							"application/json": map[string]any{
+								"schema": map[string]any{"$ref": "#/components/schemas/CreateDeploymentRequest"},
+							},
+						},
+					},
+				},
+			},
+		},
+		"components": map[string]any{
+			"schemas": map[string]any{
+				"CreateDeploymentRequest": map[string]any{
+					"type":     "object",
+					"required": []any{"name"},
+					"properties": map[string]any{
+						"name":               map[string]any{"type": "string", "description": "Deployment name"},
+						"isDagDeployEnabled": map[string]any{"type": "boolean"},
+						"executor":           map[string]any{"$ref": "#/components/schemas/Executor"},
+						"workerQueues": map[string]any{
+							"type":  "array",
+							"items": map[string]any{"$ref": "#/components/schemas/WorkerQueue"},
+						},
+					},
+				},
+				"Executor": map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"type": map[string]any{"type": "string"}},
+				},
+				"WorkerQueue": map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"name": map[string]any{"type": "string"}},
+				},
+			},
+		},
+	}
+	data, _ := json.Marshal(spec)
+	return data
+}
+
+func TestRunDescribe_ExpandsRefSchemas(t *testing.T) {
+	ts := newTestSpecServerJSON(t, refSpecJSON())
+	defer ts.Close()
+
+	var buf bytes.Buffer
+	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment"}
+
+	require.NoError(t, runDescribe(opts))
+	out := buf.String()
+
+	assert.Contains(t, out, "Schema: CreateDeploymentRequest")
+	// Request body fields expanded from the referenced schema.
+	assert.Contains(t, out, "name")
+	assert.Contains(t, out, "isDagDeployEnabled")
+	// Nested $ref expanded.
+	assert.Contains(t, out, "executor")
+	assert.Contains(t, out, "type")
+	// Array-of-$ref expanded.
+	assert.Contains(t, out, "workerQueues")
+	assert.Contains(t, out, "array of WorkerQueue")
+}
+
+func TestRunDescribe_JSONOutput(t *testing.T) {
+	ts := newTestSpecServerJSON(t, refSpecJSON())
+	defer ts.Close()
+
+	var buf bytes.Buffer
+	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment", JSON: true}
+	require.NoError(t, runDescribe(opts))
+
+	var endpoints []map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &endpoints), "output must be a JSON array")
+	require.Len(t, endpoints, 1)
+	ep := endpoints[0]
+
+	assert.Equal(t, "POST", ep["method"])
+	assert.Equal(t, "CreateDeployment", ep["operationId"])
+
+	schema := ep["requestBody"].(map[string]any)["schema"].(map[string]any)
+	assert.Equal(t, "CreateDeploymentRequest", schema["ref"])
+	assert.Equal(t, []any{"name"}, schema["required"])
+
+	// Collect resolved property names and confirm nested/array refs expanded.
+	props := schema["properties"].([]any)
+	byName := map[string]map[string]any{}
+	for _, p := range props {
+		pm := p.(map[string]any)
+		byName[pm["name"].(string)] = pm["schema"].(map[string]any)
+	}
+	assert.Equal(t, "boolean", byName["isDagDeployEnabled"]["type"])
+	assert.Equal(t, "Executor", byName["executor"]["ref"])                                  // nested $ref resolved
+	assert.NotEmpty(t, byName["executor"]["properties"])                                    // ...with its fields
+	assert.Equal(t, "WorkerQueue", byName["workerQueues"]["items"].(map[string]any)["ref"]) // array-of-$ref resolved
+}
+
+func TestRunDescribe_JSONOutputMultipleMatches(t *testing.T) {
+	ts := newTestSpecServerJSON(t, testSpecJSON())
+	defer ts.Close()
+
+	var buf bytes.Buffer
+	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", JSON: true}
+	require.NoError(t, runDescribe(opts))
+
+	var endpoints []map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &endpoints), "output must be a JSON array")
+	require.Len(t, endpoints, 2)
+	assert.Equal(t, "GET", endpoints[0]["method"])
+	assert.Equal(t, "POST", endpoints[1]["method"])
+}
+
+func TestResolveSchemaJSON_CutsCycles(t *testing.T) {
+	// Node references itself via "next"; resolution must terminate and mark the
+	// repeat as circular.
+	registry := map[string]*openapi.Schema{
+		"Node": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "value", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+				{Name: "next", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Node"}},
+			},
+		},
+	}
+	resolver := openapi.NewSchemaResolverWithSchemas(registry)
+
+	node := resolveSchemaJSON(&openapi.SchemaRef{Ref: "#/components/schemas/Node"}, resolver, map[string]bool{}, 0)
+	require.NotNil(t, node)
+	assert.Equal(t, "Node", node.Ref)
+
+	var next *schemaJSON
+	for _, p := range node.Properties {
+		if p.Name == "next" {
+			next = p.Schema
+		}
+	}
+	require.NotNil(t, next)
+	assert.Equal(t, "Node", next.Ref)
+	assert.True(t, next.Circular, "self-reference should be marked circular")
+	assert.Empty(t, next.Properties, "circular node should not recurse into properties")
+}
+
 func TestRunDescribe(t *testing.T) {
 	body := testSpecJSON()
 	ts := newTestSpecServerJSON(t, body)
@@ -679,6 +839,322 @@ func TestRunDescribe_EmptySpec(t *testing.T) {
 	err := runDescribe(opts)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no endpoints found")
+}
+
+// --- registry-driven $ref resolution -----------------------------------------
+
+// TestPrintSchema_ResolvesRefsFromRegistry covers the case that motivated this
+// change: a schema whose SchemaRef carries only a $ref name (no inline Value),
+// which must be resolved through the registry so its fields are printed.
+func TestPrintSchema_ResolvesRefsFromRegistry(t *testing.T) {
+	// CreateDeploymentRequest references Executor (nested object) and has an
+	// array of WorkerQueue objects; WorkerQueue references itself to exercise
+	// cycle detection.
+	registry := map[string]*openapi.Schema{
+		"CreateDeploymentRequest": {
+			Type:     "object",
+			Required: []string{"name"},
+			Properties: []openapi.SchemaProperty{
+				{Name: "name", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string", Description: "Deployment name"}}},
+				{Name: "isDagDeployEnabled", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "boolean"}}},
+				{Name: "executor", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Executor"}},
+				{Name: "workerQueues", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+					Type:  "array",
+					Items: &openapi.SchemaRef{Ref: "#/components/schemas/WorkerQueue"},
+				}}},
+			},
+		},
+		"Executor": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "type", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+		"WorkerQueue": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "name", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+				// Self-reference to verify cycle detection.
+				{Name: "parent", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/WorkerQueue"}},
+			},
+		},
+	}
+	resolver := openapi.NewSchemaResolverWithSchemas(registry)
+
+	var buf bytes.Buffer
+	body := &openapi.RequestBody{
+		Required: true,
+		Content: map[string]*openapi.MediaType{
+			// Pure $ref: no inline Value — this is what the live spec produces.
+			"application/json": {Schema: &openapi.SchemaRef{Ref: "#/components/schemas/CreateDeploymentRequest"}},
+		},
+	}
+	printRequestBody(&buf, body, resolver)
+	out := buf.String()
+
+	// Top-level ref name still shown.
+	assert.Contains(t, out, "CreateDeploymentRequest")
+	// Fields of the referenced request schema are now expanded.
+	assert.Contains(t, out, "name")
+	assert.Contains(t, out, "isDagDeployEnabled")
+	// Nested $ref (executor -> Executor) expands to its fields.
+	assert.Contains(t, out, "executor")
+	assert.Contains(t, out, "type")
+	// Array of $ref items (workerQueues -> WorkerQueue) expands.
+	assert.Contains(t, out, "workerQueues")
+	assert.Contains(t, out, "array of WorkerQueue")
+	// Self-referential schema is caught by cycle detection.
+	assert.Contains(t, out, "(see WorkerQueue above)")
+}
+
+// TestPrintSchema_AllOfPlusProperties verifies an allOf schema that also has its
+// own top-level properties prints both (the extend-a-base pattern).
+func TestPrintSchema_AllOfPlusProperties(t *testing.T) {
+	registry := map[string]*openapi.Schema{
+		"Base": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "baseField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	}
+	resolver := openapi.NewSchemaResolverWithSchemas(registry)
+
+	schemaRef := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type:  "object",
+		AllOf: []*openapi.SchemaRef{{Ref: "#/components/schemas/Base"}},
+		Properties: []openapi.SchemaProperty{
+			{Name: "ownField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "integer"}}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, schemaRef, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+	out := buf.String()
+	assert.Contains(t, out, "baseField", "allOf base fields must print")
+	assert.Contains(t, out, "ownField", "sibling properties must also print")
+}
+
+func TestPrintSchema_NestedAllOfPlusPropertiesPrintsOnce(t *testing.T) {
+	child := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		AllOf: []*openapi.SchemaRef{{Value: &openapi.Schema{
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "baseField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		}}},
+		Properties: []openapi.SchemaProperty{
+			{Name: "ownField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+		},
+	}}
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "child", Schema: child},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, openapi.NewSchemaResolver(), 0, map[string]bool{}, responseSchemaPrintOpts())
+
+	assert.Equal(t, 1, strings.Count(buf.String(), "baseField"), buf.String())
+	assert.Equal(t, 1, strings.Count(buf.String(), "ownField"), buf.String())
+}
+
+func TestPrintResponseSchema_ExpandsTopLevelArrayItems(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{
+		"Things": {
+			Type:  schemaTypeArray,
+			Items: &openapi.SchemaRef{Ref: "#/components/schemas/Thing"},
+		},
+		"Thing": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "id", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	})
+	entry := &openapi.ResponseEntry{
+		Code: "200",
+		Content: map[string]*openapi.MediaType{
+			"application/json": {Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Things"}},
+		},
+	}
+
+	var buf bytes.Buffer
+	printResponseSchema(&buf, entry, resolver)
+
+	assert.Contains(t, buf.String(), "Schema: Things")
+	assert.Contains(t, buf.String(), "id")
+}
+
+func TestPrintSchema_ExpandsSiblingRefsIndependently(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{
+		"Common": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "value", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	})
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "a", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Common"}},
+			{Name: "b", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Common"}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+
+	assert.Equal(t, 2, strings.Count(buf.String(), "value"), buf.String())
+	assert.NotContains(t, buf.String(), "(see Common above)")
+}
+
+func TestPrintSchema_NullablePrimitiveUsesCompactType(t *testing.T) {
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "cursor", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+				AnyOf: []*openapi.SchemaRef{
+					{Value: &openapi.Schema{Type: "string"}},
+					{Value: &openapi.Schema{Type: "null"}},
+				},
+			}}},
+			{Name: "choices", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+				AnyOf: []*openapi.SchemaRef{
+					{Value: &openapi.Schema{Type: "array", Items: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}},
+					{Value: &openapi.Schema{Type: "null"}},
+				},
+			}}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, openapi.NewSchemaResolver(), 0, map[string]bool{}, responseSchemaPrintOpts())
+
+	assert.Contains(t, buf.String(), "cursor  string or null")
+	assert.Contains(t, buf.String(), "choices  array of string or null")
+	assert.NotContains(t, buf.String(), "Any of the following")
+	assert.NotContains(t, buf.String(), "Option 1")
+}
+
+func TestPrintSchema_NullableObjectLabelsAndExpandsBranches(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{
+		"Detail": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "id", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	})
+	root := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "detail", Schema: &openapi.SchemaRef{Value: &openapi.Schema{
+				AnyOf: []*openapi.SchemaRef{
+					{Ref: "#/components/schemas/Detail"},
+					{Value: &openapi.Schema{Type: "null"}},
+				},
+			}}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, root, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+	out := buf.String()
+
+	assert.Contains(t, out, "detail  Detail or null")
+	assert.Contains(t, out, "Option 1: Detail")
+	assert.Contains(t, out, "Option 2: null")
+	assert.Contains(t, out, "id  string")
+}
+
+// TestPrintSchema_UnresolvedRefKeepsName verifies a property whose $ref cannot be
+// resolved still shows its name and the referenced schema name.
+func TestPrintSchema_UnresolvedRefKeepsName(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{}) // empty registry
+
+	schemaRef := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "executor", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Executor"}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, schemaRef, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+	out := buf.String()
+	assert.Contains(t, out, "executor", "property name must be kept")
+	assert.Contains(t, out, "Executor", "referenced schema name must be shown")
+}
+
+// TestReadOnly_RequestHidesButJSONShows pins the intentional asymmetry: text
+// request bodies hide read-only fields; --json keeps them flagged.
+func TestReadOnly_RequestHidesButJSONShows(t *testing.T) {
+	schema := &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "serverGeneratedId", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string", ReadOnly: true}}},
+			{Name: "userName", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+		},
+	}
+	resolver := openapi.NewSchemaResolver()
+
+	var buf bytes.Buffer
+	printSchema(&buf, &openapi.SchemaRef{Value: schema}, resolver, 0, map[string]bool{}, requestSchemaPrintOpts())
+	out := buf.String()
+	assert.NotContains(t, out, "serverGeneratedId", "read-only field hidden in request text")
+	assert.Contains(t, out, "userName")
+
+	node := resolveSchemaJSON(&openapi.SchemaRef{Value: schema}, resolver, map[string]bool{}, 0)
+	var ro *schemaJSON
+	for _, p := range node.Properties {
+		if p.Name == "serverGeneratedId" {
+			ro = p.Schema
+		}
+	}
+	require.NotNil(t, ro, "JSON must include the read-only field")
+	assert.True(t, ro.ReadOnly, "JSON must flag it read-only")
+}
+
+// TestResolveSchemaJSON_Composition verifies oneOf children that are $refs are
+// resolved to their fields in JSON output.
+func TestResolveSchemaJSON_Composition(t *testing.T) {
+	registry := map[string]*openapi.Schema{
+		"CeleryConfig": {
+			Type:       "object",
+			Properties: []openapi.SchemaProperty{{Name: "workerCount", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "integer"}}}},
+		},
+		"KubernetesConfig": {
+			Type:       "object",
+			Properties: []openapi.SchemaProperty{{Name: "namespace", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}},
+		},
+	}
+	resolver := openapi.NewSchemaResolverWithSchemas(registry)
+
+	ref := &openapi.SchemaRef{Value: &openapi.Schema{
+		OneOf: []*openapi.SchemaRef{
+			{Ref: "#/components/schemas/CeleryConfig"},
+			{Ref: "#/components/schemas/KubernetesConfig"},
+		},
+	}}
+	node := resolveSchemaJSON(ref, resolver, map[string]bool{}, 0)
+	require.Len(t, node.OneOf, 2)
+	assert.Equal(t, "CeleryConfig", node.OneOf[0].Ref)
+	assert.NotEmpty(t, node.OneOf[0].Properties, "oneOf ref child must expand")
+	assert.Equal(t, "KubernetesConfig", node.OneOf[1].Ref)
+	assert.NotEmpty(t, node.OneOf[1].Properties)
+}
+
+func TestResolveSchema_LazyRefWithoutRegistry(t *testing.T) {
+	// Without a registry, a pure $ref resolves to no value but still reports its name.
+	resolver := openapi.NewSchemaResolver()
+	resolved, refName := resolver.ResolveSchema(&openapi.SchemaRef{Ref: "#/components/schemas/DAG"})
+	assert.Nil(t, resolved)
+	assert.Equal(t, "DAG", refName)
 }
 
 // --- requestSchemaPrintOpts / responseSchemaPrintOpts ------------------------

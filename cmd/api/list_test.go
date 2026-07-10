@@ -204,6 +204,40 @@ func TestRunList(t *testing.T) {
 		assert.Contains(t, buf.String(), "List DAGs")
 		assert.Contains(t, buf.String(), "Health check")
 	})
+
+	t.Run("json output", func(t *testing.T) {
+		var buf bytes.Buffer
+		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+		opts := &ListOptions{Out: &buf, specCache: cache, JSON: true}
+
+		require.NoError(t, runList(opts))
+
+		var items []map[string]any
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &items), "output must be a JSON array")
+		require.Len(t, items, 2)
+
+		byPath := map[string]map[string]any{}
+		for _, it := range items {
+			byPath[it["path"].(string)] = it
+		}
+		assert.Equal(t, "get_dags", byPath["/dags"]["operationId"])
+		assert.Equal(t, "GET", byPath["/dags"]["method"])
+		assert.Equal(t, []any{"DAGs"}, byPath["/dags"]["tags"])
+		// No human-readable trailer leaked into JSON output.
+		assert.NotContains(t, buf.String(), "Found")
+	})
+
+	t.Run("json empty array when filter matches nothing", func(t *testing.T) {
+		var buf bytes.Buffer
+		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
+		opts := &ListOptions{Out: &buf, specCache: cache, Filter: "nonexistent", JSON: true}
+
+		require.NoError(t, runList(opts))
+
+		var items []map[string]any
+		require.NoError(t, json.Unmarshal(buf.Bytes(), &items))
+		assert.Empty(t, items)
+	})
 }
 
 func TestRunList_EmptySpec(t *testing.T) {
