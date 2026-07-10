@@ -436,6 +436,7 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 func NewCloudListCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
 	var verbose bool
 	var refresh bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:     "ls [filter]",
@@ -482,6 +483,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 				Filter:    filter,
 				Verbose:   verbose,
 				Refresh:   refresh,
+				JSON:      jsonOut,
 			}
 			return runList(listOpts)
 		},
@@ -489,6 +491,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint list as JSON for programmatic use")
 
 	return cmd
 }

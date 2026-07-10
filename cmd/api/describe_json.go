@@ -92,6 +92,43 @@ func writeEndpointsJSON(out io.Writer, matches []openapi.Endpoint, resolver *ope
 	return nil
 }
 
+// listEndpointJSON is the machine-readable form of a single `ls` row. It is a
+// lean summary — use `describe --json` for the full resolved schema.
+type listEndpointJSON struct {
+	Method         string   `json:"method"`
+	Path           string   `json:"path"`
+	OperationID    string   `json:"operationId,omitempty"`
+	Summary        string   `json:"summary,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	Deprecated     bool     `json:"deprecated,omitempty"`
+	PathParameters []string `json:"pathParameters,omitempty"`
+}
+
+// writeEndpointListJSON marshals the endpoint list as a JSON array (always an
+// array, even for zero or one match, so consumers can rely on the shape).
+func writeEndpointListJSON(out io.Writer, endpoints []openapi.Endpoint) error {
+	items := make([]listEndpointJSON, 0, len(endpoints))
+	for i := range endpoints {
+		ep := &endpoints[i]
+		items = append(items, listEndpointJSON{
+			Method:         ep.Method,
+			Path:           ep.Path,
+			OperationID:    ep.OperationID,
+			Summary:        ep.Summary,
+			Tags:           ep.Tags,
+			Deprecated:     ep.Deprecated,
+			PathParameters: openapi.GetPathParameters(ep.Path),
+		})
+	}
+
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(items); err != nil {
+		return fmt.Errorf("encoding list output as JSON: %w", err)
+	}
+	return nil
+}
+
 func buildEndpointJSON(ep *openapi.Endpoint, resolver *openapi.SchemaResolver) endpointJSON {
 	e := endpointJSON{
 		Method:      ep.Method,
