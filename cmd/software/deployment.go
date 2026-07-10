@@ -18,12 +18,12 @@ const (
 	k8sExecutorArg        = "k8s"
 
 	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
-	cliDeploymentUnadoptPrompt                 = "\nWarning: This permanently removes the Deployment record from Astronomer Software. The Airflow custom resource, its namespace, and its metadata database are left untouched, but this action cannot be undone from the CLI. Proceed with unadopt?"
+	cliDeploymentUnadoptPrompt                 = "\nWarning: This permanently removes the Deployment record from APC. The Airflow custom resource, its namespace, and its metadata database are left untouched, but this action cannot be undone from the CLI. Proceed with unadopt?"
 	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
 	continueSubMsg                             = " for more details. Do you want to continue?"
-	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
-	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
-	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
+	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the APC documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
 	SkipUserPromptMsgForCreateDeployment       = "Skip user confirmation prompt for creating a deployment with type: dag_deploy (experimental feature)"
 	SkipUserPromptMsgForUpdateDeployment       = "Skip user confirmation prompt for updating the deployment type to/from dag_deploy (experimental feature)"
 )
@@ -253,8 +253,8 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "adopt",
-		Short:   "Adopt an existing operator-managed Airflow custom resource into Astronomer Software",
-		Long:    "Adopt an existing operator-managed Airflow custom resource into Astronomer Software. The custom resource, its namespace, and its metadata database are left untouched; adopting only creates the corresponding Deployment record in Astronomer Software.",
+		Short:   "Adopt an existing operator-managed Airflow custom resource into APC",
+		Long:    "Adopt an existing operator-managed Airflow custom resource into APC. The custom resource, its namespace, and its metadata database are left untouched; adopting only creates the corresponding Deployment record in APC.",
 		Example: deploymentAdoptExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAdopt(cmd, out)
@@ -265,9 +265,9 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&adoptCRNamespace, "cr-namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource")
 	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; defaults to --cr-name when omitted")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "d", "", "Description for the adopted Deployment")
-	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through Astronomer Software logging")
-	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the Astronomer Software in-cluster registry for the adopted Deployment; you must pre-sync its images")
-	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no Astronomer Software representation")
+	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
+	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
+	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
 	_ = cmd.MarkFlagRequired("cluster-id")
 	_ = cmd.MarkFlagRequired("cr-name")
 	_ = cmd.MarkFlagRequired("cr-namespace")
@@ -278,7 +278,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "unadopt",
 		Short:   "Release an adopted Deployment back to operator-only management",
-		Long:    "Release an adopted Deployment back to operator-only management. The Airflow custom resource, its namespace, and its metadata database are left untouched; only the Astronomer Software Deployment record is removed.",
+		Long:    "Release an adopted Deployment back to operator-only management. The Airflow custom resource, its namespace, and its metadata database are left untouched; only the APC Deployment record is removed.",
 		Example: deploymentUnadoptExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUnadopt(cmd, out)
