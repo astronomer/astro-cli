@@ -113,7 +113,7 @@ jobs:
 
   benchmark-macos:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -121,8 +121,18 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        id: setup-go
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Cache Go build outputs
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/Library/Caches/go-build
+          key: release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-
 
       - name: Record runner details
         run: |
@@ -143,6 +153,12 @@ jobs:
           args: release --snapshot --clean --skip=publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Record Go cache sizes
+        if: always()
+        run: |
+          du -sh "$(go env GOCACHE)"
+          du -sh "$(go env GOMODCACHE)"
 
   update-godownloader:
     needs: [detect, release]

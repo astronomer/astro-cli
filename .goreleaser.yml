@@ -3,7 +3,6 @@ version: 2
 before:
   hooks:
     - go mod download
-    - go mod tidy
 release:
   github:
     owner: astronomer
