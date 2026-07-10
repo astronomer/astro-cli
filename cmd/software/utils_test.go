@@ -68,6 +68,118 @@ func (s *Suite) TestVersionMatchCmds() {
 		io.Copy(b, r)
 		s.Contains(b.String(), "Teams represents a team or a group from an IDP in the Astronomer Platform")
 	})
+
+	s.Run("1.0.1 platform with deployment adopt command", func() {
+		buf := new(bytes.Buffer)
+		mockAPI := new(houston_mocks.ClientInterface)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "1.0.1"}, nil)
+		mockAPI.On("GetPlatformVersion", nil).Return("1.0.1", nil)
+		cmd := &cobra.Command{Use: "astro"}
+		childCMDs := AddCmds(mockAPI, buf)
+		cmd.AddCommand(childCMDs...)
+
+		VersionMatchCmds(cmd, []string{"astro"})
+		buf.Reset()
+		b := new(bytes.Buffer)
+		cmd.SetArgs([]string{"deployment", "adopt", "--help"})
+
+		r, w, err := os.Pipe()
+		s.NoError(err)
+
+		realStdout := os.Stdout
+		os.Stdout = w
+		defer func() { os.Stdout = realStdout }()
+
+		_, err = cmd.ExecuteC()
+		w.Close()
+		s.NoError(err)
+		io.Copy(b, r)
+		s.Contains(b.String(), "unknown command \"adopt\" for \"astro\"")
+	})
+
+	s.Run("2.1.0 platform with deployment adopt command", func() {
+		buf := new(bytes.Buffer)
+		mockAPI := new(houston_mocks.ClientInterface)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "2.1.0"}, nil)
+		mockAPI.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		cmd := &cobra.Command{Use: "astro"}
+		childCMDs := AddCmds(mockAPI, buf)
+		cmd.AddCommand(childCMDs...)
+
+		VersionMatchCmds(cmd, []string{"astro"})
+		buf.Reset()
+		b := new(bytes.Buffer)
+		cmd.SetArgs([]string{"deployment", "adopt", "--help"})
+
+		r, w, err := os.Pipe()
+		s.NoError(err)
+
+		realStdout := os.Stdout
+		os.Stdout = w
+		defer func() { os.Stdout = realStdout }()
+
+		_, err = cmd.ExecuteC()
+		w.Close()
+		s.NoError(err)
+		io.Copy(b, r)
+		s.Contains(b.String(), "Adopt an existing operator-managed Airflow custom resource")
+	})
+
+	s.Run("1.0.1 platform with deployment unadopt command", func() {
+		buf := new(bytes.Buffer)
+		mockAPI := new(houston_mocks.ClientInterface)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "1.0.1"}, nil)
+		mockAPI.On("GetPlatformVersion", nil).Return("1.0.1", nil)
+		cmd := &cobra.Command{Use: "astro"}
+		childCMDs := AddCmds(mockAPI, buf)
+		cmd.AddCommand(childCMDs...)
+
+		VersionMatchCmds(cmd, []string{"astro"})
+		buf.Reset()
+		b := new(bytes.Buffer)
+		cmd.SetArgs([]string{"deployment", "unadopt", "--help"})
+
+		r, w, err := os.Pipe()
+		s.NoError(err)
+
+		realStdout := os.Stdout
+		os.Stdout = w
+		defer func() { os.Stdout = realStdout }()
+
+		_, err = cmd.ExecuteC()
+		w.Close()
+		s.NoError(err)
+		io.Copy(b, r)
+		s.Contains(b.String(), "unknown command \"unadopt\" for \"astro\"")
+	})
+
+	s.Run("2.1.0 platform with deployment unadopt command", func() {
+		buf := new(bytes.Buffer)
+		mockAPI := new(houston_mocks.ClientInterface)
+		mockAPI.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "2.1.0"}, nil)
+		mockAPI.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		cmd := &cobra.Command{Use: "astro"}
+		childCMDs := AddCmds(mockAPI, buf)
+		cmd.AddCommand(childCMDs...)
+
+		VersionMatchCmds(cmd, []string{"astro"})
+		buf.Reset()
+		b := new(bytes.Buffer)
+		cmd.SetArgs([]string{"deployment", "unadopt", "--help"})
+
+		r, w, err := os.Pipe()
+		s.NoError(err)
+
+		realStdout := os.Stdout
+		os.Stdout = w
+		defer func() { os.Stdout = realStdout }()
+
+		_, err = cmd.ExecuteC()
+		w.Close()
+		s.NoError(err)
+		io.Copy(b, r)
+		s.Contains(b.String(), "Release an adopted Deployment back to operator-only management")
+	})
 }
 
 func (s *Suite) TestRemoveCmd() {

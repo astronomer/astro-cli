@@ -211,12 +211,12 @@ func Adopt(req *houston.AdoptDeploymentRequest, client houston.ClientInterface, 
 // Unadopt releases an adopted deployment back to operator-only management, without touching
 // the underlying Airflow custom resource, namespace, or metadata database.
 func Unadopt(id string, client houston.ClientInterface, out io.Writer) error {
-	_, err := houston.Call(client.UnadoptDeployment)(houston.UnadoptDeploymentRequest{DeploymentID: id})
+	d, err := houston.Call(client.UnadoptDeployment)(houston.UnadoptDeploymentRequest{DeploymentID: id})
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, "\n Successfully unadopted deployment")
+	fmt.Fprintf(out, "\n Successfully unadopted deployment %s (%s)\n", d.ReleaseName, d.ID)
 
 	return nil
 }
