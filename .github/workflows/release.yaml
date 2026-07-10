@@ -24,57 +24,50 @@ jobs:
         id: parse
         run: |
           TAG="${GITHUB_REF_NAME}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
           if [[ "$TAG" =~ -nightly\. ]]; then
             TYPE="nightly"
-            VERSION=$(echo "$TAG" | sed 's/^v//')
+            VERSION="${TAG#v}"
           elif [[ "$TAG" =~ -rc\. ]]; then
             TYPE="rc"
-            VERSION=$(echo "$TAG" | sed 's/^v//; s/-rc\.[0-9]*$//')
+            VERSION="${TAG#v}"
+            VERSION="${VERSION%-rc.*}"
           else
             TYPE="ga"
-            VERSION=$(echo "$TAG" | sed 's/^v//')
+            VERSION="${TAG#v}"
           fi
 
-          echo "type=$TYPE" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Parsed — Tag: $TAG | Type: $TYPE | Version: $VERSION"
 
   release:
     needs: detect
-    runs-on: ubuntu-latest
+    runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
+      - name: Resolve source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        id: setup-go
         with:
           go-version-file: go.mod
+          cache: false
 
-      - name: Install cross-compilation tools
-        run: |
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends \
-            clang llvm cmake libssl-dev patch zlib1g-dev xz-utils
-
-      - name: Cache osxcross
-        id: cache-osxcross
+      - name: Cache Go build outputs
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: /tmp/osxcross
-          key: osxcross-macos12.3-${{ runner.os }}
-
-      - name: Build osxcross
-        if: steps.cache-osxcross.outputs.cache-hit != 'true'
-        run: |
-          git clone https://github.com/tpoechtrager/osxcross.git /tmp/osxcross
-          wget -q https://github.com/joseluisq/macosx-sdks/releases/download/12.3/MacOSX12.3.sdk.tar.xz \
-            -P /tmp/osxcross/tarballs/
-          cd /tmp/osxcross && UNATTENDED=yes ./build.sh
-
-      - name: Add osxcross to PATH
-        run: echo "/tmp/osxcross/target/bin" >> $GITHUB_PATH
+          path: ~/Library/Caches/go-build
+          key: release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ steps.source.outputs.sha }}
+          restore-keys: |
+            release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-
 
       - name: Find previous GA tag for changelog
         id: prev-tag
@@ -88,7 +81,7 @@ jobs:
             | sort -t. -k1,1n -k2,2n -k3,3n \
             | tail -1 \
             | sed 's/^/v/')
-          echo "tag=$PREV_GA" >> $GITHUB_OUTPUT
+          echo "tag=$PREV_GA" >> "$GITHUB_OUTPUT"
           echo "Previous GA tag for changelog: $PREV_GA"
 
       - name: Get Homebrew token via Octo STS
