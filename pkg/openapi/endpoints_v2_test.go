@@ -186,6 +186,62 @@ func TestExtractEndpointsV2_NilDoc(t *testing.T) {
 	assert.Nil(t, endpoints)
 }
 
+func TestExtractDefinitionsV2(t *testing.T) {
+	spec := map[string]any{
+		"swagger":  "2.0",
+		"info":     map[string]any{"title": "Test", "version": "1.0"},
+		"basePath": "/api/v1",
+		"paths": map[string]any{
+			"/resources": map[string]any{
+				"post": map[string]any{
+					"operationId": "CreateResource",
+					"parameters": []any{
+						map[string]any{
+							"name":     "body",
+							"in":       "body",
+							"required": true,
+							"schema":   map[string]any{"$ref": "#/definitions/CreateResourceRequest"},
+						},
+					},
+					"responses": map[string]any{"200": map[string]any{"description": "OK"}},
+				},
+			},
+		},
+		"definitions": map[string]any{
+			"CreateResourceRequest": map[string]any{
+				"type":     "object",
+				"required": []any{"name"},
+				"properties": map[string]any{
+					"name":    map[string]any{"type": "string"},
+					"enabled": map[string]any{"type": "boolean"},
+				},
+			},
+		},
+	}
+	data, _ := json.Marshal(spec)
+
+	_, v2doc, err := parseSpec(data)
+	require.NoError(t, err)
+	require.NotNil(t, v2doc)
+
+	registry := ExtractDefinitionsV2(v2doc)
+	require.Contains(t, registry, "CreateResourceRequest")
+	schema := registry["CreateResourceRequest"]
+	assert.Equal(t, "object", schema.Type)
+	assert.Equal(t, []string{"name"}, schema.Required)
+
+	names := make(map[string]string)
+	for _, p := range schema.Properties {
+		names[p.Name] = p.Schema.Value.Type
+	}
+	assert.Equal(t, "string", names["name"])
+	assert.Equal(t, "boolean", names["enabled"])
+}
+
+func TestExtractDefinitionsV2_NilDoc(t *testing.T) {
+	assert.Nil(t, ExtractDefinitionsV2(nil))
+}
+
 func TestExtractEndpointsV2_InlineParamType(t *testing.T) {
 	specJSON := minimalSwagger20JSON("/v1", map[string]any{
 		"/search": map[string]any{

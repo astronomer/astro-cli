@@ -717,7 +717,7 @@ func TestResolveSchemaJSON_CutsCycles(t *testing.T) {
 	}
 	resolver := openapi.NewSchemaResolverWithSchemas(registry)
 
-	node := resolveSchemaJSON(&openapi.SchemaRef{Ref: "#/components/schemas/Node"}, resolver, map[string]bool{})
+	node := resolveSchemaJSON(&openapi.SchemaRef{Ref: "#/components/schemas/Node"}, resolver, map[string]bool{}, 0)
 	require.NotNil(t, node)
 	assert.Equal(t, "Node", node.Ref)
 
@@ -884,6 +884,111 @@ func TestPrintSchema_ResolvesRefsFromRegistry(t *testing.T) {
 	assert.Contains(t, out, "array of WorkerQueue")
 	// Self-referential schema is caught by cycle detection.
 	assert.Contains(t, out, "(see WorkerQueue above)")
+}
+
+// TestPrintSchema_AllOfPlusProperties verifies an allOf schema that also has its
+// own top-level properties prints both (the extend-a-base pattern).
+func TestPrintSchema_AllOfPlusProperties(t *testing.T) {
+	registry := map[string]*openapi.Schema{
+		"Base": {
+			Type: "object",
+			Properties: []openapi.SchemaProperty{
+				{Name: "baseField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+			},
+		},
+	}
+	resolver := openapi.NewSchemaResolverWithSchemas(registry)
+
+	schemaRef := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type:  "object",
+		AllOf: []*openapi.SchemaRef{{Ref: "#/components/schemas/Base"}},
+		Properties: []openapi.SchemaProperty{
+			{Name: "ownField", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "integer"}}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, schemaRef, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+	out := buf.String()
+	assert.Contains(t, out, "baseField", "allOf base fields must print")
+	assert.Contains(t, out, "ownField", "sibling properties must also print")
+}
+
+// TestPrintSchema_UnresolvedRefKeepsName verifies a property whose $ref cannot be
+// resolved still shows its name and the referenced schema name.
+func TestPrintSchema_UnresolvedRefKeepsName(t *testing.T) {
+	resolver := openapi.NewSchemaResolverWithSchemas(map[string]*openapi.Schema{}) // empty registry
+
+	schemaRef := &openapi.SchemaRef{Value: &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "executor", Schema: &openapi.SchemaRef{Ref: "#/components/schemas/Executor"}},
+		},
+	}}
+
+	var buf bytes.Buffer
+	printSchema(&buf, schemaRef, resolver, 0, map[string]bool{}, responseSchemaPrintOpts())
+	out := buf.String()
+	assert.Contains(t, out, "executor", "property name must be kept")
+	assert.Contains(t, out, "Executor", "referenced schema name must be shown")
+}
+
+// TestReadOnly_RequestHidesButJSONShows pins the intentional asymmetry: text
+// request bodies hide read-only fields; --json keeps them flagged.
+func TestReadOnly_RequestHidesButJSONShows(t *testing.T) {
+	schema := &openapi.Schema{
+		Type: "object",
+		Properties: []openapi.SchemaProperty{
+			{Name: "serverGeneratedId", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string", ReadOnly: true}}},
+			{Name: "userName", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
+		},
+	}
+	resolver := openapi.NewSchemaResolver()
+
+	var buf bytes.Buffer
+	printSchema(&buf, &openapi.SchemaRef{Value: schema}, resolver, 0, map[string]bool{}, requestSchemaPrintOpts())
+	out := buf.String()
+	assert.NotContains(t, out, "serverGeneratedId", "read-only field hidden in request text")
+	assert.Contains(t, out, "userName")
+
+	node := resolveSchemaJSON(&openapi.SchemaRef{Value: schema}, resolver, map[string]bool{}, 0)
+	var ro *schemaJSON
+	for _, p := range node.Properties {
+		if p.Name == "serverGeneratedId" {
+			ro = p.Schema
+		}
+	}
+	require.NotNil(t, ro, "JSON must include the read-only field")
+	assert.True(t, ro.ReadOnly, "JSON must flag it read-only")
+}
+
+// TestResolveSchemaJSON_Composition verifies oneOf children that are $refs are
+// resolved to their fields in JSON output.
+func TestResolveSchemaJSON_Composition(t *testing.T) {
+	registry := map[string]*openapi.Schema{
+		"CeleryConfig": {
+			Type:       "object",
+			Properties: []openapi.SchemaProperty{{Name: "workerCount", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "integer"}}}},
+		},
+		"KubernetesConfig": {
+			Type:       "object",
+			Properties: []openapi.SchemaProperty{{Name: "namespace", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}}},
+		},
+	}
+	resolver := openapi.NewSchemaResolverWithSchemas(registry)
+
+	ref := &openapi.SchemaRef{Value: &openapi.Schema{
+		OneOf: []*openapi.SchemaRef{
+			{Ref: "#/components/schemas/CeleryConfig"},
+			{Ref: "#/components/schemas/KubernetesConfig"},
+		},
+	}}
+	node := resolveSchemaJSON(ref, resolver, map[string]bool{}, 0)
+	require.Len(t, node.OneOf, 2)
+	assert.Equal(t, "CeleryConfig", node.OneOf[0].Ref)
+	assert.NotEmpty(t, node.OneOf[0].Properties, "oneOf ref child must expand")
+	assert.Equal(t, "KubernetesConfig", node.OneOf[1].Ref)
+	assert.NotEmpty(t, node.OneOf[1].Properties)
 }
 
 func TestResolveSchema_LazyRefWithoutRegistry(t *testing.T) {

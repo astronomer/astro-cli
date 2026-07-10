@@ -12,6 +12,15 @@ import (
 // --json flag. Schemas are resolved down the $ref stack so an agent gets the
 // actual fields without needing the spec; genuine cycles are cut and marked
 // with "circular": true rather than recursing forever.
+//
+// A single matched endpoint is emitted as a JSON object; a path matching
+// multiple methods is emitted as an array of objects.
+
+// maxJSONSchemaDepth bounds resolveSchemaJSON's recursion. Cycles are already
+// cut via the ancestry set; this is a backstop against pathologically deep or
+// wide (diamond) acyclic schemas so output stays bounded. Real specs nest far
+// shallower than this.
+const maxJSONSchemaDepth = 40
 
 type endpointJSON struct {
 	Method      string           `json:"method"`
@@ -49,6 +58,7 @@ type responseJSON struct {
 type schemaJSON struct {
 	Ref         string         `json:"ref,omitempty"`
 	Circular    bool           `json:"circular,omitempty"`
+	Truncated   bool           `json:"truncated,omitempty"`
 	Type        string         `json:"type,omitempty"`
 	Format      string         `json:"format,omitempty"`
 	Description string         `json:"description,omitempty"`
@@ -149,7 +159,7 @@ func buildEndpointJSON(ep *openapi.Endpoint, resolver *openapi.SchemaResolver) e
 			In:          p.In,
 			Description: p.Description,
 			Required:    p.Required,
-			Schema:      resolveSchemaJSON(p.Schema, resolver, map[string]bool{}),
+			Schema:      resolveSchemaJSON(p.Schema, resolver, map[string]bool{}, 0),
 		})
 	}
 
@@ -159,7 +169,7 @@ func buildEndpointJSON(ep *openapi.Endpoint, resolver *openapi.SchemaResolver) e
 			Required:    ep.RequestBody.Required,
 		}
 		if mt, ok := ep.RequestBody.Content["application/json"]; ok && mt.Schema != nil {
-			rb.Schema = resolveSchemaJSON(mt.Schema, resolver, map[string]bool{})
+			rb.Schema = resolveSchemaJSON(mt.Schema, resolver, map[string]bool{}, 0)
 		}
 		e.RequestBody = rb
 	}
@@ -169,7 +179,7 @@ func buildEndpointJSON(ep *openapi.Endpoint, resolver *openapi.SchemaResolver) e
 			entry := &ep.Responses.Codes[i]
 			r := responseJSON{Code: entry.Code, Description: entry.Description}
 			if mt, ok := entry.Content["application/json"]; ok && mt.Schema != nil {
-				r.Schema = resolveSchemaJSON(mt.Schema, resolver, map[string]bool{})
+				r.Schema = resolveSchemaJSON(mt.Schema, resolver, map[string]bool{}, 0)
 			}
 			e.Responses = append(e.Responses, r)
 		}
@@ -181,8 +191,9 @@ func buildEndpointJSON(ep *openapi.Endpoint, resolver *openapi.SchemaResolver) e
 // resolveSchemaJSON converts a SchemaRef into its resolved JSON form, following
 // $ref references via the resolver. visited tracks the current ancestry so real
 // cycles are cut (marked circular) while a schema reused on sibling branches is
-// still expanded in full.
-func resolveSchemaJSON(ref *openapi.SchemaRef, resolver *openapi.SchemaResolver, visited map[string]bool) *schemaJSON {
+// still expanded in full. depth bounds recursion as a backstop for deep/wide
+// acyclic schemas (marked truncated).
+func resolveSchemaJSON(ref *openapi.SchemaRef, resolver *openapi.SchemaResolver, visited map[string]bool, depth int) *schemaJSON {
 	if ref == nil {
 		return nil
 	}
@@ -196,6 +207,12 @@ func resolveSchemaJSON(ref *openapi.SchemaRef, resolver *openapi.SchemaResolver,
 	}
 	if schema == nil {
 		// Unresolved ref (unknown schema or no registry): report the name only.
+		return node
+	}
+
+	if depth >= maxJSONSchemaDepth {
+		node.Type = schema.Type
+		node.Truncated = true
 		return node
 	}
 
@@ -217,20 +234,20 @@ func resolveSchemaJSON(ref *openapi.SchemaRef, resolver *openapi.SchemaResolver,
 	for _, p := range schema.Properties {
 		node.Properties = append(node.Properties, propertyJSON{
 			Name:   p.Name,
-			Schema: resolveSchemaJSON(p.Schema, resolver, visited),
+			Schema: resolveSchemaJSON(p.Schema, resolver, visited, depth+1),
 		})
 	}
 	if schema.Items != nil {
-		node.Items = resolveSchemaJSON(schema.Items, resolver, visited)
+		node.Items = resolveSchemaJSON(schema.Items, resolver, visited, depth+1)
 	}
 	for _, c := range schema.OneOf {
-		node.OneOf = append(node.OneOf, resolveSchemaJSON(c, resolver, visited))
+		node.OneOf = append(node.OneOf, resolveSchemaJSON(c, resolver, visited, depth+1))
 	}
 	for _, c := range schema.AnyOf {
-		node.AnyOf = append(node.AnyOf, resolveSchemaJSON(c, resolver, visited))
+		node.AnyOf = append(node.AnyOf, resolveSchemaJSON(c, resolver, visited, depth+1))
 	}
 	for _, c := range schema.AllOf {
-		node.AllOf = append(node.AllOf, resolveSchemaJSON(c, resolver, visited))
+		node.AllOf = append(node.AllOf, resolveSchemaJSON(c, resolver, visited, depth+1))
 	}
 
 	return node

@@ -411,7 +411,8 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 			for _, childRef := range schema.AllOf {
 				printSchema(out, childRef, resolver, indent, visited, opts)
 			}
-			return
+			// Fall through: an allOf schema commonly also defines its own
+			// top-level properties (extend-a-base pattern), which must print too.
 		}
 	}
 
@@ -431,18 +432,24 @@ func printSchema(out io.Writer, schemaRef *openapi.SchemaRef, resolver *openapi.
 			// Resolve through the resolver so $ref properties expand to the
 			// referenced schema's fields rather than showing just a name.
 			prop, refName := resolver.ResolveSchema(propRef)
+
+			required := ""
+			if openapi.IsRequired(name, schema.Required) {
+				required = color.RedString("*")
+			}
+
+			// Unresolved $ref (schema not in the registry): still show the
+			// property name and the referenced schema name, just don't recurse.
 			if prop == nil {
+				if refName != "" {
+					fmt.Fprintf(out, "%s%s%s  %s\n", prefix, color.GreenString(name), required, color.HiBlackString(getTypeString(nil, refName)))
+				}
 				continue
 			}
 
 			// Skip read-only properties in request schemas
 			if opts.SkipReadOnly && prop.ReadOnly {
 				continue
-			}
-
-			required := ""
-			if openapi.IsRequired(name, schema.Required) {
-				required = color.RedString("*")
 			}
 
 			typeStr := getTypeString(prop, refName)
@@ -499,12 +506,12 @@ func hasExpandableFields(s *openapi.Schema) bool {
 
 // getTypeString returns a human-readable type string for a schema.
 func getTypeString(schema *openapi.Schema, refName string) string {
-	if schema == nil {
-		return "any"
-	}
-
 	if refName != "" {
 		return refName
+	}
+
+	if schema == nil {
+		return "any"
 	}
 
 	typeStr := schema.Type
