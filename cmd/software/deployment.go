@@ -59,8 +59,8 @@ var (
 	desiredRuntimeVersion   string
 	clusterID               string
 
-	adoptCRName                  string
-	adoptCRNamespace             string
+	adoptName                    string
+	adoptNamespace               string
 	adoptLabel                   string
 	adoptDescription             string
 	adoptUseApcLogging           bool
@@ -68,7 +68,7 @@ var (
 	adoptAcceptIncompatibilities bool
 
 	deploymentAdoptExample = `
-$ astro deployment adopt --cluster-id=<cluster-id> --cr-name=<cr-name> --cr-namespace=<cr-namespace> --workspace-id=<workspace-id>
+$ astro deployment adopt --cluster-id=<cluster-id> --name=<cr-name> --namespace=<cr-namespace> --workspace-id=<workspace-id>
 `
 	deploymentUnadoptExample = `
 $ astro deployment unadopt --deployment-id=<deployment-id>
@@ -261,16 +261,16 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
-	cmd.Flags().StringVarP(&adoptCRName, "cr-name", "", "", "metadata.name of the existing Airflow custom resource")
-	cmd.Flags().StringVarP(&adoptCRNamespace, "cr-namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource")
-	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; defaults to --cr-name when omitted")
+	cmd.Flags().StringVarP(&adoptName, "name", "", "", "metadata.name of the existing Airflow custom resource (CR)")
+	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
+	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; defaults to --name when omitted")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
 	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
 	_ = cmd.MarkFlagRequired("cluster-id")
-	_ = cmd.MarkFlagRequired("cr-name")
-	_ = cmd.MarkFlagRequired("cr-namespace")
+	_ = cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("namespace")
 	return cmd
 }
 
@@ -566,8 +566,8 @@ func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
 	req := &houston.AdoptDeploymentRequest{
 		WorkspaceID:             ws,
 		ClusterID:               clusterID,
-		CRNamespace:             adoptCRNamespace,
-		CRName:                  adoptCRName,
+		CRNamespace:             adoptNamespace,
+		CRName:                  adoptName,
 		Label:                   adoptLabel,
 		Description:             adoptDescription,
 		UseApcLogging:           adoptUseApcLogging,
