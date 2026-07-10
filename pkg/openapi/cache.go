@@ -251,6 +251,20 @@ func (c *Cache) GetEndpoints() []Endpoint {
 	return endpoints
 }
 
+// GetSchemas returns a registry of named component schemas from the loaded
+// spec, keyed by schema name (e.g. "CreateDeploymentRequest"). It is used to
+// resolve $ref references lazily when displaying endpoint details.
+func (c *Cache) GetSchemas() map[string]*Schema {
+	switch {
+	case c.doc != nil:
+		return ExtractComponentSchemas(c.doc)
+	case c.v2doc != nil:
+		return ExtractDefinitionsV2(c.v2doc)
+	default:
+		return nil
+	}
+}
+
 // IsLoaded returns true if a spec has been loaded.
 func (c *Cache) IsLoaded() bool {
 	return c.doc != nil || c.v2doc != nil

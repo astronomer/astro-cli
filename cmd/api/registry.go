@@ -256,6 +256,7 @@ func NewRegistryDescribeCmd(out io.Writer, parentOpts *RegistryOptions) *cobra.C
 	var method string
 	var refresh bool
 	var verbose bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "describe <endpoint>",
@@ -281,6 +282,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 				Method:    method,
 				Refresh:   refresh,
 				Verbose:   verbose,
+				JSON:      jsonOut,
 			}
 			return runDescribe(descOpts)
 		},
@@ -289,6 +291,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint's schema as JSON (with $refs resolved) for programmatic use")
 
 	return cmd
 }
