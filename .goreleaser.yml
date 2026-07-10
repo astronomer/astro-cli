@@ -67,10 +67,12 @@ brews:
     skip_upload: auto
     homepage: https://astronomer.io
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
-    dependencies:
-      - name: podman
-        type: recommended
-        os: mac
+    # Podman 6.0+ is arm64-only on macOS, so limit the dependency to Apple Silicon
+    # to keep Intel Macs installable (https://github.com/astronomer/astro-cli/issues/2199).
+    # goreleaser's `dependencies` supports an os filter but not an arch filter,
+    # so emit the guarded depends_on line via custom_block instead.
+    custom_block: |
+      depends_on "podman" => :recommended if OS.mac? && Hardware::CPU.arm?
     test: |
       system "#{bin}/astro version"
   - name: "astro@{{ .Version }}"
@@ -89,10 +91,9 @@ brews:
     skip_upload: auto
     homepage: https://astronomer.io
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
-    dependencies:
-      - name: podman
-        type: recommended
-        os: mac
+    # See the podman note on the `astro` formula above.
+    custom_block: |
+      depends_on "podman" => :recommended if OS.mac? && Hardware::CPU.arm?
     test: |
       system "#{bin}/astro version"
 archives:
