@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
@@ -114,6 +115,7 @@ type InputDeploy struct {
 	Description       string
 	BuildSecretString string
 	Force             bool
+	DagBundleName     string
 }
 
 // InputClientDeploy contains inputs for client image deployments
@@ -195,7 +197,7 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient) error { //nolint
+func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error { //nolint
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -278,20 +280,46 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient) error { //
 
 	createDeployRequest.Git = deployGit
 
-	deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, astroV1Client)
-	if err != nil {
-		return err
-	}
-	deployID := deploy.Id
-	if deploy.DagsUploadUrl != nil {
-		dagsUploadURL = *deploy.DagsUploadUrl
+	var deployID, imageRepository string
+	if deployInput.DagBundleName != "" {
+		// dagBundleName exists only on the v1alpha1 deploy API, so route just the
+		// create call there; the upload and finalize steps below stay on v1 and
+		// operate on the same underlying deploy. This cross-API bridge is
+		// intentional and temporary — collapse back into the v1 create once
+		// dagBundleName reaches the v1 deploy API.
+		deploy, err := createDeployWithDagBundle(deployInfo.organizationID, deployInfo.deploymentID, description, deployInput.DagBundleName, deployInput.Dags, deployGit, astroV1Alpha1Client)
+		if err != nil {
+			return err
+		}
+		deployID = deploy.Id
+		imageRepository = deploy.ImageRepository
+		if deploy.DagsUploadUrl != nil {
+			dagsUploadURL = *deploy.DagsUploadUrl
+		} else {
+			dagsUploadURL = ""
+		}
+		if deploy.ImageTag != "" {
+			nextTag = deploy.ImageTag
+		} else {
+			nextTag = ""
+		}
 	} else {
-		dagsUploadURL = ""
-	}
-	if deploy.ImageTag != "" {
-		nextTag = deploy.ImageTag
-	} else {
-		nextTag = ""
+		deploy, err := createDeploy(deployInfo.organizationID, deployInfo.deploymentID, createDeployRequest, astroV1Client)
+		if err != nil {
+			return err
+		}
+		deployID = deploy.Id
+		imageRepository = deploy.ImageRepository
+		if deploy.DagsUploadUrl != nil {
+			dagsUploadURL = *deploy.DagsUploadUrl
+		} else {
+			dagsUploadURL = ""
+		}
+		if deploy.ImageTag != "" {
+			nextTag = deploy.ImageTag
+		} else {
+			nextTag = ""
+		}
 	}
 
 	if deployInput.Dags {
@@ -398,7 +426,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient) error { //
 			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
-		repository := deploy.ImageRepository
+		repository := imageRepository
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
 
@@ -774,6 +802,53 @@ func createDeploy(organizationID, deploymentID string, request astrov1.CreateDep
 		return nil, err
 	}
 	return resp.JSON200, err
+}
+
+// createDeployWithDagBundle creates a deploy targeting a named DAG bundle via the
+// v1alpha1 deploy API, the only tier that accepts dagBundleName. The v1alpha1
+// type vocabulary is simpler than v1's: the server expands IMAGE to IMAGE_AND_DAG
+// (or DAG to DAG_ONLY) based on the deployment, so a plain deploy maps to IMAGE
+// and a --dags deploy maps to DAG. Remove once dagBundleName reaches the v1 API.
+func createDeployWithDagBundle(organizationID, deploymentID, description, dagBundleName string, dags bool, git *astrov1.CreateDeployGitRequest, client astrov1alpha1.APIClient) (*astrov1alpha1.Deploy, error) {
+	deployType := astrov1alpha1.CreateDeployRequestTypeIMAGE
+	if dags {
+		deployType = astrov1alpha1.CreateDeployRequestTypeDAG
+	}
+	request := astrov1alpha1.CreateDeployRequest{
+		Type:          deployType,
+		Description:   &description,
+		DagBundleName: &dagBundleName,
+		Git:           toV1Alpha1GitRequest(git),
+	}
+	resp, err := client.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
+	if err != nil {
+		return nil, err
+	}
+	err = astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return resp.JSON200, nil
+}
+
+func toV1Alpha1GitRequest(git *astrov1.CreateDeployGitRequest) *astrov1alpha1.CreateDeployGitRequest {
+	if git == nil {
+		return nil
+	}
+	return &astrov1alpha1.CreateDeployGitRequest{
+		Account:         git.Account,
+		AuthorName:      git.AuthorName,
+		AuthorUrl:       git.AuthorUrl,
+		AuthorUsername:  git.AuthorUsername,
+		BeforeCommitSha: git.BeforeCommitSha,
+		Branch:          git.Branch,
+		CommitSha:       git.CommitSha,
+		CommitUrl:       git.CommitUrl,
+		Path:            git.Path,
+		Provider:        astrov1alpha1.CreateDeployGitRequestProvider(git.Provider),
+		RemoteUrl:       git.RemoteUrl,
+		Repo:            git.Repo,
+	}
 }
 
 func ValidRuntimeVersion(currentVersion, tag string, deploymentOptionsRuntimeVersions []string) bool {

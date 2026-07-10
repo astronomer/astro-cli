@@ -2,6 +2,7 @@ package organization
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"io"
@@ -42,7 +43,9 @@ var (
 			Offset:     0,
 		},
 	}
-	auditLogsBody          = []byte{}
+	// Raw NDJSON, as delivered by the v1 endpoint after the HTTP transport
+	// transparently decompresses the Content-Encoding: gzip response body.
+	auditLogsBody          = []byte("{\"event\":\"one\"}\n{\"event\":\"two\"}\n")
 	mockOKAuditLogResponse = astrov1.GetOrganizationAuditLogsResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -498,6 +501,40 @@ func (s *Suite) TestExportAuditLogs() {
 		err := ExportAuditLogs(mockV1Client, "org1", "", 1)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
+	})
+	s.Run("exported file is valid gzip of the raw NDJSON body", func() {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
+
+		filePath := s.T().TempDir() + "/audit-logs.ndjson.gz"
+		err := ExportAuditLogs(mockV1Client, "org1", filePath, 1)
+		s.NoError(err)
+
+		written, err := os.ReadFile(filePath)
+		s.NoError(err)
+		// File must be a real gzip stream, not raw JSON (the AI-978 regression).
+		s.Equal(byte(0x1f), written[0])
+		s.Equal(byte(0x8b), written[1])
+
+		zr, err := gzip.NewReader(bytes.NewReader(written))
+		s.NoError(err)
+		decompressed, err := io.ReadAll(zr)
+		s.NoError(err)
+		s.Equal(auditLogsBody, decompressed)
+		mockV1Client.AssertExpectations(s.T())
+	})
+	s.Run("already-gzipped body is not double-compressed", func() {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		_, err := zw.Write(auditLogsBody)
+		s.NoError(err)
+		s.NoError(zw.Close())
+		alreadyGzipped := buf.Bytes()
+
+		out, err := ensureGzip(alreadyGzipped)
+		s.NoError(err)
+		s.Equal(alreadyGzipped, out)
 	})
 	s.Run("export failure", func() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)

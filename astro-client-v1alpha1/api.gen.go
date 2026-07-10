@@ -111,6 +111,216 @@ func (e CreateAstroIdeSessionRequestPermission) Valid() bool {
 	}
 }
 
+// Defines values for CreateBundleRequestType.
+const (
+	CreateBundleRequestTypeDEPLOY CreateBundleRequestType = "DEPLOY"
+)
+
+// Valid indicates whether the value is a known member of the CreateBundleRequestType enum.
+func (e CreateBundleRequestType) Valid() bool {
+	switch e {
+	case CreateBundleRequestTypeDEPLOY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateDeployGitRequestProvider.
+const (
+	CreateDeployGitRequestProviderGENERIC CreateDeployGitRequestProvider = "GENERIC"
+	CreateDeployGitRequestProviderGITHUB  CreateDeployGitRequestProvider = "GITHUB"
+)
+
+// Valid indicates whether the value is a known member of the CreateDeployGitRequestProvider enum.
+func (e CreateDeployGitRequestProvider) Valid() bool {
+	switch e {
+	case CreateDeployGitRequestProviderGENERIC:
+		return true
+	case CreateDeployGitRequestProviderGITHUB:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateDeployRequestType.
+const (
+	CreateDeployRequestTypeBUNDLE CreateDeployRequestType = "BUNDLE"
+	CreateDeployRequestTypeDAG    CreateDeployRequestType = "DAG"
+	CreateDeployRequestTypeIMAGE  CreateDeployRequestType = "IMAGE"
+)
+
+// Valid indicates whether the value is a known member of the CreateDeployRequestType enum.
+func (e CreateDeployRequestType) Valid() bool {
+	switch e {
+	case CreateDeployRequestTypeBUNDLE:
+		return true
+	case CreateDeployRequestTypeDAG:
+		return true
+	case CreateDeployRequestTypeIMAGE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployStatus.
+const (
+	DeployStatusDEPLOYED    DeployStatus = "DEPLOYED"
+	DeployStatusFAILED      DeployStatus = "FAILED"
+	DeployStatusINITIALIZED DeployStatus = "INITIALIZED"
+)
+
+// Valid indicates whether the value is a known member of the DeployStatus enum.
+func (e DeployStatus) Valid() bool {
+	switch e {
+	case DeployStatusDEPLOYED:
+		return true
+	case DeployStatusFAILED:
+		return true
+	case DeployStatusINITIALIZED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployType.
+const (
+	DeployTypeBASEIMAGE   DeployType = "BASE_IMAGE"
+	DeployTypeBUNDLE      DeployType = "BUNDLE"
+	DeployTypeDAG         DeployType = "DAG"
+	DeployTypeDAGONLY     DeployType = "DAG_ONLY"
+	DeployTypeIMAGE       DeployType = "IMAGE"
+	DeployTypeIMAGEANDDAG DeployType = "IMAGE_AND_DAG"
+	DeployTypeIMAGEONLY   DeployType = "IMAGE_ONLY"
+)
+
+// Valid indicates whether the value is a known member of the DeployType enum.
+func (e DeployType) Valid() bool {
+	switch e {
+	case DeployTypeBASEIMAGE:
+		return true
+	case DeployTypeBUNDLE:
+		return true
+	case DeployTypeDAG:
+		return true
+	case DeployTypeDAGONLY:
+		return true
+	case DeployTypeIMAGE:
+		return true
+	case DeployTypeIMAGEANDDAG:
+		return true
+	case DeployTypeIMAGEONLY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployFieldChangeCategory.
+const (
+	Config  DeployFieldChangeCategory = "config"
+	Git     DeployFieldChangeCategory = "git"
+	Image   DeployFieldChangeCategory = "image"
+	Version DeployFieldChangeCategory = "version"
+)
+
+// Valid indicates whether the value is a known member of the DeployFieldChangeCategory enum.
+func (e DeployFieldChangeCategory) Valid() bool {
+	switch e {
+	case Config:
+		return true
+	case Git:
+		return true
+	case Image:
+		return true
+	case Version:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployGitProvider.
+const (
+	DeployGitProviderGENERIC DeployGitProvider = "GENERIC"
+	DeployGitProviderGITHUB  DeployGitProvider = "GITHUB"
+)
+
+// Valid indicates whether the value is a known member of the DeployGitProvider enum.
+func (e DeployGitProvider) Valid() bool {
+	switch e {
+	case DeployGitProviderGENERIC:
+		return true
+	case DeployGitProviderGITHUB:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeployStepStatus.
+const (
+	DeployStepStatusCOMPLETED  DeployStepStatus = "COMPLETED"
+	DeployStepStatusFAILED     DeployStepStatus = "FAILED"
+	DeployStepStatusPENDING    DeployStepStatus = "PENDING"
+	DeployStepStatusRUNNING    DeployStepStatus = "RUNNING"
+	DeployStepStatusUPFORRETRY DeployStepStatus = "UP_FOR_RETRY"
+)
+
+// Valid indicates whether the value is a known member of the DeployStepStatus enum.
+func (e DeployStepStatus) Valid() bool {
+	switch e {
+	case DeployStepStatusCOMPLETED:
+		return true
+	case DeployStepStatusFAILED:
+		return true
+	case DeployStepStatusPENDING:
+		return true
+	case DeployStepStatusRUNNING:
+		return true
+	case DeployStepStatusUPFORRETRY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentBundleType.
+const (
+	DeploymentBundleTypeDEPLOY DeploymentBundleType = "DEPLOY"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentBundleType enum.
+func (e DeploymentBundleType) Valid() bool {
+	switch e {
+	case DeploymentBundleTypeDEPLOY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TriggerGitDeployRequestDeployType.
+const (
+	DAG   TriggerGitDeployRequestDeployType = "DAG"
+	IMAGE TriggerGitDeployRequestDeployType = "IMAGE"
+)
+
+// Valid indicates whether the value is a known member of the TriggerGitDeployRequestDeployType enum.
+func (e TriggerGitDeployRequestDeployType) Valid() bool {
+	switch e {
+	case DAG:
+		return true
+	case IMAGE:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateAstroIdeSessionRequestPermission.
 const (
 	UpdateAstroIdeSessionRequestPermissionREADONLY  UpdateAstroIdeSessionRequestPermission = "READ_ONLY"
@@ -129,42 +339,105 @@ func (e UpdateAstroIdeSessionRequestPermission) Valid() bool {
 	}
 }
 
+// Defines values for ListBundlesParamsType.
+const (
+	DEPLOY ListBundlesParamsType = "DEPLOY"
+)
+
+// Valid indicates whether the value is a known member of the ListBundlesParamsType enum.
+func (e ListBundlesParamsType) Valid() bool {
+	switch e {
+	case DEPLOY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListDeployStepsParamsSorts.
+const (
+	ListDeployStepsParamsSortsCreatedAtAsc  ListDeployStepsParamsSorts = "createdAt:asc"
+	ListDeployStepsParamsSortsCreatedAtDesc ListDeployStepsParamsSorts = "createdAt:desc"
+	ListDeployStepsParamsSortsEndedAtAsc    ListDeployStepsParamsSorts = "endedAt:asc"
+	ListDeployStepsParamsSortsEndedAtDesc   ListDeployStepsParamsSorts = "endedAt:desc"
+	ListDeployStepsParamsSortsStartedAtAsc  ListDeployStepsParamsSorts = "startedAt:asc"
+	ListDeployStepsParamsSortsStartedAtDesc ListDeployStepsParamsSorts = "startedAt:desc"
+	ListDeployStepsParamsSortsStatusAsc     ListDeployStepsParamsSorts = "status:asc"
+	ListDeployStepsParamsSortsStatusDesc    ListDeployStepsParamsSorts = "status:desc"
+	ListDeployStepsParamsSortsTypeAsc       ListDeployStepsParamsSorts = "type:asc"
+	ListDeployStepsParamsSortsTypeDesc      ListDeployStepsParamsSorts = "type:desc"
+	ListDeployStepsParamsSortsUpdatedAtAsc  ListDeployStepsParamsSorts = "updatedAt:asc"
+	ListDeployStepsParamsSortsUpdatedAtDesc ListDeployStepsParamsSorts = "updatedAt:desc"
+)
+
+// Valid indicates whether the value is a known member of the ListDeployStepsParamsSorts enum.
+func (e ListDeployStepsParamsSorts) Valid() bool {
+	switch e {
+	case ListDeployStepsParamsSortsCreatedAtAsc:
+		return true
+	case ListDeployStepsParamsSortsCreatedAtDesc:
+		return true
+	case ListDeployStepsParamsSortsEndedAtAsc:
+		return true
+	case ListDeployStepsParamsSortsEndedAtDesc:
+		return true
+	case ListDeployStepsParamsSortsStartedAtAsc:
+		return true
+	case ListDeployStepsParamsSortsStartedAtDesc:
+		return true
+	case ListDeployStepsParamsSortsStatusAsc:
+		return true
+	case ListDeployStepsParamsSortsStatusDesc:
+		return true
+	case ListDeployStepsParamsSortsTypeAsc:
+		return true
+	case ListDeployStepsParamsSortsTypeDesc:
+		return true
+	case ListDeployStepsParamsSortsUpdatedAtAsc:
+		return true
+	case ListDeployStepsParamsSortsUpdatedAtDesc:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListAstroIdeProjectsParamsSorts.
 const (
-	CreatedAtAsc    ListAstroIdeProjectsParamsSorts = "createdAt:asc"
-	CreatedAtDesc   ListAstroIdeProjectsParamsSorts = "createdAt:desc"
-	DescriptionAsc  ListAstroIdeProjectsParamsSorts = "description:asc"
-	DescriptionDesc ListAstroIdeProjectsParamsSorts = "description:desc"
-	IdAsc           ListAstroIdeProjectsParamsSorts = "id:asc"
-	IdDesc          ListAstroIdeProjectsParamsSorts = "id:desc"
-	NameAsc         ListAstroIdeProjectsParamsSorts = "name:asc"
-	NameDesc        ListAstroIdeProjectsParamsSorts = "name:desc"
-	UpdatedAtAsc    ListAstroIdeProjectsParamsSorts = "updatedAt:asc"
-	UpdatedAtDesc   ListAstroIdeProjectsParamsSorts = "updatedAt:desc"
+	ListAstroIdeProjectsParamsSortsCreatedAtAsc    ListAstroIdeProjectsParamsSorts = "createdAt:asc"
+	ListAstroIdeProjectsParamsSortsCreatedAtDesc   ListAstroIdeProjectsParamsSorts = "createdAt:desc"
+	ListAstroIdeProjectsParamsSortsDescriptionAsc  ListAstroIdeProjectsParamsSorts = "description:asc"
+	ListAstroIdeProjectsParamsSortsDescriptionDesc ListAstroIdeProjectsParamsSorts = "description:desc"
+	ListAstroIdeProjectsParamsSortsIdAsc           ListAstroIdeProjectsParamsSorts = "id:asc"
+	ListAstroIdeProjectsParamsSortsIdDesc          ListAstroIdeProjectsParamsSorts = "id:desc"
+	ListAstroIdeProjectsParamsSortsNameAsc         ListAstroIdeProjectsParamsSorts = "name:asc"
+	ListAstroIdeProjectsParamsSortsNameDesc        ListAstroIdeProjectsParamsSorts = "name:desc"
+	ListAstroIdeProjectsParamsSortsUpdatedAtAsc    ListAstroIdeProjectsParamsSorts = "updatedAt:asc"
+	ListAstroIdeProjectsParamsSortsUpdatedAtDesc   ListAstroIdeProjectsParamsSorts = "updatedAt:desc"
 )
 
 // Valid indicates whether the value is a known member of the ListAstroIdeProjectsParamsSorts enum.
 func (e ListAstroIdeProjectsParamsSorts) Valid() bool {
 	switch e {
-	case CreatedAtAsc:
+	case ListAstroIdeProjectsParamsSortsCreatedAtAsc:
 		return true
-	case CreatedAtDesc:
+	case ListAstroIdeProjectsParamsSortsCreatedAtDesc:
 		return true
-	case DescriptionAsc:
+	case ListAstroIdeProjectsParamsSortsDescriptionAsc:
 		return true
-	case DescriptionDesc:
+	case ListAstroIdeProjectsParamsSortsDescriptionDesc:
 		return true
-	case IdAsc:
+	case ListAstroIdeProjectsParamsSortsIdAsc:
 		return true
-	case IdDesc:
+	case ListAstroIdeProjectsParamsSortsIdDesc:
 		return true
-	case NameAsc:
+	case ListAstroIdeProjectsParamsSortsNameAsc:
 		return true
-	case NameDesc:
+	case ListAstroIdeProjectsParamsSortsNameDesc:
 		return true
-	case UpdatedAtAsc:
+	case ListAstroIdeProjectsParamsSortsUpdatedAtAsc:
 		return true
-	case UpdatedAtDesc:
+	case ListAstroIdeProjectsParamsSortsUpdatedAtDesc:
 		return true
 	default:
 		return false
@@ -300,6 +573,30 @@ type BasicSubjectProfile struct {
 // BasicSubjectProfileSubjectType defines model for BasicSubjectProfile.SubjectType.
 type BasicSubjectProfileSubjectType string
 
+// Bundle defines model for Bundle.
+type Bundle struct {
+	BundleType     *string `json:"bundleType,omitempty"`
+	CurrentVersion *string `json:"currentVersion,omitempty"`
+	DeployId       *string `json:"deployId,omitempty"`
+	DesiredVersion *string `json:"desiredVersion,omitempty"`
+	MountPath      *string `json:"mountPath,omitempty"`
+}
+
+// BundlesPaginated defines model for BundlesPaginated.
+type BundlesPaginated struct {
+	// Bundles A list of bundles in the current page.
+	Bundles []DeploymentBundle `json:"bundles"`
+
+	// Limit The maximum number of bundles in one page.
+	Limit int `json:"limit"`
+
+	// Offset The offset of the current page.
+	Offset int `json:"offset"`
+
+	// TotalCount The total number of bundles on the deployment matching the filters.
+	TotalCount int `json:"totalCount"`
+}
+
 // CreateAstroIdeProjectRequest defines model for CreateAstroIdeProjectRequest.
 type CreateAstroIdeProjectRequest struct {
 	Description   *string `json:"description,omitempty"`
@@ -330,11 +627,247 @@ type CreateAstroIdeSessionRequest struct {
 // CreateAstroIdeSessionRequestPermission defines model for CreateAstroIdeSessionRequest.Permission.
 type CreateAstroIdeSessionRequestPermission string
 
+// CreateBundleRequest defines model for CreateBundleRequest.
+type CreateBundleRequest struct {
+	// DagBundleIds Non-DAG bundles only. The DAG bundles this non-DAG bundle is served alongside. Defaults to the main DAG bundle when omitted.
+	DagBundleIds *[]string `json:"dagBundleIds,omitempty"`
+
+	// Description Free-form description for the bundle.
+	Description *string `json:"description,omitempty"`
+
+	// IsDagBundle True to create a DAG bundle (with name); false to create a non-DAG bundle (with nonDagMountPath).
+	IsDagBundle *bool `json:"isDagBundle,omitempty"`
+
+	// Name DAG bundles only. The user-facing name. Lowercase alphanumerics, dashes, and underscores; may not be "main".
+	Name *string `json:"name,omitempty"`
+
+	// NonDagBundleType Non-DAG bundles only. Free-form descriptor for the bundle (e.g. "dbt").
+	NonDagBundleType *string `json:"nonDagBundleType,omitempty"`
+
+	// NonDagMountPath Non-DAG bundles only. The absolute path the bundle is mounted at on Airflow component pods.
+	NonDagMountPath *string `json:"nonDagMountPath,omitempty"`
+
+	// Type The bundle's type. Currently always DEPLOY.
+	Type CreateBundleRequestType `json:"type"`
+}
+
+// CreateBundleRequestType The bundle's type. Currently always DEPLOY.
+type CreateBundleRequestType string
+
+// CreateDeployGitRequest defines model for CreateDeployGitRequest.
+type CreateDeployGitRequest struct {
+	Account         *string                        `json:"account,omitempty"`
+	AuthorName      *string                        `json:"authorName,omitempty"`
+	AuthorUrl       *string                        `json:"authorUrl,omitempty"`
+	AuthorUsername  *string                        `json:"authorUsername,omitempty"`
+	BeforeCommitSha *string                        `json:"beforeCommitSha,omitempty"`
+	Branch          *string                        `json:"branch,omitempty"`
+	CommitSha       string                         `json:"commitSha"`
+	CommitUrl       *string                        `json:"commitUrl,omitempty"`
+	Path            *string                        `json:"path,omitempty"`
+	Provider        CreateDeployGitRequestProvider `json:"provider"`
+	RemoteUrl       *string                        `json:"remoteUrl,omitempty"`
+	Repo            *string                        `json:"repo,omitempty"`
+}
+
+// CreateDeployGitRequestProvider defines model for CreateDeployGitRequest.Provider.
+type CreateDeployGitRequestProvider string
+
+// CreateDeployRequest defines model for CreateDeployRequest.
+type CreateDeployRequest struct {
+	BundleMountPath *string                 `json:"bundleMountPath,omitempty"`
+	BundleType      *string                 `json:"bundleType,omitempty"`
+	DagBundleName   *string                 `json:"dagBundleName,omitempty"`
+	Description     *string                 `json:"description,omitempty"`
+	Git             *CreateDeployGitRequest `json:"git,omitempty"`
+	ImageTag        *string                 `json:"imageTag,omitempty"`
+	Type            CreateDeployRequestType `json:"type"`
+}
+
+// CreateDeployRequestType defines model for CreateDeployRequest.Type.
+type CreateDeployRequestType string
+
+// Deploy defines model for Deploy.
+type Deploy struct {
+	AirflowVersion     *string              `json:"airflowVersion,omitempty"`
+	BundleMountPath    *string              `json:"bundleMountPath,omitempty"`
+	BundleUploadUrl    *string              `json:"bundleUploadUrl,omitempty"`
+	Bundles            *[]Bundle            `json:"bundles,omitempty"`
+	CreatedAt          time.Time            `json:"createdAt"`
+	CreatedBySubject   *BasicSubjectProfile `json:"createdBySubject,omitempty"`
+	DagTarballVersion  *string              `json:"dagTarballVersion,omitempty"`
+	DagsUploadUrl      *string              `json:"dagsUploadUrl,omitempty"`
+	DeploymentId       string               `json:"deploymentId"`
+	Description        *string              `json:"description,omitempty"`
+	Git                *DeployGit           `json:"git,omitempty"`
+	Id                 string               `json:"id"`
+	ImageRepository    string               `json:"imageRepository"`
+	ImageTag           string               `json:"imageTag"`
+	IsDagDeployEnabled bool                 `json:"isDagDeployEnabled"`
+	Polaris            *DeployPolaris       `json:"polaris,omitempty"`
+	RollbackFromId     *string              `json:"rollbackFromId,omitempty"`
+	RuntimeVersion     *string              `json:"runtimeVersion,omitempty"`
+	Status             DeployStatus         `json:"status"`
+	StatusReason       *string              `json:"statusReason,omitempty"`
+	Steps              *[]DeployStep        `json:"steps,omitempty"`
+	Type               DeployType           `json:"type"`
+	UpdatedAt          *time.Time           `json:"updatedAt,omitempty"`
+	UpdatedBySubject   *BasicSubjectProfile `json:"updatedBySubject,omitempty"`
+}
+
+// DeployStatus defines model for Deploy.Status.
+type DeployStatus string
+
+// DeployType defines model for Deploy.Type.
+type DeployType string
+
+// DeployDiff defines model for DeployDiff.
+type DeployDiff struct {
+	Changes      *[]DeployFieldChange `json:"changes,omitempty"`
+	DeployAfter  *Deploy              `json:"deployAfter,omitempty"`
+	DeployBefore *Deploy              `json:"deployBefore,omitempty"`
+}
+
+// DeployFieldChange defines model for DeployFieldChange.
+type DeployFieldChange struct {
+	Category *DeployFieldChangeCategory `json:"category,omitempty"`
+	Field    *string                    `json:"field,omitempty"`
+	New      *string                    `json:"new,omitempty"`
+	Old      *string                    `json:"old,omitempty"`
+}
+
+// DeployFieldChangeCategory defines model for DeployFieldChange.Category.
+type DeployFieldChangeCategory string
+
+// DeployGit defines model for DeployGit.
+type DeployGit struct {
+	Account         *string           `json:"account,omitempty"`
+	AuthorName      *string           `json:"authorName,omitempty"`
+	AuthorUrl       *string           `json:"authorUrl,omitempty"`
+	AuthorUsername  *string           `json:"authorUsername,omitempty"`
+	BeforeCommitSha *string           `json:"beforeCommitSha,omitempty"`
+	Branch          *string           `json:"branch,omitempty"`
+	CommitSha       string            `json:"commitSha"`
+	CommitUrl       *string           `json:"commitUrl,omitempty"`
+	Path            *string           `json:"path,omitempty"`
+	Provider        DeployGitProvider `json:"provider"`
+	RemoteUrl       *string           `json:"remoteUrl,omitempty"`
+	Repo            *string           `json:"repo,omitempty"`
+}
+
+// DeployGitProvider defines model for DeployGit.Provider.
+type DeployGitProvider string
+
+// DeployPolaris defines model for DeployPolaris.
+type DeployPolaris struct {
+	ProjectId   string `json:"projectId"`
+	ProjectName string `json:"projectName"`
+	VersionId   string `json:"versionId"`
+}
+
+// DeployStep defines model for DeployStep.
+type DeployStep struct {
+	CreatedAt time.Time        `json:"createdAt"`
+	EmitsLogs *bool            `json:"emitsLogs,omitempty"`
+	EndedAt   *string          `json:"endedAt,omitempty"`
+	Id        string           `json:"id"`
+	Label     *string          `json:"label,omitempty"`
+	StartedAt *string          `json:"startedAt,omitempty"`
+	Status    DeployStepStatus `json:"status"`
+	UpdatedAt time.Time        `json:"updatedAt"`
+}
+
+// DeployStepStatus defines model for DeployStep.Status.
+type DeployStepStatus string
+
+// DeployStepLogEntry defines model for DeployStepLogEntry.
+type DeployStepLogEntry struct {
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// DeployStepLogsPaginated defines model for DeployStepLogsPaginated.
+type DeployStepLogsPaginated struct {
+	Entries    []DeployStepLogEntry `json:"entries"`
+	Limit      int                  `json:"limit"`
+	Offset     int                  `json:"offset"`
+	SearchId   string               `json:"searchId"`
+	TotalCount int                  `json:"totalCount"`
+}
+
+// DeployStepsPaginated defines model for DeployStepsPaginated.
+type DeployStepsPaginated struct {
+	DeploySteps []DeployStep `json:"deploySteps"`
+	Limit       int          `json:"limit"`
+	Offset      int          `json:"offset"`
+	TotalCount  int          `json:"totalCount"`
+}
+
+// DeploymentBundle defines model for DeploymentBundle.
+type DeploymentBundle struct {
+	// CreatedAt The time when the bundle was created in UTC.
+	CreatedAt time.Time `json:"createdAt"`
+
+	// CurrentVersion The tarball version most recently reported as running on the deployment. Lags desiredVersion until the new version has rolled out.
+	CurrentVersion *string `json:"currentVersion,omitempty"`
+
+	// DagBundleIds For non-DAG bundles, the ids of the DAG bundles this non-DAG bundle is served alongside. A non-DAG bundle is associated with at least one DAG bundle.
+	DagBundleIds *[]string `json:"dagBundleIds,omitempty"`
+
+	// DeletionIsPending True when a delete request has been accepted but the bundle has not yet been pruned from the deployment.
+	DeletionIsPending *bool `json:"deletionIsPending,omitempty"`
+
+	// DesiredVersion The tarball version the deployment is configured to run. Absent until the first deploy finalize.
+	DesiredVersion *string `json:"desiredVersion,omitempty"`
+
+	// Id The bundle's ID.
+	Id string `json:"id"`
+
+	// IsDagBundle True when this bundle carries DAGs; false for a non-DAG payload (dbt project, includes, etc.).
+	IsDagBundle *bool `json:"isDagBundle,omitempty"`
+
+	// Name DAG bundles only. The user-facing name (e.g. "main").
+	Name *string `json:"name,omitempty"`
+
+	// NonDagBundleType Non-DAG bundles only. Free-form descriptor captured at first deploy (e.g. "dbt").
+	NonDagBundleType *string `json:"nonDagBundleType,omitempty"`
+
+	// NonDagMountPath Non-DAG bundles only. The path the bundle is mounted at on Airflow component pods.
+	NonDagMountPath *string `json:"nonDagMountPath,omitempty"`
+
+	// Type The bundle's type. Currently always DEPLOY.
+	Type DeploymentBundleType `json:"type"`
+
+	// UpdatedAt The time when the bundle was last updated in UTC.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// DeploymentBundleType The bundle's type. Currently always DEPLOY.
+type DeploymentBundleType string
+
+// DeploysPaginated defines model for DeploysPaginated.
+type DeploysPaginated struct {
+	Deploys    []Deploy `json:"deploys"`
+	Limit      int      `json:"limit"`
+	Offset     int      `json:"offset"`
+	TotalCount int      `json:"totalCount"`
+}
+
 // Error defines model for Error.
 type Error struct {
-	Message    string `json:"message"`
-	RequestId  string `json:"requestId"`
-	StatusCode int    `json:"statusCode"`
+	// FieldErrors FieldErrors carries one entry per failed request-validation constraint.
+	// Only present on 400 responses caused by request binding/validation.
+	FieldErrors *[]FieldValidationError `json:"fieldErrors,omitempty"`
+	Message     string                  `json:"message"`
+	RequestId   string                  `json:"requestId"`
+	StatusCode  int                     `json:"statusCode"`
+}
+
+// FieldValidationError defines model for FieldValidationError.
+type FieldValidationError struct {
+	Code    string `json:"code"`
+	Field   string `json:"field"`
+	Message string `json:"message"`
 }
 
 // ImportAstroIdeSession defines model for ImportAstroIdeSession.
@@ -353,6 +886,21 @@ type SaveAstroIdeSessionRequest struct {
 	NewRemoteBranch *string `json:"newRemoteBranch,omitempty"`
 }
 
+// TriggerGitDeployRequest defines model for TriggerGitDeployRequest.
+type TriggerGitDeployRequest struct {
+	// BeforeSha The commit before the deploy commit for inferring the deploy type. Can be multiple commits prior to the deploy commit. If not provided uses the parent commit where there is exactly one, otherwise infers an image deploy.
+	BeforeSha *string `json:"beforeSha,omitempty"`
+
+	// DeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
+	DeployType *TriggerGitDeployRequestDeployType `json:"deployType,omitempty"`
+
+	// Sha The commit of the deployment's repository to deploy. If not provided uses the most recent commit on the deployment's branch
+	Sha *string `json:"sha,omitempty"`
+}
+
+// TriggerGitDeployRequestDeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
+type TriggerGitDeployRequestDeployType string
+
 // UpdateAstroIdeSessionRequest defines model for UpdateAstroIdeSessionRequest.
 type UpdateAstroIdeSessionRequest struct {
 	Permission UpdateAstroIdeSessionRequestPermission `json:"permission"`
@@ -360,6 +908,90 @@ type UpdateAstroIdeSessionRequest struct {
 
 // UpdateAstroIdeSessionRequestPermission defines model for UpdateAstroIdeSessionRequest.Permission.
 type UpdateAstroIdeSessionRequestPermission string
+
+// UpdateBundleRequest defines model for UpdateBundleRequest.
+type UpdateBundleRequest struct {
+	// DagBundleIds Non-DAG bundles only. Wholesale-replaces the set of DAG bundles this non-DAG bundle is served alongside. Must be non-empty.
+	DagBundleIds *[]string `json:"dagBundleIds,omitempty"`
+
+	// Description Free-form description. Updateable on any bundle.
+	Description *string `json:"description,omitempty"`
+}
+
+// ListBundlesParams defines parameters for ListBundles.
+type ListBundlesParams struct {
+	// IsDagBundle Filter on whether the bundle carries DAGs (true = DAG bundle, false = non-DAG).
+	IsDagBundle *bool `form:"isDagBundle,omitempty" json:"isDagBundle,omitempty"`
+
+	// Type Filter on bundle type.
+	Type *ListBundlesParamsType `form:"type,omitempty" json:"type,omitempty"`
+
+	// Offset The number of results to skip before returning values.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit The maximum number of results to return.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListBundlesParamsType defines parameters for ListBundles.
+type ListBundlesParamsType string
+
+// ListDeploysParams defines parameters for ListDeploys.
+type ListDeploysParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Search string to search for when listing deploys
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// SubjectId ID of the subject for the deploys
+	SubjectId *string `form:"subjectId,omitempty" json:"subjectId,omitempty"`
+}
+
+// GetDeployDiffParams defines parameters for GetDeployDiff.
+type GetDeployDiffParams struct {
+	// DeployIdBefore deploy ID before (earlier deploy)
+	DeployIdBefore string `form:"deployIdBefore" json:"deployIdBefore"`
+
+	// DeployIdAfter deploy ID after (later deploy)
+	DeployIdAfter string `form:"deployIdAfter" json:"deployIdAfter"`
+}
+
+// GetDeployParams defines parameters for GetDeploy.
+type GetDeployParams struct {
+	// IncludeSteps whether to include the deploy steps
+	IncludeSteps *bool `form:"includeSteps,omitempty" json:"includeSteps,omitempty"`
+}
+
+// ListDeployStepsParams defines parameters for ListDeploySteps.
+type ListDeployStepsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListDeployStepsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListDeployStepsParamsSorts defines parameters for ListDeploySteps.
+type ListDeployStepsParamsSorts string
+
+// ListDeployStepLogsParams defines parameters for ListDeployStepLogs.
+type ListDeployStepLogsParams struct {
+	// Limit limit of the count of the logs
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset offset of the log entries
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// SearchId searchId to get logs from
+	SearchId *string `form:"searchId,omitempty" json:"searchId,omitempty"`
+}
 
 // ListAstroIdeProjectsParams defines parameters for ListAstroIdeProjects.
 type ListAstroIdeProjectsParams struct {
@@ -417,6 +1049,18 @@ type ImportAstroIdeSessionZipParams struct {
 
 // ImportAstroIdeSessionZipParamsMode defines parameters for ImportAstroIdeSessionZip.
 type ImportAstroIdeSessionZipParamsMode string
+
+// CreateBundleJSONRequestBody defines body for CreateBundle for application/json ContentType.
+type CreateBundleJSONRequestBody = CreateBundleRequest
+
+// UpdateBundleJSONRequestBody defines body for UpdateBundle for application/json ContentType.
+type UpdateBundleJSONRequestBody = UpdateBundleRequest
+
+// TriggerGitDeployJSONRequestBody defines body for TriggerGitDeploy for application/json ContentType.
+type TriggerGitDeployJSONRequestBody = TriggerGitDeployRequest
+
+// CreateDeployJSONRequestBody defines body for CreateDeploy for application/json ContentType.
+type CreateDeployJSONRequestBody = CreateDeployRequest
 
 // CreateAstroIdeProjectJSONRequestBody defines body for CreateAstroIdeProject for application/json ContentType.
 type CreateAstroIdeProjectJSONRequestBody = CreateAstroIdeProjectRequest
@@ -503,6 +1147,50 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// ListBundles request
+	ListBundles(ctx context.Context, organizationId string, deploymentId string, params *ListBundlesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBundleWithBody request with any body
+	CreateBundleWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateBundle(ctx context.Context, organizationId string, deploymentId string, body CreateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBundle request
+	DeleteBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBundle request
+	GetBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBundleWithBody request with any body
+	UpdateBundleWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TriggerGitDeployWithBody request with any body
+	TriggerGitDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	TriggerGitDeploy(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeploys request
+	ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDeployWithBody request with any body
+	CreateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeployDiff request
+	GetDeployDiff(ctx context.Context, organizationId string, deploymentId string, params *GetDeployDiffParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploy request
+	GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeploySteps request
+	ListDeploySteps(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDeployStepLogs request
+	ListDeployStepLogs(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAstroIdeProjects request
 	ListAstroIdeProjects(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -540,6 +1228,198 @@ type ClientInterface interface {
 	UpdateAstroIdeSessionWithBody(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateAstroIdeSession(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) ListBundles(ctx context.Context, organizationId string, deploymentId string, params *ListBundlesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListBundlesRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateBundleWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBundleRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateBundle(ctx context.Context, organizationId string, deploymentId string, body CreateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBundleRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBundleRequest(c.Server, organizationId, deploymentId, bundleId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBundleRequest(c.Server, organizationId, deploymentId, bundleId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateBundleWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBundleRequestWithBody(c.Server, organizationId, deploymentId, bundleId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBundleRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TriggerGitDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTriggerGitDeployRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TriggerGitDeploy(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTriggerGitDeployRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploys(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeploysRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployRequestWithBody(c.Server, organizationId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploy(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeployRequest(c.Server, organizationId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeployDiff(ctx context.Context, organizationId string, deploymentId string, params *GetDeployDiffParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeployDiffRequest(c.Server, organizationId, deploymentId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploy(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeployRequest(c.Server, organizationId, deploymentId, deployId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeploySteps(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeployStepsRequest(c.Server, organizationId, deploymentId, deployId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListDeployStepLogs(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDeployStepLogsRequest(c.Server, organizationId, deploymentId, deployId, deployStepId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) ListAstroIdeProjects(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -708,6 +1588,899 @@ func (c *Client) UpdateAstroIdeSession(ctx context.Context, organizationId strin
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListBundlesRequest generates requests for ListBundles
+func NewListBundlesRequest(server string, organizationId string, deploymentId string, params *ListBundlesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IsDagBundle != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "isDagBundle", *params.IsDagBundle, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Type != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "type", *params.Type, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateBundleRequest calls the generic CreateBundle builder with application/json body
+func NewCreateBundleRequest(server string, organizationId string, deploymentId string, body CreateBundleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBundleRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewCreateBundleRequestWithBody generates requests for CreateBundle with any type of body
+func NewCreateBundleRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBundleRequest generates requests for DeleteBundle
+func NewDeleteBundleRequest(server string, organizationId string, deploymentId string, bundleId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBundleRequest generates requests for GetBundle
+func NewGetBundleRequest(server string, organizationId string, deploymentId string, bundleId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateBundleRequest calls the generic UpdateBundle builder with application/json body
+func NewUpdateBundleRequest(server string, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateBundleRequestWithBody(server, organizationId, deploymentId, bundleId, "application/json", bodyReader)
+}
+
+// NewUpdateBundleRequestWithBody generates requests for UpdateBundle with any type of body
+func NewUpdateBundleRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewTriggerGitDeployRequest calls the generic TriggerGitDeploy builder with application/json body
+func NewTriggerGitDeployRequest(server string, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewTriggerGitDeployRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewTriggerGitDeployRequestWithBody generates requests for TriggerGitDeploy with any type of body
+func NewTriggerGitDeployRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploy-git", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListDeploysRequest generates requests for ListDeploys
+func NewListDeploysRequest(server string, organizationId string, deploymentId string, params *ListDeploysParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "search", *params.Search, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SubjectId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "subjectId", *params.SubjectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateDeployRequest calls the generic CreateDeploy builder with application/json body
+func NewCreateDeployRequest(server string, organizationId string, deploymentId string, body CreateDeployJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDeployRequestWithBody(server, organizationId, deploymentId, "application/json", bodyReader)
+}
+
+// NewCreateDeployRequestWithBody generates requests for CreateDeploy with any type of body
+func NewCreateDeployRequestWithBody(server string, organizationId string, deploymentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetDeployDiffRequest generates requests for GetDeployDiff
+func NewGetDeployDiffRequest(server string, organizationId string, deploymentId string, params *GetDeployDiffParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/diff", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "deployIdBefore", params.DeployIdBefore, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "deployIdAfter", params.DeployIdAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDeployRequest generates requests for GetDeploy
+func NewGetDeployRequest(server string, organizationId string, deploymentId string, deployId string, params *GetDeployParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deployId", deployId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.IncludeSteps != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "includeSteps", *params.IncludeSteps, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDeployStepsRequest generates requests for ListDeploySteps
+func NewListDeployStepsRequest(server string, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deployId", deployId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/steps", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Sorts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sorts", *params.Sorts, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListDeployStepLogsRequest generates requests for ListDeployStepLogs
+func NewListDeployStepLogsRequest(server string, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "deployId", deployId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithOptions("simple", false, "deployStepId", deployStepId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/deploys/%s/steps/%s/logs", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SearchId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "searchId", *params.SearchId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewListAstroIdeProjectsRequest generates requests for ListAstroIdeProjects
@@ -1523,6 +3296,50 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// ListBundlesWithResponse request
+	ListBundlesWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListBundlesParams, reqEditors ...RequestEditorFn) (*ListBundlesResponse, error)
+
+	// CreateBundleWithBodyWithResponse request with any body
+	CreateBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBundleResponse, error)
+
+	CreateBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBundleResponse, error)
+
+	// DeleteBundleWithResponse request
+	DeleteBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*DeleteBundleResponse, error)
+
+	// GetBundleWithResponse request
+	GetBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*GetBundleResponse, error)
+
+	// UpdateBundleWithBodyWithResponse request with any body
+	UpdateBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBundleResponse, error)
+
+	UpdateBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBundleResponse, error)
+
+	// TriggerGitDeployWithBodyWithResponse request with any body
+	TriggerGitDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error)
+
+	TriggerGitDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error)
+
+	// ListDeploysWithResponse request
+	ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error)
+
+	// CreateDeployWithBodyWithResponse request with any body
+	CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
+
+	CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error)
+
+	// GetDeployDiffWithResponse request
+	GetDeployDiffWithResponse(ctx context.Context, organizationId string, deploymentId string, params *GetDeployDiffParams, reqEditors ...RequestEditorFn) (*GetDeployDiffResponse, error)
+
+	// GetDeployWithResponse request
+	GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*GetDeployResponse, error)
+
+	// ListDeployStepsWithResponse request
+	ListDeployStepsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*ListDeployStepsResponse, error)
+
+	// ListDeployStepLogsWithResponse request
+	ListDeployStepLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*ListDeployStepLogsResponse, error)
+
 	// ListAstroIdeProjectsWithResponse request
 	ListAstroIdeProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*ListAstroIdeProjectsResponse, error)
 
@@ -1560,6 +3377,328 @@ type ClientWithResponsesInterface interface {
 	UpdateAstroIdeSessionWithBodyWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error)
 
 	UpdateAstroIdeSessionWithResponse(ctx context.Context, organizationId string, workspaceId string, projectId string, sessionId string, body UpdateAstroIdeSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAstroIdeSessionResponse, error)
+}
+
+type ListBundlesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundlesPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListBundlesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListBundlesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateBundleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentBundle
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteBundleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetBundleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentBundle
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateBundleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentBundle
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type TriggerGitDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r TriggerGitDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TriggerGitDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeploysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploysPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeploysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeploysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeployDiffResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeployDiff
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeployDiffResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeployDiffResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeployResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Deploy
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeployResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeployResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeployStepsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeployStepsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeployStepsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeployStepsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListDeployStepLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeployStepLogsPaginated
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON405      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDeployStepLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDeployStepLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type ListAstroIdeProjectsResponse struct {
@@ -1806,6 +3945,146 @@ func (r UpdateAstroIdeSessionResponse) StatusCode() int {
 	return 0
 }
 
+// ListBundlesWithResponse request returning *ListBundlesResponse
+func (c *ClientWithResponses) ListBundlesWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListBundlesParams, reqEditors ...RequestEditorFn) (*ListBundlesResponse, error) {
+	rsp, err := c.ListBundles(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListBundlesResponse(rsp)
+}
+
+// CreateBundleWithBodyWithResponse request with arbitrary body returning *CreateBundleResponse
+func (c *ClientWithResponses) CreateBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBundleResponse, error) {
+	rsp, err := c.CreateBundleWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBundleResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBundleResponse, error) {
+	rsp, err := c.CreateBundle(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBundleResponse(rsp)
+}
+
+// DeleteBundleWithResponse request returning *DeleteBundleResponse
+func (c *ClientWithResponses) DeleteBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*DeleteBundleResponse, error) {
+	rsp, err := c.DeleteBundle(ctx, organizationId, deploymentId, bundleId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBundleResponse(rsp)
+}
+
+// GetBundleWithResponse request returning *GetBundleResponse
+func (c *ClientWithResponses) GetBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...RequestEditorFn) (*GetBundleResponse, error) {
+	rsp, err := c.GetBundle(ctx, organizationId, deploymentId, bundleId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBundleResponse(rsp)
+}
+
+// UpdateBundleWithBodyWithResponse request with arbitrary body returning *UpdateBundleResponse
+func (c *ClientWithResponses) UpdateBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBundleResponse, error) {
+	rsp, err := c.UpdateBundleWithBody(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBundleResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBundleResponse, error) {
+	rsp, err := c.UpdateBundle(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBundleResponse(rsp)
+}
+
+// TriggerGitDeployWithBodyWithResponse request with arbitrary body returning *TriggerGitDeployResponse
+func (c *ClientWithResponses) TriggerGitDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error) {
+	rsp, err := c.TriggerGitDeployWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTriggerGitDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) TriggerGitDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error) {
+	rsp, err := c.TriggerGitDeploy(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTriggerGitDeployResponse(rsp)
+}
+
+// ListDeploysWithResponse request returning *ListDeploysResponse
+func (c *ClientWithResponses) ListDeploysWithResponse(ctx context.Context, organizationId string, deploymentId string, params *ListDeploysParams, reqEditors ...RequestEditorFn) (*ListDeploysResponse, error) {
+	rsp, err := c.ListDeploys(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeploysResponse(rsp)
+}
+
+// CreateDeployWithBodyWithResponse request with arbitrary body returning *CreateDeployResponse
+func (c *ClientWithResponses) CreateDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error) {
+	rsp, err := c.CreateDeployWithBody(ctx, organizationId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeployResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, body CreateDeployJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeployResponse, error) {
+	rsp, err := c.CreateDeploy(ctx, organizationId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeployResponse(rsp)
+}
+
+// GetDeployDiffWithResponse request returning *GetDeployDiffResponse
+func (c *ClientWithResponses) GetDeployDiffWithResponse(ctx context.Context, organizationId string, deploymentId string, params *GetDeployDiffParams, reqEditors ...RequestEditorFn) (*GetDeployDiffResponse, error) {
+	rsp, err := c.GetDeployDiff(ctx, organizationId, deploymentId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeployDiffResponse(rsp)
+}
+
+// GetDeployWithResponse request returning *GetDeployResponse
+func (c *ClientWithResponses) GetDeployWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *GetDeployParams, reqEditors ...RequestEditorFn) (*GetDeployResponse, error) {
+	rsp, err := c.GetDeploy(ctx, organizationId, deploymentId, deployId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeployResponse(rsp)
+}
+
+// ListDeployStepsWithResponse request returning *ListDeployStepsResponse
+func (c *ClientWithResponses) ListDeployStepsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, params *ListDeployStepsParams, reqEditors ...RequestEditorFn) (*ListDeployStepsResponse, error) {
+	rsp, err := c.ListDeploySteps(ctx, organizationId, deploymentId, deployId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeployStepsResponse(rsp)
+}
+
+// ListDeployStepLogsWithResponse request returning *ListDeployStepLogsResponse
+func (c *ClientWithResponses) ListDeployStepLogsWithResponse(ctx context.Context, organizationId string, deploymentId string, deployId string, deployStepId string, params *ListDeployStepLogsParams, reqEditors ...RequestEditorFn) (*ListDeployStepLogsResponse, error) {
+	rsp, err := c.ListDeployStepLogs(ctx, organizationId, deploymentId, deployId, deployStepId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDeployStepLogsResponse(rsp)
+}
+
 // ListAstroIdeProjectsWithResponse request returning *ListAstroIdeProjectsResponse
 func (c *ClientWithResponses) ListAstroIdeProjectsWithResponse(ctx context.Context, organizationId string, workspaceId string, params *ListAstroIdeProjectsParams, reqEditors ...RequestEditorFn) (*ListAstroIdeProjectsResponse, error) {
 	rsp, err := c.ListAstroIdeProjects(ctx, organizationId, workspaceId, params, reqEditors...)
@@ -1926,6 +4205,724 @@ func (c *ClientWithResponses) UpdateAstroIdeSessionWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseUpdateAstroIdeSessionResponse(rsp)
+}
+
+// ParseListBundlesResponse parses an HTTP response from a ListBundlesWithResponse call
+func ParseListBundlesResponse(rsp *http.Response) (*ListBundlesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListBundlesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundlesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateBundleResponse parses an HTTP response from a CreateBundleWithResponse call
+func ParseCreateBundleResponse(rsp *http.Response) (*CreateBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentBundle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBundleResponse parses an HTTP response from a DeleteBundleWithResponse call
+func ParseDeleteBundleResponse(rsp *http.Response) (*DeleteBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBundleResponse parses an HTTP response from a GetBundleWithResponse call
+func ParseGetBundleResponse(rsp *http.Response) (*GetBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentBundle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateBundleResponse parses an HTTP response from a UpdateBundleWithResponse call
+func ParseUpdateBundleResponse(rsp *http.Response) (*UpdateBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentBundle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTriggerGitDeployResponse parses an HTTP response from a TriggerGitDeployWithResponse call
+func ParseTriggerGitDeployResponse(rsp *http.Response) (*TriggerGitDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TriggerGitDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeploysResponse parses an HTTP response from a ListDeploysWithResponse call
+func ParseListDeploysResponse(rsp *http.Response) (*ListDeploysResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeploysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploysPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateDeployResponse parses an HTTP response from a CreateDeployWithResponse call
+func ParseCreateDeployResponse(rsp *http.Response) (*CreateDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeployDiffResponse parses an HTTP response from a GetDeployDiffWithResponse call
+func ParseGetDeployDiffResponse(rsp *http.Response) (*GetDeployDiffResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeployDiffResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeployDiff
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeployResponse parses an HTTP response from a GetDeployWithResponse call
+func ParseGetDeployResponse(rsp *http.Response) (*GetDeployResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeployResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Deploy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeployStepsResponse parses an HTTP response from a ListDeployStepsWithResponse call
+func ParseListDeployStepsResponse(rsp *http.Response) (*ListDeployStepsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeployStepsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeployStepsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDeployStepLogsResponse parses an HTTP response from a ListDeployStepLogsWithResponse call
+func ParseListDeployStepLogsResponse(rsp *http.Response) (*ListDeployStepLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeployStepLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeployStepLogsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListAstroIdeProjectsResponse parses an HTTP response from a ListAstroIdeProjectsWithResponse call
