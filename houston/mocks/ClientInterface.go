@@ -134,6 +134,36 @@ func (_m *ClientInterface) AddWorkspaceUser(req houston.AddWorkspaceUserRequest)
 	return r0, r1
 }
 
+// AdoptDeployment provides a mock function with given fields: req
+func (_m *ClientInterface) AdoptDeployment(req *houston.AdoptDeploymentRequest) (*houston.Deployment, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdoptDeployment")
+	}
+
+	var r0 *houston.Deployment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*houston.AdoptDeploymentRequest) (*houston.Deployment, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(*houston.AdoptDeploymentRequest) *houston.Deployment); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Deployment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*houston.AdoptDeploymentRequest) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AuthenticateWithBasicAuth provides a mock function with given fields: req
 func (_m *ClientInterface) AuthenticateWithBasicAuth(req houston.BasicAuthRequest) (string, error) {
 	ret := _m.Called(req)
@@ -1374,6 +1404,36 @@ func (_m *ClientInterface) RemoveDeploymentTeam(req houston.RemoveDeploymentTeam
 	}
 
 	if rf, ok := ret.Get(1).(func(houston.RemoveDeploymentTeamRequest) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UnadoptDeployment provides a mock function with given fields: req
+func (_m *ClientInterface) UnadoptDeployment(req houston.UnadoptDeploymentRequest) (*houston.Deployment, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UnadoptDeployment")
+	}
+
+	var r0 *houston.Deployment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(houston.UnadoptDeploymentRequest) (*houston.Deployment, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(houston.UnadoptDeploymentRequest) *houston.Deployment); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Deployment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(houston.UnadoptDeploymentRequest) error); ok {
 		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
