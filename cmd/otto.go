@@ -91,5 +91,10 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 	if errors.Is(err, otto.ErrNotLoggedIn) {
 		os.Exit(1)
 	}
+	// Start already printed org-mismatch guidance to stderr; exit quietly so
+	// cobra doesn't tack on a redundant "Error: ..." line.
+	if errors.Is(err, otto.ErrNotOrgMember) {
+		os.Exit(1)
+	}
 	return err
 }
