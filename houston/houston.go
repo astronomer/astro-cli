@@ -53,6 +53,8 @@ type ClientInterface interface {
 	// deployment
 	CreateDeployment(vars map[string]interface{}) (*Deployment, error)
 	DeleteDeployment(req DeleteDeploymentRequest) (*Deployment, error)
+	AdoptDeployment(req *AdoptDeploymentRequest) (*Deployment, error)
+	UnadoptDeployment(req UnadoptDeploymentRequest) (*Deployment, error)
 	ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error)
 	UpdateDeployment(variables map[string]interface{}) (*Deployment, error)
 	GetDeployment(deploymentID string) (*Deployment, error)

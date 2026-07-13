@@ -169,6 +169,114 @@ func (s *Suite) TestDeleteDeployment() {
 	})
 }
 
+func (s *Suite) TestAdoptDeployment() {
+	testUtil.InitTestConfig("software")
+
+	mockDeployment := &Response{
+		Data: ResponseData{
+			AdoptDeployment: &Deployment{
+				ID:          "deployment-test-id",
+				Label:       "test deployment",
+				ReleaseName: "prod-airflow-4",
+				Namespace:   "airflow-prod4",
+				ClusterID:   "cluster-test-id",
+				Workspace: Workspace{
+					ID: "test-workspace-id",
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockDeployment)
+	s.NoError(err)
+
+	req := &AdoptDeploymentRequest{
+		WorkspaceID:             "test-workspace-id",
+		ClusterID:               "cluster-test-id",
+		CRNamespace:             "airflow-prod4",
+		CRName:                  "prod-airflow-4",
+		AcceptIncompatibilities: true,
+	}
+
+	s.Run("success", func() {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.AdoptDeployment(req)
+		s.NoError(err)
+		s.Equal(deployment, mockDeployment.Data.AdoptDeployment)
+	})
+
+	s.Run("error", func() {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.AdoptDeployment(req)
+		s.Contains(err.Error(), "Internal Server Error")
+	})
+}
+
+func (s *Suite) TestUnadoptDeployment() {
+	testUtil.InitTestConfig("software")
+
+	mockDeployment := &Response{
+		Data: ResponseData{
+			UnadoptDeployment: &Deployment{
+				ID:          "deployment-test-id",
+				Label:       "test deployment",
+				ReleaseName: "prod-airflow-4",
+				Namespace:   "airflow-prod4",
+				ClusterID:   "cluster-test-id",
+				Workspace: Workspace{
+					ID: "test-workspace-id",
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockDeployment)
+	s.NoError(err)
+
+	s.Run("success", func() {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.UnadoptDeployment(UnadoptDeploymentRequest{DeploymentID: "deployment-test-id"})
+		s.NoError(err)
+		s.Equal(deployment, mockDeployment.Data.UnadoptDeployment)
+	})
+
+	s.Run("error", func() {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.UnadoptDeployment(UnadoptDeploymentRequest{DeploymentID: "deployment-test-id"})
+		s.Contains(err.Error(), "Internal Server Error")
+	})
+}
+
 func (s *Suite) TestListDeployments() {
 	testUtil.InitTestConfig("software")
 

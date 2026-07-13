@@ -37,6 +37,24 @@ type DeleteDeploymentRequest struct {
 	HardDelete   bool   `json:"deploymentHardDelete"`
 }
 
+// AdoptDeploymentRequest - properties to adopt an existing operator-managed Airflow custom resource
+type AdoptDeploymentRequest struct {
+	WorkspaceID             string `json:"workspaceId"`
+	ClusterID               string `json:"clusterId"`
+	CRNamespace             string `json:"crNamespace"`
+	CRName                  string `json:"crName"`
+	Label                   string `json:"label"`
+	Description             string `json:"description"`
+	UseApcLogging           bool   `json:"useApcLogging"`
+	UseApcRegistry          bool   `json:"useApcRegistry"`
+	AcceptIncompatibilities bool   `json:"acceptIncompatibilities"`
+}
+
+// UnadoptDeploymentRequest - properties to release an adopted deployment back to operator-only management
+type UnadoptDeploymentRequest struct {
+	DeploymentID string `json:"deploymentId"`
+}
+
 var (
 	DeploymentCreateRequest = queryList{
 		{
@@ -752,6 +770,60 @@ var (
 		}
 	}`
 
+	AdoptDeploymentRequestMutation = `
+	mutation AdoptDeployment(
+		$workspaceId: Uuid!
+		$clusterId: Uuid!
+		$crNamespace: String!
+		$crName: String!
+		$label: String
+		$description: String
+		$useApcLogging: Boolean
+		$useApcRegistry: Boolean
+		$acceptIncompatibilities: Boolean
+	){
+		adoptDeployment(
+			workspaceUuid: $workspaceId
+			clusterId: $clusterId
+			crNamespace: $crNamespace
+			crName: $crName
+			label: $label
+			description: $description
+			useApcLogging: $useApcLogging
+			useApcRegistry: $useApcRegistry
+			acceptIncompatibilities: $acceptIncompatibilities
+		){
+			id
+			label
+			releaseName
+			namespace
+			clusterId
+			workspace {
+				id
+			}
+			createdAt
+			updatedAt
+		}
+	}`
+
+	UnadoptDeploymentRequestMutation = `
+	mutation UnadoptDeployment(
+		$deploymentId: Uuid!
+	){
+		unadoptDeployment(
+			deploymentUuid: $deploymentId
+		){
+			id
+			label
+			releaseName
+			namespace
+			clusterId
+			workspace {
+				id
+			}
+		}
+	}`
+
 	UpdateDeploymentAirflowRequest = `
 	mutation updateDeploymentAirflow($deploymentId: Uuid!, $desiredAirflowVersion: String!) {
 		updateDeploymentAirflow(deploymentUuid: $deploymentId, desiredAirflowVersion: $desiredAirflowVersion) {
@@ -928,6 +1000,36 @@ func (h ClientImplementation) DeleteDeployment(request DeleteDeploymentRequest) 
 	}
 
 	return res.Data.DeleteDeployment, nil
+}
+
+// AdoptDeployment - adopt an existing operator-managed Airflow custom resource into Houston
+func (h ClientImplementation) AdoptDeployment(request *AdoptDeploymentRequest) (*Deployment, error) {
+	req := Request{
+		Query:     AdoptDeploymentRequestMutation,
+		Variables: request,
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return res.Data.AdoptDeployment, nil
+}
+
+// UnadoptDeployment - release an adopted deployment back to operator-only management
+func (h ClientImplementation) UnadoptDeployment(request UnadoptDeploymentRequest) (*Deployment, error) {
+	req := Request{
+		Query:     UnadoptDeploymentRequestMutation,
+		Variables: request,
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return res.Data.UnadoptDeployment, nil
 }
 
 // ListDeployments - List deployments from the API

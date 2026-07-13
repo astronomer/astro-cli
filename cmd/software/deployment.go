@@ -18,11 +18,12 @@ const (
 	k8sExecutorArg        = "k8s"
 
 	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
+	cliDeploymentUnadoptPrompt                 = "\nWarning: This permanently removes the Deployment record from APC. The Airflow custom resource, its namespace, and its metadata database are left untouched, but this action cannot be undone from the CLI. Proceed with unadopt?"
 	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
 	continueSubMsg                             = " for more details. Do you want to continue?"
-	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
-	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DagDeployDocsLink + continueSubMsg
-	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the Software documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
+	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the APC documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
 	SkipUserPromptMsgForCreateDeployment       = "Skip user confirmation prompt for creating a deployment with type: dag_deploy (experimental feature)"
 	SkipUserPromptMsgForUpdateDeployment       = "Skip user confirmation prompt for updating the deployment type to/from dag_deploy (experimental feature)"
 )
@@ -57,6 +58,21 @@ var (
 	runtimeVersion          string
 	desiredRuntimeVersion   string
 	clusterID               string
+
+	adoptName                    string
+	adoptNamespace               string
+	adoptLabel                   string
+	adoptDescription             string
+	adoptUseApcLogging           bool
+	adoptUseApcRegistry          bool
+	adoptAcceptIncompatibilities bool
+
+	deploymentAdoptExample = `
+$ astro deployment adopt --cluster-id=<cluster-id> --name=<cr-name> --namespace=<cr-namespace> --workspace-id=<workspace-id>
+`
+	deploymentUnadoptExample = `
+$ astro deployment unadopt --deployment-id=<deployment-id>
+`
 	deploymentCreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
 $ astro deployment create --label=new-deployment-name --executor=celery
@@ -124,6 +140,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentListCmd(out),
 		newDeploymentUpdateCmd(out),
 		newDeploymentDeleteCmd(out),
+		newDeploymentAdoptCmd(out),
+		newDeploymentUnadoptCmd(out),
 		newLogsCmd(out),
 		newDeploymentSaRootCmd(out),
 		newDeploymentUserRootCmd(out),
@@ -229,6 +247,45 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	// pass --hard keep working; remove it in a future major release.
 	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deprecated: deletions always remove all infrastructure and records for the Deployment")
 	_ = cmd.Flags().MarkDeprecated("hard", "deletions are always hard deletes; the --hard flag no longer has any effect")
+	return cmd
+}
+
+func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "adopt",
+		Short:   "Adopt an existing operator-managed Airflow custom resource into APC",
+		Long:    "Adopt an existing operator-managed Airflow custom resource into APC. The custom resource, its namespace, and its metadata database are left untouched; adopting only creates the corresponding Deployment record in APC.",
+		Example: deploymentAdoptExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentAdopt(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
+	cmd.Flags().StringVarP(&adoptName, "name", "", "", "metadata.name of the existing Airflow custom resource (CR)")
+	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
+	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --name value")
+	cmd.Flags().StringVarP(&adoptDescription, "description", "", "", "Description for the adopted Deployment")
+	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
+	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
+	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
+	_ = cmd.MarkFlagRequired("cluster-id")
+	_ = cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("namespace")
+	return cmd
+}
+
+func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "unadopt",
+		Short:   "Release an adopted Deployment back to operator-only management",
+		Long:    "Release an adopted Deployment back to operator-only management. The Airflow custom resource, its namespace, and its metadata database are left untouched; only the APC Deployment record is removed.",
+		Example: deploymentUnadoptExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentUnadopt(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the adopted Deployment to release")
+	_ = cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
 
@@ -495,6 +552,41 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 		return nil
 	}
 	return deployment.Delete(args[0], true, houstonClient, out)
+}
+
+func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	req := &houston.AdoptDeploymentRequest{
+		WorkspaceID:             ws,
+		ClusterID:               clusterID,
+		CRNamespace:             adoptNamespace,
+		CRName:                  adoptName,
+		Label:                   adoptLabel,
+		Description:             adoptDescription,
+		UseApcLogging:           adoptUseApcLogging,
+		UseApcRegistry:          adoptUseApcRegistry,
+		AcceptIncompatibilities: adoptAcceptIncompatibilities,
+	}
+	return deployment.Adopt(req, houstonClient, out)
+}
+
+func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	i, _ := input.Confirm(cliDeploymentUnadoptPrompt)
+	if !i {
+		fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
+		return nil
+	}
+	return deployment.Unadopt(deploymentID, houstonClient, out)
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
