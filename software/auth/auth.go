@@ -177,11 +177,6 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 	}
 
 	ctx := &config.Context{Domain: domain}
-	err = ctx.PrintSoftwareContext(out)
-	if err != nil {
-		return err
-	}
-
 	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
 	if err != nil {
 		return err
@@ -231,6 +226,9 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		fmt.Printf(configSetDefaultWorkspace, w.Label)
 	}
 
+	// workspace.Switch prints the resulting context on success, so only print
+	// it here for the flows that haven't already done so
+	printContext := true
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in cluster
 		isSwitched := switchToLastUsedWorkspace(client, &c)
@@ -245,7 +243,15 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 			err := workspace.Switch("", pageSize, client, out)
 			if err != nil {
 				fmt.Fprint(out, cliSetWorkspaceExample)
+			} else {
+				printContext = false
 			}
+		}
+	}
+
+	if printContext {
+		if err := config.PrintCurrentSoftwareContext(out); err != nil {
+			return err
 		}
 	}
 

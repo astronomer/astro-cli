@@ -30,14 +30,6 @@ var tab = printutil.Table{
 	ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
 }
 
-// newTableOut construct new printutil.Table
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding: []int{36, 36},
-		Header:  []string{"CONTEXT DOMAIN", "WORKSPACE"},
-	}
-}
-
 // ContextExists checks to see if context exist in config
 func Exists(domain string) bool {
 	c := config.Context{Domain: domain}
@@ -126,10 +118,15 @@ func SwitchContext(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tab := newTableOut()
-	tab.AddRow([]string{ctx.Domain, ctx.Workspace}, false)
-	tab.SuccessMsg = "\n Switched context"
-	tab.Print(os.Stdout)
+	workspace := ctx.Workspace
+	if workspace == "" {
+		workspace = "N/A"
+	}
+	printutil.PrintKeyValues(os.Stdout, [][2]string{
+		{"CONTEXT DOMAIN", ctx.Domain},
+		{"WORKSPACE", workspace},
+	})
+	fmt.Println("\n Switched context")
 
 	return nil
 }

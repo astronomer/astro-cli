@@ -463,9 +463,8 @@ func (s *Suite) TestLoginFailure() {
 		if !s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
-		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
-		}
+		// no context is printed before authentication completes
+		s.Empty(out.String())
 		houstonMock.AssertExpectations(s.T())
 	})
 
@@ -478,9 +477,8 @@ func (s *Suite) TestLoginFailure() {
 		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
-		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
-		}
+		// no context is printed before authentication completes
+		s.Empty(out.String())
 		houstonMock.AssertExpectations(s.T())
 	})
 
@@ -494,9 +492,8 @@ func (s *Suite) TestLoginFailure() {
 		if s.ErrorIs(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out), errMockRegistry) {
 			return
 		}
-		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost"})
-		}
+		// no context is printed before authentication completes
+		s.Empty(out.String())
 		houstonMock.AssertExpectations(s.T())
 	})
 

@@ -26,13 +26,10 @@ func (c *Context) PrintSoftwareContext(out io.Writer) error {
 	if workspace == "" {
 		workspace = noApply
 	}
-	tab := printutil.Table{
-		Padding: []int{36, 36},
-		Header:  []string{"CLUSTER", "WORKSPACE"},
-	}
-
-	tab.AddRow([]string{ctx, workspace}, false)
-	tab.Print(out)
+	printutil.PrintKeyValues(out, [][2]string{
+		{"CLUSTER", ctx},
+		{"WORKSPACE", workspace},
+	})
 
 	return nil
 }

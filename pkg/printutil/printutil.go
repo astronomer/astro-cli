@@ -142,6 +142,22 @@ func (t *Table) PrintRows(out io.Writer, pageNumber int) {
 	}
 }
 
+// PrintKeyValues prints each label/value pair on its own line, with values
+// aligned in a single column sized to the longest label. Unlike Table, output
+// width grows with the longest value only, so long values (e.g. cluster
+// domains) never collide with a neighboring column.
+func PrintKeyValues(out io.Writer, pairs [][2]string) {
+	width := 0
+	for _, p := range pairs {
+		if len(p[0]) > width {
+			width = len(p[0])
+		}
+	}
+	for _, p := range pairs {
+		fmt.Fprintf(out, " %-*s%s\n", width+5, p[0], p[1])
+	}
+}
+
 // GetPadding converts an array of ints into template padding for str fmting
 func getPadding(padding []int) string {
 	padStr := " "

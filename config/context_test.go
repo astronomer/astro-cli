@@ -56,7 +56,7 @@ contexts:
 	buf := new(bytes.Buffer)
 	err = ctx.PrintCloudContext(buf)
 	s.NoError(err)
-	expected := " CONTROLPLANE                        WORKSPACE                           \n example.com                         ck05r3bor07h40d02y2hw4n4v           \n"
+	expected := " CONTROLPLANE     example.com\n WORKSPACE        ck05r3bor07h40d02y2hw4n4v\n"
 	s.Equal(expected, buf.String())
 }
 
@@ -90,7 +90,7 @@ contexts:
 	buf := new(bytes.Buffer)
 	err = ctx.PrintCloudContext(buf)
 	s.NoError(err)
-	expected := " CONTROLPLANE                        WORKSPACE                           \n example.com                         N/A                                 \n"
+	expected := " CONTROLPLANE     example.com\n WORKSPACE        N/A\n"
 	s.Equal(expected, buf.String())
 }
 

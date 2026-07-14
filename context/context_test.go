@@ -20,12 +20,6 @@ func TestContext(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-func (s *Suite) TestNewTableOut() {
-	tab := newTableOut()
-	s.NotNil(tab)
-	s.Equal([]int{36, 36}, tab.Padding)
-}
-
 func (s *Suite) TestExists() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	// Check that we don't have localhost123 in test config from testUtils.NewTestConfig()
