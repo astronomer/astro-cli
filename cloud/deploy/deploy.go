@@ -175,8 +175,18 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 	if shouldIncludeMonitoringDag(deploymentType) {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
+		var monitoringDag string
+		switch airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) {
+		case "2":
+			monitoringDag = airflow.Af2MonitoringDag
+		case "3":
+			monitoringDag = airflow.Af3MonitoringDag
+		default:
+			return "", errors.New("unsupported Airflow major version for runtime version " + currentRuntimeVersion)
+		}
+
 		// Create monitoring dag file
-		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.Af2MonitoringDag)
+		err := fileutil.WriteStringToFile(monitoringDagPath, monitoringDag)
 		if err != nil {
 			return "", err
 		}
