@@ -14,6 +14,7 @@ import (
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
@@ -21,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/keychain"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (
@@ -33,13 +35,36 @@ var (
 const (
 	softwarePlatform = "Astro Private Cloud"
 	cloudPlatform    = "Astro"
+
+	// noInsecureFallbackEnv refuses the plaintext credential fallback for a
+	// single invocation. The secure store is constructed before cobra parses
+	// flags, so this cannot be a flag; an env var also suits the CI and
+	// container settings where the fallback actually fires, and matches how
+	// ASTRO_API_TOKEN and ASTRO_DOMAIN are already read.
+	noInsecureFallbackEnv = "ASTRO_NO_INSECURE_FALLBACK"
 )
+
+// allowInsecureCredentialFallback reports whether credentials may be written to
+// a plaintext file when no OS-native secure store is available. It defaults to
+// true, preserving the previous config.yaml posture; users who would rather fail
+// than store secrets in the clear opt out via
+// `astro config set -g no_insecure_fallback true` or ASTRO_NO_INSECURE_FALLBACK.
+//
+// Either source can switch the protection on and neither can switch it off,
+// matching how SkipParse and AutoSelect combine their config and env sources.
+// That direction matters here: CheckEnvBool reports false for anything outside
+// true/1/yes/y/on, so letting the env win outright would mean a typo'd
+// ASTRO_NO_INSECURE_FALLBACK quietly overrode a persisted opt-out and allowed
+// the plaintext write it was set to prevent.
+func allowInsecureCredentialFallback() bool {
+	return !config.CFG.NoInsecureFallback.GetBool() && !util.CheckEnvBool(os.Getenv(noInsecureFallbackEnv))
+}
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
 	var err error
 	creds := &credentials.CurrentCredentials{}
-	store, storeErr := newSecureStore()
+	store, storeErr := newSecureStore(allowInsecureCredentialFallback())
 
 	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient, creds)

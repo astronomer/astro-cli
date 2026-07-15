@@ -3,8 +3,10 @@
 package keychain
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -123,4 +125,30 @@ func TestWriteAtomic(t *testing.T) {
 		err := writeAtomic(path, []byte("data"))
 		require.Error(t, err)
 	})
+}
+
+// A plaintext downgrade has to announce itself. The GitHub CLI's equivalent
+// fallback shipped silently and is still, two years on, their most-complained-
+// about auth behaviour (cli/cli#10108) — the user asks for a secure store,
+// doesn't get one, and never finds out.
+func TestFileStore_WarnsOnPlaintextWrite(t *testing.T) {
+	var buf bytes.Buffer
+	origOut := insecureWarningOut
+	insecureWarningOut = &buf
+	insecureWarning = &sync.Once{}
+	t.Cleanup(func() {
+		insecureWarningOut = origOut
+		insecureWarning = &sync.Once{}
+	})
+
+	s := &fileStore{path: filepath.Join(t.TempDir(), "credentials.json")}
+	require.NoError(t, s.SetCredentials("astronomer.io", Credentials{Token: "tok"}))
+
+	assert.Contains(t, buf.String(), "plain text")
+	assert.Contains(t, buf.String(), "no_insecure_fallback", "the warning should say how to refuse the fallback")
+
+	// Once per process: a token refresh mid-command shouldn't repeat it.
+	buf.Reset()
+	require.NoError(t, s.SetCredentials("astronomer.io", Credentials{Token: "tok2"}))
+	assert.Empty(t, buf.String())
 }

@@ -30,13 +30,21 @@ func SetupLogging(_ *cobra.Command, _ []string) error {
 // pre-run hook that sets up the context and checks for the latest version.
 func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, creds *credentials.CurrentCredentials, astroV1Client astrov1.APIClient) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// login/logout don't need existing credentials, skip auth setup
-		if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
+		// logout doesn't need existing credentials, and still has local context
+		// to reset even when the store is broken — let it through either way.
+		if cmd.CalledAs() == "logout" {
 			return nil
 		}
 
+		// Checked before login returns early: login doesn't need existing
+		// credentials, but it does need somewhere to put new ones, and this is
+		// where the reason it can't is worth saying.
 		if storeErr != nil {
 			return fmt.Errorf("secure credential store unavailable: %w", storeErr)
+		}
+
+		if cmd.CalledAs() == "login" {
+			return nil
 		}
 
 		// Check for latest version
@@ -51,15 +59,18 @@ func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, cre
 		if migrated, err := config.MigrateLegacyCredentials(store); err != nil {
 			softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "credential migration error: "+err.Error())
 		} else if migrated > 0 {
-			fmt.Printf("Migrated credentials for %d context(s) to your system's secure store.\n", migrated)
+			// Deliberately doesn't name the destination: on a host with no OS
+			// keyring this store is the plaintext fallback, and claiming a
+			// "secure store" would be a lie. warnInsecureWrite says so instead.
+			fmt.Printf("Moved credentials for %d context(s) out of config.yaml into the credential store.\n", migrated)
 		}
 
 		if context.IsCloudContext() {
 			if err := handleCloudSetup(cmd, store, creds, astroV1Client); err != nil {
 				return err
 			}
-		} else {
-			loadSoftwareToken(store, creds)
+		} else if err := loadSoftwareToken(store, creds); err != nil {
+			return err
 		}
 		softwareCmd.PrintDebugLogs()
 		return nil
@@ -81,15 +92,31 @@ func handleCloudSetup(cmd *cobra.Command, store keychain.SecureStore, creds *cre
 	return nil
 }
 
-func loadSoftwareToken(store keychain.SecureStore, creds *credentials.CurrentCredentials) {
+// loadSoftwareToken populates creds from the secure store for Software
+// (Houston) contexts, which have no checkToken equivalent to do it for them.
+//
+// It distinguishes "nothing stored" from "could not read what is stored". The
+// former is ordinary — the user isn't logged in, so leave creds empty and let
+// whatever needs auth say so. The latter must not be swallowed: a locked
+// keychain, a denied ACL prompt after a binary update, or a dead D-Bus would
+// otherwise leave creds empty and send unauthenticated requests to Houston,
+// surfacing as a baffling 401 rather than the credential problem it is.
+func loadSoftwareToken(store keychain.SecureStore, creds *credentials.CurrentCredentials) error {
 	if store == nil {
-		return
+		return nil
 	}
 	c, err := context.GetCurrentContext()
 	if err != nil {
-		return
+		// No context set yet, so there is nothing to load.
+		return nil
 	}
-	if keyCreds, credErr := store.GetCredentials(c.Domain); credErr == nil {
-		creds.Set(keyCreds.Token)
+	keyCreds, err := store.GetCredentials(c.Domain)
+	switch {
+	case errors.Is(err, keychain.ErrNotFound):
+		return nil
+	case err != nil:
+		return fmt.Errorf("could not read stored credentials for %s: %w", c.Domain, err)
 	}
+	creds.Set(keyCreds.Token)
+	return nil
 }

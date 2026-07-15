@@ -2,18 +2,22 @@ package cmd
 
 import (
 	"bytes"
+	"strconv"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/keychain"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/version"
 )
 
 func init() {
-	newSecureStore = func() (keychain.SecureStore, error) {
+	newSecureStore = func(_ bool) (keychain.SecureStore, error) {
 		return keychain.NewTestStore(), nil
 	}
 }
@@ -97,4 +101,34 @@ func (s *CmdSuite) TestRootCommandSoftwareContext() {
 	s.Contains(output, "deployment")
 	s.Contains(output, "run")
 	s.NotContains(output, "Run flow commands")
+}
+
+// Either source can switch the plaintext fallback off; neither can switch it
+// back on. CheckEnvBool reports false for anything outside true/1/yes/y/on, so
+// if the env var won outright a typo would quietly re-allow the plaintext write
+// a persisted opt-out was set to prevent.
+func TestAllowInsecureCredentialFallback(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		config bool
+		env    string
+		want   bool
+	}{
+		{name: "default allows the fallback", want: true},
+		{name: "config opts out", config: true, want: false},
+		{name: "env opts out", env: "true", want: false},
+		{name: "env opts out with 1", env: "1", want: false},
+		{name: "both opt out", config: true, env: "true", want: false},
+		{name: "env cannot re-enable what config disabled", config: true, env: "false", want: false},
+		{name: "a typo cannot re-enable what config disabled", config: true, env: "treu", want: false},
+		{name: "unset env leaves config alone", config: true, env: "", want: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			require.NoError(t, config.CFG.NoInsecureFallback.SetHomeString(strconv.FormatBool(tt.config)))
+			t.Setenv("ASTRO_NO_INSECURE_FALLBACK", tt.env)
+
+			assert.Equal(t, tt.want, allowInsecureCredentialFallback())
+		})
+	}
 }

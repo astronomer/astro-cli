@@ -14,6 +14,11 @@ const serviceName = "astro-cli"
 // ErrNotFound is returned when no credentials exist for the given domain.
 var ErrNotFound = errors.New("credentials not found")
 
+// ErrInsecureFallbackRefused is returned by New when no OS-native secure store
+// is available and the user has set no_insecure_fallback, meaning they would
+// rather fail than have credentials written to disk in the clear.
+var ErrInsecureFallbackRefused = errors.New("no secure credential store available and the plaintext fallback is disabled")
+
 // SecureStore persists and retrieves authentication credentials
 // using the OS-native secure store.
 type SecureStore interface {

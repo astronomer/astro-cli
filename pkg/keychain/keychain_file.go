@@ -5,8 +5,10 @@ package keychain
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 const (
@@ -14,6 +16,30 @@ const (
 	dirPerm  = 0o700
 	filePerm = 0o600
 )
+
+// insecureWarning fires the first time a plaintext write happens in a process.
+// It hangs off credential writes — login and each token refresh — rather than
+// store construction, because that is when secrets actually hit the disk. Once
+// per process keeps it from drowning out command output while still telling the
+// user on the invocation that did it.
+//
+// A pointer, not a value: resetting it in tests would otherwise copy a mutex.
+var (
+	insecureWarning              = &sync.Once{}
+	insecureWarningOut io.Writer = os.Stderr
+)
+
+// warnInsecureWrite tells the user their credentials went to disk in the clear.
+// A silent downgrade is the specific failure the GitHub CLI regrets shipping:
+// the user asks for keychain storage, does not get it, and never finds out.
+func warnInsecureWrite(path string) {
+	insecureWarning.Do(func() {
+		fmt.Fprintf(insecureWarningOut,
+			"! No OS credential store available — authentication credentials saved in plain text at %s\n"+
+				"  To require a secure store instead, run: astro config set -g no_insecure_fallback true\n",
+			path)
+	})
+}
 
 // fileStore is a plaintext JSON credential store for environments where no
 // OS-native secure store is available (Linux without Secret Service, Windows
@@ -101,7 +127,11 @@ func (s *fileStore) SetCredentials(domain string, creds Credentials) error {
 		return err
 	}
 	store[domain] = creds
-	return s.write(store)
+	if err := s.write(store); err != nil {
+		return err
+	}
+	warnInsecureWrite(s.path)
+	return nil
 }
 
 func (s *fileStore) DeleteCredentials(domain string) error {

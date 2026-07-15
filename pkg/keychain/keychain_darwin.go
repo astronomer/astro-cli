@@ -18,7 +18,10 @@ import (
 // The cachedStore wrapper (see keychain_cached.go) ensures only one keychain
 // access per domain per process, so the user sees at most one prompt per
 // command invocation.
-func New() (SecureStore, error) {
+//
+// macOS always has a Keychain, so there is nothing to fall back to and
+// allowInsecureFallback is not consulted — an unavailable Keychain is an error.
+func New(_ bool) (SecureStore, error) {
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:                    serviceName,
 		KeychainTrustApplication:       true,
@@ -27,5 +30,5 @@ func New() (SecureStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("system keychain unavailable: %w", err)
 	}
-	return newCachedStore(&keyringStore{ring: ring}), nil
+	return newCachedStore(withTimeout(&keyringStore{ring: ring}, keyringTimeout)), nil
 }
