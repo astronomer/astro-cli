@@ -237,6 +237,17 @@ func MigrateLegacyCredentials(store keychain.SecureStore) (int, error) {
 			continue
 		}
 
+		// A context entry's `domain:` field is optional — GetCurrentContext fills
+		// Domain in from the top-level `context:` key instead, so entries written
+		// without it still resolve at runtime. Here we're walking every context,
+		// not just the current one, so recover the domain from the context key
+		// (the domain with dots replaced by underscores). Without this, every
+		// domain-less context migrates under "" and they overwrite each other.
+		domain := ctx.Domain
+		if domain == "" {
+			domain = strings.ReplaceAll(contextKey, "_", ".")
+		}
+
 		creds := keychain.Credentials{
 			Token:        token,
 			RefreshToken: refreshToken,
@@ -244,7 +255,7 @@ func MigrateLegacyCredentials(store keychain.SecureStore) (int, error) {
 			ExpiresAt:    expiresAt,
 		}
 
-		if err := store.SetCredentials(ctx.Domain, creds); err != nil {
+		if err := store.SetCredentials(domain, creds); err != nil {
 			// Don't scrub on failure — will retry next invocation.
 			continue
 		}

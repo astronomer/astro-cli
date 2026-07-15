@@ -104,6 +104,47 @@ contexts:
 	assert.Equal(t, "Bearer token-b", credsB.Token)
 }
 
+// A context entry's `domain:` field is optional — real config.yaml files have
+// entries without it, and they resolve at runtime because GetCurrentContext
+// fills Domain in from the top-level `context:` key. Migration walks every
+// context rather than just the current one, so it must recover the domain from
+// the context key; otherwise all such contexts land under "" and clobber each
+// other, silently logging the user out of all but one.
+func TestMigrateLegacyCredentials_ContextsWithoutDomainField(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configRaw := []byte(`
+context: astronomer-stage.io
+contexts:
+  astronomer-dev_io:
+    token: "Bearer token-dev"
+    refreshtoken: "refresh-dev"
+  astronomer-stage_io:
+    token: "Bearer token-stage"
+    refreshtoken: "refresh-stage"
+`)
+	err := afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	require.NoError(t, err)
+	InitConfig(fs)
+
+	store := keychain.NewTestStore()
+	migrated, err := MigrateLegacyCredentials(store)
+	require.NoError(t, err)
+	assert.Equal(t, 2, migrated)
+
+	credsDev, err := store.GetCredentials("astronomer-dev.io")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer token-dev", credsDev.Token)
+	assert.Equal(t, "refresh-dev", credsDev.RefreshToken)
+
+	credsStage, err := store.GetCredentials("astronomer-stage.io")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer token-stage", credsStage.Token)
+	assert.Equal(t, "refresh-stage", credsStage.RefreshToken)
+
+	_, err = store.GetCredentials("")
+	assert.Error(t, err, "no credentials should be filed under an empty domain")
+}
+
 func TestMigrateLegacyCredentials_Idempotent(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`
