@@ -4,6 +4,7 @@ package keychain
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,9 +30,8 @@ var (
 	insecureWarningOut io.Writer = os.Stderr
 )
 
-// warnInsecureWrite tells the user their credentials went to disk in the clear.
-// A silent downgrade is the specific failure the GitHub CLI regrets shipping:
-// the user asks for keychain storage, does not get it, and never finds out.
+// warnInsecureWrite tells the user their credentials went to disk in the clear,
+// so a downgrade from the OS keychain is never silent.
 func warnInsecureWrite(path string) {
 	insecureWarning.Do(func() {
 		fmt.Fprintf(insecureWarningOut,
@@ -41,10 +41,12 @@ func warnInsecureWrite(path string) {
 	})
 }
 
-// fileStore is a plaintext JSON credential store for environments where no
-// OS-native secure store is available (Linux without Secret Service, Windows
-// before the Credential Manager backend lands). Credentials are written to
-// ~/.astro/credentials.json with mode 0600.
+var errNoCredentialsDir = errors.New("credentials directory not configured: SetCredentialsDir must be called first")
+
+// fileStore is a plaintext JSON credential store for environments with no
+// OS-native secure store: Linux without Secret Service, and Windows, which has
+// no Credential Manager backend. Credentials are written to credentials.json
+// with mode 0600.
 //
 // Writes go via a temp-file + rename so a crash mid-write cannot corrupt an
 // existing credentials file.
@@ -53,11 +55,10 @@ type fileStore struct {
 }
 
 func newFileStore() (*fileStore, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("cannot determine home directory: %w", err)
+	dir := CredentialsDir()
+	if dir == "" {
+		return nil, errNoCredentialsDir
 	}
-	dir := filepath.Join(home, ".astro")
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return nil, fmt.Errorf("cannot create credentials directory: %w", err)
 	}

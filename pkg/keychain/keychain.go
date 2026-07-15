@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/99designs/keyring"
@@ -18,6 +19,33 @@ var ErrNotFound = errors.New("credentials not found")
 // is available and the user has set no_insecure_fallback, meaning they would
 // rather fail than have credentials written to disk in the clear.
 var ErrInsecureFallbackRefused = errors.New("no secure credential store available and the plaintext fallback is disabled")
+
+var (
+	credentialsDir   string
+	credentialsDirMu sync.RWMutex
+)
+
+// SetCredentialsDir sets the directory the plaintext fallback store writes to.
+// Must be called before New on any platform that can fall back to a file.
+//
+// Injected rather than resolved here because the astro home directory honors
+// ASTRO_HOME and the repo's own home-dir lookup, both of which live in package
+// config — which imports this package, so this one cannot import it back.
+// Resolving it independently would drift: credentials would land in ~/.astro
+// while config.yaml went to $ASTRO_HOME/.astro, splitting one login across two
+// directories. Same injection pattern as pkg/proxy.SetRoutesDir.
+func SetCredentialsDir(dir string) {
+	credentialsDirMu.Lock()
+	defer credentialsDirMu.Unlock()
+	credentialsDir = dir
+}
+
+// CredentialsDir returns the configured credentials directory.
+func CredentialsDir() string {
+	credentialsDirMu.RLock()
+	defer credentialsDirMu.RUnlock()
+	return credentialsDir
+}
 
 // SecureStore persists and retrieves authentication credentials
 // using the OS-native secure store.
@@ -35,8 +63,9 @@ type Credentials struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
-// keyringStore is the shared SecureStore implementation for macOS and Linux
-// Secret Service, backed by a 99designs/keyring.Keyring.
+// keyringStore is the SecureStore implementation backed by a
+// 99designs/keyring.Keyring — macOS Keychain, or Secret Service / KWallet on
+// Linux.
 type keyringStore struct {
 	ring keyring.Keyring
 }

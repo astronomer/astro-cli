@@ -127,10 +127,8 @@ func TestWriteAtomic(t *testing.T) {
 	})
 }
 
-// A plaintext downgrade has to announce itself. The GitHub CLI's equivalent
-// fallback shipped silently and is still, two years on, their most-complained-
-// about auth behaviour (cli/cli#10108) — the user asks for a secure store,
-// doesn't get one, and never finds out.
+// A plaintext downgrade has to announce itself: the user asked for a secure
+// store and didn't get one.
 func TestFileStore_WarnsOnPlaintextWrite(t *testing.T) {
 	var buf bytes.Buffer
 	origOut := insecureWarningOut
@@ -151,4 +149,24 @@ func TestFileStore_WarnsOnPlaintextWrite(t *testing.T) {
 	buf.Reset()
 	require.NoError(t, s.SetCredentials("astronomer.io", Credentials{Token: "tok2"}))
 	assert.Empty(t, buf.String())
+}
+
+// The fallback file must live wherever config.yaml lives. The astro home dir
+// honours ASTRO_HOME and package config owns resolving it; resolving it
+// independently here would split one login across two directories.
+func TestNewFileStore_UsesInjectedCredentialsDir(t *testing.T) {
+	dir := t.TempDir()
+	SetCredentialsDir(dir)
+	t.Cleanup(func() { SetCredentialsDir("") })
+
+	s, err := newFileStore()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, "credentials.json"), s.path)
+}
+
+func TestNewFileStore_ErrorsWhenCredentialsDirUnset(t *testing.T) {
+	SetCredentialsDir("")
+
+	_, err := newFileStore()
+	assert.ErrorIs(t, err, errNoCredentialsDir)
 }

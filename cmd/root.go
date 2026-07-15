@@ -64,6 +64,10 @@ func allowInsecureCredentialFallback() bool {
 func NewRootCmd() *cobra.Command {
 	var err error
 	creds := &credentials.CurrentCredentials{}
+	// Keep the plaintext fallback's file next to config.yaml. pkg/keychain
+	// can't resolve this itself: the path honors ASTRO_HOME and is owned by
+	// package config, which imports pkg/keychain.
+	keychain.SetCredentialsDir(config.HomeConfigPath)
 	store, storeErr := newSecureStore(allowInsecureCredentialFallback())
 
 	httpClient := houston.NewHTTPClient()

@@ -11,11 +11,18 @@ import (
 
 // CI runs in a Docker container with no D-Bus / Secret Service, so New() takes
 // the fallback path. We can't test the keyring success path without a running
-// Secret Service or KWallet daemon. HOME is redirected so these never touch a
-// real ~/.astro/credentials.json.
+// Secret Service or KWallet daemon. The credentials dir is redirected so these
+// never touch a real ~/.astro/credentials.json.
+
+func setTestCredentialsDir(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	SetCredentialsDir(dir)
+	t.Cleanup(func() { SetCredentialsDir("") })
+}
 
 func TestNew_FallsBackToFileStoreWhenAllowed(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setTestCredentialsDir(t)
 
 	store, err := New(true)
 	require.NoError(t, err)
@@ -25,11 +32,9 @@ func TestNew_FallsBackToFileStoreWhenAllowed(t *testing.T) {
 	assert.IsType(t, &fileStore{}, cached.inner)
 }
 
-// Refusing the fallback has to fail rather than quietly writing secrets to
-// disk — a silent, unrefusable downgrade is the part of this design the GitHub
-// CLI regrets shipping (cli/cli#10108).
+// Refusing the fallback has to fail rather than quietly writing secrets to disk.
 func TestNew_RefusesFallbackWhenDisallowed(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setTestCredentialsDir(t)
 
 	_, err := New(false)
 	require.Error(t, err)
