@@ -26,6 +26,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -151,7 +152,32 @@ astro dev init --remote-execution-enabled --remote-image-repository quay.io/acme
 	proxyPortFlag        string
 )
 
-func newDevRootCmd(astroV1Client astrov1.APIClient, store keychain.SecureStore) *cobra.Command {
+// loadDevCredentials populates creds for the `astro dev` sub-commands that
+// reach the Astro API (`--workspace-id` / `--deployment-id`).
+//
+// The root pre-run hook normally does this, but cobra replaces a parent's
+// PersistentPreRunE with the child's rather than chaining them, and dev defines
+// its own to configure the container runtime. Before credentials moved to the
+// secure store this went unnoticed: request editors read the token straight out
+// of config.yaml, so no hook had to run. Now the token only reaches a request
+// via creds, and without this dev would send unauthenticated requests.
+//
+// Deliberately narrower than the root hook: it neither refreshes the token nor
+// prompts for login, matching what dev did when it read config.yaml directly.
+// Plain `astro dev start` targets nothing on Astro and must keep working
+// logged out, so commands without those flags load nothing.
+func loadDevCredentials(store keychain.SecureStore, creds *credentials.CurrentCredentials) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, _ []string) error {
+		wsID, _ := cmd.Flags().GetString("workspace-id")
+		depID, _ := cmd.Flags().GetString("deployment-id")
+		if wsID == "" && depID == "" {
+			return nil
+		}
+		return loadStoredToken(store, creds)
+	}
+}
+
+func newDevRootCmd(astroV1Client astrov1.APIClient, store keychain.SecureStore, creds *credentials.CurrentCredentials) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -165,6 +191,7 @@ func newDevRootCmd(astroV1Client astrov1.APIClient, store keychain.SecureStore) 
 			SetupLogging,
 			ConfigureContainerRuntime,
 			setDevModeAnnotation,
+			loadDevCredentials(store, creds),
 			telemetry.CreateTrackingHook(),
 		),
 	}

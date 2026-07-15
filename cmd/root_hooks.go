@@ -69,7 +69,7 @@ func CreateRootPersistentPreRunE(storeErr error, store keychain.SecureStore, cre
 			if err := handleCloudSetup(cmd, store, creds, astroV1Client); err != nil {
 				return err
 			}
-		} else if err := loadSoftwareToken(store, creds); err != nil {
+		} else if err := loadStoredToken(store, creds); err != nil {
 			return err
 		}
 		softwareCmd.PrintDebugLogs()
@@ -92,16 +92,18 @@ func handleCloudSetup(cmd *cobra.Command, store keychain.SecureStore, creds *cre
 	return nil
 }
 
-// loadSoftwareToken populates creds from the secure store for Software
-// (Houston) contexts, which have no checkToken equivalent to do it for them.
+// loadStoredToken populates creds with the current context's stored token,
+// without refreshing it or prompting for login. Used by Software contexts,
+// which have no checkToken equivalent to do it for them, and by `astro dev`,
+// whose pre-run hook shadows this one (see loadDevCredentials).
 //
 // It distinguishes "nothing stored" from "could not read what is stored". The
 // former is ordinary — the user isn't logged in, so leave creds empty and let
 // whatever needs auth say so. The latter must not be swallowed: a locked
 // keychain, a denied ACL prompt after a binary update, or a dead D-Bus would
-// otherwise leave creds empty and send unauthenticated requests to Houston,
+// otherwise leave creds empty and send unauthenticated requests,
 // surfacing as a baffling 401 rather than the credential problem it is.
-func loadSoftwareToken(store keychain.SecureStore, creds *credentials.CurrentCredentials) error {
+func loadStoredToken(store keychain.SecureStore, creds *credentials.CurrentCredentials) error {
 	if store == nil {
 		return nil
 	}

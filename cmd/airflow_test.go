@@ -148,7 +148,7 @@ func (s *AirflowSuite) TestDevInitCommandSoftware() {
 }
 
 func (s *AirflowSuite) TestNewAirflowDevRootCmd() {
-	cmd := newDevRootCmd(nil, nil)
+	cmd := newDevRootCmd(nil, nil, nil)
 	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
@@ -1957,7 +1957,7 @@ func (s *AirflowSuite) TestDevCommandLocalSubcommandRemoved() {
 
 func (s *AirflowSuite) TestStandaloneDockerFlagsMutuallyExclusive() {
 	// Verify that the flags are registered as mutually exclusive on the dev root command
-	cmd := newDevRootCmd(nil, nil)
+	cmd := newDevRootCmd(nil, nil, nil)
 	s.NotNil(cmd.PersistentFlags().Lookup("standalone"))
 	s.NotNil(cmd.PersistentFlags().Lookup("docker"))
 
