@@ -141,8 +141,15 @@ func checkToken(store keychain.SecureStore, creds *credentials.CurrentCredential
 	}
 
 	keyCreds, err := store.GetCredentials(c.Domain)
-	if err != nil || keyCreds.Token == "" {
+	switch {
+	case errors.Is(err, keychain.ErrNotFound) || (err == nil && keyCreds.Token == ""):
+		// Genuinely not logged in — guide the user through it.
 		return authLogin(c.Domain, "", store, creds, astroV1Client, out, false)
+	case err != nil:
+		// The store exists but wouldn't answer: a locked keychain, a denied ACL
+		// prompt after a binary update, a dead D-Bus. Say so rather than
+		// treating it as a logged-out user and springing a browser login.
+		return fmt.Errorf("could not read stored credentials for %s: %w", c.Domain, err)
 	}
 
 	if isExpired(keyCreds.ExpiresAt, accessTokenExpThreshold) {

@@ -23,9 +23,9 @@ import (
 func New(allowInsecureFallback bool) (SecureStore, error) {
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:             serviceName,
-		LibSecretCollectionName: "astro-cli",
-		KWalletAppID:            "astro-cli",
-		KWalletFolder:           "astro-cli",
+		LibSecretCollectionName: serviceName,
+		KWalletAppID:            serviceName,
+		KWalletFolder:           serviceName,
 		// Only allow persistent, non-interactive backends. KeyCtl stores
 		// credentials in kernel memory that doesn't survive reboot. Pass
 		// and File prompt for passphrases, which breaks non-interactive

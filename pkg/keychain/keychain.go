@@ -37,8 +37,6 @@ type Credentials struct {
 
 // keyringStore is the shared SecureStore implementation for macOS and Linux
 // Secret Service, backed by a 99designs/keyring.Keyring.
-//
-// On Windows, see keychain_windows.go for the per-field implementation.
 type keyringStore struct {
 	ring keyring.Keyring
 }
