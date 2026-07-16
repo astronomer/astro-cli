@@ -70,6 +70,38 @@ func (s *Suite) TestList() {
 	s.Equal(buf.String(), expected)
 }
 
+func (s *Suite) TestGetWorkspacesPaginates() {
+	page1 := astrov1.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.WorkspacesPaginated{
+			Workspaces: []astrov1.Workspace{{Name: "ws-page1", Id: "ws-1"}},
+			TotalCount: 2,
+			Limit:      1000,
+			Offset:     0,
+		},
+	}
+	page2 := astrov1.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.WorkspacesPaginated{
+			Workspaces: []astrov1.Workspace{{Name: "ws-page2", Id: "ws-2"}},
+			TotalCount: 2,
+			Limit:      1000,
+			Offset:     1000,
+		},
+	}
+	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+	// First call returns page 1 (offset 0), second call returns page 2 (offset 1000).
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
+
+	got, err := GetWorkspaces(mockClient)
+	s.NoError(err)
+	s.Len(got, 2)
+	s.Equal("ws-1", got[0].Id)
+	s.Equal("ws-2", got[1].Id)
+	mockClient.AssertExpectations(s.T())
+}
+
 func (s *Suite) TestListError() {
 	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()

@@ -375,6 +375,12 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 	return selected, nil
 }
 
+// maxListPages caps a single paginated list call at maxListPages pages as a safety
+// bound against a server that mis-reports TotalCount (mirrors cloud/env).
+const maxListPages = 100
+
+// GetWorkspaces returns every Workspace in the current Organization, paging
+// through the API as needed.
 func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -382,22 +388,32 @@ func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
 	}
 
 	sorts := []astrov1.ListWorkspacesParamsSorts{"name:asc"}
-	limit := 1000
-	workspaceListParams := &astrov1.ListWorkspacesParams{
-		Limit: &limit,
-		Sorts: &sorts,
+	pageSize := 1000
+	offset := 0
+	var workspaces []astrov1.Workspace
+	for page := 0; page < maxListPages; page++ {
+		workspaceListParams := &astrov1.ListWorkspacesParams{
+			Limit:  &pageSize,
+			Offset: &offset,
+			Sorts:  &sorts,
+		}
+
+		resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
+		if err != nil {
+			return []astrov1.Workspace{}, err
+		}
+		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return []astrov1.Workspace{}, err
+		}
+
+		paginated := *resp.JSON200
+		workspaces = append(workspaces, paginated.Workspaces...)
+		if len(paginated.Workspaces) == 0 || len(workspaces) >= paginated.TotalCount {
+			return workspaces, nil
+		}
+		offset = len(workspaces)
 	}
 
-	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
-	if err != nil {
-		return []astrov1.Workspace{}, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return []astrov1.Workspace{}, err
-	}
-
-	workspaces := resp.JSON200.Workspaces
-
-	return workspaces, nil
+	return []astrov1.Workspace{}, fmt.Errorf("aborted listing workspaces after %d pages", maxListPages)
 }

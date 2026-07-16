@@ -71,6 +71,10 @@ var (
 	dagDeployEnabled bool
 )
 
+// maxListPages caps a single paginated list call at maxListPages pages as a safety
+// bound against a server that mis-reports TotalCount (mirrors cloud/env).
+const maxListPages = 100
+
 // defaultWorkerMachineName is the machine type UpdateDeployment falls back to when
 // an executor change forces it to synthesize a replacement worker queue.
 const defaultWorkerMachineName = "A5"
@@ -1679,6 +1683,8 @@ var CoreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 	return nil
 }
 
+// ListDeployments returns every Deployment in the given Workspace (or the whole
+// Organization when ws is empty), paging through the API as needed.
 var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1687,26 +1693,35 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 		}
 		orgID = c.Organization
 	}
-	deploymentListParams := &astrov1.ListDeploymentsParams{
-		Limit: &listLimit,
-	}
-	if ws != "" {
-		deploymentListParams.WorkspaceIds = &[]string{ws}
+	offset := 0
+	var deployments []astrov1.Deployment
+	for page := 0; page < maxListPages; page++ {
+		deploymentListParams := &astrov1.ListDeploymentsParams{
+			Limit:  &listLimit,
+			Offset: &offset,
+		}
+		if ws != "" {
+			deploymentListParams.WorkspaceIds = &[]string{ws}
+		}
+
+		resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
+		if err != nil {
+			return []astrov1.Deployment{}, err
+		}
+		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		if err != nil {
+			return []astrov1.Deployment{}, err
+		}
+
+		deploymentResponse := *resp.JSON200
+		deployments = append(deployments, deploymentResponse.Deployments...)
+		if len(deploymentResponse.Deployments) == 0 || len(deployments) >= deploymentResponse.TotalCount {
+			return deployments, nil
+		}
+		offset = len(deployments)
 	}
 
-	resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
-	if err != nil {
-		return []astrov1.Deployment{}, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return []astrov1.Deployment{}, err
-	}
-
-	deploymentResponse := *resp.JSON200
-	deployments := deploymentResponse.Deployments
-
-	return deployments, nil
+	return []astrov1.Deployment{}, fmt.Errorf("aborted listing deployments after %d pages", maxListPages)
 }
 
 //nolint:dupl

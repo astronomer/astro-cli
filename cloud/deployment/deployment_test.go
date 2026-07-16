@@ -376,6 +376,40 @@ func (s *Suite) TestList() {
 	})
 }
 
+func (s *Suite) TestListDeploymentsPaginates() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	page1 := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.DeploymentsPaginated{
+			Deployments: []astrov1.Deployment{{Id: "deployment-page1"}},
+			TotalCount:  2,
+			Limit:       1000,
+			Offset:      0,
+		},
+	}
+	page2 := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.DeploymentsPaginated{
+			Deployments: []astrov1.Deployment{{Id: "deployment-page2"}},
+			TotalCount:  2,
+			Limit:       1000,
+			Offset:      1000,
+		},
+	}
+	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+	// First call returns page 1 (offset 0), second call returns page 2 (offset 1000).
+	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
+	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
+
+	got, err := ListDeployments("", "test-org", mockClient)
+	s.NoError(err)
+	s.Len(got, 2)
+	s.Equal("deployment-page1", got[0].Id)
+	s.Equal("deployment-page2", got[1].Id)
+	mockClient.AssertExpectations(s.T())
+}
+
 func (s *Suite) TestListData() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
