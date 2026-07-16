@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 )
 
 var (
@@ -51,6 +52,6 @@ func (s *Standalone) Pytest(_, _, _, _, _ string) (string, error) {
 	return "", errStandaloneWindows
 }
 func (s *Standalone) Parse(_, _, _ string) error { return errStandaloneWindows }
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface, _ keychain.SecureStore) error {
 	return errStandaloneWindows
 }

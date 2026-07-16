@@ -14,33 +14,68 @@ import (
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (
 	verboseLevel   string
 	houstonClient  houston.ClientInterface
 	houstonVersion string
+	newSecureStore = keychain.New
 )
 
 const (
 	softwarePlatform = "Astro Private Cloud"
 	cloudPlatform    = "Astro"
+
+	// noInsecureFallbackEnv refuses the plaintext credential fallback for a
+	// single invocation. The secure store is constructed before cobra parses
+	// flags, so this cannot be a flag; an env var also suits the CI and
+	// container settings where the fallback actually fires, and matches how
+	// ASTRO_API_TOKEN and ASTRO_DOMAIN are already read.
+	noInsecureFallbackEnv = "ASTRO_NO_INSECURE_FALLBACK"
 )
+
+// allowInsecureCredentialFallback reports whether credentials may be written to
+// a plaintext file when no OS-native secure store is available. It defaults to
+// true, preserving the previous config.yaml posture; users who would rather fail
+// than store secrets in the clear opt out via
+// `astro config set -g no_insecure_fallback true` or ASTRO_NO_INSECURE_FALLBACK.
+//
+// Either source can switch the protection on and neither can switch it off,
+// matching how SkipParse and AutoSelect combine their config and env sources.
+// That direction matters here: CheckEnvBool reports false for anything outside
+// true/1/yes/y/on, so letting the env win outright would mean a typo'd
+// ASTRO_NO_INSECURE_FALLBACK quietly overrode a persisted opt-out and allowed
+// the plaintext write it was set to prevent.
+func allowInsecureCredentialFallback() bool {
+	return !config.CFG.NoInsecureFallback.GetBool() && !util.CheckEnvBool(os.Getenv(noInsecureFallbackEnv))
+}
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
 	var err error
-	httpClient := houston.NewHTTPClient()
-	houstonClient = houston.NewClient(httpClient)
+	creds := &credentials.CurrentCredentials{}
+	// Keep the plaintext fallback's file next to config.yaml. pkg/keychain
+	// can't resolve this itself: the path honors ASTRO_HOME and is owned by
+	// package config, which imports pkg/keychain.
+	keychain.SetCredentialsDir(config.HomeConfigPath)
+	store, storeErr := newSecureStore(allowInsecureCredentialFallback())
 
-	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
-	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient())
+	httpClient := houston.NewHTTPClient()
+	houstonClient = houston.NewClient(httpClient, creds)
+
+	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient(), creds)
+	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient(), creds)
+	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient(), creds)
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -72,34 +107,34 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(astroV1Client),
+				CreateRootPersistentPreRunE(storeErr, store, creds, astroV1Client),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroV1Client, os.Stdout),
-		newLogoutCommand(os.Stdout),
-		newAuthRootCmd(astroV1Client, os.Stdout),
+		newLoginCommand(store, creds, astroV1Client, os.Stdout),
+		newLogoutCommand(store, os.Stdout),
+		newAuthRootCmd(store, creds, astroV1Client, os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(astroV1Client),
+		newDevRootCmd(astroV1Client, store, creds),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
-		api.NewAPICmd(),
+		api.NewAPICmd(creds),
 		newTelemetryCmd(os.Stdout),
 		newTelemetrySendCmd(),
-		newOttoCmd(),
+		newOttoCmd(creds),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, os.Stdout)...,
+			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, creds, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(
-			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
+			softwareCmd.AddCmds(houstonClient, store, os.Stdout)...,
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}

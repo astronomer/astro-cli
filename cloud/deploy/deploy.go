@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -116,6 +117,7 @@ type InputDeploy struct {
 	BuildSecretString string
 	Force             bool
 	DagBundleName     string
+	Creds             *credentials.CurrentCredentials
 }
 
 // InputClientDeploy contains inputs for client image deployments
@@ -125,6 +127,7 @@ type InputClientDeploy struct {
 	Platform          string
 	BuildSecretString string
 	DeploymentID      string
+	Creds             *credentials.CurrentCredentials
 }
 
 const accessYourDeploymentFmt = `
@@ -237,7 +240,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 	}
 
 	if deployInfo.cicdEnforcement {
-		if !canCiCdDeploy(c.Token) {
+		if !canCiCdDeploy(deployInput.Creds) {
 			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name) //nolint
 		}
 	}
@@ -442,7 +445,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 		imageHandler := airflowImageHandler(deployInfo.deployImage)
 		fmt.Println("Pushing image to Astronomer registry")
-		_, err = imageHandler.Push(remoteImage, registryUsername, c.Token, false)
+		_, err = imageHandler.Push(remoteImage, registryUsername, deployInput.Creds.Get(), false)
 		if err != nil {
 			return err
 		}
@@ -1049,7 +1052,7 @@ func setupClientDependencyFiles(buildDir string) error {
 
 // DeployClientImage handles the client deploy functionality
 func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic
-	c, err := config.GetCurrentContext()
+	_, err := config.GetCurrentContext()
 	if err != nil {
 		return errors.Wrap(err, "failed to get current context")
 	}
@@ -1098,7 +1101,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			}
 			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
-			err := airflow.DockerLogin(baseImageRegistry, registryUsername, c.Token)
+			err := airflow.DockerLogin(baseImageRegistry, registryUsername, deployInput.Creds.Get())
 			if err != nil {
 				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
 				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")

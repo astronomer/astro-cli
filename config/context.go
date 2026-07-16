@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
+
+	"github.com/astronomer/astro-cli/pkg/keychain"
 )
 
 var (
@@ -31,9 +32,6 @@ type Context struct {
 	OrganizationProduct string `mapstructure:"organization_product"`
 	Workspace           string `mapstructure:"workspace"`
 	LastUsedWorkspace   string `mapstructure:"last_used_workspace"`
-	Token               string `mapstructure:"token"`
-	RefreshToken        string `mapstructure:"refreshtoken"`
-	UserEmail           string `mapstructure:"user_email"`
 }
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
@@ -123,14 +121,11 @@ func (c *Context) SetContext() error {
 	}
 
 	context := map[string]string{
-		"token":                c.Token,
 		"domain":               c.Domain,
 		"organization":         c.Organization,
 		"organization_product": c.OrganizationProduct,
 		"workspace":            c.Workspace,
 		"last_used_workspace":  c.Workspace,
-		"refreshtoken":         c.RefreshToken,
-		"user_email":           c.UserEmail,
 	}
 
 	viperHome.Set(contextsKey+"."+key, context)
@@ -217,21 +212,67 @@ func (c *Context) DeleteContext() error {
 	return nil
 }
 
-func (c *Context) SetExpiresIn(value int64) error {
-	cKey, err := c.GetContextKey()
+// MigrateLegacyCredentials reads credential fields (token, refreshtoken,
+// user_email, ExpiresIn) directly from viper across all contexts and moves
+// them to the provided SecureStore. Each context is migrated atomically:
+// if the keychain write fails the context is left in config.yaml and retried
+// on the next invocation. Returns the number of contexts migrated.
+//
+// These are the legacy viper context keys; this is the only code that reads
+// them.
+func MigrateLegacyCredentials(store keychain.SecureStore) (int, error) {
+	contexts, err := GetContexts()
 	if err != nil {
-		return err
-	}
-	expiretime := time.Now().Add(time.Duration(value) * time.Second)
-	return setContextField(cKey, "ExpiresIn", expiretime)
-}
-
-func (c *Context) GetExpiresIn() (time.Time, error) {
-	cKey, err := c.GetContextKey()
-	if err != nil {
-		return time.Time{}, err
+		return 0, err
 	}
 
-	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
-	return viperHome.GetTime(cfgPath), nil
+	migrated := 0
+	for contextKey, ctx := range contexts.Contexts {
+		token := viperHome.GetString(fmt.Sprintf("%s.%s.token", contextsKey, contextKey))
+		refreshToken := viperHome.GetString(fmt.Sprintf("%s.%s.refreshtoken", contextsKey, contextKey))
+		userEmail := viperHome.GetString(fmt.Sprintf("%s.%s.user_email", contextsKey, contextKey))
+		expiresAt := viperHome.GetTime(fmt.Sprintf("%s.%s.ExpiresIn", contextsKey, contextKey))
+
+		if token == "" && refreshToken == "" {
+			continue
+		}
+
+		// A context entry's `domain:` field is optional — GetCurrentContext fills
+		// Domain in from the top-level `context:` key instead, so entries written
+		// without it still resolve at runtime. Here we're walking every context,
+		// not just the current one, so recover the domain from the context key
+		// (the domain with dots replaced by underscores). Without this, every
+		// domain-less context migrates under "" and they overwrite each other.
+		domain := ctx.Domain
+		if domain == "" {
+			domain = strings.ReplaceAll(contextKey, "_", ".")
+		}
+
+		creds := keychain.Credentials{
+			Token:        token,
+			RefreshToken: refreshToken,
+			UserEmail:    userEmail,
+			ExpiresAt:    expiresAt,
+		}
+
+		if err := store.SetCredentials(domain, creds); err != nil {
+			// Don't scrub on failure — will retry next invocation.
+			continue
+		}
+
+		// Scrub credential fields from the config map entirely so they don't
+		// linger as empty strings in the YAML file.
+		ctxPath := fmt.Sprintf("%s.%s", contextsKey, contextKey)
+		ctxMap := viperHome.GetStringMap(ctxPath)
+		for _, field := range []string{"token", "refreshtoken", "user_email", "expiresin"} {
+			delete(ctxMap, field)
+		}
+		viperHome.Set(ctxPath, ctxMap)
+		if err := saveConfig(viperHome, HomeConfigFile); err != nil {
+			return migrated, err
+		}
+		migrated++
+	}
+
+	return migrated, nil
 }

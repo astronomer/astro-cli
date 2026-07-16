@@ -25,6 +25,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/keychain"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -1249,13 +1250,16 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil) // All tests enabled by default
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil) // All tests enabled by default
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
 	})
 
 	s.Run("success with deployment id", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		store := keychain.NewTestStore()
+		_ = store.SetCredentials("localhost", keychain.Credentials{Token: "Bearer test-token"})
 		imageHandler := new(mocks.ImageHandler)
 
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -1270,7 +1274,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", true, true, true, false, false, "", mockV1Client) // All tests enabled by default
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", true, true, true, false, false, "", mockV1Client, store) // All tests enabled by default
 
 		s.NoError(err)
 		imageHandler.AssertExpectations(s.T())
@@ -1282,7 +1286,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil)
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1294,7 +1298,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil)
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1307,7 +1311,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil) // versionTest=true is required for this path
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil) // versionTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1322,7 +1326,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil) // versionTest=true is required for this path
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil) // versionTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1338,7 +1342,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil) // dagTest=true is required for this path
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil) // dagTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1353,7 +1357,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil) // dagTest=true is required for this path
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, true, true, false, false, "", nil, nil) // dagTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1365,12 +1369,15 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, false, "", mockV1Client)
+		err := mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, false, "", mockV1Client, nil)
 		s.Error(err)
 		// No image handler expectations needed as it fails before pull/build
 	})
 
 	s.Run("image pull failure", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		store := keychain.NewTestStore()
+		_ = store.SetCredentials("localhost", keychain.Credentials{Token: "Bearer test-token"})
 		imageHandler := new(mocks.ImageHandler)
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Twice()
@@ -1379,7 +1386,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, false, false, "", mockV1Client)
+		err := mockDockerCompose.UpgradeTest("new-version", "test-deployment-id", "", "", false, false, false, false, false, "", mockV1Client, store)
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T()) // Only Pull is called
 	})
@@ -1393,7 +1400,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 
 		mockDockerCompose.imageHandler = imageHandler
 		// Add default values for new lint flags
-		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, false, false, "", nil) // versionTest=true is required for this path
+		err := mockDockerCompose.UpgradeTest("new-version", "", "", "", true, false, false, false, false, "", nil, nil) // versionTest=true is required for this path
 		s.Error(err)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1405,7 +1412,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		s.NoError(err)
 
 		// Add default values for new lint flags
-		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, false, "", nil)
+		err = mockDockerCompose.UpgradeTest("new-version", "deployment-id", "", "", false, false, false, false, false, "", nil, nil)
 		s.Error(err) // Expect error due to missing context/domain
 	})
 
@@ -1423,7 +1430,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
 		// Call with lintTest=true, includeLintDeprecations=false, lintFix=false, lintConfigFile=""
-		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, false, "", nil)
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, false, "", nil, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1442,7 +1449,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
 		// Call with lintTest=true, includeLintDeprecations=true, lintFix=false, lintConfigFile=""
-		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, true, false, "", nil)
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, true, false, "", nil, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1476,7 +1483,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		originalWorkingPath := config.WorkingPath
 		config.WorkingPath = cwd
 		defer func() { config.WorkingPath = originalWorkingPath }()
-		err = mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, false, "my-custom-ruff.toml", nil)
+		err = mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, false, "my-custom-ruff.toml", nil, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())
@@ -1495,7 +1502,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
 		// Call with lintTest=true, includeLintDeprecations=false, lintFix=false, lintConfigFile=""
-		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, false, "", nil)
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, false, "", nil, nil)
 		s.Error(err)
 		s.Contains(err.Error(), "one of the tests run above failed")
 
@@ -1514,7 +1521,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
 		// Call with lintTest=true, includeLintDeprecations=false, lintFix=false, lintConfigFile=""
 		// Target version is 2.0.0, so lint test should be skipped internally
-		err := mockDockerCompose.UpgradeTest("2.0.0", "", "", "", false, false, true, false, false, "", nil)
+		err := mockDockerCompose.UpgradeTest("2.0.0", "", "", "", false, false, true, false, false, "", nil, nil)
 		s.NoError(err) // Should succeed without running lint
 
 		imageHandler.AssertExpectations(s.T())
@@ -1534,7 +1541,7 @@ func (s *Suite) TestDockerComposeUpgradeTest() {
 		mockDockerCompose.imageHandler = imageHandler
 		mockDockerCompose.ruffImageHandler = ruffImageHandler
 		// Call with lintTest=true, includeLintDeprecations=false, lintFix=true, lintConfigFile=""
-		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, true, "", nil)
+		err := mockDockerCompose.UpgradeTest("3.0-1", "", "", "", false, false, true, false, true, "", nil, nil)
 		s.NoError(err)
 
 		imageHandler.AssertExpectations(s.T())

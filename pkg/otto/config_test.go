@@ -15,6 +15,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -45,7 +46,7 @@ func TestConfigSuite(t *testing.T) {
 
 func (s *ConfigSuite) TestNewConfigFromContext() {
 	// With test config initialized, should get auth fields
-	cfg := NewConfigFromContext()
+	cfg := NewConfigFromContext(credentials.New("test-token"))
 	// Test config has a domain and token set
 	s.NotEmpty(cfg.Domain)
 }

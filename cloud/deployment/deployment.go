@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -128,21 +129,26 @@ func deploymentTableConfig(fromAllWorkspaces bool, ws string) *output.TableConfi
 	)
 }
 
-func CanCiCdDeploy(bearerToken string) bool {
-	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
-	// Parse the token to peek at the custom claims
-	claims, err := parseToken(token)
+func CanCiCdDeploy(creds *credentials.CurrentCredentials) bool {
+	if creds == nil {
+		return false
+	}
+	bearerToken := creds.Get()
+	if bearerToken == "" {
+		return false
+	}
+	parts := strings.SplitN(bearerToken, " ", 2)
+	if len(parts) < 2 {
+		return false
+	}
+	claims, err := parseToken(parts[1])
 	if err != nil {
 		fmt.Println("Unable to Parse Token")
 		return false
 	}
 
 	// Only API Tokens and API Keys have permissions
-	if len(claims.Permissions) > 0 {
-		return true
-	}
-
-	return false
+	return len(claims.Permissions) > 0
 }
 
 // deploymentToInfo converts a deployment to DeploymentInfo for structured output
@@ -865,7 +871,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, ast
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astrov1.WorkerQueueRequest, hybridQueueList []astrov1.HybridWorkerQueueRequest, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogUrlPattern *string, force bool, astroV1Client astrov1.APIClient) error { //nolint
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astrov1.WorkerQueueRequest, hybridQueueList []astrov1.HybridWorkerQueueRequest, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogUrlPattern *string, force bool, astroV1Client astrov1.APIClient, creds *credentials.CurrentCredentials) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
@@ -888,7 +894,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		isCicdEnforced = true
 	}
 	if !force && isCicdEnforced && dagDeploy != "" {
-		if !canCiCdDeploy(c.Token) {
+		if !canCiCdDeploy(creds) {
 			fmt.Printf("\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start." +
 				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")
 			y, _ := input.Confirm("\n\nAre you sure you want to continue?")

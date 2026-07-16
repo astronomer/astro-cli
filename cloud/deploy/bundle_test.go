@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/git"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -36,7 +37,7 @@ func TestBundles(t *testing.T) {
 }
 
 func (s *BundleSuite) TestBundleDeploy_Success() {
-	canCiCdDeploy = func(token string) bool {
+	canCiCdDeploy = func(creds *credentials.CurrentCredentials) bool {
 		return true
 	}
 
@@ -52,6 +53,7 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 		BundleType:    "test-bundle-type",
 		Description:   "test-description",
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, true, true)
@@ -77,13 +79,14 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 }
 
 func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
-	canCiCdDeploy = func(token string) bool {
+	canCiCdDeploy = func(creds *credentials.CurrentCredentials) bool {
 		return false
 	}
 
 	input := &DeployBundleInput{
 		DeploymentID:  "test-deployment-id",
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, true, true)
@@ -98,6 +101,7 @@ func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
 func (s *BundleSuite) TestBundleDeploy_DagDeployDisabled() {
 	input := &DeployBundleInput{
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, false, false)
@@ -116,6 +120,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 	input := &DeployBundleInput{
 		BundlePath:    gitPath,
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, true, false)
@@ -196,6 +201,7 @@ func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 	input := &DeployBundleInput{
 		BundlePath:    gitPath,
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, true, false)
@@ -233,6 +239,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 	input := &DeployBundleInput{
 		BundlePath:    gitPath,
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, true, false)
@@ -261,6 +268,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 	input := &DeployBundleInput{
 		AstroV1Client: s.mockV1Client,
+		Creds:         &credentials.CurrentCredentials{},
 	}
 
 	mockGetDeployment(s.mockV1Client, true, false)

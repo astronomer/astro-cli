@@ -41,7 +41,7 @@ func (s *Suite) TestSubscribeDeploymentLog() {
 			return nil
 		}
 
-		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
+		err := SubscribeDeploymentLog("test-id", "test-component", "test", "test-token", 0)
 		s.NoError(err)
 	})
 
@@ -50,7 +50,7 @@ func (s *Suite) TestSubscribeDeploymentLog() {
 			return errMock
 		}
 
-		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
+		err := SubscribeDeploymentLog("test-id", "test-component", "test", "test-token", 0)
 		s.ErrorIs(err, errMock)
 	})
 }

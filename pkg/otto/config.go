@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 )
 
 // Config holds the environment configuration for spawning Otto.
@@ -20,12 +21,16 @@ type Config struct {
 }
 
 // NewConfigFromContext builds a Config from the current astro login context.
-func NewConfigFromContext() *Config {
+// The token comes from creds: the context carries no token, only the secure
+// store does, and PersistentPreRunE resolves it into creds.
+func NewConfigFromContext(creds *credentials.CurrentCredentials) *Config {
 	cfg := &Config{}
 
 	ctx, err := config.GetCurrentContext()
 	if err == nil {
-		cfg.Token = strings.TrimPrefix(ctx.Token, "Bearer ")
+		if creds != nil {
+			cfg.Token = strings.TrimPrefix(creds.Get(), "Bearer ")
+		}
 		cfg.Domain = ctx.Domain
 		cfg.Organization = ctx.Organization
 	}

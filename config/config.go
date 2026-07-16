@@ -97,6 +97,7 @@ var (
 		DevMode:                 newCfg("dev.mode", "docker"),
 		DevBuildSecrets:         newCfg("dev.build_secrets", ""),
 		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
+		NoInsecureFallback:      newCfg("no_insecure_fallback", "false"),
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
 		ProxyPort:               newCfg("proxy.port", "6563"),

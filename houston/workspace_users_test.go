@@ -43,7 +43,7 @@ func (s *Suite) TestAddWorkspaceUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.AddWorkspaceUser(AddWorkspaceUserRequest{"workspace-id", "email", "role"})
 		s.NoError(err)
@@ -58,7 +58,7 @@ func (s *Suite) TestAddWorkspaceUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.AddWorkspaceUser(AddWorkspaceUserRequest{"workspace-id", "email", "role"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -99,7 +99,7 @@ func (s *Suite) TestDeleteWorkspaceUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.DeleteWorkspaceUser(DeleteWorkspaceUserRequest{"workspace-id", "user-id"})
 		s.NoError(err)
@@ -114,7 +114,7 @@ func (s *Suite) TestDeleteWorkspaceUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.DeleteWorkspaceUser(DeleteWorkspaceUserRequest{"workspace-id", "user-id"})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -152,7 +152,7 @@ func (s *Suite) TestListWorkspaceUserAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListWorkspaceUserAndRoles("workspace-id")
 		s.NoError(err)
@@ -167,7 +167,7 @@ func (s *Suite) TestListWorkspaceUserAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListWorkspaceUserAndRoles("workspace-id")
 		s.Contains(err.Error(), "Internal Server Error")
@@ -205,7 +205,7 @@ func (s *Suite) TestListWorkspacePaginatedUserAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
 		s.NoError(err)
@@ -220,7 +220,7 @@ func (s *Suite) TestListWorkspacePaginatedUserAndRoles() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -246,7 +246,7 @@ func (s *Suite) TestUpdateWorkspaceUserAndRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.UpdateWorkspaceUserRole(UpdateWorkspaceUserRoleRequest{"workspace-id", "test@test.com", WorkspaceAdminRole})
 		s.NoError(err)
@@ -261,7 +261,7 @@ func (s *Suite) TestUpdateWorkspaceUserAndRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.UpdateWorkspaceUserRole(UpdateWorkspaceUserRoleRequest{"workspace-id", "test@test.com", WorkspaceAdminRole})
 		s.Contains(err.Error(), "Internal Server Error")
@@ -296,7 +296,7 @@ func (s *Suite) TestGetWorkspaceUserRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.GetWorkspaceUserRole(GetWorkspaceUserRoleRequest{"workspace-id", "email"})
 		s.NoError(err)
@@ -311,7 +311,7 @@ func (s *Suite) TestGetWorkspaceUserRole() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.GetWorkspaceUserRole(GetWorkspaceUserRoleRequest{"workspace-id", "email"})
 		s.Contains(err.Error(), "Internal Server Error")

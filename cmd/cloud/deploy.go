@@ -227,6 +227,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		BuildSecretString: BuildSecretString,
 		Force:             forceDeploy,
 		DagBundleName:     dagBundleName,
+		Creds:             creds,
 	}
 
 	return DeployImage(deployInput, astroV1Client, astroV1Alpha1Client)

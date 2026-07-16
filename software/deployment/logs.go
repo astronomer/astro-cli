@@ -33,7 +33,7 @@ func Log(deploymentID, component, search string, since time.Duration, client hou
 	return nil
 }
 
-func SubscribeDeploymentLog(deploymentID, component, search string, since time.Duration) error {
+func SubscribeDeploymentLog(deploymentID, component, search, token string, since time.Duration) error {
 	// Calculate timestamp as now - since e.g:
 	// (2019-04-02 17:51:03.780819 +0000 UTC - 2 mins) = 2019-04-02 17:49:03.780819 +0000 UTC
 	timestamp := time.Now().UTC().Add(-since)
@@ -43,7 +43,7 @@ func SubscribeDeploymentLog(deploymentID, component, search string, since time.D
 		return err
 	}
 
-	err = subscribe(cl.Token, cl.GetSoftwareWebsocketURL(), request)
+	err = subscribe(token, cl.GetSoftwareWebsocketURL(), request)
 	if err != nil {
 		return err
 	}

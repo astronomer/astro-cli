@@ -2,6 +2,7 @@ package astrov1alpha1
 
 import (
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/credentials"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -14,13 +15,15 @@ type APIClient = ClientWithResponsesInterface
 
 // NewV1Alpha1Client creates an API client for the Astro v1alpha1 public API.
 // v1alpha1 is retained only for endpoints that v1 does not yet cover (Astro IDE).
-func NewV1Alpha1Client(c *httputil.HTTPClient) *ClientWithResponses {
+// The provided CurrentCredentials is read on every request — set it via
+// CurrentCredentials.Set after credentials are resolved in PersistentPreRunE.
+func NewV1Alpha1Client(c *httputil.HTTPClient, creds *credentials.CurrentCredentials) *ClientWithResponses {
 	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
 		ctx, err := context.GetCurrentContext()
 		if err != nil {
 			return "", "", err
 		}
-		return ctx.Token, ctx.GetPublicRESTAPIURL("v1alpha1"), nil
+		return creds.Get(), ctx.GetPublicRESTAPIURL("v1alpha1"), nil
 	})))
 	return cl
 }

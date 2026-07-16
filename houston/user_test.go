@@ -40,7 +40,7 @@ func (s *Suite) TestCreateUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		response, err := api.CreateUser(CreateUserRequest{"email", "password"})
 		s.NoError(err)
@@ -55,7 +55,7 @@ func (s *Suite) TestCreateUser() {
 				Header:     make(http.Header),
 			}
 		})
-		api := NewClient(client)
+		api := NewClient(client, nil)
 
 		_, err := api.CreateUser(CreateUserRequest{"email", "password"})
 		s.Contains(err.Error(), "Internal Server Error")

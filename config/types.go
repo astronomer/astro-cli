@@ -59,6 +59,7 @@ type cfgs struct {
 	DevMode                 cfg
 	DevBuildSecrets         cfg
 	TelemetryEnabled        cfg
+	NoInsecureFallback      cfg
 	TelemetryAnonymousID    cfg
 	TelemetryNoticeShown    cfg
 	ProxyPort               cfg
