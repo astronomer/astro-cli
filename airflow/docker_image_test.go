@@ -843,6 +843,12 @@ func (s *Suite) TestDockerImagePush403Error() {
 			return nil
 		}
 
+		// the bash-less fallback logs in via cmdExecWithStdin; without this stub
+		// the test would invoke the real container runtime
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
 		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("Error response from daemon: authentication required")
 		}
