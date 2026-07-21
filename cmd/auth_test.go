@@ -64,8 +64,9 @@ func (s *CmdSuite) TestLogout() {
 	localDomain := "localhost"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogout = func(domain string, out io.Writer) {
+	cloudLogout = func(domain string, out io.Writer) error {
 		s.Equal(localDomain, domain)
+		return nil
 	}
 	softwareLogout = func(domain string) {
 		s.Equal(softwareDomain, domain)

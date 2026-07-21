@@ -921,12 +921,13 @@ func TestLogout(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
-		Logout("astronomer.io", buf)
+		err := Logout("astronomer.io", buf)
+		assert.NoError(t, err)
 		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
 	})
 
 	t.Run("success_with_email", func(t *testing.T) {
-		assertions := func(expUserEmail string, expToken string) {
+		assertions := func(expUserEmail, expToken, expRefreshToken string) {
 			contexts, err := config.GetContexts()
 			assert.NoError(t, err)
 			context := contexts.Contexts["localhost"]
@@ -934,6 +935,7 @@ func TestLogout(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, expUserEmail, context.UserEmail)
 			assert.Equal(t, expToken, context.Token)
+			assert.Equal(t, expRefreshToken, context.RefreshToken)
 		}
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
@@ -942,16 +944,32 @@ func TestLogout(t *testing.T) {
 		assert.NoError(t, err)
 		err = c.SetContextKey("token", "Bearer some-token")
 		assert.NoError(t, err)
+		err = c.SetContextKey("refreshtoken", "some-refresh-token")
+		assert.NoError(t, err)
 		// test before
-		assertions("test.user@astronomer.io", "Bearer some-token")
+		assertions("test.user@astronomer.io", "Bearer some-token", "some-refresh-token")
 
 		// log out
 		c, err = config.GetCurrentContext()
 		assert.NoError(t, err)
-		Logout(c.Domain, os.Stdout)
+		buf := new(bytes.Buffer)
+		err = Logout(c.Domain, buf)
+		assert.NoError(t, err)
 
-		// test after logout
-		assertions("", "")
+		// test after logout: token, refresh token, and email are all cleared
+		assertions("", "", "")
+		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
+	})
+
+	t.Run("partial_failure_does_not_report_success", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		buf := new(bytes.Buffer)
+		// an empty domain makes every SetContextKey call fail (no domain configured),
+		// so Logout should bail out with an error instead of printing success.
+		err := Logout("", buf)
+		assert.Error(t, err)
+		assert.NotContains(t, buf.String(), "Successfully logged out of Astronomer")
+		assert.Contains(t, buf.String(), "Failed to clear access token")
 	})
 }
 
