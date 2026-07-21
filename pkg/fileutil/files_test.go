@@ -1021,9 +1021,9 @@ func (s *Suite) TestDefaultPermissions() {
 	s.Run("CreateFile makes parent dirs 0o755", func() {
 		root := s.T().TempDir()
 		target := filepath.Join(root, "nested", "child", "file.txt")
-		f, err := CreateFile(target)
+		file, err := CreateFile(target)
 		s.NoError(err)
-		f.Close()
+		file.Close()
 
 		info, err := os.Stat(filepath.Join(root, "nested"))
 		s.NoError(err)
