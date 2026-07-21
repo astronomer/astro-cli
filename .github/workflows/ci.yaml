@@ -91,15 +91,19 @@ jobs:
       src: ${{ steps.filter.outputs.src }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
-        id: filter
         with:
-          filters: |
-            src:
-              - '**/*.go'
-              - 'go.mod'
-              - 'go.sum'
-              - 'integration-test/**'
+          fetch-depth: 0
+      # Plain git diff instead of dorny/paths-filter: the org Actions policy
+      # blocks the workflow token from the PR files API this repo's filters
+      # would otherwise use ("Resource not accessible by integration").
+      - id: filter
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          if git diff --name-only "$base"...HEAD | grep -qE '(\.go$|^go\.mod$|^go\.sum$|^integration-test/)'; then
+            echo "src=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "src=false" >> "$GITHUB_OUTPUT"
+          fi
 
   integration-test:
     needs: [lint, test, test-windows, detect-changes]
