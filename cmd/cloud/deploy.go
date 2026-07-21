@@ -187,7 +187,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	if deploymentID != "" && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 		if err != nil {
-			return nil
+			return errors.Wrap(err, "failed to save deployment id in config")
 		}
 	}
 

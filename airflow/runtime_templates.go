@@ -173,7 +173,7 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, os.ModePerm); err != nil {
+			if err := os.MkdirAll(targetPath, 0o755); err != nil { //nolint:mnd
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case tar.TypeReg:

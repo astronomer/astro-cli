@@ -423,6 +423,30 @@ func TestCheckToken(t *testing.T) {
 		err = checkToken(mockV1Client, nil)
 		assert.Contains(t, err.Error(), "failed to login")
 	})
+	t.Run("does not overwrite the token when refresh fails but relogin succeeds", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		// the test config has no refresh token and an expired (zero-value) ExpiresIn,
+		// so checkToken will call refresh, which fails against the real auth endpoint
+		// with an empty refresh token, then falls back to authLogin above.
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		err = ctx.SetContextKey("token", "Bearer relogin-token")
+		assert.NoError(t, err)
+
+		// run checkToken
+		err = checkToken(mockV1Client, nil)
+		assert.NoError(t, err)
+
+		// the token set by the (mocked) successful relogin must survive: it should
+		// not be clobbered by the failed refresh's zero-value response
+		ctx, err = context.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer relogin-token", ctx.Token)
+	})
 }
 
 func TestCheckAPIToken(t *testing.T) {

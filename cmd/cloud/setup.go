@@ -158,6 +158,9 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 			if err != nil {
 				return err
 			}
+			// authLogin already persisted the new context, so don't fall through
+			// and overwrite it with the failed refresh's zero-value token
+			return nil
 		}
 		// persist the updated context with the renewed access token
 		err = c.SetContextKey("token", "Bearer "+res.AccessToken)

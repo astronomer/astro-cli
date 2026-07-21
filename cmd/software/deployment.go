@@ -670,7 +670,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	if executorUpdate != "" {
 		executorType, err = validateExecutorArg(executorUpdate)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 

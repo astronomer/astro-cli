@@ -698,7 +698,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	if err != nil {
 		return exitCode, err
 	}
-	if strings.Contains(exitCode, "0") { // if the error code is 0 the pytests passed
+	if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 0 { // exit code 0 means the pytests passed
 		return "", nil
 	}
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
@@ -912,7 +912,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 	fmt.Println("\nRunning DAG parse test with the new Airflow version")
 	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 	if err != nil {
-		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
+		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
 			fmt.Println("See above for errors detected in your DAGs")
 			return false, nil
 		} else {
@@ -1333,7 +1333,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 	pytestFile := DefaultTestPath
 	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecretString)
 	if err != nil {
-		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
+		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
 			return errors.New("See above for errors detected in your DAGs")
 		}
 		return errors.Wrap(err, "something went wrong while parsing your DAGs")

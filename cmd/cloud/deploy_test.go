@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
@@ -71,6 +73,61 @@ func TestDeployImage(t *testing.T) {
 
 	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--parse", "--pytest")
 	assert.NoError(t, err)
+}
+
+func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+		return nil
+	}
+
+	// config.InitConfig reads and writes real files on disk (via afero.NewOsFs()),
+	// including the home config that stores the current context. Point ASTRO_HOME at
+	// a throwaway directory with its own valid context, so the test does not depend on
+	// (or clobber) whatever real ~/.astro/config.yaml happens to exist on the machine
+	// running the test - on a fresh CI runner there is no such file, so without this
+	// the deploy fails earlier with "no context set" instead of exercising the save path.
+	//
+	// ASTRO_HOME is restored (and config's cached home-config path resynced) before
+	// testUtil.InitTestConfig runs in the deferred cleanup below, otherwise the fake
+	// config it writes for later tests lands at the wrong path and leaves them with no
+	// context set either.
+	origAstroHome, hadAstroHome := os.LookupEnv("ASTRO_HOME")
+	homeDir := t.TempDir()
+	require.NoError(t, os.Setenv("ASTRO_HOME", homeDir))
+	homeAstroDir := filepath.Join(homeDir, config.ConfigDir)
+	require.NoError(t, os.MkdirAll(homeAstroDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(homeAstroDir, config.ConfigFileNameWithExt), testUtil.NewTestConfig(testUtil.LocalPlatform), 0o600))
+
+	// Point the project config at a real directory, but make the config file itself
+	// a directory instead of a file, so the write that saves the deployment ID fails.
+	// This confirms that a save failure stops the deploy instead of returning nil.
+	tmpDir := t.TempDir()
+	astroDir := filepath.Join(tmpDir, config.ConfigDir)
+	require.NoError(t, os.MkdirAll(filepath.Join(astroDir, config.ConfigFileNameWithExt), 0o755))
+
+	origWorkingPath := config.WorkingPath
+	config.WorkingPath = tmpDir
+	config.InitConfig(afero.NewOsFs())
+	defer func() {
+		if hadAstroHome {
+			os.Setenv("ASTRO_HOME", origAstroHome)
+		} else {
+			os.Unsetenv("ASTRO_HOME")
+		}
+		config.WorkingPath = origWorkingPath
+		config.InitConfig(afero.NewOsFs())
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+	}()
+
+	err := execDeployCmd("test-deployment-id", "--save")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to save deployment id in config")
 }
 
 func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {

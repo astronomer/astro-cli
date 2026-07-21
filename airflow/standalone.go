@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -73,7 +74,7 @@ var (
 var parseRuntimeTagPython = airflowrt.ParseRuntimeTagPython
 
 // af2DarwinShim, af2PickleFixPlugin, and writeDarwinForkSafetyPatch are
-// provided by the airflowrt package so they can be shared with astro-desktop.
+// provided by the airflowrt package so they can be shared with Astro Desktop.
 var (
 	af2DarwinShim              = airflowrt.AF2DarwinShim
 	af2PickleFixPlugin         = airflowrt.AF2PickleFixPlugin
@@ -1238,7 +1239,7 @@ func (s *Standalone) Parse(_, _, _ string) error {
 
 	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", "")
 	if err != nil {
-		if strings.Contains(exitCode, "1") {
+		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
 			return errors.New("See above for errors detected in your DAGs")
 		}
 		return errors.Wrap(err, "something went wrong while parsing your DAGs")

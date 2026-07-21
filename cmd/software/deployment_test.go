@@ -595,6 +595,30 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 	})
 }
 
+func (s *Suite) TestDeploymentUpdateInvalidExecutor() {
+	s.Run("invalid executor stops the update and returns an error instead of silently doing nothing", func() {
+		appConfig = &houston.AppConfig{}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.ImageDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		houstonClient = api
+
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--executor=bogus"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		s.EqualError(err, errInvalidExecutorType.Error())
+		// The update should never reach Houston when the executor flag is invalid.
+		api.AssertNotCalled(s.T(), "UpdateDeployment", mock.Anything)
+	})
+}
+
 func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 	s.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User rejects.", func() {
 		appConfig = &houston.AppConfig{

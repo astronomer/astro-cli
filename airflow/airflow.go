@@ -15,7 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-var perm os.FileMode = 0o777
+var perm os.FileMode = 0o755
 
 var ExtractTemplate = InitFromTemplate
 

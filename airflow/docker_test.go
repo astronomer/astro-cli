@@ -1204,6 +1204,33 @@ func (s *Suite) TestDockerComposePytest() {
 		imageHandler.AssertExpectations(s.T())
 	})
 
+	s.Run("internal error exit code 10 reported as failure", func() {
+		// exit code 10 substring-contains "0"; the old check reported it as a pass
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("10", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		resp, err := mockDockerCompose.Pytest("", "", "", "", "")
+		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Equal("10", resp)
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("interrupt exit code 130 reported as failure", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("130", nil).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		resp, err := mockDockerCompose.Pytest("", "", "", "", "")
+		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Equal("130", resp)
+		imageHandler.AssertExpectations(s.T())
+	})
+
 	s.Run("image build failure", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(errMockDocker).Once()
@@ -1585,6 +1612,40 @@ func (s *Suite) TestDockerComposeParse() {
 
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("2", nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.Parse("", "test", "")
+		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+		composeMock.AssertExpectations(s.T())
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("internal error exit code 10", func() {
+		// exit code 10 substring-contains "1"; the old check reported it as a clean DAG error
+		DefaultTestPath = "test_dag_integrity_file.py"
+
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("10", nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.Parse("", "test", "")
+		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+		composeMock.AssertExpectations(s.T())
+		imageHandler.AssertExpectations(s.T())
+	})
+
+	s.Run("interrupt exit code 130", func() {
+		// exit code 130 (Ctrl-C) substring-contains "1"; the old check reported it as a clean DAG error
+		DefaultTestPath = "test_dag_integrity_file.py"
+
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("130", nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		mockDockerCompose.composeService = composeMock

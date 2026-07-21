@@ -238,7 +238,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = []string{
 		"inspect",
 		"astro-pytest",
-		"--format='{{.State.ExitCode}}'",
+		"--format={{.State.ExitCode}}",
 	}
 	var outb bytes.Buffer
 	inspectErr := cmdExec(containerRuntime, &outb, stderr, args...)
@@ -260,7 +260,8 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		logger.Debugf("Error removing the astro-pytest container: %s", rmErr.Error())
 	}
 
-	return outb.String(), err
+	// trim the trailing newline so consumers get a clean integer string to parse
+	return strings.TrimSpace(outb.String()), err
 }
 
 func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {

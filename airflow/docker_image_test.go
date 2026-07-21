@@ -186,6 +186,23 @@ func (s *Suite) TestDockerImagePytest() {
 		s.Equal(out, "exit code 1")
 	})
 
+	s.Run("exit code trimmed to clean integer", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "start":
+				return errMock
+			case args[0] == "inspect":
+				stdout.Write([]byte("10\n")) // docker inspect prints the code with a trailing newline
+				return nil
+			default:
+				return nil
+			}
+		}
+		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
+		s.Error(err)
+		s.Equal("10", out)
+	})
+
 	s.Run("copy error", func() {
 		// Create a directory so the docker cp loop has something to copy
 		dagsDir := cwd + "/dags"
