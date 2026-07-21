@@ -19,6 +19,13 @@ const (
 	StopTimeout           = 10 * time.Second
 )
 
+// stopPollInterval and stopTimeout mirror the exported constants; tests
+// shorten them to exercise the stop path without real processes.
+var (
+	stopPollInterval = StopPollInterval
+	stopTimeout      = StopTimeout
+)
+
 // ReadPID reads a PID file and checks if the process is alive.
 // Returns the PID and true if the process is running, or 0 and false otherwise.
 func ReadPID(pidFilePath string) (int, bool) {
@@ -60,19 +67,23 @@ func StopProcess(pidFilePath string) (bool, error) {
 
 	terminateProcess(pid)
 
-	// Poll for process exit
-	deadline := time.Now().Add(StopTimeout)
+	// Poll the process group — not just the master PID. airflow standalone
+	// spawns scheduler/api-server/triggerer as subprocesses that inherit the
+	// group; the master often exits on SIGTERM well before its children finish
+	// graceful shutdown. Watching only the master would return early here and
+	// leave those subprocesses running.
+	deadline := time.Now().Add(stopTimeout)
 	for time.Now().Before(deadline) {
-		time.Sleep(StopPollInterval)
-		if _, stillAlive := ReadPID(pidFilePath); !stillAlive {
+		time.Sleep(stopPollInterval)
+		if !isProcessGroupAlive(pid) {
 			break
 		}
 	}
 
-	// If still alive, force kill
-	if _, stillAlive := ReadPID(pidFilePath); stillAlive {
+	// If any group member is still alive, force kill
+	if isProcessGroupAlive(pid) {
 		killProcess(pid)
-		time.Sleep(StopPollInterval)
+		time.Sleep(stopPollInterval)
 	}
 
 	os.Remove(pidFilePath)

@@ -60,6 +60,45 @@ func TestBuildEnv(t *testing.T) {
 	assert.True(t, strings.HasPrefix(envMap["PATH"], filepath.Join(dir, ".venv", "bin")))
 }
 
+func TestBuildEnv_LoopbackDefaults(t *testing.T) {
+	dir := t.TempDir()
+
+	env := BuildEnv(dir, "", "")
+
+	envMap := envToMap(env)
+	// The api-server (AF3) and webserver (AF2) must default to loopback so a
+	// standalone instance with all-admins auth is not reachable from the LAN.
+	assert.Equal(t, "127.0.0.1", envMap["AIRFLOW__API__HOST"])
+	assert.Equal(t, "127.0.0.1", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
+func TestBuildEnv_LoopbackOverriddenByEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, ".env")
+	content := "AIRFLOW__API__HOST=0.0.0.0\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
+	require.NoError(t, os.WriteFile(envFile, []byte(content), 0o644))
+
+	env := BuildEnv(dir, "", envFile)
+
+	envMap := envToMap(env)
+	// A user's explicit .env setting wins over the loopback default.
+	assert.Equal(t, "0.0.0.0", envMap["AIRFLOW__API__HOST"])
+	assert.Equal(t, "0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
+func TestBuildEnv_LoopbackOverriddenByInheritedEnv(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("AIRFLOW__API__HOST", "0.0.0.0")
+	t.Setenv("AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "0.0.0.0")
+
+	env := BuildEnv(dir, "", "")
+
+	envMap := envToMap(env)
+	// A user's setting in the inherited environment wins over the loopback default.
+	assert.Equal(t, "0.0.0.0", envMap["AIRFLOW__API__HOST"])
+	assert.Equal(t, "0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
 func TestBuildEnv_DefaultPort(t *testing.T) {
 	dir := t.TempDir()
 

@@ -47,6 +47,16 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 	}
 	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
 
+	// Pin the api-server (Airflow 3) and webserver (Airflow 2) to the IPv4
+	// loopback. Airflow's own default bind is 0.0.0.0, which — combined with
+	// SIMPLE_AUTH_MANAGER_ALL_ADMINS above — would expose the instance to every
+	// device on the LAN. Local dev only needs localhost. These are defaults, not
+	// forced values: a user's own setting, from the .env file or the inherited
+	// environment, wins. The inapplicable key for whichever Airflow major is
+	// running is simply ignored.
+	setDefault(overrides, "AIRFLOW__API__HOST", "127.0.0.1")
+	setDefault(overrides, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "127.0.0.1")
+
 	// Layer 3: macOS proxy workaround.
 	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
 	// When Airflow's LocalExecutor forks, this can spin at 100% CPU indefinitely.
@@ -70,6 +80,19 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// setDefault sets key to value in overrides unless the user already supplied
+// it — via the .env file (already merged into overrides) or the inherited
+// environment (which passes through to the final env untouched).
+func setDefault(overrides map[string]string, key, value string) {
+	if _, ok := overrides[key]; ok {
+		return
+	}
+	if _, ok := os.LookupEnv(key); ok {
+		return
+	}
+	overrides[key] = value
 }
 
 // LoadEnvFile reads a .env file and returns key=value pairs.
