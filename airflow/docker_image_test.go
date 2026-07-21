@@ -717,6 +717,29 @@ func (s *Suite) TestExecCmd() {
 	})
 }
 
+func (s *Suite) TestExecCmdWithStdin() {
+	s.Run("success", func() {
+		stdout := new(bytes.Buffer)
+		stderr := new(bytes.Buffer)
+		err := cmdExecWithStdin("cat", "s3cr3t", stdout, stderr)
+		s.NoError(err)
+		s.Equal("s3cr3t", stdout.String())
+		s.Empty(stderr.String())
+	})
+
+	s.Run("invalid cmd", func() {
+		err := cmdExecWithStdin("invalid-cmd", "", nil, nil)
+		s.Contains(err.Error(), "failed to find the invalid-cmd command")
+	})
+
+	s.Run("cmd failure", func() {
+		stdout := new(bytes.Buffer)
+		stderr := new(bytes.Buffer)
+		err := cmdExecWithStdin("test", "", stdout, stderr, "-f", "does-not-exist")
+		s.Contains(err.Error(), "failed to execute cmd")
+	})
+}
+
 func (s *Suite) TestUseBash() {
 	s.Run("success", func() {
 		var gotStdin string
