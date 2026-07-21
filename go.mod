@@ -39,6 +39,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/container v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/localrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
 	github.com/compose-spec/compose-go/v2 v2.9.1
 	github.com/distribution/reference v0.6.0
@@ -444,3 +445,5 @@ replace github.com/astronomer/astro-cli/pkg/container => ./pkg/container
 replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
 
 replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry
+
+replace github.com/astronomer/astro-cli/pkg/localrt => ./pkg/localrt

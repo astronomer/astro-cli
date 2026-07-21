@@ -99,6 +99,11 @@ linters:
         text: 'shadow: declaration of .err. shadows declaration'
       - path: (.+)\.go$
         text: 'sloppyTestFuncName: function cleanUpInitFiles should be of form'
+      # v2 tree: Deps and the localrt contract structs are passed by value
+      # on purpose (docs/v2-architecture.md), so hugeParam does not apply
+      - linters: [gocritic]
+        path: ^cmd/(local|astro)/
+        text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]
         text: 'G115:'
