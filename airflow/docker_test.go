@@ -1207,12 +1207,12 @@ func (s *Suite) TestDockerComposePytest() {
 	s.Run("internal error exit code 10 reported as failure", func() {
 		// exit code 10 substring-contains "0"; the old check reported it as a pass
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("Build", "", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("10", nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest("", "", "", "", "")
+		resp, err := mockDockerCompose.Pytest("", "", "", "", nil)
 		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
 		s.Equal("10", resp)
 		imageHandler.AssertExpectations(s.T())
@@ -1220,12 +1220,12 @@ func (s *Suite) TestDockerComposePytest() {
 
 	s.Run("interrupt exit code 130 reported as failure", func() {
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", "", "", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
+		imageHandler.On("Build", "", mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return(nil).Once()
 		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []string{}, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, NoCache: false}).Return("130", nil).Once()
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest("", "", "", "", "")
+		resp, err := mockDockerCompose.Pytest("", "", "", "", nil)
 		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
 		s.Equal("130", resp)
 		imageHandler.AssertExpectations(s.T())
@@ -1634,7 +1634,7 @@ func (s *Suite) TestDockerComposeParse() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Parse("", "test", "")
+		err := mockDockerCompose.Parse("", "test", nil)
 		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
 		composeMock.AssertExpectations(s.T())
 		imageHandler.AssertExpectations(s.T())
@@ -1651,7 +1651,7 @@ func (s *Suite) TestDockerComposeParse() {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Parse("", "test", "")
+		err := mockDockerCompose.Parse("", "test", nil)
 		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
 		composeMock.AssertExpectations(s.T())
 		imageHandler.AssertExpectations(s.T())

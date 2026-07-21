@@ -286,9 +286,7 @@ func newAirflowUpgradeTestCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd.Flags().StringVarP(&lintConfigFile, "lint-config-file", "", "", "Relative path within project to a custom ruff config file. If not specified, a default config will be used.")
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "i", "", "ID of the Deployment you want run dependency tests against.")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "n", "", "Name of the upgraded image. Updates the FROM line in your Dockerfile to pull this image for the upgrade.")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Expose a secret to containers. Equivalent to 'docker build --secret'. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 	var err error
 	var avoidACFlag bool
 
@@ -336,9 +334,7 @@ func newAirflowStartCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 	annotateFlag(cmd, "no-cache", "docker")
 	annotateFlag(cmd, "image-name", "docker")
 	annotateFlag(cmd, "no-browser", "docker")
@@ -445,9 +441,7 @@ func newAirflowRestartCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	// Docker mode flags
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 	annotateFlag(cmd, "no-cache", "docker")
 	annotateFlag(cmd, "image-name", "docker")
 	annotateFlag(cmd, "build-secret", "docker")
@@ -476,9 +470,7 @@ func newAirflowPytestCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"--cov-config path\"'")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run pytest with")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 
 	return cmd
 }
@@ -494,9 +486,7 @@ func newAirflowParseCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run parse with")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 
 	return cmd
 }
@@ -511,9 +501,7 @@ func newAirflowBuildCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to tag as the project image")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 
 	return cmd
 }
@@ -821,7 +809,7 @@ func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) err
 		fmt.Printf("failed to add 'upgrade-test*' to .gitignore: %s", err.Error())
 	}
 
-	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString())
+	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString(), os.Getenv("BUILD_SECRET_INPUT"))
 
 	err = containerHandler.UpgradeTest(runtimeVersion, deploymentID, customImageName, resolvedBuildSecrets, versionTest, dagTest, lintTest, lintDeprecations, lintFix, lintConfigFile, astroV1Client)
 	if err != nil {
@@ -856,7 +844,7 @@ func airflowStart(cmd *cobra.Command, args []string, astroV1Client astrov1.APICl
 		return err
 	}
 
-	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString())
+	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString(), os.Getenv("BUILD_SECRET_INPUT"))
 
 	return containerHandler.Start(&airflow.StartOptions{
 		ImageName:    customImageName,
@@ -1062,7 +1050,7 @@ func airflowRestart(cmd *cobra.Command, args []string, astroV1Client astrov1.API
 		}
 	}
 
-	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString())
+	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString(), os.Getenv("BUILD_SECRET_INPUT"))
 
 	return containerHandler.Start(&airflow.StartOptions{
 		ImageName:    customImageName,
@@ -1116,7 +1104,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString())
+	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString(), os.Getenv("BUILD_SECRET_INPUT"))
 
 	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "", pytestArgs, resolvedBuildSecrets)
 	if err != nil {
@@ -1145,7 +1133,7 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString())
+	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString(), os.Getenv("BUILD_SECRET_INPUT"))
 
 	return containerHandler.Parse(customImageName, "", resolvedBuildSecrets)
 }
@@ -1166,7 +1154,7 @@ func airflowBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString())
+	resolvedBuildSecrets := util.ResolveBuildSecrets(buildSecrets, config.CFG.DevBuildSecrets.GetString(), os.Getenv("BUILD_SECRET_INPUT"))
 
 	return containerHandler.Build(customImageName, resolvedBuildSecrets, noCache)
 }

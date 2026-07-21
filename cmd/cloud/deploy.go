@@ -96,9 +96,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secret", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt. Can be used multiple times to expose multiple secrets")
-	cmd.Flags().StringArrayVar(&buildSecrets, "build-secrets", []string{}, "Deprecated: use --build-secret instead")
-	cmd.Flags().MarkDeprecated("build-secrets", "use --build-secret instead") //nolint:errcheck
+	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
 	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "this flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck
 	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-DAG bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
@@ -224,7 +222,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		WaitTime:       waitTime,
 		DagsPath:       dagsPath,
 		Description:    deployDescription,
-		BuildSecrets:   util.ResolveBuildSecrets(buildSecrets),
+		BuildSecrets:   util.ResolveBuildSecrets(buildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
 		Force:          forceDeploy,
 		DagBundleName:  dagBundleName,
 	}

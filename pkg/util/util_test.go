@@ -1,7 +1,6 @@
 package util
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -230,14 +229,14 @@ func (s *Suite) TestParseAPIToken() {
 
 func (s *Suite) TestResolveBuildSecrets() {
 	s.Run("returns nil if no secrets are given", func() {
-		s.Nil(ResolveBuildSecrets([]string{}))
+		s.Nil(ResolveBuildSecrets([]string{}, ""))
 	})
 
 	s.Run("returns flag values as-is", func() {
-		s.Equal([]string{"secret1"}, ResolveBuildSecrets([]string{"secret1"}))
+		s.Equal([]string{"secret1"}, ResolveBuildSecrets([]string{"secret1"}, ""))
 		s.Equal(
 			[]string{"secret1", "secret2", "secret3"},
-			ResolveBuildSecrets([]string{"secret1", "secret2", "secret3"}),
+			ResolveBuildSecrets([]string{"secret1", "secret2", "secret3"}, ""),
 		)
 	})
 
@@ -249,21 +248,30 @@ func (s *Suite) TestResolveBuildSecrets() {
 		s.Equal([]string{"flag-secret"}, ResolveBuildSecrets([]string{"flag-secret"}, "fallback-secret"))
 	})
 
-	s.Run("fallback takes priority over BUILD_SECRET_INPUT", func() {
-		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
-		defer os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
-		os.Setenv("BUILD_SECRET_INPUT", "env-secret")
-
-		s.Equal([]string{"fallback-secret"}, ResolveBuildSecrets([]string{}, "fallback-secret"))
+	s.Run("earlier fallback takes priority over later ones", func() {
+		s.Equal([]string{"first"}, ResolveBuildSecrets([]string{}, "first", "second"))
 	})
 
-	s.Run("uses BUILD_SECRET_INPUT when flag and fallbacks are empty", func() {
-		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
-		defer os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
-		os.Setenv("BUILD_SECRET_INPUT", "env-secret")
+	s.Run("uses later fallback when earlier ones are empty", func() {
+		s.Equal([]string{"second"}, ResolveBuildSecrets([]string{}, "", "second"))
+	})
 
-		s.Equal([]string{"flag-secret"}, ResolveBuildSecrets([]string{"flag-secret"}))
-		s.Equal([]string{"env-secret"}, ResolveBuildSecrets([]string{}))
+	s.Run("splits newline-delimited fallbacks", func() {
+		s.Equal(
+			[]string{"id=aws,src=credentials", "id=PLATFORM_PASSWORD,env=PLATFORM_PASSWORD"},
+			ResolveBuildSecrets([]string{}, "id=aws,src=credentials\nid=PLATFORM_PASSWORD,env=PLATFORM_PASSWORD"),
+		)
+	})
+
+	s.Run("drops blank lines and surrounding whitespace", func() {
+		s.Equal(
+			[]string{"id=one,src=one.txt", "id=two,env=TWO"},
+			ResolveBuildSecrets([]string{}, "\n  id=one,src=one.txt\r\n\nid=two,env=TWO\n"),
+		)
+	})
+
+	s.Run("whitespace-only fallback is skipped in favor of later ones", func() {
+		s.Equal([]string{"second"}, ResolveBuildSecrets([]string{}, " \n ", "second"))
 	})
 }
 

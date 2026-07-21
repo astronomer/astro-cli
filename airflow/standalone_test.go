@@ -2008,7 +2008,7 @@ func (s *Suite) TestStandaloneParse_Interrupted() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Parse("", "", "")
+	err = handler.Parse("", "", nil)
 	s.Error(err)
 	s.Contains(err.Error(), "something went wrong while parsing your DAGs")
 }
