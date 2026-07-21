@@ -167,7 +167,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		err = c.SetExpiresIn(res.ExpiresIn)
+		err = c.SetExpiresIn(time.Duration(res.ExpiresIn) * time.Second)
 		if err != nil {
 			return err
 		}
@@ -322,7 +322,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		return false, err
 	}
 
-	err = c.SetExpiresIn(tokenRes.ExpiresIn)
+	err = c.SetExpiresIn(time.Duration(tokenRes.ExpiresIn) * time.Second)
 	if err != nil {
 		return false, err
 	}
@@ -396,7 +396,7 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 		return false, err
 	}
 
-	err = c.SetExpiresIn(time.Now().AddDate(1, 0, 0).Unix())
+	err = c.SetExpiresIn(365 * 24 * time.Hour)
 	if err != nil {
 		return false, err
 	}

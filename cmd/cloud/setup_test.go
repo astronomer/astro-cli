@@ -507,6 +507,37 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("sets a one year expiry for an ASTRO_API_TOKEN, not a unix timestamp", func(t *testing.T) {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		_, err = checkAPIToken(true, mockV1Client)
+		assert.NoError(t, err)
+
+		c, err := context.GetContext(domain)
+		assert.NoError(t, err)
+		expiresAt, err := c.GetExpiresIn()
+		assert.NoError(t, err)
+
+		// The stored expiry should be about a year from now, not a Unix
+		// timestamp mistakenly treated as a duration in seconds (which would
+		// land roughly 57 years out).
+		assert.WithinDuration(t, time.Now().Add(365*24*time.Hour), expiresAt, time.Hour)
+	})
+
 	t.Run("failed to parse api token", func(t *testing.T) {
 		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
