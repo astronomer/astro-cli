@@ -5,8 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
@@ -71,6 +73,37 @@ func TestDeployImage(t *testing.T) {
 
 	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--parse", "--pytest")
 	assert.NoError(t, err)
+}
+
+func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+		return nil
+	}
+
+	// Point the project config at a real directory, but make the config file itself
+	// a directory instead of a file, so the write that saves the deployment ID fails.
+	// This confirms that a save failure stops the deploy instead of returning nil.
+	tmpDir := t.TempDir()
+	astroDir := filepath.Join(tmpDir, config.ConfigDir)
+	require.NoError(t, os.MkdirAll(filepath.Join(astroDir, config.ConfigFileNameWithExt), 0o755))
+
+	origWorkingPath := config.WorkingPath
+	config.WorkingPath = tmpDir
+	config.InitConfig(afero.NewOsFs())
+	defer func() {
+		config.WorkingPath = origWorkingPath
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+	}()
+
+	err := execDeployCmd("test-deployment-id", "--save")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to save deployment id in config")
 }
 
 func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
