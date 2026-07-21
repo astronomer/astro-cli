@@ -92,7 +92,7 @@ func (p *Proxy) Start() error {
 
 	v4, boundPort, err := bindLoopbackWithFallback(p.Port())
 	if err != nil {
-		return fmt.Errorf("proxy failed to start: %w", err)
+		return fmt.Errorf("starting proxy: %w", err)
 	}
 
 	p.portMu.Lock()
@@ -118,7 +118,7 @@ func (p *Proxy) Start() error {
 	// Give Serve a moment to fail fast (e.g. an error right after Listen).
 	select {
 	case err := <-errCh:
-		return fmt.Errorf("proxy failed to start: %w", err)
+		return fmt.Errorf("starting proxy: %w", err)
 	case <-time.After(startFailWindow):
 		return nil
 	}

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -271,6 +272,73 @@ func TestAddRoute_DockerRouteSurvivesPruningWithDeadPID(t *testing.T) {
 	assert.Equal(t, "12345", routes[0].Port)
 	assert.Equal(t, "docker", routes[0].Mode)
 	assert.Equal(t, "15432", routes[0].Services["postgres"])
+}
+
+func TestReadRoutesCacheSeesExternalChange(t *testing.T) {
+	s := testStore(t)
+
+	require.NoError(t, s.AddRoute(&Route{
+		Hostname:   "my-project.localhost",
+		Port:       "12345",
+		ProjectDir: "/home/user/my-project",
+		PID:        os.Getpid(),
+	}))
+
+	// First read populates the cache.
+	routes, err := s.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, "12345", routes[0].Port)
+
+	// An unchanged file serves from cache and returns the same routes.
+	routes, err = s.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+
+	// Rewrite routes.json behind the Store's back, as another process
+	// would. Different content and size, so the stat check must miss.
+	external := []Route{{
+		Hostname:   "other-project.localhost",
+		Port:       "23456",
+		ProjectDir: "/home/user/other-project",
+		PID:        os.Getpid(),
+	}}
+	data, err := json.MarshalIndent(external, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(s.routesFilePath(), data, FilePermRW))
+
+	routes, err = s.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, "other-project.localhost", routes[0].Hostname)
+	assert.Equal(t, "23456", routes[0].Port)
+
+	// Deleting the file drops the cache too.
+	require.NoError(t, os.Remove(s.routesFilePath()))
+	routes, err = s.ReadRoutes()
+	require.NoError(t, err)
+	assert.Empty(t, routes)
+}
+
+func TestReadRoutesResultDoesNotAliasCache(t *testing.T) {
+	s := testStore(t)
+
+	require.NoError(t, s.AddRoute(&Route{
+		Hostname:   "my-project.localhost",
+		Port:       "12345",
+		ProjectDir: "/home/user/my-project",
+		PID:        os.Getpid(),
+	}))
+
+	first, err := s.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+	first[0].Port = "mutated"
+
+	second, err := s.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, second, 1)
+	assert.Equal(t, "12345", second[0].Port)
 }
 
 func TestAddRoute_WithServices(t *testing.T) {

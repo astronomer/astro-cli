@@ -5,23 +5,18 @@
 package project
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Marker is the file whose presence makes a directory a project root.
 const Marker = "pyproject.toml"
-
-// worktreeHostnameDots is the dot count of <worktree>.<repo>.localhost.
-const worktreeHostnameDots = 2
 
 // NotFoundError reports that no project marker was found in the start
 // directory or any of its parents.
@@ -83,35 +78,21 @@ func New(dir string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	hostname, err := proxy.DeriveHostname(abs)
+	hostname, isWorktree, err := proxy.DeriveHostname(abs)
 	if err != nil {
 		return nil, err
 	}
 	return &Project{
-		Dir: abs,
-		ID:  id,
-		// Sanitized hostname labels never contain dots, so a second dot
-		// can only come from DeriveHostname's <worktree>.<repo>.localhost
-		// branch. Deriving the flag from the hostname keeps the two
-		// consistent and avoids reading .git twice.
-		IsWorktree: strings.Count(hostname, ".") == worktreeHostnameDots,
+		Dir:        abs,
+		ID:         id,
+		IsWorktree: isWorktree,
 		Hostname:   hostname,
 	}, nil
 }
 
 // ID returns the identity key for a project directory: the sha256 hex of
-// its symlink-resolved absolute path. Resolving symlinks first means every
-// route to the same directory yields the same ID, so per-project state
-// never forks.
+// its symlink-resolved absolute path. It is a thin wrapper over
+// localrt.ProjectID, which owns project identity (docs/v2-architecture.md).
 func ID(dir string) (string, error) {
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return "", fmt.Errorf("resolving %s: %w", dir, err)
-	}
-	resolved, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		return "", fmt.Errorf("resolving symlinks in %s: %w", abs, err)
-	}
-	sum := sha256.Sum256([]byte(resolved))
-	return hex.EncodeToString(sum[:]), nil
+	return localrt.ProjectID(dir)
 }

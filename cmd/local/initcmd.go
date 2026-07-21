@@ -28,7 +28,7 @@ func newInitCmd(c *cli) *cobra.Command {
 			if _, err := c.renderer(); err != nil {
 				return err
 			}
-			return notBuilt("astro init (project scaffold, an earlier fix)")
+			return notBuilt("astro init (project scaffold)") // an earlier fix
 		},
 	}
 	cmd.Flags().StringVar(&opts.airflowVersion, "airflow-version", "", "Airflow version to pin in the manifest (default: latest)")

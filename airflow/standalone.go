@@ -323,7 +323,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 			proxyPort = pkgproxy.DefaultPort
 		}
 
-		hostname, hErr := pkgproxy.DeriveHostname(s.airflowHome)
+		hostname, _, hErr := pkgproxy.DeriveHostname(s.airflowHome)
 		if hErr != nil {
 			// Fall back to non-proxy mode if hostname derivation fails
 			useProxy = false
@@ -652,6 +652,7 @@ func (s *Standalone) registerProxyRoute(pid int) string {
 		Port:       s.webserverPort(),
 		ProjectDir: s.airflowHome,
 		PID:        pid,
+		Mode:       pkgproxy.RouteModeStandalone,
 	}
 	if err := proxy.Routes().AddRoute(route); err != nil {
 		fmt.Printf("Warning: could not register proxy route: %s\n", err.Error())
@@ -913,7 +914,7 @@ func (s *Standalone) Stop(_ bool) error {
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
 func (s *Standalone) removeProxyRoute() {
-	hostname, err := pkgproxy.DeriveHostname(s.airflowHome)
+	hostname, _, err := pkgproxy.DeriveHostname(s.airflowHome)
 	if err != nil {
 		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
@@ -956,7 +957,7 @@ func (s *Standalone) Kill() error {
 func (s *Standalone) PS() (*types.PSStatus, error) {
 	pid, alive := s.readPID()
 	status := &types.PSStatus{
-		Mode:    "standalone",
+		Mode:    pkgproxy.RouteModeStandalone,
 		Running: &alive,
 	}
 	if alive {

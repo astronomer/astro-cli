@@ -42,7 +42,7 @@ func newProxyStopCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop",
 		Short: "Stop the proxy daemon",
-		Long:  "Force-stop the proxy daemon. It will restart automatically on the next 'astro local start'.",
+		Long:  "Force-stop the proxy daemon. It will restart automatically the next time local Airflow starts.",
 		RunE:  proxyStop,
 	}
 }

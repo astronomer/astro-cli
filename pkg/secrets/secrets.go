@@ -1,8 +1,7 @@
 // Package secrets stores sensitive values for local development. The
 // mechanism: one master key in the OS keyring, values AES-256-GCM encrypted
-// on disk. The keyring implementation is lifted from Astro Desktop's secret
-// package in an earlier fix, with the AEAD scoped per Store instance and the
-// keyring service name a constructor parameter.
+// on disk, with the AEAD scoped per Store instance and the keyring service
+// name a constructor parameter.
 //
 // The CLI and Astro Desktop share one vault: both open the store with
 // DefaultService and the shared value home (~/.astro/secrets), so a secret
@@ -17,7 +16,7 @@ import "errors"
 const DefaultService = "astro"
 
 // Meta identifies a stored secret without exposing its value. ListMeta is
-// the only call surfaces visible to coding agents / LLMs may use (chat
+// the only call allowed on surfaces visible to coding agents / LLMs (chat
 // panes, MCP tools, AGENTS.md-driven flows): it reads cached ciphertext and
 // is structurally incapable of returning a value, touching the keyring, or
 // prompting — so an agent can see what exists but never what it is.

@@ -220,7 +220,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
 func (d *DockerCompose) removeProxyRoute() {
-	hostname, err := pkgproxy.DeriveHostname(d.airflowHome)
+	hostname, _, err := pkgproxy.DeriveHostname(d.airflowHome)
 	if err != nil {
 		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
@@ -291,7 +291,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			proxyPort = pkgproxy.DefaultPort
 		}
 
-		hostname, hErr := pkgproxy.DeriveHostname(d.airflowHome)
+		hostname, _, hErr := pkgproxy.DeriveHostname(d.airflowHome)
 		if hErr != nil {
 			// Fall back to non-proxy mode if hostname derivation fails
 			useProxy = false
@@ -411,7 +411,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			ProjectDir: d.airflowHome,
 			PID:        0, // Docker routes don't track PID — CLI exits after start
 			Services:   services,
-			Mode:       "docker",
+			Mode:       pkgproxy.RouteModeDocker,
 		}
 		if addErr := proxy.Routes().AddRoute(&route); addErr != nil {
 			fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
@@ -543,7 +543,7 @@ func (d *DockerCompose) PS() (*airflowTypes.PSStatus, error) {
 	}
 
 	status := &airflowTypes.PSStatus{
-		Mode:       "docker",
+		Mode:       pkgproxy.RouteModeDocker,
 		Containers: make([]airflowTypes.ContainerStatus, 0, len(psInfo)),
 	}
 

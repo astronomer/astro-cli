@@ -42,7 +42,7 @@ func (s *Store) AllocatePort() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("failed to find an available port after %d attempts", maxRetries)
+	return "", fmt.Errorf("finding an available port: %d attempts exhausted", maxRetries)
 }
 
 // IsPortAvailable checks if a port is free by attempting to connect.

@@ -75,5 +75,5 @@ func TestAllocatePort_AllBusy(t *testing.T) {
 
 	_, err := s.AllocatePort()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to find an available port")
+	assert.Contains(t, err.Error(), "finding an available port")
 }

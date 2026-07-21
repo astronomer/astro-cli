@@ -492,7 +492,7 @@ func newCheckCmd(c *cli) *cobra.Command {
 			if _, err := c.renderer(); err != nil {
 				return err
 			}
-			return notBuilt("astro local check (project validation, an earlier fix)")
+			return notBuilt("astro local check (project validation)") // an earlier fix
 		},
 	}
 	cmd.Flags().Bool("strict", false, "Treat warnings as errors (not built yet)")

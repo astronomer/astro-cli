@@ -32,21 +32,23 @@ func SanitizeLabel(name string) string {
 
 // DeriveHostname converts a project directory path into a valid DNS hostname.
 //
-// If the project is inside a git worktree, the hostname includes both the
-// worktree name and the repo name: <worktree>.<repo>.localhost.
-// Otherwise, it uses just the directory name: <dir>.localhost.
-func DeriveHostname(projectDir string) (string, error) {
+// If the project is inside a linked git worktree, the hostname includes both
+// the worktree name and the repo name — <worktree>.<repo>.localhost — and
+// isWorktree is true. Otherwise, it uses just the directory name,
+// <dir>.localhost. Callers wanting the worktree fact use the returned flag
+// instead of re-reading .git or inspecting the hostname's shape.
+func DeriveHostname(projectDir string) (hostname string, isWorktree bool, err error) {
 	// Try worktree detection first
-	if hostname, err := deriveWorktreeHostname(projectDir); err == nil && hostname != "" {
-		return hostname, nil
+	if hostname, wErr := deriveWorktreeHostname(projectDir); wErr == nil && hostname != "" {
+		return hostname, true, nil
 	}
 
 	// Fallback: use directory name
 	label := SanitizeLabel(filepath.Base(projectDir))
 	if label == "" {
-		return "", fmt.Errorf("could not derive a valid hostname from project directory %q", projectDir)
+		return "", false, fmt.Errorf("deriving a hostname from project directory %q: no usable label", projectDir)
 	}
-	return label + LocalhostSuffix, nil
+	return label + LocalhostSuffix, false, nil
 }
 
 // ReadDotGit reads the .git file/directory at the given path. It is a variable

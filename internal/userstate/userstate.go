@@ -1,7 +1,7 @@
 // Package userstate stores per-user, per-project local state: which
 // deployment the project points at, the preferred port, dev mode. It lives
 // under the astro cache directory, keyed by project path hash
-// (internal/project.ID), so worktrees and copies of a project each get
+// (localrt.ProjectID), so worktrees and copies of a project each get
 // their own state.
 package userstate
 
@@ -14,13 +14,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
 const (
 	stateFile = "state.json"
-	dirPerm   = 0o755
-	filePerm  = 0o600
+	// dirPerm is owner-only: per-user state should not be readable by
+	// other users on the machine.
+	dirPerm  = 0o700
+	filePerm = 0o600
 )
 
 // State is what astro remembers about a project for this user. It is not
@@ -48,31 +50,17 @@ func (e *DecodeError) Error() string {
 func (e *DecodeError) Unwrap() error { return e.Err }
 
 // CacheRoot returns the astro cache directory: $XDG_CACHE_HOME/astro when
-// set, otherwise ~/.cache/astro. Per the XDG spec a relative XDG_CACHE_HOME
-// is invalid and ignored.
+// set, otherwise ~/.cache/astro. It is a thin wrapper over
+// localrt.CacheRoot, which owns state locations (docs/v2-architecture.md).
 func CacheRoot() (string, error) {
-	if xdg := os.Getenv("XDG_CACHE_HOME"); filepath.IsAbs(xdg) {
-		return filepath.Join(xdg, "astro"), nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("finding home directory: %w", err)
-	}
-	return filepath.Join(home, ".cache", "astro"), nil
+	return localrt.CacheRoot()
 }
 
 // Dir returns the state directory for a project,
-// <cache>/projects/<path-hash>. It does not create the directory.
+// <cache>/projects/<path-hash>. It does not create the directory. It is a
+// thin wrapper over localrt.StateDir, which owns state locations.
 func Dir(projectPath string) (string, error) {
-	root, err := CacheRoot()
-	if err != nil {
-		return "", err
-	}
-	id, err := project.ID(projectPath)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, "projects", id), nil
+	return localrt.StateDir(projectPath)
 }
 
 // Load reads the project's state. A missing file is an empty State, not an

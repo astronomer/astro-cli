@@ -106,6 +106,9 @@ func TestLoadMinimal(t *testing.T) {
 
 func TestLoadMissingFile(t *testing.T) {
 	_, err := Load(filepath.Join(t.TempDir(), "pyproject.toml"))
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("want ErrNotFound, got %v", err)
+	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("want fs.ErrNotExist, got %v", err)
 	}

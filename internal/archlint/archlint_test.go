@@ -26,9 +26,13 @@ const modulePrefix = "github.com/astronomer/astro-cli/"
 
 // v2BelowCmd lists v2 packages below the cmd/ layer, where printing and
 // exiting are review-blocking. Extend as v2 packages land (internal/plan,
-// pkg/manifest, ...).
+// ...).
 var v2BelowCmd = []string{
+	"internal/project",
+	"internal/userstate",
 	"pkg/localrt",
+	"pkg/manifest",
+	"pkg/secrets",
 }
 
 // v2All lists every v2 package, none of which may import config/ or the v1

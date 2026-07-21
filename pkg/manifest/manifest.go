@@ -18,6 +18,7 @@ package manifest
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"regexp"
 	"sort"
@@ -68,6 +69,11 @@ type Deployment struct {
 // errors.Is, typically to offer init or import.
 var ErrNoAstroSection = errors.New("no [tool.astro] section")
 
+// ErrNotFound reports that no pyproject.toml exists at the path given to
+// Load. It wraps the underlying error, so errors.Is(err, fs.ErrNotExist)
+// still holds.
+var ErrNotFound = errors.New("pyproject.toml not found")
+
 // ParseError reports a pyproject.toml that does not decode as TOML. Err is
 // the go-toml error and carries the position.
 type ParseError struct {
@@ -110,12 +116,15 @@ func (e *ValidationError) Error() string {
 }
 
 // Load reads and validates the manifest at path (a pyproject.toml). A
-// missing file surfaces as an error satisfying errors.Is(err,
-// fs.ErrNotExist); other failure shapes are ErrNoAstroSection, ParseError,
-// and ValidationError.
+// missing file surfaces as ErrNotFound (which also satisfies
+// errors.Is(err, fs.ErrNotExist)); other failure shapes are
+// ErrNoAstroSection, ParseError, and ValidationError.
 func Load(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("%w: %w", ErrNotFound, err)
+		}
 		return nil, err
 	}
 	m, err := Parse(data)

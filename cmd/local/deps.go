@@ -12,9 +12,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"runtime"
 
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -56,7 +55,7 @@ func NewDeps() Deps {
 		Stderr:     os.Stderr,
 		Runtime:    localrtRuntime{},
 		WorkingDir: os.Getwd,
-		OpenURL:    openURL,
+		OpenURL:    browser.OpenURL,
 	}
 }
 
@@ -78,17 +77,6 @@ func (localrtRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
 
 func (localrtRuntime) List() ([]localrt.Status, error) {
 	return localrt.List()
-}
-
-func openURL(url string) error {
-	switch runtime.GOOS {
-	case "darwin":
-		return exec.Command("open", url).Start()
-	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	default:
-		return exec.Command("xdg-open", url).Start()
-	}
 }
 
 // skipPreRunAnnotation mirrors internal/telemetry.SkipPreRunAnnotation. It

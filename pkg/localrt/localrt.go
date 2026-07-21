@@ -17,8 +17,9 @@ import (
 )
 
 // Mode selects how Airflow runs. The values are wire-coupled: they appear in
-// the state record and in routes.json (pkg/proxy Route.Mode), so changing a
-// string breaks tools already in the field.
+// the state record and in routes.json (pkg/proxy Route.Mode — pkg/proxy's
+// RouteModeStandalone/RouteModeDocker carry the same wire values), so
+// changing a string breaks tools already in the field.
 type Mode string
 
 const (
@@ -46,6 +47,11 @@ type Plan struct {
 	StopWithSession bool
 	// Env is the fully layered process environment for Airflow.
 	Env map[string]string
+	// Hostname is the display hostname for this project, computed by the
+	// caller (e.g. from pkg/proxy's derivation). localrt persists it into
+	// the state record and reports it in Status; it is a label, never an
+	// identity.
+	Hostname string
 	// StateDir is the per-project runtime state home,
 	// ~/.cache/astro/projects/<path-hash>.
 	StateDir string
