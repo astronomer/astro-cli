@@ -1,0 +1,8 @@
+Using CPython 3.12.13
+  × No solution found when resolving dependencies for split (markers:
+  │ python_full_version >= '3.12'):
+  ╰─▶ Because apache-airflow==2.10.4 depends on flask>=2.2.1,<2.3 and your
+      project depends on apache-airflow==2.10.4, we can conclude that your
+      project depends on flask>=2.2.1,<2.3.
+      And because your project depends on flask>=3.1, we can conclude that
+      your project's requirements are unsatisfiable.
