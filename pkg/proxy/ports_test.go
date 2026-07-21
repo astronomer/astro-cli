@@ -10,14 +10,14 @@ import (
 )
 
 func TestAllocatePort(t *testing.T) {
-	setupTestDir(t)
+	s := testStore(t)
 
 	// Override isPortAvailable to always return true
 	origIsPortAvailable := isPortAvailable
 	defer func() { isPortAvailable = origIsPortAvailable }()
 	isPortAvailable = func(_ string) bool { return true }
 
-	port, err := AllocatePort()
+	port, err := s.AllocatePort()
 	require.NoError(t, err)
 	assert.NotEmpty(t, port)
 
@@ -30,10 +30,10 @@ func TestAllocatePort(t *testing.T) {
 }
 
 func TestAllocatePort_AvoidAllocated(t *testing.T) {
-	setupTestDir(t)
+	s := testStore(t)
 
 	// Pre-register a route so its port is taken
-	_ = AddRoute(&Route{
+	_ = s.AddRoute(&Route{
 		Hostname:   "existing.localhost",
 		Port:       "12345",
 		ProjectDir: "/tmp/existing",
@@ -47,7 +47,7 @@ func TestAllocatePort_AvoidAllocated(t *testing.T) {
 
 	// Allocate many ports and ensure none are 12345
 	for range 100 {
-		port, err := AllocatePort()
+		port, err := s.AllocatePort()
 		require.NoError(t, err)
 		assert.NotEqual(t, "12345", port)
 	}
@@ -66,14 +66,14 @@ func TestIsPortAvailable(t *testing.T) {
 }
 
 func TestAllocatePort_AllBusy(t *testing.T) {
-	setupTestDir(t)
+	s := testStore(t)
 
 	// Override isPortAvailable to always return false
 	origIsPortAvailable := isPortAvailable
 	defer func() { isPortAvailable = origIsPortAvailable }()
 	isPortAvailable = func(_ string) bool { return false }
 
-	_, err := AllocatePort()
+	_, err := s.AllocatePort()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to find an available port")
 }

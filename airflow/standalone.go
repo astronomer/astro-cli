@@ -32,6 +32,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/settings"
@@ -319,10 +320,10 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	if useProxy {
 		proxyPort = config.CFG.ProxyPort.GetString()
 		if proxyPort == "" {
-			proxyPort = proxy.DefaultPort
+			proxyPort = pkgproxy.DefaultPort
 		}
 
-		hostname, hErr := proxy.DeriveHostname(s.airflowHome)
+		hostname, hErr := pkgproxy.DeriveHostname(s.airflowHome)
 		if hErr != nil {
 			// Fall back to non-proxy mode if hostname derivation fails
 			useProxy = false
@@ -332,8 +333,8 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 			// Only allocate a port if no explicit --port was set
 			if opts.Port == "" {
 				defaultPort := s.webserverPort()
-				if !proxy.IsPortAvailable(defaultPort) {
-					allocatedPort, aErr := proxy.AllocatePort()
+				if !pkgproxy.IsPortAvailable(defaultPort) {
+					allocatedPort, aErr := proxy.Routes().AllocatePort()
 					if aErr != nil {
 						return fmt.Errorf("error allocating webserver port: %w", aErr)
 					}
@@ -646,21 +647,22 @@ func (s *Standalone) registerProxyRoute(pid int) string {
 	if !s.useProxy || s.proxyHostname == "" {
 		return ""
 	}
-	route := &proxy.Route{
+	route := &pkgproxy.Route{
 		Hostname:   s.proxyHostname,
 		Port:       s.webserverPort(),
 		ProjectDir: s.airflowHome,
 		PID:        pid,
 	}
-	if err := proxy.AddRoute(route); err != nil {
+	if err := proxy.Routes().AddRoute(route); err != nil {
 		fmt.Printf("Warning: could not register proxy route: %s\n", err.Error())
 		return ""
 	}
-	if _, err := proxy.EnsureRunning(s.proxyPort); err != nil {
+	boundPort, err := proxy.EnsureRunning(s.proxyPort)
+	if err != nil {
 		fmt.Printf("Warning: could not start proxy: %s\n", err.Error())
 		return ""
 	}
-	return fmt.Sprintf("http://%s:%s", s.proxyHostname, s.proxyPort)
+	return fmt.Sprintf("http://%s:%s", s.proxyHostname, boundPort)
 }
 
 // healthEndpoint returns the health check URL and component name.
@@ -911,12 +913,12 @@ func (s *Standalone) Stop(_ bool) error {
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
 func (s *Standalone) removeProxyRoute() {
-	hostname, err := proxy.DeriveHostname(s.airflowHome)
+	hostname, err := pkgproxy.DeriveHostname(s.airflowHome)
 	if err != nil {
 		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
 	}
-	remaining, err := proxy.RemoveRoute(hostname)
+	remaining, err := proxy.Routes().RemoveRoute(hostname)
 	if err != nil {
 		logger.Debugf("could not remove proxy route for %s: %s", hostname, err)
 		return
@@ -1135,7 +1137,7 @@ func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variabl
 	// If proxy mode allocated a random port, the actual port is stored in
 	// the proxy route registered during Start. Fall back to config default.
 	port := s.webserverPort()
-	if route, rerr := proxy.GetRouteByProject(s.airflowHome); rerr == nil && route != nil && route.Port != "" {
+	if route, rerr := proxy.Routes().GetRouteByProject(s.airflowHome); rerr == nil && route != nil && route.Port != "" {
 		port = route.Port
 	}
 

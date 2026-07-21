@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 func newProxyRootCmd() *cobra.Command {
@@ -41,7 +42,7 @@ func newProxyStopCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop",
 		Short: "Stop the proxy daemon",
-		Long:  "Force-stop the proxy daemon. It will restart automatically on the next 'astro dev start'.",
+		Long:  "Force-stop the proxy daemon. It will restart automatically on the next 'astro local start'.",
 		RunE:  proxyStop,
 	}
 }
@@ -53,17 +54,17 @@ func newProxyServeCmd() *cobra.Command {
 		Hidden: true,
 		RunE:   proxyServe,
 	}
-	cmd.Flags().StringVar(&proxyPortFlag, "port", proxy.DefaultPort, "Port to listen on")
+	cmd.Flags().StringVar(&proxyPortFlag, "port", pkgproxy.DefaultPort, "Port to listen on")
 	return cmd
 }
 
 func proxyStatus(_ *cobra.Command, _ []string) error {
 	port := config.CFG.ProxyPort.GetString()
 	if port == "" {
-		port = proxy.DefaultPort
+		port = pkgproxy.DefaultPort
 	}
 
-	routes, err := proxy.ListRoutes()
+	routes, err := proxy.Routes().ListRoutes()
 	if err != nil {
 		return fmt.Errorf("error reading routes: %w", err)
 	}
@@ -71,13 +72,18 @@ func proxyStatus(_ *cobra.Command, _ []string) error {
 	pid, alive := proxy.IsRunning()
 	switch {
 	case alive:
+		// Prefer the port the daemon reported at bind time over the config value.
+		if bound := proxy.BoundPort(); bound != "" {
+			port = bound
+		}
 		fmt.Printf("%s Proxy is running (PID %d) on port %s\n", ansi.Green("\u2714"), pid, port)
 	case len(routes) > 0:
 		// Routes exist but daemon is dead — auto-restart
 		fmt.Println("Proxy is not running. Restarting…")
-		if _, ensureErr := proxy.EnsureRunning(port); ensureErr != nil {
+		if boundPort, ensureErr := proxy.EnsureRunning(port); ensureErr != nil {
 			fmt.Printf("Warning: could not restart proxy: %s\n", ensureErr.Error())
 		} else {
+			port = boundPort
 			pid, alive = proxy.IsRunning()
 			if alive {
 				fmt.Printf("%s Proxy restarted (PID %d) on port %s\n", ansi.Green("\u2714"), pid, port)
@@ -122,6 +128,5 @@ func proxyStop(_ *cobra.Command, _ []string) error {
 }
 
 func proxyServe(_ *cobra.Command, _ []string) error {
-	p := proxy.NewProxy(proxyPortFlag)
-	return p.Serve()
+	return proxy.Serve(proxyPortFlag)
 }

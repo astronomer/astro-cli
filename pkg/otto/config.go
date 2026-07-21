@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Config holds the environment configuration for spawning Otto.
@@ -44,13 +45,17 @@ func DetectAirflow() string {
 		return ""
 	}
 
-	route, err := proxy.GetRouteByProject(cwd)
+	route, err := proxy.Routes().GetRouteByProject(cwd)
 	if err != nil || route == nil || route.Port == "" {
 		return ""
 	}
 
 	if route.Hostname != "" {
-		hostnameURL := fmt.Sprintf("http://%s:%s", route.Hostname, proxy.DefaultPort)
+		proxyPort := proxy.BoundPort()
+		if proxyPort == "" {
+			proxyPort = pkgproxy.DefaultPort
+		}
+		hostnameURL := fmt.Sprintf("http://%s:%s", route.Hostname, proxyPort)
 		if isAirflowHealthy(hostnameURL) {
 			return hostnameURL
 		}

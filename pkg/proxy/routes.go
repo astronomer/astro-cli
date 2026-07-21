@@ -6,19 +6,25 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
 const (
 	routesFileName = "routes.json"
 	lockFileName   = "routes.lock"
-	lockTimeout    = 5 * time.Second
-	FilePermRW     = 0o600 // owner read/write
-	DirPermRWX     = 0o755 // owner rwx, group/other rx
+	// lockTimeout must exceed the CLI's daemon start wait (10s): EnsureRunning
+	// holds this lock while a daemon starts, and concurrent route writes should
+	// outwait that instead of failing.
+	lockTimeout = 15 * time.Second
+	FilePermRW  = 0o600 // owner read/write
+	DirPermRWX  = 0o755 // owner rwx, group/other rx
 )
 
 // Route represents a registered project route.
+//
+// Route is a wire contract: routes.json is read and written by multiple
+// tools, including CLI versions already in the field. Add fields with
+// omitempty; never rename, remove, or retype existing ones.
 type Route struct {
 	Hostname   string            `json:"hostname"`
 	Port       string            `json:"port"`
@@ -28,40 +34,34 @@ type Route struct {
 	Mode       string            `json:"mode,omitempty"`     // "docker" or "standalone"; empty treated as "standalone"
 }
 
-var (
-	routesDir   string
-	routesDirMu sync.RWMutex
-)
-
-// SetRoutesDir sets the directory where routes.json and the lock file are stored.
-// Must be called before any route operations. Defaults to nothing — callers must
-// configure this at init time.
-func SetRoutesDir(dir string) {
-	routesDirMu.Lock()
-	defer routesDirMu.Unlock()
-	routesDir = dir
+// Store reads and writes routes.json (and its lock file) in a directory.
+type Store struct {
+	dir string
 }
 
-// RoutesDir returns the configured routes directory.
-func RoutesDir() string {
-	routesDirMu.RLock()
-	defer routesDirMu.RUnlock()
-	return routesDir
+// NewStore returns a Store rooted at dir. The directory is created on first write.
+func NewStore(dir string) *Store {
+	return &Store{dir: dir}
 }
 
-// RoutesFilePath returns the path to routes.json.
-func RoutesFilePath() string {
-	return filepath.Join(RoutesDir(), routesFileName)
+// Dir returns the store's directory.
+func (s *Store) Dir() string {
+	return s.dir
 }
 
-// LockFilePath returns the path used for the flock-based file lock.
-func LockFilePath() string {
-	return filepath.Join(RoutesDir(), lockFileName)
+// routesFilePath returns the path to routes.json.
+func (s *Store) routesFilePath() string {
+	return filepath.Join(s.dir, routesFileName)
+}
+
+// lockFilePath returns the path used for the flock-based file lock.
+func (s *Store) lockFilePath() string {
+	return filepath.Join(s.dir, lockFileName)
 }
 
 // ReadRoutes reads routes from the routes file. Returns empty slice if file doesn't exist.
-func ReadRoutes() ([]Route, error) {
-	data, err := os.ReadFile(RoutesFilePath())
+func (s *Store) ReadRoutes() ([]Route, error) {
+	data, err := os.ReadFile(s.routesFilePath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []Route{}, nil
@@ -81,8 +81,8 @@ func ReadRoutes() ([]Route, error) {
 }
 
 // WriteRoutes writes routes to the routes file atomically using a temp file + rename.
-func WriteRoutes(routes []Route) error {
-	if err := os.MkdirAll(RoutesDir(), DirPermRWX); err != nil {
+func (s *Store) WriteRoutes(routes []Route) error {
+	if err := os.MkdirAll(s.dir, DirPermRWX); err != nil {
 		return fmt.Errorf("error creating proxy directory: %w", err)
 	}
 
@@ -91,11 +91,11 @@ func WriteRoutes(routes []Route) error {
 		return fmt.Errorf("error marshaling routes: %w", err)
 	}
 
-	tmpFile := RoutesFilePath() + ".tmp"
+	tmpFile := s.routesFilePath() + ".tmp"
 	if err := os.WriteFile(tmpFile, data, FilePermRW); err != nil {
 		return fmt.Errorf("error writing routes temp file: %w", err)
 	}
-	if err := os.Rename(tmpFile, RoutesFilePath()); err != nil {
+	if err := os.Rename(tmpFile, s.routesFilePath()); err != nil {
 		os.Remove(tmpFile) //nolint:errcheck
 		return fmt.Errorf("error renaming routes temp file: %w", err)
 	}
@@ -118,14 +118,14 @@ func PruneStaleRoutes(routes []Route) []Route {
 // AddRoute registers a new route. It acquires the file lock, prunes stale routes,
 // and adds the new route. Returns an error if the hostname is already registered
 // for a different project directory.
-func AddRoute(route *Route) error {
-	lockFile, err := AcquireLock()
+func (s *Store) AddRoute(route *Route) error {
+	lockFile, err := s.AcquireLock()
 	if err != nil {
 		return fmt.Errorf("error acquiring routes lock: %w", err)
 	}
 	defer ReleaseLock(lockFile)
 
-	routes, err := ReadRoutes()
+	routes, err := s.ReadRoutes()
 	if err != nil {
 		return err
 	}
@@ -138,25 +138,25 @@ func AddRoute(route *Route) error {
 			if r.ProjectDir == route.ProjectDir {
 				// Same project, update the route
 				routes[i] = *route
-				return WriteRoutes(routes)
+				return s.WriteRoutes(routes)
 			}
 			return fmt.Errorf("hostname %q is already registered for project %s", route.Hostname, r.ProjectDir)
 		}
 	}
 
 	routes = append(routes, *route)
-	return WriteRoutes(routes)
+	return s.WriteRoutes(routes)
 }
 
 // RemoveRoute deregisters a route by hostname. Returns the number of remaining routes.
-func RemoveRoute(hostname string) (int, error) {
-	lockFile, err := AcquireLock()
+func (s *Store) RemoveRoute(hostname string) (int, error) {
+	lockFile, err := s.AcquireLock()
 	if err != nil {
 		return 0, fmt.Errorf("error acquiring routes lock: %w", err)
 	}
 	defer ReleaseLock(lockFile)
 
-	routes, err := ReadRoutes()
+	routes, err := s.ReadRoutes()
 	if err != nil {
 		return 0, err
 	}
@@ -170,21 +170,21 @@ func RemoveRoute(hostname string) (int, error) {
 		}
 	}
 
-	if err := WriteRoutes(filtered); err != nil {
+	if err := s.WriteRoutes(filtered); err != nil {
 		return 0, err
 	}
 	return len(filtered), nil
 }
 
 // ListRoutes returns all active routes (after pruning stale ones).
-func ListRoutes() ([]Route, error) {
-	lockFile, err := AcquireLock()
+func (s *Store) ListRoutes() ([]Route, error) {
+	lockFile, err := s.AcquireLock()
 	if err != nil {
 		return nil, fmt.Errorf("error acquiring routes lock: %w", err)
 	}
 	defer ReleaseLock(lockFile)
 
-	routes, err := ReadRoutes()
+	routes, err := s.ReadRoutes()
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func ListRoutes() ([]Route, error) {
 	routes = PruneStaleRoutes(routes)
 
 	// Write back pruned routes
-	if err := WriteRoutes(routes); err != nil {
+	if err := s.WriteRoutes(routes); err != nil {
 		return nil, err
 	}
 
@@ -203,8 +203,8 @@ func ListRoutes() ([]Route, error) {
 // This is a read-only operation that does not acquire the write lock or
 // prune stale routes, making it safe to call on the hot path (e.g. per
 // HTTP request in the proxy handler).
-func GetRoute(hostname string) (*Route, error) {
-	routes, err := ReadRoutes()
+func (s *Store) GetRoute(hostname string) (*Route, error) {
+	routes, err := s.ReadRoutes()
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +217,8 @@ func GetRoute(hostname string) (*Route, error) {
 }
 
 // GetRouteByProject returns the route for a given project directory, or nil if not found.
-func GetRouteByProject(projectDir string) (*Route, error) {
-	routes, err := ReadRoutes()
+func (s *Store) GetRouteByProject(projectDir string) (*Route, error) {
+	routes, err := s.ReadRoutes()
 	if err != nil {
 		return nil, err
 	}

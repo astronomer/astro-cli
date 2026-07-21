@@ -15,6 +15,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -161,7 +162,7 @@ func (s *ConfigSuite) TestDetectAirflow_RouteExistsAndHealthy() {
 
 	port := urlPort(s.T(), srv.URL)
 	cwd := s.chdirTempProject("healthy-project")
-	s.writeRoute(&proxy.Route{
+	s.writeRoute(&pkgproxy.Route{
 		Hostname:   "healthy-project.localhost",
 		Port:       port,
 		ProjectDir: cwd,
@@ -176,7 +177,7 @@ func (s *ConfigSuite) TestDetectAirflow_RouteExistsButUnhealthy() {
 	// health check (e.g. the standalone PID died without cleaning the route).
 	// We must not return the URL — callers would fail confusingly against it.
 	cwd := s.chdirTempProject("unhealthy-project")
-	s.writeRoute(&proxy.Route{
+	s.writeRoute(&pkgproxy.Route{
 		Hostname:   "unhealthy-project.localhost",
 		Port:       unusedPort(s.T()),
 		ProjectDir: cwd,
@@ -196,7 +197,7 @@ func (s *ConfigSuite) TestDetectAirflow_IgnoresOtherProjectsRoutes() {
 	port := urlPort(s.T(), srv.URL)
 	otherDir := filepath.Join(s.T().TempDir(), "other-project")
 	s.Require().NoError(os.MkdirAll(otherDir, 0o755))
-	s.writeRoute(&proxy.Route{
+	s.writeRoute(&pkgproxy.Route{
 		Hostname:   "other-project.localhost",
 		Port:       port,
 		ProjectDir: otherDir,
@@ -223,9 +224,9 @@ func (s *ConfigSuite) chdirTempProject(name string) string {
 	return resolved
 }
 
-func (s *ConfigSuite) writeRoute(r *proxy.Route) {
+func (s *ConfigSuite) writeRoute(r *pkgproxy.Route) {
 	s.T().Helper()
-	s.Require().NoError(proxy.AddRoute(r))
+	s.Require().NoError(proxy.Routes().AddRoute(r))
 }
 
 func (s *ConfigSuite) startFakeAirflow(status int) *httptest.Server {

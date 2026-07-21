@@ -46,6 +46,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/settings"
@@ -219,12 +220,12 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
 func (d *DockerCompose) removeProxyRoute() {
-	hostname, err := proxy.DeriveHostname(d.airflowHome)
+	hostname, err := pkgproxy.DeriveHostname(d.airflowHome)
 	if err != nil {
 		logger.Debugf("could not derive proxy hostname: %s", err)
 		return
 	}
-	remaining, err := proxy.RemoveRoute(hostname)
+	remaining, err := proxy.Routes().RemoveRoute(hostname)
 	if err != nil {
 		logger.Debugf("could not remove proxy route for %s: %s", hostname, err)
 		return
@@ -287,10 +288,10 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	if useProxy {
 		proxyPort = config.CFG.ProxyPort.GetString()
 		if proxyPort == "" {
-			proxyPort = proxy.DefaultPort
+			proxyPort = pkgproxy.DefaultPort
 		}
 
-		hostname, hErr := proxy.DeriveHostname(d.airflowHome)
+		hostname, hErr := pkgproxy.DeriveHostname(d.airflowHome)
 		if hErr != nil {
 			// Fall back to non-proxy mode if hostname derivation fails
 			useProxy = false
@@ -303,17 +304,17 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			// port in between, compose up will fail with a clear "port already in use" error.
 			// This is acceptable — the window is small and the failure mode is obvious.
 			webPort := config.CFG.APIServerPort.GetString()
-			if !proxy.IsPortAvailable(webPort) {
+			if !pkgproxy.IsPortAvailable(webPort) {
 				var aErr error
-				webPort, aErr = proxy.AllocatePort()
+				webPort, aErr = proxy.Routes().AllocatePort()
 				if aErr != nil {
 					return fmt.Errorf("error allocating webserver port: %w", aErr)
 				}
 			}
 			pgPort := config.CFG.PostgresPort.GetString()
-			if !proxy.IsPortAvailable(pgPort) {
+			if !pkgproxy.IsPortAvailable(pgPort) {
 				var aErr error
-				pgPort, aErr = proxy.AllocatePort()
+				pgPort, aErr = proxy.Routes().AllocatePort()
 				if aErr != nil {
 					return fmt.Errorf("error allocating postgres port: %w", aErr)
 				}
@@ -404,7 +405,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 		if portOvr != nil && portOvr.PostgresPort != "" {
 			services["postgres"] = portOvr.PostgresPort
 		}
-		route := proxy.Route{
+		route := pkgproxy.Route{
 			Hostname:   proxyHostname,
 			Port:       portOvr.WebserverPort,
 			ProjectDir: d.airflowHome,
@@ -412,12 +413,15 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			Services:   services,
 			Mode:       "docker",
 		}
-		if addErr := proxy.AddRoute(&route); addErr != nil {
+		if addErr := proxy.Routes().AddRoute(&route); addErr != nil {
 			fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
 			proxyActive = false
-		} else if _, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
+		} else if boundPort, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
 			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
 			proxyActive = false
+		} else {
+			// The daemon may be listening on a different port than requested.
+			proxyPort = boundPort
 		}
 	}
 
@@ -1464,7 +1468,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 	// If proxy mode allocated a random port, the actual port is stored in
 	// the proxy route registered during Start. Fall back to config default.
 	var portOvr *PortOverrides
-	if route, rerr := proxy.GetRouteByProject(d.airflowHome); rerr == nil && route != nil && route.Port != "" {
+	if route, rerr := proxy.Routes().GetRouteByProject(d.airflowHome); rerr == nil && route != nil && route.Port != "" {
 		portOvr = &PortOverrides{
 			WebserverPort: route.Port,
 			APIServerPort: route.Port,

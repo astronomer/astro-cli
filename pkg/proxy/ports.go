@@ -17,10 +17,10 @@ const (
 // AllocatePort picks a random available port from the pool (10000-19999).
 // It checks that the port is not already in use by another process and not
 // already allocated in routes.json.
-func AllocatePort() (string, error) {
+func (s *Store) AllocatePort() (string, error) {
 	// Read existing routes to avoid collisions
 	allocated := map[string]bool{}
-	routes, _ := ReadRoutes() // ignore error — best effort
+	routes, _ := s.ReadRoutes() // ignore error — best effort
 	for _, r := range routes {
 		allocated[r.Port] = true
 		for _, p := range r.Services {
