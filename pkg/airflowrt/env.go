@@ -47,15 +47,8 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 	}
 	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
 
-	// Pin the api-server (Airflow 3) and webserver (Airflow 2) to the IPv4
-	// loopback. Airflow's own default bind is 0.0.0.0, which — combined with
-	// SIMPLE_AUTH_MANAGER_ALL_ADMINS above — would expose the instance to every
-	// device on the LAN. Local dev only needs localhost. These are defaults, not
-	// forced values: a user's own setting, from the .env file or the inherited
-	// environment, wins. The inapplicable key for whichever Airflow major is
-	// running is simply ignored.
-	setDefault(overrides, "AIRFLOW__API__HOST", "127.0.0.1")
-	setDefault(overrides, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "127.0.0.1")
+	// Bind to loopback by default so all-admins auth isn't exposed to the LAN.
+	ApplyLoopbackDefaults(overrides)
 
 	// Layer 3: macOS proxy workaround.
 	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
@@ -80,6 +73,17 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// ApplyLoopbackDefaults pins the api-server (Airflow 3) and webserver
+// (Airflow 2) bind address to the IPv4 loopback. Airflow's own default is
+// 0.0.0.0, which would expose a SIMPLE_AUTH_MANAGER_ALL_ADMINS instance to
+// the whole network. These are defaults, not forced values: a user's own
+// setting, in overrides (the parsed .env file) or the inherited environment,
+// wins. Airflow ignores whichever key doesn't apply to the running major.
+func ApplyLoopbackDefaults(overrides map[string]string) {
+	setDefault(overrides, "AIRFLOW__API__HOST", "127.0.0.1")
+	setDefault(overrides, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "127.0.0.1")
 }
 
 // setDefault sets key to value in overrides unless the user already supplied

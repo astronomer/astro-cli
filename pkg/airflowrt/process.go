@@ -90,6 +90,14 @@ func StopProcess(pidFilePath string) (bool, error) {
 	return true, nil
 }
 
+// ProcessGroupAlive reports whether any process in pid's group is still
+// running. The process must have been started with Setpgid so pid is the
+// group leader. On Windows, where Unix process groups don't apply, it checks
+// the single PID.
+func ProcessGroupAlive(pid int) bool {
+	return isProcessGroupAlive(pid)
+}
+
 // ResolveInEnvPath looks up a binary name in the PATH from the given env slice.
 // This is needed because exec.Command uses the parent process's PATH, not cmd.Env.
 func ResolveInEnvPath(binary string, env []string) string {
