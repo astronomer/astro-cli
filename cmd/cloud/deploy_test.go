@@ -170,7 +170,8 @@ func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 		{"no-dags-base-dir", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--no-dags-base-dir"}},
 		{"pytest", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--pytest"}},
 		{"parse", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--parse"}},
-		{"build-secrets", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--build-secrets", "id=mysecret,src=secrets.txt"}},
+		{"build-secret", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--build-secret", "id=mysecret,src=secrets.txt"}},
+		{"multiple build-secret", []string{"-f", "test-deployment-id", "--image-name", "img:1", "--build-secret", "id=mysecret,src=secrets.txt", "--build-secret", "id=aws,src=credentials"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

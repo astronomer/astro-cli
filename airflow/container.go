@@ -33,14 +33,14 @@ type ContainerHandler interface {
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
 	Bash(container string) error
-	Build(customImageName, buildSecretString string, noCache bool) error
+	Build(customImageName string, buildSecrets []string, noCache bool) error
 	RunDAG(dagID, settingsFile, dagFile, executionDate string, noCache, taskLogs bool) error
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 	ComposeExport(settingsFile, composeFile string) error
-	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error)
-	Parse(customImageName, deployImageName, buildSecretString string) error
-	UpgradeTest(runtimeVersion, deploymentID, customImageName, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.ClientWithResponsesInterface) error
+	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string, buildSecrets []string) (string, error)
+	Parse(customImageName, deployImageName string, buildSecrets []string) error
+	UpgradeTest(runtimeVersion, deploymentID, customImageName string, buildSecrets []string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -50,7 +50,7 @@ type RegistryHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(dockerfile, buildSecretString string, config types.ImageBuildConfig) error
+	Build(dockerfile string, buildSecrets []string, config types.ImageBuildConfig) error
 	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)

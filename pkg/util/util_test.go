@@ -228,25 +228,25 @@ func (s *Suite) TestParseAPIToken() {
 	})
 }
 
-func (s *Suite) TestGetbuildSecretString() {
-	s.Run("returns empty string if buildSecret is empty", func() {
-		s.Equal("", GetbuildSecretString([]string{}))
+func (s *Suite) TestResolveBuildSecrets() {
+	s.Run("returns nil if no secrets are given", func() {
+		s.Nil(ResolveBuildSecrets([]string{}))
 	})
 
-	s.Run("returns the only secret if buildSecret has only one element", func() {
-		s.Equal("secret1", GetbuildSecretString([]string{"secret1"}))
+	s.Run("returns flag values as-is", func() {
+		s.Equal([]string{"secret1"}, ResolveBuildSecrets([]string{"secret1"}))
+		s.Equal(
+			[]string{"secret1", "secret2", "secret3"},
+			ResolveBuildSecrets([]string{"secret1", "secret2", "secret3"}),
+		)
 	})
 
-	s.Run("returns comma-separated string for multiple secrets in buildSecret", func() {
-		s.Equal("secret1,secret2,secret3", GetbuildSecretString([]string{"secret1", "secret2", "secret3"}))
-	})
-
-	s.Run("uses fallback when buildSecret is empty and fallback is provided", func() {
-		s.Equal("fallback-secret", GetbuildSecretString([]string{}, "fallback-secret"))
+	s.Run("uses fallback when flag is empty", func() {
+		s.Equal([]string{"fallback-secret"}, ResolveBuildSecrets([]string{}, "fallback-secret"))
 	})
 
 	s.Run("flag takes priority over fallback", func() {
-		s.Equal("flag-secret", GetbuildSecretString([]string{"flag-secret"}, "fallback-secret"))
+		s.Equal([]string{"flag-secret"}, ResolveBuildSecrets([]string{"flag-secret"}, "fallback-secret"))
 	})
 
 	s.Run("fallback takes priority over BUILD_SECRET_INPUT", func() {
@@ -254,25 +254,16 @@ func (s *Suite) TestGetbuildSecretString() {
 		defer os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
 		os.Setenv("BUILD_SECRET_INPUT", "env-secret")
 
-		s.Equal("fallback-secret", GetbuildSecretString([]string{}, "fallback-secret"))
+		s.Equal([]string{"fallback-secret"}, ResolveBuildSecrets([]string{}, "fallback-secret"))
 	})
 
-	s.Run("overrides buildSecretString with BUILD_SECRET_INPUT if set", func() {
-		// Save the original value of BUILD_SECRET_INPUT
+	s.Run("uses BUILD_SECRET_INPUT when flag and fallbacks are empty", func() {
 		originalBuildSecretInput := os.Getenv("BUILD_SECRET_INPUT")
-		defer func() {
-			// Reset BUILD_SECRET_INPUT to its original value after the test
-			os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
-		}()
+		defer os.Setenv("BUILD_SECRET_INPUT", originalBuildSecretInput)
+		os.Setenv("BUILD_SECRET_INPUT", "env-secret")
 
-		// Set BUILD_SECRET_INPUT to a different value
-		os.Setenv("BUILD_SECRET_INPUT", "override_secret")
-
-		// Test with a non-empty buildSecret
-		s.Equal("secret1,secret2", GetbuildSecretString([]string{"secret1", "secret2"}))
-
-		// Test with an empty buildSecret
-		s.Equal("override_secret", GetbuildSecretString([]string{}))
+		s.Equal([]string{"flag-secret"}, ResolveBuildSecrets([]string{"flag-secret"}))
+		s.Equal([]string{"env-secret"}, ResolveBuildSecrets([]string{}))
 	})
 }
 
