@@ -1,0 +1,18 @@
+[project]
+name = "warehouse-loads"
+requires-python = ">=3.12"
+dependencies = [
+    "apache-airflow-providers-snowflake>=5.0",  # pinned after the 4.x dialect break
+    "dbt-core~=1.8",
+    "pandas>=2.1",
+    # kept for the legacy S3 sensors; drop with AIRFLOW-1893
+    "boto3",
+]
+
+[tool.astro]
+airflow = "3.0"
+
+[tool.astro.deployments.prod]
+target = "astro"
+workspace = "ws-data-eng"
+deployment = "dep-warehouse-prod"

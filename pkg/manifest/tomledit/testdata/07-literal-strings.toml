@@ -1,0 +1,17 @@
+[project]
+name = "regex-heavy"
+# literal strings so the regexes below stay un-escaped
+dependencies = ['apache-airflow-providers-common-sql']
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.target.astro]
+system-packages = ['libaio', 'unixodbc']
+
+[tool.pytest.ini_options]
+addopts = '-ra --strict-markers'
+filterwarnings = [
+    'ignore:.*distutils.*:DeprecationWarning',
+    'error::airflow\.exceptions\.RemovedInAirflow4Warning',
+]

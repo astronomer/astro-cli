@@ -1,0 +1,26 @@
+# ============================================================
+# finance-dags
+# owned by: data-platform@example.com
+# every change here goes through CODEOWNERS review
+# ============================================================
+
+[project] # PEP 621; uv owns this table
+name = "finance-dags" # also the local hostname: finance-dags.localhost
+requires-python = ">=3.11" # bumped from 3.9 for TaskFlow generics
+dependencies = [
+    # -- providers --
+    "apache-airflow-providers-snowflake",
+    "apache-airflow-providers-slack", # alerting only
+    # -- libraries --
+    "great-expectations",
+]
+
+# astro owns everything below
+[tool.astro]
+# 3.1 until the 3.2 provider audit closes
+airflow = "3.1"
+
+[tool.astro.deployments.prod] # the only deployment CI may touch
+target = "astro" # control plane
+workspace = "ws-finance"
+deployment = "dep-prod-7c2f"

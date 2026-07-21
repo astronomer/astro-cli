@@ -1,0 +1,25 @@
+[project]
+name = "multi-index"
+dependencies = ["httpx"]
+
+# ordered: uv checks the first index that has the package
+[[tool.uv.index]]
+name = "internal"
+url = "https://pypi.internal.example.com/simple"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = 'mirror'
+url = 'https://mirror.example.com/simple'
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.dev]
+target = "astro"
+workspace = "ws-plat"
+deployment = 'dep-dev-2'

@@ -1,0 +1,10 @@
+[project]
+name = "etl"
+
+[tool.astro]
+airflow = '3.1'
+
+[tool.astro.deployments.prod]
+target = 'astro'
+workspace = 'ws-etl'
+deployment = 'dep-etl-prod'

@@ -1,0 +1,8 @@
+[project]
+name = "dotted"
+
+# everything under one [tool] header, dotted
+[tool]
+astro.airflow = "3.1"
+astro.target.astro.image = { os = "debian", python = "3.11" }
+ruff.line-length = 100

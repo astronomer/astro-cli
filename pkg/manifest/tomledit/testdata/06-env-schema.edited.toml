@@ -1,0 +1,30 @@
+[project]
+name = "customer-360"
+dependencies = ["apache-airflow-providers-snowflake"]
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.env.connections.warehouse]
+conn_type = "snowflake"
+required  = true
+# same conn_id everywhere; only the environment behind it changes
+bindings.local = { from = "env-manager", deployment = "preview" }
+bindings.prod  = { from = "env-manager" }
+
+[tool.astro.env.connections.crm]
+conn_type = "http"
+required = true
+
+[tool.astro.env.connections.metrics]
+conn_type = 'postgres'
+
+[tool.astro.deployments.preview]
+target = "astro"
+workspace = "ws-c360"
+deployment = "dep-preview"
+
+[tool.astro.deployments.prod]
+target = "astro"
+workspace = "ws-c360"
+deployment = 'dep-prod-2'

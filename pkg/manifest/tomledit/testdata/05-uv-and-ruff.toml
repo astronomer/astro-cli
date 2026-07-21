@@ -1,0 +1,31 @@
+[project]
+name = "orders-pipelines"
+requires-python = ">=3.11"
+dependencies = [
+    "apache-airflow-providers-postgres",
+    "internal-utils",  # served from the private index below
+]
+
+[tool.uv]
+# resolution must stay reproducible across CI and laptops
+resolution = "highest"
+
+[[tool.uv.index]]
+name = "internal"
+url = "https://pypi.internal.example.com/simple"
+# credential lives in the astro vault, not here
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "AIR"]  # AIR = airflow ruleset
+ignore = ["E501"]
+
+[tool.astro]
+airflow = "2.10" # last 2.x, upgrade tracked in JIRA-4411
+
+[tool.astro.deployments.staging]
+target = "astro"
+workspace = "ws-orders"
+deployment = "dep-staging"

@@ -1,0 +1,22 @@
+# my-pipelines — team data platform DAGs
+[project]
+name = "my-pipelines"
+requires-python = ">=3.11"
+dependencies = ["pandas>=2.1", "apache-airflow-providers-snowflake"]
+
+[tool.astro]
+airflow = '3.2' # floats to the newest patch by default
+
+[tool.astro.target.astro] # meaningless to other targets
+image = { os = "ubi", python = "3.12" }
+system-packages = ["libaio"]
+
+[tool.astro.deployments.my-prod-deployment]
+target     = "astro"
+workspace  = "ws-abc"
+deployment = 'dep-new'
+
+[tool.astro.deployments.my-dev-deployment]
+target = 'astro'
+workspace = 'ws-abc'
+deployment = 'dep-dev'
