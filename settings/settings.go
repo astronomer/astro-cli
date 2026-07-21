@@ -456,8 +456,8 @@ func EnvExportVariables(id, envFile string) error {
 		if err != nil {
 			fmt.Printf("variable json decode unsuccessful: %s", err.Error())
 		}
-		// add variables to the env file
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
+		// add variables to the env file; env file can hold secret values, so keep it owner-only
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
 		if err != nil {
 			return errors.Wrap(err, "Writing variables to file unsuccessful")
 		}
@@ -497,8 +497,8 @@ func EnvExportConnections(id, envFile string) error {
 		}
 
 		vars := strings.Split(out, "\n")
-		// add connections to the env file
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
+		// add connections to the env file; connection URIs contain passwords, so keep it owner-only
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
 		if err != nil {
 			return errors.Wrap(err, "Writing connections to file unsuccessful")
 		}

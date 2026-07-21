@@ -1983,6 +1983,36 @@ func (s *Suite) TestStandaloneParse_DagErrors() {
 	s.Contains(err.Error(), "errors detected in your DAGs")
 }
 
+func (s *Suite) TestStandaloneParse_Interrupted() {
+	// exit code 130 (Ctrl-C) substring-contains "1"; the old check reported it as a clean DAG error
+	tmpDir, err := os.MkdirTemp("", "standalone-parse")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".astro"), 0o755)
+	s.NoError(err)
+	err = os.WriteFile(filepath.Join(tmpDir, DefaultTestPath), []byte("test"), 0o644)
+	s.NoError(err)
+
+	err = os.MkdirAll(filepath.Join(tmpDir, ".venv", "bin"), 0o755)
+	s.NoError(err)
+
+	origExec := standaloneExec
+	defer func() { standaloneExec = origExec }()
+
+	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
+		cmd := exec.Command("sh", "-c", "exit 130") //nolint:gosec
+		return cmd.Run()
+	}
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Parse("", "", "")
+	s.Error(err)
+	s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+}
+
 // --- resolveInEnvPath tests ---
 
 func TestResolveInEnvPath(t *testing.T) {
