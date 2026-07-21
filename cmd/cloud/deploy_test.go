@@ -86,6 +86,24 @@ func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
 		return nil
 	}
 
+	// config.InitConfig reads and writes real files on disk (via afero.NewOsFs()),
+	// including the home config that stores the current context. Point ASTRO_HOME at
+	// a throwaway directory with its own valid context, so the test does not depend on
+	// (or clobber) whatever real ~/.astro/config.yaml happens to exist on the machine
+	// running the test - on a fresh CI runner there is no such file, so without this
+	// the deploy fails earlier with "no context set" instead of exercising the save path.
+	//
+	// ASTRO_HOME is restored (and config's cached home-config path resynced) before
+	// testUtil.InitTestConfig runs in the deferred cleanup below, otherwise the fake
+	// config it writes for later tests lands at the wrong path and leaves them with no
+	// context set either.
+	origAstroHome, hadAstroHome := os.LookupEnv("ASTRO_HOME")
+	homeDir := t.TempDir()
+	require.NoError(t, os.Setenv("ASTRO_HOME", homeDir))
+	homeAstroDir := filepath.Join(homeDir, config.ConfigDir)
+	require.NoError(t, os.MkdirAll(homeAstroDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(homeAstroDir, config.ConfigFileNameWithExt), testUtil.NewTestConfig(testUtil.LocalPlatform), 0o600))
+
 	// Point the project config at a real directory, but make the config file itself
 	// a directory instead of a file, so the write that saves the deployment ID fails.
 	// This confirms that a save failure stops the deploy instead of returning nil.
@@ -97,7 +115,13 @@ func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
 	config.WorkingPath = tmpDir
 	config.InitConfig(afero.NewOsFs())
 	defer func() {
+		if hadAstroHome {
+			os.Setenv("ASTRO_HOME", origAstroHome)
+		} else {
+			os.Unsetenv("ASTRO_HOME")
+		}
 		config.WorkingPath = origWorkingPath
+		config.InitConfig(afero.NewOsFs())
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 	}()
 
