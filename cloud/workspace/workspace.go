@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/cloud/pagination"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -152,7 +153,7 @@ func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) e
 		}
 
 		if wsID == "" {
-			return errors.Wrap(err, "workspace id/name could not be found")
+			return errors.New("workspace id/name could not be found")
 		}
 	}
 
@@ -375,10 +376,6 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 	return selected, nil
 }
 
-// maxListPages caps a single paginated list call at maxListPages pages as a safety
-// bound against a server that mis-reports TotalCount (mirrors cloud/env).
-const maxListPages = 100
-
 // GetWorkspaces returns every Workspace in the current Organization, paging
 // through the API as needed.
 func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
@@ -388,32 +385,16 @@ func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
 	}
 
 	sorts := []astrov1.ListWorkspacesParamsSorts{"name:asc"}
-	pageSize := 1000
-	offset := 0
-	var workspaces []astrov1.Workspace
-	for page := 0; page < maxListPages; page++ {
-		workspaceListParams := &astrov1.ListWorkspacesParams{
-			Limit:  &pageSize,
-			Offset: &offset,
-			Sorts:  &sorts,
-		}
-
-		resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
+	return pagination.Collect("workspaces", func(offset int) ([]astrov1.Workspace, int, error) {
+		pageSize := 1000
+		params := &astrov1.ListWorkspacesParams{Limit: &pageSize, Offset: &offset, Sorts: &sorts}
+		resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, params)
 		if err != nil {
-			return []astrov1.Workspace{}, err
+			return nil, 0, err
 		}
-		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-		if err != nil {
-			return []astrov1.Workspace{}, err
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
 		}
-
-		paginated := *resp.JSON200
-		workspaces = append(workspaces, paginated.Workspaces...)
-		if len(paginated.Workspaces) == 0 || len(workspaces) >= paginated.TotalCount {
-			return workspaces, nil
-		}
-		offset = len(workspaces)
-	}
-
-	return []astrov1.Workspace{}, fmt.Errorf("aborted listing workspaces after %d pages", maxListPages)
+		return resp.JSON200.Workspaces, resp.JSON200.TotalCount, nil
+	})
 }

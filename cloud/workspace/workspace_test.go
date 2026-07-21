@@ -86,13 +86,14 @@ func (s *Suite) TestGetWorkspacesPaginates() {
 			Workspaces: []astrov1.Workspace{{Name: "ws-page2", Id: "ws-2"}},
 			TotalCount: 2,
 			Limit:      1000,
-			Offset:     1000,
+			Offset:     1,
 		},
 	}
 	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-	// First call returns page 1 (offset 0), second call returns page 2 (offset 1000).
-	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
-	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
+	// Assert the request offset advances: page 1 is fetched at offset 0, and after
+	// one result is collected page 2 is fetched at offset 1.
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, offsetIs(0)).Return(&page1, nil).Once()
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, offsetIs(1)).Return(&page2, nil).Once()
 
 	got, err := GetWorkspaces(mockClient)
 	s.NoError(err)
@@ -100,6 +101,13 @@ func (s *Suite) TestGetWorkspacesPaginates() {
 	s.Equal("ws-1", got[0].Id)
 	s.Equal("ws-2", got[1].Id)
 	mockClient.AssertExpectations(s.T())
+}
+
+// offsetIs matches ListWorkspacesParams whose Offset equals want.
+func offsetIs(want int) any {
+	return mock.MatchedBy(func(p *astrov1.ListWorkspacesParams) bool {
+		return p != nil && p.Offset != nil && *p.Offset == want
+	})
 }
 
 func (s *Suite) TestListError() {

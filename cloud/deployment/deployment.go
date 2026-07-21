@@ -17,6 +17,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/pagination"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -70,10 +71,6 @@ var (
 	listLimit        = 1000
 	dagDeployEnabled bool
 )
-
-// maxListPages caps a single paginated list call at maxListPages pages as a safety
-// bound against a server that mis-reports TotalCount (mirrors cloud/env).
-const maxListPages = 100
 
 // defaultWorkerMachineName is the machine type UpdateDeployment falls back to when
 // an executor change forces it to synthesize a replacement worker queue.
@@ -1693,35 +1690,20 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 		}
 		orgID = c.Organization
 	}
-	offset := 0
-	var deployments []astrov1.Deployment
-	for page := 0; page < maxListPages; page++ {
-		deploymentListParams := &astrov1.ListDeploymentsParams{
-			Limit:  &listLimit,
-			Offset: &offset,
-		}
+	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
+		params := &astrov1.ListDeploymentsParams{Limit: &listLimit, Offset: &offset}
 		if ws != "" {
-			deploymentListParams.WorkspaceIds = &[]string{ws}
+			params.WorkspaceIds = &[]string{ws}
 		}
-
-		resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
+		resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, params)
 		if err != nil {
-			return []astrov1.Deployment{}, err
+			return nil, 0, err
 		}
-		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-		if err != nil {
-			return []astrov1.Deployment{}, err
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
 		}
-
-		deploymentResponse := *resp.JSON200
-		deployments = append(deployments, deploymentResponse.Deployments...)
-		if len(deploymentResponse.Deployments) == 0 || len(deployments) >= deploymentResponse.TotalCount {
-			return deployments, nil
-		}
-		offset = len(deployments)
-	}
-
-	return []astrov1.Deployment{}, fmt.Errorf("aborted listing deployments after %d pages", maxListPages)
+		return resp.JSON200.Deployments, resp.JSON200.TotalCount, nil
+	})
 }
 
 //nolint:dupl
