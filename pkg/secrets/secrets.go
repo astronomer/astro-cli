@@ -45,12 +45,3 @@ type Config struct {
 	// Dir is where encrypted values live on disk.
 	Dir string
 }
-
-// ErrNotImplemented marks the contract stub below.
-var ErrNotImplemented = errors.New("not yet implemented")
-
-// NewKeyringStore opens the master-key + encrypted-file store.
-// Implementation arrives with an earlier fix.
-func NewKeyringStore(cfg Config) (Store, error) {
-	return nil, ErrNotImplemented
-}
