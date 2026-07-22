@@ -18,8 +18,13 @@ type AuthConfig struct {
 
 // FetchAuthConfig retrieves OAuth configuration from an Astronomer domain.
 // The domain should be just the base domain (e.g., "astronomer.io"), not a full URL.
-func FetchAuthConfig(domain string) (AuthConfig, error) {
-	addr := fmt.Sprintf("https://api.%s/%s", domain, AuthConfigEndpoint)
+func FetchAuthConfig(domain string, opts ...RequestOption) (AuthConfig, error) {
+	o := resolveOptions(opts)
+	base := o.baseURL
+	if base == "" {
+		base = fmt.Sprintf("https://api.%s", domain)
+	}
+	addr := fmt.Sprintf("%s/%s", base, AuthConfigEndpoint)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, addr, nil)
 	if err != nil {
@@ -28,7 +33,7 @@ func FetchAuthConfig(domain string) (AuthConfig, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Astro-Client-Identifier", "cli")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		return AuthConfig{}, fmt.Errorf("cannot reach %s: %w", domain, err)
 	}

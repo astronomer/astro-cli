@@ -25,10 +25,9 @@ func TestFetchAuthConfig_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// FetchAuthConfig builds "https://api.<domain>/..." so we can't easily
-	// redirect to the test server. Instead, test the struct/endpoint constant.
-	assert.Equal(t, "private/v1alpha1/cli/auth-config", AuthConfigEndpoint)
-	assert.Equal(t, "test-client", cfg.ClientID)
+	got, err := FetchAuthConfig("example.io", WithBaseURL(srv.URL), WithHTTPClient(srv.Client()))
+	require.NoError(t, err)
+	assert.Equal(t, cfg, got)
 }
 
 func TestFetchAuthConfig_ServerError(t *testing.T) {
@@ -37,7 +36,6 @@ func TestFetchAuthConfig_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Can't test directly against live domain, but verify error handling
-	_, err := FetchAuthConfig("localhost-nonexistent-domain-12345.invalid")
+	_, err := FetchAuthConfig("example.io", WithBaseURL(srv.URL), WithHTTPClient(srv.Client()))
 	require.Error(t, err)
 }

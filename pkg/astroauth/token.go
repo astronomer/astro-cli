@@ -25,7 +25,8 @@ type TokenResponse struct {
 }
 
 // ExchangeCode exchanges an authorization code for tokens using PKCE.
-func ExchangeCode(authCfg AuthConfig, verifier, code string) (*TokenResponse, error) {
+func ExchangeCode(authCfg AuthConfig, verifier, code string, opts ...RequestOption) (*TokenResponse, error) {
+	o := resolveOptions(opts)
 	addr := authCfg.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authCfg.ClientID},
@@ -41,7 +42,7 @@ func ExchangeCode(authCfg AuthConfig, verifier, code string) (*TokenResponse, er
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
@@ -58,7 +59,8 @@ func ExchangeCode(authCfg AuthConfig, verifier, code string) (*TokenResponse, er
 }
 
 // RefreshToken exchanges a refresh token for new tokens.
-func RefreshToken(authCfg AuthConfig, refreshTok string) (*TokenResponse, error) {
+func RefreshToken(authCfg AuthConfig, refreshTok string, opts ...RequestOption) (*TokenResponse, error) {
+	o := resolveOptions(opts)
 	addr := authCfg.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authCfg.ClientID},
@@ -72,7 +74,7 @@ func RefreshToken(authCfg AuthConfig, refreshTok string) (*TokenResponse, error)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token refresh failed: %w", err)
 	}

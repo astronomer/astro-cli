@@ -82,7 +82,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Run unit tests
-        run: go test -count=1 -cover -covermode=atomic -test.v ./...
+        run: go test -count=1 -shuffle=on -timeout=10m -cover -covermode=atomic -test.v ./...
 
   detect-changes:
     if: github.event_name == 'pull_request'

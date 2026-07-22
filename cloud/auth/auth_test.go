@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -118,80 +119,51 @@ var (
 )
 
 func Test_FetchDomainAuthConfig(t *testing.T) {
-	domain := "astronomer.io"
-	actual, err := FetchDomainAuthConfig(domain)
+	// non-cloud domains are rejected before any network call is made
+	for _, domain := range []string{
+		"gcp0001.us-east4.astronomer.io", // Gen1 CLI domain
+		"fail.astronomer.io",
+		"fail.astronomer-dev.io",
+		"fail.astronomer-stage.io",
+		"fail.astronomer-perf.io",
+	} {
+		_, err := FetchDomainAuthConfig(domain)
+		assert.Errorf(t, err, "expected %s to be rejected as a non-cloud domain", domain)
+	}
+
+	// cloud domains reach out over httpClient; serve a canned config so the test
+	// asserts the request/parse plumbing instead of hitting the live API
+	origHTTPClient := httpClient
+	defer func() { httpClient = origHTTPClient }()
+
+	mockResponse := Config{
+		ClientID:  "client-id",
+		Audience:  "audience",
+		DomainURL: "https://myURL.com/",
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
-	assert.Equal(t, actual.ClientID, "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9")
-	assert.Equal(t, actual.Audience, "astronomer-ee")
-	assert.Equal(t, actual.DomainURL, "https://auth.astronomer.io/")
-
-	domain = "gcp0001.us-east4.astronomer.io" // Gen1 CLI domain
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.Error(t, err)
-	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
-
-	domain = "fail.astronomer.io"
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.Error(t, err)
-	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
-
-	domain = "astronomer-dev.io"
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.NoError(t, err)
-	assert.Equal(t, actual.ClientID, "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG")
-	assert.Equal(t, actual.Audience, "astronomer-ee")
-	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-dev.io/")
-
-	domain = "fail.astronomer-dev.io"
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.Error(t, err)
-	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
-
-	domain = "astronomer-stage.io"
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.NoError(t, err)
-	assert.Equal(t, actual.ClientID, "jsarDat3BeDXZ1monEAeqJPOvRvterpm")
-	assert.Equal(t, actual.Audience, "astronomer-ee")
-	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-stage.io/")
-
-	domain = "fail.astronomer-stage.io"
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.Error(t, err)
-	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
-
-	domain = "fail.astronomer-perf.io"
-	actual, err = FetchDomainAuthConfig(domain)
-	assert.Error(t, err)
-	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
-
-	t.Run("pr preview is a valid domain", func(t *testing.T) {
-		// mocking this as once a PR closes, test would fail
-		mockResponse := Config{
-			ClientID:  "client-id",
-			Audience:  "audience",
-			DomainURL: "https://myURL.com/",
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		assert.Equal(t, "cli", req.Header.Get("X-Astro-Client-Identifier"))
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+			Header:     make(http.Header),
 		}
-		jsonResponse, err := json.Marshal(mockResponse)
-		assert.NoError(t, err)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		domain = "pr1234.astronomer-dev.io"
-		actual, err = FetchDomainAuthConfig(domain)
-		assert.NoError(t, err)
-		assert.Equal(t, actual.ClientID, mockResponse.ClientID)
-		assert.Equal(t, actual.Audience, mockResponse.Audience)
-		assert.Equal(t, actual.DomainURL, mockResponse.DomainURL)
 	})
+
+	for _, domain := range []string{
+		"astronomer.io",
+		"astronomer-dev.io",
+		"astronomer-stage.io",
+		"pr1234.astronomer-dev.io", // pr preview
+	} {
+		actual, err := FetchDomainAuthConfig(domain)
+		assert.NoError(t, err)
+		assert.Equal(t, mockResponse.ClientID, actual.ClientID)
+		assert.Equal(t, mockResponse.Audience, actual.Audience)
+		assert.Equal(t, mockResponse.DomainURL, actual.DomainURL)
+	}
 }
 
 func TestRequestUserInfo(t *testing.T) {
@@ -309,37 +281,46 @@ func TestRequestToken(t *testing.T) {
 }
 
 func TestAuthorizeCallbackHandler(t *testing.T) {
-	httpClient = httputil.NewHTTPClient()
+	client := httputil.NewHTTPClient()
+	httpClient = client
 	t.Run("success", func(t *testing.T) {
 		callbackServer = "localhost:12345"
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
-			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
+			defer wg.Done()
+			time.Sleep(2 * time.Second) // time to spin up the server in authorizeCallbackHandler
 
 			opts := &httputil.DoOptions{
 				Method: http.MethodGet,
 				Path:   "http://localhost:12345/callback?code=test",
 			}
-			_, err = httpClient.Do(opts)
-			assert.NoError(t, err)
+			_, cbErr := client.Do(opts)
+			assert.NoError(t, cbErr)
 		}()
 		code, err := authorizeCallbackHandler()
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
+		wg.Wait()
 	})
 
 	t.Run("error", func(t *testing.T) {
 		callbackServer = "localhost:12346"
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
-			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
+			defer wg.Done()
+			time.Sleep(2 * time.Second) // time to spin up the server in authorizeCallbackHandler
 			opts := &httputil.DoOptions{
 				Method: http.MethodGet,
 				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
 			}
-			_, err = httpClient.Do(opts)
-			assert.NoError(t, err)
+			_, cbErr := client.Do(opts)
+			assert.NoError(t, cbErr)
 		}()
 		_, err := authorizeCallbackHandler()
 		assert.Contains(t, err.Error(), "fatal_error")
+		wg.Wait()
 	})
 
 	t.Run("timeout", func(t *testing.T) {
@@ -377,7 +358,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(Config{}, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -392,7 +373,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(Config{}, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -415,7 +396,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(Config{}, true)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -427,7 +408,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return Result{}, errMock
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err = mockAuthenticator.authDeviceLogin(Config{}, true)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
 }
@@ -478,7 +459,6 @@ func TestCheckUserSession(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 		assert.NoError(t, err)
 	})
 
@@ -491,7 +471,6 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.Contains(t, err.Error(), "Please contact your Astro Organization Owner to be invited to the organization")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("list organization network error", func(t *testing.T) {
@@ -503,7 +482,6 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.Contains(t, err.Error(), "network error")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("self user network error", func(t *testing.T) {
@@ -514,7 +492,6 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.Contains(t, err.Error(), "network error")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("self user failure", func(t *testing.T) {
@@ -524,7 +501,6 @@ func TestCheckUserSession(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -537,7 +513,6 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.ErrorIs(t, err, config.ErrCtxConfigErr)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("list workspace failure", func(t *testing.T) {
@@ -549,7 +524,6 @@ func TestCheckUserSession(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.ErrorIs(t, err, errMock)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -564,7 +538,6 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("success with workspace switch", func(t *testing.T) {
@@ -576,7 +549,6 @@ func TestCheckUserSession(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -612,7 +584,6 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("success with identity first auth flow", func(t *testing.T) {
@@ -626,7 +597,6 @@ func TestCheckUserSession(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -651,7 +621,6 @@ func TestCheckUserSession(t *testing.T) {
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockV1Client, buf)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 		assert.NoError(t, err)
 	})
@@ -731,7 +700,6 @@ func TestLogin(t *testing.T) {
 		err := Login("astronomer.io", "", mockV1Client, os.Stdout, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("can login to a pr preview environment successfully", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
@@ -773,7 +741,6 @@ func TestLogin(t *testing.T) {
 		err = Login("pr5723.cloud.astronomer-dev.io", "", mockV1Client, os.Stdout, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("oauth token success", func(t *testing.T) {
@@ -800,7 +767,6 @@ func TestLogin(t *testing.T) {
 
 		err := Login("astronomer.io", "OAuth Token", mockV1Client, os.Stdout, false)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -841,7 +807,6 @@ func TestLogin(t *testing.T) {
 		err := Login("", "", mockV1Client, os.Stdout, false)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("initial login with empty config file", func(t *testing.T) {
@@ -871,9 +836,8 @@ func TestLogin(t *testing.T) {
 		// initialize stdin with user email input
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
 		// do the test
-		err = Login("astronomer.io", "", mockV1Client, os.Stdout, true)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -912,7 +876,6 @@ func TestLogin(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, domainContext.Token, "Bearer access_token")
 		assert.Equal(t, currentContext.Token, "token")
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 }

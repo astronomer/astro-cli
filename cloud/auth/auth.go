@@ -44,7 +44,6 @@ var (
 )
 
 var (
-	err             error
 	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
@@ -427,7 +426,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 func Logout(domain string, out io.Writer) {
 	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
 
-	err = c.SetContextKey("token", "")
+	err := c.SetContextKey("token", "")
 	if err != nil {
 		return
 	}

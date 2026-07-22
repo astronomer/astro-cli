@@ -22,7 +22,7 @@ func TestFetchUserInfo_Success(t *testing.T) {
 	defer srv.Close()
 
 	cfg := AuthConfig{DomainURL: srv.URL + "/"}
-	info, err := FetchUserInfo(cfg, "test-token")
+	info, err := FetchUserInfo(cfg, "test-token", WithHTTPClient(srv.Client()))
 	require.NoError(t, err)
 	assert.Equal(t, "user@example.com", info.Email)
 	assert.Equal(t, "Test User", info.Name)
@@ -35,7 +35,7 @@ func TestFetchUserInfo_NoEmail(t *testing.T) {
 	defer srv.Close()
 
 	cfg := AuthConfig{DomainURL: srv.URL + "/"}
-	_, err := FetchUserInfo(cfg, "token")
+	_, err := FetchUserInfo(cfg, "token", WithHTTPClient(srv.Client()))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no email")
 }

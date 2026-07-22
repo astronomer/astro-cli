@@ -20,7 +20,6 @@ import (
 )
 
 var (
-	mockV1Client               = new(astrov1_mocks.ClientWithResponsesInterface)
 	executorKubernetes         = astrov1.DeploymentExecutorKUBERNETES
 	executorAstro              = astrov1.DeploymentExecutorASTRO
 	errGetDeployment           = errors.New("test get deployment error")
@@ -164,45 +163,8 @@ var (
 		IsHibernating: &hibernationIsHibernating,
 		OverrideUntil: &hibernationOverrideUntil,
 	}
-	isDevelopmentMode = true
-	sourceDeployment  = astrov1.Deployment{
-		Id:                        deploymentID,
-		Name:                      "test-deployment-label",
-		Description:               &description,
-		WorkspaceName:             &workspaceName,
-		WorkspaceId:               "test-ws-id",
-		Namespace:                 "great-release-name",
-		ClusterId:                 &clusterID,
-		ClusterName:               &ClusterName,
-		ContactEmails:             &contactEmails,
-		Type:                      &hybridType,
-		Executor:                  &executorCelery,
-		Region:                    &region,
-		RuntimeVersion:            "6.0.0",
-		AirflowVersion:            "2.4.0",
-		SchedulerAu:               &schedulerAU,
-		SchedulerReplicas:         schedulerReplicas,
-		WebServerAirflowApiUrl:    "some-url/api/v1",
-		EnvironmentVariables:      &deploymentEnvironmentVariable,
-		WorkerQueues:              &workerqueue,
-		UpdatedAt:                 time.Now(),
-		Status:                    "UNHEALTHY",
-		IsDagDeployEnabled:        true,
-		DefaultTaskPodCpu:         &defaultTaskPodCPU,
-		DefaultTaskPodMemory:      &defaultTaskPodMemory,
-		ResourceQuotaCpu:          &resourceQuotaCPU,
-		ResourceQuotaMemory:       &resourceQuotaMemory,
-		SchedulerSize:             &schedulerTestSize,
-		CloudProvider:             &cloudProvider,
-		IsDevelopmentMode:         &isDevelopmentMode,
-		EffectiveWorkloadIdentity: &workloadIdentity,
-		ScalingSpec: &astrov1.DeploymentScalingSpec{
-			HibernationSpec: &astrov1.DeploymentHibernationSpec{
-				Override:  &hibernationOverride,
-				Schedules: &hibernationSchedules,
-			},
-		},
-	}
+	isDevelopmentMode         = true
+	sourceDeployment          = newSourceDeployment()
 	taskLogBucket             = "task-log-bucket"
 	taskLogURLPattern         = "task-log-url-pattern"
 	sourceDeploymentDedicated = astrov1.Deployment{
@@ -250,6 +212,47 @@ var (
 	}
 )
 
+func newSourceDeployment() astrov1.Deployment {
+	return astrov1.Deployment{
+		Id:                        deploymentID,
+		Name:                      "test-deployment-label",
+		Description:               &description,
+		WorkspaceName:             &workspaceName,
+		WorkspaceId:               "test-ws-id",
+		Namespace:                 "great-release-name",
+		ClusterId:                 &clusterID,
+		ClusterName:               &ClusterName,
+		ContactEmails:             &contactEmails,
+		Type:                      &hybridType,
+		Executor:                  &executorCelery,
+		Region:                    &region,
+		RuntimeVersion:            "6.0.0",
+		AirflowVersion:            "2.4.0",
+		SchedulerAu:               &schedulerAU,
+		SchedulerReplicas:         schedulerReplicas,
+		WebServerAirflowApiUrl:    "some-url/api/v1",
+		EnvironmentVariables:      &deploymentEnvironmentVariable,
+		WorkerQueues:              &workerqueue,
+		UpdatedAt:                 time.Now(),
+		Status:                    "UNHEALTHY",
+		IsDagDeployEnabled:        true,
+		DefaultTaskPodCpu:         &defaultTaskPodCPU,
+		DefaultTaskPodMemory:      &defaultTaskPodMemory,
+		ResourceQuotaCpu:          &resourceQuotaCPU,
+		ResourceQuotaMemory:       &resourceQuotaMemory,
+		SchedulerSize:             &schedulerTestSize,
+		CloudProvider:             &cloudProvider,
+		IsDevelopmentMode:         &isDevelopmentMode,
+		EffectiveWorkloadIdentity: &workloadIdentity,
+		ScalingSpec: &astrov1.DeploymentScalingSpec{
+			HibernationSpec: &astrov1.DeploymentHibernationSpec{
+				Override:  &hibernationOverride,
+				Schedules: &hibernationSchedules,
+			},
+		},
+	}
+}
+
 func errReturningYAMLMarshal(v interface{}) ([]byte, error) {
 	return []byte{}, errMarshal
 }
@@ -275,8 +278,9 @@ func restoreYAMLMarshal(replace func(v interface{}) ([]byte, error)) {
 }
 
 func TestInspect(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	workspaceID := "test-ws-id"
 	deploymentName := "test-deployment-label"
 	deploymentResponse := sourceDeployment
@@ -292,7 +296,6 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment template in yaml format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -305,7 +308,6 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
 		assert.NotContains(t, out.String(), deploymentName)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment in json format to stdout", func(t *testing.T) {
@@ -320,7 +322,6 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment template in json format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -334,7 +335,6 @@ func TestInspect(t *testing.T) {
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
 		assert.NotContains(t, out.String(), deploymentName)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment's specific field to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -345,7 +345,6 @@ func TestInspect(t *testing.T) {
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.cluster_name", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), *deploymentResponse.ClusterName)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prompts for a deployment to inspect if no deployment name or id was provided", func(t *testing.T) {
@@ -359,7 +358,6 @@ func TestInspect(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentName)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if core deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -369,7 +367,6 @@ func TestInspect(t *testing.T) {
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if listing deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -377,7 +374,6 @@ func TestInspect(t *testing.T) {
 
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if requested field is not found in deployment", func(t *testing.T) {
@@ -389,7 +385,6 @@ func TestInspect(t *testing.T) {
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "no-exist-information", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, "", out.String())
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if formatting deployment fails", func(t *testing.T) {
@@ -404,7 +399,6 @@ func TestInspect(t *testing.T) {
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errMarshal)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if getting context fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
@@ -412,7 +406,6 @@ func TestInspect(t *testing.T) {
 
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("Display Cluster Region and hide Release Name if an org is hosted", func(t *testing.T) {
@@ -434,14 +427,12 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), "us-central1")
 		assert.Contains(t, out.String(), "a5")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("when no deployments in workspace", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 		err := Inspect(workspaceID, "", "", "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -455,7 +446,6 @@ func TestInspect(t *testing.T) {
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, out.String(), "")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("returns actual workload identity when the flag is set to true", func(t *testing.T) {
@@ -468,12 +458,12 @@ func TestInspect(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), workloadIdentity)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 }
 
 func TestGetDeploymentInspectInfo(t *testing.T) {
-	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	description = ""
 	cloudProvider := astrov1.DeploymentCloudProviderGCP
 	sourceDeployment.Description = &description
@@ -517,6 +507,8 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 }
 
 func TestGetDeploymentConfig(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		sourceDeployment.Type = &hybridType
 		sourceDeployment.EffectiveWorkloadIdentity = &workloadIdentity
@@ -615,6 +607,8 @@ func TestGetDeploymentConfig(t *testing.T) {
 }
 
 func TestGetPrintableDeployment(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	sourceDeployment.Type = &hybridType
 	taskPodNodePoolID := "task_node_id"
@@ -641,6 +635,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 }
 
 func TestGetAdditionalNullableFields(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
 	sourceDeployment.Type = &hybridType
 	sourceDeployment.TaskPodNodePoolId = nil
 	for _, exec := range []astrov1.DeploymentExecutor{executorCelery, executorAstro} {
@@ -761,6 +756,8 @@ func TestGetQMapPodEphemeralStorage(t *testing.T) {
 }
 
 func TestFormatPrintableDeployment(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	var expectedPrintableDeployment []byte
 	sourceDeployment.Type = &hybridType
@@ -1264,6 +1261,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 }
 
 func TestGetSpecificField(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	sourceDeployment.Status = "UNHEALTHY"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	info, _ := getDeploymentInfo(sourceDeployment)
@@ -1380,6 +1379,8 @@ func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 }
 
 func TestGetTemplate(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	info, _ := getDeploymentInfo(sourceDeployment)
@@ -1485,6 +1486,8 @@ func TestGetTemplate(t *testing.T) {
 }
 
 func TestReturnSpecifiedValue(t *testing.T) {
+	sourceDeployment = newSourceDeployment()
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	deploymentName := "test-deployment-label"
 

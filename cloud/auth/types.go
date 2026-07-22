@@ -45,7 +45,7 @@ type CallbackMessage struct {
 }
 
 func (res Result) writeToContext(c *config.Context) error {
-	err = c.SetContextKey("token", "Bearer "+res.AccessToken)
+	err := c.SetContextKey("token", "Bearer "+res.AccessToken)
 	if err != nil {
 		return err
 	}

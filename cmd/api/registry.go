@@ -17,7 +17,6 @@ const (
 	defaultRegistryURL      = "https://airflow.apache.org/registry"
 	registryURLEnv          = "ASTRO_REGISTRY_URL"
 	registrySpecPath        = "/api/openapi.json"
-	registryCacheFileName   = "openapi-registry-cache.json"
 	registryStripPathPrefix = "/api"
 )
 
@@ -306,7 +305,9 @@ func initRegistrySpecCache(opts *RegistryOptions) {
 	}
 	base := resolveRegistryURL(opts.RegistryURL)
 	specURL := base + registrySpecPath
-	cachePath := filepath.Join(config.HomeConfigPath, registryCacheFileName)
+	// Key the cache file by spec URL so different registries (and, in tests,
+	// different servers) never share a cache entry.
+	cachePath := filepath.Join(config.HomeConfigPath, openapi.SpecCacheFileName(specURL))
 	opts.specCache = openapi.NewCacheWithOptions(specURL, cachePath)
 	opts.specCache.SetStripPrefix(registryStripPathPrefix)
 }

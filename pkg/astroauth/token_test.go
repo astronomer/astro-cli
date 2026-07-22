@@ -35,7 +35,7 @@ func TestExchangeCode_Success(t *testing.T) {
 		DomainURL: srv.URL + "/",
 	}
 
-	resp, err := ExchangeCode(cfg, "test-verifier", "test-code")
+	resp, err := ExchangeCode(cfg, "test-verifier", "test-code", WithHTTPClient(srv.Client()))
 	require.NoError(t, err)
 	assert.Equal(t, "access-123", resp.AccessToken)
 	assert.Equal(t, "refresh-456", resp.RefreshToken)
@@ -53,7 +53,7 @@ func TestExchangeCode_Error(t *testing.T) {
 	defer srv.Close()
 
 	cfg := AuthConfig{ClientID: "c", DomainURL: srv.URL + "/"}
-	_, err := ExchangeCode(cfg, "v", "code")
+	_, err := ExchangeCode(cfg, "v", "code", WithHTTPClient(srv.Client()))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "The code has expired")
 }
@@ -73,7 +73,7 @@ func TestRefreshToken_Success(t *testing.T) {
 	defer srv.Close()
 
 	cfg := AuthConfig{ClientID: "c", DomainURL: srv.URL + "/"}
-	resp, err := RefreshToken(cfg, "old-refresh")
+	resp, err := RefreshToken(cfg, "old-refresh", WithHTTPClient(srv.Client()))
 	require.NoError(t, err)
 	assert.Equal(t, "new-access", resp.AccessToken)
 }

@@ -25,7 +25,6 @@ var (
 func TestVariableList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	MockResponseInit()
 	variableValue := "test-value-1"
 	t.Run("success", func(t *testing.T) {
@@ -100,7 +99,6 @@ func TestVariableList(t *testing.T) {
 func TestVariableModify(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	MockResponseInit()
 	cloudProvider := astrov1.DeploymentCloudProviderGCP
 	mockUpdateDeploymentResponse := astrov1.UpdateDeploymentResponse{
@@ -154,7 +152,6 @@ func TestVariableModify(t *testing.T) {
 		assert.Contains(t, buf.String(), "test-value-1")
 		assert.Contains(t, buf.String(), "test-value-2")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("success with secret value", func(t *testing.T) {
@@ -184,7 +181,6 @@ func TestVariableModify(t *testing.T) {
 		assert.Contains(t, buf.String(), "test-key-2")
 		assert.Contains(t, buf.String(), "****")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("list deployment failure", func(t *testing.T) {
@@ -208,7 +204,6 @@ func TestVariableModify(t *testing.T) {
 		err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("missing var key or value", func(t *testing.T) {
@@ -228,7 +223,6 @@ func TestVariableModify(t *testing.T) {
 		assert.Contains(t, buf.String(), "You must provide a variable value")
 		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
 		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("create env var failure", func(t *testing.T) {
@@ -241,7 +235,6 @@ func TestVariableModify(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
 		assert.ErrorIs(t, err, errMock)
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -257,7 +250,6 @@ func TestVariableModify(t *testing.T) {
 		buf := new(bytes.Buffer)
 		_ = VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
 		assert.Contains(t, buf.String(), "No variables for this Deployment")
-		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 }
@@ -275,30 +267,34 @@ func TestReadLines(t *testing.T) {
 }
 
 func TestAddVariableFromFile(t *testing.T) {
-	resp := addVariablesFromFile(
+	resp, _ := addVariablesFromFile(
 		"./testfiles/test-env-file", []string{"test-key-2"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-2", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, true, false)
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, true, false,
+	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}, {Key: "test-key-1", Value: &testValue1}}, resp)
 
-	resp = addVariablesFromFile(
+	resp, _ = addVariablesFromFile(
 		"./testfiles/test-env-file", []string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, true, false)
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, true, false,
+	)
 
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue1}}, resp)
 
-	resp = addVariablesFromFile(
+	resp, _ = addVariablesFromFile(
 		"./testfiles/test-env-file", []string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false)
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false,
+	)
 
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
 
-	resp = addVariablesFromFile(
+	resp, _ = addVariablesFromFile(
 		"./testfiles/test-env-file-wrong", []string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false)
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false,
+	)
 
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
 }
@@ -326,7 +322,8 @@ func TestWriteVarToFile(t *testing.T) {
 
 func TestAddVariable(t *testing.T) {
 	buf := new(bytes.Buffer)
-	resp := addVariable([]string{"test-key-1"},
+	resp := addVariable(
+		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
 		"test-key-1", "test-value-3", true, false, buf,
@@ -334,7 +331,8 @@ func TestAddVariable(t *testing.T) {
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
 
 	buf = new(bytes.Buffer)
-	resp = addVariable([]string{"test-key-1"},
+	resp = addVariable(
+		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
 		"test-key-1", "test-value-3", false, false, buf,
@@ -344,28 +342,32 @@ func TestAddVariable(t *testing.T) {
 
 func TestAddVariablesFromArgs(t *testing.T) {
 	buf := new(bytes.Buffer)
-	resp := addVariablesFromArgs([]string{"test-key-1"},
+	resp, _ := addVariablesFromArgs(
+		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
 		[]string{"test-key-1=test-value-3"}, true, false, buf,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
 
-	resp = addVariablesFromArgs([]string{"test-key-1"},
+	resp, _ = addVariablesFromArgs(
+		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
 		[]string{"test-key-1=test-value-3"}, false, false, buf,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}}, resp)
 
-	resp = addVariablesFromArgs([]string{"test-key-1"},
+	resp, _ = addVariablesFromArgs(
+		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{},
 		[]astrov1.DeploymentEnvironmentVariableRequest{},
 		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false, buf,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, resp)
 
-	resp = addVariablesFromArgs([]string{"test-key-1"},
+	resp, _ = addVariablesFromArgs(
+		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{},
 		[]astrov1.DeploymentEnvironmentVariableRequest{},
 		[]string{"test-key-2=test-value=4", "test-key-3=", "test-key-3"}, false, false, buf,

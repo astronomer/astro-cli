@@ -17,7 +17,8 @@ type UserInfo struct {
 }
 
 // FetchUserInfo retrieves the user's profile from the OAuth userinfo endpoint.
-func FetchUserInfo(authCfg AuthConfig, accessToken string) (*UserInfo, error) {
+func FetchUserInfo(authCfg AuthConfig, accessToken string, opts ...RequestOption) (*UserInfo, error) {
+	o := resolveOptions(opts)
 	addr := authCfg.DomainURL + "userinfo"
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, addr, nil)
@@ -27,7 +28,7 @@ func FetchUserInfo(authCfg AuthConfig, accessToken string) (*UserInfo, error) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("userinfo request failed: %w", err)
 	}

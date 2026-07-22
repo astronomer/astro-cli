@@ -274,10 +274,8 @@ func (s *Suite) SetupTest() {
 func (s *Suite) TearDownSubTest() {
 	// assert expectations
 	mockV1Client.AssertExpectations(s.T())
-	mockV1Client.AssertExpectations(s.T())
 
 	// reset mocks
-	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 
 	// reset responses object
@@ -939,7 +937,6 @@ func (s *Suite) TestLogs() {
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("success without deployment", func() {
 		// Mock ListDeployments
@@ -967,7 +964,6 @@ func (s *Suite) TestLogs() {
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("failure", func() {
@@ -983,7 +979,6 @@ func (s *Suite) TestLogs() {
 		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, false, false, false, logCount, mockV1Client)
 		s.ErrorIs(err, errMock)
 
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1001,7 +996,6 @@ func (s *Suite) TestLogs() {
 		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockV1Client)
 		s.NoError(err)
 
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("pagination fetches multiple pages", func() {
@@ -1071,11 +1065,13 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
 		// First call: Limit pointer points to 3.
-		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+		mockV1Client.On(
+			"GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
 			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool { return p.Limit != nil && *p.Limit == 3 }),
 		).Return(&page1Response, nil).Once()
 		// Second call: Limit pointer should have been shrunk to 1 (logCount - already-fetched).
-		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+		mockV1Client.On(
+			"GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
 			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool { return p.Limit != nil && *p.Limit == 1 }),
 		).Return(&page2Response, nil).Once()
 
@@ -1128,7 +1124,8 @@ func (s *Suite) TestLogs() {
 	s.Run("dag-processor flag requests dag-processor source", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
-		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+		mockV1Client.On(
+			"GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
 			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool {
 				return len(p.Sources) == 1 && p.Sources[0] == astrov1.GetDeploymentLogsParamsSourcesDagProcessor
 			}),
@@ -1140,7 +1137,8 @@ func (s *Suite) TestLogs() {
 	s.Run("generic component flag passes through arbitrary sources", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
-		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+		mockV1Client.On(
+			"GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
 			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool {
 				return len(p.Sources) == 2 &&
 					p.Sources[0] == astrov1.GetDeploymentLogsParamsSources("scheduler") &&
@@ -1154,7 +1152,8 @@ func (s *Suite) TestLogs() {
 	s.Run("default sources include dag-processor when no flags set", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
-		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
+		mockV1Client.On(
+			"GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything,
 			mock.MatchedBy(func(p *astrov1.GetDeploymentLogsParams) bool {
 				for _, src := range p.Sources {
 					if src == astrov1.GetDeploymentLogsParamsSourcesDagProcessor {
@@ -1242,7 +1241,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with Celery Executor and different schedulers", func() {
@@ -1274,7 +1272,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with enabling ci-cd enforcement", func() {
@@ -1293,7 +1290,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with enabling development mode", func() {
@@ -1311,7 +1307,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with cloud provider and region", func() {
@@ -1328,7 +1323,6 @@ func (s *Suite) TestCreate() {
 		s.NoError(err)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1354,7 +1348,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with hosted deployment with workload identity", func() {
@@ -1378,7 +1371,6 @@ func (s *Suite) TestCreate() {
 		s.NoError(err)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1430,7 +1422,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success with region selection", func() {
@@ -1448,7 +1439,6 @@ func (s *Suite) TestCreate() {
 		s.NoError(err)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1468,7 +1458,6 @@ func (s *Suite) TestCreate() {
 		s.NoError(err)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1492,7 +1481,6 @@ func (s *Suite) TestCreate() {
 		s.NoError(err)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1520,7 +1508,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("success and wait for status with Dedicated Deployment", func() {
@@ -1545,7 +1532,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("returns an error when creating a Hybrid deployment fails", func() {
@@ -1564,7 +1550,6 @@ func (s *Suite) TestCreate() {
 		s.Contains(err.Error(), "failed to create deployment")
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1602,7 +1587,6 @@ func (s *Suite) TestCreate() {
 
 		// Assert expectations
 		mockV1Client.AssertExpectations(s.T())
-		mockV1Client.AssertExpectations(s.T())
 	})
 
 	s.Run("invalid hybrid resources", func() {
@@ -1617,7 +1601,6 @@ func (s *Suite) TestCreate() {
 		s.ErrorIs(err, ErrInvalidResourceRequest)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -1658,7 +1641,6 @@ func (s *Suite) TestCreate() {
 		s.NoError(err)
 
 		// Assert expectations
-		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
 }
