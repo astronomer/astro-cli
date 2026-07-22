@@ -581,6 +581,73 @@ func (s *Suite) TestDockerImageGetLabel() {
 	})
 }
 
+func (s *Suite) TestDockerImageHasEnvVarWithPrefix() {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	s.Run("prefix present", func() {
+		mockResp := `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python","PATH=/usr/bin"]`
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			io.WriteString(stdout, mockResp)
+			return nil
+		}
+
+		found, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+		s.NoError(err)
+		s.True(found)
+	})
+
+	s.Run("prefix absent", func() {
+		mockResp := `["PATH=/usr/bin"]`
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			io.WriteString(stdout, mockResp)
+			return nil
+		}
+
+		found, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+		s.NoError(err)
+		s.False(found)
+	})
+
+	s.Run("altImageName overrides imageName", func() {
+		mockResp := `[]`
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "alt-image")
+			io.WriteString(stdout, mockResp)
+			return nil
+		}
+
+		found, err := handler.HasEnvVarWithPrefix("alt-image", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+		s.NoError(err)
+		s.False(found)
+	})
+
+	s.Run("cmdExec error", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			return errMockDocker
+		}
+
+		_, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+		s.ErrorIs(err, errMockDocker)
+	})
+
+	s.Run("cmdExec failure", func() {
+		mockErrResp := "test-err-response"
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			io.WriteString(stderr, mockErrResp)
+			return nil
+		}
+
+		_, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+		s.ErrorIs(err, errGetImageLabel)
+	})
+}
+
 func (s *Suite) TestDockerImageListLabel() {
 	handler := DockerImage{
 		imageName: "testing",
