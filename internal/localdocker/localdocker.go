@@ -62,6 +62,14 @@ type Engine struct {
 	health    func(ctx context.Context, url string, timeout time.Duration) error
 	now       func() time.Time
 
+	// ensureEngine brings a stopped engine daemon/machine up before the start
+	// touches it (LOCAL engine auto-start). composeAvail checks the Compose v2
+	// plugin is present. startSession spawns the detached session watcher for
+	// --stop-with-session. All three are seams so tests never touch a daemon.
+	ensureEngine func(cb localrt.Callbacks) error
+	composeAvail func(ctx context.Context, conn engineConn) error
+	startSession func(projectPath string, parentPID int) error
+
 	healthTimeout time.Duration
 }
 
@@ -70,7 +78,7 @@ type Engine struct {
 // this package must not read config.
 func New(routesDir string) *Engine {
 	s := proxy.NewStore(routesDir, proxy.WithRouteLiveness(localprune.RouteAlive))
-	return &Engine{
+	e := &Engine{
 		routes:        s,
 		cmd:           execCommander{},
 		preferred:     resolvePreferredEngine,
@@ -79,8 +87,12 @@ func New(routesDir string) *Engine {
 		allocPort:     s.AllocatePort,
 		health:        waitHealthy,
 		now:           time.Now,
+		startSession:  spawnSessionWatcher,
 		healthTimeout: defaultHealthTimeout,
 	}
+	e.ensureEngine = func(cb localrt.Callbacks) error { return ensureEngineUp(cb, e.now) }
+	e.composeAvail = e.probeCompose
+	return e
 }
 
 // Start brings the project's compose stack up and waits for Airflow to be
@@ -96,6 +108,12 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
 	}
 	localshared.OnState(cb, localrt.StateStarting, nil)
+
+	// Bring a stopped engine up first, so `start --docker` with the daemon
+	// down recovers instead of failing on the first compose call.
+	if err := e.ensureEngine(cb); err != nil {
+		return nil, err
+	}
 
 	image, err := imageRef(p.AirflowVersion)
 	if err != nil {
@@ -118,7 +136,32 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, err
 	}
 
-	composePath, err := e.writeComposeFile(p, projectPath, composeInput{
+	conn, err := e.preferred()
+	if err != nil {
+		return nil, err
+	}
+	// A missing Compose v2 plugin otherwise surfaces as an opaque "exit status
+	// 125"; catch it here with an actionable message before any compose call.
+	if err := e.composeAvail(ctx, conn); err != nil {
+		return nil, err
+	}
+
+	stateDir, err := e.stateDir(p, projectPath)
+	if err != nil {
+		return nil, err
+	}
+	// Install the project's dependencies into a layer over the runtime image
+	// so docker mode imports the same packages standalone does. The base image
+	// already provides Airflow, so only the rest are installed; a project with
+	// nothing beyond Airflow needs no build and runs the runtime image as-is.
+	if deps := runtimeDeps(p.Dependencies); len(deps) > 0 {
+		image, err = e.buildDepsImage(ctx, conn, stateDir, image, name, deps, cb)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName:   name,
 		Image:         image,
 		PostgresImage: postgresImage,
@@ -131,10 +174,6 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, err
 	}
 
-	conn, err := e.preferred()
-	if err != nil {
-		return nil, err
-	}
 	up := composeLine{conn: conn, file: composePath, name: name, projectDir: projectPath}
 	if err := e.runCompose(ctx, up, cb, "up", "--detach", "--quiet-pull"); err != nil {
 		return nil, fmt.Errorf("starting project containers: %w", err)
@@ -159,6 +198,20 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, err
 	}
 	e.addRoute(rec, pgPort, cb)
+
+	if p.StopWithSession {
+		// The record is written, so the watcher can Attach; spawn it now to
+		// stop the project when the starter exits. A spawn failure leaves
+		// Airflow up and reported — better than failing a healthy start — so
+		// it is surfaced as a warning, not returned.
+		if err := e.startSession(projectPath, rec.PID); err != nil && cb.OnLine != nil {
+			cb.OnLine(localrt.LogLine{
+				Component: "system",
+				Time:      e.now(),
+				Text:      fmt.Sprintf("could not arm --stop-with-session cleanup: %s", err),
+			})
+		}
+	}
 
 	url := fmt.Sprintf("http://localhost:%d/api/v2/monitor/health", apiPort)
 	if err := e.health(ctx, url, e.healthTimeout); err != nil {
@@ -272,6 +325,8 @@ func (a *airflow) Stop(ctx context.Context, opts localrt.StopOptions) error {
 				errs = append(errs, err)
 			}
 		}
+		// Drop the per-project dependency image (a no-op when none was built).
+		a.eng.removeBuiltImage(ctx, conn, a.rec.ComposeProject)
 	}
 	return errors.Join(errs...)
 }
@@ -353,9 +408,10 @@ func (e *Engine) choosePort(requested, fallback int) (int, error) {
 	return localshared.ChoosePort(requested, fallback, e.portFree, e.allocPort)
 }
 
-// writeComposeFile renders and writes the compose file under the project's
-// state dir (Plan.StateDir when set, the canonical location otherwise).
-func (e *Engine) writeComposeFile(p localrt.Plan, projectPath string, in composeInput) (string, error) {
+// stateDir resolves the project's runtime state home (Plan.StateDir when set,
+// the canonical location otherwise) and creates it. The compose file, the
+// generated Dockerfile, and the requirements file all land here.
+func (e *Engine) stateDir(p localrt.Plan, projectPath string) (string, error) {
 	dir := p.StateDir
 	if dir == "" {
 		var err error
@@ -366,6 +422,11 @@ func (e *Engine) writeComposeFile(p localrt.Plan, projectPath string, in compose
 	if err := os.MkdirAll(dir, stateDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", dir, err)
 	}
+	return dir, nil
+}
+
+// writeComposeFile renders and writes the compose file into the state dir.
+func (e *Engine) writeComposeFile(dir string, in composeInput) (string, error) {
 	yaml, err := generateCompose(in)
 	if err != nil {
 		return "", err

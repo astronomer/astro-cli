@@ -70,6 +70,9 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
 			AirflowVersion: m.Astro.AirflowVersion,
+			// Docker mode installs these into the runtime image for parity
+			// with standalone, which gets them from the uv venv sync.
+			Dependencies: m.Project.Dependencies,
 			// PythonVersion is left empty on purpose: uv resolves the
 			// interpreter from the manifest's requires-python, so a specifier
 			// like ">=3.10" never reaches uv's --python, which wants a

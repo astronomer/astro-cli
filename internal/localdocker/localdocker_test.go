@@ -60,6 +60,9 @@ func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	e.allocPort = func() (string, error) { return "", errors.New("allocation not expected") }
 	e.health = func(context.Context, string, time.Duration) error { return nil }
 	e.now = func() time.Time { return time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC) }
+	e.ensureEngine = func(localrt.Callbacks) error { return nil }
+	e.composeAvail = func(context.Context, engineConn) error { return nil }
+	e.startSession = func(string, int) error { return nil }
 	return e
 }
 
@@ -144,6 +147,139 @@ func TestStartSessionTiedRecordsOwnerPID(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, rec.StopWithSession)
 	assert.Equal(t, os.Getpid(), rec.PID)
+}
+
+func TestStartInstallsDependenciesIntoImage(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.Dependencies = []string{"pandas==2.2.0", "requests"}
+
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	name, err := composeProjectName(p.ProjectPath)
+	require.NoError(t, err)
+	tag := builtImageTag(name)
+
+	// A build ran, tagging the per-project image over the runtime base.
+	assert.True(t, hasCall(cmd.calls, "docker build --tag "+tag), "expected a build, got %v", cmd.calls)
+	// The compose up runs the built image, not the bare runtime image.
+	stateDir, err := localrt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(compose), "image: "+tag)
+	assert.NotContains(t, string(compose), runtimeImageRepo)
+
+	// The requirements file in the build context holds the manifest deps.
+	req, err := os.ReadFile(filepath.Join(stateDir, buildContextDir, requirementsName))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas==2.2.0\nrequests\n", string(req))
+	// packages.txt must exist so the image's ONBUILD copy does not fail.
+	assert.FileExists(t, filepath.Join(stateDir, buildContextDir, packagesName))
+}
+
+func TestStartNoDependenciesSkipsBuild(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t) // no Dependencies
+
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.False(t, hasCall(cmd.calls, "build"), "no build may run without extra deps, got %v", cmd.calls)
+}
+
+func TestStartAirflowOnlyDepsSkipsBuild(t *testing.T) {
+	// The base image provides Airflow; a manifest listing only Airflow (any
+	// extras/pin) needs no build layer.
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.Dependencies = []string{"apache-airflow==3.1.*", "apache-airflow[celery]"}
+
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.False(t, hasCall(cmd.calls, "build"), "airflow-only deps must not trigger a build, got %v", cmd.calls)
+}
+
+func TestRuntimeDepsDropsAirflowOnly(t *testing.T) {
+	got := runtimeDeps([]string{
+		"apache-airflow==3.1.*",
+		"apache-airflow[celery] >= 3",
+		"APACHE_AIRFLOW==3",
+		"apache-airflow-providers-postgres",
+		"pandas",
+		"requests>=2",
+	})
+	assert.Equal(t, []string{
+		"apache-airflow-providers-postgres",
+		"pandas",
+		"requests>=2",
+	}, got)
+}
+
+func TestStartFailedDepInstallReturnsNamedError(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects, run: func(call string, _ localrt.Stdio) error {
+		if strings.Contains(call, "build") {
+			return errors.New("exit status 1")
+		}
+		return nil
+	}}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.Dependencies = []string{"nonexistent-package-xyz"}
+
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dependencies")
+	// The build failed, so no containers start.
+	assert.False(t, hasCall(cmd.calls, "up --detach"), "no up after a failed build, got %v", cmd.calls)
+}
+
+func TestStartBringsEngineUpFirst(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	var ensured bool
+	e.ensureEngine = func(localrt.Callbacks) error { ensured = true; return nil }
+	_, err := e.Start(context.Background(), testPlan(t), localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.True(t, ensured, "the engine must be brought up before the start")
+}
+
+func TestStartFailsWhenEngineCannotStart(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	e.ensureEngine = func(localrt.Callbacks) error { return errors.New("engine down") }
+	_, err := e.Start(context.Background(), testPlan(t), localrt.Callbacks{})
+	assert.ErrorContains(t, err, "engine down")
+	assert.Empty(t, cmd.calls, "nothing may run when the engine cannot start")
+}
+
+func TestStartReportsMissingCompose(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	e.composeAvail = func(context.Context, engineConn) error { return ErrComposeMissing }
+	_, err := e.Start(context.Background(), testPlan(t), localrt.Callbacks{})
+	assert.ErrorIs(t, err, ErrComposeMissing)
+	assert.False(t, hasCall(cmd.calls, "up"), "no compose up when the plugin is missing")
+}
+
+func TestStartSessionTiedSpawnsWatcher(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	var gotProject string
+	var gotPID int
+	e.startSession = func(project string, pid int) error {
+		gotProject, gotPID = project, pid
+		return nil
+	}
+	p := testPlan(t)
+	p.StopWithSession = true
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, p.ProjectPath, gotProject)
+	assert.Equal(t, os.Getpid(), gotPID)
 }
 
 func TestStartHealthFailureKeepsRecordAndRoute(t *testing.T) {
@@ -257,9 +393,20 @@ func TestStopForceAndClean(t *testing.T) {
 
 	require.NoError(t, af.Stop(context.Background(), localrt.StopOptions{Force: true, Clean: true}))
 
-	down := cmd.calls[len(cmd.calls)-1]
-	assert.Contains(t, down, "down --timeout 0 --volumes --remove-orphans")
+	assert.True(t, hasCall(cmd.calls, "down --timeout 0 --volumes --remove-orphans"), "expected a forced clean down, got %v", cmd.calls)
+	// A clean stop also drops the per-project dependency image (best-effort).
+	assert.True(t, hasCall(cmd.calls, "image rm --force "+builtImagePrefix), "expected an image rm, got %v", cmd.calls)
 	assert.NoFileExists(t, composeFile)
+}
+
+// hasCall reports whether any recorded call contains substr.
+func hasCall(calls []string, substr string) bool {
+	for _, c := range calls {
+		if strings.Contains(c, substr) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestFindProjectProbesBothEngines(t *testing.T) {

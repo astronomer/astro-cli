@@ -32,6 +32,7 @@ func AddCmds(d Deps) []*cobra.Command {
 		NewInitCmd(d),
 		NewDevCmd(d),
 		newSuperviseCmd(d),
+		newSessionWatchCmd(d),
 	}
 	cmds = append(cmds, rootAliasCmds(d)...)
 	for _, cmd := range cmds {

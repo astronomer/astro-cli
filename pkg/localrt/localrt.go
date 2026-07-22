@@ -39,6 +39,11 @@ type Plan struct {
 	Mode           Mode
 	AirflowVersion string
 	PythonVersion  string
+	// Dependencies is the project's [project] dependencies (PEP 508 specs).
+	// Standalone mode ignores it — uv syncs the venv straight from the
+	// manifest — but docker mode installs these into the runtime image so
+	// both modes run Airflow against the same set of packages.
+	Dependencies []string
 	// StopWithSession ties Airflow's lifetime to the process that starts
 	// it: true means Airflow is killed when that process exits; false (the
 	// default) means Airflow keeps running and any tool can reconnect to

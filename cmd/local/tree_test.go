@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localstandalone/supervise"
 )
 
@@ -28,9 +29,11 @@ func TestTreeInvariants(t *testing.T) {
 			if cmd.Annotations[skipPreRunAnnotation] != "true" {
 				t.Errorf("%s is missing the skip-pre-run annotation", cmd.CommandPath())
 			}
-			// The dev stub and the internal supervisor render no data, so
-			// the --output rule does not apply to them.
-			if cmd.Runnable() && cmd.Name() != "dev" && cmd.Name() != supervise.Subcommand {
+			// The dev stub and the internal supervisor/session-watcher render
+			// no data, so the --output rule does not apply to them.
+			if cmd.Runnable() && cmd.Name() != "dev" &&
+				cmd.Name() != supervise.Subcommand &&
+				cmd.Name() != localdocker.SessionWatchSubcommand {
 				if cmd.Flags().Lookup("output") == nil &&
 					cmd.PersistentFlags().Lookup("output") == nil &&
 					cmd.InheritedFlags().Lookup("output") == nil {
