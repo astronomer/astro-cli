@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/astronomer/astro-cli/internal/localshared"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
@@ -25,7 +26,7 @@ var ErrNotStandaloneMode = errors.New("this project's local Airflow is not runni
 type Engine struct{}
 
 // New matches the Unix constructor.
-func New(_ string) *Engine { return &Engine{} }
+func New(_ string, _ localshared.ProxyDaemon) *Engine { return &Engine{} }
 
 func (e *Engine) Start(_ context.Context, _ localrt.Plan, _ localrt.Callbacks) (localrt.Airflow, error) {
 	return nil, ErrWindowsUnsupported

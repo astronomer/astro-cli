@@ -24,7 +24,7 @@ func newSessionWatchCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			eng := localdocker.New(routesDir())
+			eng := localdocker.New(routesDir(), newProxyDaemon())
 			return eng.WatchAndStop(cmd.Context(), project, parentPID)
 		},
 	}

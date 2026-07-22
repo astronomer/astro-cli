@@ -13,13 +13,16 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
+	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/internal/checks"
 	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localprune"
+	"github.com/astronomer/astro-cli/internal/localshared"
 	"github.com/astronomer/astro-cli/internal/localstandalone"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -93,11 +96,34 @@ type modeRuntime struct {
 
 func newModeRuntime() modeRuntime {
 	dir := routesDir()
+	daemon := newProxyDaemon()
 	return modeRuntime{
-		docker:     localdocker.New(dir),
-		standalone: localstandalone.New(dir),
+		docker:     localdocker.New(dir, daemon),
+		standalone: localstandalone.New(dir, daemon),
 		routes:     proxy.NewStore(dir, proxy.WithRouteLiveness(localprune.RouteAlive)),
 	}
+}
+
+// proxyDaemon adapts airflow/proxy's daemon lifecycle to the engines'
+// localshared.ProxyDaemon seam. It lives at the composition layer because
+// airflow/proxy pulls in config, which the v2 engines must not import; they
+// see only the interface.
+type proxyDaemon struct{}
+
+func (proxyDaemon) EnsureRunning() (string, error) {
+	return proxydaemon.EnsureRunning(proxy.DefaultPort)
+}
+
+func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
+
+// newProxyDaemon returns the daemon seam, or nil on Windows, where the proxy
+// is unsupported (decision 12): the engines skip the daemon and Airflow stays
+// reachable on its direct localhost port.
+func newProxyDaemon() localshared.ProxyDaemon {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	return proxyDaemon{}
 }
 
 // routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the

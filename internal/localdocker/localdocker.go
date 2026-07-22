@@ -53,6 +53,10 @@ var ErrNotDockerMode = errors.New("this project's local Airflow is not running i
 // fake.
 type Engine struct {
 	routes *proxy.Store
+	// daemon is the reverse-proxy lifecycle: started after a route lands so
+	// <name>.localhost resolves, reaped when the last route goes. Nil on
+	// Windows and in tests, where localshared.EnsureDaemon/ReapDaemon no-op.
+	daemon localshared.ProxyDaemon
 
 	cmd       Commander
 	preferred func() (engineConn, error)
@@ -76,10 +80,11 @@ type Engine struct {
 // New builds the production engine. routesDir is where pkg/proxy keeps
 // routes.json (~/.astro/proxy); the composition root supplies it because
 // this package must not read config.
-func New(routesDir string) *Engine {
+func New(routesDir string, daemon localshared.ProxyDaemon) *Engine {
 	s := proxy.NewStore(routesDir, proxy.WithRouteLiveness(localprune.RouteAlive))
 	e := &Engine{
 		routes:        s,
+		daemon:        daemon,
 		cmd:           execCommander{},
 		preferred:     resolvePreferredEngine,
 		connFor:       connFor,
@@ -218,6 +223,9 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		localshared.OnState(cb, localrt.StateError, err)
 		return nil, err
 	}
+	// The route landed before the health wait so status/stop worked during it;
+	// start the daemon now that Airflow answers, so <name>.localhost resolves.
+	localshared.EnsureDaemon(e.daemon, cb, e.now(), rec.Hostname)
 	localshared.OnState(cb, localrt.StateRunning, nil)
 	return &airflow{eng: e, rec: rec}, nil
 }
@@ -319,6 +327,9 @@ func (a *airflow) Stop(ctx context.Context, opts localrt.StopOptions) error {
 		return fmt.Errorf("stopping project containers: %w", err)
 	}
 	errs := []error{a.eng.removeRoute(a.rec), localstate.Remove(a.rec.ProjectPath)}
+	// The route is gone; drop the daemon too if it was the last one, so the
+	// last project to stop leaves no orphan proxy behind.
+	localshared.ReapDaemon(a.eng.daemon)
 	if opts.Clean {
 		if p := a.composeFilePath(); p != "" {
 			if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {

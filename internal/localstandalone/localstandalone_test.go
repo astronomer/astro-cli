@@ -81,7 +81,7 @@ func testEngine(t *testing.T) (*Engine, *fakeProcs, *[]string) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	procs := &fakeProcs{alive: map[int]bool{}}
 	var launches []string
-	e := New(filepath.Join(t.TempDir(), "proxy"))
+	e := New(filepath.Join(t.TempDir(), "proxy"), nil)
 	e.uv = func(context.Context) (venvSyncer, error) { return fakeUV{}, nil }
 	e.launch = func(_ string, _ []string, name string, args ...string) (int, error) {
 		launches = append(launches, name+" "+strings.Join(args, " "))

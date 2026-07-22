@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -344,14 +345,44 @@ func (c *cli) runStatus() error {
 }
 
 func renderStatus(w io.Writer, st localrt.Status) error {
-	_, err := fmt.Fprintf(w, "project: %s\nstate: %s\n", st.ProjectPath, st.State)
-	if err != nil {
+	if _, err := fmt.Fprintf(w, "project: %s\nstate: %s\n", st.ProjectPath, st.State); err != nil {
 		return err
 	}
-	if st.State == localrt.StateRunning {
-		_, err = fmt.Fprintf(w, "mode: %s\npid: %d\nurl: http://localhost:%d\n", st.Mode, st.PID, st.Port)
+	if st.State != localrt.StateRunning {
+		return nil
 	}
-	return err
+	url := primaryURL(st)
+	if _, err := fmt.Fprintf(w, "mode: %s\npid: %d\nurl: %s\n", st.Mode, st.PID, url); err != nil {
+		return err
+	}
+	// When the shown URL is the hostname, print the direct port too so the
+	// always-reachable fallback stays discoverable.
+	if direct := directURL(st); direct != url {
+		if _, err := fmt.Fprintf(w, "direct: %s\n", direct); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// directURL is a project's always-reachable Airflow URL, bound straight to its
+// backend port on localhost.
+func directURL(st localrt.Status) string {
+	return fmt.Sprintf("http://localhost:%d", st.Port)
+}
+
+// primaryURL is the URL to show the user: the <name>.localhost hostname the
+// proxy daemon serves when it is running, else the direct localhost URL. The
+// hostname needs the daemon, so it is offered only when the daemon is up and
+// the record carries a hostname; otherwise (daemon down, Windows, older
+// record) the direct URL, which always works, stands in.
+func primaryURL(st localrt.Status) string {
+	if st.Hostname != "" {
+		if port := proxydaemon.BoundPort(); port != "" {
+			return fmt.Sprintf("http://%s:%s", st.Hostname, port)
+		}
+	}
+	return directURL(st)
 }
 
 func newListCmd(c *cli) *cobra.Command {
@@ -664,7 +695,7 @@ func (c *cli) runOpen(printURL bool) error {
 	if st.State != localrt.StateRunning {
 		return fmt.Errorf("local Airflow is %s; run `%s` first", st.State, replaceStart)
 	}
-	url := fmt.Sprintf("http://localhost:%d", st.Port)
+	url := primaryURL(st)
 	if printURL {
 		v := struct {
 			URL string `json:"url"`

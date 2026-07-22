@@ -176,7 +176,7 @@ var StartDaemon = func(port string) (string, error) {
 		return "", fmt.Errorf("error finding CLI executable: %w", err)
 	}
 
-	cmd := exec.Command(exe, "dev", "proxy", "serve", "--port", port) //nolint:gosec
+	cmd := exec.Command(exe, ServeSubcommand, "--port", port) //nolint:gosec
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -226,7 +226,7 @@ func waitForPortFile() (string, error) {
 }
 
 // Serve runs the proxy server in the foreground until SIGTERM/SIGINT. It is
-// the body of the hidden `dev proxy serve` subcommand the daemon runs as.
+// the body of the hidden ServeSubcommand the daemon runs as.
 // Once listening it writes the bound port to the port file, which is what
 // StartDaemon waits for before writing the PID file.
 func Serve(port string) error {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localstandalone/supervise"
 )
@@ -29,11 +30,12 @@ func TestTreeInvariants(t *testing.T) {
 			if cmd.Annotations[skipPreRunAnnotation] != "true" {
 				t.Errorf("%s is missing the skip-pre-run annotation", cmd.CommandPath())
 			}
-			// The dev stub and the internal supervisor/session-watcher render
-			// no data, so the --output rule does not apply to them.
+			// The dev stub and the internal supervisor, session-watcher, and
+			// proxy server render no data, so the --output rule does not apply.
 			if cmd.Runnable() && cmd.Name() != "dev" &&
 				cmd.Name() != supervise.Subcommand &&
-				cmd.Name() != localdocker.SessionWatchSubcommand {
+				cmd.Name() != localdocker.SessionWatchSubcommand &&
+				cmd.Name() != proxydaemon.ServeSubcommand {
 				if cmd.Flags().Lookup("output") == nil &&
 					cmd.PersistentFlags().Lookup("output") == nil &&
 					cmd.InheritedFlags().Lookup("output") == nil {

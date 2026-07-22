@@ -52,7 +52,7 @@ func noProjects(string) ([]byte, error) { return nil, nil }
 func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	t.Helper()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	e := New(filepath.Join(t.TempDir(), "proxy"))
+	e := New(filepath.Join(t.TempDir(), "proxy"), nil)
 	e.cmd = cmd
 	e.preferred = func() (engineConn, error) { return engineConn{bin: "docker"}, nil }
 	e.connFor = func(bin string) engineConn { return engineConn{bin: bin} }
