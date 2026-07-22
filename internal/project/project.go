@@ -80,7 +80,12 @@ func New(dir string) (*Project, error) {
 	}
 	hostname, isWorktree, err := proxy.DeriveHostname(abs)
 	if err != nil {
-		return nil, err
+		// Hostname is a cosmetic display label; identity is the hash (id).
+		// A directory name with no DNS-usable characters (all non-ASCII, all
+		// punctuation) leaves DeriveHostname with no label to build from.
+		// Fall back to an ID-derived label so a valid, unique hostname always
+		// exists and project-scoped commands keep working.
+		hostname = "astro-" + id[:8] + proxy.LocalhostSuffix
 	}
 	return &Project{
 		Dir:        abs,

@@ -4,7 +4,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -151,6 +153,49 @@ func TestDiscoverRegularRepoIsNotWorktree(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, p.IsWorktree)
 	assert.Equal(t, "proj.localhost", p.Hostname)
+}
+
+// validLabel matches a single DNS label: lowercase alphanumeric and hyphens,
+// no leading or trailing hyphen.
+var validLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+func TestNewFallsBackToIDHostnameForUnusableName(t *testing.T) {
+	// A directory name that sanitizes to an empty DNS label — all non-ASCII,
+	// or all punctuation — must not break the project. Identity is the path
+	// hash, so the hostname falls back to an ID-derived label.
+	root := t.TempDir()
+	dirs := map[string]string{
+		"nonascii":    "日本語",
+		"punctuation": "...",
+		"normal":      "my-project",
+	}
+	hostnames := map[string]string{}
+	for key, dirName := range dirs {
+		proj := filepath.Join(root, key, dirName)
+		require.NoError(t, os.MkdirAll(proj, 0o755))
+		writeMarker(t, proj)
+
+		p, err := Discover(proj)
+		require.NoError(t, err)
+		hostnames[key] = p.Hostname
+
+		label, ok := strings.CutSuffix(p.Hostname, ".localhost")
+		require.True(t, ok, "hostname %q should end in .localhost", p.Hostname)
+		assert.Regexp(t, validLabel, label, "hostname label must be a valid DNS label")
+
+		if key == "normal" {
+			// A usable name still derives from the name — no identity churn.
+			assert.Equal(t, "my-project.localhost", p.Hostname)
+		} else {
+			// Unusable names fall back to astro-<first 8 hex of ID>.localhost.
+			assert.Equal(t, "astro-"+p.ID[:8]+".localhost", p.Hostname)
+		}
+	}
+
+	// The two odd projects must not collide with each other or the normal one.
+	assert.NotEqual(t, hostnames["nonascii"], hostnames["punctuation"])
+	assert.NotEqual(t, hostnames["nonascii"], hostnames["normal"])
+	assert.NotEqual(t, hostnames["punctuation"], hostnames["normal"])
 }
 
 func TestIDMissingDirectory(t *testing.T) {
