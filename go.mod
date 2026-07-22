@@ -56,7 +56,7 @@ require (
 	github.com/oapi-codegen/runtime v1.4.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pb33f/libopenapi v0.34.0
-	github.com/pelletier/go-toml/v2 v2.3.0
+	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758
 	github.com/whilp/git-urls v1.0.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
@@ -357,6 +357,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29 // indirect
 	github.com/Microsoft/hcsshim v0.14.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/bugsnag/bugsnag-go v1.5.0 // indirect
@@ -447,3 +448,5 @@ replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
 replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry
 
 replace github.com/astronomer/astro-cli/pkg/localrt => ./pkg/localrt
+
+replace github.com/astronomer/astro-cli/pkg/manifest => ./pkg/manifest

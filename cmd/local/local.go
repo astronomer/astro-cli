@@ -21,14 +21,11 @@ const (
 	nameLogs    = "logs"
 	nameRun     = "run"
 	nameInit    = "init"
-	nameObject  = "object"
 	nameDev     = "dev"
 
-	replaceStart     = "astro local start"
-	replaceStatus    = "astro local status"
-	replaceLogs      = "astro local logs"
-	replaceInit      = "astro init"
-	replaceEnvSchema = "astro local env schema"
+	replaceStart = "astro local start"
+	replaceLogs  = "astro local logs"
+	replaceInit  = "astro init"
 )
 
 // cli carries one command family's invocation state: the deps and the value

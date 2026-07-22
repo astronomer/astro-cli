@@ -9,39 +9,17 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/internal/scaffold"
 )
 
-// devMappingDoc is the published full mapping from `astro dev` to the v2
-// surface.
-const devMappingDoc = "astro.sh/v2/dev-to-local"
+// The dev-to-local mapping lives in internal/scaffold, which also publishes
+// it in every scaffolded AGENTS.md; the stub renders the same data.
+const devMappingDoc = scaffold.DevMappingDoc
 
-// devReplacement maps one v1 `astro dev` subcommand to what replaces it.
-type devReplacement struct {
-	Command     string `json:"command"`
-	Replacement string `json:"replacement"`
-}
+type devReplacement = scaffold.DevReplacement
 
-// devReplacements returns the mapping in the order shown to the user.
-// Multi-word entries must come before their one-word prefix so lookup finds
-// the longest match.
-func devReplacements() []devReplacement {
-	return []devReplacement{
-		{nameStart, replaceStart},
-		{nameStop, "astro local stop"},
-		{nameRestart, "astro local restart"},
-		{"ps", replaceStatus},
-		{nameLogs, replaceLogs},
-		{nameRun, "astro local run"},
-		{"bash", "astro local shell"},
-		{"parse", "astro local check"},
-		{"kill", "astro local stop --clean"},
-		{"pytest", "uv run pytest"},
-		{nameInit, replaceInit},
-		{nameObject + " import", replaceEnvSchema},
-		{nameObject + " export", replaceEnvSchema},
-		{nameObject, replaceEnvSchema},
-	}
-}
+func devReplacements() []devReplacement { return scaffold.DevReplacements() }
 
 // devRemoved is the data behind the stub's output: the JSON payload in json
 // mode, and the source the human message is rendered from.
@@ -160,12 +138,13 @@ func renderDevRemoved(p devRemoved) string {
 	}
 	b.WriteString(".\nLocal Airflow now lives under `astro local`:\n\n")
 	examples := []devReplacement{
-		{nameStart, replaceStart},
-		{nameLogs, replaceLogs},
-		{nameInit, replaceInit},
+		{Command: nameStart, Replacement: replaceStart},
+		{Command: nameLogs, Replacement: replaceLogs},
+		{Command: nameInit, Replacement: replaceInit},
 	}
 	if p.Replacement != "" {
-		examples = append([]devReplacement{{strings.TrimPrefix(p.Typed, "astro dev "), p.Replacement}}, examples...)
+		typed := devReplacement{Command: strings.TrimPrefix(p.Typed, "astro dev "), Replacement: p.Replacement}
+		examples = append([]devReplacement{typed}, examples...)
 	}
 	seen := map[string]bool{}
 	for _, e := range examples {

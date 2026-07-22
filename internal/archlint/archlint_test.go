@@ -32,6 +32,7 @@ var v2BelowCmd = []string{
 	"internal/localdocker",
 	"internal/localstate",
 	"internal/project",
+	"internal/scaffold",
 	"internal/userstate",
 	"pkg/localrt",
 	"pkg/manifest",
