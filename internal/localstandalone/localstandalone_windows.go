@@ -35,6 +35,12 @@ func (e *Engine) Attach(_ string) (localrt.Airflow, error) {
 	return nil, ErrWindowsUnsupported
 }
 
+// LogHandle matches the Unix signature; standalone logs never exist on
+// Windows, where local Airflow runs in docker mode.
+func (e *Engine) LogHandle(_ string) (localrt.Airflow, error) {
+	return nil, ErrWindowsUnsupported
+}
+
 func (e *Engine) ReadStatus(_ string) (localrt.Status, error) {
 	return localrt.Status{}, ErrWindowsUnsupported
 }

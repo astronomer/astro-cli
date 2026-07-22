@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -149,6 +150,39 @@ func TestLogsFollowStopsOnCancel(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("follow did not end on cancel")
 	}
+}
+
+func TestLogsReadableAfterStop(t *testing.T) {
+	// Stop removes the record but keeps the log file, so `astro local logs`
+	// must still read it through a detached handle (no live record needed).
+	e, _, _ := testEngine(t)
+	p := testPlan(t)
+	af, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	stateDir, err := localrt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	for _, l := range testLogLines() {
+		fmt.Fprintln(&buf, l)
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(stateDir, logFileName), buf.Bytes(), 0o600))
+
+	require.NoError(t, af.Stop(context.Background(), localrt.StopOptions{}))
+	_, err = localstate.Load(p.ProjectPath)
+	require.ErrorIs(t, err, localstate.ErrNotRunning)
+
+	// LogHandle reads the persisted file with no record, honoring --tail.
+	handle, err := e.LogHandle(p.ProjectPath)
+	require.NoError(t, err)
+	var got []localrt.LogLine
+	err = handle.Logs(context.Background(), localrt.LogOptions{
+		Tail:   2,
+		OnLine: func(l localrt.LogLine) { got = append(got, l) },
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "10:00:03 three", got[0].Text)
 }
 
 func TestLogsWithoutFileSaysStartFirst(t *testing.T) {

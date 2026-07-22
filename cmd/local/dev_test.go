@@ -16,7 +16,8 @@ type fakeRuntime struct{}
 func (fakeRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks) (localrt.Airflow, error) {
 	return nil, localrt.ErrNotImplemented
 }
-func (fakeRuntime) Attach(string) (localrt.Airflow, error) { return nil, localrt.ErrNotImplemented }
+func (fakeRuntime) Attach(string) (localrt.Airflow, error)    { return nil, localrt.ErrNotImplemented }
+func (fakeRuntime) LogSource(string) (localrt.Airflow, error) { return nil, localrt.ErrNotImplemented }
 func (fakeRuntime) ReadStatus(string) (localrt.Status, error) {
 	return localrt.Status{}, localrt.ErrNotImplemented
 }

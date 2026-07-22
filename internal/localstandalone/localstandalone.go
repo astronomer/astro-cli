@@ -353,6 +353,19 @@ func (e *Engine) Attach(projectPath string) (localrt.Airflow, error) {
 	return &airflow{eng: e, rec: rec}, nil
 }
 
+// LogHandle returns a handle for reading a stopped project's persisted log
+// file, without a live record: the standalone log file outlives the record
+// (Stop removes the record but not the log), and its path derives from the
+// project's state dir. Logs on this handle reads the backlog and, since a
+// zero pgid reads as not alive, a follow ends once the file is drained.
+func (e *Engine) LogHandle(projectPath string) (localrt.Airflow, error) {
+	abs, err := filepath.Abs(projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolving %s: %w", projectPath, err)
+	}
+	return &airflow{eng: e, rec: localstate.Record{ProjectPath: abs, Mode: localrt.ModeStandalone}}, nil
+}
+
 // ReadStatus reports a project's status from its state record plus a
 // process-group liveness check.
 func (e *Engine) ReadStatus(projectPath string) (localrt.Status, error) {

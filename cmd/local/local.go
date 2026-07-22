@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"strconv"
 	"text/tabwriter"
 	"time"
@@ -73,6 +74,16 @@ func (c *cli) attach() (localrt.Airflow, error) {
 		return nil, err
 	}
 	return c.d.Runtime.Attach(dir)
+}
+
+// logSource returns a handle for reading logs. Unlike attach it also serves a
+// stopped project, so `astro local logs` works after `astro local stop`.
+func (c *cli) logSource() (localrt.Airflow, error) {
+	dir, err := c.projectPath()
+	if err != nil {
+		return nil, err
+	}
+	return c.d.Runtime.LogSource(dir)
 }
 
 func (c *cli) readStatus() (localrt.Status, error) {
@@ -163,6 +174,12 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	if err != nil {
 		return err
 	}
+	// A busy explicit --port falls back to another port rather than failing;
+	// say so on stderr so the user knows the URL moved and stdout stays clean
+	// for json.
+	if opts.RequestedPort > 0 && st.Port != opts.RequestedPort {
+		fmt.Fprintf(c.d.Stderr, "requested port %d is in use; started on %d instead\n", opts.RequestedPort, st.Port)
+	}
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
 		return err
 	}
@@ -243,13 +260,15 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	if err != nil {
 		return err
 	}
-	af, err := c.attach()
+	st, err := c.readStatus()
 	if err != nil {
 		return err
 	}
-	st, err := af.Status()
-	if err != nil {
-		return err
+	if st.State != localrt.StateRunning {
+		// Nothing is running (the record is gone), so there is nothing to stop
+		// and no prior mode or port to carry: restart falls back to a plain
+		// start with the defaults.
+		return c.runStart(ctx, plan.Options{})
 	}
 	// Rebuild the plan from the manifest and env as they are now, so a
 	// restart picks up edits — but keep the running mode, port, and session
@@ -261,6 +280,10 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	})
 	if err != nil {
 		return c.reportBuildError(r, err)
+	}
+	af, err := c.attach()
+	if err != nil {
+		return err
 	}
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
@@ -524,7 +547,7 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 	if err != nil {
 		return err
 	}
-	af, err := c.attach()
+	af, err := c.logSource()
 	if err != nil {
 		return err
 	}
@@ -568,7 +591,14 @@ func (c *cli) runExec(ctx context.Context, argv []string) error {
 	if err != nil {
 		return err
 	}
-	return af.Run(ctx, argv, c.stdio())
+	err = af.Run(ctx, argv, c.stdio())
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		// The wrapped command failed and has already written its own output;
+		// carry its exit code out so a caller sees the real status, not 1.
+		return &ExitError{Code: exitErr.ExitCode()}
+	}
+	return err
 }
 
 func newShellCmd(c *cli) *cobra.Command {

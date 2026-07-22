@@ -112,5 +112,12 @@ func TestStatusFromRecord(t *testing.T) {
 	assert.Equal(t, rec.StartedAt, st.StartedAt)
 	assert.True(t, st.StopWithSession)
 
-	assert.Equal(t, localrt.StateStopped, rec.Status(false).State)
+	// A stopped record's pid and port are stale, so Status omits them: the
+	// process is gone and the port is reassignable.
+	stopped := rec.Status(false)
+	assert.Equal(t, localrt.StateStopped, stopped.State)
+	assert.Zero(t, stopped.PID)
+	assert.Zero(t, stopped.Port)
+	// Running keeps them.
+	assert.Equal(t, rec.PID, rec.Status(true).PID)
 }

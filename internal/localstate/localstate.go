@@ -151,13 +151,16 @@ func (r Record) Status(running bool) localrt.Status {
 		Mode:            r.Mode,
 		StopWithSession: r.StopWithSession,
 		State:           localrt.StateStopped,
-		PID:             r.PID,
-		Port:            r.Port,
 		Hostname:        r.Hostname,
 		StartedAt:       r.StartedAt,
 	}
 	if running {
 		st.State = localrt.StateRunning
+		// PID and Port describe a live runtime; on a stopped record they are
+		// stale (the process is gone, the port reassignable), so report them
+		// only while running.
+		st.PID = r.PID
+		st.Port = r.Port
 	}
 	return st
 }

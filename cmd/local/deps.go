@@ -9,6 +9,7 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -52,6 +53,10 @@ type Deps struct {
 type Runtime interface {
 	Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error)
 	Attach(projectPath string) (localrt.Airflow, error)
+	// LogSource returns a handle for reading a project's logs. Unlike Attach
+	// it also serves a stopped standalone project, whose log file outlives its
+	// record; the handle's Logs reads that file.
+	LogSource(projectPath string) (localrt.Airflow, error)
 	ReadStatus(projectPath string) (localrt.Status, error)
 	List() ([]localrt.Status, error)
 	// PruneStale removes the records (and their routes) whose runtime is
@@ -112,10 +117,45 @@ func (r modeRuntime) Start(ctx context.Context, p localrt.Plan, cb localrt.Callb
 		// runtime (no --docker); standalone is the default.
 		p.Mode = localrt.ModeStandalone
 	}
+	// One project starts at a time. The lock stops two concurrent starts from
+	// both writing the record, where the loser's dying pid would orphan the
+	// winner's live Airflow; it is held across the liveness check and the
+	// engine's record write so the check-and-write is atomic.
+	unlock, err := localstate.Lock(p.ProjectPath)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	if err := r.refuseLiveStart(p); err != nil {
+		return nil, err
+	}
 	if p.Mode == localrt.ModeDocker {
 		return r.docker.Start(ctx, p, cb)
 	}
 	return r.standalone.Start(ctx, p, cb)
+}
+
+// refuseLiveStart refuses to start over a runtime that is already live, so a
+// second start — same mode or a different one — never overwrites the record
+// and orphans the running Airflow. This is the only place a cross-mode
+// collision is caught, since an engine knows only its own mode. A record whose
+// runtime is gone falls through to the engine, which overwrites a stale
+// same-mode record and still refuses a foreign mode.
+func (r modeRuntime) refuseLiveStart(p localrt.Plan) error {
+	rec, err := localstate.Load(p.ProjectPath)
+	if errors.Is(err, localstate.ErrNotRunning) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if r.statusOf(rec).State != localrt.StateRunning {
+		return nil
+	}
+	if rec.Mode != p.Mode {
+		return fmt.Errorf("local Airflow is already running for this project in %s mode; stop it first with `astro local stop`", modeLabel(rec.Mode))
+	}
+	return fmt.Errorf("local Airflow is already running for this project; use `astro local restart` to restart it or `astro local stop` to stop it")
 }
 
 func (r modeRuntime) Attach(projectPath string) (localrt.Airflow, error) {
@@ -127,6 +167,22 @@ func (r modeRuntime) Attach(projectPath string) (localrt.Airflow, error) {
 		return r.docker.Attach(projectPath)
 	}
 	return r.standalone.Attach(projectPath)
+}
+
+func (r modeRuntime) LogSource(projectPath string) (localrt.Airflow, error) {
+	rec, err := localstate.Load(projectPath)
+	if err == nil {
+		if rec.Mode == localrt.ModeDocker {
+			return r.docker.Attach(projectPath)
+		}
+		return r.standalone.Attach(projectPath)
+	}
+	if errors.Is(err, localstate.ErrNotRunning) {
+		// No record: only standalone leaves a log file behind, so read it
+		// through the standalone engine's detached log handle.
+		return r.standalone.LogHandle(projectPath)
+	}
+	return nil, err
 }
 
 func (r modeRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
