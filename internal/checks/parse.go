@@ -110,7 +110,8 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 	if _, err := os.Stat(python); err != nil {
 		return ParseReport{}, fmt.Errorf(
 			"no Python found at %s — run `astro local start` to build the project environment first: %w",
-			python, ErrEnvNotReady)
+			python, ErrEnvNotReady,
+		)
 	}
 
 	home, cleanup, err := r.tempHome()
@@ -119,10 +120,18 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 	}
 	defer cleanup()
 
-	env := append(os.Environ(),
+	// The script writes its JSON here rather than to stdout: Airflow 3 spews
+	// log lines to stdout while building a DagBag (and from a signal handler on
+	// an import timeout, which no logging switch can mute), so stdout can't be
+	// kept clean for the result. A private file in the scratch home can be.
+	resultFile := filepath.Join(home, "parse-result.json")
+
+	env := append(
+		os.Environ(),
 		"AIRFLOW_HOME="+home,
 		"AIRFLOW__CORE__DAGS_FOLDER="+in.DagsDir,
 		"AIRFLOW__CORE__LOAD_EXAMPLES=False",
+		"ASTRO_PARSE_RESULT_FILE="+resultFile,
 	)
 	args := []string{"-", in.ProjectPath, in.DagsDir}
 	stdout, err := r.Exec.Run(ctx, in.ProjectPath, env, python, args, parseScript)
@@ -130,8 +139,15 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 		return ParseReport{}, fmt.Errorf("running the DAG parse: %w", err)
 	}
 
+	// Prefer the result file; fall back to stdout for a script that ignored the
+	// env var (older embed, or a test's fake executor).
+	raw := bytes.TrimSpace(stdout)
+	if fromFile, ferr := os.ReadFile(resultFile); ferr == nil && len(bytes.TrimSpace(fromFile)) > 0 {
+		raw = bytes.TrimSpace(fromFile)
+	}
+
 	var report ParseReport
-	if err := json.Unmarshal(bytes.TrimSpace(stdout), &report); err != nil {
+	if err := json.Unmarshal(raw, &report); err != nil {
 		return ParseReport{}, fmt.Errorf("decoding the DAG parse output: %w", err)
 	}
 	return report, nil

@@ -1,9 +1,16 @@
 # Embedded by internal/checks and run with the project's own .venv Python
 # (`python - <project_root> <dags_dir>`, program on stdin). It builds one
-# Airflow DagBag and prints a single JSON object to stdout: per-DAG import
-# errors, the loaded DAG inventory, and per-file parse times. No scheduler,
-# no metadata database, no writes to the user's project — AIRFLOW_HOME points
-# at a throwaway directory the Go caller owns.
+# Airflow DagBag and writes a single JSON object with the result: per-DAG
+# import errors, the loaded DAG inventory, and per-file parse times. No
+# scheduler, no metadata database, no writes to the user's project —
+# AIRFLOW_HOME points at a throwaway directory the Go caller owns.
+#
+# The result goes to the file named by ASTRO_PARSE_RESULT_FILE when set, and
+# to stdout otherwise. Airflow 3 writes log lines to stdout while it builds a
+# DagBag (and does so from a signal handler on an import timeout, which
+# `logging.disable` cannot stop), so stdout is not a channel we can keep clean
+# for the result. A private file the Go caller reads is: nothing else writes
+# to it. stdout stays the fallback for a plain command-line run.
 #
 # This modernizes the v1 "DO NOT EDIT" integrity-test file, which pytest ran
 # from a copy written into the user's tree. Here the checks run from this
@@ -21,9 +28,30 @@ import os
 import sys
 
 
-def emit(result):
-    json.dump(result, sys.stdout)
-    sys.stdout.write("\n")
+def emit(result, fallback_stdout):
+    path = os.environ.get("ASTRO_PARSE_RESULT_FILE")
+    if path:
+        with open(path, "w") as f:
+            json.dump(result, f)
+            f.write("\n")
+        return
+    json.dump(result, fallback_stdout)
+    fallback_stdout.write("\n")
+    fallback_stdout.flush()
+
+
+def reserve_stdout():
+    # Move the real stdout aside and point fd 1 at stderr, so Airflow's log
+    # lines — Python prints, logging handlers, native code, even a signal
+    # handler firing mid-parse — land on stderr and leave stdout clean. This
+    # keeps the stdout fallback usable; the result itself goes to a private
+    # file (see emit), which no Airflow output can reach. Redirecting the fd,
+    # not just sys.stdout, is what catches writes that skip sys.stdout.
+    sys.stdout.flush()
+    saved_fd = os.dup(1)
+    os.dup2(2, 1)
+    sys.stdout = sys.stderr
+    return os.fdopen(saved_fd, "w", closefd=True)
 
 
 def install_parse_monkeypatches():
@@ -106,6 +134,10 @@ def parse_seconds(stat):
 
 
 def main():
+    # Do this before importing Airflow so its logging handlers bind to the
+    # redirected stream, not the real stdout we keep for the JSON result.
+    real_stdout = reserve_stdout()
+
     project_root = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
     dags_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(project_root, "dags")
 
@@ -125,7 +157,7 @@ def main():
         dagbag = DagBag(dag_folder=dags_dir, include_examples=False)
     except Exception as exc:
         result["fatal"] = "{}: {}".format(type(exc).__name__, exc)
-        emit(result)
+        emit(result, real_stdout)
         return
 
     def rel(path):
@@ -149,7 +181,7 @@ def main():
             }
         )
 
-    emit(result)
+    emit(result, real_stdout)
 
 
 if __name__ == "__main__":

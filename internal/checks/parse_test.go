@@ -73,6 +73,47 @@ func TestParseDecodesReportAndFeedsScriptOnStdin(t *testing.T) {
 	assert.True(t, hasEnvPrefix(ex.gotEnv, "AIRFLOW_HOME="), "AIRFLOW_HOME must be set to a scratch dir")
 }
 
+// fileWritingExec mimics the real script: it writes the JSON result to the
+// file named by ASTRO_PARSE_RESULT_FILE and returns whatever stdout spam it was
+// given. It exists to prove Parse reads the result from the file and ignores a
+// polluted stdout.
+type fileWritingExec struct {
+	result []byte
+	stdout []byte
+}
+
+func (f *fileWritingExec) Run(_ context.Context, _ string, env []string, _ string, _ []string, _ []byte) ([]byte, error) {
+	for _, kv := range env {
+		if path, ok := strings.CutPrefix(kv, "ASTRO_PARSE_RESULT_FILE="); ok {
+			if err := os.WriteFile(path, f.result, 0o600); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return f.stdout, nil
+}
+
+// TestParseReadsResultFileDespiteStdoutPollution reproduces the Airflow 3 bug:
+// the DagBag writes log lines to stdout before, and (on an import timeout) after
+// the result. The trailing line — a bare timestamp Go's JSON decoder reads as a
+// number and then chokes on the '-' — is exactly what broke a stdout-only
+// decode. Parse must take the result from the file and pass regardless.
+func TestParseReadsResultFileDespiteStdoutPollution(t *testing.T) {
+	spam := "[2026-07-20T12:00:00.000+0000] {dagbag.py:591} INFO - Filling up the DagBag\n" +
+		"airflow.exceptions.AirflowTaskTimeout: DagBag import timeout for dags/slow.py after 30.0s\n" +
+		"2026-07-20T12:00:00.200Z [info] scheduler shutting down\n"
+	ex := &fileWritingExec{
+		result: []byte(`{"schema_version":1,"dags":[{"dag_id":"a","file":"dags/a.py"}],"import_errors":[],"files":[]}`),
+		stdout: []byte(spam),
+	}
+	r := runnerWithPython(t, ex)
+
+	report, err := r.Parse(context.Background(), ParseInput{ProjectPath: "/proj", DagsDir: "/proj/dags"})
+	require.NoError(t, err, "stdout spam around the JSON must not break decoding")
+	require.Len(t, report.Dags, 1)
+	assert.Equal(t, "a", report.Dags[0].DagID)
+}
+
 func TestParseFatalReportDecodesWithoutError(t *testing.T) {
 	ex := &fakeExec{stdout: []byte(`{"fatal":"ModuleNotFoundError: No module named 'airflow'"}`)}
 	r := runnerWithPython(t, ex)
