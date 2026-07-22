@@ -107,7 +107,42 @@ func ProjectNameUnique() (string, error) {
 	b := md5.Sum([]byte(pwd))
 	s := fmt.Sprintf("%x", b[:])
 
-	return projectName + "_" + s[0:6], nil
+	return sanitizeImageName(projectName + "_" + s[0:6]), nil
+}
+
+// validImageName matches docker's grammar for a single image-name path
+// component: alphanumeric runs joined by single "." / "_" / "-" separators (or
+// a double "__"), starting and ending with an alphanumeric.
+var validImageName = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*$`)
+
+// sanitizeImageName turns an arbitrary project name into a name docker will
+// accept as an image tag. Names docker already accepts are returned unchanged,
+// so cached image tags keep their names. Anything else is lowercased, has every
+// run of non-alphanumeric characters collapsed to a single "-", and its leading
+// and trailing separators trimmed. The result is always a non-empty valid name.
+func sanitizeImageName(s string) string {
+	s = strings.ToLower(s)
+	if validImageName.MatchString(s) {
+		return s
+	}
+
+	var b strings.Builder
+	prevSep := false
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			prevSep = false
+		} else if !prevSep {
+			b.WriteByte('-')
+			prevSep = true
+		}
+	}
+
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		out = "project"
+	}
+	return out
 }
 
 func normalizeName(s string) string {

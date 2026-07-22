@@ -20,6 +20,13 @@ const (
 	idleTimeout       = 120 * time.Second
 	shutdownGraceTime = 5 * time.Second
 	startFailWindow   = 100 * time.Millisecond
+
+	// SignatureHeader and SignatureValue mark responses the proxy generates
+	// itself (its landing and not-found pages). A caller can probe the proxy's
+	// port and check for this header to confirm it's really the astro proxy on
+	// the other end, not an unrelated process that recycled its PID/port.
+	SignatureHeader = "X-Astro-Proxy"
+	SignatureValue  = "astro-local-proxy"
 )
 
 // Proxy is an HTTP reverse proxy that routes requests based on the Host
@@ -240,6 +247,7 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(SignatureHeader, SignatureValue)
 	if err := landingTmpl.Execute(w, data); err != nil {
 		slog.Debug("landing page template", "error", err)
 	}
@@ -248,6 +256,7 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 // notFoundPage shows a helpful 404 page for unknown hostnames.
 func (p *Proxy) notFoundPage(w http.ResponseWriter, hostname string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(SignatureHeader, SignatureValue)
 	w.WriteHeader(http.StatusNotFound)
 	if err := notFoundTmpl.Execute(w, notFoundData{
 		Hostname: hostname,

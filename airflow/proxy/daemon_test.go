@@ -4,9 +4,12 @@ package proxy
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -114,6 +117,11 @@ func TestEnsureRunning_AlreadyRunningReturnsBoundPort(t *testing.T) {
 	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
 	require.NoError(t, writePIDFile(pid, "16123"))
 
+	// Simulate a genuine running proxy: the identity check confirms it.
+	origIsProxy := isProxyDaemon
+	defer func() { isProxyDaemon = origIsProxy }()
+	isProxyDaemon = func(int, string) bool { return true }
+
 	// Daemon alive with recorded port — EnsureRunning must report that port,
 	// not the requested one.
 	port, err := EnsureRunning("6563")
@@ -121,11 +129,81 @@ func TestEnsureRunning_AlreadyRunningReturnsBoundPort(t *testing.T) {
 	assert.Equal(t, "16123", port)
 }
 
+// A live process that answers HTTP but isn't the proxy (no signature header)
+// stands in for an unrelated process that recycled the daemon's old PID/port.
+// EnsureRunning must treat the PID file as stale and start a fresh daemon.
+func TestEnsureRunning_LiveNonProxyIsStale(t *testing.T) {
+	setupTestDir(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	port := strings.TrimPrefix(srv.URL, "http://127.0.0.1:")
+
+	// PID file: our own PID (definitely alive) pointed at the non-proxy port.
+	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
+	require.NoError(t, writePIDFile(os.Getpid(), port))
+
+	// Pin the process-name fallback: the recycled process is not the proxy.
+	origProc := processLooksLikeProxy
+	defer func() { processLooksLikeProxy = origProc }()
+	processLooksLikeProxy = func(int) bool { return false }
+
+	started := false
+	origStart := StartDaemon
+	defer func() { StartDaemon = origStart }()
+	StartDaemon = func(p string) (string, error) {
+		started = true
+		require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
+		require.NoError(t, writePIDFile(os.Getpid(), p))
+		return p, nil
+	}
+
+	got, err := EnsureRunning("6563")
+	require.NoError(t, err)
+	assert.True(t, started, "a live non-proxy process on the recorded port must trigger a restart")
+	assert.Equal(t, "6563", got)
+}
+
+// A live process that answers with the proxy signature is trusted as running,
+// so EnsureRunning returns its port without restarting.
+func TestEnsureRunning_LiveProxyIsTrusted(t *testing.T) {
+	setupTestDir(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set(pkgproxy.SignatureHeader, pkgproxy.SignatureValue)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	port := strings.TrimPrefix(srv.URL, "http://127.0.0.1:")
+
+	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
+	require.NoError(t, writePIDFile(os.Getpid(), port))
+
+	origStart := StartDaemon
+	defer func() { StartDaemon = origStart }()
+	StartDaemon = func(string) (string, error) {
+		t.Fatal("StartDaemon must not run when a live proxy answers on the recorded port")
+		return "", nil
+	}
+
+	got, err := EnsureRunning("6563")
+	require.NoError(t, err)
+	assert.Equal(t, port, got)
+}
+
 func TestEnsureRunning_ConcurrentStartsOnlyOne(t *testing.T) {
 	setupTestDir(t)
 
 	var mu sync.Mutex
 	starts := 0
+
+	// Once the first goroutine records a PID file, the rest must see a live
+	// daemon: treat the recorded process as a genuine proxy.
+	origIsProxy := isProxyDaemon
+	defer func() { isProxyDaemon = origIsProxy }()
+	isProxyDaemon = func(int, string) bool { return true }
 
 	origStartDaemon := StartDaemon
 	defer func() { StartDaemon = origStartDaemon }()

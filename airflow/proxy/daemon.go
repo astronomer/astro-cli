@@ -4,6 +4,8 @@ package proxy
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -132,22 +134,80 @@ func EnsureRunning(port string) (string, error) {
 
 	pid, ver, bound, err := parsePIDFile()
 	if err == nil && isPIDAlive(pid) {
-		if ver == version.CurrVersion || version.CurrVersion == "" {
-			logger.Debugf("proxy daemon already running (PID %d)", pid)
-			if bound != "" {
-				return bound, nil
+		switch {
+		case ver == version.CurrVersion || version.CurrVersion == "":
+			// kill-0 only proves *some* process owns this PID. A SIGKILL'd
+			// daemon can leave a PID file whose PID an unrelated process later
+			// recycles — most likely on dev builds, where an empty version
+			// can't force the mismatch restart below. Confirm the process is
+			// actually our proxy before trusting the file.
+			if isProxyDaemon(pid, bound) {
+				logger.Debugf("proxy daemon already running (PID %d)", pid)
+				if bound != "" {
+					return bound, nil
+				}
+				return port, nil // older daemon didn't record its port
 			}
-			return port, nil // older daemon didn't record its port
+			logger.Debugf("PID %d is alive but is not the proxy daemon; treating PID file as stale and restarting", pid)
+		default:
+			// Version mismatch — restart the daemon
+			logger.Debugf("proxy daemon version %q doesn't match CLI version %q, restarting", ver, version.CurrVersion)
+			StopDaemon() //nolint:errcheck
 		}
-		// Version mismatch — restart the daemon
-		logger.Debugf("proxy daemon version %q doesn't match CLI version %q, restarting", ver, version.CurrVersion)
-		StopDaemon() //nolint:errcheck
 	}
 
 	// Clean up stale PID file
 	os.Remove(pidFilePath())
 
 	return StartDaemon(port)
+}
+
+// proxyProbeTimeout bounds the liveness probe so EnsureRunning can't hang on a
+// recycled PID that holds an open but unresponsive socket.
+const proxyProbeTimeout = 500 * time.Millisecond
+
+// isProxyDaemon reports whether the live process at pid is really this CLI's
+// proxy daemon rather than an unrelated process that recycled a stale PID. It
+// first asks the recorded port for the proxy's HTTP signature; if that can't be
+// reached (no recorded port, or the request fails) it falls back to matching
+// the process's command line.
+var isProxyDaemon = func(pid int, port string) bool {
+	if port != "" && probeProxySignature(port) {
+		return true
+	}
+	return processLooksLikeProxy(pid)
+}
+
+// probeProxySignature does a short-timeout GET against the recorded port and
+// reports whether the response carries the proxy's signature header. A bare
+// loopback Host makes the proxy answer with its own landing page (which sets
+// the header) instead of routing to a backend.
+func probeProxySignature(port string) bool {
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+port+"/", http.NoBody)
+	if err != nil {
+		return false
+	}
+	req.Host = "localhost"
+
+	client := &http.Client{Timeout: proxyProbeTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+	return resp.Header.Get(pkgproxy.SignatureHeader) == pkgproxy.SignatureValue
+}
+
+// processLooksLikeProxy reports whether pid's command line looks like this
+// CLI's proxy daemon, which re-execs itself with ServeSubcommand. It's the
+// fallback for daemons that didn't record a port (older CLIs).
+var processLooksLikeProxy = func(pid int) bool {
+	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), ServeSubcommand)
 }
 
 // StartDaemon starts the proxy as a background process by re-executing the

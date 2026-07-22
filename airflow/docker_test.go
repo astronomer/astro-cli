@@ -75,6 +75,47 @@ func (s *Suite) TestImageName() {
 	s.Equal(ImageName("test-repo", "0.15.0"), "test-repo/airflow:0.15.0")
 }
 
+func (s *Suite) TestSanitizeImageName() {
+	// Already-valid names must pass through byte-for-byte. Changing them would
+	// rename cached image tags and orphan users' local images.
+	unchanged := []string{
+		"simple",
+		"project_name",
+		"my-project",
+		"my-project_abc123", // typical ProjectNameUnique output
+		"a__b",              // docker allows a double-underscore separator
+		"foo.bar",
+		"tmp155bkx9_684ec5",
+	}
+	for _, in := range unchanged {
+		s.Equal(in, sanitizeImageName(in), "valid name %q must not change", in)
+	}
+
+	// Malformed names must become valid docker image names. These are the
+	// shapes that broke `astro dev` builds from random temp-dir names.
+	fixes := map[string]string{
+		"a-_b":                  "a-b",                  // the reported "-_" double separator
+		"__x":                   "x",                    // leading separators trimmed
+		"-lead":                 "lead",                 // leading separator trimmed
+		"trail-":                "trail",                // trailing separator trimmed
+		"!!!":                   "project",              // all punctuation -> non-empty fallback
+		"tmp-155-bkx-9-_684ec5": "tmp-155-bkx-9-684ec5", // the exact failing shape
+		"UPPER":                 "upper",                // docker image names are lowercase
+	}
+	for in, want := range fixes {
+		got := sanitizeImageName(in)
+		s.Equal(want, got, "input %q", in)
+		s.True(validImageName.MatchString(got), "sanitized %q -> %q must be a valid image name", in, got)
+	}
+
+	// Whatever the input, the result is always a valid, non-empty image name.
+	for _, in := range []string{"", "-", "___", ".-.", "a-_-_-b", "9", "-_-"} {
+		got := sanitizeImageName(in)
+		s.NotEmpty(got)
+		s.True(validImageName.MatchString(got), "sanitized %q -> %q must be a valid image name", in, got)
+	}
+}
+
 func (s *Suite) TestCheckServiceStateTrue() {
 	s.True(checkServiceState("RUNNING test", "RUNNING"))
 }
