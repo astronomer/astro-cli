@@ -511,19 +511,3 @@ func (c *cli) runReset(ctx context.Context, yes bool) error {
 	}
 	return c.runStop(ctx, localrt.StopOptions{Clean: true})
 }
-
-func newCheckCmd(c *cli) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "check",
-		Short: "Validate this project's DAGs without starting Airflow",
-		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if _, err := c.renderer(); err != nil {
-				return err
-			}
-			return notBuilt("astro local check (project validation)") // an earlier fix
-		},
-	}
-	cmd.Flags().Bool("strict", false, "Treat warnings as errors (not built yet)")
-	return cmd
-}

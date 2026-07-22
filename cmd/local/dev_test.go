@@ -30,6 +30,7 @@ func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 		Stdout:     stdout,
 		Stderr:     &bytes.Buffer{},
 		Runtime:    fakeRuntime{},
+		Checks:     stubParser{},
 		WorkingDir: func() (string, error) { return t.TempDir(), nil },
 		OpenURL:    func(string) error { return nil },
 	}

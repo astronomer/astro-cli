@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/spf13/afero"
 
 	"github.com/astronomer/astro-cli/cmd"
+	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
@@ -20,6 +22,12 @@ func main() {
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
 	if err := cmd.NewRootCmd().Execute(); err != nil {
+		// A command that carries its own exit code (e.g. `astro local check`)
+		// has already rendered everything the user needs; propagate the code.
+		var exit *local.ExitError
+		if errors.As(err, &exit) {
+			os.Exit(exit.Code)
+		}
 		os.Exit(1)
 	}
 

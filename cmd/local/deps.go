@@ -9,7 +9,6 @@ package local
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/checks"
 	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localstandalone"
 	"github.com/astronomer/astro-cli/internal/localstate"
@@ -33,6 +33,9 @@ type Deps struct {
 
 	// Runtime is the pkg/localrt surface the commands call.
 	Runtime Runtime
+
+	// Checks runs `astro local check`'s DAG parse against the project venv.
+	Checks checks.Parser
 
 	// WorkingDir resolves the project path. Commands never call os.Getwd
 	// themselves so tests can pin it.
@@ -58,6 +61,7 @@ func NewDeps() Deps {
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 		Runtime:    newModeRuntime(),
+		Checks:     checks.NewVenvRunner(),
 		WorkingDir: os.Getwd,
 		OpenURL:    browser.OpenURL,
 	}
@@ -159,13 +163,6 @@ func markSkipPreRun(cmd *cobra.Command) {
 	for _, sub := range cmd.Commands() {
 		markSkipPreRun(sub)
 	}
-}
-
-// notBuilt marks a surface whose engine or scaffold work has not landed yet
-// (an earlier fix/42/43). It wraps localrt.ErrNotImplemented so callers and tests
-// can detect the condition with errors.Is.
-func notBuilt(what string) error {
-	return fmt.Errorf("%s is %w in this build", what, localrt.ErrNotImplemented)
 }
 
 // errAborted reports a confirmation answered "no".
