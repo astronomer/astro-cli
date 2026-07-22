@@ -18,9 +18,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/localdocker"
+	"github.com/astronomer/astro-cli/internal/localstandalone"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
-	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Deps is everything the v2 commands need from the process. The composition
@@ -63,18 +63,19 @@ func NewDeps() Deps {
 	}
 }
 
-// modeRuntime is the production Runtime: it dispatches on localrt.Mode.
-// Docker mode is built (internal/localdocker, an earlier fix); standalone falls
-// through to the pkg/localrt stubs until the an earlier fix engine lands, at
-// which point this dispatch moves behind localrt itself and the seam here
-// goes back to straight delegation. Read paths dispatch on the mode the
-// state record captured at start, so any tool stops what another started.
+// modeRuntime is the production Runtime: it dispatches on localrt.Mode
+// between the two engines, standalone (internal/localstandalone, an earlier fix)
+// and docker (internal/localdocker, an earlier fix). Read paths dispatch on the
+// mode the state record captured at start, so any tool stops what another
+// started.
 type modeRuntime struct {
-	docker *localdocker.Engine
+	docker     *localdocker.Engine
+	standalone *localstandalone.Engine
 }
 
 func newModeRuntime() modeRuntime {
-	return modeRuntime{docker: localdocker.New(routesDir())}
+	dir := routesDir()
+	return modeRuntime{docker: localdocker.New(dir), standalone: localstandalone.New(dir)}
 }
 
 // routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
@@ -89,10 +90,15 @@ func routesDir() string {
 }
 
 func (r modeRuntime) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error) {
+	if p.Mode == "" {
+		// Plan building (manifest + user state) lands in a later issue;
+		// until then no --mode means the standalone default.
+		p.Mode = localrt.ModeStandalone
+	}
 	if p.Mode == localrt.ModeDocker {
 		return r.docker.Start(ctx, p, cb)
 	}
-	return localrt.Start(ctx, p, cb)
+	return r.standalone.Start(ctx, p, cb)
 }
 
 func (r modeRuntime) Attach(projectPath string) (localrt.Airflow, error) {
@@ -103,7 +109,7 @@ func (r modeRuntime) Attach(projectPath string) (localrt.Airflow, error) {
 	if rec.Mode == localrt.ModeDocker {
 		return r.docker.Attach(projectPath)
 	}
-	return localrt.Attach(projectPath)
+	return r.standalone.Attach(projectPath)
 }
 
 func (r modeRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
@@ -117,7 +123,7 @@ func (r modeRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
 	if rec.Mode == localrt.ModeDocker {
 		return r.docker.ReadStatus(projectPath)
 	}
-	return localrt.ReadStatus(projectPath)
+	return r.standalone.ReadStatus(projectPath)
 }
 
 func (r modeRuntime) List() ([]localrt.Status, error) {
@@ -131,7 +137,7 @@ func (r modeRuntime) List() ([]localrt.Status, error) {
 			statuses = append(statuses, r.docker.StatusOf(rec))
 			continue
 		}
-		statuses = append(statuses, rec.Status(proxy.IsPIDAlive(rec.PID)))
+		statuses = append(statuses, r.standalone.StatusOf(rec))
 	}
 	return statuses, nil
 }

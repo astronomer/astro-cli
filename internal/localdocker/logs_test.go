@@ -7,19 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLineWriterBuffersPartialWrites(t *testing.T) {
-	var got []string
-	w := &lineWriter{emit: func(s string) { got = append(got, s) }}
-
-	for _, chunk := range []string{"first li", "ne\r\nsecond", " line\npart", "ial"} {
-		_, err := w.Write([]byte(chunk))
-		assert.NoError(t, err)
-	}
-	assert.Equal(t, []string{"first line", "second line"}, got)
-	w.Flush()
-	assert.Equal(t, []string{"first line", "second line", "partial"}, got)
-}
-
 func TestComponentName(t *testing.T) {
 	now := func() time.Time { return time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC) }
 

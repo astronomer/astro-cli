@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/internal/localstandalone/supervise"
 )
 
 func walk(cmd *cobra.Command, fn func(*cobra.Command)) {
@@ -26,7 +28,9 @@ func TestTreeInvariants(t *testing.T) {
 			if cmd.Annotations[skipPreRunAnnotation] != "true" {
 				t.Errorf("%s is missing the skip-pre-run annotation", cmd.CommandPath())
 			}
-			if cmd.Runnable() && cmd.Name() != "dev" {
+			// The dev stub and the internal supervisor render no data, so
+			// the --output rule does not apply to them.
+			if cmd.Runnable() && cmd.Name() != "dev" && cmd.Name() != supervise.Subcommand {
 				if cmd.Flags().Lookup("output") == nil &&
 					cmd.PersistentFlags().Lookup("output") == nil &&
 					cmd.InheritedFlags().Lookup("output") == nil {

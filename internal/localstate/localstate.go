@@ -42,14 +42,19 @@ type Record struct {
 	// ProjectPath is the absolute project root, symlinks intact. The state
 	// directory is keyed by the resolved path's hash, which cannot be
 	// inverted, so List needs the path stored here.
-	ProjectPath     string       `json:"projectPath"`
-	Mode            localrt.Mode `json:"mode"`
-	PID             int          `json:"pid,omitempty"`
-	ComposeProject  string       `json:"composeProject,omitempty"`
-	Port            int          `json:"port"`
-	Hostname        string       `json:"hostname,omitempty"`
-	StartedAt       time.Time    `json:"startedAt"`
-	StopWithSession bool         `json:"stopWithSession,omitempty"`
+	ProjectPath string       `json:"projectPath"`
+	Mode        localrt.Mode `json:"mode"`
+	PID         int          `json:"pid,omitempty"`
+	// Pgid is the process group of a standalone Airflow (the leader is
+	// PID). Stop signals and liveness checks address the group, not the
+	// master: `airflow standalone` spawns its components into the group
+	// and the master often exits before they do.
+	Pgid            int       `json:"pgid,omitempty"`
+	ComposeProject  string    `json:"composeProject,omitempty"`
+	Port            int       `json:"port"`
+	Hostname        string    `json:"hostname,omitempty"`
+	StartedAt       time.Time `json:"startedAt"`
+	StopWithSession bool      `json:"stopWithSession,omitempty"`
 }
 
 // Save writes the record for its ProjectPath, creating the state directory

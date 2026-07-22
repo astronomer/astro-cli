@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/localshared"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -93,13 +94,13 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
 	}
-	onState(cb, localrt.StateStarting, nil)
+	localshared.OnState(cb, localrt.StateStarting, nil)
 
 	image, err := imageRef(p.AirflowVersion)
 	if err != nil {
 		return nil, err
 	}
-	hostname, err := planHostname(p, projectPath)
+	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
 		return nil, err
 	}
@@ -160,10 +161,10 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 
 	url := fmt.Sprintf("http://localhost:%d/api/v2/monitor/health", apiPort)
 	if err := e.health(ctx, url, e.healthTimeout); err != nil {
-		onState(cb, localrt.StateError, err)
+		localshared.OnState(cb, localrt.StateError, err)
 		return nil, err
 	}
-	onState(cb, localrt.StateRunning, nil)
+	localshared.OnState(cb, localrt.StateRunning, nil)
 	return &airflow{eng: e, rec: rec}, nil
 }
 
@@ -295,7 +296,7 @@ func (a *airflow) Logs(ctx context.Context, opts localrt.LogOptions) error {
 	}
 	args = append(args, opts.Components...)
 
-	w := &lineWriter{emit: func(line string) {
+	w := &localshared.LineWriter{Emit: func(line string) {
 		l := parseLogLine(line, a.eng.now)
 		if opts.OnLine != nil {
 			opts.OnLine(l)
@@ -346,25 +347,9 @@ func (a *airflow) composeFilePath() string {
 	return filepath.Join(dir, composeFileName)
 }
 
-// choosePort resolves one published port: the requested one when free, the
-// mode default when free, otherwise an allocated one from the proxy pool.
+// choosePort resolves one published port through the shared policy.
 func (e *Engine) choosePort(requested, fallback int) (int, error) {
-	for _, p := range []int{requested, fallback} {
-		if p > 0 && e.portFree(strconv.Itoa(p)) {
-			return p, nil
-		}
-		if p == requested && p > 0 {
-			// A busy requested port falls through to allocation, not to
-			// the default: the caller asked for that port specifically,
-			// and the default may collide with another project.
-			break
-		}
-	}
-	s, err := e.allocPort()
-	if err != nil {
-		return 0, err
-	}
-	return strconv.Atoi(s)
+	return localshared.ChoosePort(requested, fallback, e.portFree, e.allocPort)
 }
 
 // writeComposeFile renders and writes the compose file under the project's
@@ -410,7 +395,7 @@ func (e *Engine) runCompose(ctx context.Context, l composeLine, cb localrt.Callb
 		full = append(full, "--file", l.file, "--project-directory", l.projectDir)
 	}
 	full = append(append(full, "--project-name", l.name), args...)
-	w := &lineWriter{emit: func(line string) {
+	w := &localshared.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(localrt.LogLine{Component: "compose", Time: e.now(), Text: line})
 		}
@@ -443,27 +428,5 @@ func (e *Engine) addRoute(rec localstate.Record, pgPort int, cb localrt.Callback
 
 // removeRoute deregisters the project's proxy route.
 func (e *Engine) removeRoute(rec localstate.Record) error {
-	if rec.Hostname == "" {
-		return nil
-	}
-	if _, err := e.routes.RemoveRoute(rec.Hostname); err != nil {
-		return fmt.Errorf("removing proxy route %s: %w", rec.Hostname, err)
-	}
-	return nil
-}
-
-// planHostname uses the plan's hostname, deriving one only when plan
-// building has not (the same derivation internal/project uses).
-func planHostname(p localrt.Plan, projectPath string) (string, error) {
-	if p.Hostname != "" {
-		return p.Hostname, nil
-	}
-	hostname, _, err := proxy.DeriveHostname(projectPath)
-	return hostname, err
-}
-
-func onState(cb localrt.Callbacks, s localrt.State, err error) {
-	if cb.OnState != nil {
-		cb.OnState(s, err)
-	}
+	return localshared.RemoveRoute(e.routes, rec.Hostname)
 }

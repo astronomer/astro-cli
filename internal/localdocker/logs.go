@@ -1,8 +1,6 @@
 package localdocker
 
 import (
-	"bytes"
-	"io"
 	"strings"
 	"time"
 
@@ -52,37 +50,3 @@ func splitTimestamp(s string) (time.Time, string, bool) {
 	}
 	return ts, rest, true
 }
-
-// lineWriter is an io.Writer that splits its input into lines and hands
-// each complete one to emit. Compose writes whole lines, but nothing
-// guarantees write boundaries, so partial lines are buffered.
-type lineWriter struct {
-	buf  bytes.Buffer
-	emit func(string)
-}
-
-func (w *lineWriter) Write(p []byte) (int, error) {
-	w.buf.Write(p)
-	for {
-		line, err := w.buf.ReadString('\n')
-		if err != nil {
-			// Partial line: put it back and wait for the rest.
-			w.buf.WriteString(line)
-			break
-		}
-		if line = strings.TrimRight(line, "\r\n"); line != "" {
-			w.emit(line)
-		}
-	}
-	return len(p), nil
-}
-
-// Flush emits any trailing line that arrived without a newline.
-func (w *lineWriter) Flush() {
-	if rest := strings.TrimRight(w.buf.String(), "\r\n"); rest != "" {
-		w.emit(rest)
-	}
-	w.buf.Reset()
-}
-
-var _ io.Writer = (*lineWriter)(nil)

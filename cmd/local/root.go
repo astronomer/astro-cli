@@ -30,6 +30,7 @@ func AddCmds(d Deps) []*cobra.Command {
 		NewLocalCmd(d),
 		NewInitCmd(d),
 		NewDevCmd(d),
+		newSuperviseCmd(d),
 	}
 	return append(cmds, rootAliasCmds(d)...)
 }
