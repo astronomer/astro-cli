@@ -512,15 +512,19 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	return label, nil
 }
 
-// GetEnvVars returns the list of environment variables (in "KEY=VALUE" form)
-// baked into the image config, as reported by `docker inspect .Config.Env`.
-// altImageName, if non-empty, overrides the image name to inspect.
-func (d *DockerImage) GetEnvVars(altImageName string) ([]string, error) {
-	var envVars []string
-
+// HasEnvVarWithPrefix reports whether the image config has an environment variable whose
+// NAME starts with prefix, as reported by `docker inspect .Config.Env`. altImageName, if
+// non-empty, overrides the image name to inspect.
+//
+// Deliberately narrow: this is the only capability exposed for reading an image's baked-in
+// env vars. The full "KEY=VALUE" list (which may include values -- e.g. secrets baked into a
+// misconfigured image) exists only in a local variable inside this function; it is never
+// returned to the caller, logged, or retained anywhere. Callers only ever learn whether a
+// name prefix is present, never any variable's value, and not even the full list of names.
+func (d *DockerImage) HasEnvVarWithPrefix(altImageName, prefix string) (bool, error) {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
-		return envVars, err
+		return false, err
 	}
 
 	stdout := new(bytes.Buffer)
@@ -533,16 +537,26 @@ func (d *DockerImage) GetEnvVars(altImageName string) ([]string, error) {
 
 	err = cmdExec(containerRuntime, stdout, stderr, "inspect", "--format", "{{ json .Config.Env }}", imageName)
 	if err != nil {
-		return envVars, err
+		return false, err
 	}
 	if execErr := stderr.String(); execErr != "" {
-		return envVars, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
+		return false, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
 	}
-	err = json.Unmarshal(stdout.Bytes(), &envVars)
-	if err != nil {
-		return envVars, err
+
+	// envVars ("KEY=VALUE" pairs, potentially including secret values) is intentionally
+	// scoped to this function body only -- it is discarded as soon as the prefix check
+	// below completes, never returned or logged.
+	var envVars []string
+	if err := json.Unmarshal(stdout.Bytes(), &envVars); err != nil {
+		return false, err
 	}
-	return envVars, nil
+	for _, envVar := range envVars {
+		name, _, _ := strings.Cut(envVar, "=")
+		if strings.HasPrefix(name, prefix) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (d *DockerImage) DoesImageExist(imageName string) error {

@@ -712,24 +712,19 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 }
 
-// hasEnvVarWithPrefix reports whether the image's baked-in environment
-// variables (docker inspect .Config.Env) contain any entry whose "KEY" (the
-// portion before the first "=") starts with prefix. It is a naive, best-effort
-// signal only -- errors reading env vars are treated as "not found" rather
-// than surfaced, since this check must never block a deploy.
+// hasEnvVarWithPrefix reports whether the image has a baked-in environment variable whose
+// name starts with prefix. It is a naive, best-effort signal only -- errors are treated as
+// "not found" rather than surfaced, since this check must never block a deploy. The actual
+// env var values are never read into this package at all: ImageHandler.HasEnvVarWithPrefix
+// keeps the raw "KEY=VALUE" list (which may include secret values baked into a misconfigured
+// image) scoped entirely within its own implementation and returns only a bool.
 func hasEnvVarWithPrefix(imageHandler airflow.ImageHandler, altImageName, prefix string) bool {
-	envVars, err := imageHandler.GetEnvVars(altImageName)
+	found, err := imageHandler.HasEnvVarWithPrefix(altImageName, prefix)
 	if err != nil {
 		logger.Debugf("unable to read image env vars for flavor check: %s", err)
 		return false
 	}
-	for _, envVar := range envVars {
-		key, _, _ := strings.Cut(envVar, "=")
-		if strings.HasPrefix(key, prefix) {
-			return true
-		}
-	}
-	return false
+	return found
 }
 
 // preBuildAgentFlavorCheck inspects a Dockerfile's (or Dockerfile.client's) FROM image

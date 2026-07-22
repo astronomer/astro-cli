@@ -124,29 +124,27 @@ func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string,
 	return r0, r1
 }
 
-// GetEnvVars provides a mock function with given fields: altImageName
-func (_m *ImageHandler) GetEnvVars(altImageName string) ([]string, error) {
-	ret := _m.Called(altImageName)
+// HasEnvVarWithPrefix provides a mock function with given fields: altImageName, prefix
+func (_m *ImageHandler) HasEnvVarWithPrefix(altImageName string, prefix string) (bool, error) {
+	ret := _m.Called(altImageName, prefix)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetEnvVars")
+		panic("no return value specified for HasEnvVarWithPrefix")
 	}
 
-	var r0 []string
+	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]string, error)); ok {
-		return rf(altImageName)
+	if rf, ok := ret.Get(0).(func(string, string) (bool, error)); ok {
+		return rf(altImageName, prefix)
 	}
-	if rf, ok := ret.Get(0).(func(string) []string); ok {
-		r0 = rf(altImageName)
+	if rf, ok := ret.Get(0).(func(string, string) bool); ok {
+		r0 = rf(altImageName, prefix)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
+		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(altImageName)
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(altImageName, prefix)
 	} else {
 		r1 = ret.Error(1)
 	}

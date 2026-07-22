@@ -54,7 +54,9 @@ type ImageHandler interface {
 	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
-	GetEnvVars(altImageName string) ([]string, error)
+	// HasEnvVarWithPrefix reports whether the image config has an env var whose name starts
+	// with prefix. Deliberately narrow: never exposes variable values or the full name list.
+	HasEnvVarWithPrefix(altImageName, prefix string) (bool, error)
 	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error

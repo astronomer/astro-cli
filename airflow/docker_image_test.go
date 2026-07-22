@@ -581,12 +581,12 @@ func (s *Suite) TestDockerImageGetLabel() {
 	})
 }
 
-func (s *Suite) TestDockerImageGetEnvVars() {
+func (s *Suite) TestDockerImageHasEnvVarWithPrefix() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
 
-	s.Run("success", func() {
+	s.Run("prefix present", func() {
 		mockResp := `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python","PATH=/usr/bin"]`
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			s.Contains(args, "inspect")
@@ -594,9 +594,22 @@ func (s *Suite) TestDockerImageGetEnvVars() {
 			return nil
 		}
 
-		resp, err := handler.GetEnvVars("")
+		found, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
 		s.NoError(err)
-		s.Equal([]string{"ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python", "PATH=/usr/bin"}, resp)
+		s.True(found)
+	})
+
+	s.Run("prefix absent", func() {
+		mockResp := `["PATH=/usr/bin"]`
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			io.WriteString(stdout, mockResp)
+			return nil
+		}
+
+		found, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+		s.NoError(err)
+		s.False(found)
 	})
 
 	s.Run("altImageName overrides imageName", func() {
@@ -607,9 +620,9 @@ func (s *Suite) TestDockerImageGetEnvVars() {
 			return nil
 		}
 
-		resp, err := handler.GetEnvVars("alt-image")
+		found, err := handler.HasEnvVarWithPrefix("alt-image", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
 		s.NoError(err)
-		s.Equal([]string{}, resp)
+		s.False(found)
 	})
 
 	s.Run("cmdExec error", func() {
@@ -618,7 +631,7 @@ func (s *Suite) TestDockerImageGetEnvVars() {
 			return errMockDocker
 		}
 
-		_, err := handler.GetEnvVars("")
+		_, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
 		s.ErrorIs(err, errMockDocker)
 	})
 
@@ -630,7 +643,7 @@ func (s *Suite) TestDockerImageGetEnvVars() {
 			return nil
 		}
 
-		_, err := handler.GetEnvVars("")
+		_, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
 		s.ErrorIs(err, errGetImageLabel)
 	})
 }
