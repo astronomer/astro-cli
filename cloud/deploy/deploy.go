@@ -712,14 +712,15 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 }
 
-// hasEnvVarWithPrefix reports whether the image has a baked-in environment variable whose
-// name starts with prefix. It is a naive, best-effort signal only -- errors are treated as
-// "not found" rather than surfaced, since this check must never block a deploy. The actual
-// env var values are never read into this package at all: ImageHandler.HasEnvVarWithPrefix
-// keeps the raw "KEY=VALUE" list (which may include secret values baked into a misconfigured
-// image) scoped entirely within its own implementation and returns only a bool.
-func hasEnvVarWithPrefix(imageHandler airflow.ImageHandler, altImageName, prefix string) bool {
-	found, err := imageHandler.HasEnvVarWithPrefix(altImageName, prefix)
+// isAgentFlavorImage reports whether the image has a baked-in environment variable
+// identifying it as a Remote Execution agent image (agentEnvVarPrefix). It is a naive,
+// best-effort signal only -- errors are treated as "not found" rather than surfaced, since
+// this check must never block a deploy. The actual env var values are never read into this
+// package at all: ImageHandler.HasEnvVarWithPrefix keeps the raw "KEY=VALUE" list (which may
+// include secret values baked into a misconfigured image) scoped entirely within its own
+// implementation and returns only a bool.
+func isAgentFlavorImage(imageHandler airflow.ImageHandler, altImageName string) bool {
+	found, err := imageHandler.HasEnvVarWithPrefix(altImageName, agentEnvVarPrefix)
 	if err != nil {
 		logger.Debugf("unable to read image env vars for flavor check: %s", err)
 		return false
@@ -771,7 +772,35 @@ func preBuildAgentFlavorCheck(imageHandler airflow.ImageHandler, dockerfilePath 
 		return false, false
 	}
 
-	return hasEnvVarWithPrefix(imageHandler, fromImage, agentEnvVarPrefix), true
+	return isAgentFlavorImage(imageHandler, fromImage), true
+}
+
+// warnIfPreBuildAgentFlavorMismatch prints warningMsg if the Dockerfile's FROM image's
+// agent-flavor (as detected by preBuildAgentFlavorCheck) equals wantAgentFlavor -- i.e. the
+// hosted deploy path passes wantAgentFlavor=true (warn if the FROM image looks like an
+// agent image), and the Remote Execution client path passes wantAgentFlavor=false (warn if
+// it does NOT). Extracted out of buildImage/DeployClientImage to keep their own cognitive
+// complexity down; this check is always non-fatal, gated on ShowWarnings, and silently
+// skipped when preBuildAgentFlavorCheck can't determine a flavor at all.
+func warnIfPreBuildAgentFlavorMismatch(imageHandler airflow.ImageHandler, dockerfilePath, warningMsg string, wantAgentFlavor bool) {
+	if !config.CFG.ShowWarnings.GetBool() {
+		return
+	}
+	if isAgentFlavor, ok := preBuildAgentFlavorCheck(imageHandler, dockerfilePath); ok && isAgentFlavor == wantAgentFlavor {
+		fmt.Printf(warningMsg, agentEnvVarPrefix)
+	}
+}
+
+// cancelIfAgentFlavorImageHosted cancels the deploy (os.Exit(1)) if the actual built image
+// looks like a Remote Execution agent image. Extracted out of buildImage to keep its own
+// cognitive complexity down. Unlike the pre-build check, this inspects the real built image
+// with no ARG/multi-stage ambiguity, so it is fatal rather than a warning.
+func cancelIfAgentFlavorImageHosted(imageHandler airflow.ImageHandler) {
+	if isAgentFlavorImage(imageHandler, "") {
+		fmt.Printf(warningAgentImageInHostedDeployMsg, agentEnvVarPrefix)
+		fmt.Println("Canceling deploy...")
+		os.Exit(1)
+	}
 }
 
 // dockerignoreContainsDags reports whether content has a line equal to "dags/".
@@ -797,12 +826,8 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		// docker build, so a slow build isn't wasted on an obvious flavor mismatch. This
 		// is a best-effort, non-fatal check -- see preBuildAgentFlavorCheck for how
 		// unresolvable/failed cases are skipped. The equivalent post-build check below
-		// (hasEnvVarWithPrefix on the built image) remains as the safety net either way.
-		if config.CFG.ShowWarnings.GetBool() {
-			if isAgentFlavor, ok := preBuildAgentFlavorCheck(imageHandler, filepath.Join(path, dockerfile)); ok && isAgentFlavor {
-				fmt.Printf(warningAgentBaseImageInHostedDeployMsg, agentEnvVarPrefix)
-			}
-		}
+		// (isAgentFlavorImage on the built image) remains as the safety net either way.
+		warnIfPreBuildAgentFlavorMismatch(imageHandler, filepath.Join(path, dockerfile), warningAgentBaseImageInHostedDeployMsg, true)
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {
 			err := buildImageWithoutDags(path, buildSecretString, imageHandler)
@@ -833,11 +858,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	// Post-build check: unlike the pre-build check above, this inspects the actual image
 	// that is about to be pushed and run as this Deployment's scheduler/webserver/worker --
 	// no ARG-template or multi-stage ambiguity, so this one is fatal rather than a warning.
-	if hasEnvVarWithPrefix(imageHandler, "", agentEnvVarPrefix) {
-		fmt.Printf(warningAgentImageInHostedDeployMsg, agentEnvVarPrefix)
-		fmt.Println("Canceling deploy...")
-		os.Exit(1)
-	}
+	cancelIfAgentFlavorImageHosted(imageHandler)
 
 	if config.CFG.ShowWarnings.GetBool() && version == "" {
 		if imageName != "" {
@@ -1244,13 +1265,8 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		// running docker build, so a slow build isn't wasted on an obvious flavor
 		// mismatch. Best-effort and non-fatal -- see preBuildAgentFlavorCheck for how
 		// unresolvable/failed cases are skipped. The equivalent post-build check below
-		// (hasEnvVarWithPrefix on the built image) remains as the safety net either way.
-		if config.CFG.ShowWarnings.GetBool() {
-			dockerfileClientPath := filepath.Join(deployInput.Path, "Dockerfile.client")
-			if isAgentFlavor, ok := preBuildAgentFlavorCheck(imageHandler, dockerfileClientPath); ok && !isAgentFlavor {
-				fmt.Printf(warningNonAgentBaseImageInClientDeployMsg, agentEnvVarPrefix)
-			}
-		}
+		// (isAgentFlavorImage on the built image) remains as the safety net either way.
+		warnIfPreBuildAgentFlavorMismatch(imageHandler, filepath.Join(deployInput.Path, "Dockerfile.client"), warningNonAgentBaseImageInClientDeployMsg, false)
 
 		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecretString, buildConfig)
 		if err != nil {
@@ -1262,7 +1278,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	// that is about to be pushed to the customer's private registry and run as the Remote
 	// Execution agent -- no ARG-template or multi-stage ambiguity, so this one is fatal
 	// rather than a warning.
-	if !hasEnvVarWithPrefix(imageHandler, "", agentEnvVarPrefix) {
+	if !isAgentFlavorImage(imageHandler, "") {
 		fmt.Printf(warningNonAgentImageInClientDeployMsg, agentEnvVarPrefix)
 		return errors.New("built image does not look like a Remote Execution agent image; canceling deploy")
 	}

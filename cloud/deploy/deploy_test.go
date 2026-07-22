@@ -1238,7 +1238,7 @@ func captureStdout(t *testing.T, fn func()) string {
 	return <-outC
 }
 
-// TestHasEnvVarWithPrefixDelegatesToImageHandler is a pure test of the thin wrapper used by
+// TestIsAgentFlavorImageDelegatesToImageHandler is a pure test of the thin wrapper used by
 // both the pre-build (warning, non-fatal) and post-build (fatal, os.Exit) agent-flavor checks.
 // The actual name-prefix matching logic lives entirely in
 // ImageHandler.HasEnvVarWithPrefix (airflow/docker_image_test.go covers that), by design: the
@@ -1249,12 +1249,12 @@ func captureStdout(t *testing.T, fn func()) string {
 // os.Exit(1) on a mismatch (same existing convention as the version-downgrade/unsupported-
 // version checks -- see TestValidRuntimeVersion below, which likewise tests the decision
 // function directly rather than the os.Exit call site in buildImage).
-func TestHasEnvVarWithPrefixDelegatesToImageHandler(t *testing.T) {
+func TestIsAgentFlavorImageDelegatesToImageHandler(t *testing.T) {
 	t.Run("returns true when found", func(t *testing.T) {
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(true, nil).Once()
 
-		assert.True(t, hasEnvVarWithPrefix(mockImageHandler, "", agentEnvVarPrefix))
+		assert.True(t, isAgentFlavorImage(mockImageHandler, ""))
 		mockImageHandler.AssertExpectations(t)
 	})
 
@@ -1262,7 +1262,7 @@ func TestHasEnvVarWithPrefixDelegatesToImageHandler(t *testing.T) {
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(false, nil).Once()
 
-		assert.False(t, hasEnvVarWithPrefix(mockImageHandler, "", agentEnvVarPrefix))
+		assert.False(t, isAgentFlavorImage(mockImageHandler, ""))
 		mockImageHandler.AssertExpectations(t)
 	})
 
@@ -1270,7 +1270,7 @@ func TestHasEnvVarWithPrefixDelegatesToImageHandler(t *testing.T) {
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(false, errors.New("inspect failed")).Once()
 
-		assert.False(t, hasEnvVarWithPrefix(mockImageHandler, "", agentEnvVarPrefix))
+		assert.False(t, isAgentFlavorImage(mockImageHandler, ""))
 		mockImageHandler.AssertExpectations(t)
 	})
 }
