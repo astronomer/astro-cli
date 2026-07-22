@@ -54,7 +54,15 @@ type Result struct {
 	// Values is the assembled input the validator judged. It holds real
 	// values — never hand it to an LLM-visible surface; that is what
 	// Listing is for.
-	Values     envschema.Values
+	Values envschema.Values
+	// Env is the assembled Airflow process environment: each declared env
+	// var under its own NAME, each Airflow Variable under AIRFLOW_VAR_<KEY>,
+	// each connection under AIRFLOW_CONN_<ID>. Only names that resolved to a
+	// value appear; a missing required name is absent here and reported in
+	// Missing instead. This is the map a plan builder layers onto the
+	// runtime env — real values, so it carries the same handling rule as
+	// Values.
+	Env        map[string]string
 	Violations []envschema.Violation
 	// Missing joins the missing-value violations with the schema: what to
 	// provide and where. Sorted by section then name.
@@ -104,7 +112,7 @@ func Resolve(in Inputs) (*Result, error) {
 	}
 
 	environ := environMap(in.Environ)
-	r := &resolver{in: in, environ: environ}
+	r := &resolver{in: in, environ: environ, env: map[string]string{}}
 
 	res.Values.EnvVars = r.values(in.Schema.EnvVars, env, envschema.SectionEnvVar, func(name string) string { return name })
 	res.Values.AirflowVariables = r.values(in.Schema.AirflowVariables, env, envschema.SectionAirflowVariable, airflowenv.EnvKeyForVarKey)
@@ -112,6 +120,9 @@ func Resolve(in Inputs) (*Result, error) {
 
 	if len(r.errs) > 0 {
 		return nil, errors.Join(r.errs...)
+	}
+	if len(r.env) > 0 {
+		res.Env = r.env
 	}
 
 	res.Violations = append(envschema.Validate(in.Schema, res.Values), r.extraViolations...)
@@ -123,7 +134,11 @@ func Resolve(in Inputs) (*Result, error) {
 type resolver struct {
 	in      Inputs
 	environ map[string]string
-	errs    []error
+	// env accumulates the Airflow process environment as names resolve,
+	// keyed by the env-var name Airflow reads (NAME, AIRFLOW_VAR_<KEY>,
+	// AIRFLOW_CONN_<ID>). It becomes Result.Env.
+	env  map[string]string
+	errs []error
 	// extraViolations holds findings the validator can't see, e.g. a vault
 	// connection whose stored value isn't valid connection JSON.
 	extraViolations []envschema.Violation
@@ -143,10 +158,12 @@ func (r *resolver) values(specs map[string]envschema.ValueSpec, env string, sect
 		key := envKey(name)
 		if v, ok := r.environ[key]; ok {
 			out[name] = v
+			r.env[key] = v
 			continue
 		}
 		if v, ok := r.vaultGet(EnvVaultKey(r.in.Scope, key), EnvVaultKey("", key)); ok {
 			out[name] = v
+			r.env[key] = v
 		}
 	}
 	return out
@@ -163,14 +180,15 @@ func (r *resolver) connTypes(specs map[string]envschema.ConnSpec, env string) ma
 		if !r.checkBinding(spec.Bindings, env, envschema.SectionConnection, connID) {
 			continue
 		}
-		raw, ok := r.environ[airflowenv.EnvKeyForConnID(connID)]
+		connKey := airflowenv.EnvKeyForConnID(connID)
+		raw, ok := r.environ[connKey]
 		if !ok {
 			raw, ok = r.vaultGet(ConnVaultKey(r.in.Scope, connID), ConnVaultKey("", connID))
 		}
 		if !ok {
 			continue
 		}
-		conn, ok := airflowenv.DecodeConnEnv(airflowenv.EnvKeyForConnID(connID), raw)
+		conn, ok := airflowenv.DecodeConnEnv(connKey, raw)
 		if !ok {
 			// A corrupt value is present, not missing: record it with an
 			// empty conn_type (which the validator won't re-judge) so the
@@ -185,6 +203,9 @@ func (r *resolver) connTypes(specs map[string]envschema.ConnSpec, env string) ma
 			continue
 		}
 		out[connID] = conn.ConnType
+		// The value is valid connection JSON: pass it to Airflow verbatim
+		// under AIRFLOW_CONN_<ID>.
+		r.env[connKey] = raw
 	}
 	return out
 }

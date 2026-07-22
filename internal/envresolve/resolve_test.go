@@ -74,6 +74,20 @@ func TestResolveLayering(t *testing.T) {
 	if !reflect.DeepEqual(res.Values, wantValues) {
 		t.Errorf("Values mismatch\n got: %+v\nwant: %+v", res.Values, wantValues)
 	}
+	// Env is the assembled Airflow process environment: each name under the
+	// env-var key Airflow reads, connection value passed through verbatim.
+	_, wantConn, _ := airflowenv.EncodeConnEnv(
+		connmodel.Connection{ConnID: "warehouse", ConnType: "postgres", ConnPassword: "s3cret"}) //nolint:gosec // G101: test fixture
+	wantEnv := map[string]string{
+		"FROM_ENV":               "env-wins",
+		"FROM_SCOPED":            "scoped-wins",
+		"FROM_GLOBAL":            "global-wins",
+		"AIRFLOW_VAR_BATCH_SIZE": "100",
+		"AIRFLOW_CONN_WAREHOUSE": wantConn,
+	}
+	if !reflect.DeepEqual(res.Env, wantEnv) {
+		t.Errorf("Env mismatch\n got: %+v\nwant: %+v", res.Env, wantEnv)
+	}
 	if len(res.Violations) != 0 || len(res.Missing) != 0 {
 		t.Errorf("want a clean result, got violations %v missing %v", res.Violations, res.Missing)
 	}

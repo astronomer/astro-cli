@@ -34,6 +34,7 @@ var v2BelowCmd = []string{
 	"internal/localshared",
 	"internal/localstandalone",
 	"internal/localstate",
+	"internal/plan",
 	"internal/project",
 	"internal/scaffold",
 	"internal/userstate",
@@ -48,7 +49,6 @@ var v2BelowCmd = []string{
 // v2All lists every v2 package, none of which may import config/ or the v1
 // cmd tree.
 var v2All = append([]string{
-	"cmd/astro",
 	"cmd/local",
 }, v2BelowCmd...)
 

@@ -48,8 +48,9 @@ func NewDevCmd(d Deps) *cobra.Command {
 		// Old invocations carry flags this stub does not know; parsing
 		// them would fail before the guidance prints.
 		DisableFlagParsing: true,
-		SilenceUsage:       true,
-		SilenceErrors:      true,
+		// Usage is silenced (the guidance is the whole point); the error is
+		// not, so the runner prints the tombstone message.
+		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			return c.runDevRemoved(args)
 		},

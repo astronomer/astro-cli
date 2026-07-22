@@ -2,12 +2,15 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/plan"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -44,24 +47,38 @@ func (c *cli) renderer() (Renderer, error) {
 	return Renderer{Format: f, Out: c.d.Stdout}, nil
 }
 
+// projectPath discovers the project that contains the working directory,
+// walking up to find the manifest, and returns its root. Every command that
+// addresses "this project" (status, logs, stop, ...) routes through here, so
+// running from a subdirectory still hashes the project root, not the cwd. A
+// directory outside any project surfaces *project.NotFoundError, whose
+// message says what is missing.
 func (c *cli) projectPath() (string, error) {
-	return c.d.WorkingDir()
+	wd, err := c.d.WorkingDir()
+	if err != nil {
+		return "", err
+	}
+	proj, err := project.Discover(wd)
+	if err != nil {
+		return "", err
+	}
+	return proj.Dir, nil
 }
 
 func (c *cli) attach() (localrt.Airflow, error) {
-	project, err := c.projectPath()
+	dir, err := c.projectPath()
 	if err != nil {
 		return nil, err
 	}
-	return c.d.Runtime.Attach(project)
+	return c.d.Runtime.Attach(dir)
 }
 
 func (c *cli) readStatus() (localrt.Status, error) {
-	project, err := c.projectPath()
+	dir, err := c.projectPath()
 	if err != nil {
 		return localrt.Status{}, err
 	}
-	return c.d.Runtime.ReadStatus(project)
+	return c.d.Runtime.ReadStatus(dir)
 }
 
 // NewLocalCmd builds the `astro local` tree. It works offline with no
@@ -98,7 +115,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 func newStartCmd(c *cli) *cobra.Command {
 	var opts struct {
 		port            int
-		mode            string
+		docker          bool
 		stopWithSession bool
 	}
 	cmd := &cobra.Command{
@@ -106,38 +123,37 @@ func newStartCmd(c *cli) *cobra.Command {
 		Short: "Start local Airflow for this project",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return c.runStart(cmd.Context(), opts.port, opts.mode, opts.stopWithSession)
+			mode := localrt.Mode("")
+			if opts.docker {
+				mode = localrt.ModeDocker
+			}
+			return c.runStart(cmd.Context(), plan.Options{
+				Mode:            mode,
+				RequestedPort:   opts.port,
+				StopWithSession: opts.stopWithSession,
+			})
 		},
 	}
 	cmd.Flags().IntVar(&opts.port, "port", 0, "Preferred API server port (0 lets the runtime pick)")
-	cmd.Flags().StringVar(&opts.mode, "mode", "", "How Airflow runs: standalone or docker (default: from the project manifest)")
+	cmd.Flags().BoolVar(&opts.docker, "docker", false, "Run Airflow in Docker instead of the default standalone mode")
 	cmd.Flags().BoolVar(&opts.stopWithSession, "stop-with-session", false, "Stop Airflow when this process exits instead of leaving it running")
 	return cmd
 }
 
-func (c *cli) runStart(ctx context.Context, port int, mode string, stopWithSession bool) error {
+func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
 	}
-	project, err := c.projectPath()
+	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return err
 	}
-	m, err := parseMode(mode)
+	built, err := plan.Build(wd, opts)
 	if err != nil {
-		return err
+		return c.reportBuildError(r, err)
 	}
-	// Plan building (manifest, config and env layering) is internal/plan
-	// work that lands with the engine; until then the plan carries only
-	// what the command line says.
-	plan := localrt.Plan{
-		ProjectPath:     project,
-		Mode:            m,
-		StopWithSession: stopWithSession,
-		RequestedPort:   port,
-	}
-	af, err := c.d.Runtime.Start(ctx, plan, c.callbacks(r))
+	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return err
 	}
@@ -145,20 +161,24 @@ func (c *cli) runStart(ctx context.Context, port int, mode string, stopWithSessi
 	if err != nil {
 		return err
 	}
+	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
+		return err
+	}
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
 }
 
-// parseMode validates a --mode value; empty means "let plan building
-// decide".
-func parseMode(s string) (localrt.Mode, error) {
-	switch m := localrt.Mode(s); m {
-	case "", localrt.ModeStandalone, localrt.ModeDocker:
-		return m, nil
-	default:
-		return "", fmt.Errorf("unknown mode %q (supported: standalone, docker)", s)
+// reportBuildError renders a plan-build failure. A *plan.MissingEnvError in
+// json mode emits its structured payload on stdout; every failure is returned
+// so the exit code is non-zero and the runner prints the message.
+func (c *cli) reportBuildError(r Renderer, err error) error {
+	var missing *plan.MissingEnvError
+	if errors.As(err, &missing) && r.Format == FormatJSON {
+		//nolint:errcheck // the returned err is what fails the command
+		r.Emit(missing.Payload(), func(io.Writer) error { return nil })
 	}
+	return err
 }
 
 func newStopCmd(c *cli) *cobra.Command {
@@ -217,6 +237,10 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	if err != nil {
 		return err
 	}
+	wd, err := c.d.WorkingDir()
+	if err != nil {
+		return err
+	}
 	af, err := c.attach()
 	if err != nil {
 		return err
@@ -225,21 +249,29 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	if err != nil {
 		return err
 	}
+	// Rebuild the plan from the manifest and env as they are now, so a
+	// restart picks up edits — but keep the running mode, port, and session
+	// tie. Build before stopping: a build failure leaves Airflow untouched.
+	built, err := plan.Build(wd, plan.Options{
+		Mode:            st.Mode,
+		RequestedPort:   st.Port,
+		StopWithSession: st.StopWithSession,
+	})
+	if err != nil {
+		return c.reportBuildError(r, err)
+	}
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
 	}
-	plan := localrt.Plan{
-		ProjectPath:     st.ProjectPath,
-		Mode:            st.Mode,
-		StopWithSession: st.StopWithSession,
-		RequestedPort:   st.Port,
-	}
-	af, err = c.d.Runtime.Start(ctx, plan, c.callbacks(r))
+	af, err = c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return err
 	}
 	st, err = af.Status()
 	if err != nil {
+		return err
+	}
+	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
 		return err
 	}
 	return r.Emit(st, func(w io.Writer) error {

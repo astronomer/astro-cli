@@ -24,8 +24,8 @@ import (
 )
 
 // Deps is everything the v2 commands need from the process. The composition
-// root (cmd/astro/main.go today; the v1 root's main once final wiring lands)
-// builds it once and hands it down.
+// root (the v1 root, cmd/root.go) builds it once through NewDeps and hands it
+// down.
 type Deps struct {
 	Stdin  io.Reader
 	Stdout io.Writer
@@ -91,8 +91,8 @@ func routesDir() string {
 
 func (r modeRuntime) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error) {
 	if p.Mode == "" {
-		// Plan building (manifest + user state) lands in a later issue;
-		// until then no --mode means the standalone default.
+		// The plan leaves Mode empty when the command asked for no specific
+		// runtime (no --docker); standalone is the default.
 		p.Mode = localrt.ModeStandalone
 	}
 	if p.Mode == localrt.ModeDocker {

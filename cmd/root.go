@@ -12,6 +12,7 @@ import (
 	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	"github.com/astronomer/astro-cli/cmd/local"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
@@ -83,7 +84,6 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newLogoutCommand(os.Stdout),
 		newAuthRootCmd(astroV1Client, os.Stdout),
 		newVersionCommand(),
-		newDevRootCmd(astroV1Client),
 		newContextCmd(os.Stdout),
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
@@ -103,6 +103,14 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
+
+	// The v2 tree (`astro local`, `astro init`, the start/stop/logs aliases,
+	// and the `astro dev` removal stub) mounts outside the cloud/software
+	// branch: local Airflow works offline with no account. Every command
+	// carries the skip-pre-run annotation, so PersistentPreRunE above returns
+	// before any config load or network call. The stub replaces the v1 dev
+	// tree in this binary.
+	rootCmd.AddCommand(local.AddCmds(local.NewDeps())...)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")

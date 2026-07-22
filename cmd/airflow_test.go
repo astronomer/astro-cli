@@ -79,22 +79,17 @@ var (
 )
 
 func (s *AirflowSuite) TestDevRootCommand() {
-	output, err := executeCommand("dev")
-	s.NoError(err)
-	s.Contains(output, "astro dev", output)
+	// The v1 dev tree is replaced by the removal stub in this binary.
+	_, err := executeCommand("dev")
+	s.Error(err)
+	s.Contains(err.Error(), "astro dev was removed in Astro CLI v2")
 }
 
 func (s *AirflowSuite) TestDevInitCommand() {
-	output, err := executeCommand("dev", "init", "--help")
-	s.NoError(err)
-	s.Contains(output, "astro dev", output)
-	s.NotContains(output, "--use-astronomer-certified")
-
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	output, err = executeCommand("dev", "init", "--help")
-	s.NoError(err)
-	s.Contains(output, "astro dev", output)
-	s.Contains(output, "--use-astronomer-certified")
+	// `astro dev init` now points at `astro init`.
+	_, err := executeCommand("dev", "init")
+	s.Error(err)
+	s.Contains(err.Error(), "astro init")
 }
 
 func (s *AirflowSuite) TestDevInitCommandSoftware() {
@@ -1947,12 +1942,11 @@ func (s *AirflowSuite) TestStandaloneModePS() {
 }
 
 func (s *AirflowSuite) TestDevCommandLocalSubcommandRemoved() {
-	output, err := executeCommand("dev", "--help")
-	s.NoError(err)
-	// Ensure "local" does not appear as a subcommand in help output.
-	// It may appear in descriptions like "Start a local Airflow environment",
-	// but should not appear as a top-level command name.
-	s.NotContains(output, "  local")
+	// `astro dev` is now a removal stub: it swallows any subcommand (or flag)
+	// and fails, so it never exposes a subcommand tree of its own.
+	_, err := executeCommand("dev", "--help")
+	s.Error(err)
+	s.Contains(err.Error(), "removed in Astro CLI v2")
 }
 
 func (s *AirflowSuite) TestStandaloneDockerFlagsMutuallyExclusive() {
