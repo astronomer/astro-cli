@@ -46,6 +46,25 @@ const (
 	warningInvalidImageNameMsg         = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidPrebuiltImageNameMsg = "WARNING! The image '%s' does not appear to be based on Astro Runtime (the '%s' label is missing). Ensure your image is built FROM quay.io/astronomer/astro-runtime to proceed.\n"
 
+	// agentEnvVarPrefix is baked into the image config's Env list for Remote
+	// Execution agent images (built FROM astro-remote-execution-agent), but not
+	// for plain Astro Runtime images. It is used as a naive, best-effort signal
+	// to detect when the wrong image flavor is being deployed via a given path.
+	agentEnvVarPrefix = "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER"
+
+	warningAgentImageInHostedDeployMsg    = "WARNING! The image you built looks like a Remote Execution agent image (an environment variable prefixed '%s' was found in the image config). This image will run as your Deployment's scheduler/webserver/worker, but the agent entrypoint does not support running as a scheduler and will crash loop. Check your Dockerfile and confirm whether you meant to run 'astro deploy' (hosted) or 'astro remote deploy' (Remote Execution) instead.\n" //nolint:lll
+	warningNonAgentImageInClientDeployMsg = "WARNING! The client image you built does not look like a Remote Execution agent image (no environment variable prefixed '%s' was found in the image config). Check your Dockerfile.client to confirm it is built FROM an astro-remote-execution-agent base image.\n"                                                                                                                                                                                //nolint:lll
+
+	// warningAgentBaseImageInHostedDeployMsg / warningNonAgentBaseImageInClientDeployMsg are the
+	// pre-build counterparts of the two warnings above. They inspect the Dockerfile's (or
+	// Dockerfile.client's) FROM image directly -- before docker build runs -- so the same
+	// flavor-mismatch signal can surface before any potentially slow customer RUN steps
+	// execute. Wording intentionally calls out "base image referenced in your Dockerfile's
+	// FROM line" so it's not confused with the post-build warning, which is about the image
+	// that was actually built.
+	warningAgentBaseImageInHostedDeployMsg    = "WARNING! The base image referenced in your Dockerfile's FROM line looks like a Remote Execution agent image (an environment variable prefixed '%s' was found when inspecting it). This image will run as your Deployment's scheduler/webserver/worker, but the agent entrypoint does not support running as a scheduler and will crash loop. Check your Dockerfile and confirm whether you meant to run 'astro deploy' (hosted) or 'astro remote deploy' (Remote Execution) instead.\n" //nolint:lll
+	warningNonAgentBaseImageInClientDeployMsg = "WARNING! The base image referenced in your Dockerfile.client's FROM line does not look like a Remote Execution agent image (no environment variable prefixed '%s' was found when inspecting it). Check your Dockerfile.client to confirm it is built FROM an astro-remote-execution-agent base image.\n"                                                                                                                                                                                //nolint:lll
+
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
 	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
@@ -693,6 +712,73 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 }
 
+// hasEnvVarWithPrefix reports whether the image's baked-in environment
+// variables (docker inspect .Config.Env) contain any entry whose "KEY" (the
+// portion before the first "=") starts with prefix. It is a naive, best-effort
+// signal only -- errors reading env vars are treated as "not found" rather
+// than surfaced, since this check must never block a deploy.
+func hasEnvVarWithPrefix(imageHandler airflow.ImageHandler, altImageName, prefix string) bool {
+	envVars, err := imageHandler.GetEnvVars(altImageName)
+	if err != nil {
+		logger.Debugf("unable to read image env vars for flavor check: %s", err)
+		return false
+	}
+	for _, envVar := range envVars {
+		key, _, _ := strings.Cut(envVar, "=")
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// preBuildAgentFlavorCheck inspects a Dockerfile's (or Dockerfile.client's) FROM image
+// reference -- before any docker build runs -- and reports whether that base image looks
+// like a Remote Execution agent image. This lets buildImage and DeployClientImage warn
+// about an image-flavor mismatch before potentially slow customer RUN steps execute,
+// rather than only after the full image build completes. It reuses the same
+// docker.ParseFile / docker.GetImageFromParsedFile mechanism already used for the
+// warningInvalidImageNameMsg path, for consistency.
+//
+// This is best-effort and silent on failure: ok=false tells the caller to skip the
+// pre-build warning entirely and fall through to the existing post-build check as the
+// safety net. That happens when:
+//   - The Dockerfile can't be parsed.
+//   - No FROM line is found, or the FROM value is an unresolved ARG template (e.g.
+//     "FROM ${BASE_IMAGE}") -- docker.GetImageFromParsedFile does not expand ARGs, so
+//     these are detected by checking for a literal "$" in the returned value.
+//   - Pulling the FROM image fails for any reason (private registry auth not yet set
+//     up, network issue, image doesn't exist standalone, etc).
+//
+// Like the existing docker.GetImageFromParsedFile call site above, only the *first*
+// FROM line in the Dockerfile is considered; a multi-stage Dockerfile whose final stage
+// uses a different base image than its first FROM is not specially handled here (this
+// matches, rather than changes, existing behavior).
+//
+// Note: docker build pulls the FROM image anyway if it isn't already cached locally, so
+// pulling it here does not add a new network round-trip -- it just reorders an
+// unavoidable pull ahead of the customer's Dockerfile RUN steps.
+func preBuildAgentFlavorCheck(imageHandler airflow.ImageHandler, dockerfilePath string) (isAgentFlavor, ok bool) {
+	cmds, err := docker.ParseFile(dockerfilePath)
+	if err != nil {
+		logger.Debugf("skipping pre-build image flavor check: unable to parse dockerfile %s: %s", dockerfilePath, err)
+		return false, false
+	}
+
+	fromImage := docker.GetImageFromParsedFile(cmds)
+	if fromImage == "" || strings.Contains(fromImage, "$") {
+		logger.Debugf("skipping pre-build image flavor check: no resolvable FROM image found in %s (got %q)", dockerfilePath, fromImage)
+		return false, false
+	}
+
+	if err := imageHandler.Pull(fromImage, "", ""); err != nil {
+		logger.Debugf("skipping pre-build image flavor check: unable to pull FROM image %q: %s", fromImage, err)
+		return false, false
+	}
+
+	return hasEnvVarWithPrefix(imageHandler, fromImage, agentEnvVarPrefix), true
+}
+
 // dockerignoreContainsDags reports whether content has a line equal to "dags/".
 // Uses bufio.Scanner so CRLF line endings are handled identically to LF.
 func dockerignoreContainsDags(content []byte) bool {
@@ -711,6 +797,17 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	if imageName == "" {
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
+
+		// Fail-early check: inspect the Dockerfile's FROM image directly, before running
+		// docker build, so a slow build isn't wasted on an obvious flavor mismatch. This
+		// is a best-effort, non-fatal check -- see preBuildAgentFlavorCheck for how
+		// unresolvable/failed cases are skipped. The equivalent post-build check below
+		// (hasEnvVarWithPrefix on the built image) remains as the safety net either way.
+		if config.CFG.ShowWarnings.GetBool() {
+			if isAgentFlavor, ok := preBuildAgentFlavorCheck(imageHandler, filepath.Join(path, dockerfile)); ok && isAgentFlavor {
+				fmt.Printf(warningAgentBaseImageInHostedDeployMsg, agentEnvVarPrefix)
+			}
+		}
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {
 			err := buildImageWithoutDags(path, buildSecretString, imageHandler)
@@ -736,6 +833,15 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 	version, err = imageHandler.GetLabel("", runtimeImageLabel)
 	if err != nil {
 		fmt.Println("unable get runtime version from image")
+	}
+
+	// Post-build check: unlike the pre-build check above, this inspects the actual image
+	// that is about to be pushed and run as this Deployment's scheduler/webserver/worker --
+	// no ARG-template or multi-stage ambiguity, so this one is fatal rather than a warning.
+	if hasEnvVarWithPrefix(imageHandler, "", agentEnvVarPrefix) {
+		fmt.Printf(warningAgentImageInHostedDeployMsg, agentEnvVarPrefix)
+		fmt.Println("Canceling deploy...")
+		os.Exit(1)
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && version == "" {
@@ -1139,10 +1245,31 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			TargetPlatforms: targetPlatforms,
 		}
 
+		// Fail-early check: inspect Dockerfile.client's FROM image directly, before
+		// running docker build, so a slow build isn't wasted on an obvious flavor
+		// mismatch. Best-effort and non-fatal -- see preBuildAgentFlavorCheck for how
+		// unresolvable/failed cases are skipped. The equivalent post-build check below
+		// (hasEnvVarWithPrefix on the built image) remains as the safety net either way.
+		if config.CFG.ShowWarnings.GetBool() {
+			dockerfileClientPath := filepath.Join(deployInput.Path, "Dockerfile.client")
+			if isAgentFlavor, ok := preBuildAgentFlavorCheck(imageHandler, dockerfileClientPath); ok && !isAgentFlavor {
+				fmt.Printf(warningNonAgentBaseImageInClientDeployMsg, agentEnvVarPrefix)
+			}
+		}
+
 		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecretString, buildConfig)
 		if err != nil {
 			return fmt.Errorf("failed to build client image: %w", err)
 		}
+	}
+
+	// Post-build check: unlike the pre-build check above, this inspects the actual image
+	// that is about to be pushed to the customer's private registry and run as the Remote
+	// Execution agent -- no ARG-template or multi-stage ambiguity, so this one is fatal
+	// rather than a warning.
+	if !hasEnvVarWithPrefix(imageHandler, "", agentEnvVarPrefix) {
+		fmt.Printf(warningNonAgentImageInClientDeployMsg, agentEnvVarPrefix)
+		return errors.New("built image does not look like a Remote Execution agent image; canceling deploy")
 	}
 
 	// Push the image to the remote registry (assumes docker login was done externally)

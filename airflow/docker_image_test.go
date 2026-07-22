@@ -581,6 +581,60 @@ func (s *Suite) TestDockerImageGetLabel() {
 	})
 }
 
+func (s *Suite) TestDockerImageGetEnvVars() {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	s.Run("success", func() {
+		mockResp := `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python","PATH=/usr/bin"]`
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			io.WriteString(stdout, mockResp)
+			return nil
+		}
+
+		resp, err := handler.GetEnvVars("")
+		s.NoError(err)
+		s.Equal([]string{"ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python", "PATH=/usr/bin"}, resp)
+	})
+
+	s.Run("altImageName overrides imageName", func() {
+		mockResp := `[]`
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "alt-image")
+			io.WriteString(stdout, mockResp)
+			return nil
+		}
+
+		resp, err := handler.GetEnvVars("alt-image")
+		s.NoError(err)
+		s.Equal([]string{}, resp)
+	})
+
+	s.Run("cmdExec error", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			return errMockDocker
+		}
+
+		_, err := handler.GetEnvVars("")
+		s.ErrorIs(err, errMockDocker)
+	})
+
+	s.Run("cmdExec failure", func() {
+		mockErrResp := "test-err-response"
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains(args, "inspect")
+			io.WriteString(stderr, mockErrResp)
+			return nil
+		}
+
+		_, err := handler.GetEnvVars("")
+		s.ErrorIs(err, errGetImageLabel)
+	})
+}
+
 func (s *Suite) TestDockerImageListLabel() {
 	handler := DockerImage{
 		imageName: "testing",

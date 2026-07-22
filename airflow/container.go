@@ -54,6 +54,7 @@ type ImageHandler interface {
 	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
+	GetEnvVars(altImageName string) ([]string, error)
 	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error

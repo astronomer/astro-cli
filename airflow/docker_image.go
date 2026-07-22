@@ -512,6 +512,39 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	return label, nil
 }
 
+// GetEnvVars returns the list of environment variables (in "KEY=VALUE" form)
+// baked into the image config, as reported by `docker inspect .Config.Env`.
+// altImageName, if non-empty, overrides the image name to inspect.
+func (d *DockerImage) GetEnvVars(altImageName string) ([]string, error) {
+	var envVars []string
+
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return envVars, err
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	imageName := d.imageName
+	if altImageName != "" {
+		imageName = altImageName
+	}
+
+	err = cmdExec(containerRuntime, stdout, stderr, "inspect", "--format", "{{ json .Config.Env }}", imageName)
+	if err != nil {
+		return envVars, err
+	}
+	if execErr := stderr.String(); execErr != "" {
+		return envVars, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
+	}
+	err = json.Unmarshal(stdout.Bytes(), &envVars)
+	if err != nil {
+		return envVars, err
+	}
+	return envVars, nil
+}
+
 func (d *DockerImage) DoesImageExist(imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {

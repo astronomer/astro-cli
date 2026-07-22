@@ -124,6 +124,36 @@ func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string,
 	return r0, r1
 }
 
+// GetEnvVars provides a mock function with given fields: altImageName
+func (_m *ImageHandler) GetEnvVars(altImageName string) ([]string, error) {
+	ret := _m.Called(altImageName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEnvVars")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) ([]string, error)); ok {
+		return rf(altImageName)
+	}
+	if rf, ok := ret.Get(0).(func(string) []string); ok {
+		r0 = rf(altImageName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(altImageName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListLabels provides a mock function with no fields
 func (_m *ImageHandler) ListLabels() (map[string]string, error) {
 	ret := _m.Called()
