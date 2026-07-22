@@ -39,7 +39,7 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, astroV1Client astrov1.APIClient, out io.Writer) error { //nolint
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, astroV1Client astrov1.APIClient, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 	var (
 		requestedDeployment                  astrov1.Deployment
 		err                                  error
@@ -201,12 +201,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			return fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
 		}
 		// add the new queue to the list of worker queues
-		listToCreate = append(listToCreate, queueToCreateOrUpdate) //nolint
+		listToCreate = append(listToCreate, queueToCreateOrUpdate)
 		hybridListToCreate = append(hybridListToCreate, queueToCreateOrUpdateHybrid)
 	case updateAction:
 		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
-				i, _ := input.Confirm(
+				i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
 					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)))
 
 				if !i {
@@ -353,7 +353,7 @@ func IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid astrov1.Hybri
 // It returns true if queueToCreateOrUpdate exists in []existingQueues
 // It returns false if queueToCreateOrUpdate does not exist in []existingQueues
 func QueueExists(existingQueues []astrov1.WorkerQueue, queueToCreateOrUpdate astrov1.WorkerQueueRequest, queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) bool { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
-	for _, queue := range existingQueues { //nolint
+	for _, queue := range existingQueues {
 		if queue.Name == queueToCreateOrUpdateHybrid.Name {
 			// queueToCreateOrUpdate exists
 			return true
@@ -403,7 +403,7 @@ func selectWorkerMachine(workerType string, workerMachines []astrov1.WorkerMachi
 			machineMap[strconv.Itoa(index)] = workerMachines[i]
 		}
 
-		tab.Print(out)
+		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 		choice := input.Text("\n> ")
 		selectedPool, ok := machineMap[choice]
 		if !ok {
@@ -457,7 +457,7 @@ func selectNodePool(workerType string, nodePools []astrov1.NodePool, out io.Writ
 			nodePoolMap[strconv.Itoa(index)] = nodePools[i]
 		}
 
-		tab.Print(out)
+		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 		choice := input.Text("\n> ")
 		selectedPool, ok := nodePoolMap[choice]
 		if !ok {
@@ -485,7 +485,7 @@ func selectNodePool(workerType string, nodePools []astrov1.NodePool, out io.Writ
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Client astrov1.APIClient, out io.Writer) error { //nolint:gocognit
+func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Client astrov1.APIClient, out io.Writer) error { //nolint:gocognit // v1 complexity, refactor tracked separately
 	var (
 		requestedDeployment      astrov1.Deployment
 		err                      error
@@ -531,7 +531,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 
 	if QueueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
-			i, _ := input.Confirm(
+			i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
 				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)))
 
 			if !i {
@@ -541,7 +541,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
 			// create a new workerQueuesToKeep without queueToDelete in it
-			for i := range existingQueues { //nolint
+			for i := range existingQueues {
 				if existingQueues[i].Name != queueToDelete.Name {
 					existingQueueRequest := astrov1.WorkerQueueRequest{
 						Name:              existingQueues[i].Name,
@@ -563,7 +563,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 			fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
 		} else {
 			// create a new listToDeleteHybrid without queueToDeleteHybrid in it
-			for i := range existingQueues { //nolint
+			for i := range existingQueues {
 				if existingQueues[i].Name != queueToDeleteHybrid.Name {
 					existingQueueRequest := astrov1.HybridWorkerQueueRequest{
 						Name:              existingQueues[i].Name,
@@ -626,7 +626,7 @@ func selectQueue(queueListIndex *[]astrov1.WorkerQueue, out io.Writer) (string, 
 		queueMap[strconv.Itoa(index)] = queueList[i]
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	queueToDelete, ok := queueMap[choice]
 	if !ok {
@@ -640,10 +640,8 @@ func selectQueue(queueListIndex *[]astrov1.WorkerQueue, out io.Writer) (string, 
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
 // sets the resources for CeleryExecutor and AstroExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
-//
-//nolint:dupl
 func updateQueueList(existingQueues []astrov1.WorkerQueueRequest, queueToUpdate astrov1.WorkerQueueRequest, executor *astrov1.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astrov1.WorkerQueueRequest { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
-	for i, queue := range existingQueues { //nolint
+	for i, queue := range existingQueues {
 		if queue.Name != queueToUpdate.Name {
 			continue
 		}
@@ -674,9 +672,8 @@ func updateQueueList(existingQueues []astrov1.WorkerQueueRequest, queueToUpdate 
 	return existingQueues
 }
 
-//nolint:dupl
 func updateHybridQueueList(existingQueues []astrov1.HybridWorkerQueueRequest, queueToUpdate astrov1.HybridWorkerQueueRequest, executor *astrov1.DeploymentExecutor, wQueueMin, wQueueMax, wQueueConcurrency int) []astrov1.HybridWorkerQueueRequest {
-	for i, queue := range existingQueues { //nolint
+	for i, queue := range existingQueues {
 		if queue.Name != queueToUpdate.Name {
 			continue
 		}

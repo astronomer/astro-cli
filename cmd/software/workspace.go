@@ -76,7 +76,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&workspaceCreateLabel, "label", "l", "", "Label for your new workspace")
 	cmd.Flags().StringVarP(&workspaceCreateDescription, "description", "d", "", "Description for your new workspace")
-	_ = cmd.MarkFlagRequired("label")
+	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
 	return cmd
 }

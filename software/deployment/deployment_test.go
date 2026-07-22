@@ -1585,12 +1585,12 @@ func (s *Suite) TestMeetsRuntimeUpgradeReqs() {
 		{
 			name:        "error parsing runtime version",
 			args:        args{runtimeVersion: "invalid version", desiredRuntimeVersion: "4.2.5"},
-			expectedErr: fmt.Errorf("invalid semantic version"), //nolint
+			expectedErr: fmt.Errorf("invalid semantic version"),
 		},
 		{
 			name:        "error parsing desired runtime version",
 			args:        args{runtimeVersion: "4.2.5", desiredRuntimeVersion: "invalid version"},
-			expectedErr: fmt.Errorf("invalid semantic version"), //nolint
+			expectedErr: fmt.Errorf("invalid semantic version"),
 		},
 	}
 	for _, tt := range tests {

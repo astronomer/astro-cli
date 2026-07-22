@@ -88,6 +88,6 @@ func ListOrgRoles(out io.Writer, client astrov1.APIClient, shouldIncludeDefaultR
 		}, false)
 	}
 
-	table.Print(out)
+	table.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }

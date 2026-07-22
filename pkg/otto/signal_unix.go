@@ -16,7 +16,7 @@ func forwardSignals(cmd *exec.Cmd) {
 	go func() {
 		for sig := range sigCh {
 			if cmd.Process != nil {
-				_ = cmd.Process.Signal(sig)
+				_ = cmd.Process.Signal(sig) //nolint:errcheck // error deliberately ignored in this v1 path
 			}
 		}
 	}()

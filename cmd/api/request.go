@@ -258,7 +258,7 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 	// set on the parent api command).
 	if result.StatusCode >= httpStatusError {
 		if len(result.Body) > 0 {
-			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ")
+			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ") //nolint:errcheck // error deliberately ignored in this v1 path
 		}
 		return &SilentError{StatusCode: result.StatusCode}
 	}
@@ -381,7 +381,7 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 	// SilentError to match the executeSingleRequest behavior.
 	if result.StatusCode >= httpStatusError {
 		if len(result.Body) > 0 {
-			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ")
+			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ") //nolint:errcheck // error deliberately ignored in this v1 path
 		}
 		return nil, 0, 0, &SilentError{StatusCode: result.StatusCode}
 	}

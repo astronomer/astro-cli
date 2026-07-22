@@ -54,7 +54,7 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 		return nil
 	}
 
-	makeVarTable(environmentVariablesObjects).Print(out)
+	makeVarTable(environmentVariablesObjects).Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -153,7 +153,7 @@ func VariableModify(
 		fmt.Fprintln(out, "\nNo variables for this Deployment")
 	} else {
 		fmt.Fprintln(out, "\nUpdated list of your Deployment's variables:")
-		makeVarTable(environmentVariablesObjects).Print(out)
+		makeVarTable(environmentVariablesObjects).Print(out) //nolint:errcheck // best-effort render to the terminal
 	}
 	if errVarBool {
 		return errVarCreateUpdate
@@ -189,7 +189,7 @@ func readLines(path string) ([]string, error) {
 
 // writes vars from cloud into a file
 func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentVariable, envFile string) error {
-	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
+	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
 	if err != nil {
 		return err
 	}
@@ -283,13 +283,13 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		if vars[i] == "" {
 			continue
 		}
-		if len(strings.SplitN(vars[i], "=", 2)) == 1 { //nolint:mnd
+		if len(strings.SplitN(vars[i], "=", 2)) == 1 {
 			fmt.Printf("%s is an improperly formatted variable, no variable created\n", vars[i])
 			errVarBool = true
 			continue
 		}
-		key := strings.SplitN(vars[i], "=", 2)[0]   //nolint:mnd
-		value := strings.SplitN(vars[i], "=", 2)[1] //nolint:mnd
+		key := strings.SplitN(vars[i], "=", 2)[0]
+		value := strings.SplitN(vars[i], "=", 2)[1]
 		if key == "" {
 			fmt.Printf("empty key! skipping creating variable with key: %s\n", key)
 			errVarBool = true

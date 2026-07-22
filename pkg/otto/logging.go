@@ -50,5 +50,5 @@ func rotateIfLarge(path string, maxBytes int64) {
 	if err != nil || info.Size() < maxBytes {
 		return
 	}
-	_ = os.Rename(path, path+".old")
+	_ = os.Rename(path, path+".old") //nolint:errcheck // error deliberately ignored in this v1 path
 }

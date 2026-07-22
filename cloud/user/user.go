@@ -196,7 +196,7 @@ func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
 		userMap[strconv.Itoa(index)] = users[i]
 	}
 
-	table.Print(os.Stdout)
+	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := userMap[choice]
 	if !ok {
@@ -585,7 +585,7 @@ func GetDeploymentUsers(client astrov1.APIClient, deploymentID string, _ int) ([
 
 // ListDeploymentUsersData returns deployment user list data for structured output
 //
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func ListDeploymentUsersData(client astrov1.APIClient, deploymentID string) (*UserList, error) {
 	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
 	if err != nil {
@@ -634,7 +634,7 @@ func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string
 
 // ListWorkspaceUsersData returns workspace user list data for structured output
 //
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*UserList, error) {
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {

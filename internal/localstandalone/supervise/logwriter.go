@@ -25,9 +25,8 @@ type cappedWriter struct {
 }
 
 func newCappedWriter(f *os.File) *cappedWriter {
-	info, _ := f.Stat()
 	var size int64
-	if info != nil {
+	if info, err := f.Stat(); err == nil {
 		size = info.Size()
 	}
 	return &cappedWriter{f: f, written: size}
@@ -68,8 +67,14 @@ func (w *cappedWriter) truncate() {
 		}
 	}
 
-	_ = w.f.Truncate(0)
-	_, _ = w.f.Seek(0, io.SeekStart)
-	written, _ := w.f.Write(tail)
+	// If either reset fails the rewrite would land at the wrong offset, so
+	// leave the file as-is rather than corrupt it.
+	if err := w.f.Truncate(0); err != nil {
+		return
+	}
+	if _, err := w.f.Seek(0, io.SeekStart); err != nil {
+		return
+	}
+	written, _ := w.f.Write(tail) //nolint:errcheck // best-effort capping; the recorded count still reflects a short write
 	w.written = int64(written)
 }

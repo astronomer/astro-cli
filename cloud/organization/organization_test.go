@@ -426,6 +426,17 @@ func (s *Suite) TestSwitch() {
 	})
 }
 
+func (s *Suite) TestSwitchWithContextSurfacesCredentialWriteError() {
+	// A context with no domain makes every context write fail. That failure
+	// must reach the caller instead of being dropped on the floor.
+	testUtil.InitTestConfig(testUtil.ErrorReturningContext)
+	targetOrg := &astrov1.Organization{Id: "test-org-id"}
+	buf := new(bytes.Buffer)
+	err := SwitchWithContext("localhost", targetOrg, new(astrov1_mocks.ClientWithResponsesInterface), buf)
+	s.ErrorIs(err, config.ErrCtxConfigErr)
+	s.Empty(buf.String())
+}
+
 func (s *Suite) TestIsOrgHosted() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)

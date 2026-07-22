@@ -25,7 +25,7 @@ import (
 var (
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
-	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
+	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion)
 	ErrKubernetesNamespaceNotSpecified = errors.New("no kubernetes namespaces specified")
 	errInvalidSSHKeyPath               = errors.New("wrong path specified, no file exists for ssh key")
 	errInvalidKnownHostsPath           = errors.New("wrong path specified, no file exists for known hosts")
@@ -169,7 +169,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 	if req.Executor == houston.CeleryExecutorType || req.Executor == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerURL)
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -203,7 +203,7 @@ func Adopt(req *houston.AdoptDeploymentRequest, client houston.ClientInterface, 
 	}
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Namespace, d.ClusterID, d.ID}, false)
 	tab.SuccessMsg = "\n Successfully adopted deployment"
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -247,10 +247,10 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 		tab.AddRow([]string{name}, false)
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	in := input.Text("\n> ")
-	i, err := strconv.ParseInt(in, 10, 64) //nolint:mnd
+	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", ErrParsingInt{in: in}
 	}
@@ -353,7 +353,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 	}
 	tab.AddRow(resp, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -399,7 +399,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 		fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to Astronomer.\n", d.DesiredAirflowVersion) +
 		"To cancel, run: \n $ astro deployment airflow upgrade --cancel\n"
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -473,13 +473,13 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to Astronomer.\n", desiredRuntimeVersion) +
 		"To cancel, run: \n $ astro deployment runtime upgrade --cancel\n"
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
 
 // RuntimeUpgradeCancel is to cancel an upgrade operation for a deployment
-func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
 	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
@@ -524,7 +524,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 
 	var latestRuntimeRelease *semver.Version
 	for idx := range runtimeReleases {
-		runtimeVersion, _ := semver.NewVersion(runtimeReleases[idx].Version)
+		runtimeVersion, _ := semver.NewVersion(runtimeReleases[idx].Version) //nolint:errcheck // error deliberately ignored in this v1 path
 		if latestRuntimeRelease == nil {
 			latestRuntimeRelease = runtimeVersion
 		} else if runtimeVersion != nil && !latestRuntimeRelease.GreaterThan(runtimeVersion) {
@@ -556,7 +556,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to Astronomer.\n", desiredRuntimeVersion) +
 		"To cancel, run: \n $ astro deployment runtime migrate --cancel\n"
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -607,7 +607,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	var filteredVersions []string
 
 	for _, v := range airflowVersions {
-		vv, _ := semver.NewVersion(v)
+		vv, _ := semver.NewVersion(v) //nolint:errcheck // error deliberately ignored in this v1 path
 		// false means no colors
 		if currentAirflowVersion.LessThan(vv) {
 			filteredVersions = append(filteredVersions, v)
@@ -615,7 +615,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 		}
 	}
 
-	t.Print(out)
+	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	in := input.Text("\n> ")
 	i, err := strconv.ParseInt(in, 10, 64)
@@ -667,10 +667,10 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 		}
 	}
 
-	t.Print(out)
+	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	in := input.Text("\n> ")
-	i, err := strconv.ParseInt(in, 10, 64) //nolint:mnd
+	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", err
 	}
@@ -678,7 +678,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 }
 
 func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error {
-	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10) //nolint:mnd
+	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10)
 	minRequiredVersion := minAirflowVersion
 	airflowUpgradeVersion, err := semver.NewVersion(upgradeVersion)
 	if err != nil {
@@ -833,7 +833,7 @@ func getURLHost(gitURL string) (string, error) {
 }
 
 func GetDeploymentsErr(err error) error {
-	return fmt.Errorf(houston.HoustonConnectionErrMsg, err) //nolint:all
+	return fmt.Errorf(houston.HoustonConnectionErrMsg, err)
 }
 
 var GetDeployments = func(ws string, client houston.ClientInterface) ([]houston.Deployment, error) {
@@ -879,7 +879,7 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 		deployMap[strconv.Itoa(index)] = deployments[i]
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {

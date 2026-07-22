@@ -150,7 +150,6 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
@@ -585,7 +584,7 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [key1=val1 key2=val2]",
@@ -603,14 +602,14 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Create environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set the new environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables from")
-	_ = cmd.Flags().MarkHidden("key")
-	_ = cmd.Flags().MarkHidden("value")
+	_ = cmd.Flags().MarkHidden("key")   //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.Flags().MarkHidden("value") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to create variables from")
 
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [key1=update_val1 key2=update_val2]",
@@ -627,14 +626,14 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Update environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set updated environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables to update from")
-	_ = cmd.Flags().MarkHidden("key")
-	_ = cmd.Flags().MarkHidden("value")
+	_ = cmd.Flags().MarkHidden("key")   //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.Flags().MarkHidden("value") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to update variables from")
 
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentHibernateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "hibernate [DEPLOYMENT-ID]",
@@ -658,7 +657,7 @@ func newDeploymentHibernateCmd() *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentWakeUpCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "wake-up [DEPLOYMENT-ID]",
@@ -719,7 +718,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, astroV1Client)
 }
 
-func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo
+func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -851,7 +850,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error { //nolint:gocognit
+func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -1085,7 +1084,6 @@ func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	return user.RemoveDeploymentUser(email, deploymentID, out, astroV1Client)
 }
 
-//nolint:dupl
 func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "token",
@@ -1107,7 +1105,6 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -1124,7 +1121,6 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -1148,7 +1144,6 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
@@ -1170,7 +1165,7 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
@@ -1192,7 +1187,6 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
@@ -1213,7 +1207,6 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "organization-token",
@@ -1230,7 +1223,6 @@ func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace-token",

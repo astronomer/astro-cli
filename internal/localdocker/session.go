@@ -70,7 +70,7 @@ func spawnSessionWatcher(projectPath string, parentPID int) error {
 	if err != nil {
 		return fmt.Errorf("resolving the astro binary for the session watcher: %w", err)
 	}
-	cmd := exec.Command(exe, SessionWatchSubcommand, //nolint:gosec // fixed subcommand; args are a pid and the project path
+	cmd := exec.Command(exe, SessionWatchSubcommand,
 		SessionParentPIDFlag, strconv.Itoa(parentPID),
 		SessionProjectFlag, projectPath)
 	cmd.SysProcAttr = detachSysProcAttr()
@@ -79,6 +79,6 @@ func spawnSessionWatcher(projectPath string, parentPID int) error {
 	}
 	// Reap the watcher if it exits while the CLI is still alive; once the CLI
 	// exits (the normal case) init adopts it.
-	go func() { _ = cmd.Wait() }()
+	go func() { _ = cmd.Wait() }() //nolint:errcheck // reaper goroutine; the watcher's exit status is not our concern
 	return nil
 }

@@ -121,7 +121,7 @@ var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (strin
 
 		deployMap[strconv.Itoa(index)] = ws[i]
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
@@ -366,7 +366,7 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 		workspaceMap[strconv.Itoa(index)] = workspaces[i]
 	}
 
-	table.Print(os.Stdout)
+	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := workspaceMap[choice]
 	if !ok {

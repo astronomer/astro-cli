@@ -128,7 +128,7 @@ func ListTokens(client astrov1.APIClient, deploymentID string, tokenTypes *[]Dep
 			createdBy,
 		}, false)
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -252,7 +252,7 @@ func RotateToken(id, name, deploymentID string, cleanOutput, force bool, out io.
 
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
-		i, _ := input.Confirm(
+		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 
 		if !i {
@@ -303,7 +303,7 @@ func DeleteToken(id, name, deploymentID string, force bool, out io.Writer, clien
 		} else {
 			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name))
 		}
-		i, _ := input.Confirm(msg)
+		i, _ := input.Confirm(msg) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !i {
 			if isDep {
 				fmt.Println("Canceling API Token deletion")
@@ -367,7 +367,7 @@ func selectTokens(deploymentID string, apiTokens []astrov1.ApiToken) (astrov1.Ap
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 
 	selected, ok := apiTokensMap[choice]
@@ -422,7 +422,7 @@ func getDeploymentTokens(deploymentID string, tokenTypes *[]DeploymentTokenType,
 	return filtered, nil
 }
 
-func getDeploymentToken(id, name, deploymentID, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) { //nolint:gocognit
+func getDeploymentToken(id, name, deploymentID, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) {
 	switch {
 	case id == "" && name == "":
 		fmt.Println(message)
@@ -464,7 +464,7 @@ func getDeploymentToken(id, name, deploymentID, message string, tokens []astrov1
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24) //nolint:mnd
+	days := int(duration.Hours() / 24) //nolint:mnd // the value is clear from context
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 

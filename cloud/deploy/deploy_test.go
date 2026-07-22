@@ -2573,6 +2573,26 @@ func TestBuildImageWithoutDagsAppendsDagsDuringBuild(t *testing.T) {
 	}
 }
 
+func TestBuildImageWithoutDagsSurfacesRestoreError(t *testing.T) {
+	dir := t.TempDir()
+	dockerignorePath := filepath.Join(dir, ".dockerignore")
+	assert.NoError(t, os.WriteFile(dockerignorePath, []byte("some/path/\n"), 0o644))
+
+	mockImageHandler := new(mocks.ImageHandler)
+	// Sabotage the restore: swap the .dockerignore file for a directory during
+	// the build so the deferred WriteFile cannot put the original bytes back.
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Run(func(_ mock.Arguments) {
+		assert.NoError(t, os.Remove(dockerignorePath))
+		assert.NoError(t, os.Mkdir(dockerignorePath, 0o755))
+	}).Return(nil)
+
+	err := buildImageWithoutDags(dir, "", mockImageHandler)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "restoring")
+
+	mockImageHandler.AssertExpectations(t)
+}
+
 func TestRemoveDagsFromDockerIgnore(t *testing.T) {
 	tests := []struct {
 		name     string

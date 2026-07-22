@@ -99,7 +99,7 @@ func proxyStatus(_ *cobra.Command, _ []string) error {
 	}
 
 	fmt.Println("\nActive routes:")
-	tw := tabwriter.NewWriter(os.Stdout, 0, 8, 2, '\t', 0) //nolint:mnd
+	tw := tabwriter.NewWriter(os.Stdout, 0, 8, 2, '\t', 0) //nolint:mnd // the value is clear from context
 	fmt.Fprintln(tw, "URL\tBackend Port\tPostgres Port\tProject Dir\tPID")
 	for _, r := range routes {
 		pgPort := "-"

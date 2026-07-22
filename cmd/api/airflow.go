@@ -46,8 +46,6 @@ type AirflowOptions struct {
 }
 
 // NewAirflowCmd creates the 'astro api airflow' command.
-//
-//nolint:dupl
 func NewAirflowCmd(out io.Writer) *cobra.Command {
 	opts := &AirflowOptions{
 		RequestOptions: RequestOptions{

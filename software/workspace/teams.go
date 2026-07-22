@@ -13,7 +13,7 @@ import (
 var errTeamNotInWorkspace = errors.New("the team you are trying to change is not part of this workspace")
 
 // Add a team to a workspace with specified role
-func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl // the duplication is acceptable here
 	w, err := houston.Call(client.AddWorkspaceTeam)(houston.AddWorkspaceTeamRequest{WorkspaceID: workspaceID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, o
 
 	tab.AddRow([]string{w.Label, w.ID, teamID, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", teamID, w.Label)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -46,7 +46,7 @@ func RemoveTeam(workspaceID, teamID string, client houston.ClientInterface, out 
 
 	utab.AddRow([]string{w.Label, w.ID, teamID}, false)
 	utab.SuccessMsg = "Successfully removed team from workspace"
-	utab.Print(out)
+	utab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -68,12 +68,12 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 			tab.AddRow([]string{workspaceID, workspaceTeams[i].ID, workspaceTeams[i].Name, role}, false)
 		}
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
 // Update workspace team role
-func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint: dupl
+func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	// get team you are updating to show role from before change
 	teams, err := houston.Call(client.GetWorkspaceTeamRole)(houston.GetWorkspaceTeamRoleRequest{WorkspaceID: workspaceID, TeamID: teamID})
 

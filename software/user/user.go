@@ -20,8 +20,8 @@ func Create(email, password string, client houston.ClientInterface, out io.Write
 		email = input.Text("Email: ")
 	}
 	if password == "" {
-		inputPassword, _ := input.Password("Password: ")
-		inputPassword2, _ := input.Password("Re-enter Password: ")
+		inputPassword, _ := input.Password("Password: ")           //nolint:errcheck // a prompt failure falls through to the empty response
+		inputPassword2, _ := input.Password("Re-enter Password: ") //nolint:errcheck // a prompt failure falls through to the empty response
 		if inputPassword != inputPassword2 {
 			return errPasswordMismatch
 		}

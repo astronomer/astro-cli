@@ -132,7 +132,7 @@ func newProxyDaemon() localshared.ProxyDaemon {
 func routesDir() string {
 	home := os.Getenv("ASTRO_HOME")
 	if home == "" {
-		home, _ = os.UserHomeDir()
+		home, _ = os.UserHomeDir() //nolint:errcheck // falls back to a relative path, matching v1's ASTRO_HOME handling
 	}
 	return filepath.Join(home, ".astro", "proxy")
 }

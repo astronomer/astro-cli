@@ -90,7 +90,7 @@ func SelectTemplate(templateList []string) (string, error) {
 		templateMap[strconv.Itoa(index)] = template
 	}
 
-	templatesTab.Print(os.Stdout)
+	templatesTab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 
 	// Prompt user for selection
 	choice := input.Text("\n> ")
@@ -135,7 +135,7 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gr.Close()
+	defer gr.Close() //nolint:errcheck // best-effort close
 
 	tarReader := tar.NewReader(gr)
 	var baseDir string
@@ -173,7 +173,7 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, 0o755); err != nil { //nolint:mnd
+			if err := os.MkdirAll(targetPath, 0o755); err != nil { //nolint:mnd // the value is clear from context
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case tar.TypeReg:
@@ -182,7 +182,7 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 				return fmt.Errorf("failed to create file: %w", err)
 			}
 
-			if _, err := io.Copy(outFile, tarReader); err != nil { //nolint
+			if _, err := io.Copy(outFile, tarReader); err != nil { //nolint:gosec // the archive is Astronomer's own runtime template, not untrusted input
 				outFile.Close()
 				return fmt.Errorf("failed to copy file contents: %w", err)
 			}

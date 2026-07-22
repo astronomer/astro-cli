@@ -62,7 +62,6 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-//nolint:gocognit
 func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
@@ -136,7 +135,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	expireTime, _ := c.GetExpiresIn()
+	expireTime, _ := c.GetExpiresIn() //nolint:errcheck // error deliberately ignored in this v1 path
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
@@ -333,7 +332,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 
 	org := orgs[0]
 	orgID := org.Id
-	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint:staticcheck // renders the typed Product enum as a plain string
 
 	// get workspace ID
 	deployments, err := deployment.ListDeployments("", orgID, astroV1Client)
@@ -432,7 +431,7 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 	}
 
 	org := orgs[0]
-	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint:staticcheck // renders the typed Product enum as a plain string
 
 	if wsID == "" {
 		wsID = c.Workspace
@@ -450,7 +449,7 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 }
 
 func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {
-	wsID, _ := cmd.Flags().GetString("workspace-id")
-	depID, _ := cmd.Flags().GetString("deployment-id")
+	wsID, _ := cmd.Flags().GetString("workspace-id")   //nolint:errcheck // error deliberately ignored in this v1 path
+	depID, _ := cmd.Flags().GetString("deployment-id") //nolint:errcheck // error deliberately ignored in this v1 path
 	return wsID != "" || depID != ""
 }

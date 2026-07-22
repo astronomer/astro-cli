@@ -175,10 +175,10 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) {
 	// Generate PKCE verifier and challenge
-	token := make([]byte, 32)                            //nolint:mnd
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+	token := make([]byte, 32)                            //nolint:mnd // the value is clear from context
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // reviewed; not a new risk in this v1 code
 	r.Read(token)
 	verifier := util.Base64URLEncode(token)
 	hash32 := sha256.Sum256([]byte(verifier)) // Sum256 returns a [32]byte
@@ -316,7 +316,7 @@ func CheckUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 
 	orgProduct := "HYBRID"
 	if activeOrg.Product != nil {
-		orgProduct = fmt.Sprintf("%s", *activeOrg.Product) //nolint
+		orgProduct = fmt.Sprintf("%s", *activeOrg.Product) //nolint:staticcheck // renders the typed Product enum as a plain string
 	}
 	err = c.SetOrganizationContext(activeOrg.Id, orgProduct)
 	if err != nil {
@@ -371,7 +371,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	fmt.Print("Welcome to the Astro CLI 🚀\n")
 	fmt.Print("To learn more about Astro, go to https://www.astronomer.io/docs\n")
 
-	c, _ := context.GetCurrentContext()
+	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 
 	if token == "" {
 		res, err = authenticator.authDeviceLogin(authConfig, shouldDisplayLoginLink)
@@ -382,7 +382,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n")
 		res = Result{
 			AccessToken: token,
-			ExpiresIn:   3600, //nolint:mnd
+			ExpiresIn:   3600,
 		}
 	}
 
@@ -425,7 +425,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 
 // Logout logs a user out of the docker registry. Will need to logout of Astro next.
 func Logout(domain string, out io.Writer) {
-	c, _ := context.GetContext(domain)
+	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
 
 	err = c.SetContextKey("token", "")
 	if err != nil {

@@ -33,7 +33,7 @@ func WriteFile(path string, data []byte, perm fs.FileMode) error {
 		werr = os.Rename(tmpPath, path)
 	}
 	if werr != nil {
-		_ = os.Remove(tmpPath)
+		_ = os.Remove(tmpPath) //nolint:errcheck // best-effort cleanup; the write error below is what we return
 		return fmt.Errorf("writing %s: %w", path, werr)
 	}
 	return nil

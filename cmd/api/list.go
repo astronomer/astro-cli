@@ -119,7 +119,7 @@ func printEndpointsTable(out io.Writer, endpoints []openapi.Endpoint) {
 			fmt.Fprintf(w, "  %-8s\t%s\t%s%s\n", colorizeMethod(tagEndpoints[j].Method), tagEndpoints[j].Path, tagEndpoints[j].OperationID, deprecated)
 		}
 
-		w.Flush()
+		w.Flush() //nolint:errcheck // best-effort flush
 	}
 }
 

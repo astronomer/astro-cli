@@ -26,9 +26,10 @@ func waitForProcessExit(pid int) {
 		pollProcessExit(pid)
 		return
 	}
-	defer func() { _ = unix.Close(fd) }()
+	defer func() { _ = unix.Close(fd) }() //nolint:errcheck // best-effort close of the pidfd
 
-	fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}} //nolint:gosec // pidfd_open returns a non-negative fd that always fits in int32
+	// pidfd_open returns a non-negative fd that always fits in int32.
+	fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
 
 	for {
 		_, err := unix.Poll(fds, -1)

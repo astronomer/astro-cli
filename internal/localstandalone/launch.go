@@ -37,7 +37,7 @@ func (execCommander) Run(ctx context.Context, dir string, env []string, s localr
 // at once. Its stdio is deliberately empty: the supervisor owns the log
 // file, and any pipe from this process would close when the CLI exits.
 func launchDetached(dir string, env []string, name string, args ...string) (int, error) {
-	cmd := exec.Command(name, args...) //nolint:gosec // the engine builds this command line from its own binary and venv layout
+	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -46,6 +46,6 @@ func launchDetached(dir string, env []string, name string, args ...string) (int,
 	}
 	// Reap the child if it exits while the CLI is still alive; when the
 	// CLI exits first (the normal detached case), init adopts the child.
-	go func() { _ = cmd.Wait() }()
+	go func() { _ = cmd.Wait() }() //nolint:errcheck // reaper goroutine; the child's exit status is not our concern
 	return cmd.Process.Pid, nil
 }

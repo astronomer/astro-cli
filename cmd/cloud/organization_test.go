@@ -20,7 +20,6 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-//nolint:unparam
 func execOrganizationCmd(args ...string) (string, error) {
 	testUtil.SetupOSArgsForGinkgo()
 	buf := new(bytes.Buffer)

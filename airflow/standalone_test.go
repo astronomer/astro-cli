@@ -726,7 +726,7 @@ func (s *Suite) TestStandaloneGetConstraints_FetchFails() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	_, _, _, err = handler.getConstraints("3.1-99", defaultPythonVersion) //nolint:dogsled
+	_, _, _, err = handler.getConstraints("3.1-99", defaultPythonVersion) //nolint:dogsled // the extra blanks are fine here
 	s.Error(err)
 	s.Contains(err.Error(), "error fetching constraints")
 	s.Contains(err.Error(), "network error")
@@ -986,7 +986,7 @@ func (s *Suite) TestStandaloneStart_Background() {
 	s.NoError(err)
 
 	// Clean up the process
-	handler.Stop(false) //nolint:errcheck
+	handler.Stop(false)
 }
 
 func (s *Suite) TestStandaloneStart_AlreadyRunning() {
@@ -1102,7 +1102,7 @@ func (s *Suite) TestStandaloneStop_Running() {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	err = cmd.Start()
 	s.NoError(err)
-	go cmd.Wait() //nolint:errcheck
+	go cmd.Wait()
 
 	// Write its PID
 	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
@@ -1897,7 +1897,7 @@ func (s *Suite) TestStandalonePytest_Failure() {
 
 	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
 		// Run a real command that exits with code 1 to produce an *exec.ExitError
-		cmd := exec.Command("sh", "-c", "exit 1") //nolint:gosec
+		cmd := exec.Command("sh", "-c", "exit 1")
 		return cmd.Run()
 	}
 
@@ -1971,7 +1971,7 @@ func (s *Suite) TestStandaloneParse_DagErrors() {
 	defer func() { standaloneExec = origExec }()
 
 	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
-		cmd := exec.Command("sh", "-c", "exit 1") //nolint:gosec
+		cmd := exec.Command("sh", "-c", "exit 1")
 		return cmd.Run()
 	}
 
@@ -2001,7 +2001,7 @@ func (s *Suite) TestStandaloneParse_Interrupted() {
 	defer func() { standaloneExec = origExec }()
 
 	standaloneExec = func(dir string, env, args []string, _ io.Reader, _, _ io.Writer) error {
-		cmd := exec.Command("sh", "-c", "exit 130") //nolint:gosec
+		cmd := exec.Command("sh", "-c", "exit 130")
 		return cmd.Run()
 	}
 

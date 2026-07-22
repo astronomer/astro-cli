@@ -55,7 +55,7 @@ func Create(label, desc string, client houston.ClientInterface, out io.Writer) e
 	tab := newTableOut()
 	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully created workspace"
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -88,7 +88,7 @@ func List(client houston.ClientInterface, out io.Writer) error {
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -152,7 +152,7 @@ var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer
 
 		deployMap[strconv.Itoa(index)] = ws[i]
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
@@ -189,7 +189,7 @@ var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int
 
 		in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
 		value, found := gotoOptions[in]
-		i, err := strconv.ParseInt(in, 10, 8) //nolint:mnd
+		i, err := strconv.ParseInt(in, 10, 8)
 
 		if found {
 			return value
@@ -255,7 +255,7 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 	}
 
 	in := input.Text("\n> ")
-	i, err := strconv.ParseInt(in, 10, 64) //nolint:mnd
+	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return workspaceSelection{id: "", quit: false, err: fmt.Errorf("cannot parse %s to int: %w", in, err)}
 	}
@@ -308,7 +308,7 @@ func Update(id string, client houston.ClientInterface, out io.Writer, args map[s
 	tab := newTableOut()
 	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }

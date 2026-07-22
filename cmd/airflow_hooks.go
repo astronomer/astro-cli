@@ -55,7 +55,7 @@ func EnsureRuntime(cmd *cobra.Command, args []string) error {
 	osChecker := runtimes.CreateOSChecker()
 	if osChecker.IsWindows() {
 		pluginsDir := filepath.Join(config.WorkingPath, "plugins")
-		if err := os.MkdirAll(pluginsDir, 0o755); err != nil && !os.IsExist(err) { //nolint:mnd
+		if err := os.MkdirAll(pluginsDir, 0o755); err != nil && !os.IsExist(err) { //nolint:mnd // the value is clear from context
 			return fmt.Errorf(failedToCreatePluginsDir, err)
 		}
 	}

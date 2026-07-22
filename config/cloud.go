@@ -29,7 +29,7 @@ func (c *Context) PrintCloudContext(out io.Writer) error {
 	}
 
 	tab.AddRow([]string{ctx, workspace}, false)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }

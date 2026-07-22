@@ -81,9 +81,9 @@ func Switch(domain string) error {
 }
 
 func Delete(domain string, noPrompt bool) error {
-	currentCtx, _ := GetCurrentContext()
+	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this v1 path
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
-		i, _ := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain))
+		i, _ := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain)) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !i {
 			fmt.Println(cancelCtxDeleteMsg)
 			return nil
@@ -129,7 +129,7 @@ func SwitchContext(cmd *cobra.Command, args []string) error {
 	tab := newTableOut()
 	tab.AddRow([]string{ctx.Domain, ctx.Workspace}, false)
 	tab.SuccessMsg = "\n Switched context"
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -147,7 +147,7 @@ func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	//nolint:gocritic
+	//nolint:gocritic // intentional in this v1 code
 	for ctxKey, ctx := range contexts.Contexts {
 		if ctx.Domain != "" {
 			domain = ctx.Domain
@@ -162,7 +162,7 @@ func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {
 		}
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 

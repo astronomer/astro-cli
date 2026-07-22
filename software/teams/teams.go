@@ -60,12 +60,12 @@ func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client housto
 		}
 		if len(workspaceRolesTable.Rows) > 0 {
 			fmt.Fprintln(out, "\nWorkspace Level Roles:")
-			workspaceRolesTable.Print(out)
+			workspaceRolesTable.Print(out) //nolint:errcheck // best-effort render to the terminal
 		}
 
 		if len(deploymentRolesTable.Rows) > 0 {
 			fmt.Fprintln(out, "\nDeployment Level Roles:")
-			deploymentRolesTable.Print(out)
+			deploymentRolesTable.Print(out) //nolint:errcheck // best-effort render to the terminal
 		}
 	}
 

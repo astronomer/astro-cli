@@ -99,7 +99,7 @@ func defaultTempHome() (dir string, cleanup func(), err error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return dir, func() { _ = os.RemoveAll(dir) }, nil
+	return dir, func() { _ = os.RemoveAll(dir) }, nil //nolint:errcheck // best-effort cleanup of the temp home
 }
 
 // Parse runs the embedded script and decodes its report. A missing venv
@@ -157,7 +157,7 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 type execExecutor struct{}
 
 func (execExecutor) Run(ctx context.Context, dir string, env []string, name string, args []string, stdin []byte) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // name is the project's own venv Python, args are the embedded script and project paths
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = env
 	cmd.Stdin = bytes.NewReader(stdin)

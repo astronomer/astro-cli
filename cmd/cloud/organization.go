@@ -467,7 +467,7 @@ func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove",
@@ -491,7 +491,7 @@ func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
 	return team.RemoveUser(teamID, userID, forceTeam, out, astroV1Client)
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
@@ -539,7 +539,6 @@ func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
 
 // org tokens
 
-//nolint:dupl
 func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "token",
@@ -560,7 +559,6 @@ func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -578,7 +576,6 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "roles [TOKEN_ID]",
@@ -594,7 +591,6 @@ func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -618,7 +614,6 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
@@ -641,7 +636,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
@@ -664,7 +659,6 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
@@ -685,13 +679,11 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	return organization.ListTokens(astroV1Client, out)
 }
 
-//nolint:dupl
 func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		// make sure the id is lowercase
@@ -701,7 +693,6 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 	return organization.ListTokenRoles(tokenID, astroV1Client, out)
 }
 
-//nolint:dupl
 func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	if tokenName == "" {
 		// no role was provided so ask the user for it
@@ -721,7 +712,6 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	return organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, cleanTokenOutput, out, astroV1Client)
 }
 
-//nolint:dupl
 func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
@@ -733,7 +723,6 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroV1Client)
 }
 
-//nolint:dupl
 func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
@@ -745,7 +734,6 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroV1Client)
 }
 
-//nolint:dupl
 func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
@@ -757,7 +745,6 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	return organization.DeleteToken(tokenID, name, forceDelete, out, astroV1Client)
 }
 
-//nolint:dupl
 func selectOrganizationRole() (string, error) {
 	tokenRolesMap := map[string]string{}
 	tab := &printutil.Table{
@@ -773,7 +760,7 @@ func selectOrganizationRole() (string, error) {
 		tokenRolesMap[strconv.Itoa(index)] = validOrganizationRoles[i]
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := tokenRolesMap[choice]
 	if !ok {

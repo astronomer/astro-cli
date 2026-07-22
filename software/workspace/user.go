@@ -19,7 +19,7 @@ var (
 )
 
 // Add a user to a workspace with specified role
-func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl // the duplication is acceptable here
 	w, err := houston.Call(client.AddWorkspaceUser)(houston.AddWorkspaceUserRequest{WorkspaceID: workspaceID, Email: email, Role: role})
 	if err != nil {
 		return err
@@ -33,13 +33,13 @@ func Add(workspaceID, email, role string, client houston.ClientInterface, out io
 
 	tab.AddRow([]string{w.Label, w.ID, email, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
 
 // Remove a user from a workspace
-func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error {
 	w, err := houston.Call(client.DeleteWorkspaceUser)(houston.DeleteWorkspaceUserRequest{WorkspaceID: workspaceID, UserID: userID})
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func Remove(workspaceID, userID string, client houston.ClientInterface, out io.W
 
 	utab.AddRow([]string{w.Label, w.ID, userID}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
-	utab.Print(out)
+	utab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -75,7 +75,7 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
 		}
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -98,7 +98,7 @@ func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, clie
 			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
 		}
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	totalUsers := len(users)
 	if pageNumber == 0 && totalUsers < take {

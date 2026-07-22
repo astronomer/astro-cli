@@ -1064,7 +1064,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		err = os.WriteFile("./dags/test.py", fileContent, os.ModePerm)
 		s.NoError(err)
 
-		gzipMockError := errors.New("some gzip error") //nolint
+		gzipMockError := errors.New("some gzip error")
 
 		// mock the gzip creation to throw an error
 		gzipFile = func(srcFilePath, destFilePath string) error {

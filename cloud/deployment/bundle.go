@@ -277,7 +277,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 	}
 
 	if !force {
-		confirmed, _ := input.Confirm(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id))
+		confirmed, _ := input.Confirm(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id)) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !confirmed {
 			fmt.Fprintln(out, "Canceling bundle deletion")
 			return nil

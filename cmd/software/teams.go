@@ -75,7 +75,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&teamRole, "role", "r", "", "Role assigned to the team, one of: SYSTEM_VIEWER, SYSTEM_EDITOR, SYSTEM_ADMIN, NONE")
-	_ = cmd.MarkFlagRequired("role")
+	_ = cmd.MarkFlagRequired("role") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

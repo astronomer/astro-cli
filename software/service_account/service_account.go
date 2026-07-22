@@ -18,7 +18,7 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error {
 	createServiceAccountRequest := &houston.CreateServiceAccountRequest{
 		DeploymentID: deploymentUUID,
 		Label:        label,
@@ -37,7 +37,7 @@ func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, cli
 	return tab.Print(out)
 }
 
-func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error {
 	request := &houston.CreateServiceAccountRequest{
 		WorkspaceID: workspaceUUID,
 		Label:       label,

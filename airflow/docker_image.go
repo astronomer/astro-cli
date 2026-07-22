@@ -219,7 +219,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	copyDirs := []string{"dags", "tests", "plugins", "include", ".astro"}
 	for _, dir := range copyDirs {
 		srcPath := airflowHome + "/" + dir
-		if exists, _ := util.Exists(srcPath); !exists {
+		if exists, _ := util.Exists(srcPath); !exists { //nolint:errcheck // treated as absent on error
 			continue
 		}
 		docErr := cmdExec(containerRuntime, stdout, stderr, "cp", srcPath, "astro-pytest:/usr/local/airflow/")

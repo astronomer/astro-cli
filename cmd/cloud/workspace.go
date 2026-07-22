@@ -255,7 +255,6 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "token",
@@ -277,7 +276,6 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -295,7 +293,6 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
@@ -329,7 +326,6 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -353,7 +349,6 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
@@ -376,7 +371,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
@@ -398,7 +393,6 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
@@ -419,7 +413,6 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
@@ -439,7 +432,6 @@ func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func newWorkspaceOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "organization-token",
@@ -880,7 +872,7 @@ func selectWorkspaceRole() (string, error) {
 		tokenRolesMap[strconv.Itoa(index)] = validWorkspaceRoles[i]
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := tokenRolesMap[choice]
 	if !ok {

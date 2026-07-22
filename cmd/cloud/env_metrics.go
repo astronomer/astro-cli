@@ -88,9 +88,9 @@ func newEnvMetricsCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&envMetricsKey, "key", "k", "", "Metrics export key (required)")
 	metricsCommonFlags(cmd)
 	addAutoLinkFlag(cmd)
-	_ = cmd.MarkFlagRequired("key")
-	_ = cmd.MarkFlagRequired("endpoint")
-	_ = cmd.MarkFlagRequired("exporter-type")
+	_ = cmd.MarkFlagRequired("key")           //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("endpoint")      //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("exporter-type") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

@@ -42,10 +42,10 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 			err := cloudCmd.Setup(cmd, astroV1Client)
 			if err != nil {
 				if strings.Contains(err.Error(), "token is invalid or malformed") {
-					return errors.New("API Token is invalid or malformed") //nolint
+					return errors.New("API Token is invalid or malformed")
 				}
 				if strings.Contains(err.Error(), "the API token given has expired") {
-					return errors.New("API Token is expired") //nolint
+					return errors.New("API Token is expired")
 				}
 				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 			}

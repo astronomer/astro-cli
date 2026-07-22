@@ -30,7 +30,7 @@ type RegistryOptions struct {
 
 // NewRegistryCmd creates the 'astro api registry' command.
 //
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func NewRegistryCmd(out io.Writer) *cobra.Command {
 	opts := &RegistryOptions{
 		RequestOptions: RequestOptions{

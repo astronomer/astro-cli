@@ -38,7 +38,7 @@ func confirmOperation(force bool) bool {
 	if force {
 		return true
 	}
-	y, _ := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?")
+	y, _ := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?") //nolint:errcheck // a prompt failure falls through to the empty response
 	return y
 }
 
@@ -336,7 +336,7 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 		teamMap[strconv.Itoa(index)] = teams[i]
 	}
 
-	table.Print(os.Stdout)
+	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := teamMap[choice]
 	if !ok {
@@ -687,7 +687,7 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 		teamMemberMap[strconv.Itoa(index)] = teamMembers[i]
 	}
 
-	table.Print(os.Stdout)
+	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := teamMemberMap[choice]
 	if !ok {
@@ -746,7 +746,7 @@ func ListTeamUsers(teamID string, out io.Writer, client astrov1.APIClient) (err 
 			members[i].Username,
 		}, false)
 	}
-	table.Print(out)
+	table.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -905,7 +905,7 @@ func roleInWorkspace(team astrov1.Team, workspaceID string) string { //nolint:go
 
 // ListDeploymentTeamsData returns deployment team list data for structured output
 //
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func ListDeploymentTeamsData(client astrov1.APIClient, deploymentID string) (*TeamList, error) {
 	teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
 	if err != nil {
@@ -951,7 +951,7 @@ func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string
 
 // ListWorkspaceTeamsData returns workspace team list data for structured output
 //
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*TeamList, error) {
 	teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 	if err != nil {

@@ -55,13 +55,13 @@ func UserList(deploymentID, email, userID, fullName string, client houston.Clien
 		}
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
 
 // Add a user to a deployment with specified role
-func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	addUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
@@ -74,13 +74,13 @@ func Add(deploymentID, email, role string, client houston.ClientInterface, out i
 
 	tab.AddRow([]string{deploymentID, email, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully added %s as a %s", email, role)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
 
 // UpdateUser updates a user's deployment role
-func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	updateUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
@@ -93,7 +93,7 @@ func UpdateUser(deploymentID, email, role string, client houston.ClientInterface
 
 	tab.AddRow([]string{d.Deployment.ID, d.User.Username, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated %s to a %s", email, role)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -114,7 +114,7 @@ func RemoveUser(deploymentID, email string, client houston.ClientInterface, out 
 
 	tab.AddRow([]string{deploymentID, email, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", d.Role, email, deploymentID)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }

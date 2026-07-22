@@ -69,7 +69,7 @@ func BuildDeploymentLogsSubscribeRequest(deploymentID, component, search string,
 		},
 	}
 	s := StartSubscription{Type: "start", Payload: payload}
-	b, _ := json.Marshal(s)
+	b, _ := json.Marshal(s) //nolint:errcheck // marshaling a plain struct that does not error in practice
 	return string(b), nil
 }
 
@@ -82,14 +82,14 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 		logger.Fatal("dial:", err)
 	}
 	defer func() {
-		ws.Close()
+		ws.Close() //nolint:errcheck // best-effort close
 		if resp != nil {
 			resp.Body.Close()
 		}
 	}()
 
 	initSubscription := InitSubscription{Type: "connection_init", Payload: AuthPayload{Authorization: jwtToken}}
-	js, _ := json.Marshal(&initSubscription)
+	js, _ := json.Marshal(&initSubscription) //nolint:errcheck // marshaling a plain struct that does not error in practice
 
 	err = ws.WriteMessage(websocket.TextMessage, js)
 	if err != nil {

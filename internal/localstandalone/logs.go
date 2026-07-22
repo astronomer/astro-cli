@@ -127,7 +127,7 @@ func (a *airflow) Logs(ctx context.Context, opts localrt.LogOptions) error {
 	}
 	logPath := filepath.Join(stateDir, logFileName)
 
-	f, err := os.Open(logPath) //nolint:gosec // the engine derives this path from the project's state dir
+	f, err := os.Open(logPath)
 	if errors.Is(err, os.ErrNotExist) {
 		if !opts.Follow {
 			return errors.New("this project has no local Airflow logs yet; `astro local start` creates them")
@@ -245,7 +245,7 @@ func deliverFunc(opts localrt.LogOptions, now func() time.Time) func(logEntry) {
 			opts.OnLine(line)
 			return
 		}
-		fmt.Fprintln(opts.Writer, entry.raw) //nolint:errcheck // downstream writes surface on the stream's own error paths
+		fmt.Fprintln(opts.Writer, entry.raw)
 	}
 }
 
@@ -281,7 +281,7 @@ func (a *airflow) waitForLogFile(ctx context.Context, logPath string) (*os.File,
 			return nil, nil
 		case <-time.After(followPollInterval):
 		}
-		f, err := os.Open(logPath) //nolint:gosec // the engine derives this path from the project's state dir
+		f, err := os.Open(logPath)
 		if err == nil {
 			return f, nil
 		}

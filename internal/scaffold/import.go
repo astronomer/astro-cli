@@ -296,7 +296,6 @@ func copyTree(src, dst string) (int, error) {
 		}
 		target := filepath.Join(dst, rel)
 		if d.IsDir() {
-			//nolint:gosec // G301: see dirPerm
 			return os.MkdirAll(target, dirPerm)
 		}
 		if !d.Type().IsRegular() {
@@ -320,7 +319,7 @@ func copyFileInto(src, dst string) (bool, error) {
 	if _, err := os.Lstat(dst); err == nil {
 		return false, nil
 	}
-	data, err := os.ReadFile(src) //nolint:gosec // G304: paths come from the user's own source repo
+	data, err := os.ReadFile(src)
 	if err != nil {
 		return false, fmt.Errorf("reading %s: %w", src, err)
 	}

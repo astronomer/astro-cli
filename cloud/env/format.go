@@ -244,7 +244,7 @@ func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out
 		}
 		t.AddRow(row, false)
 	}
-	t.Print(out)
+	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -327,7 +327,7 @@ func writeVarLinksTable(report *VarLinksReport, includeSecrets bool, out io.Writ
 			linkTable.AddRow([]string{strconv.Itoa(i + 1), l.DeploymentID, override}, false)
 		}
 		fmt.Fprintln(out, "LINKS:")
-		linkTable.Print(out)
+		linkTable.Print(out) //nolint:errcheck // best-effort render to the terminal
 	}
 
 	fmt.Fprintln(out)
@@ -370,7 +370,7 @@ func writeConnTable(envObjs []astrov1.EnvironmentObject, out io.Writer) error {
 		}
 		t.AddRow(row, false)
 	}
-	t.Print(out)
+	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -404,7 +404,7 @@ func writeAirflowVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bo
 		}
 		t.AddRow(row, false)
 	}
-	t.Print(out)
+	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -435,7 +435,7 @@ func writeMetricsExportTable(envObjs []astrov1.EnvironmentObject, out io.Writer)
 		}
 		t.AddRow(row, false)
 	}
-	t.Print(out)
+	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 	return nil
 }
 
@@ -474,6 +474,6 @@ func writeYAML(v any, out io.Writer) error {
 		return err
 	}
 	enc := yaml.NewEncoder(out)
-	defer enc.Close()
+	defer enc.Close() //nolint:errcheck // best-effort close
 	return enc.Encode(generic)
 }

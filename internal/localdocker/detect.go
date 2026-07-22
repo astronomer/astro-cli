@@ -50,7 +50,7 @@ func connFor(bin string) engineConn {
 	if err != nil {
 		return engineConn{bin: bin}
 	}
-	env, _ := mgr.ConnectionEnv()
+	env, _ := mgr.ConnectionEnv() //nolint:errcheck // best-effort, per the comment above
 	return engineConn{bin: bin, env: env}
 }
 

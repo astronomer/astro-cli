@@ -42,7 +42,7 @@ func newDbtCmd() *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy DEPLOYMENT-ID",
@@ -141,7 +141,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	return DeployBundle(deployBundleInput)
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDbtDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete DEPLOYMENT-ID",

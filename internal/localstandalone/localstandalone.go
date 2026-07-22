@@ -411,7 +411,7 @@ func (e *Engine) groupAlive(rec localstate.Record) bool {
 // killGroup signals the whole process group.
 func (e *Engine) killGroup(pgid int, sig syscall.Signal) {
 	if pgid > 0 {
-		_ = e.kill(-pgid, sig)
+		_ = e.kill(-pgid, sig) //nolint:errcheck // best-effort signal to the process group
 	}
 }
 

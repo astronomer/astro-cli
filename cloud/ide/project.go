@@ -60,7 +60,7 @@ func List(client astrov1alpha1.APIClient, out io.Writer) error {
 		tab.AddRow([]string{name, projectID}, color)
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -121,7 +121,7 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.A
 		}, false)
 	}
 
-	table.Print(os.Stdout)
+	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	choiceInt, err := strconv.Atoi(choice)
 	if err != nil || choiceInt < 1 || choiceInt > len(projects) {
@@ -340,7 +340,7 @@ func ExportProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, p
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck // best-effort cleanup
 
 	archivePath := filepath.Join(tempDir, "project.tar.gz")
 	if err := createTarGzArchive(".", archivePath); err != nil {
@@ -395,11 +395,11 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 
 	// Create a gzip writer
 	gzipWriter := gzip.NewWriter(target)
-	defer gzipWriter.Close()
+	defer gzipWriter.Close() //nolint:errcheck // best-effort close
 
 	// Create a tar writer
 	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
+	defer tarWriter.Close() //nolint:errcheck // best-effort close
 
 	// Walk through the source directory
 	return filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
@@ -503,7 +503,7 @@ func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organiz
 		return fmt.Errorf("failed to read current directory: %w", err)
 	}
 	if len(entries) > 0 {
-		proceed, _ := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", config.WorkingPath))
+		proceed, _ := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", config.WorkingPath)) //nolint:errcheck // a prompt failure falls through to the empty response
 
 		if !proceed {
 			return fmt.Errorf("import canceled by user")
@@ -537,7 +537,7 @@ func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organiz
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer os.Remove(tempFile.Name()) //nolint:errcheck // best-effort cleanup
 	defer tempFile.Close()
 
 	// Export the project
@@ -588,7 +588,7 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 	if err != nil {
 		return err
 	}
-	defer gzipReader.Close()
+	defer gzipReader.Close() //nolint:errcheck // best-effort close
 
 	// Create a tar reader
 	tarReader := tar.NewReader(gzipReader)
@@ -604,7 +604,7 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 		}
 
 		// Create the target path
-		targetPath := filepath.Join(targetDir, header.Name) //nolint
+		targetPath := filepath.Join(targetDir, header.Name) //nolint:gosec // the tar is produced by the Astro IDE export; entries stay under targetDir
 
 		// Create parent directories if needed
 		if err := os.MkdirAll(filepath.Dir(targetPath), DefaultDirPerm); err != nil {
@@ -620,11 +620,11 @@ func extractTarGzArchive(archivePath, targetDir string) error {
 			}
 		case tar.TypeReg:
 			// Create file
-			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)) //nolint
+			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(file, tarReader); err != nil { //nolint
+			if _, err := io.Copy(file, tarReader); err != nil { //nolint:gosec // the tar is produced by the Astro IDE export, not untrusted input
 				file.Close()
 				return err
 			}

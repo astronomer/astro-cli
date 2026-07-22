@@ -91,7 +91,7 @@ Upsert semantics: if not already linked, the link is created; if already linked,
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to link (required)")
 	cmd.Flags().StringVar(&envLinkValue, "value", "", "Override value to use for the linked deployment (only the linked deployment sees this value)")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Add to excludeLinks instead of links (auto-link only)")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.MarkFlagsMutuallyExclusive("value", "exclude")
 	return cmd
 }
@@ -108,7 +108,7 @@ func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
 	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Remove from excludeLinks instead of links")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

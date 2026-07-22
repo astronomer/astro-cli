@@ -22,6 +22,6 @@ func CreateTempProject() (dir string, cleanup func(), err error) {
 	}
 	return projectDir, func() {
 		configFile.Close()
-		os.RemoveAll(projectDir)
+		os.RemoveAll(projectDir) //nolint:errcheck // best-effort cleanup
 	}, nil
 }

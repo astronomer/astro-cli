@@ -225,9 +225,9 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	if localHoustonVersion >= "1.0.0" {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
-		_ = cmd.MarkFlagRequired("cluster-id")
+		_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	}
-	_ = cmd.MarkFlagRequired("label")
+	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -246,7 +246,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	// no-op. It is kept (hidden + deprecation notice) so existing scripts that
 	// pass --hard keep working; remove it in a future major release.
 	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deprecated: deletions always remove all infrastructure and records for the Deployment")
-	_ = cmd.Flags().MarkDeprecated("hard", "deletions are always hard deletes; the --hard flag no longer has any effect")
+	_ = cmd.Flags().MarkDeprecated("hard", "deletions are always hard deletes; the --hard flag no longer has any effect") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -268,9 +268,9 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
 	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
-	_ = cmd.MarkFlagRequired("cluster-id")
-	_ = cmd.MarkFlagRequired("name")
-	_ = cmd.MarkFlagRequired("namespace")
+	_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("name")       //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("namespace")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -285,7 +285,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the adopted Deployment to release")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -395,7 +395,7 @@ func newDeploymentAirflowRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade",
@@ -431,7 +431,7 @@ func newDeploymentRuntimeRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dupl
+func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"up"},
@@ -479,7 +479,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	if clusterID != "" {
-		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws})
+		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws}) //nolint:errcheck // error deliberately ignored in this v1 path
 	}
 
 	// Silence Usage as we have now validated command input
@@ -503,7 +503,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 
 	// If it's a dag_deploy type, validate from the user first
 	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
-		y, _ := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg)
+		y, _ := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !y {
 			fmt.Println("canceling deployment create..")
 			return nil
@@ -546,7 +546,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding.
-	i, _ := input.Confirm(cliDeploymentHardDeletePrompt)
+	i, _ := input.Confirm(cliDeploymentHardDeletePrompt) //nolint:errcheck // a prompt failure falls through to the empty response
 	if !i {
 		fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
 		return nil
@@ -581,7 +581,7 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	i, _ := input.Confirm(cliDeploymentUnadoptPrompt)
+	i, _ := input.Confirm(cliDeploymentUnadoptPrompt) //nolint:errcheck // a prompt failure falls through to the empty response
 	if !i {
 		fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
 		return nil
@@ -641,7 +641,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	if !skipPrompt {
 		// non dag_deploy to dag_deploy
 		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType && dagDeploymentType == houston.DagOnlyDeploymentType {
-			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg)
+			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg) //nolint:errcheck // a prompt failure falls through to the empty response
 			if !y {
 				fmt.Println("canceling deployment update..")
 				return nil
@@ -650,7 +650,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 		// dag_deploy to non dag_deploy
 		if deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType && dagDeploymentType != houston.DagOnlyDeploymentType {
-			y, _ := input.Confirm(UpdateDeploymentTypeFromDagDeployPromptMsg)
+			y, _ := input.Confirm(UpdateDeploymentTypeFromDagDeployPromptMsg) //nolint:errcheck // a prompt failure falls through to the empty response
 			if !y {
 				fmt.Println("canceling deployment update..")
 				return nil

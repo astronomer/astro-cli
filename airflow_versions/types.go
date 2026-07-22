@@ -77,7 +77,7 @@ func NewAirflowVersion(v string, tags []string) (*AirflowVersion, error) {
 
 	// get post_n1
 	m := AirflowVersionReg.FindStringSubmatch(v)
-	postN1, _ := strconv.ParseUint(m[8], 10, 64) //nolint:mnd
+	postN1, _ := strconv.ParseUint(m[8], 10, 64) //nolint:errcheck // m[8] is a digit run matched by the regex, so the parse cannot fail
 
 	av := AirflowVersion{
 		*semV,

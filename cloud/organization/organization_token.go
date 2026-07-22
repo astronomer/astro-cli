@@ -158,7 +158,7 @@ func selectTokens(apiTokens []astrov1.ApiToken) (astrov1.ApiToken, error) {
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := apiTokensMap[choice]
 	if !ok {
@@ -199,7 +199,7 @@ func listOrgScopedAPITokens(client astrov1.APIClient) ([]astrov1.ApiToken, error
 	return tokens, nil
 }
 
-func getOrganizationToken(id, name, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) { //nolint:gocognit
+func getOrganizationToken(id, name, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) {
 	switch {
 	case id == "" && name == "":
 		fmt.Println(message)
@@ -268,7 +268,7 @@ func ListTokens(client astrov1.APIClient, out io.Writer) error {
 			createdBy,
 		}, false)
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -326,7 +326,7 @@ func ListTokenRoles(id string, client astrov1.APIClient, out io.Writer) (err err
 	for _, r := range tokenRoles(apiToken) {
 		tab.AddRow([]string{string(r.EntityType), r.EntityId, r.Role}, false)
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -439,7 +439,7 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
-		i, _ := input.Confirm(
+		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 
 		if !i {
@@ -490,7 +490,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrov1.APIC
 		} else {
 			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Organization?", ansi.Bold(token.Name))
 		}
-		i, _ := input.Confirm(msg)
+		i, _ := input.Confirm(msg) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !i {
 			if isOrg {
 				fmt.Println("Canceling API Token deletion")
@@ -518,7 +518,7 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrov1.APIC
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24) //nolint:mnd
+	days := int(duration.Hours() / 24) //nolint:mnd // the value is clear from context
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 

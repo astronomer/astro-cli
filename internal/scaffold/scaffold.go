@@ -169,7 +169,6 @@ func renderManifest(name, version, depsLiteral string) (string, error) {
 // as skipped, so a rerun over a partial scaffold is safe. Greenfield and
 // import share it, so it appends to plain slices rather than a Result.
 func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) error {
-	//nolint:gosec // G301: see dirPerm
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return err
 	}
@@ -179,7 +178,6 @@ func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) 
 			*skipped = append(*skipped, d+"/")
 			continue
 		}
-		//nolint:gosec // G301: see dirPerm
 		if err := os.Mkdir(path, dirPerm); err != nil {
 			return fmt.Errorf("creating %s: %w", d, err)
 		}
@@ -197,7 +195,6 @@ func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) 
 			*skipped = append(*skipped, f.name)
 			continue
 		}
-		//nolint:gosec // G306: see filePerm
 		if err := os.WriteFile(path, []byte(f.content), filePerm); err != nil {
 			return fmt.Errorf("creating %s: %w", f.name, err)
 		}

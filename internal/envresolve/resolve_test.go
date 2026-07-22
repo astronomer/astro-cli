@@ -51,7 +51,7 @@ func TestResolveLayering(t *testing.T) {
 		}
 	}
 	vaultConn(t, store, ConnVaultKey(scope, "warehouse"),
-		connmodel.Connection{ConnID: "warehouse", ConnType: "postgres", ConnPassword: "s3cret"}) //nolint:gosec // G101: test fixture, not a real credential
+		connmodel.Connection{ConnID: "warehouse", ConnType: "postgres", ConnPassword: "s3cret"})
 
 	res, err := Resolve(Inputs{
 		Schema:  schema,
@@ -77,7 +77,7 @@ func TestResolveLayering(t *testing.T) {
 	// Env is the assembled Airflow process environment: each name under the
 	// env-var key Airflow reads, connection value passed through verbatim.
 	_, wantConn, _ := airflowenv.EncodeConnEnv(
-		connmodel.Connection{ConnID: "warehouse", ConnType: "postgres", ConnPassword: "s3cret"}) //nolint:gosec // G101: test fixture
+		connmodel.Connection{ConnID: "warehouse", ConnType: "postgres", ConnPassword: "s3cret"})
 	wantEnv := map[string]string{
 		"FROM_ENV":               "env-wins",
 		"FROM_SCOPED":            "scoped-wins",

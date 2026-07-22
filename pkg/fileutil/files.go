@@ -107,7 +107,7 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 	defer tarfile.Close()
 
 	tarball := tar.NewWriter(tarfile)
-	defer tarball.Close()
+	defer tarball.Close() //nolint:errcheck // best-effort close
 
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
@@ -220,7 +220,7 @@ func Contains(elems []string, param string) (exist bool, position int) {
 // This function finds all files of a specific extension
 func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 	var files []string
-	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck
+	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck // error deliberately ignored in this v1 path
 		if f != nil && !f.IsDir() {
 			r, err := regexp.MatchString(ext, f.Name())
 			if err == nil && r {
@@ -234,7 +234,7 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 }
 
 func AddLineToFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func AddLineToFile(filePath, lineText, commentText string) error {
 
 // This function removes airflow db init from the Dockerfile. Needed by astro run command
 func RemoveLineFromFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 		}
 		// Close the multipart writer to finalize the request
-		writer.Close()
+		writer.Close() //nolint:errcheck // best-effort close
 
 		headers := args.Headers
 		headers["Content-Type"] = writer.FormDataContentType()
@@ -348,8 +348,8 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 			continue
 		}
-		defer response.Body.Close() //nolint:gocritic
-		data, _ := io.ReadAll(response.Body)
+		defer response.Body.Close()          //nolint:gocritic // intentional in this v1 code
+		data, _ := io.ReadAll(response.Body) //nolint:errcheck // error deliberately ignored in this v1 path
 		responseStatusCode := response.StatusCode
 
 		// Return success for 2xx status code
@@ -359,8 +359,8 @@ func UploadFile(args *UploadFileArguments) error {
 			break
 		}
 
-		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"})
-		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData)) //nolint
+		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"}) //nolint:errcheck // error deliberately ignored in this v1 path
+		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData))
 
 		// don't retry for 4xx since it is a client side error
 		if responseStatusCode >= http.StatusBadRequest && responseStatusCode < http.StatusInternalServerError {
@@ -399,7 +399,7 @@ func GzipFile(srcFilePath, destFilePath string) error {
 
 	// Create a gzip writer on top of file writer
 	gzipWriter := gzip.NewWriter(destFile)
-	defer gzipWriter.Close()
+	defer gzipWriter.Close() //nolint:errcheck // best-effort close
 
 	// Copy contents of the file to the gzip writer
 	_, err = io.Copy(gzipWriter, srcFile)

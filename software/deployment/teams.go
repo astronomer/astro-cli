@@ -36,13 +36,13 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 		}
 	}
 
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
 
 // AddTeam adds a team to a deployment with specified role
-func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	_, err := houston.Call(client.AddDeploymentTeam)(houston.AddDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
@@ -55,13 +55,13 @@ func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, 
 	}
 	tab.AddRow([]string{deploymentID, teamID, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\nSuccessfully added team %s to deployment %s as a %s", teamID, deploymentID, role)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
 
 // UpdateTeam updates a team's deployment role
-func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
+func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	_, err := houston.Call(client.UpdateDeploymentTeamRole)(houston.UpdateDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 
 	tab.AddRow([]string{deploymentID, teamID, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated team %s to a %s", teamID, role)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -95,7 +95,7 @@ func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out
 
 	tab.AddRow([]string{deploymentID, teamID}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed team %s from deployment %s", teamID, deploymentID)
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }

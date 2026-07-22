@@ -44,7 +44,7 @@ func confirmTTY(prompt string) bool {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return false
 	}
-	ok, _ := input.Confirm(prompt)
+	ok, _ := input.Confirm(prompt) //nolint:errcheck // a prompt failure falls through to the empty response
 	return ok
 }
 

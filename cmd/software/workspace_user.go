@@ -50,7 +50,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&workspaceUserWsRole, "role", "r", houston.WorkspaceViewerRole, "Role assigned to user")
 	cmd.Flags().StringVarP(&workspaceUserCreateEmail, "email", "e", "", "Email of the user you wish to add to this workspace.")
-	_ = cmd.MarkFlagRequired("email")
+	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

@@ -1593,7 +1593,7 @@ func TestIsValidExecutor(t *testing.T) {
 	})
 
 	// Airflow 3 introduces AstroExecutor as a valid executor
-	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...) //nolint:gocritic
+	af3ValidExecutors := append(af3OnlyValidExecutors, af2ValidExecutors...) //nolint:gocritic // intentional in this v1 code
 	for _, executor := range af3ValidExecutors {
 		t.Run(fmt.Sprintf("returns true if executor is %s isAirflow3=true", executor), func(t *testing.T) {
 			actual := deployment.IsValidExecutor(executor, "3.0-1", "standard")

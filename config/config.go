@@ -39,14 +39,14 @@ var (
 	ConfigDir = ".astro"
 
 	// HomePath is the path to a users home directory
-	HomePath, _ = fileutil.GetHomeDir()
+	HomePath, _ = fileutil.GetHomeDir() //nolint:errcheck // error deliberately ignored in this v1 path
 	// HomeConfigPath is the path to the users global config directory
 	HomeConfigPath = filepath.Join(HomePath, ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
 
 	// WorkingPath is the path to the working directory
-	WorkingPath, _ = fileutil.GetWorkingDir()
+	WorkingPath, _ = fileutil.GetWorkingDir() //nolint:errcheck // error deliberately ignored in this v1 path
 
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
@@ -143,7 +143,7 @@ func initHome(fs afero.Fs) {
 	}
 
 	// If home config does not exist, create it
-	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs)
+	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs) //nolint:errcheck // treated as absent on error
 	if !homeConfigExists {
 		err := CreateConfig(viperHome, fs, HomeConfigPath, HomeConfigFile)
 		if err != nil {
@@ -175,7 +175,7 @@ func initProject(fs afero.Fs) {
 	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
 
 	// If path is empty or config file does not exist, just return
-	workingConfigExists, _ := fileutil.Exists(workingConfigFile, fs)
+	workingConfigExists, _ := fileutil.Exists(workingConfigFile, fs) //nolint:errcheck // treated as absent on error
 	if workingConfigPath == "" || workingConfigPath == HomeConfigPath || !workingConfigExists {
 		return
 	}
@@ -294,7 +294,7 @@ func saveConfig(v *viper.Viper, file string) error {
 	if !locked {
 		return fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
 	}
-	defer func() { _ = lock.Unlock() }()
+	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this v1 path
 
 	if err := v.WriteConfigAs(file); err != nil {
 		return fmt.Errorf("error saving config: %w", err)

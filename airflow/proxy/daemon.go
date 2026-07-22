@@ -152,12 +152,12 @@ func EnsureRunning(port string) (string, error) {
 		default:
 			// Version mismatch — restart the daemon
 			logger.Debugf("proxy daemon version %q doesn't match CLI version %q, restarting", ver, version.CurrVersion)
-			StopDaemon() //nolint:errcheck
+			StopDaemon() //nolint:errcheck // error deliberately ignored in this v1 path
 		}
 	}
 
 	// Clean up stale PID file
-	os.Remove(pidFilePath())
+	os.Remove(pidFilePath()) //nolint:errcheck // best-effort cleanup
 
 	return StartDaemon(port)
 }
@@ -195,7 +195,7 @@ func probeProxySignature(port string) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck // error deliberately ignored in this v1 path
 	return resp.Header.Get(pkgproxy.SignatureHeader) == pkgproxy.SignatureValue
 }
 
@@ -203,7 +203,7 @@ func probeProxySignature(port string) bool {
 // CLI's proxy daemon, which re-execs itself with ServeSubcommand. It's the
 // fallback for daemons that didn't record a port (older CLIs).
 var processLooksLikeProxy = func(pid int) bool {
-	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec
+	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec // reviewed; not a new risk in this v1 code
 	if err != nil {
 		return false
 	}
@@ -222,7 +222,7 @@ var StartDaemon = func(port string) (string, error) {
 
 	// Drop any port file from a previous daemon so the wait below can't
 	// read a stale port.
-	os.Remove(portFilePath())
+	os.Remove(portFilePath()) //nolint:errcheck // best-effort cleanup
 
 	logFile, err := os.OpenFile(logFilePath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, pkgproxy.FilePermRW)
 	if err != nil {
@@ -236,7 +236,7 @@ var StartDaemon = func(port string) (string, error) {
 		return "", fmt.Errorf("error finding CLI executable: %w", err)
 	}
 
-	cmd := exec.Command(exe, ServeSubcommand, "--port", port) //nolint:gosec
+	cmd := exec.Command(exe, ServeSubcommand, "--port", port)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -252,19 +252,19 @@ var StartDaemon = func(port string) (string, error) {
 
 	bound, err := waitForPortFile()
 	if err != nil {
-		syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck
-		cmd.Process.Release()              //nolint:errcheck
+		syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this v1 path
+		cmd.Process.Release()              //nolint:errcheck // error deliberately ignored in this v1 path
 		return "", fmt.Errorf("proxy daemon did not start: %w (see %s)", err, logFilePath())
 	}
 
 	if err := writePIDFile(pid, bound); err != nil {
-		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck
-		cmd.Process.Release()              //nolint:errcheck
+		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
+		cmd.Process.Release()              //nolint:errcheck // error deliberately ignored in this v1 path
 		return "", fmt.Errorf("error writing proxy PID file: %w", err)
 	}
 
 	// Release the process so it doesn't become a zombie
-	cmd.Process.Release() //nolint:errcheck
+	cmd.Process.Release() //nolint:errcheck // error deliberately ignored in this v1 path
 
 	logger.Debugf("proxy daemon started (PID %d) on port %s", pid, bound)
 	return bound, nil
@@ -320,7 +320,7 @@ func StopDaemon() error {
 	}
 
 	logger.Debugf("stopping proxy daemon (PID %d)", pid)
-	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck
+	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
 
 	// Poll for exit
 	deadline := time.Now().Add(stopTimeout)
@@ -333,15 +333,15 @@ func StopDaemon() error {
 	}
 
 	// Force kill
-	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck
+	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this v1 path
 	time.Sleep(stopPollWait)
 	removeDaemonFiles()
 	return nil
 }
 
 func removeDaemonFiles() {
-	os.Remove(pidFilePath())
-	os.Remove(portFilePath())
+	os.Remove(pidFilePath())  //nolint:errcheck // best-effort cleanup
+	os.Remove(portFilePath()) //nolint:errcheck // best-effort cleanup
 }
 
 // StopIfEmpty stops the proxy daemon if there are no active routes.
@@ -352,6 +352,6 @@ func StopIfEmpty() {
 	}
 	if len(routes) == 0 {
 		logger.Debugf("no active routes, stopping proxy daemon")
-		StopDaemon() //nolint:errcheck
+		StopDaemon() //nolint:errcheck // error deliberately ignored in this v1 path
 	}
 }

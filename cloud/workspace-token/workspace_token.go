@@ -138,7 +138,7 @@ func ListTokens(client astrov1.APIClient, workspaceID string, tokenTypes *[]Toke
 			createdBy,
 		}, false)
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	return nil
 }
@@ -281,7 +281,7 @@ func RotateToken(id, name, workspaceID string, cleanOutput, force bool, out io.W
 
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
-		i, _ := input.Confirm(
+		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 
 		if !i {
@@ -336,7 +336,7 @@ func DeleteToken(id, name, workspaceID string, force bool, out io.Writer, client
 		} else {
 			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Workspace?", ansi.Bold(token.Name))
 		}
-		i, _ := input.Confirm(msg)
+		i, _ := input.Confirm(msg) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !i {
 			if isWS {
 				fmt.Println("Canceling API Token deletion")
@@ -400,7 +400,7 @@ func selectTokens(workspaceID string, apiTokens []astrov1.ApiToken) (astrov1.Api
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 
 	selected, ok := apiTokensMap[choice]
@@ -459,7 +459,7 @@ func getWorkspaceTokens(workspaceID string, tokenTypes *[]TokenType, client astr
 	return filtered, nil
 }
 
-func getWorkspaceToken(id, name, workspaceID, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) { //nolint:gocognit
+func getWorkspaceToken(id, name, workspaceID, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) {
 	switch {
 	case id == "" && name == "":
 		fmt.Println(message)
@@ -501,7 +501,7 @@ func getWorkspaceToken(id, name, workspaceID, message string, tokens []astrov1.A
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24) //nolint:mnd
+	days := int(duration.Hours() / 24) //nolint:mnd // the value is clear from context
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 

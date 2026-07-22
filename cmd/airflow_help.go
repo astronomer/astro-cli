@@ -88,5 +88,5 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 
 // annotateFlag sets a group annotation on a flag for grouped help display.
 func annotateFlag(cmd *cobra.Command, name, group string) {
-	cmd.Flags().SetAnnotation(name, "group", []string{group}) //nolint:errcheck
+	cmd.Flags().SetAnnotation(name, "group", []string{group}) //nolint:errcheck // error deliberately ignored in this v1 path
 }

@@ -71,8 +71,8 @@ var (
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive // intentional in this v1 code
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive // intentional in this v1 code
 )
 
 var (
@@ -164,7 +164,7 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 		result = append(result, '\n')
 	}
 
-	return os.WriteFile(fullpath, result, 0o666) //nolint:gosec, mnd
+	return os.WriteFile(fullpath, result, 0o666) //nolint:gosec,mnd // rewrites the user's own .dockerignore in place
 }
 
 func shouldIncludeMonitoringDag(deploymentType astrov1.DeploymentType) bool {
@@ -192,7 +192,7 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 		}
 
 		// Remove the monitoring dag file after the upload
-		defer os.Remove(monitoringDagPath)
+		defer os.Remove(monitoringDagPath) //nolint:errcheck // best-effort cleanup
 	}
 
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
@@ -207,7 +207,7 @@ func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, dep
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error { //nolint
+func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error { //nolint:gocognit,gocyclo,gocritic // v1 complexity, refactor tracked separately
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -238,7 +238,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 	if deployInfo.cicdEnforcement {
 		if !canCiCdDeploy(c.Token) {
-			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name) //nolint
+			return fmt.Errorf(errCiCdEnforcementUpdate, deployInfo.name)
 		}
 	}
 
@@ -249,7 +249,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 	if deployInput.Image && !deployInfo.isRemoteExecutionEnabled {
 		if !deployInfo.dagDeployEnabled {
-			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID)
 		}
 	}
 
@@ -334,7 +334,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 	if deployInput.Dags {
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?") //nolint:errcheck // a prompt failure falls through to the empty response
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -354,14 +354,14 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		if !deployInfo.dagDeployEnabled {
-			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID)
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
 		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astrov1.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
-				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID)
 			}
 
 			return err
@@ -400,20 +400,20 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		)
 	} else {
 		fullpath := filepath.Join(deployInput.Path, ".dockerignore")
-		fileExist, _ := fileutil.Exists(fullpath, nil)
+		fileExist, _ := fileutil.Exists(fullpath, nil) //nolint:errcheck // treated as absent on error
 		if fileExist {
 			err := removeDagsFromDockerIgnore(fullpath)
 			if err != nil {
 				return errors.Wrap(err, "Found dags entry in .dockerignore file. Remove this entry and try again")
 			}
 		}
-		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
+		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil) //nolint:errcheck // treated as absent on error
 		if !envFileExists && deployInput.EnvFile != ".env" {
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?") //nolint:errcheck // a prompt failure falls through to the empty response
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -655,7 +655,7 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 	}, nil
 }
 
-func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) error {
+func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) (err error) {
 	fullpath := filepath.Join(path, ".dockerignore")
 
 	// Snapshot the original bytes so we can restore byte-for-byte after the build
@@ -667,16 +667,22 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 	}
 
 	defer func() {
+		var restoreErr error
 		if originalExisted {
-			_ = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd
+			restoreErr = os.WriteFile(fullpath, originalBytes, 0o644) //nolint:gosec,mnd // restore the user's own .dockerignore with its standard perms
 		} else {
-			_ = os.Remove(fullpath)
+			restoreErr = os.Remove(fullpath)
+		}
+		// A failed restore leaves the user's .dockerignore modified, so report
+		// it. Don't mask an earlier build error.
+		if restoreErr != nil && err == nil {
+			err = fmt.Errorf("restoring %s after build: %w", fullpath, restoreErr)
 		}
 	}()
 
 	switch {
 	case !originalExisted:
-		if err := os.WriteFile(fullpath, []byte("dags/\n"), 0o644); err != nil { //nolint:gosec,mnd
+		if err := os.WriteFile(fullpath, []byte("dags/\n"), 0o644); err != nil { //nolint:gosec,mnd // temporary .dockerignore for the dagless build, standard perms
 			return err
 		}
 	case !dockerignoreContainsDags(originalBytes):
@@ -685,7 +691,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 			modified = append(modified, '\n')
 		}
 		modified = append(modified, []byte("dags/\n")...)
-		if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd
+		if err := os.WriteFile(fullpath, modified, 0o644); err != nil { //nolint:gosec,mnd // rewrite the user's .dockerignore with its standard perms
 			return err
 		}
 	}
@@ -932,7 +938,7 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 
 	// Cleanup function to be called by the caller
 	cleanup := func() {
-		os.RemoveAll(tempBuildDir)
+		os.RemoveAll(tempBuildDir) //nolint:errcheck // best-effort cleanup
 	}
 
 	// Always return cleanup function if we created a temp directory, even on error
@@ -1048,7 +1054,7 @@ func setupClientDependencyFiles(buildDir string) error {
 }
 
 // DeployClientImage handles the client deploy functionality
-func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic
+func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this v1 code
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return errors.Wrap(err, "failed to get current context")
@@ -1172,7 +1178,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 
 // validateClientImageRuntimeVersion validates that the client image runtime version
 // is not newer than the deployment runtime version
-func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic
+func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this v1 code
 	// Skip validation if no deployment ID provided
 	if deployInput.DeploymentID == "" {
 		return nil

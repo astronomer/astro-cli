@@ -17,7 +17,7 @@ func Text(promptText string) string {
 	if promptText != "" {
 		fmt.Print(promptText)
 	}
-	text, _ := reader.ReadString('\n')
+	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this v1 path
 	return strings.Trim(text, "\r\n")
 }
 
@@ -26,14 +26,14 @@ func Confirm(promptText string) (bool, error) {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s (y/n) ", promptText)
 
-	text, _ := reader.ReadString('\n')
+	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this v1 path
 	return strings.Trim(text, "\r\n") == "y", nil
 }
 
 // Password requests a users passord, does not print out what they entered, and returns it
 func Password(promptText string) (string, error) {
 	fmt.Print(promptText)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin)) //nolint: unconvert
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin)) //nolint:unconvert // the int() is needed on Windows, where syscall.Stdin is a Handle
 	if err != nil {
 		return "", err
 	}

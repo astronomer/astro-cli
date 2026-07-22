@@ -85,8 +85,8 @@ func newEnvConnCreateCmd(out io.Writer) *cobra.Command {
 	}
 	connFlags(cmd)
 	addAutoLinkFlag(cmd)
-	_ = cmd.MarkFlagRequired("key")
-	_ = cmd.MarkFlagRequired("type")
+	_ = cmd.MarkFlagRequired("key")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("type") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -102,7 +102,7 @@ func newEnvConnUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	connUpdateFlags(cmd)
 	addAutoLinkFlag(cmd)
-	_ = cmd.MarkFlagRequired("type")
+	_ = cmd.MarkFlagRequired("type") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

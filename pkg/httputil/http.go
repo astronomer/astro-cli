@@ -129,7 +129,7 @@ func DownloadResponseToFile(sourceURL, path string) {
 			return nil
 		},
 	}
-	resp, err := client.Get(sourceURL) //nolint
+	resp, err := client.Get(sourceURL)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func DownloadResponseToFile(sourceURL, path string) {
 
 func RequestAndGetJSONBody(route string) map[string]interface{} {
 	client := &http.Client{Timeout: defaultHTTPTimeout}
-	res, err := client.Get(route) //nolint
+	res, err := client.Get(route)
 	if err != nil {
 		logger.Fatal(err)
 	}

@@ -369,7 +369,7 @@ func (a *airflow) Logs(ctx context.Context, opts localrt.LogOptions) error {
 			opts.OnLine(l)
 			return
 		}
-		fmt.Fprintln(opts.Writer, line) //nolint:errcheck // downstream writes surface on the stream's own error paths
+		fmt.Fprintln(opts.Writer, line)
 	}}
 	err := a.eng.cmd.Run(ctx, conn.env, localrt.Stdio{Out: w, Err: w}, conn.bin, args...)
 	w.Flush()

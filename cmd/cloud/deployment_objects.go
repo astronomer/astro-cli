@@ -75,7 +75,7 @@ func newDeploymentConnectionListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -105,7 +105,7 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -134,7 +134,7 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
@@ -193,7 +193,7 @@ func newDeploymentAirflowVariableListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -217,7 +217,7 @@ func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -240,7 +240,7 @@ func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
@@ -299,7 +299,7 @@ func newDeploymentPoolListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -324,7 +324,7 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -349,7 +349,7 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
@@ -372,7 +372,6 @@ func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl
 func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -456,7 +455,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.ConnectionUpdate(airflowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -498,7 +497,6 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	return deployment.CopyConnection(fromAirflowURL, toAirflowURL, airflowAPIClient, out)
 }
 
-//nolint:dupl
 func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -554,7 +552,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.VariableCreate(airflowURL, varValue, key, description, airflowAPIClient, out)
 }
 
-func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
+func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -582,7 +580,7 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error { 
 	return deployment.VariableUpdate(airflowURL, varValue, key, description, airflowAPIClient, out)
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -624,7 +622,6 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	return deployment.CopyVariable(fromAirflowURL, toAirflowURL, airflowAPIClient, out)
 }
 
-//nolint:dupl
 func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -648,7 +645,7 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 	return deployment.PoolList(airflowURL, airflowAPIClient, out)
 }
 
-func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
+func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -687,7 +684,7 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error { //nolint
 	return deployment.PoolCreate(airflowURL, name, description, slots, includeDeferredValue, airflowAPIClient, out)
 }
 
-func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
+func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -729,7 +726,6 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error { //nolint
 	return deployment.PoolUpdate(airflowURL, name, description, slots, includeDeferredValue, airflowAPIClient, out)
 }
 
-//nolint:dupl
 func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {

@@ -179,7 +179,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, astroV1Cli
 	return nil
 }
 
-func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}, error) { //nolint
+func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}, error) { //nolint:gocritic // signature kept as-is for this v1 code
 	deploymentURL, err := deployment.GetDeploymentURL(deploymentObj.Id, deploymentObj.WorkspaceId)
 	if err != nil {
 		return nil, err
@@ -352,7 +352,7 @@ func getQMap(deploymentPointer *astrov1.Deployment, sourceNodePools []astrov1.No
 	}
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
-	for _, queue := range sourceDeploymentQs { //nolint
+	for _, queue := range sourceDeploymentQs {
 		if *deploymentObj.Executor == astrov1.DeploymentExecutorCELERY || *deploymentObj.Executor == astrov1.DeploymentExecutorASTRO {
 			resources = map[string]interface{}{
 				"max_worker_count":   queue.MaxWorkerCount,

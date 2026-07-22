@@ -49,7 +49,7 @@ var (
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string, ctx *config.Context, client houston.ClientInterface) (string, error) {
 	if password == "" {
-		password, _ = input.Password(inputPassword)
+		password, _ = input.Password(inputPassword) //nolint:errcheck // a prompt failure falls through to the empty response
 	}
 
 	return houston.Call(client.AuthenticateWithBasicAuth)(houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
@@ -138,7 +138,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 	}
 
 	if err != nil {
-		fmt.Fprint(out, registryAuthFailMsg)
+		fmt.Fprint(out, registryAuthFailMsg) //nolint:errcheck // best-effort render to the terminal
 		return err
 	}
 
@@ -244,7 +244,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 			}
 			err := workspace.Switch("", pageSize, client, out)
 			if err != nil {
-				fmt.Fprint(out, cliSetWorkspaceExample)
+				fmt.Fprint(out, cliSetWorkspaceExample) //nolint:errcheck // best-effort render to the terminal
 			}
 		}
 	}

@@ -85,7 +85,6 @@ func ConnectionUpdate(airflowURL, connID, connType, description, host, login, pa
 	return nil
 }
 
-//nolint:dupl
 func CopyConnection(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
 	// get connectons from original Deployment
 	fromConnectionResp, err := airflowAPIClient.GetConnections(fromAirflowURL)
@@ -174,7 +173,7 @@ func VariableUpdate(airflowURL, value, key, description string, airflowAPIClient
 	return nil
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func CopyVariable(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
 	// get variables from original Deployment
 	fromVariableResp, err := airflowAPIClient.GetVariables(fromAirflowURL)
@@ -263,7 +262,7 @@ func PoolUpdate(airflowURL, name, description string, slots int, includeDeferred
 	return nil
 }
 
-//nolint:dupl
+//nolint:dupl // the duplication is acceptable here
 func CopyPool(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
 	// get Pools from original Deployment
 	fromPoolResp, err := airflowAPIClient.GetPools(fromAirflowURL)

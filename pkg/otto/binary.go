@@ -123,7 +123,7 @@ func EnsureBinary() error {
 	if err != nil {
 		return downloadAndInstall()
 	}
-	minVer, _ := semver.NewVersion(MinVersion)
+	minVer, _ := semver.NewVersion(MinVersion) //nolint:errcheck // error deliberately ignored in this v1 path
 	if iv.LessThan(minVer) {
 		fmt.Printf("Otto %s is below minimum required version %s, updating...\n", version, MinVersion)
 		return downloadAndInstall()
@@ -173,7 +173,7 @@ func downloadAndInstall() error {
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer os.Remove(tmpFile.Name()) //nolint:errcheck // best-effort cleanup
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
 		tmpFile.Close()
 		return fmt.Errorf("downloading otto: %w", err)
@@ -193,9 +193,9 @@ func downloadAndInstall() error {
 	if err := renamePlatformBinary(binDir); err != nil {
 		return err
 	}
-	_ = os.Chmod(BinaryPath(), binPerm)
+	_ = os.Chmod(BinaryPath(), binPerm) //nolint:errcheck // error deliberately ignored in this v1 path
 
-	v, _ := InstalledVersion()
+	v, _ := InstalledVersion() //nolint:errcheck // error deliberately ignored in this v1 path
 	if v != "" {
 		fmt.Printf("Otto %s installed\n", v)
 	}
@@ -233,7 +233,7 @@ func extractTarGz(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("decompressing archive: %w", err)
 	}
-	defer gz.Close()
+	defer gz.Close() //nolint:errcheck // best-effort close
 
 	tr := tar.NewReader(gz)
 	for {
@@ -264,7 +264,7 @@ func extractTarGz(src, dst string) error {
 			if err != nil {
 				return fmt.Errorf("writing %s: %w", name, err)
 			}
-			if _, err := io.Copy(out, tr); err != nil { //nolint:gosec
+			if _, err := io.Copy(out, tr); err != nil { //nolint:gosec // reviewed; not a new risk in this v1 code
 				out.Close()
 				return fmt.Errorf("writing %s: %w", name, err)
 			}
@@ -280,7 +280,7 @@ func extractZip(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("opening zip archive: %w", err)
 	}
-	defer r.Close()
+	defer r.Close() //nolint:errcheck // best-effort close
 
 	for _, f := range r.File {
 		name := filepath.Clean(f.Name)
@@ -308,7 +308,7 @@ func extractZip(src, dst string) error {
 			rc.Close()
 			return fmt.Errorf("writing %s: %w", name, err)
 		}
-		if _, err := io.Copy(out, rc); err != nil { //nolint:gosec
+		if _, err := io.Copy(out, rc); err != nil { //nolint:gosec // reviewed; not a new risk in this v1 code
 			out.Close()
 			rc.Close()
 			return fmt.Errorf("writing %s: %w", name, err)

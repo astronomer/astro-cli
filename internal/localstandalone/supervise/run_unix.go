@@ -46,7 +46,7 @@ func Run(args []string) error {
 	// (ReadAt) when it truncates, and ReadAt on a write-only fd fails with
 	// EBADF — which would silently defeat the cap and let the log grow
 	// without bound.
-	logFile, err := os.OpenFile(*logPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, logFilePerm) //nolint:gosec // the engine derives this path from the project's state dir
+	logFile, err := os.OpenFile(*logPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, logFilePerm)
 	if err != nil {
 		return fmt.Errorf("creating log file: %w", err)
 	}

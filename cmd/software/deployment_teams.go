@@ -37,7 +37,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage deployment team resources",
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to associate team to")
 	cmd.AddCommand(
 		newDeploymentTeamListCmd(out),
@@ -59,7 +59,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team to be added to deployment")
-	_ = cmd.MarkFlagRequired("team-id")
+	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "deployment role assigned to team")
 	return cmd
 }

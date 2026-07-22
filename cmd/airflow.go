@@ -263,7 +263,7 @@ func newAirflowInitCmd() *cobra.Command {
 
 	if _, err := context.GetCurrentContext(); err != nil && !avoidACFlag { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
-		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
+		_ = cmd.Flags().MarkHidden("use-astronomer-certified") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	}
 	return cmd
 }
@@ -306,7 +306,7 @@ func newAirflowUpgradeTestCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	_, err = context.GetCurrentContext()
 	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "Use an Astronomer Certified image instead of Astro Runtime. Use the airflow-version flag to specify your AC version.")
-		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
+		_ = cmd.Flags().MarkHidden("use-astronomer-certified") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	}
 
 	return cmd
@@ -575,7 +575,7 @@ func newObjectExportCmd() *cobra.Command {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,gocyclo
+func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 	name, err := ensureProjectName(args, projectName)
 	if err != nil {
 		return err
@@ -661,7 +661,7 @@ func airflowInit(cmd *cobra.Command, args []string) error { //nolint:gocognit,go
 	emptyDir := fileutil.IsEmptyDir(config.WorkingPath)
 
 	if !emptyDir && !forceInit {
-		i, _ := input.Confirm(
+		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
 			fmt.Sprintf("%s is not an empty directory. Are you sure you want to initialize a project here?", config.WorkingPath))
 
 		if !i {
@@ -728,7 +728,7 @@ func ensureProjectDirectory(args []string, workingPath, projectName string) (str
 
 	// If the project directory does not exist, create it.
 	if !projectDirExists {
-		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions)) //nolint:gosec
+		err := os.Mkdir(newProjectPath, os.FileMode(directoryPermissions))
 		if err != nil {
 			return "", err
 		}
@@ -769,7 +769,7 @@ func ensureProjectName(args []string, projectName string) (string, error) {
 	return projectName, nil
 }
 
-func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) error { //nolint:gocognit
+func airflowUpgradeTest(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	// Validate runtimeVersion and airflowVersion
 	if airflowVersion != "" && runtimeVersion != "" {
 		return errInvalidBothAirflowAndRuntimeVersionsUpgrade

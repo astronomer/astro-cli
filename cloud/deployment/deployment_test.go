@@ -720,10 +720,10 @@ func (s *Suite) TestIsDeploymentDedicated() {
 func (s *Suite) TestSelectRegion() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.Run("list regions failure", func() {
-		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint
+		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint:unconvert // explicit conversion kept for test readability
 		getSharedClusterOptionsParams := &astrov1.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint
+			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint:unconvert // explicit conversion kept for test readability
 		}
 
 		mockV1Client.On("GetClusterOptionsWithResponse", mock.Anything, mock.Anything, getSharedClusterOptionsParams).Return(nil, errMock).Once()
@@ -734,10 +734,10 @@ func (s *Suite) TestSelectRegion() {
 	})
 
 	s.Run("region via selection", func() {
-		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint
+		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint:unconvert // explicit conversion kept for test readability
 		getSharedClusterOptionsParams := &astrov1.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint
+			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint:unconvert // explicit conversion kept for test readability
 		}
 
 		mockOKRegionResponse := &astrov1.GetClusterOptionsResponse{
@@ -769,10 +769,10 @@ func (s *Suite) TestSelectRegion() {
 	})
 
 	s.Run("region via selection aws", func() {
-		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderAWS) //nolint
+		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderAWS) //nolint:unconvert // explicit conversion kept for test readability
 		getSharedClusterOptionsParams := &astrov1.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint
+			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint:unconvert // explicit conversion kept for test readability
 		}
 
 		mockOKRegionResponse := &astrov1.GetClusterOptionsResponse{
@@ -804,10 +804,10 @@ func (s *Suite) TestSelectRegion() {
 	})
 
 	s.Run("region invalid selection", func() {
-		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint
+		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint:unconvert // explicit conversion kept for test readability
 		getSharedClusterOptionsParams := &astrov1.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint
+			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint:unconvert // explicit conversion kept for test readability
 		}
 
 		mockOKRegionResponse := &astrov1.GetClusterOptionsResponse{
@@ -838,10 +838,10 @@ func (s *Suite) TestSelectRegion() {
 	})
 
 	s.Run("not able to find region", func() {
-		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint
+		provider := astrov1.GetClusterOptionsParamsProvider(astrov1.GetClusterOptionsParamsProviderGCP) //nolint:unconvert // explicit conversion kept for test readability
 		getSharedClusterOptionsParams := &astrov1.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint
+			Type:     astrov1.GetClusterOptionsParamsType(astrov1.GetClusterOptionsParamsTypeDEDICATED), //nolint:unconvert // explicit conversion kept for test readability
 		}
 
 		mockOKRegionResponse := &astrov1.GetClusterOptionsResponse{
@@ -1758,7 +1758,7 @@ func (s *Suite) TestCanCiCdDeploy() {
 	s.Equal(canDeploy, true)
 }
 
-func (s *Suite) TestUpdate() { //nolint
+func (s *Suite) TestUpdate() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cloudProvider := astrov1.DeploymentCloudProviderAZURE
 	astroMachine := "test-machine"

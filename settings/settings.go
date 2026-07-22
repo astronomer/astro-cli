@@ -29,7 +29,7 @@ var (
 	// ConfigFileType is the config file extension
 	ConfigFileType = "yaml"
 	// WorkingPath is the path to the working directory
-	WorkingPath, _ = fileutil.GetWorkingDir()
+	WorkingPath, _ = fileutil.GetWorkingDir() //nolint:errcheck // error deliberately ignored in this v1 path
 
 	// viperSettings is the viper object in a project directory
 	viperSettings *viper.Viper
@@ -138,7 +138,7 @@ func airflowAPIRequest(method, requestURL, authHeader string, body []byte) (resp
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
 	}
-	req, err := http.NewRequest(method, requestURL, bodyReader) //nolint:gosec
+	req, err := http.NewRequest(method, requestURL, bodyReader)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error creating request: %w", err)
 	}
@@ -154,7 +154,7 @@ func airflowAPIRequest(method, requestURL, authHeader string, body []byte) (resp
 		return nil, 0, fmt.Errorf("error making request to %s: %w", requestURL, err)
 	}
 	defer resp.Body.Close()
-	respBody, _ = io.ReadAll(resp.Body)
+	respBody, _ = io.ReadAll(resp.Body) //nolint:errcheck // error deliberately ignored in this v1 path
 	return respBody, resp.StatusCode, nil
 }
 
@@ -457,7 +457,7 @@ func EnvExportVariables(id, envFile string) error {
 			fmt.Printf("variable json decode unsuccessful: %s", err.Error())
 		}
 		// add variables to the env file; env file can hold secret values, so keep it owner-only
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd // the value is clear from context
 		if err != nil {
 			return errors.Wrap(err, "Writing variables to file unsuccessful")
 		}
@@ -498,7 +498,7 @@ func EnvExportConnections(id, envFile string) error {
 
 		vars := strings.Split(out, "\n")
 		// add connections to the env file; connection URIs contain passwords, so keep it owner-only
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
+		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd // the value is clear from context
 		if err != nil {
 			return errors.Wrap(err, "Writing connections to file unsuccessful")
 		}
@@ -506,7 +506,7 @@ func EnvExportConnections(id, envFile string) error {
 		defer f.Close()
 
 		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:mnd
+			varSplit := strings.SplitN(vars[i], "=", 2)
 			if len(varSplit) > 1 {
 				fmt.Println("Exporting Connection: " + varSplit[0])
 				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
@@ -577,7 +577,7 @@ func ExportConnections(id string) error {
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:mnd
+	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1]
 
 	var connections AirflowConnections
 
@@ -692,7 +692,7 @@ func ExportPools(id string) error {
 
 	var pools AirflowPools
 	// remove warnings and extra text from the the output
-	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1] //nolint:mnd
+	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1]
 
 	err = yaml.Unmarshal([]byte(yamlpools), &pools)
 	if err != nil {

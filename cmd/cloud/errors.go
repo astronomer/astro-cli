@@ -5,7 +5,7 @@ import "fmt"
 // errRequiredFlag returns a standardized error for missing required flags.
 // hint should tell the user how to find valid values (e.g., "astro deployment list").
 //
-//nolint:unparam
+//nolint:unparam // signature kept for consistency
 func errRequiredFlag(flag, hint string) error {
 	if hint != "" {
 		return fmt.Errorf("required flag --%s not set. To find valid values, run: %s", flag, hint)

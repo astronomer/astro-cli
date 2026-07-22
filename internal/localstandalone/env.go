@@ -123,14 +123,14 @@ const (
 // running server, `astro local run`, the shell — on the same signing key.
 func jwtSecret(stateDir string) string {
 	path := filepath.Join(stateDir, jwtSecretFile)
-	if data, err := os.ReadFile(path); err == nil && len(data) > 0 { //nolint:gosec // the engine derives this path from the project's state dir
+	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
 		return string(data)
 	}
 
 	b := make([]byte, jwtSecretBytes)
 	_, _ = rand.Read(b)
 	secret := base64.RawURLEncoding.EncodeToString(b)
-	_ = os.WriteFile(path, []byte(secret), secretFilePerm)
+	_ = os.WriteFile(path, []byte(secret), secretFilePerm) //nolint:errcheck // best-effort persistence; a failed write just regenerates the secret next run
 	return secret
 }
 

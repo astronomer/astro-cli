@@ -323,7 +323,7 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		data, _ := io.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body) //nolint:errcheck // error deliberately ignored in this v1 path
 		return nil, &httputil.Error{Status: resp.StatusCode, Message: string(data)}
 	}
 

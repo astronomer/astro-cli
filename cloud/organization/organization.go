@@ -170,7 +170,7 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 
 		deployMap[strconv.Itoa(index)] = or[i]
 	}
-	tab.Print(out)
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
@@ -181,19 +181,27 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 }
 
 func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Client astrov1.APIClient, out io.Writer) error {
-	c, _ := context.GetCurrentContext()
+	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 
 	// reset org context
 	orgProduct := "HYBRID"
 	if targetOrg.Product != nil {
-		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint
+		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint:staticcheck // renders the typed Product enum as a plain string
 	}
-	_ = c.SetOrganizationContext(targetOrg.Id, orgProduct)
-	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
-	_ = c.SetContextKey("token", c.Token)
-	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
-	_ = c.SetContextKey("user_email", c.UserEmail)
-	c, _ = context.GetCurrentContext()
+	if err := c.SetOrganizationContext(targetOrg.Id, orgProduct); err != nil {
+		return err
+	}
+	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106
+	if err := c.SetContextKey("token", c.Token); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("refreshtoken", c.RefreshToken); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("user_email", c.UserEmail); err != nil {
+		return err
+	}
+	c, _ = context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 	// call check user session which will trigger workspace switcher flow
 	err := CheckUserSession(&c, astroV1Client, out)
 	if err != nil {
@@ -342,7 +350,7 @@ func pluralize(count int) string {
 }
 
 func IsOrgHosted() bool {
-	c, _ := context.GetCurrentContext()
+	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 	return c.OrganizationProduct == "HOSTED"
 }
 

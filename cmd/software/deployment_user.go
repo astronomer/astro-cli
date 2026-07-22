@@ -64,12 +64,12 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentUserID, "user-id", "u", "", "ID of the user to search for")
 	cmd.Flags().StringVarP(&deploymentUserEmail, "email", "e", "", "Email of the user to search for")
 	cmd.Flags().StringVarP(&deploymentUserFullname, "name", "n", "", "Full name of the user to search for")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
 	return cmd
 }
 
-func newDeploymentUserAddCmd(out io.Writer) *cobra.Command { //nolint:dupl
+func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add",
 		Short:   "Add a user to a Deployment",
@@ -83,13 +83,13 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	cmd.Flags().StringVarP(&deploymentUserEmail, "email", "e", "", "Email of the user to add to the Deployment")
 
-	_ = cmd.MarkFlagRequired("deployment-id")
-	_ = cmd.MarkFlagRequired("email")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("email")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
 	return cmd
 }
 
-func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command { //nolint:dupl
+func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove [email]",
 		Short:   "Remove a user from a Deployment",
@@ -101,11 +101,11 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command { //nolint:dupl
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment where you want to remove the user")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
-func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command { //nolint:dupl
+func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [email]",
 		Short:   "Update a user's role for a deployment",
@@ -118,7 +118,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment where you want to update the user")
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

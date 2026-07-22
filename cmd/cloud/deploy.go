@@ -87,26 +87,26 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy DAGs to a named DAG bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
-	cmd.Flags().MarkHidden("dag-bundle-name") //nolint:errcheck
+	cmd.Flags().MarkHidden("dag-bundle-name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
+	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
-	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "this flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck
+	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "this flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-DAG bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
 	cmd.Flags().StringVar(&nonDagsMountPath, "non-dags-mount-path", "", "Path to mount the non-DAG bundle in Airflow, for reference by DAGs. Used with --non-dags")
 	cmd.Flags().StringVar(&nonDagsBundleType, "non-dags-bundle-type", "none", "Free-form label identifying the kind of non-DAG bundle (e.g. dbt). Any value is accepted. Defaults to \"none\". Used with --non-dags")
 	cmd.Flags().StringVar(&nonDagsBundlePath, "non-dags-local-path", "", "Path to the non-DAG bundle to deploy. Default current directory. Used with --non-dags")
-	cmd.Flags().MarkHidden(nonDagsFlag)            //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-mount-path")  //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-bundle-type") //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-local-path")  //nolint:errcheck
+	cmd.Flags().MarkHidden(nonDagsFlag)            //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.Flags().MarkHidden("non-dags-mount-path")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.Flags().MarkHidden("non-dags-bundle-type") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.Flags().MarkHidden("non-dags-local-path")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
 	annotateDeployFlag(cmd, "image", "image")
 	annotateDeployFlag(cmd, imageNameFlag, "image")

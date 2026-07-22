@@ -176,7 +176,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project) (map[string]string,
 func openVault() secrets.Store {
 	home := os.Getenv("ASTRO_HOME")
 	if home == "" {
-		home, _ = os.UserHomeDir()
+		home, _ = os.UserHomeDir() //nolint:errcheck // a lookup failure degrades to env-only resolution, per the doc above
 	}
 	store, err := secrets.NewKeyringStore(secrets.Config{
 		Service: secrets.DefaultService,

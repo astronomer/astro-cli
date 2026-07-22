@@ -45,12 +45,13 @@ const (
 	HostedDedicated = "HOSTED_DEDICATED"
 	HostedStandard  = "HOSTED_STANDARD"
 	HostedShared    = "HOSTED_SHARED"
+	standardType    = "STANDARD"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
+func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 	var (
 		err                                           error
 		errHelp, clusterID, workspaceID, outputFormat string
@@ -107,7 +108,7 @@ func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, o
 	}
 	if action == createAction {
 		// get correct value for dag deploy
-		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
 			if organization.IsOrgHosted() {
 				dagDeploy = true
 			} else {
@@ -155,7 +156,7 @@ func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, o
 		}
 		workspaceID = existingDeployment.WorkspaceId
 		// determine dagDeploy
-		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil { //nolint:staticcheck
+		if formattedDeployment.Deployment.Configuration.DagDeployEnabled == nil {
 			dagDeploy = existingDeployment.IsDagDeployEnabled
 		} else {
 			dagDeploy = *formattedDeployment.Deployment.Configuration.DagDeployEnabled
@@ -192,9 +193,7 @@ func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, o
 // It returns an error if getting default options fail.
 // It returns an error if worker-queue options are not valid.
 // It returns an error if node pool id could not be found for the worker type.
-//
-//nolint:dupl
-func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astrov1.Deployment, nodePools []astrov1.NodePool, dagDeploy bool, envVars []astrov1.DeploymentEnvironmentVariableRequest, astroV1Client astrov1.APIClient, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint
+func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astrov1.Deployment, nodePools []astrov1.NodePool, dagDeploy bool, envVars []astrov1.DeploymentEnvironmentVariableRequest, astroV1Client astrov1.APIClient, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 	var (
 		defaultOptions          astrov1.WorkerQueueOptions
 		configOptions           astrov1.DeploymentOptions
@@ -726,7 +725,7 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 			if !canCiCdDeploy(c.Token) {
 				fmt.Printf("\nWarning: You are trying to update dag deploy setting on a deployment with ci-cd enforcement enabled. You will not be able to deploy your dags using the CLI and that dags will not be visible in the UI and new tasks will not start." +
 					"\nEither disable ci-cd enforcement or please cancel this operation and use API Tokens instead.")
-				y, _ := input.Confirm("\n\nAre you sure you want to continue?")
+				y, _ := input.Confirm("\n\nAre you sure you want to continue?") //nolint:errcheck // a prompt failure falls through to the empty response
 
 				if !y {
 					fmt.Println("Canceling Deployment update")
@@ -862,7 +861,7 @@ func getClusterInfoFromName(clusterName, organizationID string, astroV1Client as
 		return "", nil, err
 	}
 
-	for _, cluster := range existingClusters { //nolint
+	for _, cluster := range existingClusters { //nolint:gocritic // the range copy is fine for this v1 loop
 		if cluster.Name == clusterName {
 			if cluster.NodePools != nil {
 				nodePools = *cluster.NodePools
@@ -901,7 +900,7 @@ func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []ast
 	if workerType == "" {
 		return nodePools[0].Id, nil
 	}
-	for i := range nodePools { //nolint
+	for i := range nodePools {
 		if nodePools[i].NodeInstanceType == workerType {
 			return nodePools[i].Id, nil
 		}
@@ -1052,7 +1051,7 @@ func transformDeploymentType(deploymentType string) astrov1.DeploymentType {
 	var transformedDeploymentType astrov1.DeploymentType
 
 	switch strings.ToUpper(deploymentType) {
-	case "STANDARD":
+	case standardType:
 		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD
 	case HostedShared:
 		transformedDeploymentType = astrov1.DeploymentTypeSTANDARD

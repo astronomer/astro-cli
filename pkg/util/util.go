@@ -136,7 +136,7 @@ func StripOutKeysFromJSONByteArray(jsonData []byte, keys []string) ([]byte, erro
 	for _, key := range keys {
 		delete(jsonDataStruct, key)
 	}
-	resultJSON, _ := json.Marshal(jsonDataStruct)
+	resultJSON, _ := json.Marshal(jsonDataStruct) //nolint:errcheck // marshaling a plain struct that does not error in practice
 	return resultJSON, nil
 }
 

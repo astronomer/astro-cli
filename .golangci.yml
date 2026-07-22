@@ -9,6 +9,7 @@ linters:
     - dupl
     - errcheck
     - exhaustive
+    - forbidigo
     - gocognit
     - goconst
     - gocritic
@@ -27,6 +28,24 @@ linters:
     - unused
     - whitespace
   settings:
+    errcheck:
+      # Flag `_ = f()` too, not just unchecked returns. The exclusions below
+      # cover the writes that genuinely cannot fail in a way we can act on.
+      check-blank: true
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Print
+        - fmt.Printf
+        - fmt.Println
+        - fmt.Fprintf
+        - fmt.Fprintln
+    forbidigo:
+      forbid:
+        - pattern: '^fmt\.Print(f|ln)?$'
+        - pattern: '^os\.Exit$'
+        - pattern: '^log\.(Fatal|Fatalf|Fatalln|Panic|Panicf|Panicln)$'
+      analyze-types: true
     dupl:
       threshold: 100
     goconst:
@@ -70,9 +89,9 @@ linters:
         - "10"
         - "64"
     nolintlint:
-      require-explanation: false
-      require-specific: false
-      allow-unused: true
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
     staticcheck:
       checks:
         - all
@@ -84,8 +103,18 @@ linters:
       - comments
       - common-false-positives
       - legacy
-      - std-error-handling
     rules:
+      # forbidigo backs up the archlint go test (internal/archlint): below the
+      # cmd/ layer, v2 packages must report through callbacks and return errors,
+      # not print/exit/log-fatal. Scope it to the v2 packages archlint guards
+      # that live in this module, so it stays a lint-time guard for v2 and never
+      # fires on the v1 tree, which prints by design. The v2 pkg/* modules have
+      # their own go.mod and aren't reached by a root run, so archlint (which
+      # walks the tree) is their only guard.
+      # Keep this list in sync with v2BelowCmd in internal/archlint/archlint_test.go
+      # when a new internal/ v2 package lands.
+      - linters: [forbidigo]
+        path-except: ^internal/(checks|envresolve|fsatomic|localdocker|localprune|localshared|localstandalone|localstate|plan|project|scaffold|userstate)/
       - linters:
           - dupl
           - errcheck

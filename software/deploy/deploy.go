@@ -43,14 +43,14 @@ var (
 	errNoDomainSet               = errors.New("no domain set, re-authenticate")
 	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
 	errDeploymentNotFound        = errors.New("no airflow deployments found")
-	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
+	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n")
 	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
 	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
 	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your Astronomer cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
-	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
+	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host")
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
 	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
@@ -86,7 +86,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		return deploymentID, err
 	}
 
-	c, _ := config.GetCurrentContext()
+	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 	cloudDomain := c.Domain
 	nextTag := ""
 	releaseName := ""
@@ -177,7 +177,7 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	vars := make(map[string]interface{})
 	vars["clusterId"] = deploymentInfo.ClusterID
 	// ignoring the error as user can be connected to platform where runtime is not enabled
-	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)(vars)
+	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)(vars) //nolint:errcheck // error deliberately ignored in this v1 path
 	var validTags string
 	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
 		validTags = strings.Join(deploymentConfig.GetValidTags(tag), ", ")
@@ -193,7 +193,7 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 			msg = fmt.Sprintf(warningInvalidNameTagEmptyRecommendations, tag)
 		}
 
-		i, _ := input.Confirm(msg)
+		i, _ := input.Confirm(msg) //nolint:errcheck // a prompt failure falls through to the empty response
 		if !i {
 			fmt.Println("Canceling deploy...")
 			os.Exit(1)
@@ -231,7 +231,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
 		token = c.Token
-		platformVersion, _ := houstonClient.GetPlatformVersion(nil)
+		platformVersion, _ := houstonClient.GetPlatformVersion(nil) //nolint:errcheck // error deliberately ignored in this v1 path
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			var err error
 			registry, err = getDeploymentRegistryURL(deploymentInfo.Urls)
@@ -270,8 +270,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		if useShaAsTag {
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
 		}
-		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel)
-		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)
+		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel) //nolint:errcheck // error deliberately ignored in this v1 path
+		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel) //nolint:errcheck // error deliberately ignored in this v1 path
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
 		_, err = houston.Call(houstonClient.UpdateDeploymentImage)(req)
 		return err
@@ -433,7 +433,7 @@ func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsI
 			deployMap[strconv.Itoa(index)] = deployment
 		}
 
-		tab.Print(os.Stdout)
+		tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
 		choice := input.Text("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
@@ -569,7 +569,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 
 	// Alert the user if dags folder is empty
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?") //nolint:errcheck // a prompt failure falls through to the empty response
 		if !i {
 			return ErrEmptyDagFolderUserCancelledOperation
 		}
@@ -581,7 +581,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		return err
 	}
 	if cleanUpFiles {
-		defer os.Remove(dagsTarPath)
+		defer os.Remove(dagsTarPath) //nolint:errcheck // best-effort cleanup
 	}
 
 	// Gzip the tar
@@ -590,10 +590,10 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		return err
 	}
 	if cleanUpFiles {
-		defer os.Remove(dagsTarGzPath)
+		defer os.Remove(dagsTarGzPath) //nolint:errcheck // best-effort cleanup
 	}
 
-	c, _ := config.GetCurrentContext()
+	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 
 	headers := map[string]string{
 		"authorization": c.Token,

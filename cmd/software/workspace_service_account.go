@@ -41,7 +41,7 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
+func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
@@ -57,7 +57,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd.Flags().StringVarP(&workspaceSACategory, "category", "c", "default", "Category of the new service account")
 	cmd.Flags().StringVarP(&workspaceSALabel, "label", "l", "", "Label of the new service account")
 	cmd.Flags().StringVarP(&workspaceSARole, "role", "r", houston.WorkspaceViewerRole, "Role (permissions) attached to the created service account")
-	_ = cmd.MarkFlagRequired("label")
+	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

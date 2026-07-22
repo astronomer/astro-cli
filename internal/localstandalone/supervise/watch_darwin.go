@@ -16,10 +16,11 @@ func waitForProcessExit(pid int) {
 		pollProcessExit(pid)
 		return
 	}
-	defer func() { _ = syscall.Close(kq) }()
+	defer func() { _ = syscall.Close(kq) }() //nolint:errcheck // best-effort close of the kqueue fd
 
 	ev := syscall.Kevent_t{
-		Ident:  uint64(pid), //nolint:gosec // pid is always a positive int from the caller; kevent requires uint64
+		// pid is always a positive int from the caller; kevent requires uint64.
+		Ident:  uint64(pid),
 		Filter: syscall.EVFILT_PROC,
 		Flags:  syscall.EV_ADD | syscall.EV_ENABLE | syscall.EV_ONESHOT,
 		Fflags: syscall.NOTE_EXIT,

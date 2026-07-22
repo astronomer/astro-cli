@@ -43,7 +43,7 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
+func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
@@ -58,8 +58,8 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the Service Account")
 	cmd.Flags().StringVarP(&deploymentSACreateLabel, "label", "l", "", "Label of the Service Account")
 	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the Service Account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
-	_ = cmd.MarkFlagRequired("label")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("label")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -75,7 +75,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage Service Accounts")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
@@ -92,7 +92,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage Service Accounts")
-	_ = cmd.MarkFlagRequired("deployment-id")
+	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

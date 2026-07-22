@@ -46,7 +46,7 @@ func GetAnonymousID() string {
 		return existingID
 	}
 	newID := sharedtel.NewAnonymousID()
-	_ = config.CFG.TelemetryAnonymousID.SetHomeString(newID)
+	_ = config.CFG.TelemetryAnonymousID.SetHomeString(newID) //nolint:errcheck // best-effort telemetry write
 	return newID
 }
 
@@ -75,7 +75,7 @@ func showFirstRunNotice() {
 		"The Astro CLI now collects anonymous usage data to help us prioritize and invest in CLI features.\n"+
 			"Only commands, OS, and CLI version are tracked — no personal information is collected.\n"+
 			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
-	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
+	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true") //nolint:errcheck // best-effort telemetry write
 }
 
 // buildCommandProperties constructs the telemetry property map for a command.
@@ -173,7 +173,7 @@ func isDebugMode() bool {
 
 // sendDebug sends telemetry synchronously and prints debug output
 func sendDebug(payload sharedtel.TelemetryPayload, apiURL string) {
-	body, _ := json.MarshalIndent(payload, "", "  ")
+	body, _ := json.MarshalIndent(payload, "", "  ") //nolint:errcheck // marshaling a plain struct that does not error in practice
 	fmt.Fprintf(os.Stderr, "[telemetry] POST %s\n%s\n", apiURL, body)
 
 	status, err := sharedtel.Send(payload, apiURL)
@@ -218,6 +218,6 @@ func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL string) {
 	}
 
 	if cmd.Process != nil {
-		_ = cmd.Process.Release()
+		_ = cmd.Process.Release() //nolint:errcheck // error deliberately ignored in this v1 path
 	}
 }

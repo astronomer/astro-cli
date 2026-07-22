@@ -14,7 +14,7 @@ type APIClient = ClientWithResponsesInterface
 
 // NewV1Client creates an API client for the Astro v1 public API.
 func NewV1Client(c *httputil.HTTPClient) *ClientWithResponses {
-	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) {
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) { //nolint:errcheck // error deliberately ignored in this v1 path
 		ctx, err := context.GetCurrentContext()
 		if err != nil {
 			return "", "", err

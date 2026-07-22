@@ -246,7 +246,7 @@ func (s *Standalone) printLoginHint(bullet string) {
 
 // Start runs airflow standalone locally without Docker.
 //
-//nolint:gocognit,gocyclo
+//nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 func (s *Standalone) Start(opts *types.StartOptions) error {
 	settingsFile := opts.SettingsFile
 	waitTime := opts.WaitTime
@@ -395,7 +395,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 
 	// Step 2: Install user requirements with only airflow/sdk version locks
 	requirementsPath := filepath.Join(s.airflowHome, "requirements.txt")
-	if exists, _ := fileutil.Exists(requirementsPath, nil); exists {
+	if exists, _ := fileutil.Exists(requirementsPath, nil); exists { //nolint:errcheck // treated as absent on error
 		userInstallArgs := []string{
 			"pip", "install",
 			"--python", venvPython,
@@ -456,9 +456,9 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 		}
 
 		pythonBin := filepath.Join(venvBin, "python")
-		cmd = exec.Command(pythonBin, shimPath) //nolint:gosec
+		cmd = exec.Command(pythonBin, shimPath)
 	} else {
-		cmd = exec.Command(airflowBin, "standalone") //nolint:gosec
+		cmd = exec.Command(airflowBin, "standalone")
 	}
 	cmd.Dir = s.airflowHome
 	cmd.Env = env
@@ -497,7 +497,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 		select {
 		case <-sigChan:
 			if cmd.Process != nil {
-				syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+				syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
 			}
 		case <-done:
 		}
@@ -508,7 +508,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(2) //nolint:mnd
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		scanner := bufio.NewScanner(stdout)
@@ -596,12 +596,12 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	// usage the CLI exits right after Start() returns and the child is
 	// reparented to init, but during tests (or if the parent stays alive)
 	// an un-reaped child would appear alive to signal-0 checks in Stop().
-	go cmd.Wait() //nolint:errcheck
+	go cmd.Wait() //nolint:errcheck // error deliberately ignored in this v1 path
 
 	err = os.WriteFile(s.pidFilePath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), filePermissions)
 	if err != nil {
 		// Kill the process if we can't write the PID file
-		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
 		return fmt.Errorf("error writing PID file: %w", err)
 	}
 	// Run health check (blocking — wait for healthy or timeout)
@@ -854,7 +854,7 @@ func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, er
 	env := s.buildEnv()
 
 	// Use system bash — Python venvs don't include bash; venv bin/ is on PATH.
-	cmd := exec.Command("bash", "-c", command) //nolint:gosec
+	cmd := exec.Command("bash", "-c", command)
 	cmd.Dir = s.airflowHome
 	cmd.Env = env
 
@@ -883,13 +883,13 @@ func (s *Standalone) Stop(_ bool) error {
 
 	if !alive {
 		// Stale PID file — clean up
-		os.Remove(s.pidFilePath())
+		os.Remove(s.pidFilePath()) //nolint:errcheck // best-effort cleanup
 		fmt.Println("No standalone Airflow process found (cleaned up stale PID file).")
 		return nil
 	}
 
 	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
-	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
+	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
 
 	// Poll for process exit
 	deadline := time.Now().Add(stopTimeout)
@@ -902,11 +902,11 @@ func (s *Standalone) Stop(_ bool) error {
 
 	// If still alive, send SIGKILL
 	if _, stillAlive := s.readPID(); stillAlive {
-		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
+		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this v1 path
 		time.Sleep(stopPollInterval)
 	}
 
-	os.Remove(s.pidFilePath())
+	os.Remove(s.pidFilePath()) //nolint:errcheck // best-effort cleanup
 	fmt.Println("Airflow standalone stopped.")
 	return nil
 }
@@ -931,7 +931,7 @@ func (s *Standalone) removeProxyRoute() {
 
 // Kill stops a running process (if any) and cleans up standalone state files.
 func (s *Standalone) Kill() error {
-	s.Stop(false) //nolint:errcheck
+	s.Stop(false) //nolint:errcheck // error deliberately ignored in this v1 path
 
 	sp := spinner.NewSpinner("Cleaning up standalone environment…")
 	sp.Start()
@@ -943,8 +943,8 @@ func (s *Standalone) Kill() error {
 	}
 
 	for _, p := range pathsToRemove {
-		if exists, _ := fileutil.Exists(p, nil); exists {
-			os.RemoveAll(p)
+		if exists, _ := fileutil.Exists(p, nil); exists { //nolint:errcheck // treated as absent on error
+			os.RemoveAll(p) //nolint:errcheck // best-effort cleanup
 		}
 	}
 
@@ -1258,7 +1258,7 @@ func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string
 // execCommand runs a command in the given directory.
 // Output is suppressed unless verbose (debug) logging is enabled.
 func execCommand(dir, name string, args ...string) error {
-	cmd := exec.Command(name, args...) //nolint:gosec
+	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	if logger.IsLevelEnabled(logrus.DebugLevel) {
 		cmd.Stdout = os.Stdout
