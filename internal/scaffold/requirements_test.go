@@ -39,9 +39,40 @@ pandas[performance]==2.2.0 ; python_version >= "3.11"
 func TestParseRequirementsJoinsContinuations(t *testing.T) {
 	lines := parseRequirements([]byte("flask==2.0 \\\n    --hash=sha256:abc\n"))
 	require.Len(t, lines, 1)
-	assert.Equal(t, reqDependency, lines[0].kind)
+	// A --hash pin is not PEP 508; the folded line is carried as a comment, not
+	// emitted as a dependency uv would reject. Both halves survive verbatim.
+	assert.Equal(t, reqCarried, lines[0].kind)
 	assert.Contains(t, lines[0].text, "flask==2.0")
 	assert.Contains(t, lines[0].text, "--hash")
+}
+
+func TestClassifierCarriesNonRequirements(t *testing.T) {
+	// Shapes that are not resolvable PEP 508 requirements must be carried as
+	// comments, never emitted as dependencies uv would reject.
+	carried := []string{
+		"git+https://github.com/example/pkg.git",
+		"https://example.test/pkg-1.0-py3-none-any.whl",
+		"pkg==1.0 --hash=sha256:abc123",
+		"this is not a requirement",
+	}
+	for _, line := range carried {
+		lines := parseRequirements([]byte(line + "\n"))
+		require.Len(t, lines, 1, line)
+		assert.Equal(t, reqCarried, lines[0].kind, "should carry: %q", line)
+	}
+
+	// Real requirements, including a named direct reference, stay dependencies.
+	deps := []string{
+		"requests",
+		"flask>=2.0,<3",
+		"pandas[performance]==2.2.0 ; python_version >= \"3.11\"",
+		"pkg @ https://example.test/pkg-1.0.tar.gz",
+	}
+	for _, line := range deps {
+		lines := parseRequirements([]byte(line + "\n"))
+		require.Len(t, lines, 1, line)
+		assert.Equal(t, reqDependency, lines[0].kind, "should stay a dependency: %q", line)
+	}
 }
 
 func TestRenderDependenciesPreservesCommentsAndParses(t *testing.T) {

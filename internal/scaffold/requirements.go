@@ -59,11 +59,13 @@ func parseRequirements(data []byte) []reqLine {
 			case spec == "":
 				// The content was only an inline comment.
 				out = append(out, reqLine{kind: reqComment, text: inline})
-			case startsAlnum(spec):
+			case isRequirement(spec):
 				out = append(out, reqLine{kind: reqDependency, text: spec, inline: inline})
 			default:
-				// A pip option (-r, -e, --index-url) or a garbage line: we
-				// cannot express it as a dependency, so carry it as a comment.
+				// A pip option (-r, -e, --index-url), a bare URL, a --hash pin,
+				// or a garbage line: we cannot express it as a PEP 508
+				// dependency, so carry it as a comment instead of emitting a
+				// requirement uv would reject.
 				out = append(out, reqLine{kind: reqCarried, text: line})
 			}
 		}
@@ -117,6 +119,49 @@ func startsAlnum(s string) bool {
 	}
 	c := s[0]
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+}
+
+// isRequirement reports whether spec can be carried verbatim into
+// [project.dependencies] as a PEP 508 requirement. It is deliberately strict:
+// a direct URL (git+…, http(s)://…), a line carrying a pip --hash pin, or
+// anything whose head is not a distribution name followed by a version
+// specifier or marker is not a dependency uv can resolve, so parseRequirements
+// carries it as a reported comment instead.
+func isRequirement(spec string) bool {
+	if !startsAlnum(spec) {
+		return false
+	}
+	// --hash is a pip option, not PEP 508; a continuation-folded "pkg==1 --hash"
+	// line would otherwise be emitted as an unresolvable requirement.
+	if strings.Contains(spec, "--hash") {
+		return false
+	}
+	// A bare URL names no distribution. A named direct reference (pkg @ url)
+	// starts with the name, not the scheme, so it still passes below.
+	lower := strings.ToLower(spec)
+	for _, scheme := range []string{"git+", "http://", "https://"} {
+		if strings.HasPrefix(lower, scheme) {
+			return false
+		}
+	}
+	name, rest := splitNameSpec(spec)
+	return name != "" && validSpecTail(rest)
+}
+
+// validSpecTail reports whether rest, the part after a requirement's name and
+// extras, is empty or opens with a version specifier, marker, or direct
+// reference. Anything else (stray words, an unexpected symbol) means the line
+// is not a real requirement.
+func validSpecTail(rest string) bool {
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return true
+	}
+	switch rest[0] {
+	case '<', '>', '=', '!', '~', ';', '@', '(':
+		return true
+	}
+	return false
 }
 
 // renderDependencies renders the classified lines as a TOML array literal for

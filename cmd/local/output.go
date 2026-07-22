@@ -2,6 +2,7 @@ package local
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -52,6 +53,80 @@ func (r Renderer) Emit(v any, text func(w io.Writer) error) error {
 // flags, so one registration covers a whole command family.
 func addOutputFlag(cmd *cobra.Command, target *string) {
 	cmd.PersistentFlags().StringVarP(target, "output", "o", string(FormatText), "Output format: text or json")
+}
+
+// wrapErrorOutput makes every leaf under cmd honor --output json on its failure
+// path: a failed command emits one JSON error object on stdout instead of only
+// cobra's plaintext "Error:" on stderr. Applied once over the whole v2 tree so
+// every command shares the behavior. Streaming commands still emit their own
+// NDJSON; this adds the terminal error object when the command returns an error.
+func wrapErrorOutput(d Deps, cmd *cobra.Command) {
+	for _, sub := range cmd.Commands() {
+		wrapErrorOutput(d, sub)
+	}
+	inner := cmd.RunE
+	if inner == nil {
+		return
+	}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		err := inner(cmd, args)
+		if err == nil {
+			return nil
+		}
+		// The command already wrote a richer JSON object (a plan-build failure's
+		// structured payload); carry the exit non-zero without a second object.
+		var shown errJSONShown
+		if errors.As(err, &shown) {
+			cmd.SilenceErrors = true
+			return err
+		}
+		// A command that carries its own exit code has already rendered its
+		// result (check's NDJSON summary, for one) and main turns the code into
+		// the exit status; keep cobra from printing "Error: exit code N" over it.
+		var exit *ExitError
+		if errors.As(err, &exit) {
+			cmd.SilenceErrors = true
+			return err
+		}
+		if cmdOutputFormat(cmd) == FormatJSON {
+			emitJSONError(d.Stdout, err)
+			// The object is on stdout; silence cobra so json mode stays a single
+			// object and nothing lands on stderr.
+			cmd.SilenceErrors = true
+		}
+		return err
+	}
+}
+
+// cmdOutputFormat reads the resolved --output value off cmd, defaulting to text
+// when the flag is absent (the dev stub parses it itself) or unparseable.
+func cmdOutputFormat(cmd *cobra.Command) Format {
+	f := cmd.Flags().Lookup("output")
+	if f == nil {
+		return FormatText
+	}
+	format, err := ParseFormat(f.Value.String())
+	if err != nil {
+		return FormatText
+	}
+	return format
+}
+
+// errJSONShown marks an error whose command already wrote its own JSON object
+// to stdout, so wrapErrorOutput does not add the generic one on top.
+type errJSONShown struct{ err error }
+
+func (e errJSONShown) Error() string { return e.err.Error() }
+func (e errJSONShown) Unwrap() error { return e.err }
+
+// emitJSONError writes the single JSON error object a failed command reports in
+// json mode.
+func emitJSONError(w io.Writer, err error) {
+	//nolint:errcheck // the command already failed; a write error changes nothing
+	json.NewEncoder(w).Encode(struct {
+		Error string `json:"error"`
+		Code  int    `json:"code"`
+	}{Error: err.Error(), Code: 1})
 }
 
 // event is one progress update on a streaming surface (start, logs). In

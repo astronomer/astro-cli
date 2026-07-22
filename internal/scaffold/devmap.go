@@ -28,8 +28,11 @@ func DevReplacements() []DevReplacement {
 		{"kill", "astro local stop --clean"},
 		{"pytest", "uv run pytest"},
 		{"init", "astro init"},
-		{"object import", "astro local env schema"},
-		{"object export", "astro local env schema"},
-		{"object", "astro local env schema"},
+		// Connections and variables move to the env schema in pyproject.toml.
+		// There is no `astro local env` command yet, so name the schema, not a
+		// phantom subcommand.
+		{"object import", "the env schema in pyproject.toml"},
+		{"object export", "the env schema in pyproject.toml"},
+		{"object", "the env schema in pyproject.toml"},
 	}
 }

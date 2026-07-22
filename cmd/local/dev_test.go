@@ -64,8 +64,8 @@ func TestDevStubNamesTheReplacement(t *testing.T) {
 		{[]string{"kill"}, "astro local stop --clean"},
 		{[]string{"pytest"}, "uv run pytest"},
 		{[]string{"init"}, "astro init"},
-		{[]string{"object", "import"}, "astro local env schema"},
-		{[]string{"object", "export"}, "astro local env schema"},
+		{[]string{"object", "import"}, "the env schema in pyproject.toml"},
+		{[]string{"object", "export"}, "the env schema in pyproject.toml"},
 	}
 	for _, tc := range cases {
 		t.Run(strings.Join(tc.typed, " "), func(t *testing.T) {

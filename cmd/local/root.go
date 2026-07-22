@@ -36,6 +36,7 @@ func AddCmds(d Deps) []*cobra.Command {
 	cmds = append(cmds, rootAliasCmds(d)...)
 	for _, cmd := range cmds {
 		silenceUsage(cmd)
+		wrapErrorOutput(d, cmd)
 	}
 	return cmds
 }

@@ -113,7 +113,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	rootCmd.AddCommand(local.AddCmds(local.NewDeps())...)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
-	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
+	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 
 	return rootCmd
 }

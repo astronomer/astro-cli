@@ -99,12 +99,21 @@ func (c *cli) readStatus() (localrt.Status, error) {
 func NewLocalCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := &cobra.Command{
-		Use:           "local",
-		Short:         "Run Apache Airflow locally from your project",
-		Long:          "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:          "local",
+		Short:        "Run Apache Airflow locally from your project",
+		Long:         "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
+		Args:         cobra.ArbitraryArgs,
+		SilenceUsage: true,
+		// A bare `astro local` prints help and succeeds; an unknown subcommand
+		// fails. Without a RunE cobra treats this non-runnable parent as a help
+		// request and exits 0 even on a typo (it returns flag.ErrHelp before it
+		// validates args), so drive both cases here.
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
+		},
 	}
 	addOutputFlag(cmd, &c.output)
 	cmd.AddCommand(
@@ -196,6 +205,9 @@ func (c *cli) reportBuildError(r Renderer, err error) error {
 	if errors.As(err, &missing) && r.Format == FormatJSON {
 		//nolint:errcheck // the returned err is what fails the command
 		r.Emit(missing.Payload(), func(io.Writer) error { return nil })
+		// The payload is the JSON error object; mark it so the shared wrapper
+		// does not print a second, plainer one over it.
+		return errJSONShown{err}
 	}
 	return err
 }
@@ -214,7 +226,7 @@ func newStopCmd(c *cli) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.force, "force", false, "Skip the graceful shutdown window")
-	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Also remove derived runtime state (replaces `astro dev kill`)")
+	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Also remove derived runtime state (replaces the old astro dev kill)")
 	return cmd
 }
 

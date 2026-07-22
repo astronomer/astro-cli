@@ -77,15 +77,18 @@ const (
 // — it must not require in-memory state from the process that started it.
 // Proxy routes are derived from it (Route.ProjectDir = ProjectPath,
 // Route.Port = itoa(Port)); routes.json itself stays a compatibility view.
+// The json tags keep this in step with the rest of the v2 surface: lowercase
+// keys, and the fields a stopped Airflow zeroes (pid, port, startedAt) drop out
+// rather than reporting a false 0 or a zero-value timestamp.
 type Status struct {
-	ProjectPath     string
-	Mode            Mode
-	StopWithSession bool
-	State           State
-	PID             int
-	Port            int
-	Hostname        string
-	StartedAt       time.Time
+	ProjectPath     string    `json:"projectPath"`
+	Mode            Mode      `json:"mode,omitempty"`
+	StopWithSession bool      `json:"stopWithSession,omitempty"`
+	State           State     `json:"state"`
+	PID             int       `json:"pid,omitempty"`
+	Port            int       `json:"port,omitempty"`
+	Hostname        string    `json:"hostname,omitempty"`
+	StartedAt       time.Time `json:"startedAt,omitzero"`
 }
 
 // LogLine is one parsed line of component output.

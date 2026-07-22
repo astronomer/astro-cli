@@ -87,6 +87,84 @@ func TestCommandsRejectUnknownOutputFormat(t *testing.T) {
 	}
 }
 
+func TestFailingCommandEmitsJSONErrorObject(t *testing.T) {
+	// The fake runtime fails every call, so each of these commands returns an
+	// error. Under --output json the failure must be one JSON error object on
+	// stdout, not a plaintext line on stderr.
+	cases := [][]string{
+		{"local", "status", "-o", "json"},
+		{"local", "stop", "-o", "json"},
+		{"local", "logs", "-o", "json"},
+		{"stop", "-o", "json"}, // root alias
+	}
+	for _, args := range cases {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			d, stdout := testDeps(t)
+			if err := execute(t, d, args...); err == nil {
+				t.Fatalf("%v should fail", args)
+			}
+			line := strings.TrimSpace(stdout.String())
+			if strings.Count(line, "\n") != 0 {
+				t.Fatalf("want one JSON object, got %q", stdout.String())
+			}
+			var obj struct {
+				Error string `json:"error"`
+				Code  int    `json:"code"`
+			}
+			if err := json.Unmarshal([]byte(line), &obj); err != nil {
+				t.Fatalf("stdout is not a JSON error object: %q (%v)", stdout.String(), err)
+			}
+			if obj.Error == "" {
+				t.Errorf("error field is empty: %q", line)
+			}
+			if obj.Code == 0 {
+				t.Errorf("code field should be non-zero: %q", line)
+			}
+		})
+	}
+}
+
+func TestUnknownLocalSubcommandFails(t *testing.T) {
+	d, _ := testDeps(t)
+	if err := execute(t, d, "local", "bogus"); err == nil {
+		t.Fatal("`astro local bogus` must fail, not print help and exit 0")
+	}
+	// A bare `astro local` prints help and succeeds.
+	d, _ = testDeps(t)
+	if err := execute(t, d, "local"); err != nil {
+		t.Fatalf("bare `astro local` should succeed: %v", err)
+	}
+}
+
+func TestStatusJSONIsLowercaseAndOmitsZeroFields(t *testing.T) {
+	// A stopped status carries no pid, port, or start time; the json shape must
+	// use lowercase keys and drop those zero fields (no PascalCase, no leaked
+	// 0001-01-01 timestamp), matching the rest of the v2 surface.
+	out := &bytes.Buffer{}
+	r := Renderer{Format: FormatJSON, Out: out}
+	st := localrt.Status{ProjectPath: "/p", State: localrt.StateStopped}
+	if err := r.Emit(st, nil); err != nil {
+		t.Fatal(err)
+	}
+	var keys map[string]any
+	if err := json.Unmarshal(out.Bytes(), &keys); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+	for _, gone := range []string{"StartedAt", "startedAt", "PID", "pid", "Port", "port", "Mode", "mode"} {
+		if _, ok := keys[gone]; ok {
+			t.Errorf("stopped status should omit %q: %v", gone, keys)
+		}
+	}
+	for _, want := range []string{"projectPath", "state"} {
+		if _, ok := keys[want]; !ok {
+			t.Errorf("status json missing %q: %v", want, keys)
+		}
+	}
+	if strings.Contains(out.String(), "0001-01-01") {
+		t.Errorf("zero StartedAt leaked into json: %q", out.String())
+	}
+}
+
 func TestConfirmEOFIsAnErrorNotANo(t *testing.T) {
 	d, _ := testDeps(t)
 	d.Stdin = strings.NewReader("") // closed stdin
