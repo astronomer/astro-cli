@@ -64,8 +64,17 @@ const (
 	filePerm = 0o644
 )
 
+// Names reused across the greenfield and import paths (and their tests), kept
+// as constants so goconst stays quiet and the spellings never drift.
+const (
+	dirDags       = "dags"
+	dirPlugins    = "plugins"
+	fileGitignore = ".gitignore"
+	fileAgents    = "AGENTS.md"
+)
+
 // projectDirs are the standard project directories, in creation order.
-var projectDirs = []string{"dags", "include", "plugins", "tests"}
+var projectDirs = []string{dirDags, "include", dirPlugins, "tests"}
 
 // Run scaffolds a project in dir, creating it if needed. It refuses a
 // directory that already has a pyproject.toml or looks like a v1 astro
@@ -97,7 +106,7 @@ func Run(dir string, opts Options) (*Result, error) {
 		goos = runtime.GOOS
 	}
 	res := &Result{Dir: abs, Name: name, AirflowVersion: version}
-	if err := write(abs, pyproject, goos != "windows", res); err != nil {
+	if err := write(abs, pyproject, goos != "windows", &res.Created, &res.Skipped); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -143,8 +152,9 @@ func renderPyproject(name, version string) (string, error) {
 }
 
 // write puts the scaffold on disk. Existing entries are kept and reported
-// as skipped, so a rerun over a partial scaffold is safe.
-func write(dir, pyproject string, withSymlink bool, res *Result) error {
+// as skipped, so a rerun over a partial scaffold is safe. Greenfield and
+// import share it, so it appends to plain slices rather than a Result.
+func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) error {
 	//nolint:gosec // G301: see dirPerm
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return err
@@ -152,32 +162,32 @@ func write(dir, pyproject string, withSymlink bool, res *Result) error {
 	for _, d := range projectDirs {
 		path := filepath.Join(dir, d)
 		if _, err := os.Lstat(path); err == nil {
-			res.Skipped = append(res.Skipped, d+"/")
+			*skipped = append(*skipped, d+"/")
 			continue
 		}
 		//nolint:gosec // G301: see dirPerm
 		if err := os.Mkdir(path, dirPerm); err != nil {
 			return fmt.Errorf("creating %s: %w", d, err)
 		}
-		res.Created = append(res.Created, d+"/")
+		*created = append(*created, d+"/")
 	}
 
 	files := []struct{ name, content string }{
 		{project.Marker, pyproject},
-		{".gitignore", gitignoreTemplate},
-		{"AGENTS.md", agentsContent()},
+		{fileGitignore, gitignoreTemplate},
+		{fileAgents, agentsContent()},
 	}
 	for _, f := range files {
 		path := filepath.Join(dir, f.name)
 		if _, err := os.Lstat(path); err == nil {
-			res.Skipped = append(res.Skipped, f.name)
+			*skipped = append(*skipped, f.name)
 			continue
 		}
 		//nolint:gosec // G306: see filePerm
 		if err := os.WriteFile(path, []byte(f.content), filePerm); err != nil {
 			return fmt.Errorf("creating %s: %w", f.name, err)
 		}
-		res.Created = append(res.Created, f.name)
+		*created = append(*created, f.name)
 	}
 
 	if !withSymlink {
@@ -185,13 +195,13 @@ func write(dir, pyproject string, withSymlink bool, res *Result) error {
 	}
 	link := filepath.Join(dir, "CLAUDE.md")
 	if _, err := os.Lstat(link); err == nil {
-		res.Skipped = append(res.Skipped, "CLAUDE.md")
+		*skipped = append(*skipped, "CLAUDE.md")
 		return nil
 	}
 	if err := os.Symlink("AGENTS.md", link); err != nil {
 		return fmt.Errorf("linking CLAUDE.md: %w", err)
 	}
-	res.Created = append(res.Created, "CLAUDE.md -> AGENTS.md")
+	*created = append(*created, "CLAUDE.md -> AGENTS.md")
 	return nil
 }
 
