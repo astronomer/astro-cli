@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -318,35 +320,183 @@ func renderStatus(w io.Writer, st localrt.Status) error {
 }
 
 func newListCmd(c *cli) *cobra.Command {
+	var opts struct {
+		all   bool
+		clean bool
+	}
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List every local Airflow known on this machine",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return c.runList()
+			return c.runList(opts.all, opts.clean)
 		},
 	}
-	cmd.Flags().Bool("all", false, "Include stopped projects (not built yet)")
+	cmd.Flags().BoolVar(&opts.all, "all", false, "Include stale records whose Airflow is no longer running")
+	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Remove stale records whose process or compose project is gone")
 	return cmd
 }
 
-func (c *cli) runList() error {
+func (c *cli) runList(all, clean bool) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
+	}
+	if clean {
+		return c.runListClean(r)
 	}
 	statuses, err := c.d.Runtime.List()
 	if err != nil {
 		return err
 	}
-	return r.Emit(statuses, func(w io.Writer) error {
-		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "PROJECT\tSTATE\tMODE\tPORT")
-		for _, st := range statuses {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%d\n", st.ProjectPath, st.State, st.Mode, st.Port)
+	rows := buildListRows(statuses, all, time.Now())
+	return emitListRows(r, rows, renderListTable)
+}
+
+func (c *cli) runListClean(r Renderer) error {
+	removed, err := c.d.Runtime.PruneStale()
+	if err != nil {
+		return err
+	}
+	// Everything PruneStale returns is stale by definition; show it all.
+	rows := buildListRows(removed, true, time.Now())
+	return emitListRows(r, rows, renderRemovedRows)
+}
+
+// State labels for a list row. Stale means the record outlived its runtime.
+const (
+	listStateRunning = "running"
+	listStateStale   = "stopped (stale)"
+)
+
+// listRow is one line of `astro local list`, the shared value text and json
+// both render. Uptime is precomputed so the two renderings never diverge.
+type listRow struct {
+	Project   string `json:"project"`
+	Hostname  string `json:"hostname,omitempty"`
+	Mode      string `json:"mode"`
+	State     string `json:"state"`
+	Port      int    `json:"port,omitempty"`
+	URL       string `json:"url,omitempty"`
+	StartedAt string `json:"startedAt,omitempty"`
+	Uptime    string `json:"uptime,omitempty"`
+}
+
+// buildListRows turns statuses into display rows. Without all, only running
+// Airflows show; with it, stale records show too. now is a parameter so the
+// uptime is testable.
+func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow {
+	rows := make([]listRow, 0, len(statuses))
+	for _, st := range statuses {
+		running := st.State == localrt.StateRunning
+		if !running && !all {
+			continue
 		}
-		return tw.Flush()
-	})
+		row := listRow{
+			Project:  st.ProjectPath,
+			Hostname: st.Hostname,
+			Mode:     modeLabel(st.Mode),
+			Port:     st.Port,
+		}
+		if running {
+			row.State = listStateRunning
+			row.URL = fmt.Sprintf("http://localhost:%d", st.Port)
+			if !st.StartedAt.IsZero() {
+				row.StartedAt = st.StartedAt.Format(time.RFC3339)
+				row.Uptime = formatUptime(now.Sub(st.StartedAt))
+			}
+		} else {
+			// A record with no live runtime is a leftover: the process or
+			// compose project is gone, but the record was never cleared.
+			row.State = listStateStale
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+// emitListRows renders rows: one JSON object per line in json mode (so the
+// output is NDJSON, not one array), the text renderer once otherwise.
+func emitListRows(r Renderer, rows []listRow, text func(io.Writer, []listRow) error) error {
+	if r.Format == FormatJSON {
+		for _, row := range rows {
+			if err := r.Emit(row, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return r.Emit(rows, func(w io.Writer) error { return text(w, rows) })
+}
+
+func renderListTable(w io.Writer, rows []listRow) error {
+	if len(rows) == 0 {
+		_, err := fmt.Fprintln(w, "No local Airflow found.")
+		return err
+	}
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "PROJECT\tHOSTNAME\tMODE\tSTATE\tPORT\tUPTIME")
+	for _, row := range rows {
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			row.Project, dash(row.Hostname), row.Mode, row.State, dash(portLabel(row.Port)), dash(row.Uptime))
+	}
+	return tw.Flush()
+}
+
+func renderRemovedRows(w io.Writer, rows []listRow) error {
+	if len(rows) == 0 {
+		_, err := fmt.Fprintln(w, "No stale local Airflow records to remove.")
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "Removed %d stale record(s):\n", len(rows)); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintf(w, "  %s\n", row.Project); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// modeLabel renders a mode for display; an empty mode reads as standalone,
+// matching the record and route contracts.
+func modeLabel(m localrt.Mode) string {
+	if m == "" {
+		return string(localrt.ModeStandalone)
+	}
+	return string(m)
+}
+
+func portLabel(port int) string {
+	if port == 0 {
+		return ""
+	}
+	return strconv.Itoa(port)
+}
+
+func dash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+// formatUptime renders a duration compactly: seconds under a minute, minutes
+// under an hour, hours and minutes above.
+func formatUptime(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	d = d.Round(time.Second)
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	default:
+		return fmt.Sprintf("%dh%dm", int(d/time.Hour), int((d%time.Hour)/time.Minute))
+	}
 }
 
 func newLogsCmd(c *cli) *cobra.Command {

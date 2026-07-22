@@ -387,3 +387,45 @@ func TestRunWhenNotRunning(t *testing.T) {
 	err := af.Run(context.Background(), []string{"true"}, localrt.Stdio{})
 	assert.ErrorContains(t, err, "not running")
 }
+
+func TestContainersGone(t *testing.T) {
+	// A daemon that cannot be reached is not a confirmation that the project
+	// is gone: `list --clean` must not delete a project on a blip.
+	t.Run("both engines unreachable is not confirmed gone", func(t *testing.T) {
+		cmd := &fakeCmd{output: func(string) ([]byte, error) {
+			return nil, errors.New("cannot connect to the docker daemon")
+		}}
+		e := testEngine(t, cmd)
+		gone, err := e.ContainersGone(context.Background(), "/home/me/demo")
+		require.Error(t, err)
+		assert.False(t, gone)
+	})
+
+	// One engine answering cleanly with no match confirms gone; the other
+	// engine being absent (podman not installed) is normal, not a blocker.
+	t.Run("a reachable engine with no match confirms gone", func(t *testing.T) {
+		cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+			if strings.HasPrefix(call, "docker ps") {
+				return nil, nil
+			}
+			return nil, errors.New("podman machine not running")
+		}}
+		e := testEngine(t, cmd)
+		gone, err := e.ContainersGone(context.Background(), "/home/me/demo")
+		require.NoError(t, err)
+		assert.True(t, gone)
+	})
+
+	t.Run("a running container is not gone", func(t *testing.T) {
+		cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+			if strings.HasPrefix(call, "docker ps") {
+				return []byte("astro-demo\n"), nil
+			}
+			return nil, nil
+		}}
+		e := testEngine(t, cmd)
+		gone, err := e.ContainersGone(context.Background(), "/home/me/demo")
+		require.NoError(t, err)
+		assert.False(t, gone)
+	})
+}

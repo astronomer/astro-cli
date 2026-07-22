@@ -18,9 +18,11 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/checks"
 	"github.com/astronomer/astro-cli/internal/localdocker"
+	"github.com/astronomer/astro-cli/internal/localprune"
 	"github.com/astronomer/astro-cli/internal/localstandalone"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Deps is everything the v2 commands need from the process. The composition
@@ -52,6 +54,9 @@ type Runtime interface {
 	Attach(projectPath string) (localrt.Airflow, error)
 	ReadStatus(projectPath string) (localrt.Status, error)
 	List() ([]localrt.Status, error)
+	// PruneStale removes the records (and their routes) whose runtime is
+	// gone, returning what it removed. It backs `astro local list --clean`.
+	PruneStale() ([]localrt.Status, error)
 }
 
 // NewDeps builds the production Deps. Call it once, from main.
@@ -75,11 +80,19 @@ func NewDeps() Deps {
 type modeRuntime struct {
 	docker     *localdocker.Engine
 	standalone *localstandalone.Engine
+	// routes is the CLI's own view of routes.json, for the list join and the
+	// --clean sweep. It carries the record-aware prune predicate so listing
+	// never evicts a route whose owner is still alive.
+	routes *proxy.Store
 }
 
 func newModeRuntime() modeRuntime {
 	dir := routesDir()
-	return modeRuntime{docker: localdocker.New(dir), standalone: localstandalone.New(dir)}
+	return modeRuntime{
+		docker:     localdocker.New(dir),
+		standalone: localstandalone.New(dir),
+		routes:     proxy.NewStore(dir, proxy.WithRouteLiveness(localprune.RouteAlive)),
+	}
 }
 
 // routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
@@ -135,15 +148,69 @@ func (r modeRuntime) List() ([]localrt.Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Join with the live routes: it fills a hostname the record predates, and
+	// the read prunes routes.json through the record-aware predicate, so a
+	// list also heals the file. Best-effort — a missing or unreadable proxy
+	// dir must not hide the records.
+	hostByProject := map[string]string{}
+	if routes, rerr := r.routes.ListRoutes(); rerr == nil {
+		for _, rt := range routes {
+			hostByProject[rt.ProjectDir] = rt.Hostname
+		}
+	}
 	statuses := make([]localrt.Status, 0, len(recs))
 	for _, rec := range recs {
-		if rec.Mode == localrt.ModeDocker {
-			statuses = append(statuses, r.docker.StatusOf(rec))
-			continue
+		st := r.statusOf(rec)
+		if st.Hostname == "" {
+			st.Hostname = hostByProject[st.ProjectPath]
 		}
-		statuses = append(statuses, r.standalone.StatusOf(rec))
+		statuses = append(statuses, st)
 	}
 	return statuses, nil
+}
+
+// statusOf reports one record's live status through the engine that owns its
+// mode, so liveness is checked the way that mode records it.
+func (r modeRuntime) statusOf(rec localstate.Record) localrt.Status {
+	if rec.Mode == localrt.ModeDocker {
+		return r.docker.StatusOf(rec)
+	}
+	return r.standalone.StatusOf(rec)
+}
+
+func (r modeRuntime) PruneStale() ([]localrt.Status, error) {
+	statuses, err := r.List()
+	if err != nil {
+		return nil, err
+	}
+	var removed []localrt.Status
+	for _, st := range statuses {
+		if st.State == localrt.StateRunning {
+			continue
+		}
+		// Docker liveness cannot tell "compose gone" from "engine down", so
+		// confirm the containers are really absent before deleting. A blip in
+		// the daemon must not wipe a running project's record. Standalone
+		// liveness is a syscall, so its stopped verdict is trusted as-is.
+		if st.Mode == localrt.ModeDocker {
+			gone, cerr := r.docker.ContainersGone(context.Background(), st.ProjectPath)
+			if cerr != nil || !gone {
+				continue
+			}
+		}
+		// Drop the route first, while the record still backs it, then the
+		// record. Removing an absent record is not an error.
+		if st.Hostname != "" {
+			if _, rerr := r.routes.RemoveRoute(st.Hostname); rerr != nil {
+				return removed, rerr
+			}
+		}
+		if rerr := localstate.Remove(st.ProjectPath); rerr != nil {
+			return removed, rerr
+		}
+		removed = append(removed, st)
+	}
+	return removed, nil
 }
 
 // skipPreRunAnnotation mirrors internal/telemetry.SkipPreRunAnnotation. It

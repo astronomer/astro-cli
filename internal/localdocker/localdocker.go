@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/localprune"
 	"github.com/astronomer/astro-cli/internal/localshared"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -68,7 +69,7 @@ type Engine struct {
 // routes.json (~/.astro/proxy); the composition root supplies it because
 // this package must not read config.
 func New(routesDir string) *Engine {
-	s := proxy.NewStore(routesDir)
+	s := proxy.NewStore(routesDir, proxy.WithRouteLiveness(localprune.RouteAlive))
 	return &Engine{
 		routes:        s,
 		cmd:           execCommander{},

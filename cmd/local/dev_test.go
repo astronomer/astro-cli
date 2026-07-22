@@ -20,7 +20,8 @@ func (fakeRuntime) Attach(string) (localrt.Airflow, error) { return nil, localrt
 func (fakeRuntime) ReadStatus(string) (localrt.Status, error) {
 	return localrt.Status{}, localrt.ErrNotImplemented
 }
-func (fakeRuntime) List() ([]localrt.Status, error) { return nil, localrt.ErrNotImplemented }
+func (fakeRuntime) List() ([]localrt.Status, error)       { return nil, localrt.ErrNotImplemented }
+func (fakeRuntime) PruneStale() ([]localrt.Status, error) { return nil, localrt.ErrNotImplemented }
 
 func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 	t.Helper()

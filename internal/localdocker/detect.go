@@ -2,6 +2,7 @@ package localdocker
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/container"
@@ -23,6 +24,12 @@ type engineConn struct {
 }
 
 const workingDirLabel = "com.docker.compose.project.working_dir"
+
+// Engine binaries probed for a project's containers.
+const (
+	binDocker = "docker"
+	binPodman = "podman"
+)
 
 // resolvePreferredEngine picks the engine for starting a project: pkg/
 // container's resolution ($PATH search, OrbStack detection) plus its
@@ -55,34 +62,68 @@ func connFor(bin string) engineConn {
 // inspect) is only resolved when the first probe comes up empty. An empty
 // name means no engine has running containers for this directory.
 func (e *Engine) findProject(ctx context.Context, projectPath string) (conn engineConn, composeProject string) {
+	conn, name, _ := e.probeEngines(ctx, projectPath)
+	return conn, name
+}
+
+// probeEngines asks the preferred engine, then the other of docker/podman,
+// for the project's running compose name — so the common case is one lookup
+// and the second engine's connection is resolved only when the first comes up
+// empty. It returns the first match with its engine, and whether at least one
+// engine answered without error, which lets a caller tell a clean "not found"
+// from "no engine reachable".
+func (e *Engine) probeEngines(ctx context.Context, projectPath string) (conn engineConn, composeProject string, reached bool) {
 	pref, err := e.preferred()
 	if err != nil {
-		pref = engineConn{bin: "docker"}
+		pref = engineConn{bin: binDocker}
 	}
-	if name := e.probe(ctx, pref, projectPath); name != "" {
-		return pref, name
+	prefName, prefErr := e.probe(ctx, pref, projectPath)
+	if prefName != "" {
+		return pref, prefName, true
 	}
-	other := "podman"
-	if pref.bin == "podman" {
-		other = "docker"
+	other := binPodman
+	if pref.bin == binPodman {
+		other = binDocker
 	}
-	conn = e.connFor(other)
-	if name := e.probe(ctx, conn, projectPath); name != "" {
-		return conn, name
+	oconn := e.connFor(other)
+	otherName, otherErr := e.probe(ctx, oconn, projectPath)
+	if otherName != "" {
+		return oconn, otherName, true
 	}
-	return engineConn{}, ""
+	// Reached when at least one engine answered cleanly with no match; a
+	// not-installed second engine erroring is normal.
+	return engineConn{}, "", prefErr == nil || otherErr == nil
 }
 
 // probe asks one engine for the compose project name of a running
-// container whose working_dir label matches projectPath.
-func (e *Engine) probe(ctx context.Context, conn engineConn, projectPath string) string {
-	out, err := e.cmd.Output(ctx, conn.env, conn.bin, "ps",
+// container whose working_dir label matches projectPath. It returns the
+// engine's error so a caller that must distinguish "no such project" from
+// "engine unreachable" can — findProject treats both as an empty name.
+func (e *Engine) probe(ctx context.Context, conn engineConn, projectPath string) (string, error) {
+	out, err := e.cmd.Output(
+		ctx, conn.env, conn.bin, "ps",
 		"--filter", "label="+workingDirLabel+"="+projectPath,
 		"--format", `{{.Label "com.docker.compose.project"}}`,
 	)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	name, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
-	return name
+	return name, nil
+}
+
+// ContainersGone reports whether projectPath's containers are confirmed
+// absent from every reachable engine. It errors when no engine could be
+// reached, so a caller that deletes state (astro local list --clean) refuses
+// to drop a docker record whose engine is only momentarily down — unlike
+// findProject, which cannot tell that apart from a stopped project.
+func (e *Engine) ContainersGone(ctx context.Context, projectPath string) (bool, error) {
+	_, name, reached := e.probeEngines(ctx, projectPath)
+	if name != "" {
+		return false, nil
+	}
+	if !reached {
+		return false, fmt.Errorf("no container engine reachable to confirm %s is stopped", projectPath)
+	}
+	return true, nil
 }

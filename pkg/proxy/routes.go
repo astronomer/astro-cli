@@ -50,6 +50,14 @@ type Route struct {
 type Store struct {
 	dir string
 
+	// routeAlive decides whether a route survives pruning. When nil the
+	// Store uses defaultRouteAlive (docker kept, others PID-checked). The CLI
+	// injects a record-aware predicate through WithRouteLiveness so a route
+	// is never evicted while its owning state record reports the runtime
+	// alive; pkg/proxy stays free of astro-cli imports because the predicate
+	// arrives from outside.
+	routeAlive func(Route) bool
+
 	// cacheMu guards the cached parse below. It is a plain mutex, not the
 	// cross-process file lock: cached reads never touch routes.lock.
 	cacheMu     sync.Mutex
@@ -59,9 +67,23 @@ type Store struct {
 	cachedValid bool
 }
 
+// StoreOption configures a Store at construction.
+type StoreOption func(*Store)
+
+// WithRouteLiveness sets the predicate that decides whether a route survives
+// pruning. It replaces the default PID check for every prune this Store does
+// (AddRoute, RemoveRoute, ListRoutes).
+func WithRouteLiveness(alive func(Route) bool) StoreOption {
+	return func(s *Store) { s.routeAlive = alive }
+}
+
 // NewStore returns a Store rooted at dir. The directory is created on first write.
-func NewStore(dir string) *Store {
-	return &Store{dir: dir}
+func NewStore(dir string, opts ...StoreOption) *Store {
+	s := &Store{dir: dir}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Dir returns the store's directory.
@@ -189,18 +211,38 @@ func (s *Store) WriteRoutes(routes []Route) error {
 	return nil
 }
 
-// PruneStaleRoutes removes routes whose owner process is no longer alive.
-// Docker routes (Mode == RouteModeDocker) are never pruned by PID because
-// the CLI process exits after starting containers. They are cleaned up
-// explicitly.
+// defaultRouteAlive is the prune predicate a Store uses when none is
+// injected. Docker routes are never pruned by PID because the CLI process
+// exits after starting containers; they are cleaned up explicitly.
+func defaultRouteAlive(r Route) bool {
+	return r.Mode == RouteModeDocker || IsPIDAlive(r.PID)
+}
+
+// PruneStaleRoutes removes routes whose owner is no longer alive, by the
+// default PID check. Kept for callers that prune outside a Store.
 func PruneStaleRoutes(routes []Route) []Route {
-	alive := make([]Route, 0, len(routes))
+	return prune(routes, defaultRouteAlive)
+}
+
+// prune returns the routes for which alive reports true.
+func prune(routes []Route, alive func(Route) bool) []Route {
+	kept := make([]Route, 0, len(routes))
 	for _, r := range routes {
-		if r.Mode == RouteModeDocker || IsPIDAlive(r.PID) {
-			alive = append(alive, r)
+		if alive(r) {
+			kept = append(kept, r)
 		}
 	}
-	return alive
+	return kept
+}
+
+// pruneStale drops the Store's stale routes, using the injected liveness
+// predicate when set and the default PID check otherwise.
+func (s *Store) pruneStale(routes []Route) []Route {
+	alive := s.routeAlive
+	if alive == nil {
+		alive = defaultRouteAlive
+	}
+	return prune(routes, alive)
 }
 
 // AddRoute registers a new route. It acquires the file lock, prunes stale routes,
@@ -218,7 +260,7 @@ func (s *Store) AddRoute(route *Route) error {
 		return err
 	}
 
-	routes = PruneStaleRoutes(routes)
+	routes = s.pruneStale(routes)
 
 	// Check for hostname collision
 	for i, r := range routes {
@@ -249,7 +291,7 @@ func (s *Store) RemoveRoute(hostname string) (int, error) {
 		return 0, err
 	}
 
-	routes = PruneStaleRoutes(routes)
+	routes = s.pruneStale(routes)
 
 	filtered := make([]Route, 0, len(routes))
 	for _, r := range routes {
@@ -277,7 +319,7 @@ func (s *Store) ListRoutes() ([]Route, error) {
 		return nil, err
 	}
 
-	routes = PruneStaleRoutes(routes)
+	routes = s.pruneStale(routes)
 
 	// Write back pruned routes
 	if err := s.WriteRoutes(routes); err != nil {

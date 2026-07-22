@@ -228,6 +228,31 @@ func TestPruneStaleRoutes(t *testing.T) {
 	assert.Equal(t, "alive.localhost", routes[0].Hostname)
 }
 
+// TestWithRouteLiveness_KeepsRouteTheDefaultWouldEvict is the cross-owner
+// hazard: another owner's route carries a PID the default check reads as
+// dead, but an injected predicate (in the CLI, record-aware) reports it
+// alive. The Store must keep it rather than evict a live owner's route.
+func TestWithRouteLiveness_KeepsRouteTheDefaultWouldEvict(t *testing.T) {
+	origIsPIDAlive := IsPIDAlive
+	defer func() { IsPIDAlive = origIsPIDAlive }()
+	IsPIDAlive = func(int) bool { return false } // the default check would evict everything
+
+	kept := "desktops-project.localhost"
+	s := NewStore(filepath.Join(t.TempDir(), "proxy"), WithRouteLiveness(func(r Route) bool {
+		return r.Hostname == kept
+	}))
+
+	require.NoError(t, s.WriteRoutes([]Route{
+		{Hostname: kept, Port: "12345", ProjectDir: "/tmp/desktop", PID: 99999},
+		{Hostname: "gone.localhost", Port: "12346", ProjectDir: "/tmp/gone", PID: 99999},
+	}))
+
+	routes, err := s.ListRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, kept, routes[0].Hostname)
+}
+
 func TestPruneStaleRoutes_DockerNotPruned(t *testing.T) {
 	origIsPIDAlive := IsPIDAlive
 	defer func() { IsPIDAlive = origIsPIDAlive }()
