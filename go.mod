@@ -36,11 +36,15 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.7.0
+	github.com/astronomer/astro-cli/pkg/airflowenv v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/container v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/envschema v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/localrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/secrets v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
 	github.com/compose-spec/compose-go/v2 v2.9.1
 	github.com/distribution/reference v0.6.0
@@ -134,6 +138,7 @@ require (
 	github.com/curioswitch/go-reassign v0.3.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/daixiang0/gci v0.13.5 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
 	github.com/docker/cli-docs-tool v0.11.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
@@ -177,6 +182,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a // indirect
@@ -311,6 +317,7 @@ require (
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/yeya24/promlinter v0.3.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
+	github.com/zalando/go-keyring v0.2.8 // indirect
 	github.com/zclconf/go-cty v1.17.0 // indirect
 	gitlab.com/bosi/decorder v0.4.2 // indirect
 	go-simpler.org/musttag v0.13.0 // indirect
@@ -453,3 +460,11 @@ replace github.com/astronomer/astro-cli/pkg/localrt => ./pkg/localrt
 replace github.com/astronomer/astro-cli/pkg/manifest => ./pkg/manifest
 
 replace github.com/astronomer/astro-cli/pkg/uv => ./pkg/uv
+
+replace github.com/astronomer/astro-cli/pkg/envschema => ./pkg/envschema
+
+replace github.com/astronomer/astro-cli/pkg/secrets => ./pkg/secrets
+
+replace github.com/astronomer/astro-cli/pkg/connmodel => ./pkg/connmodel
+
+replace github.com/astronomer/astro-cli/pkg/airflowenv => ./pkg/airflowenv
