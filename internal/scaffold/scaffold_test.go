@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
 const windowsOS = "windows"
@@ -45,6 +47,35 @@ func TestRunFreshScaffold(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "flight-data", m.Project.Name)
 	assert.Equal(t, DefaultAirflowVersion, m.Astro.AirflowVersion)
+	// [project.dependencies] must install the pinned Airflow, so init → start
+	// works with no hand-edit. The default pin is partial, so the
+	// requirement is a prefix match.
+	assert.Equal(t, []string{"apache-airflow==3.1.*"}, m.Project.Dependencies)
+}
+
+// TestScaffoldedProjectLocksWithRealUv scaffolds a project and runs a real
+// `uv lock` against it, proving init produces a manifest uv can actually
+// resolve — the end-to-end gap an earlier fix closed. It needs uv and network, so it
+// skips under -short or when uv is absent (as CI is).
+func TestScaffoldedProjectLocksWithRealUv(t *testing.T) {
+	if testing.Short() {
+		t.Skip("real uv lock reaches the network")
+	}
+	if _, err := exec.LookPath("uv"); err != nil {
+		t.Skip("uv not on PATH")
+	}
+
+	dir := filepath.Join(t.TempDir(), "locktest")
+	_, err := Run(dir, Options{})
+	require.NoError(t, err)
+
+	client, err := uv.New(t.Context(), uv.Options{CacheDir: t.TempDir()})
+	require.NoError(t, err)
+	require.NoError(t, client.Lock(t.Context(), dir, uv.Stdio{}),
+		"a freshly scaffolded project must uv lock cleanly")
+
+	_, err = os.Stat(filepath.Join(dir, "uv.lock"))
+	require.NoError(t, err, "uv lock must write a lockfile")
 }
 
 func TestRunHonorsNameAndAirflowVersion(t *testing.T) {
@@ -58,6 +89,8 @@ func TestRunHonorsNameAndAirflowVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "etl", m.Project.Name)
 	assert.Equal(t, "3.0.2", m.Astro.AirflowVersion)
+	// A full three-part pin becomes an exact requirement, not a prefix match.
+	assert.Equal(t, []string{"apache-airflow==3.0.2"}, m.Project.Dependencies)
 }
 
 func TestRunRejectsInvalidNameAndVersion(t *testing.T) {

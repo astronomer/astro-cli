@@ -8,11 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/project"
-	"github.com/astronomer/astro-cli/pkg/manifest"
-	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
@@ -76,7 +75,9 @@ type ImportResult struct {
 	// Dags and Plugins count the files copied from the source.
 	Dags    int `json:"dags"`
 	Plugins int `json:"plugins,omitempty"`
-	// Dependencies counts the requirements carried into the manifest.
+	// Dependencies counts the entries written to [project.dependencies]: the
+	// requirements carried from the source, plus the apache-airflow line the
+	// import adds when the source named none.
 	Dependencies int `json:"dependencies"`
 	// Warnings collects non-fatal notes: carried lines, a missing
 	// requirements.txt, a defaulted Airflow version.
@@ -127,7 +128,6 @@ func Import(ctx context.Context, src, dst string, opts ImportOptions) (*ImportRe
 	}
 
 	reqs, haveReqs := readRequirements(absSrc)
-	depsLiteral, depCount := renderDependencies(reqs)
 
 	name := opts.Name
 	if name == "" {
@@ -135,7 +135,19 @@ func Import(ctx context.Context, src, dst string, opts ImportOptions) (*ImportRe
 	}
 	version, from := resolveAirflow(opts.AirflowVersion, reqs)
 
-	pyproject, err := renderImportManifest(name, version, depsLiteral)
+	// Guarantee the project can start: when the source carries no
+	// apache-airflow requirement, add one matching the resolved pin, so
+	// [project.dependencies] installs Airflow just as a greenfield init does.
+	// A source that already names apache-airflow is left verbatim — rewriting
+	// it would be guessing.
+	deps := reqs
+	addedAirflow := !hasAirflowDependency(reqs)
+	if addedAirflow {
+		deps = append(slices.Clone(reqs), reqLine{kind: reqDependency, text: airflowRequirement(version)})
+	}
+	depsLiteral, depCount := renderDependencies(deps)
+
+	pyproject, err := renderManifest(name, version, depsLiteral)
 	if err != nil {
 		return nil, err
 	}
@@ -150,10 +162,13 @@ func Import(ctx context.Context, src, dst string, opts ImportOptions) (*ImportRe
 	}
 	res.Warnings = append(res.Warnings, carriedWarnings(reqs)...)
 	if !haveReqs {
-		res.Warnings = append(res.Warnings, "no requirements.txt in the source; dependencies left empty")
+		res.Warnings = append(res.Warnings, "no requirements.txt in the source")
 	}
 	if from == "default" {
 		res.Warnings = append(res.Warnings, "no apache-airflow pin in requirements.txt; using the default Airflow "+DefaultAirflowVersion)
+	}
+	if addedAirflow {
+		res.Warnings = append(res.Warnings, "added "+airflowRequirement(version)+" to dependencies so the project's environment includes Airflow")
 	}
 
 	goos := opts.GOOS
@@ -336,39 +351,6 @@ func resolveAirflow(flag string, reqs []reqLine) (version, from string) {
 		return v, "requirements"
 	}
 	return DefaultAirflowVersion, "default"
-}
-
-// renderImportManifest fills the manifest with the carried dependencies, then
-// sets the name and Airflow pin through the surgical editor (so the name is
-// quoted correctly) and round-trips through manifest.Parse to guarantee the
-// scaffolded project loads.
-func renderImportManifest(name, version, depsLiteral string) (string, error) {
-	tmpl := "[project]\n" +
-		"name = 'astro-project'\n" +
-		"version = '0.1.0'\n" +
-		"requires-python = '>=3.10'\n" +
-		"dependencies = " + depsLiteral + "\n\n" +
-		"[tool.astro]\n" +
-		"airflow = '" + DefaultAirflowVersion + "'\n"
-
-	ed, err := tomledit.NewSurgical([]byte(tmpl))
-	if err != nil {
-		return "", err
-	}
-	if err := ed.Set([]string{"project", "name"}, name); err != nil {
-		return "", err
-	}
-	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
-		return "", err
-	}
-	data, err := ed.Bytes()
-	if err != nil {
-		return "", err
-	}
-	if _, err := manifest.Parse(data); err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
 
 // runLock attempts the uv lock and records the outcome. A resolution failure

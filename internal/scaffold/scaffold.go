@@ -126,12 +126,29 @@ func refuse(dir string) error {
 	return nil
 }
 
-// renderPyproject fills the static template: one tomledit pass sets the
-// project name and the Airflow pin, and a manifest.Parse round-trip
-// guarantees every scaffolded project loads — an invalid --name or
-// --airflow-version surfaces here as the manifest's own validation error.
+// renderPyproject builds the greenfield manifest. [project.dependencies]
+// carries the Airflow the project pins, derived from the same version that
+// fills [tool.astro].airflow, so init → start needs no hand-edit.
 func renderPyproject(name, version string) (string, error) {
-	ed, err := tomledit.NewSurgical([]byte(pyprojectTemplate))
+	deps, _ := renderDependencies([]reqLine{{kind: reqDependency, text: airflowRequirement(version)}})
+	return renderManifest(name, version, deps)
+}
+
+// renderManifest fills the shared pyproject template with the given
+// dependencies array literal, then sets the project name and Airflow pin
+// through the surgical editor (so both are quoted the way the manifest
+// expects) and round-trips through manifest.Parse, so every scaffolded project
+// — greenfield or imported — is guaranteed to load. An invalid --name or
+// --airflow-version surfaces here as the manifest's own validation error.
+func renderManifest(name, version, depsLiteral string) (string, error) {
+	tmpl := "[project]\n" +
+		"name = 'astro-project'\n" +
+		"version = '0.1.0'\n" +
+		"requires-python = '>=3.10'\n" +
+		"dependencies = " + depsLiteral + "\n\n" +
+		"[tool.astro]\n" +
+		"airflow = '" + DefaultAirflowVersion + "'\n"
+	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
 		return "", err
 	}

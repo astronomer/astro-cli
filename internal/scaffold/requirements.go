@@ -38,6 +38,9 @@ type reqLine struct {
 // airflowPinRe accepts the version shapes tool.astro.airflow allows.
 var airflowPinRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
 
+// airflowDist is the core Airflow distribution's normalized (PEP 503) name.
+const airflowDist = "apache-airflow"
+
 // parseRequirements turns requirements.txt bytes into classified lines, in
 // file order. Blank lines are dropped (the array's own layout replaces them);
 // everything with content is kept.
@@ -172,15 +175,10 @@ func airflowPin(lines []reqLine) (version string, ok bool) {
 }
 
 func pinFromSpec(spec string) (version string, ok bool) {
-	s := spec
-	if i := strings.IndexAny(s, ";@"); i >= 0 { // drop marker or direct URL
-		s = s[:i]
-	}
-	name, rest := splitNameSpec(s)
-	if normalizeName(name) != "apache-airflow" {
+	name, rest := specNameSpec(spec)
+	if normalizeName(name) != airflowDist {
 		return "", false
 	}
-	rest = strings.TrimSpace(rest)
 	if !strings.HasPrefix(rest, "==") {
 		return "", false
 	}
@@ -192,6 +190,49 @@ func pinFromSpec(spec string) (version string, ok bool) {
 		return "", false
 	}
 	return v, true
+}
+
+// specNameSpec splits a requirement into its distribution name and the
+// specifier, first dropping any environment marker or direct-URL suffix.
+func specNameSpec(spec string) (name, rest string) {
+	s := spec
+	if i := strings.IndexAny(s, ";@"); i >= 0 {
+		s = s[:i]
+	}
+	return splitNameSpec(s)
+}
+
+// namesAirflow reports whether a requirement is an apache-airflow distribution,
+// however it is pinned — or whether it is pinned at all.
+func namesAirflow(spec string) bool {
+	name, _ := specNameSpec(spec)
+	return normalizeName(name) == airflowDist
+}
+
+// hasAirflowDependency reports whether the parsed lines already carry an
+// apache-airflow requirement, so the import leaves it verbatim instead of
+// adding its own.
+func hasAirflowDependency(lines []reqLine) bool {
+	for _, l := range lines {
+		if l.kind == reqDependency && namesAirflow(l.text) {
+			return true
+		}
+	}
+	return false
+}
+
+// airflowRequirement is the [project.dependencies] entry that installs the
+// Airflow the manifest pins. It mirrors [tool.astro].airflow one-to-one: a
+// partial pin ("3", "3.1") becomes a prefix match ("apache-airflow==3.1.*") so
+// the project tracks patch releases — the same "resolution to a concrete
+// release happens later" the pin itself promises — while a full "3.1.2" pin
+// stays exact. This is the one place the dependency string is derived, so the
+// greenfield and import paths stay in step.
+func airflowRequirement(version string) string {
+	if strings.Count(version, ".") < 2 {
+		return airflowDist + "==" + version + ".*"
+	}
+	return airflowDist + "==" + version
 }
 
 // splitNameSpec splits a requirement into its distribution name and the rest

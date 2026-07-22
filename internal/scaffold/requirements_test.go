@@ -98,6 +98,37 @@ func TestAirflowPin(t *testing.T) {
 	}
 }
 
+func TestAirflowRequirement(t *testing.T) {
+	cases := map[string]string{
+		"3":     "apache-airflow==3.*",
+		"3.1":   "apache-airflow==3.1.*",
+		"3.1.2": "apache-airflow==3.1.2",
+	}
+	for pin, want := range cases {
+		assert.Equal(t, want, airflowRequirement(pin), pin)
+	}
+}
+
+func TestHasAirflowDependency(t *testing.T) {
+	cases := []struct {
+		spec string
+		want bool
+	}{
+		{"apache-airflow==2.9.1", true},
+		{"apache-airflow", true}, // named without a pin
+		{"apache-airflow>=2.9", true},
+		{"apache_airflow[amazon]==2.9.1", true}, // normalized name, with extras
+		{`apache-airflow==2.9.1 ; python_version < "3.12"`, true},
+		{"apache-airflow-providers-http==1.0", false}, // a provider, not core
+		{"flask==2.0", false},
+	}
+	for _, tc := range cases {
+		got := hasAirflowDependency([]reqLine{{kind: reqComment, text: "note"}, {kind: reqDependency, text: tc.spec}})
+		assert.Equal(t, tc.want, got, tc.spec)
+	}
+	assert.False(t, hasAirflowDependency(nil))
+}
+
 func TestCarriedWarnings(t *testing.T) {
 	lines := parseRequirements([]byte("flask\n-r base.txt\n!!!bad\n"))
 	ws := carriedWarnings(lines)

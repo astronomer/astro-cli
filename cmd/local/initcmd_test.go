@@ -162,7 +162,9 @@ func TestInitFromJSONOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout.String()), &payload); err != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", err, stdout.String())
 	}
-	if payload.Dir != dir || payload.Dependencies != 2 || payload.Dags != 1 {
+	// flask and requests carried, plus the apache-airflow line the import adds
+	// because the source named no Airflow.
+	if payload.Dir != dir || payload.Dependencies != 3 || payload.Dags != 1 {
 		t.Errorf("unexpected payload: %+v", payload)
 	}
 	if !payload.Lock.Attempted || !payload.Lock.Locked {

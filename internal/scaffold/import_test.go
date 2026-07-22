@@ -66,15 +66,19 @@ func TestImportPlainRepo(t *testing.T) {
 	assert.Equal(t, DefaultAirflowVersion, res.Airflow)
 	assert.Equal(t, "default", res.AirflowFrom)
 	assert.Equal(t, 2, res.Dags)
-	assert.Equal(t, 2, res.Dependencies)
+	// The source named no Airflow, so the import adds the pin's requirement
+	// alongside the two carried lines.
+	assert.Equal(t, 3, res.Dependencies)
+	assert.Contains(t, strings.Join(res.Warnings, "\n"), "added apache-airflow==3.1.*")
 	assert.True(t, res.Lock.Attempted)
 	assert.True(t, res.Lock.Locked)
 	assert.True(t, loc.called)
 
-	// The manifest loads and carries the requirements verbatim.
+	// The manifest loads, carries the requirements verbatim, and gains the
+	// apache-airflow line so the project can start with no hand-edit.
 	m, err := manifest.Load(filepath.Join(dst, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"flask==2.0", "requests"}, m.Project.Dependencies)
+	assert.Equal(t, []string{"flask==2.0", "requests", "apache-airflow==3.1.*"}, m.Project.Dependencies)
 
 	// Dags are copied (source untouched), preserving the subtree.
 	for _, f := range []string{"dags/etl.py", "dags/util/aux.py", "AGENTS.md", ".gitignore"} {
@@ -176,8 +180,15 @@ func TestImportMissingRequirements(t *testing.T) {
 
 	res, err := Import(context.Background(), src, dst, ImportOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, 0, res.Dependencies)
-	assert.Contains(t, res.Warnings, "no requirements.txt in the source; dependencies left empty")
+	// No requirements.txt, but the import still lands the Airflow pin so the
+	// project can start.
+	assert.Equal(t, 1, res.Dependencies)
+	assert.Contains(t, res.Warnings, "no requirements.txt in the source")
+	assert.Contains(t, strings.Join(res.Warnings, "\n"), "added apache-airflow==3.1.*")
+
+	m, err := manifest.Load(filepath.Join(dst, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"apache-airflow==3.1.*"}, m.Project.Dependencies)
 }
 
 func TestImportLockFailureIsReportedNotRolledBack(t *testing.T) {

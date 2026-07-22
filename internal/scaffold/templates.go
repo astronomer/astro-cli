@@ -5,20 +5,6 @@ import (
 	"strings"
 )
 
-// pyprojectTemplate is the whole manifest, static on purpose: renderPyproject
-// only rewrites the name and the Airflow pin, so the scaffold keeps working
-// even if the manifest edit API churns (the tomledit fallback path).
-// Single-quoted throughout to match the quoting the editor emits.
-const pyprojectTemplate = `[project]
-name = 'astro-project'
-version = '0.1.0'
-requires-python = '>=3.10'
-dependencies = []
-
-[tool.astro]
-airflow = '` + DefaultAirflowVersion + `'
-`
-
 const gitignoreTemplate = `# Derived environment (rebuilt by the astro CLI; never commit it)
 .venv/
 __pycache__/
