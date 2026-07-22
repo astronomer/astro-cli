@@ -215,8 +215,11 @@ func (s *Suite) TestStandaloneStart_FloatingTag() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
+	defer handler.Stop(false)
 
-	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true})
+	// NoProxy keeps the post-start goroutine from launching the real proxy
+	// daemon (a re-exec of the test binary that just times out here).
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true, NoProxy: true})
 	s.NoError(err)
 }
 
@@ -916,8 +919,11 @@ func (s *Suite) TestStandaloneStart_HappyPath() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
+	defer handler.Stop(false)
 
-	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true})
+	// NoProxy keeps the post-start goroutine from launching the real proxy
+	// daemon (a re-exec of the test binary that just times out here).
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, Foreground: true, NoProxy: true})
 	s.NoError(err)
 }
 

@@ -3,7 +3,6 @@ package docker
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -20,10 +19,12 @@ func TestDocker(t *testing.T) {
 }
 
 func (s *Suite) TestExecPipe() {
-	var buf bytes.Buffer
-	data := ""
-	resp := &types.HijackedResponse{Reader: bufio.NewReader(strings.NewReader(data))}
-	err := ExecPipe(*resp, &buf, &buf, &buf)
-	fmt.Println(buf.String())
+	// Give inStream its own reader, separate from the output buffer. ExecPipe
+	// can return on the stdout branch while its stdin-copy goroutine is still
+	// draining inStream, so sharing one buffer for in and out (and then reading
+	// it) races with that goroutine.
+	var out bytes.Buffer
+	resp := &types.HijackedResponse{Reader: bufio.NewReader(strings.NewReader(""))}
+	err := ExecPipe(*resp, strings.NewReader(""), &out, &out)
 	s.NoError(err)
 }

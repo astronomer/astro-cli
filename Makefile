@@ -14,7 +14,7 @@ build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
 test:
-	go test -count=1 -shuffle=on -timeout=10m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
+	go test -count=1 -race -shuffle=on -timeout=15m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
 
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init

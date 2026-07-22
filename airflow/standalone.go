@@ -129,6 +129,13 @@ type Standalone struct {
 	proxyHostname       string // e.g. "my-project.localhost"
 	proxyPort           string // proxy listener port (default 6563)
 	airflowMajorVersion string // "2" or "3", determined from the runtime tag at Start()
+
+	// startupWG tracks the foreground post-start goroutine (health check,
+	// proxy registration, browser open). startForeground and Stop join it so
+	// the goroutine can't outlive the Standalone — otherwise it keeps reading
+	// package globals (config.HomeConfigPath via proxy.Routes()) after the
+	// caller has moved on.
+	startupWG sync.WaitGroup
 }
 
 // StandaloneInit creates a new Standalone handler.
@@ -526,7 +533,9 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 	// Run health check in background
 	healthURL, healthComp := s.healthEndpoint()
+	s.startupWG.Add(1)
 	go func() {
+		defer s.startupWG.Done()
 		err := checkWebserverHealth(healthURL, waitTime, healthComp)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "\n%s\n", err.Error())
@@ -557,6 +566,10 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 	}()
 
 	wg.Wait()
+	// Join the post-start goroutine before returning so it never reads package
+	// globals after the caller (or a test) has moved on. It always terminates:
+	// the health check is bounded by waitTime.
+	s.startupWG.Wait()
 	err = cmd.Wait()
 	if err != nil {
 		// If the process was killed by a signal (e.g. Ctrl+C), don't treat it as an error
@@ -872,6 +885,10 @@ func (s *Standalone) readPID() (int, bool) {
 
 // Stop terminates the standalone Airflow process.
 func (s *Standalone) Stop(_ bool) error {
+	// Wait for the foreground post-start goroutine to finish so it can't race
+	// with removeProxyRoute below or outlive this handler.
+	s.startupWG.Wait()
+
 	// Deregister proxy route
 	s.removeProxyRoute()
 
