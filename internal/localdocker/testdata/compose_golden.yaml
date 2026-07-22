@@ -1,0 +1,139 @@
+x-common-env: &common-env
+  AIRFLOW__API_AUTH__JWT_SECRET: 'astro-demo-abc123'
+  AIRFLOW__API__BASE_URL: 'http://localhost:8081'
+  AIRFLOW__API__PORT: '8080'
+  AIRFLOW__API__SECRET_KEY: 'astro-demo-abc123'
+  AIRFLOW__CORE__AUTH_MANAGER: 'airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager'
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://api-server:8080/execution/'
+  AIRFLOW__CORE__EXECUTOR: 'LocalExecutor'
+  AIRFLOW__CORE__FERNET_KEY: 'd6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw='
+  AIRFLOW__CORE__LOAD_EXAMPLES: 'True'
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'True'
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: 'postgresql://postgres:postgres@postgres:5432'
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: 'postgresql://postgres:postgres@postgres:5432'
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: 'True'
+  ASTRONOMER_ENVIRONMENT: 'local'
+  MY_SECRET: 'it''s quoted'
+
+networks:
+  airflow:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+
+services:
+  postgres:
+    image: docker.io/postgres:12.6
+    restart: unless-stopped
+    networks:
+      - airflow
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+    ports:
+      - 127.0.0.1:15432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+  db-migration:
+    depends_on:
+      - postgres
+    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    command:
+      - airflow
+      - db
+      - migrate
+    networks:
+      - airflow
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-db-migration"
+    environment: *common-env
+
+  scheduler:
+    depends_on:
+      - db-migration
+    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    command:
+      - airflow
+      - scheduler
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-scheduler"
+    environment: *common-env
+    volumes:
+      - /home/me/demo/dags:/usr/local/airflow/dags:z
+      - /home/me/demo/include:/usr/local/airflow/include:z
+
+  dag-processor:
+    depends_on:
+      - db-migration
+    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    command:
+      - airflow
+      - dag-processor
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-dag-processor"
+    environment: *common-env
+    volumes:
+      - /home/me/demo/dags:/usr/local/airflow/dags:z
+      - /home/me/demo/include:/usr/local/airflow/include:z
+
+  api-server:
+    depends_on:
+      - db-migration
+    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    command:
+      - airflow
+      - api-server
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-api-server"
+    environment: *common-env
+    ports:
+      - 127.0.0.1:8081:8080
+    volumes:
+      - /home/me/demo/dags:/usr/local/airflow/dags:z
+      - /home/me/demo/include:/usr/local/airflow/include:z
+
+  triggerer:
+    depends_on:
+      - db-migration
+    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    command:
+      - airflow
+      - triggerer
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-triggerer"
+    environment: *common-env
+    volumes:
+      - /home/me/demo/dags:/usr/local/airflow/dags:z
+      - /home/me/demo/include:/usr/local/airflow/include:z

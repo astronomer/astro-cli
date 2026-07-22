@@ -28,6 +28,9 @@ const modulePrefix = "github.com/astronomer/astro-cli/"
 // exiting are review-blocking. Extend as v2 packages land (internal/plan,
 // ...).
 var v2BelowCmd = []string{
+	"internal/fsatomic",
+	"internal/localdocker",
+	"internal/localstate",
 	"internal/project",
 	"internal/userstate",
 	"pkg/localrt",

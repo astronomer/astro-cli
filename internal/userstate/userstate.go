@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/astronomer/astro-cli/internal/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -91,7 +92,7 @@ func Load(projectPath string) (State, error) {
 		return State{}, err
 	}
 	if !bytes.Equal(canonical, raw) {
-		if err := writeAtomic(path, canonical); err != nil {
+		if err := fsatomic.WriteFile(path, canonical, filePerm); err != nil {
 			return State{}, err
 		}
 	}
@@ -112,7 +113,7 @@ func Save(projectPath string, s State) error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(filepath.Join(dir, stateFile), data)
+	return fsatomic.WriteFile(filepath.Join(dir, stateFile), data, filePerm)
 }
 
 func (s *State) normalize() {
@@ -127,32 +128,4 @@ func encode(s State) ([]byte, error) {
 		return nil, fmt.Errorf("encoding state: %w", err)
 	}
 	return append(data, '\n'), nil
-}
-
-// writeAtomic writes data via a temp file in the same directory plus
-// rename, so readers never see a half-written file and a crash leaves the
-// old contents intact.
-func writeAtomic(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, "."+stateFile+".*")
-	if err != nil {
-		return fmt.Errorf("creating temp file in %s: %w", dir, err)
-	}
-	tmpPath := tmp.Name()
-	_, werr := tmp.Write(data)
-	cerr := tmp.Close()
-	if werr == nil {
-		werr = cerr
-	}
-	if werr == nil {
-		werr = os.Chmod(tmpPath, filePerm)
-	}
-	if werr == nil {
-		werr = os.Rename(tmpPath, path)
-	}
-	if werr != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("writing %s: %w", path, werr)
-	}
-	return nil
 }

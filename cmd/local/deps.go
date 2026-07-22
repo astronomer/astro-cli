@@ -12,11 +12,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/localdocker"
+	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Deps is everything the v2 commands need from the process. The composition
@@ -53,30 +57,83 @@ func NewDeps() Deps {
 		Stdin:      os.Stdin,
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
-		Runtime:    localrtRuntime{},
+		Runtime:    newModeRuntime(),
 		WorkingDir: os.Getwd,
 		OpenURL:    browser.OpenURL,
 	}
 }
 
-// localrtRuntime is the production Runtime: straight delegation to
-// pkg/localrt.
-type localrtRuntime struct{}
+// modeRuntime is the production Runtime: it dispatches on localrt.Mode.
+// Docker mode is built (internal/localdocker, an earlier fix); standalone falls
+// through to the pkg/localrt stubs until the an earlier fix engine lands, at
+// which point this dispatch moves behind localrt itself and the seam here
+// goes back to straight delegation. Read paths dispatch on the mode the
+// state record captured at start, so any tool stops what another started.
+type modeRuntime struct {
+	docker *localdocker.Engine
+}
 
-func (localrtRuntime) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error) {
+func newModeRuntime() modeRuntime {
+	return modeRuntime{docker: localdocker.New(routesDir())}
+}
+
+// routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
+// same location v1 uses, honoring the same ASTRO_HOME override — v1 and v2
+// must see each other's routes.
+func routesDir() string {
+	home := os.Getenv("ASTRO_HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	return filepath.Join(home, ".astro", "proxy")
+}
+
+func (r modeRuntime) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error) {
+	if p.Mode == localrt.ModeDocker {
+		return r.docker.Start(ctx, p, cb)
+	}
 	return localrt.Start(ctx, p, cb)
 }
 
-func (localrtRuntime) Attach(projectPath string) (localrt.Airflow, error) {
+func (r modeRuntime) Attach(projectPath string) (localrt.Airflow, error) {
+	rec, err := localstate.Load(projectPath)
+	if err != nil {
+		return nil, err
+	}
+	if rec.Mode == localrt.ModeDocker {
+		return r.docker.Attach(projectPath)
+	}
 	return localrt.Attach(projectPath)
 }
 
-func (localrtRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
+func (r modeRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
+	rec, err := localstate.Load(projectPath)
+	if errors.Is(err, localstate.ErrNotRunning) {
+		return localrt.Status{ProjectPath: projectPath, State: localrt.StateStopped}, nil
+	}
+	if err != nil {
+		return localrt.Status{}, err
+	}
+	if rec.Mode == localrt.ModeDocker {
+		return r.docker.ReadStatus(projectPath)
+	}
 	return localrt.ReadStatus(projectPath)
 }
 
-func (localrtRuntime) List() ([]localrt.Status, error) {
-	return localrt.List()
+func (r modeRuntime) List() ([]localrt.Status, error) {
+	recs, err := localstate.List()
+	if err != nil {
+		return nil, err
+	}
+	statuses := make([]localrt.Status, 0, len(recs))
+	for _, rec := range recs {
+		if rec.Mode == localrt.ModeDocker {
+			statuses = append(statuses, r.docker.StatusOf(rec))
+			continue
+		}
+		statuses = append(statuses, rec.Status(proxy.IsPIDAlive(rec.PID)))
+	}
+	return statuses, nil
 }
 
 // skipPreRunAnnotation mirrors internal/telemetry.SkipPreRunAnnotation. It

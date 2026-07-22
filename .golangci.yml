@@ -102,7 +102,7 @@ linters:
       # v2 tree: Deps and the localrt contract structs are passed by value
       # on purpose (docs/v2-architecture.md), so hugeParam does not apply
       - linters: [gocritic]
-        path: ^cmd/(local|astro)/
+        path: ^(cmd/(local|astro)|internal/local)
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]
