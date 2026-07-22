@@ -43,4 +43,28 @@ func TestChoosePort(t *testing.T) {
 	got, err = ChoosePort(8081, 8080, busy, alloc)
 	require.NoError(t, err)
 	assert.Equal(t, 10123, got)
+
+	// An excluded default falls through to allocation, so a sibling port can't
+	// be reused.
+	got, err = ChoosePort(0, 8080, free, alloc, 8080)
+	require.NoError(t, err)
+	assert.Equal(t, 10123, got)
+
+	// Allocation retries past an excluded pool port and returns the next one.
+	seq := []string{"10123", "10124"}
+	i := 0
+	stepAlloc := func() (string, error) {
+		s := seq[i]
+		i++
+		return s, nil
+	}
+	got, err = ChoosePort(0, 8080, busy, stepAlloc, 10123)
+	require.NoError(t, err)
+	assert.Equal(t, 10124, got)
+
+	// A degenerate allocator that only ever returns the excluded port gives up
+	// rather than looping forever.
+	stuck := func() (string, error) { return "10123", nil }
+	_, err = ChoosePort(0, 8080, busy, stuck, 10123)
+	require.Error(t, err)
 }

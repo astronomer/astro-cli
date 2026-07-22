@@ -84,7 +84,7 @@ func ParseSchema(env map[string]any) (*envschema.Schema, error) {
 		}
 	}
 	if len(p.problems) > 0 {
-		sort.Slice(p.problems, func(i, j int) bool { return p.problems[i].Key < p.problems[j].Key })
+		sort.SliceStable(p.problems, func(i, j int) bool { return p.problems[i].Key < p.problems[j].Key })
 		return nil, &SchemaError{Problems: p.problems}
 	}
 	return s, nil

@@ -34,7 +34,9 @@ Layout:
 ## Local Airflow
 
 Local Airflow lives under ` + "`astro local`" + `. It works offline, needs no
-account, and every command supports ` + "`--output json`" + `.
+account, and most commands take ` + "`--output json`" + ` for machine-readable
+output. The passthrough commands (` + "`run`" + `, ` + "`shell`" + `) stream the
+child process's own output instead.
 
     astro local start          # start Airflow for this project
     astro local stop           # stop it (--clean also wipes runtime state)

@@ -77,7 +77,7 @@ func Listing(s *envschema.Schema, store secrets.Store, scope string) ([]ListedNa
 	for i := range out {
 		out[i].InVault = out[i].VaultScope != ""
 	}
-	sort.Slice(out, func(i, j int) bool {
+	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Section != out[j].Section {
 			return out[i].Section < out[j].Section
 		}

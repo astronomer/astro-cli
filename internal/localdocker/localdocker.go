@@ -136,7 +136,7 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 	if err != nil {
 		return nil, err
 	}
-	pgPort, err := e.choosePort(0, defaultPostgresPort)
+	pgPort, err := e.choosePort(0, defaultPostgresPort, apiPort)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, err
 	}
 
-	stateDir, err := e.stateDir(p, projectPath)
+	stateDir, err := e.stateDir(projectPath)
 	if err != nil {
 		return nil, err
 	}
@@ -414,21 +414,22 @@ func (a *airflow) composeFilePath() string {
 	return filepath.Join(dir, composeFileName)
 }
 
-// choosePort resolves one published port through the shared policy.
-func (e *Engine) choosePort(requested, fallback int) (int, error) {
-	return localshared.ChoosePort(requested, fallback, e.portFree, e.allocPort)
+// choosePort resolves one published port through the shared policy. exclude
+// carries ports already chosen this Start so the api and postgres draws can't
+// collide before routes.json records either.
+func (e *Engine) choosePort(requested, fallback int, exclude ...int) (int, error) {
+	return localshared.ChoosePort(requested, fallback, e.portFree, e.allocPort, exclude...)
 }
 
-// stateDir resolves the project's runtime state home (Plan.StateDir when set,
-// the canonical location otherwise) and creates it. The compose file, the
-// generated Dockerfile, and the requirements file all land here.
-func (e *Engine) stateDir(p localrt.Plan, projectPath string) (string, error) {
-	dir := p.StateDir
-	if dir == "" {
-		var err error
-		if dir, err = localrt.StateDir(projectPath); err != nil {
-			return "", err
-		}
+// stateDir resolves the project's runtime state home (the canonical location
+// from localrt.StateDir) and creates it. The compose file, the generated
+// Dockerfile, and the requirements file all land here. Stop and
+// composeFilePath derive the same path from the Record, so this must stay the
+// one source of truth — a divergent location would leak the compose file.
+func (e *Engine) stateDir(projectPath string) (string, error) {
+	dir, err := localrt.StateDir(projectPath)
+	if err != nil {
+		return "", err
 	}
 	if err := os.MkdirAll(dir, stateDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", dir, err)

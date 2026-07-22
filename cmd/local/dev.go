@@ -4,12 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/scaffold"
 )
 
@@ -157,21 +156,18 @@ func renderDevRemoved(p devRemoved) string {
 	}
 	fmt.Fprintf(&b, "\nFull mapping: %s", p.Doc)
 	if p.V1Project {
-		b.WriteString("\n\nThis directory holds an astro v1 project (Dockerfile, no pyproject.toml). Migration ships in a later release; use astro CLI 1.x with this project for now.")
+		b.WriteString("\n\nThis directory holds an astro v1 project (Dockerfile and .astro/). Migration ships in a later release; use astro CLI 1.x with this project for now.")
 	}
 	return b.String()
 }
 
-// isV1Project reports whether the working directory looks like a v1 astro
-// project: a Dockerfile and no pyproject.toml.
+// isV1Project reports whether the working directory holds a v1 astro project,
+// using the shared predicate in internal/project so `astro dev` and
+// `astro init` never disagree about what counts as v1.
 func (c *cli) isV1Project() bool {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return false
 	}
-	if _, err := os.Stat(filepath.Join(wd, "pyproject.toml")); err == nil {
-		return false
-	}
-	_, err = os.Stat(filepath.Join(wd, "Dockerfile"))
-	return err == nil
+	return project.IsV1(wd)
 }

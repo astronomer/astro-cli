@@ -44,18 +44,26 @@ var (
 // anything else (uv output, tracebacks, banners) is "system".
 var logComponents = []string{"scheduler", "api-server", "triggerer", "dag-processor", "webserver", "standalone"}
 
-// parseLogLine splits one standalone log line into a localrt.LogLine. Lines
-// without a parseable timestamp get the zero Time; the caller substitutes
-// arrival time where one is needed.
-func parseLogLine(line string) localrt.LogLine {
-	component := "system"
-	rest := line
+// parseLogMeta peels the component prefix off a standalone log line and
+// returns the component plus the rest of the line — the message body before
+// cleaning. This is the cheap half of parsing: no regex cleaning runs here.
+func parseLogMeta(line string) (component, rest string) {
 	for _, c := range logComponents {
 		if strings.HasPrefix(line, c+" ") {
-			component, rest = c, strings.TrimPrefix(line, c+" ")
-			break
+			return c, strings.TrimPrefix(line, c+" ")
 		}
 	}
+	return "system", line
+}
+
+// parseLogLine splits one standalone log line into a localrt.LogLine, cleaned
+// display Text included. Lines without a parseable timestamp get the zero
+// Time; the caller substitutes arrival time where one is needed. cleanLogMessage
+// runs several regexes, so callers that only need Component/Time (the log
+// filters) use parseLogMeta and let deliverFunc clean the body on the OnLine
+// path.
+func parseLogLine(line string) localrt.LogLine {
+	component, rest := parseLogMeta(line)
 	return localrt.LogLine{
 		Component: component,
 		Time:      parseLineTime(rest),
@@ -184,22 +192,28 @@ func (a *airflow) Logs(ctx context.Context, opts localrt.LogOptions) error {
 	}
 }
 
-// logEntry pairs a raw line with its parsed form so Writer mode can emit
-// the original text.
+// logEntry carries a raw line with the cheap half of its parse (component,
+// time, and the uncleaned message body). Writer mode emits raw and never
+// cleans; OnLine mode cleans the body in deliverFunc.
 type logEntry struct {
-	raw    string
-	parsed localrt.LogLine
+	raw       string
+	component string
+	time      time.Time
+	body      string
 }
 
-// filterLine parses one raw line and applies the component and Since
-// filters. Lines without their own timestamp pass the Since filter: better
-// a few extra lines than silently dropping tracebacks.
+// filterLine parses the cheap half of one raw line and applies the component
+// and Since filters. It does not clean the message — that regex work is
+// deferred to the OnLine delivery path, since Writer mode discards the cleaned
+// text. Lines without their own timestamp pass the Since filter: better a few
+// extra lines than silently dropping tracebacks.
 func filterLine(raw string, opts localrt.LogOptions) (logEntry, bool) {
-	parsed := parseLogLine(raw)
+	component, body := parseLogMeta(raw)
+	lineTime := parseLineTime(body)
 	if len(opts.Components) > 0 {
 		found := false
 		for _, c := range opts.Components {
-			if parsed.Component == c {
+			if component == c {
 				found = true
 				break
 			}
@@ -208,18 +222,23 @@ func filterLine(raw string, opts localrt.LogOptions) (logEntry, bool) {
 			return logEntry{}, false
 		}
 	}
-	if !opts.Since.IsZero() && !parsed.Time.IsZero() && parsed.Time.Before(opts.Since) {
+	if !opts.Since.IsZero() && !lineTime.IsZero() && lineTime.Before(opts.Since) {
 		return logEntry{}, false
 	}
-	return logEntry{raw: raw, parsed: parsed}, true
+	return logEntry{raw: raw, component: component, time: lineTime, body: body}, true
 }
 
-// deliverFunc builds the emit path once: parsed lines to OnLine, raw lines
-// to Writer, arrival time standing in for lines without their own.
+// deliverFunc builds the emit path once: cleaned lines to OnLine, raw lines
+// to Writer, arrival time standing in for lines without their own. The regex
+// cleaning runs here so it only touches lines OnLine will actually show.
 func deliverFunc(opts localrt.LogOptions, now func() time.Time) func(logEntry) {
 	return func(entry logEntry) {
 		if opts.OnLine != nil {
-			line := entry.parsed
+			line := localrt.LogLine{
+				Component: entry.component,
+				Time:      entry.time,
+				Text:      cleanLogMessage(entry.body),
+			}
 			if line.Time.IsZero() {
 				line.Time = now()
 			}

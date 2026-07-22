@@ -117,10 +117,7 @@ func refuse(dir string) error {
 	if _, err := os.Stat(filepath.Join(dir, project.Marker)); err == nil {
 		return fmt.Errorf("%s %w; edit that manifest instead of re-initializing", dir, ErrManifestExists)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
-		return nil
-	}
-	if info, err := os.Stat(filepath.Join(dir, ".astro")); err == nil && info.IsDir() {
+	if project.IsV1(dir) {
 		return fmt.Errorf("%s %w (Dockerfile and .astro/); migration ships in a later release — use astro CLI 1.x with this project for now", dir, ErrV1Project)
 	}
 	return nil

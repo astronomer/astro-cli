@@ -279,7 +279,7 @@ func missingReport(s *envschema.Schema, scope string, violations []envschema.Vio
 }
 
 func sortViolations(vs []envschema.Violation) {
-	sort.Slice(vs, func(i, j int) bool {
+	sort.SliceStable(vs, func(i, j int) bool {
 		if vs[i].Section != vs[j].Section {
 			return vs[i].Section < vs[j].Section
 		}

@@ -210,3 +210,41 @@ func TestNotFoundErrorMentionsStart(t *testing.T) {
 	require.True(t, errors.As(err, &nf))
 	assert.Contains(t, nf.Start, filepath.Base(dir))
 }
+
+func TestIsV1(t *testing.T) {
+	writeDockerfile := func(t *testing.T, dir string) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	}
+	writeAstroDir := func(t *testing.T, dir string) {
+		t.Helper()
+		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
+	}
+
+	t.Run("Dockerfile and .astro is v1", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		writeAstroDir(t, dir)
+		assert.True(t, IsV1(dir))
+	})
+	t.Run("Dockerfile alone is not v1", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		assert.False(t, IsV1(dir))
+	})
+	t.Run("pyproject dir is not v1", func(t *testing.T) {
+		dir := t.TempDir()
+		writeMarker(t, dir)
+		assert.False(t, IsV1(dir))
+	})
+	t.Run("v2 marker beside a v1 layout is not v1", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		writeAstroDir(t, dir)
+		writeMarker(t, dir)
+		assert.False(t, IsV1(dir))
+	})
+	t.Run("empty dir is not v1", func(t *testing.T) {
+		assert.False(t, IsV1(t.TempDir()))
+	})
+}

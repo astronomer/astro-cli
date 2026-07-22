@@ -22,6 +22,11 @@ const (
 // violation; a present-but-optional value is still checked (cheap, catches
 // typos). A nil schema yields no violations.
 //
+// "Required" means present, not non-empty: a required name set to the empty
+// string counts as satisfied (behavior lifted from Astro Desktop). Whether an
+// empty required value should instead be a violation is an open product
+// question.
+//
 // Lifted from Astro Desktop's envschema.Validate, adapted to the map-keyed
 // Schema and the ValueType consts. Desktop's "enum" type became the Enum
 // field, which constrains any base type: the type check runs first, then
@@ -68,7 +73,7 @@ func Validate(s *Schema, v Values) []Violation {
 	}
 
 	// Map iteration made the order random; findings must be stable.
-	sort.Slice(out, func(i, j int) bool {
+	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Section != out[j].Section {
 			return out[i].Section < out[j].Section
 		}

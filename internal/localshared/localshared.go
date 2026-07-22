@@ -57,12 +57,31 @@ func ReapDaemon(d ProxyDaemon) {
 	}
 }
 
+// allocAttempts bounds the retries when the pool hands back a port already
+// claimed by a sibling allocation in the same Start. The pool is thousands of
+// ports wide, so a clash is rare and clears on the next draw; the cap only
+// guards against a degenerate allocator looping forever.
+const allocAttempts = 50
+
 // ChoosePort resolves one published port: the requested one when free, the
 // mode default when free, otherwise an allocated one from the proxy pool.
 // portFree and alloc are the engine's seams so tests never bind sockets.
-func ChoosePort(requested, fallback int, portFree func(port string) bool, alloc func() (string, error)) (int, error) {
+//
+// exclude names ports already chosen for this same project this Start but not
+// yet written to routes.json — the sibling port a two-port mode (docker's api
+// and postgres) picked a moment earlier. Without it both draws can land on the
+// same pool port, since neither sees the other until the routes are saved.
+func ChoosePort(requested, fallback int, portFree func(port string) bool, alloc func() (string, error), exclude ...int) (int, error) {
+	blocked := func(p int) bool {
+		for _, e := range exclude {
+			if p == e {
+				return true
+			}
+		}
+		return false
+	}
 	for _, p := range []int{requested, fallback} {
-		if p > 0 && portFree(strconv.Itoa(p)) {
+		if p > 0 && !blocked(p) && portFree(strconv.Itoa(p)) {
 			return p, nil
 		}
 		if p == requested && p > 0 {
@@ -72,11 +91,20 @@ func ChoosePort(requested, fallback int, portFree func(port string) bool, alloc 
 			break
 		}
 	}
-	s, err := alloc()
-	if err != nil {
-		return 0, err
+	for range allocAttempts {
+		s, err := alloc()
+		if err != nil {
+			return 0, err
+		}
+		p, err := strconv.Atoi(s)
+		if err != nil {
+			return 0, err
+		}
+		if !blocked(p) {
+			return p, nil
+		}
 	}
-	return strconv.Atoi(s)
+	return 0, fmt.Errorf("could not allocate a port distinct from %v", exclude)
 }
 
 // PlanHostname uses the plan's hostname, deriving one only when plan

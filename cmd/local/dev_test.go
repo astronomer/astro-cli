@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -106,6 +108,43 @@ func TestDevStubBareAndUnknown(t *testing.T) {
 	if !strings.Contains(err.Error(), devMappingDoc) {
 		t.Errorf("unknown subcommand should link the mapping: %v", err)
 	}
+}
+
+func TestDevStubV1Notice(t *testing.T) {
+	writeDockerfile := func(t *testing.T, dir string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const notice = "astro v1 project (Dockerfile and .astro/)"
+
+	t.Run("Dockerfile and .astro gets the v1 notice", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		d, _ := testDeps(t)
+		d.WorkingDir = func() (string, error) { return dir, nil }
+		err := execute(t, d, "dev")
+		if err == nil || !strings.Contains(err.Error(), notice) {
+			t.Errorf("v1 dir should get the v1 notice: %v", err)
+		}
+	})
+	t.Run("Dockerfile alone gets no v1 notice", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		d, _ := testDeps(t)
+		d.WorkingDir = func() (string, error) { return dir, nil }
+		err := execute(t, d, "dev")
+		if err == nil {
+			t.Fatal("astro dev must still fail")
+		}
+		if strings.Contains(err.Error(), "astro v1 project") {
+			t.Errorf("a Dockerfile-only dir must not be called v1: %v", err)
+		}
+	})
 }
 
 func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {

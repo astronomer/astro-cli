@@ -95,6 +95,24 @@ func New(dir string) (*Project, error) {
 	}, nil
 }
 
+// IsV1 reports whether dir holds an astro v1 project: the old Dockerfile
+// layout with a .astro/ directory and no v2 manifest. A Dockerfile on its own
+// marks some container project, not necessarily v1, so it does not qualify —
+// `astro init` may still scaffold a v2 manifest beside it, and `astro dev`
+// must not claim such a directory is v1. A directory carrying the v2 Marker is
+// a v2 project, so it is never v1 either. This is the single v1 predicate both
+// `astro init` (refuse) and `astro dev` share.
+func IsV1(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, Marker)); err == nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, ".astro"))
+	return err == nil && info.IsDir()
+}
+
 // ID returns the identity key for a project directory: the sha256 hex of
 // its symlink-resolved absolute path. It is a thin wrapper over
 // localrt.ProjectID, which owns project identity (docs/v2-architecture.md).
