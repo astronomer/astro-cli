@@ -44,6 +44,11 @@ type Plan struct {
 	// manifest — but docker mode installs these into the runtime image so
 	// both modes run Airflow against the same set of packages.
 	Dependencies []string
+	// Packages is the project's [tool.astro] packages, the OS (apt) packages
+	// it needs at the system level. Docker mode bakes them into the runtime
+	// image through the ONBUILD packages.txt step; standalone mode has no
+	// image and cannot honor them, so it is warned about them at start.
+	Packages []string
 	// StopWithSession ties Airflow's lifetime to the process that starts
 	// it: true means Airflow is killed when that process exits; false (the
 	// default) means Airflow keeps running and any tool can reconnect to

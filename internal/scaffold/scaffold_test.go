@@ -51,6 +51,12 @@ func TestRunFreshScaffold(t *testing.T) {
 	// works with no hand-edit. The default pin is partial, so the
 	// requirement is a prefix match.
 	assert.Equal(t, []string{"apache-airflow==3.1.*"}, m.Project.Dependencies)
+	// A greenfield project declares no OS packages: the manifest carries no
+	// packages key at all, not an empty list.
+	assert.Nil(t, m.Astro.Packages)
+	data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "packages")
 }
 
 // TestScaffoldedProjectLocksWithRealUv scaffolds a project and runs a real

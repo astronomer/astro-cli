@@ -22,6 +22,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -45,6 +46,10 @@ type Astro struct {
 	// It may be partial ("3", "3.1"): resolution to a concrete version
 	// happens downstream, not here.
 	AirflowVersion string
+	// Packages is [tool.astro] packages, the OS (apt) packages the project
+	// needs at the system level — v1's packages.txt. Docker mode installs
+	// them into the runtime image; standalone mode cannot and warns.
+	Packages []string
 	// Deployments is the committed deployment inventory,
 	// [tool.astro.deployments.<name>].
 	Deployments map[string]Deployment
@@ -155,6 +160,7 @@ func Parse(data []byte) (*Manifest, error) {
 	m := &Manifest{
 		Astro: Astro{
 			AirflowVersion: f.Tool.Astro.Airflow,
+			Packages:       f.Tool.Astro.Packages,
 			Targets:        f.Tool.Astro.Target,
 			Env:            f.Tool.Astro.Env,
 		},
@@ -203,6 +209,12 @@ func validate(m *Manifest) []Problem {
 		add("tool.astro.airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", m.Astro.AirflowVersion))
 	}
 
+	for i, p := range m.Astro.Packages {
+		if strings.TrimSpace(p) == "" {
+			add(fmt.Sprintf("tool.astro.packages[%d]", i), "must be a non-empty string")
+		}
+	}
+
 	for name, d := range m.Astro.Deployments {
 		key := "tool.astro.deployments." + name
 		if d.Target == "" {
@@ -242,6 +254,7 @@ type wireProject struct {
 
 type wireAstro struct {
 	Airflow     string                    `toml:"airflow"`
+	Packages    []string                  `toml:"packages"`
 	Target      map[string]map[string]any `toml:"target"`
 	Deployments map[string]wireDeployment `toml:"deployments"`
 	Env         map[string]any            `toml:"env"`

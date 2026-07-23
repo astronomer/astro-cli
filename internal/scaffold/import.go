@@ -79,6 +79,9 @@ type ImportResult struct {
 	// requirements carried from the source, plus the apache-airflow line the
 	// import adds when the source named none.
 	Dependencies int `json:"dependencies"`
+	// Packages counts the OS packages carried from the source's packages.txt
+	// into [tool.astro] packages.
+	Packages int `json:"packages,omitempty"`
 	// Warnings collects non-fatal notes: carried lines, a missing
 	// requirements.txt, a defaulted Airflow version.
 	Warnings []string `json:"warnings,omitempty"`
@@ -147,7 +150,10 @@ func Import(ctx context.Context, src, dst string, opts ImportOptions) (*ImportRe
 	}
 	depsLiteral, depCount := renderDependencies(deps)
 
-	pyproject, err := renderManifest(name, version, depsLiteral)
+	// Carry the source's OS packages (v1's packages.txt) into [tool.astro]
+	// packages, so docker mode installs them just as v1 did.
+	pkgs := readPackages(absSrc)
+	pyproject, err := renderManifest(name, version, depsLiteral, renderPackages(pkgs))
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +165,7 @@ func Import(ctx context.Context, src, dst string, opts ImportOptions) (*ImportRe
 		Airflow:      version,
 		AirflowFrom:  from,
 		Dependencies: depCount,
+		Packages:     len(pkgs),
 	}
 	res.Warnings = append(res.Warnings, carriedWarnings(reqs)...)
 	if !haveReqs {
@@ -338,6 +345,35 @@ func readRequirements(src string) (lines []reqLine, present bool) {
 		return nil, false
 	}
 	return parseRequirements(data), true
+}
+
+// readPackages reads the source packages.txt (v1's OS-package list) and
+// returns the apt names, dropping blank lines and comments — the same
+// tolerance readRequirements shows. A missing file yields no packages.
+func readPackages(src string) []string {
+	data, err := os.ReadFile(filepath.Join(src, "packages.txt"))
+	if err != nil {
+		return nil
+	}
+	return parsePackages(data)
+}
+
+// parsePackages turns packages.txt bytes into apt package names, in file
+// order. Blank lines and comment lines are dropped, and a trailing inline
+// comment on a package line is stripped, matching parseRequirements.
+func parsePackages(data []byte) []string {
+	var out []string
+	for _, raw := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(strings.TrimRight(raw, "\r"))
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		name, _ := splitInlineComment(line)
+		if name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // resolveAirflow decides the pin and where it came from: an explicit flag

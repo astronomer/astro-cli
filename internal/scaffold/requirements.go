@@ -192,6 +192,22 @@ func renderDependencies(lines []reqLine) (literal string, count int) {
 	return b.String(), count
 }
 
+// renderPackages renders OS package names as a TOML array literal for
+// [tool.astro] packages. An empty list yields "", so the caller omits the
+// packages key — a greenfield manifest carries no packages line.
+func renderPackages(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("[\n")
+	for _, n := range names {
+		b.WriteString("    " + tomlString(n) + ",\n")
+	}
+	b.WriteString("]")
+	return b.String()
+}
+
 // carriedWarnings reports the lines that could not become dependencies, so the
 // import surfaces them rather than hiding them in a comment.
 func carriedWarnings(lines []reqLine) []string {

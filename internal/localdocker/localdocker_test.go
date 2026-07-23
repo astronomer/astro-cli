@@ -180,6 +180,49 @@ func TestStartInstallsDependenciesIntoImage(t *testing.T) {
 	assert.FileExists(t, filepath.Join(stateDir, buildContextDir, packagesName))
 }
 
+func TestStartWritesOSPackagesIntoContext(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.Packages = []string{"libpq-dev", "build-essential"}
+
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	name, err := composeProjectName(p.ProjectPath)
+	require.NoError(t, err)
+	tag := builtImageTag(name)
+	// OS packages alone trigger the build layer, even with no extra deps.
+	assert.True(t, hasCall(cmd.calls, "docker build --tag "+tag), "expected a build, got %v", cmd.calls)
+
+	stateDir, err := localrt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	pkgs, err := os.ReadFile(filepath.Join(stateDir, buildContextDir, packagesName))
+	require.NoError(t, err)
+	assert.Equal(t, "libpq-dev\nbuild-essential\n", string(pkgs))
+	// requirements.txt is still written (no extra deps here) so its own
+	// ONBUILD copy holds.
+	assert.FileExists(t, filepath.Join(stateDir, buildContextDir, requirementsName))
+}
+
+func TestStartNoOSPackagesWritesEmptyFile(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.Dependencies = []string{"pandas"} // a build runs, but no OS packages
+
+	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	stateDir, err := localrt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	// packages.txt must exist but stay empty when the manifest lists none,
+	// so the ONBUILD copy does not fail.
+	pkgs, err := os.ReadFile(filepath.Join(stateDir, buildContextDir, packagesName))
+	require.NoError(t, err)
+	assert.Empty(t, pkgs)
+}
+
 func TestStartNoDependenciesSkipsBuild(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)

@@ -152,6 +152,11 @@ func renderImport(w io.Writer, res *scaffold.ImportResult) error {
 			return err
 		}
 	}
+	if res.Packages > 0 {
+		if _, err := fmt.Fprintf(w, "  %d OS packages carried into pyproject.toml\n", res.Packages); err != nil {
+			return err
+		}
+	}
 	for _, warn := range res.Warnings {
 		if _, err := fmt.Fprintf(w, "  note: %s\n", warn); err != nil {
 			return err

@@ -17,7 +17,7 @@ import (
 
 // ErrWindowsUnsupported reports that standalone mode does not run on
 // Windows; docker mode does.
-var ErrWindowsUnsupported = errors.New("standalone mode is not supported on Windows; run local Airflow in containers instead: astro local start --mode docker")
+var ErrWindowsUnsupported = errors.New("standalone mode is not supported on Windows; run local Airflow in containers instead: astro local start --docker")
 
 // ErrNotStandaloneMode reports a record this engine does not own.
 var ErrNotStandaloneMode = errors.New("this project's local Airflow is not running in standalone mode")

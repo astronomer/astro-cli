@@ -86,18 +86,24 @@ func distName(req string) string {
 // runtime image's ONBUILD triggers, returning the tag to run. Build output
 // streams to cb.OnLine (component "build"); a failed install returns a named
 // error, never a hang.
-func (e *Engine) buildDepsImage(ctx context.Context, conn engineConn, stateDir, baseImage, projectName string, deps []string, cb localrt.Callbacks) (string, error) {
+func (e *Engine) buildDepsImage(ctx context.Context, conn engineConn, stateDir, baseImage, projectName string, deps, packages []string, cb localrt.Callbacks) (string, error) {
 	tag := builtImageTag(projectName)
 	contextDir := filepath.Join(stateDir, buildContextDir)
 	if err := os.MkdirAll(contextDir, stateDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", contextDir, err)
 	}
-	// requirements.txt carries the deps; packages.txt must exist (empty is
-	// fine) or the image's `ONBUILD COPY packages.txt .` fails.
+	// requirements.txt carries the deps; packages.txt carries the manifest's
+	// OS packages, one apt name per line. It must exist even when empty, or
+	// the image's `ONBUILD COPY packages.txt .` fails, so an empty list still
+	// writes the (empty) file.
 	if err := os.WriteFile(filepath.Join(contextDir, requirementsName), []byte(strings.Join(deps, "\n")+"\n"), proxy.FilePermRW); err != nil {
 		return "", fmt.Errorf("writing the generated requirements file: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(contextDir, packagesName), nil, proxy.FilePermRW); err != nil {
+	var packagesData []byte
+	if len(packages) > 0 {
+		packagesData = []byte(strings.Join(packages, "\n") + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, packagesName), packagesData, proxy.FilePermRW); err != nil {
 		return "", fmt.Errorf("writing the generated packages file: %w", err)
 	}
 	// The Dockerfile is only `FROM <base>`; the ONBUILD triggers do the

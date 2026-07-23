@@ -79,6 +79,51 @@ func TestEmitTextRendersSameValue(t *testing.T) {
 	}
 }
 
+func TestWarnStandalonePackages(t *testing.T) {
+	packages := []string{"libpq-dev"}
+	cases := []struct {
+		name     string
+		plan     localrt.Plan
+		wantWarn bool
+	}{
+		{"standalone with packages warns", localrt.Plan{Packages: packages}, true},
+		{"explicit standalone with packages warns", localrt.Plan{Mode: localrt.ModeStandalone, Packages: packages}, true},
+		{"docker with packages is silent", localrt.Plan{Mode: localrt.ModeDocker, Packages: packages}, false},
+		{"standalone without packages is silent", localrt.Plan{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Text mode: a warning line, or nothing.
+			text := &bytes.Buffer{}
+			warnStandalonePackages(Renderer{Format: FormatText, Out: text}, tc.plan)
+			if tc.wantWarn {
+				if !strings.Contains(text.String(), "warning: this project declares OS packages") {
+					t.Errorf("text output missing the warning: %q", text.String())
+				}
+			} else if text.Len() != 0 {
+				t.Errorf("expected no warning, got %q", text.String())
+			}
+
+			// JSON mode: a single warning event line, or nothing.
+			jsonOut := &bytes.Buffer{}
+			warnStandalonePackages(Renderer{Format: FormatJSON, Out: jsonOut}, tc.plan)
+			if !tc.wantWarn {
+				if jsonOut.Len() != 0 {
+					t.Errorf("expected no JSON warning, got %q", jsonOut.String())
+				}
+				return
+			}
+			var e event
+			if err := json.Unmarshal(bytes.TrimSpace(jsonOut.Bytes()), &e); err != nil {
+				t.Fatalf("warning is not valid JSON: %v: %q", err, jsonOut.String())
+			}
+			if e.Event != "warning" || !strings.Contains(e.Text, "standalone mode cannot install them") {
+				t.Errorf("unexpected warning event: %+v", e)
+			}
+		})
+	}
+}
+
 func TestCommandsRejectUnknownOutputFormat(t *testing.T) {
 	d, _ := testDeps(t)
 	err := execute(t, d, "local", "status", "--output", "yaml")

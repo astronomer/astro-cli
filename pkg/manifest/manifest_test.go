@@ -26,6 +26,7 @@ dependencies = ["pandas>=2.1", "apache-airflow-providers-snowflake"]
 
 [tool.astro]
 airflow = "3.1"
+packages = ["libpq-dev", "build-essential"]
 
 [tool.astro.target.astro]
 image = { os = "ubi", python = "3.12" }
@@ -65,6 +66,11 @@ func TestLoadFull(t *testing.T) {
 		t.Errorf("AirflowVersion = %q, want %q", m.Astro.AirflowVersion, "3.1")
 	}
 
+	wantPackages := []string{"libpq-dev", "build-essential"}
+	if !reflect.DeepEqual(m.Astro.Packages, wantPackages) {
+		t.Errorf("Packages = %#v, want %#v", m.Astro.Packages, wantPackages)
+	}
+
 	wantDeployments := map[string]Deployment{
 		"preview": {Target: "astro", Workspace: "ws-abc", Deployment: "dep-preview"},
 		"prod":    {Target: "astro", Workspace: "ws-abc", Deployment: "dep-xyz"},
@@ -99,7 +105,7 @@ func TestLoadMinimal(t *testing.T) {
 	if m.Project.Name != "etl" || m.Astro.AirflowVersion != "3" {
 		t.Errorf("got %#v", m)
 	}
-	if m.Astro.Deployments != nil || m.Astro.Env != nil || m.Astro.Targets != nil {
+	if m.Astro.Deployments != nil || m.Astro.Env != nil || m.Astro.Targets != nil || m.Astro.Packages != nil {
 		t.Errorf("absent sections should stay nil, got %#v", m.Astro)
 	}
 }
@@ -158,6 +164,11 @@ func TestValidation(t *testing.T) {
 			name:     "bad airflow version",
 			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"three\"\n",
 			wantKeys: []string{"tool.astro.airflow"},
+		},
+		{
+			name:     "empty package entry",
+			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\npackages = [\"libpq-dev\", \"  \"]\n",
+			wantKeys: []string{"tool.astro.packages[1]"},
 		},
 		{
 			name: "incomplete deployment",

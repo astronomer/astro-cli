@@ -176,6 +176,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	if err != nil {
 		return c.reportBuildError(r, err)
 	}
+	warnStandalonePackages(r, built.Plan)
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return err
@@ -195,6 +196,22 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	}
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
+	})
+}
+
+// warnStandalonePackages warns once, at start, when a project declares OS
+// packages but is starting in standalone mode, which has no image to bake them
+// into. Docker mode installs them, so it says nothing. The warning routes
+// through the renderer, so json mode keeps one JSON object per line.
+func warnStandalonePackages(r Renderer, p localrt.Plan) {
+	if len(p.Packages) == 0 || p.Mode == localrt.ModeDocker {
+		return
+	}
+	e := event{Event: "warning", Text: "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself"}
+	//nolint:errcheck // a warning write failure surfaces on the command's own output
+	r.Emit(e, func(w io.Writer) error {
+		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
+		return werr
 	})
 }
 
@@ -298,6 +315,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	if err != nil {
 		return err
 	}
+	warnStandalonePackages(r, built.Plan)
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
 	}

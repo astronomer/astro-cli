@@ -155,12 +155,13 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 	if err != nil {
 		return nil, err
 	}
-	// Install the project's dependencies into a layer over the runtime image
-	// so docker mode imports the same packages standalone does. The base image
-	// already provides Airflow, so only the rest are installed; a project with
-	// nothing beyond Airflow needs no build and runs the runtime image as-is.
-	if deps := runtimeDeps(p.Dependencies); len(deps) > 0 {
-		image, err = e.buildDepsImage(ctx, conn, stateDir, image, name, deps, cb)
+	// Install the project's dependencies and OS packages into a layer over the
+	// runtime image so docker mode matches standalone. The base image already
+	// provides Airflow, so only the rest are installed; a project with nothing
+	// beyond Airflow and no OS packages needs no build and runs the runtime
+	// image as-is.
+	if deps := runtimeDeps(p.Dependencies); len(deps) > 0 || len(p.Packages) > 0 {
+		image, err = e.buildDepsImage(ctx, conn, stateDir, image, name, deps, p.Packages, cb)
 		if err != nil {
 			return nil, err
 		}

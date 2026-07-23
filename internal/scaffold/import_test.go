@@ -93,6 +93,43 @@ func TestImportPlainRepo(t *testing.T) {
 	}
 }
 
+func TestImportCarriesOSPackages(t *testing.T) {
+	src := t.TempDir()
+	writeFiles(t, src, map[string]string{
+		"dags/d.py":        "# dag\n",
+		"requirements.txt": "requests\n",
+		// Blank lines, comments, and an inline comment are all tolerated,
+		// matching the requirements importer.
+		"packages.txt": "libpq-dev\n\n# system libs\nbuild-essential  # for wheels\n",
+	})
+	dst := filepath.Join(t.TempDir(), "imported")
+
+	res, err := Import(context.Background(), src, dst, ImportOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, res.Packages)
+
+	m, err := manifest.Load(filepath.Join(dst, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"libpq-dev", "build-essential"}, m.Astro.Packages)
+}
+
+func TestImportWithoutPackagesEmitsNoPackagesKey(t *testing.T) {
+	src := t.TempDir()
+	writeFiles(t, src, map[string]string{
+		"dags/d.py":        "# dag\n",
+		"requirements.txt": "requests\n",
+	})
+	dst := filepath.Join(t.TempDir(), "imported")
+
+	res, err := Import(context.Background(), src, dst, ImportOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 0, res.Packages)
+
+	data, err := os.ReadFile(filepath.Join(dst, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "packages")
+}
+
 func TestImportLiftsAirflowPinAndCarriesGarbage(t *testing.T) {
 	src := t.TempDir()
 	writeFiles(t, src, map[string]string{
