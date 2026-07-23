@@ -13,6 +13,7 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 )
 
 var (
@@ -38,8 +39,26 @@ func newDbtCmd() *cobra.Command {
 	cmd.AddCommand(
 		newDbtDeployCmd(),
 		newDbtDeleteCmd(),
+		newDbtCleanupCmd(),
 	)
 	return cmd
+}
+
+func newDbtCleanupCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "cleanup [path ...]",
+		Args:   cobra.ArbitraryArgs,
+		Short:  "Uninstall the Cosmos Boost plugin and its associated files",
+		Long:   "Uninstall the Cosmos Boost plugin and its associated files under each path (default: the current directory).",
+		Hidden: true,
+		RunE:   cleanupDbt,
+	}
+	return cmd
+}
+
+func cleanupDbt(cmd *cobra.Command, args []string) error {
+	cmd.SilenceUsage = true
+	return cosmosboost.Uninstall(args...)
 }
 
 //nolint:dupl
