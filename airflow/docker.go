@@ -241,7 +241,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	imageName := opts.ImageName
 	settingsFile := opts.SettingsFile
 	composeFile := opts.ComposeFile
-	buildSecretString := opts.BuildSecretString
+	buildSecrets := opts.BuildSecrets
 	noCache := opts.NoCache
 	noBrowser := opts.NoBrowser
 	waitTime := opts.WaitTime
@@ -257,7 +257,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 			}
 		}
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
 		if !config.CFG.DisableAstroRun.GetBool() {
 			// remove astro-run-dag from requirments.txt
 			err := fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
@@ -663,12 +663,12 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error) {
+func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string, buildSecrets []string) (string, error) {
 	// deployImageName may be provided to the function if it is being used in the deploy command
 	if deployImageName == "" {
 		// build image
 		if customImageName == "" {
-			err := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+			err := d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 			if err != nil {
 				return "", err
 			}
@@ -704,7 +704,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage string, buildSecrets []string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -729,7 +729,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	} else {
 		// build image for current Airflow version to get current Airflow version
 		fmt.Println("\nBuilding image for current version")
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 		if imageBuildErr != nil {
 			return imageBuildErr
 		}
@@ -758,7 +758,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	newDockerFile := destFolder + "/Dockerfile"
 
 	if versionTest {
-		err := d.versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage, buildSecretString)
+		err := d.versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage, buildSecrets)
 		if err != nil {
 			return err
 		}
@@ -767,7 +767,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	var failed bool
 
 	if dagTest {
-		dagTestPassed, err := d.dagTest(testHomeDirectory, newVersion, newDockerFile, customImage, buildSecretString)
+		dagTestPassed, err := d.dagTest(testHomeDirectory, newVersion, newDockerFile, customImage, buildSecrets)
 		if err != nil {
 			return err
 		}
@@ -829,7 +829,7 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, astroV1Clie
 	return nil
 }
 
-func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage, buildSecretString string) error {
+func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage string, buildSecrets []string) error {
 	fmt.Println("\nComparing dependency versions between current and upgraded environment")
 	// pip freeze old Airflow image
 	fmt.Println("\nObtaining pip freeze for current version")
@@ -845,7 +845,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymen
 		return err
 	}
 	fmt.Println("\nBuilding image for new version")
-	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 	if imageBuildErr != nil {
 		return imageBuildErr
 	}
@@ -867,7 +867,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymen
 	return nil
 }
 
-func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, customImage, buildSecretString string) (bool, error) {
+func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, customImage string, buildSecrets []string) (bool, error) {
 	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newVersion)
 
 	// build image with the new runtime version
@@ -883,7 +883,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 		fmt.Printf("Adding 'pytest-html' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 	}
 	fmt.Println("\nBuilding image for new version")
-	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 
 	// remove pytest-html to the requirements
 	err = fileutil.RemoveLineFromFile(reqFile, "pytest-html", " # This package is needed for the upgrade dag test. It will be removed once the test is over")
@@ -1314,7 +1314,7 @@ func checkVersionChange(before, after string) (change bool, updateType string, e
 	}
 }
 
-func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretString string) error {
+func (d *DockerCompose) Parse(customImageName, deployImageName string, buildSecrets []string) error {
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath
 
@@ -1331,7 +1331,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 	fmt.Println("Checking your DAGs for errors…")
 
 	pytestFile := DefaultTestPath
-	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecretString)
+	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecrets)
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
 			return errors.New("See above for errors detected in your DAGs")
@@ -1342,14 +1342,14 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 	return err
 }
 
-func (d *DockerCompose) Build(customImageName, buildSecretString string, noCache bool) error {
+func (d *DockerCompose) Build(customImageName string, buildSecrets []string, noCache bool) error {
 	// If a custom image name is provided, tag it as our project image
 	if customImageName != "" {
 		return d.imageHandler.TagLocalImage(customImageName)
 	}
 
 	// Build the image
-	return d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{
+	return d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{
 		Path:    d.airflowHome,
 		NoCache: noCache,
 	})
@@ -1551,7 +1551,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
 		}
 	}()
-	err = d.imageHandler.Build(d.dockerfile, "", airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
+	err = d.imageHandler.Build(d.dockerfile, nil, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
 	if err != nil {
 		return err
 	}
