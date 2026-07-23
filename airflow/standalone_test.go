@@ -287,7 +287,7 @@ func (s *Suite) TestStandaloneUnsupportedCommands() {
 
 	s.Equal(errStandaloneNotSupported, handler.RunDAG("", "", "", "", false, false))
 
-	buildErr := handler.Build("", "", false)
+	buildErr := handler.Build("", nil, false)
 	s.Error(buildErr)
 	s.Contains(buildErr.Error(), "not available in standalone mode")
 
@@ -295,7 +295,7 @@ func (s *Suite) TestStandaloneUnsupportedCommands() {
 	s.Error(composeErr)
 	s.Contains(composeErr.Error(), "not available in standalone mode")
 
-	upgradeErr := handler.UpgradeTest("", "", "", "", false, false, false, false, false, "", nil)
+	upgradeErr := handler.UpgradeTest("", "", "", nil, false, false, false, false, false, "", nil)
 	s.Error(upgradeErr)
 	s.Contains(upgradeErr.Error(), "not available in standalone mode")
 }
@@ -1758,7 +1758,7 @@ func (s *Suite) TestStandalonePytest_NoVenv() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	_, err = handler.Pytest("", "", "", "", "")
+	_, err = handler.Pytest("", "", "", "", nil)
 	s.Error(err)
 	s.Contains(err.Error(), "no virtual environment found")
 }
@@ -1785,7 +1785,7 @@ func (s *Suite) TestStandalonePytest_Success() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	exitCode, err := handler.Pytest("", "", "", "", "")
+	exitCode, err := handler.Pytest("", "", "", "", nil)
 	s.NoError(err)
 	s.Equal("", exitCode)
 	s.Equal([]string{"pytest", "tests/"}, capturedArgs)
@@ -1824,7 +1824,7 @@ func (s *Suite) TestStandalonePytest_WithFileAndArgs() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	exitCode, err := handler.Pytest("test_dag.py", "", "", "-v --tb=short", "")
+	exitCode, err := handler.Pytest("test_dag.py", "", "", "-v --tb=short", nil)
 	s.NoError(err)
 	s.Equal("", exitCode)
 	s.Equal([]string{"pytest", "tests/test_dag.py", "-v", "--tb=short"}, capturedArgs)
@@ -1850,7 +1850,7 @@ func (s *Suite) TestStandalonePytest_DefaultTestPath() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	exitCode, err := handler.Pytest(DefaultTestPath, "", "", "", "")
+	exitCode, err := handler.Pytest(DefaultTestPath, "", "", "", nil)
 	s.NoError(err)
 	s.Equal("", exitCode)
 	// DefaultTestPath should NOT be prepended with tests/
@@ -1877,7 +1877,7 @@ func (s *Suite) TestStandalonePytest_FileInTestsDir() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	exitCode, err := handler.Pytest("tests/test_my_dag.py", "", "", "", "")
+	exitCode, err := handler.Pytest("tests/test_my_dag.py", "", "", "", nil)
 	s.NoError(err)
 	s.Equal("", exitCode)
 	// Already contains "tests", should not be prepended
@@ -1904,7 +1904,7 @@ func (s *Suite) TestStandalonePytest_Failure() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	exitCode, err := handler.Pytest("", "", "", "", "")
+	exitCode, err := handler.Pytest("", "", "", "", nil)
 	s.Error(err)
 	s.Equal("1", exitCode)
 	s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
@@ -1921,7 +1921,7 @@ func (s *Suite) TestStandaloneParse_FileNotFound() {
 	s.NoError(err)
 
 	// No DefaultTestPath file exists — should return nil with a message
-	err = handler.Parse("", "", "")
+	err = handler.Parse("", "", nil)
 	s.NoError(err)
 }
 
@@ -1950,7 +1950,7 @@ func (s *Suite) TestStandaloneParse_Success() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Parse("", "", "")
+	err = handler.Parse("", "", nil)
 	s.NoError(err)
 }
 
@@ -1978,7 +1978,7 @@ func (s *Suite) TestStandaloneParse_DagErrors() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Parse("", "", "")
+	err = handler.Parse("", "", nil)
 	s.Error(err)
 	s.Contains(err.Error(), "errors detected in your DAGs")
 }
@@ -2008,7 +2008,7 @@ func (s *Suite) TestStandaloneParse_Interrupted() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Parse("", "", "")
+	err = handler.Parse("", "", nil)
 	s.Error(err)
 	s.Contains(err.Error(), "something went wrong while parsing your DAGs")
 }
