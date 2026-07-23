@@ -32,6 +32,7 @@ var v2BelowCmd = []string{
 	"internal/deploy",
 	"internal/envresolve",
 	"internal/fsatomic",
+	"internal/imagebuild",
 	"internal/localdocker",
 	"internal/localprune",
 	"internal/localshared",

@@ -171,16 +171,11 @@ func TestStartInstallsDependenciesIntoImage(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(compose), "image: "+tag)
 	assert.NotContains(t, string(compose), runtimeImageRepo)
-
-	// The requirements file in the build context holds the manifest deps.
-	req, err := os.ReadFile(filepath.Join(stateDir, buildContextDir, requirementsName))
-	require.NoError(t, err)
-	assert.Equal(t, "pandas==2.2.0\nrequests\n", string(req))
-	// packages.txt must exist so the image's ONBUILD copy does not fail.
-	assert.FileExists(t, filepath.Join(stateDir, buildContextDir, packagesName))
+	// The build context's contents (requirements.txt, packages.txt) are the
+	// builder's concern and are checked in internal/imagebuild.
 }
 
-func TestStartWritesOSPackagesIntoContext(t *testing.T) {
+func TestStartOSPackagesTriggerBuild(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
 	p := testPlan(t)
@@ -194,33 +189,6 @@ func TestStartWritesOSPackagesIntoContext(t *testing.T) {
 	tag := builtImageTag(name)
 	// OS packages alone trigger the build layer, even with no extra deps.
 	assert.True(t, hasCall(cmd.calls, "docker build --tag "+tag), "expected a build, got %v", cmd.calls)
-
-	stateDir, err := localrt.StateDir(p.ProjectPath)
-	require.NoError(t, err)
-	pkgs, err := os.ReadFile(filepath.Join(stateDir, buildContextDir, packagesName))
-	require.NoError(t, err)
-	assert.Equal(t, "libpq-dev\nbuild-essential\n", string(pkgs))
-	// requirements.txt is still written (no extra deps here) so its own
-	// ONBUILD copy holds.
-	assert.FileExists(t, filepath.Join(stateDir, buildContextDir, requirementsName))
-}
-
-func TestStartNoOSPackagesWritesEmptyFile(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
-	p := testPlan(t)
-	p.Dependencies = []string{"pandas"} // a build runs, but no OS packages
-
-	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
-	require.NoError(t, err)
-
-	stateDir, err := localrt.StateDir(p.ProjectPath)
-	require.NoError(t, err)
-	// packages.txt must exist but stay empty when the manifest lists none,
-	// so the ONBUILD copy does not fail.
-	pkgs, err := os.ReadFile(filepath.Join(stateDir, buildContextDir, packagesName))
-	require.NoError(t, err)
-	assert.Empty(t, pkgs)
 }
 
 func TestStartNoDependenciesSkipsBuild(t *testing.T) {
@@ -244,22 +212,6 @@ func TestStartAirflowOnlyDepsSkipsBuild(t *testing.T) {
 	_, err := e.Start(context.Background(), p, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.False(t, hasCall(cmd.calls, "build"), "airflow-only deps must not trigger a build, got %v", cmd.calls)
-}
-
-func TestRuntimeDepsDropsAirflowOnly(t *testing.T) {
-	got := runtimeDeps([]string{
-		"apache-airflow==3.1.*",
-		"apache-airflow[celery] >= 3",
-		"APACHE_AIRFLOW==3",
-		"apache-airflow-providers-postgres",
-		"pandas",
-		"requests>=2",
-	})
-	assert.Equal(t, []string{
-		"apache-airflow-providers-postgres",
-		"pandas",
-		"requests>=2",
-	}, got)
 }
 
 func TestStartFailedDepInstallReturnsNamedError(t *testing.T) {
