@@ -29,6 +29,7 @@ const modulePrefix = "github.com/astronomer/astro-cli/"
 // ...).
 var v2BelowCmd = []string{
 	"internal/checks",
+	"internal/deploy",
 	"internal/envresolve",
 	"internal/fsatomic",
 	"internal/localdocker",

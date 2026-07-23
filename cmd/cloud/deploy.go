@@ -3,15 +3,22 @@ package cloud
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
+	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/pkg/git"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -37,6 +44,8 @@ var (
 	nonDagsMountPath  string
 	nonDagsBundleType string
 	nonDagsBundlePath string
+	v2Deployment      string
+	v2Workspace       string
 	deployExample     = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
@@ -71,6 +80,12 @@ func NewDeployCmd() *cobra.Command {
 			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
 				return nil
 			}
+			// A v2 project has no .astro/config.yaml, so the v1 EnsureProjectDir
+			// check would reject it. The v2 path loads and validates the manifest
+			// itself, so skip the v1 check and let deploy() route.
+			if v2deploy.IsV2Project(config.WorkingPath) {
+				return nil
+			}
 			return EnsureProjectDir(cmd, args)
 		},
 		RunE:    deploy,
@@ -95,6 +110,8 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.Flags().StringVar(&v2Deployment, "deployment", "", "Deployment id to deploy to, overriding the manifest link. For v2 projects (a pyproject.toml with [tool.astro])")
+	cmd.Flags().StringVar(&v2Workspace, "workspace", "", "Workspace for the deploy, overriding the context. For v2 projects (a pyproject.toml with [tool.astro])")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
@@ -144,6 +161,13 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 }
 
 func deploy(cmd *cobra.Command, args []string) error {
+	// Route by project type. A v2 project (a pyproject.toml with [tool.astro])
+	// takes the new v2 deploy path; everything else runs the v1 path below,
+	// unchanged. project detection lives in internal/deploy.
+	if v2deploy.IsV2Project(config.WorkingPath) {
+		return deployV2(cmd, args)
+	}
+
 	deploymentID = ""
 
 	// Get deploymentId from args, if passed
@@ -284,4 +308,96 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		AstroV1Client: astroV1Client,
 	}
 	return DeployBundle(deployBundleInput)
+}
+
+// deployV2 runs the v2 deploy path: load the manifest, gather flags and
+// context, resolve the deployment and run a dags-only deploy, then render the
+// result. The v2 logic lives in internal/deploy; this is the cmd shim that
+// parses, wires the transport, and prints.
+func deployV2(cmd *cobra.Command, args []string) error {
+	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
+	if err != nil {
+		return err
+	}
+
+	linkName := ""
+	if len(args) > 0 {
+		linkName = args[0]
+	}
+
+	// The workspace from the current context is the fallback when neither
+	// --workspace nor a link carries one. An empty context is not an error here;
+	// internal/deploy decides when a workspace is actually required.
+	contextWorkspace, _ := workspace.GetCurrentWorkspace() //nolint:errcheck // absent context is handled downstream
+
+	// --workspace wins over the legacy --workspace-id when both are set.
+	overrideWorkspace := v2Workspace
+	if overrideWorkspace == "" {
+		overrideWorkspace = workspaceID
+	}
+
+	cmd.SilenceUsage = true
+
+	res, err := v2deploy.Run(v2deploy.Request{
+		ProjectDir:       config.WorkingPath,
+		Manifest:         m,
+		LinkName:         linkName,
+		DeploymentID:     v2Deployment,
+		WorkspaceID:      overrideWorkspace,
+		ContextWorkspace: contextWorkspace,
+		DagsOnly:         dags,
+		Image:            image,
+		ImageName:        cmd.Flags().Changed(imageNameFlag),
+		Description:      deployDescription,
+		Wait:             waitForDeploy,
+		WaitTime:         waitTime,
+		NoDagsBaseDir:    noDagsBaseDir,
+		Interactive:      term.IsTerminal(int(os.Stdin.Fd())),
+	}, v2Deployer{client: astroV1Client})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Deployed DAGs (version %s) to deployment %s.\n", res.DagTarballVersion, res.DeploymentID)
+	if res.URL != "" {
+		fmt.Printf("Deployment: %s\n", res.URL)
+	}
+	return nil
+}
+
+// v2Deployer wires internal/deploy's transport seam to the v1 cloud/deploy
+// transport and the deployment selection flow.
+type v2Deployer struct {
+	client astrov1.APIClient
+}
+
+// ResolveUnlinked runs v1's workspace-level pick/create flow and returns the
+// chosen deployment id.
+func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
+	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.client)
+	if err != nil {
+		return "", err
+	}
+	return dep.Id, nil
+}
+
+// DeployDags reuses the v1 dags-only transport for the v2 project's dags/.
+func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, error) {
+	res, err := cloud.DeployDagsV2(cloud.DagDeployV2Input{
+		ProjectDir:    in.ProjectDir,
+		DeploymentID:  in.DeploymentID,
+		Description:   in.Description,
+		NoDagsBaseDir: in.NoDagsBaseDir,
+		Wait:          in.Wait,
+		WaitTime:      in.WaitTime,
+	}, d.client)
+	if err != nil {
+		return v2deploy.DagResult{}, err
+	}
+	return v2deploy.DagResult{
+		WorkspaceID:       res.WorkspaceID,
+		RuntimeVersion:    res.RuntimeVersion,
+		DagTarballVersion: res.DagTarballVersion,
+		URL:               res.URL,
+	}, nil
 }

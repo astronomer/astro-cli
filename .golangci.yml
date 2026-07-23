@@ -132,7 +132,7 @@ linters:
       # are passed by value on purpose (docs/v2-architecture.md), so
       # hugeParam does not apply
       - linters: [gocritic]
-        path: ^(cmd/(local|astro)|internal/(local|envresolve))
+        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy))
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]
