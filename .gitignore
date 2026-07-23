@@ -26,3 +26,5 @@ testbin/
 testbin/golangci-lint
 upgrade-test*
 vendor/github.com/theupdateframework/notary/Dockerfile
+config/test.yaml
+config/test.yaml.lock
