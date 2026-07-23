@@ -2970,6 +2970,11 @@ type AllowedIpAddressRange struct {
 	UpdatedBy *BasicSubjectProfile `json:"updatedBy,omitempty"`
 }
 
+// AllowedIpAddressRangesList defines model for AllowedIpAddressRangesList.
+type AllowedIpAddressRangesList struct {
+	AllowedIpAddressRanges []AllowedIpAddressRange `json:"allowedIpAddressRanges"`
+}
+
 // AllowedIpAddressRangesPaginated defines model for AllowedIpAddressRangesPaginated.
 type AllowedIpAddressRangesPaginated struct {
 	AllowedIpAddressRanges []AllowedIpAddressRange `json:"allowedIpAddressRanges"`
@@ -3097,6 +3102,18 @@ type BasicSubjectProfile struct {
 // BasicSubjectProfileSubjectType The subject type.
 type BasicSubjectProfileSubjectType string
 
+// BulkCreateAllowedIpAddressRangesRequest defines model for BulkCreateAllowedIpAddressRangesRequest.
+type BulkCreateAllowedIpAddressRangesRequest struct {
+	// AllowedIpAddressRanges The allowed IP address ranges, in CIDR format. The batch is created atomically: if any value fails validation or conflicts with an existing range, no rows are inserted.
+	AllowedIpAddressRanges []string `json:"allowedIpAddressRanges"`
+}
+
+// BulkDeleteAllowedIpAddressRangesRequest defines model for BulkDeleteAllowedIpAddressRangesRequest.
+type BulkDeleteAllowedIpAddressRangesRequest struct {
+	// AllowedIpAddressRangeIds The allowed IP address range IDs to delete. Duplicate and unknown IDs are accepted; existing matching rows are deleted atomically.
+	AllowedIpAddressRangeIds []string `json:"allowedIpAddressRangeIds"`
+}
+
 // Bundle defines model for Bundle.
 type Bundle struct {
 	// BundleType The type of bundle.
@@ -3161,8 +3178,11 @@ type Cluster struct {
 	IsFailedOver *bool `json:"isFailedOver,omitempty"`
 
 	// IsLimited Whether the cluster is limited.
-	IsLimited *bool            `json:"isLimited,omitempty"`
-	Metadata  *ClusterMetadata `json:"metadata,omitempty"`
+	IsLimited *bool `json:"isLimited,omitempty"`
+
+	// IsPrivateNetworkEgressEnabled Whether Private Network Egress mode is enabled, which disables public Internet connectivity from the cluster's Deployments and metrics exports. For AWS clusters only.
+	IsPrivateNetworkEgressEnabled *bool            `json:"isPrivateNetworkEgressEnabled,omitempty"`
+	Metadata                      *ClusterMetadata `json:"metadata,omitempty"`
 
 	// Name The cluster's name.
 	Name string `json:"name"`
@@ -3452,6 +3472,9 @@ type CreateAwsClusterRequest struct {
 
 	// EnableReplicationTimeControl Whether Bucket Storage Replication Time Control should be enabled for DR on task logs.
 	EnableReplicationTimeControl *bool `json:"enableReplicationTimeControl,omitempty"`
+
+	// IsPrivateNetworkEgressEnabled When true, enables Private Network Egress mode, which disables public Internet connectivity from the cluster's Deployments and metrics exports. For AWS clusters only.
+	IsPrivateNetworkEgressEnabled *bool `json:"isPrivateNetworkEgressEnabled,omitempty"`
 
 	// K8sTags The Kubernetes tags in the cluster.
 	K8sTags *[]ClusterK8sTag `json:"k8sTags,omitempty"`
@@ -3908,8 +3931,11 @@ type CreateEnvironmentObjectRequest struct {
 	AirflowVariable *CreateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 
 	// AutoLinkDeployments Whether or not to automatically link Deployments to the environment object. Only applicable for WORKSPACE scope
-	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
-	Connection          *CreateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
+	Connection          *CreateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
+
+	// Description The description of the environment object
+	Description         *string                                            `json:"description,omitempty"`
 	EnvironmentVariable *CreateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
 
 	// ExcludeLinks The links to exclude from the environment object. Only applicable for WORKSPACE scope
@@ -4784,8 +4810,11 @@ type EnvironmentObject struct {
 	Connection          *EnvironmentObjectConnection `json:"connection,omitempty"`
 
 	// CreatedAt The time when the environment object was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`
-	CreatedAt           *string                               `json:"createdAt,omitempty"`
-	CreatedBy           *BasicSubjectProfile                  `json:"createdBy,omitempty"`
+	CreatedAt *string              `json:"createdAt,omitempty"`
+	CreatedBy *BasicSubjectProfile `json:"createdBy,omitempty"`
+
+	// Description The description of the environment object
+	Description         *string                               `json:"description,omitempty"`
 	EnvironmentVariable *EnvironmentObjectEnvironmentVariable `json:"environmentVariable,omitempty"`
 
 	// ExcludeLinks The excluded links for the environment object
@@ -4809,6 +4838,9 @@ type EnvironmentObject struct {
 
 	// ScopeEntityId The ID of the scope entity where the environment object is created
 	ScopeEntityId string `json:"scopeEntityId"`
+
+	// SetFields Names of fields that have a value set on the environment object. Secret values are masked in responses, so this list lets clients tell a set secret from an unset field. Map members appear as dotted paths (for example "extra.aws_secret")
+	SetFields []string `json:"setFields"`
 
 	// SourceScope The source scope of the environment object, if it is resolved from a link
 	SourceScope *EnvironmentObjectSourceScope `json:"sourceScope,omitempty"`
@@ -4934,6 +4966,9 @@ type EnvironmentObjectLink struct {
 
 	// ScopeEntityId Linked entity ID the environment object
 	ScopeEntityId string `json:"scopeEntityId"`
+
+	// SetFields Names of override fields that have a value set on this link. Secret values are masked, so this list distinguishes a set secret override from an unset one. Map members appear as dotted paths (for example "headers.X-Key")
+	SetFields []string `json:"setFields"`
 }
 
 // EnvironmentObjectLinkScope Scope of the linked entity for the environment object
@@ -5034,9 +5069,12 @@ type EnvironmentObjectsPaginated struct {
 
 // Error defines model for Error.
 type Error struct {
-	Message    string `json:"message"`
-	RequestId  string `json:"requestId"`
-	StatusCode int    `json:"statusCode"`
+	// FieldErrors FieldErrors carries one entry per failed request-validation constraint.
+	// Only present on 400 responses caused by request binding/validation.
+	FieldErrors *[]FieldValidationError `json:"fieldErrors,omitempty"`
+	Message     string                  `json:"message"`
+	RequestId   string                  `json:"requestId"`
+	StatusCode  int                     `json:"statusCode"`
 }
 
 // ExcludeLinkEnvironmentObjectRequest defines model for ExcludeLinkEnvironmentObjectRequest.
@@ -5050,6 +5088,13 @@ type ExcludeLinkEnvironmentObjectRequest struct {
 
 // ExcludeLinkEnvironmentObjectRequestScope Scope of the entity to exclude for environment object
 type ExcludeLinkEnvironmentObjectRequestScope string
+
+// FieldValidationError defines model for FieldValidationError.
+type FieldValidationError struct {
+	Code    string `json:"code"`
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
 
 // FinalizeDeployRequest defines model for FinalizeDeployRequest.
 type FinalizeDeployRequest struct {
@@ -5191,14 +5236,16 @@ type Organization struct {
 	BillingEmail *string `json:"billingEmail,omitempty"`
 
 	// CreatedAt The time when the Organization was created in UTC, formatted as `YYYY-MM-DDTHH:MM:SSZ`.
-	CreatedAt time.Time           `json:"createdAt"`
-	CreatedBy BasicSubjectProfile `json:"createdBy"`
+	CreatedAt             time.Time           `json:"createdAt"`
+	CreatedBy             BasicSubjectProfile `json:"createdBy"`
+	HasAiFeaturesDisabled *bool               `json:"hasAiFeaturesDisabled,omitempty"`
 
 	// HasAllowedIpAddressRanges Whether the Organization has at least one IP address range configured.
 	HasAllowedIpAddressRanges bool `json:"hasAllowedIpAddressRanges"`
 
 	// Id The Organization's ID.
-	Id string `json:"id"`
+	Id                        string `json:"id"`
+	IsBlockedEnableAiFeatures bool   `json:"isBlockedEnableAiFeatures"`
 
 	// IsScimEnabled Whether SCIM is enabled for the Organization.
 	IsScimEnabled bool `json:"isScimEnabled"`
@@ -5749,6 +5796,9 @@ type UpdateDedicatedClusterRequest struct {
 	// IsFailedOver Whether to trigger a DR failover for the cluster.
 	IsFailedOver *bool `json:"isFailedOver,omitempty"`
 
+	// IsPrivateNetworkEgressEnabled When true, enables Private Network Egress mode, which disables public Internet connectivity from the cluster's Deployments and metrics exports. For AWS clusters only.
+	IsPrivateNetworkEgressEnabled *bool `json:"isPrivateNetworkEgressEnabled,omitempty"`
+
 	// K8sTags A list of Kubernetes tags to add to the cluster.
 	K8sTags []ClusterK8sTag `json:"k8sTags"`
 
@@ -6029,6 +6079,9 @@ type UpdateEnvironmentObjectOverridesRequest struct {
 	Connection          *UpdateEnvironmentObjectConnectionOverridesRequest          `json:"connection,omitempty"`
 	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableOverridesRequest `json:"environmentVariable,omitempty"`
 	MetricsExport       *UpdateEnvironmentObjectMetricsExportOverridesRequest       `json:"metricsExport,omitempty"`
+
+	// UnsetFields Names of override fields to unset on the linked entity so it inherits the parent value. For connections and metrics exports, individual fields are named (for example "password"); for map fields a single key can be unset with a dotted path (for example "extra.aws_secret"). A field cannot be both set above and listed here.
+	UnsetFields *[]string `json:"unsetFields,omitempty"`
 }
 
 // UpdateEnvironmentObjectRequest defines model for UpdateEnvironmentObjectRequest.
@@ -6036,8 +6089,11 @@ type UpdateEnvironmentObjectRequest struct {
 	AirflowVariable *UpdateEnvironmentObjectAirflowVariableRequest `json:"airflowVariable,omitempty"`
 
 	// AutoLinkDeployments Whether or not to automatically link Deployments to the environment object. Only applicable for WORKSPACE scope
-	AutoLinkDeployments *bool                                              `json:"autoLinkDeployments,omitempty"`
-	Connection          *UpdateEnvironmentObjectConnectionRequest          `json:"connection,omitempty"`
+	AutoLinkDeployments *bool                                     `json:"autoLinkDeployments,omitempty"`
+	Connection          *UpdateEnvironmentObjectConnectionRequest `json:"connection,omitempty"`
+
+	// Description The description of the environment object
+	Description         *string                                            `json:"description,omitempty"`
 	EnvironmentVariable *UpdateEnvironmentObjectEnvironmentVariableRequest `json:"environmentVariable,omitempty"`
 
 	// ExcludeLinks The links to exclude from the environment object. Only applicable for WORKSPACE scope
@@ -6132,7 +6188,8 @@ type UpdateOrganizationRequest struct {
 	AllowEnhancedSupportAccess *bool `json:"allowEnhancedSupportAccess,omitempty"`
 
 	// BillingEmail The Organization's billing email.
-	BillingEmail string `json:"billingEmail"`
+	BillingEmail          string `json:"billingEmail"`
+	HasAiFeaturesDisabled *bool  `json:"hasAiFeaturesDisabled,omitempty"`
 
 	// IsScimEnabled Whether SCIM is enabled for the Organization.
 	IsScimEnabled bool `json:"isScimEnabled"`
@@ -6275,7 +6332,7 @@ type UpdateWorkerQueueRequest struct {
 	// NodePoolId The node pool ID associated with the worker queue. Required for Hybrid deployments.
 	NodePoolId *string `json:"nodePoolId,omitempty"`
 
-	// PodEphemeralStorage The ephemeral storage limit for each worker Pod. Units are in Gibibytes or `Gi`.
+	// PodEphemeralStorage The ephemeral storage limit for each worker Pod. Must be a valid Kubernetes resource string, e.g. `10Gi`.
 	PodEphemeralStorage *string `json:"podEphemeralStorage,omitempty"`
 
 	// WorkerConcurrency The maximum number of concurrent tasks that a worker Pod can run at a time.
@@ -6489,7 +6546,7 @@ type WorkerQueueRequest struct {
 	// Name The worker queue's name.
 	Name string `json:"name"`
 
-	// PodEphemeralStorage The ephemeral storage limit for each worker Pod. Units are in Gibibytes or `Gi`.
+	// PodEphemeralStorage The ephemeral storage limit for each worker Pod. Must be a valid Kubernetes resource string, e.g. `10Gi`.
 	PodEphemeralStorage *string `json:"podEphemeralStorage,omitempty"`
 
 	// WorkerConcurrency The maximum number of concurrent tasks that a worker Pod can run at a time.
@@ -7010,6 +7067,12 @@ type UpdateOrganizationJSONRequestBody = UpdateOrganizationRequest
 
 // CreateAllowedIpAddressRangeJSONRequestBody defines body for CreateAllowedIpAddressRange for application/json ContentType.
 type CreateAllowedIpAddressRangeJSONRequestBody = CreateAllowedIpAddressRangeRequest
+
+// BulkCreateAllowedIpAddressRangesJSONRequestBody defines body for BulkCreateAllowedIpAddressRanges for application/json ContentType.
+type BulkCreateAllowedIpAddressRangesJSONRequestBody = BulkCreateAllowedIpAddressRangesRequest
+
+// BulkDeleteAllowedIpAddressRangesJSONRequestBody defines body for BulkDeleteAllowedIpAddressRanges for application/json ContentType.
+type BulkDeleteAllowedIpAddressRangesJSONRequestBody = BulkDeleteAllowedIpAddressRangesRequest
 
 // CreateClusterJSONRequestBody defines body for CreateCluster for application/json ContentType.
 type CreateClusterJSONRequestBody = CreateClusterRequest
@@ -7630,6 +7693,16 @@ type ClientInterface interface {
 
 	CreateAllowedIpAddressRange(ctx context.Context, organizationId string, body CreateAllowedIpAddressRangeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// BulkCreateAllowedIpAddressRangesWithBody request with any body
+	BulkCreateAllowedIpAddressRangesWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	BulkCreateAllowedIpAddressRanges(ctx context.Context, organizationId string, body BulkCreateAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BulkDeleteAllowedIpAddressRangesWithBody request with any body
+	BulkDeleteAllowedIpAddressRangesWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	BulkDeleteAllowedIpAddressRanges(ctx context.Context, organizationId string, body BulkDeleteAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteAllowedIpAddressRange request
 	DeleteAllowedIpAddressRange(ctx context.Context, organizationId string, allowedIpAddressRangeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -7970,6 +8043,54 @@ func (c *Client) CreateAllowedIpAddressRangeWithBody(ctx context.Context, organi
 
 func (c *Client) CreateAllowedIpAddressRange(ctx context.Context, organizationId string, body CreateAllowedIpAddressRangeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAllowedIpAddressRangeRequest(c.Server, organizationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkCreateAllowedIpAddressRangesWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkCreateAllowedIpAddressRangesRequestWithBody(c.Server, organizationId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkCreateAllowedIpAddressRanges(ctx context.Context, organizationId string, body BulkCreateAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkCreateAllowedIpAddressRangesRequest(c.Server, organizationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkDeleteAllowedIpAddressRangesWithBody(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkDeleteAllowedIpAddressRangesRequestWithBody(c.Server, organizationId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BulkDeleteAllowedIpAddressRanges(ctx context.Context, organizationId string, body BulkDeleteAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBulkDeleteAllowedIpAddressRangesRequest(c.Server, organizationId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9493,6 +9614,100 @@ func NewCreateAllowedIpAddressRangeRequestWithBody(server string, organizationId
 	}
 
 	operationPath := fmt.Sprintf("/organizations/%s/allowed-ip-address-ranges", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewBulkCreateAllowedIpAddressRangesRequest calls the generic BulkCreateAllowedIpAddressRanges builder with application/json body
+func NewBulkCreateAllowedIpAddressRangesRequest(server string, organizationId string, body BulkCreateAllowedIpAddressRangesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewBulkCreateAllowedIpAddressRangesRequestWithBody(server, organizationId, "application/json", bodyReader)
+}
+
+// NewBulkCreateAllowedIpAddressRangesRequestWithBody generates requests for BulkCreateAllowedIpAddressRanges with any type of body
+func NewBulkCreateAllowedIpAddressRangesRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/allowed-ip-address-ranges/bulk-create", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewBulkDeleteAllowedIpAddressRangesRequest calls the generic BulkDeleteAllowedIpAddressRanges builder with application/json body
+func NewBulkDeleteAllowedIpAddressRangesRequest(server string, organizationId string, body BulkDeleteAllowedIpAddressRangesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewBulkDeleteAllowedIpAddressRangesRequestWithBody(server, organizationId, "application/json", bodyReader)
+}
+
+// NewBulkDeleteAllowedIpAddressRangesRequestWithBody generates requests for BulkDeleteAllowedIpAddressRanges with any type of body
+func NewBulkDeleteAllowedIpAddressRangesRequestWithBody(server string, organizationId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/allowed-ip-address-ranges/bulk-delete", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -13973,6 +14188,16 @@ type ClientWithResponsesInterface interface {
 
 	CreateAllowedIpAddressRangeWithResponse(ctx context.Context, organizationId string, body CreateAllowedIpAddressRangeJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAllowedIpAddressRangeResponse, error)
 
+	// BulkCreateAllowedIpAddressRangesWithBodyWithResponse request with any body
+	BulkCreateAllowedIpAddressRangesWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkCreateAllowedIpAddressRangesResponse, error)
+
+	BulkCreateAllowedIpAddressRangesWithResponse(ctx context.Context, organizationId string, body BulkCreateAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkCreateAllowedIpAddressRangesResponse, error)
+
+	// BulkDeleteAllowedIpAddressRangesWithBodyWithResponse request with any body
+	BulkDeleteAllowedIpAddressRangesWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteAllowedIpAddressRangesResponse, error)
+
+	BulkDeleteAllowedIpAddressRangesWithResponse(ctx context.Context, organizationId string, body BulkDeleteAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteAllowedIpAddressRangesResponse, error)
+
 	// DeleteAllowedIpAddressRangeWithResponse request
 	DeleteAllowedIpAddressRangeWithResponse(ctx context.Context, organizationId string, allowedIpAddressRangeId string, reqEditors ...RequestEditorFn) (*DeleteAllowedIpAddressRangeResponse, error)
 
@@ -14380,6 +14605,59 @@ func (r CreateAllowedIpAddressRangeResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateAllowedIpAddressRangeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type BulkCreateAllowedIpAddressRangesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AllowedIpAddressRangesList
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r BulkCreateAllowedIpAddressRangesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BulkCreateAllowedIpAddressRangesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type BulkDeleteAllowedIpAddressRangesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r BulkDeleteAllowedIpAddressRangesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BulkDeleteAllowedIpAddressRangesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -16235,6 +16513,40 @@ func (c *ClientWithResponses) CreateAllowedIpAddressRangeWithResponse(ctx contex
 	return ParseCreateAllowedIpAddressRangeResponse(rsp)
 }
 
+// BulkCreateAllowedIpAddressRangesWithBodyWithResponse request with arbitrary body returning *BulkCreateAllowedIpAddressRangesResponse
+func (c *ClientWithResponses) BulkCreateAllowedIpAddressRangesWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkCreateAllowedIpAddressRangesResponse, error) {
+	rsp, err := c.BulkCreateAllowedIpAddressRangesWithBody(ctx, organizationId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkCreateAllowedIpAddressRangesResponse(rsp)
+}
+
+func (c *ClientWithResponses) BulkCreateAllowedIpAddressRangesWithResponse(ctx context.Context, organizationId string, body BulkCreateAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkCreateAllowedIpAddressRangesResponse, error) {
+	rsp, err := c.BulkCreateAllowedIpAddressRanges(ctx, organizationId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkCreateAllowedIpAddressRangesResponse(rsp)
+}
+
+// BulkDeleteAllowedIpAddressRangesWithBodyWithResponse request with arbitrary body returning *BulkDeleteAllowedIpAddressRangesResponse
+func (c *ClientWithResponses) BulkDeleteAllowedIpAddressRangesWithBodyWithResponse(ctx context.Context, organizationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BulkDeleteAllowedIpAddressRangesResponse, error) {
+	rsp, err := c.BulkDeleteAllowedIpAddressRangesWithBody(ctx, organizationId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkDeleteAllowedIpAddressRangesResponse(rsp)
+}
+
+func (c *ClientWithResponses) BulkDeleteAllowedIpAddressRangesWithResponse(ctx context.Context, organizationId string, body BulkDeleteAllowedIpAddressRangesJSONRequestBody, reqEditors ...RequestEditorFn) (*BulkDeleteAllowedIpAddressRangesResponse, error) {
+	rsp, err := c.BulkDeleteAllowedIpAddressRanges(ctx, organizationId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBulkDeleteAllowedIpAddressRangesResponse(rsp)
+}
+
 // DeleteAllowedIpAddressRangeWithResponse request returning *DeleteAllowedIpAddressRangeResponse
 func (c *ClientWithResponses) DeleteAllowedIpAddressRangeWithResponse(ctx context.Context, organizationId string, allowedIpAddressRangeId string, reqEditors ...RequestEditorFn) (*DeleteAllowedIpAddressRangeResponse, error) {
 	rsp, err := c.DeleteAllowedIpAddressRange(ctx, organizationId, allowedIpAddressRangeId, reqEditors...)
@@ -17378,6 +17690,121 @@ func ParseCreateAllowedIpAddressRangeResponse(rsp *http.Response) (*CreateAllowe
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseBulkCreateAllowedIpAddressRangesResponse parses an HTTP response from a BulkCreateAllowedIpAddressRangesWithResponse call
+func ParseBulkCreateAllowedIpAddressRangesResponse(rsp *http.Response) (*BulkCreateAllowedIpAddressRangesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &BulkCreateAllowedIpAddressRangesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AllowedIpAddressRangesList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseBulkDeleteAllowedIpAddressRangesResponse parses an HTTP response from a BulkDeleteAllowedIpAddressRangesWithResponse call
+func ParseBulkDeleteAllowedIpAddressRangesResponse(rsp *http.Response) (*BulkDeleteAllowedIpAddressRangesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &BulkDeleteAllowedIpAddressRangesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

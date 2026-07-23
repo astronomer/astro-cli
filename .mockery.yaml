@@ -45,15 +45,15 @@ packages:
       dir: pkg/azure/mocks
     interfaces:
       Azure:
-  github.com/astronomer/astro-cli/airflow/runtimes:
+  # Container-runtime interfaces live in the pkg/container submodule. mockery
+  # loads it through the root module's replace directive and writes into
+  # pkg/container/mocks; the submodule's own go.mod stays testify-only (mockery
+  # only ever runs from the root module here).
+  github.com/astronomer/astro-cli/pkg/container:
     config:
-      dir: airflow/runtimes/mocks
+      dir: pkg/container/mocks
       outpkg: mocks
     interfaces:
       OSChecker:
-      EnvChecker:
-      FileChecker:
-      HostInspector:
-      ContainerRuntime:
-      PodmanEngine:
       DockerEngine:
+      PodmanEngine:

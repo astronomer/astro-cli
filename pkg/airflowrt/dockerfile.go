@@ -43,15 +43,25 @@ func ParseDockerfile(projectPath string) (image, tag string, err error) {
 // full image tag. Returns an empty pythonVersion when the tag has no explicit
 // -python-X.Y suffix so the caller can fall back to other sources.
 //
+// Image-variant flavors (-slim, -base) are stripped from the base tag: they
+// identify a Docker base image, not a runtime version. The CDN constraints/
+// freeze files and the runtime index key on the bare version, so leaving the
+// flavor in would 404 the constraints fetch and miss the index lookup.
+//
 //	"3.1-12"                    → base="3.1-12", python=""
 //	"3.1-12-python-3.11"       → base="3.1-12", python="3.11"
 //	"3.1-12-python-3.11-base"  → base="3.1-12", python="3.11"
+//	"13.7.0-slim"              → base="13.7.0", python=""
+//	"13.7.0-slim-python-3.12"  → base="13.7.0", python="3.12"
 func ParseRuntimeTagPython(tag string) (baseTag, pythonVersion string) {
-	loc := RuntimePythonRe.FindStringSubmatchIndex(tag)
-	if loc == nil {
-		return strings.TrimSuffix(tag, "-base"), ""
+	if loc := RuntimePythonRe.FindStringSubmatchIndex(tag); loc != nil {
+		baseTag, pythonVersion = tag[:loc[0]], tag[loc[2]:loc[3]]
+	} else {
+		baseTag = tag
 	}
-	return tag[:loc[0]], tag[loc[2]:loc[3]]
+	baseTag = strings.TrimSuffix(baseTag, "-base")
+	baseTag = strings.TrimSuffix(baseTag, "-slim")
+	return baseTag, pythonVersion
 }
 
 // IsValidRuntimeTag checks if a tag looks like a valid pinned runtime version (X.Y-Z).

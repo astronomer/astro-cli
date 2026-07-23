@@ -115,7 +115,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	// get the deployment id to deploy the dbt project to
-	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
+	deploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	// get the deployment id to delete the dbt project
-	deploymentID, err := resolveDeploymentIDFromDbtArgsFlags(args, workspaceID, deploymentName)
+	deploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func extractDbtProjectName(dbtProjectPath string) (string, error) {
 	return dbtProjectName, nil
 }
 
-func resolveDeploymentIDFromDbtArgsFlags(args []string, workspaceID, deploymentName string) (string, error) {
+func resolveDeploymentIDFromArgsFlags(args []string, workspaceID, deploymentName string) (string, error) {
 	// if provided, use the deployment ID from the command argument
 	if len(args) > 0 {
 		return args[0], nil

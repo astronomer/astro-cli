@@ -1011,3 +1011,22 @@ func (s *Suite) TestCopyDirectory() {
 		s.True(os.IsNotExist(err), "expected infra/ to be pruned")
 	})
 }
+
+func (s *Suite) TestDefaultPermissions() {
+	// Directories default to 0o755 and files to 0o644 so the CLI stops writing
+	// world-writable paths (LOCAL-7).
+	s.Equal(os.FileMode(0o755), perm)
+	s.Equal(0o755, openPermissions)
+
+	s.Run("CreateFile makes parent dirs 0o755", func() {
+		root := s.T().TempDir()
+		target := filepath.Join(root, "nested", "child", "file.txt")
+		file, err := CreateFile(target)
+		s.NoError(err)
+		file.Close()
+
+		info, err := os.Stat(filepath.Join(root, "nested"))
+		s.NoError(err)
+		s.Equal(os.FileMode(0o755), info.Mode().Perm())
+	})
+}

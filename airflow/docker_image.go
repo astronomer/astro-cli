@@ -87,7 +87,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 	return true, nil
 }
 
-func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfig airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildConfig airflowTypes.ImageBuildConfig) error {
 	// Start the spinner.
 	s := spinner.NewSpinner("Building project image…")
 	if !logger.IsLevelEnabled(logrus.DebugLevel) {
@@ -135,12 +135,8 @@ func (d *DockerImage) Build(dockerfilePath, buildSecretString string, buildConfi
 	if len(buildConfig.TargetPlatforms) > 0 {
 		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
 	}
-	if buildSecretString != "" {
-		buildSecretArgs := []string{
-			"--secret",
-			buildSecretString,
-		}
-		args = append(args, buildSecretArgs...)
+	for _, secret := range buildSecrets {
+		args = append(args, "--secret", secret)
 	}
 
 	// Route output streams according to verbosity.
@@ -238,7 +234,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	args = []string{
 		"inspect",
 		"astro-pytest",
-		"--format='{{.State.ExitCode}}'",
+		"--format={{.State.ExitCode}}",
 	}
 	var outb bytes.Buffer
 	inspectErr := cmdExec(containerRuntime, &outb, stderr, args...)
@@ -260,7 +256,8 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		logger.Debugf("Error removing the astro-pytest container: %s", rmErr.Error())
 	}
 
-	return outb.String(), err
+	// trim the trailing newline so consumers get a clean integer string to parse
+	return strings.TrimSpace(outb.String()), err
 }
 
 func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {

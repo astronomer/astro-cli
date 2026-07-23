@@ -30,8 +30,9 @@ type CloudOptions struct {
 func NewCloudCmd(out io.Writer) *cobra.Command {
 	opts := &CloudOptions{
 		RequestOptions: RequestOptions{
-			Out:    out,
-			ErrOut: os.Stderr,
+			Out:             out,
+			ErrOut:          os.Stderr,
+			TotalCountField: "totalCount",
 			// specCache is initialized lazily when the domain is known
 		},
 	}
@@ -435,6 +436,7 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 func NewCloudListCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
 	var verbose bool
 	var refresh bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:     "ls [filter]",
@@ -481,6 +483,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 				Filter:    filter,
 				Verbose:   verbose,
 				Refresh:   refresh,
+				JSON:      jsonOut,
 			}
 			return runList(listOpts)
 		},
@@ -488,6 +491,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint list as JSON")
 
 	return cmd
 }
@@ -498,6 +502,7 @@ func NewCloudDescribeCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command
 	var method string
 	var refresh bool
 	var verbose bool
+	var jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "describe <endpoint>",
@@ -538,6 +543,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 				Method:    method,
 				Refresh:   refresh,
 				Verbose:   verbose,
+				JSON:      jsonOut,
 			}
 			return runDescribe(descOpts)
 		},
@@ -546,6 +552,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint schema as JSON")
 
 	return cmd
 }

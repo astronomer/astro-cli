@@ -595,6 +595,30 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 	})
 }
 
+func (s *Suite) TestDeploymentUpdateInvalidExecutor() {
+	s.Run("invalid executor stops the update and returns an error instead of silently doing nothing", func() {
+		appConfig = &houston.AppConfig{}
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
+		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+		dagDeployment := &houston.DagDeploymentConfig{
+			Type: houston.ImageDeploymentType,
+		}
+		deployment := &houston.Deployment{
+			DagDeployment: *dagDeployment,
+		}
+		api.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		houstonClient = api
+
+		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--executor=bogus"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		s.EqualError(err, errInvalidExecutorType.Error())
+		// The update should never reach Houston when the executor flag is invalid.
+		api.AssertNotCalled(s.T(), "UpdateDeployment", mock.Anything)
+	})
+}
+
 func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 	s.Run("user should be prompted if new deployment type is not dag_deploy but current type is dag_deploy. User rejects.", func() {
 		appConfig = &houston.AppConfig{
@@ -905,12 +929,175 @@ func (s *Suite) TestDeploymentDelete() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
-	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(mockDeployment, nil)
+	// Deletions are always hard deletes now (PLX-575).
+	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+
+	// Delete now always prompts for confirmation; answer "y".
+	input := []byte("y")
+	r, w, err := os.Pipe()
+	s.Require().NoError(err)
+	_, err = w.Write(input)
+	s.NoError(err)
+	w.Close()
+	stdin := os.Stdin
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", mockDeployment.ID)
 	s.NoError(err)
 	s.Contains(output, expectedOut)
+}
+
+func (s *Suite) TestDeploymentAdopt() {
+	expectedOut := `Successfully adopted deployment`
+	mockAdoptedDeployment := &houston.Deployment{
+		ID:          "cknz133ra49758zr9w34b87ua",
+		Label:       "prod-airflow-4",
+		ReleaseName: "prod-airflow-4",
+		Namespace:   "airflow-prod4",
+		ClusterID:   "cluster-test-id",
+	}
+
+	s.Run("success with only required flags", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		api.On("AdoptDeployment", &houston.AdoptDeploymentRequest{
+			// InitTestConfig("software") sets this workspace as the current context's workspace.
+			WorkspaceID:             "ck05r3bor07h40d02y2hw4n4v",
+			ClusterID:               "cluster-test-id",
+			CRNamespace:             "airflow-prod4",
+			CRName:                  "prod-airflow-4",
+			AcceptIncompatibilities: true,
+		}).Return(mockAdoptedDeployment, nil)
+
+		houstonClient = api
+		output, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4", "--namespace=airflow-prod4")
+		s.NoError(err)
+		s.Contains(output, expectedOut)
+		s.Contains(output, mockAdoptedDeployment.ReleaseName)
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("success with optional flags and an explicit workspace", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		api.On("AdoptDeployment", &houston.AdoptDeploymentRequest{
+			WorkspaceID:             "some-other-workspace-id",
+			ClusterID:               "cluster-test-id",
+			CRNamespace:             "airflow-prod4",
+			CRName:                  "prod-airflow-4",
+			Label:                   "My Adopted Deployment",
+			Description:             "adopted from standalone operator",
+			UseApcLogging:           true,
+			UseApcRegistry:          true,
+			AcceptIncompatibilities: false,
+		}).Return(mockAdoptedDeployment, nil)
+
+		houstonClient = api
+		output, err := execDeploymentCmd(
+			"adopt",
+			"--workspace-id=some-other-workspace-id",
+			"--cluster-id=cluster-test-id",
+			"--name=prod-airflow-4",
+			"--namespace=airflow-prod4",
+			"--label=My Adopted Deployment",
+			"--description=adopted from standalone operator",
+			"--use-apc-logging",
+			"--use-apc-registry",
+			"--accept-incompatibilities=false",
+		)
+		s.NoError(err)
+		s.Contains(output, expectedOut)
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("missing required flags", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+
+		myTests := []struct {
+			cmdArgs       []string
+			expectedError string
+		}{
+			{cmdArgs: []string{"adopt", "--name=prod-airflow-4", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cluster-id" not set`},
+			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "name" not set`},
+			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4"}, expectedError: `required flag(s) "namespace" not set`},
+		}
+		for _, tt := range myTests {
+			houstonClient = api
+			_, err := execDeploymentCmd(tt.cmdArgs...)
+			s.EqualError(err, tt.expectedError)
+		}
+	})
+
+	s.Run("api error", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		api.On("AdoptDeployment", mock.Anything).Return(nil, errMockHouston)
+
+		houstonClient = api
+		_, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4", "--namespace=airflow-prod4")
+		s.EqualError(err, errMockHouston.Error())
+	})
+}
+
+func (s *Suite) TestDeploymentUnadopt() {
+	expectedOut := `Successfully unadopted deployment`
+	mockUnadoptedDeployment := &houston.Deployment{
+		ID:          mockDeployment.ID,
+		Label:       mockDeployment.Label,
+		ReleaseName: mockDeployment.ReleaseName,
+	}
+
+	s.Run("success", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		api.On("UnadoptDeployment", houston.UnadoptDeploymentRequest{DeploymentID: mockDeployment.ID}).Return(mockUnadoptedDeployment, nil)
+
+		defer testUtil.MockUserInput(s.T(), "y")()
+
+		houstonClient = api
+		output, err := execDeploymentCmd("unadopt", "--deployment-id", mockDeployment.ID)
+		s.NoError(err)
+		s.Contains(output, expectedOut)
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("user declines the confirmation prompt", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+
+		defer testUtil.MockUserInput(s.T(), "n")()
+
+		houstonClient = api
+		output, err := execDeploymentCmd("unadopt", "--deployment-id", mockDeployment.ID)
+		s.NoError(err)
+		s.Contains(output, "was not executed and your Deployment was not unadopted")
+		api.AssertNotCalled(s.T(), "UnadoptDeployment", mock.Anything)
+	})
+
+	s.Run("missing required flag", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+
+		houstonClient = api
+		_, err := execDeploymentCmd("unadopt")
+		s.EqualError(err, `required flag(s) "deployment-id" not set`)
+	})
+
+	s.Run("api error", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", nil).Return("2.1.0", nil)
+		api.On("UnadoptDeployment", houston.UnadoptDeploymentRequest{DeploymentID: mockDeployment.ID}).Return(nil, errMockHouston)
+
+		defer testUtil.MockUserInput(s.T(), "y")()
+
+		houstonClient = api
+		_, err := execDeploymentCmd("unadopt", "--deployment-id", mockDeployment.ID)
+		s.EqualError(err, errMockHouston.Error())
+	})
 }
 
 func (s *Suite) TestDeploymentList() {

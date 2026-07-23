@@ -1,0 +1,257 @@
+name: Create Release Tag
+
+run-name: "${{ inputs.type || 'nightly' }} release${{ inputs.version && format(' v{0}', inputs.version) || '' }} from ${{ github.ref_name }} (by @${{ github.actor }})"
+
+on:
+  schedule:
+    # Nightly, from main. Manual dispatch below still covers on-demand nightly/rc/ga.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - nightly
+          - rc
+          - ga
+        default: nightly
+      version:
+        description: 'Semantic version without v prefix (e.g. 1.43.0) — required for rc and ga, ignored for nightly'
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+  id-token: write  # Required for Octo STS OIDC token exchange
+
+jobs:
+  preflight:
+    name: Pre-flight summary (review before approving)
+    runs-on: ubuntu-latest
+    outputs:
+      type: ${{ steps.release-inputs.outputs.type }}
+      version: ${{ steps.release-inputs.outputs.version }}
+      tag: ${{ steps.compute.outputs.tag }}
+      prev_ga: ${{ steps.compute.outputs.prev_ga }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release inputs
+        id: release-inputs
+        env:
+          REQUESTED_TYPE: ${{ inputs.type }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            TYPE="nightly"
+            VERSION=""
+          else
+            TYPE="$REQUESTED_TYPE"
+            VERSION="$REQUESTED_VERSION"
+          fi
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate inputs
+        env:
+          TYPE: ${{ steps.release-inputs.outputs.type }}
+          VERSION: ${{ steps.release-inputs.outputs.version }}
+        run: |
+          set -e
+          BRANCH="${GITHUB_REF_NAME}"
+
+          if [ "$TYPE" = "nightly" ]; then
+            if [ "$BRANCH" != "main" ]; then
+              echo "::error::Nightly tags must be created from the main branch. Current branch: $BRANCH"
+              exit 1
+            fi
+          else
+            if [[ ! "$BRANCH" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+              echo "::error::RC and GA tags must be created from a release-X.Y branch. Current branch: $BRANCH"
+              exit 1
+            fi
+            if [ -z "$VERSION" ]; then
+              echo "::error::VERSION is required for $TYPE releases."
+              exit 1
+            fi
+            BRANCH_MAJOR_MINOR="${BASH_REMATCH[1]}"
+            ESCAPED_MM="${BRANCH_MAJOR_MINOR//./\\.}"
+            if [[ ! "$VERSION" =~ ^${ESCAPED_MM}\.[0-9]+$ ]]; then
+              echo "::error::Version '$VERSION' does not match branch '$BRANCH'. Expected ${BRANCH_MAJOR_MINOR}.Z"
+              exit 1
+            fi
+          fi
+          echo "Validated: type=$TYPE branch=$BRANCH version=$VERSION"
+
+      - name: Require successful CI for the nightly commit
+        if: steps.release-inputs.outputs.type == 'nightly'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          CI_RUN=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow ci.yaml \
+            --commit "$GITHUB_SHA" \
+            --event push \
+            --limit 1 \
+            --json status,conclusion,url \
+            --jq '.[0] // empty')
+
+          if [ -z "$CI_RUN" ]; then
+            echo "::error::No push CI run found for commit $GITHUB_SHA."
+            exit 1
+          fi
+
+          STATUS=$(jq -r '.status' <<< "$CI_RUN")
+          CONCLUSION=$(jq -r '.conclusion' <<< "$CI_RUN")
+          URL=$(jq -r '.url' <<< "$CI_RUN")
+          if [ "$STATUS" != "completed" ] || [ "$CONCLUSION" != "success" ]; then
+            echo "::error::CI for commit $GITHUB_SHA is $STATUS/$CONCLUSION: $URL"
+            exit 1
+          fi
+          echo "CI passed for commit $GITHUB_SHA: $URL"
+
+      - name: Compute tag
+        id: compute
+        env:
+          TYPE: ${{ steps.release-inputs.outputs.type }}
+          VERSION: ${{ steps.release-inputs.outputs.version }}
+        run: |
+          set -e
+          case "$TYPE" in
+            nightly) TAG=$(make nightly-tag) ;;
+            rc)      TAG=$(make rc-tag VERSION="$VERSION") ;;
+            ga)      TAG=$(make release-tag VERSION="$VERSION") ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Computed tag: $TAG"
+
+          PREV_GA=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" \
+            | grep -v -- '-' \
+            | sed 's/^v//' \
+            | sort -t. -k1,1n -k2,2n -k3,3n \
+            | tail -1 \
+            | sed 's/^/v/')
+          echo "prev_ga=$PREV_GA" >> "$GITHUB_OUTPUT"
+          echo "Previous GA tag: $PREV_GA"
+
+      - name: Write release summary
+        env:
+          TAG: ${{ steps.compute.outputs.tag }}
+          PREV_GA: ${{ steps.compute.outputs.prev_ga }}
+          TYPE: ${{ steps.release-inputs.outputs.type }}
+        run: |
+          set -e
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          COMMIT_FULL=$(git rev-parse HEAD)
+          REPO_URL="https://github.com/${{ github.repository }}"
+
+          {
+            echo "## Release Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Tag | \`$TAG\` |"
+            echo "| Type | **$TYPE** |"
+            echo "| Branch | \`${GITHUB_REF_NAME}\` |"
+            echo "| Commit | [\`$COMMIT_SHORT\`]($REPO_URL/commit/$COMMIT_FULL) |"
+            echo "| Triggered by | @${{ github.actor }} |"
+            if [ "$TYPE" = "ga" ]; then
+              echo "| Previous GA | [\`$PREV_GA\`]($REPO_URL/releases/tag/$PREV_GA) |"
+            fi
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$TYPE" = "ga" ]; then
+            {
+              echo "### Approver checklist"
+              echo ""
+              echo "- [ ] Latest RC for this version was tested and validated"
+              echo "- [ ] Release branch is at the correct commit"
+              echo "- [ ] No outstanding bug fixes to cherry-pick before GA"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "_Full changelog will be auto-generated on the GitHub release page once the tag is pushed._" >> "$GITHUB_STEP_SUMMARY"
+
+  warm-release-cache:
+    name: Warm macOS release cache
+    needs: preflight
+    if: needs.preflight.outputs.type == 'nightly'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        id: setup-go
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache Go build outputs
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/Library/Caches/go-build
+          key: release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-${{ steps.source.outputs.sha }}
+          restore-keys: |
+            release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-
+
+      - name: Build release artifacts without publishing
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: v2.15.2
+          args: release --snapshot --clean --skip=publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-tag:
+    needs: [preflight, warm-release-cache]
+    if: always() && needs.preflight.result == 'success' && (needs.warm-release-cache.result == 'success' || needs.warm-release-cache.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: ${{ needs.preflight.outputs.type == 'ga' && 'release' || '' }}
+    steps:
+      - name: Get token via Octo STS
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: sts-token
+        with:
+          scope: astronomer
+          identity: astro-cli-release
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.sts-token.outputs.token }}
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "Pushed tag: $TAG"
+          {
+            echo "## Release Tag Created"
+            echo ""
+            echo "**Tag:** \`$TAG\`"
+            echo "**Type:** ${{ needs.preflight.outputs.type }}"
+            echo "**Branch:** \`$GITHUB_REF_NAME\`"
+            echo "**Commit:** \`$(git rev-parse --short HEAD)\`"
+            echo "**Actor:** @$GITHUB_ACTOR"
+          } >> "$GITHUB_STEP_SUMMARY"

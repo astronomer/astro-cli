@@ -731,3 +731,66 @@ func TestLoad_LocalFile_AlwaysFresh(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Version 2", cache.GetDoc().Info.Title)
 }
+
+// --- GetSchemas --------------------------------------------------------------
+
+func TestGetSchemas_V3(t *testing.T) {
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]any{"title": "Test", "version": "1.0"},
+		"paths":   map[string]any{},
+		"components": map[string]any{
+			"schemas": map[string]any{
+				"Widget": map[string]any{
+					"type":     "object",
+					"required": []any{"id"},
+					"properties": map[string]any{
+						"id":      map[string]any{"type": "string"},
+						"enabled": map[string]any{"type": "boolean"},
+					},
+				},
+			},
+		},
+	}
+	data, _ := json.Marshal(spec)
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+	require.NoError(t, os.WriteFile(tmpFile, data, 0o600))
+
+	cache := NewCacheForLocalFile(tmpFile)
+	require.NoError(t, cache.Load(false))
+
+	schemas := cache.GetSchemas()
+	require.Contains(t, schemas, "Widget")
+	assert.Equal(t, "object", schemas["Widget"].Type)
+	assert.Equal(t, []string{"id"}, schemas["Widget"].Required)
+}
+
+func TestGetSchemas_V2(t *testing.T) {
+	spec := map[string]any{
+		"swagger":  "2.0",
+		"info":     map[string]any{"title": "Test", "version": "1.0"},
+		"basePath": "/api/v1",
+		"paths":    map[string]any{},
+		"definitions": map[string]any{
+			"Widget": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"id": map[string]any{"type": "string"}},
+			},
+		},
+	}
+	data, _ := json.Marshal(spec)
+	tmpFile := filepath.Join(t.TempDir(), "spec.json")
+	require.NoError(t, os.WriteFile(tmpFile, data, 0o600))
+
+	cache := NewCacheForLocalFile(tmpFile)
+	require.NoError(t, cache.Load(false))
+
+	schemas := cache.GetSchemas()
+	require.Contains(t, schemas, "Widget")
+	assert.Equal(t, "object", schemas["Widget"].Type)
+}
+
+func TestGetSchemas_NotLoaded(t *testing.T) {
+	cache := NewCache()
+	assert.Nil(t, cache.GetSchemas())
+}

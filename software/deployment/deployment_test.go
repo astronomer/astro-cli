@@ -474,6 +474,76 @@ func (s *Suite) TestDelete() {
 	})
 }
 
+func (s *Suite) TestAdopt() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	mockDeployment := &houston.Deployment{
+		ID:          "ckbv818oa00r107606ywhoqtw",
+		Label:       "prod-airflow-4",
+		ReleaseName: "prod-airflow-4",
+		Namespace:   "airflow-prod4",
+		ClusterID:   "cluster-test-id",
+	}
+	req := &houston.AdoptDeploymentRequest{
+		WorkspaceID:             "workspace-test-id",
+		ClusterID:               "cluster-test-id",
+		CRNamespace:             "airflow-prod4",
+		CRName:                  "prod-airflow-4",
+		AcceptIncompatibilities: true,
+	}
+
+	s.Run("adopt success", func() {
+		api := new(mocks.ClientInterface)
+		api.On("AdoptDeployment", req).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Adopt(req, api, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully adopted deployment")
+		s.Contains(buf.String(), mockDeployment.ReleaseName)
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("adopt api error", func() {
+		api := new(mocks.ClientInterface)
+		api.On("AdoptDeployment", req).Return(nil, errMock)
+
+		buf := new(bytes.Buffer)
+		err := Adopt(req, api, buf)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
+	})
+}
+
+func (s *Suite) TestUnadopt() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	mockDeployment := &houston.Deployment{
+		ID:          "ckbv818oa00r107606ywhoqtw",
+		Label:       "prod-airflow-4",
+		ReleaseName: "prod-airflow-4",
+	}
+
+	s.Run("unadopt success", func() {
+		api := new(mocks.ClientInterface)
+		api.On("UnadoptDeployment", houston.UnadoptDeploymentRequest{DeploymentID: mockDeployment.ID}).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Unadopt(mockDeployment.ID, api, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully unadopted deployment")
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("unadopt api error", func() {
+		api := new(mocks.ClientInterface)
+		api.On("UnadoptDeployment", houston.UnadoptDeploymentRequest{DeploymentID: mockDeployment.ID}).Return(nil, errMock)
+
+		buf := new(bytes.Buffer)
+		err := Unadopt(mockDeployment.ID, api, buf)
+		s.EqualError(err, errMock.Error())
+		api.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestList() {
 	clusterID := "testClusterID"
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)

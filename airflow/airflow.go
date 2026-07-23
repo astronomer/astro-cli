@@ -15,7 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-var perm os.FileMode = 0o777
+var perm os.FileMode = 0o755
 
 var ExtractTemplate = InitFromTemplate
 
@@ -28,6 +28,9 @@ var (
 
 	//go:embed include/airflow2/composeyml.go.tmpl
 	Af2Composeyml string
+
+	//go:embed include/airflow3/astronomermonitoringdag.py
+	Af3MonitoringDag string
 
 	//go:embed include/airflow3/composeyml.go.tmpl
 	Af3Composeyml string

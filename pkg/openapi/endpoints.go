@@ -59,6 +59,23 @@ func v3MethodOps(pi *v3high.PathItem) []v3MethodOp {
 	}
 }
 
+// ExtractComponentSchemas returns a registry of all named component schemas
+// (#/components/schemas/*) keyed by name. Nested $ref references within each
+// schema are left unresolved (stored as ref names) so callers can resolve them
+// lazily via SchemaResolver and guard against cycles while walking.
+func ExtractComponentSchemas(doc *v3high.Document) map[string]*Schema {
+	if doc == nil || doc.Components == nil || doc.Components.Schemas == nil {
+		return nil
+	}
+	schemas := make(map[string]*Schema)
+	for name, proxy := range doc.Components.Schemas.FromOldest() {
+		if ref := convertSchemaProxy(proxy); ref != nil && ref.Value != nil {
+			schemas[name] = ref.Value
+		}
+	}
+	return schemas
+}
+
 // newEndpoint creates an Endpoint from a libopenapi Operation.
 func newEndpoint(method, path string, op *v3high.Operation) Endpoint {
 	ep := Endpoint{

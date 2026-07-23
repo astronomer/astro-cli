@@ -30,14 +30,15 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.54.0
-	golang.org/x/sys v0.44.0
+	golang.org/x/net v0.55.0
+	golang.org/x/sys v0.45.0
 )
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.7.0
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/container v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
 	github.com/compose-spec/compose-go/v2 v2.9.1
 	github.com/distribution/reference v0.6.0
@@ -437,6 +438,8 @@ replace github.com/ldez/tagliatelle => github.com/ldez/tagliatelle v0.5.0
 replace github.com/astronomer/astro-cli/pkg/proxy => ./pkg/proxy
 
 replace github.com/astronomer/astro-cli/pkg/airflowrt => ./pkg/airflowrt
+
+replace github.com/astronomer/astro-cli/pkg/container => ./pkg/container
 
 replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
 

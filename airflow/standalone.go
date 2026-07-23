@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -223,6 +224,23 @@ func (s *Standalone) pidFilePath() string {
 
 func (s *Standalone) logFilePath() string {
 	return filepath.Join(s.airflowHome, standaloneDir, standaloneLogFile)
+}
+
+// printLoginHint prints a hint about the default Airflow UI credentials.
+// AF2 requires FAB auth: on macOS we seed admin/admin, and on other
+// platforms `airflow standalone` generates a random password into
+// standalone_admin_password.txt under $AIRFLOW_HOME. AF3 uses the simple auth
+// manager (any username is admin), so no hint is needed.
+func (s *Standalone) printLoginHint(bullet string) {
+	if s.airflowMajorVersion != "2" {
+		return
+	}
+	if runtime.GOOS == osDarwin {
+		fmt.Printf("%sLogin:      %s\n", bullet, ansi.Bold("admin / admin"))
+		return
+	}
+	passwordFile := filepath.Join(standaloneDir, "standalone_admin_password.txt")
+	fmt.Printf("%sLogin:      username %s, password in %s\n", bullet, ansi.Bold("admin"), ansi.Bold(passwordFile))
 }
 
 // Start runs airflow standalone locally without Docker.
@@ -527,6 +545,7 @@ func (s *Standalone) startForeground(cmd *exec.Cmd, waitTime time.Duration, sett
 
 		fmt.Println("\n" + ansi.Green("\u2714") + " Airflow is ready!")
 		fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
+		s.printLoginHint(bullet)
 		fmt.Println()
 
 		if !(s.noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
@@ -608,6 +627,7 @@ func (s *Standalone) startBackground(cmd *exec.Cmd, waitTime time.Duration, sett
 	fmt.Printf("%sAirflow UI: %s\n", bullet, ansi.Bold(uiURL))
 	fmt.Printf("%sView logs: %s\n", bullet, ansi.Bold("astro dev logs -f"))
 	fmt.Printf("%sStop:      %s\n", bullet, ansi.Bold("astro dev stop"))
+	s.printLoginHint(bullet)
 
 	if !(s.noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
 		if err := standaloneOpenURL(uiURL); err != nil {
@@ -1064,7 +1084,7 @@ func standaloneExecDefault(dir string, env, args []string, stdin io.Reader, stdo
 	return airflowrt.ExecWithEnv(dir, env, args, stdin, stdout, stderr)
 }
 
-func (s *Standalone) Build(_, _ string, _ bool) error {
+func (s *Standalone) Build(_ string, _ []string, _ bool) error {
 	return errors.New("astro dev build builds a Docker image and is not available in standalone mode")
 }
 
@@ -1173,7 +1193,7 @@ func (s *Standalone) ComposeExport(_, _ string) error {
 }
 
 // Pytest runs pytest on DAGs using the local venv.
-func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString, _ string) (string, error) {
+func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString string, _ []string) (string, error) {
 	if err := s.ensureVenv(); err != nil {
 		return "", err
 	}
@@ -1203,7 +1223,7 @@ func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString, _ string) (strin
 }
 
 // Parse validates DAGs by running the default integrity test.
-func (s *Standalone) Parse(_, _, _ string) error {
+func (s *Standalone) Parse(_, _ string, _ []string) error {
 	path := filepath.Join(s.airflowHome, DefaultTestPath)
 
 	fileExist, err := fileutil.Exists(path, nil)
@@ -1217,9 +1237,9 @@ func (s *Standalone) Parse(_, _, _ string) error {
 
 	fmt.Println("Checking your DAGs for errors…")
 
-	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", "")
+	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", nil)
 	if err != nil {
-		if strings.Contains(exitCode, "1") {
+		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
 			return errors.New("See above for errors detected in your DAGs")
 		}
 		return errors.Wrap(err, "something went wrong while parsing your DAGs")
@@ -1228,7 +1248,7 @@ func (s *Standalone) Parse(_, _, _ string) error {
 	return nil
 }
 
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _ string, _ []string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
 }
 

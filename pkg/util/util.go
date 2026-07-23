@@ -103,19 +103,30 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	return claims, nil
 }
 
-func GetbuildSecretString(buildSecret []string) (buildSecretString string) {
-	for i, secret := range buildSecret {
-		if i == 0 {
-			buildSecretString = secret
-		} else {
-			buildSecretString = buildSecretString + "," + secret
+// ResolveBuildSecrets returns the Docker build secrets to use: the secrets
+// given on the command line if there are any, otherwise the first fallback
+// that provides any. Each element is one complete `docker build --secret`
+// specification; fallbacks may be newline-delimited to provide multiple
+// secrets.
+func ResolveBuildSecrets(flagSecrets []string, fallbacks ...string) []string {
+	if len(flagSecrets) > 0 {
+		return flagSecrets
+	}
+	for _, fb := range fallbacks {
+		if secrets := splitBuildSecretLines(fb); len(secrets) > 0 {
+			return secrets
 		}
 	}
-	if os.Getenv("BUILD_SECRET_INPUT") != "" && buildSecretString == "" {
-		buildSecretString = os.Getenv("BUILD_SECRET_INPUT")
-	}
+	return nil
+}
 
-	return buildSecretString
+func splitBuildSecretLines(value string) (secrets []string) {
+	for _, line := range strings.Split(value, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			secrets = append(secrets, line)
+		}
+	}
+	return secrets
 }
 
 func StripOutKeysFromJSONByteArray(jsonData []byte, keys []string) ([]byte, error) {
