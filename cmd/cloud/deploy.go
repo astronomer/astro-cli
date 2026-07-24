@@ -1,7 +1,9 @@
 package cloud
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -46,6 +48,7 @@ var (
 	nonDagsBundlePath string
 	v2Deployment      string
 	v2Workspace       string
+	deployOutput      string
 	deployExample     = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
@@ -112,6 +115,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().StringVar(&v2Deployment, "deployment", "", "Deployment id to deploy to, overriding the manifest link. For v2 projects (a pyproject.toml with [tool.astro])")
 	cmd.Flags().StringVar(&v2Workspace, "workspace", "", "Workspace for the deploy, overriding the context. For v2 projects (a pyproject.toml with [tool.astro])")
+	cmd.Flags().StringVar(&deployOutput, "output", string(formatText), "Output format for v2 projects: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	cmd.Flags().StringSliceVar(&buildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
 	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
@@ -315,9 +319,16 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 // or both — then render the result. The v2 logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
 func deployV2(cmd *cobra.Command, args []string) error {
-	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
+	format, err := parseDeployFormat(deployOutput)
 	if err != nil {
 		return err
+	}
+
+	out := cmd.OutOrStdout()
+
+	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
+	if err != nil {
+		return deployV2Err(cmd, format, err)
 	}
 
 	linkName := ""
@@ -340,11 +351,13 @@ func deployV2(cmd *cobra.Command, args []string) error {
 
 	// An image build can run for minutes with no transport output yet, so say so
 	// before handing off; the transport itself stays silent (v2 layer rules).
-	if !dags {
+	// json mode drops these lines so the single result object is the only thing
+	// this command adds to stdout.
+	if !dags && format == formatText {
 		if imageName != "" {
-			fmt.Printf("Deploying prebuilt image %s...\n", imageName)
+			fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
 		} else {
-			fmt.Println("Building your project image, this can take a few minutes...")
+			fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 		}
 	}
 
@@ -363,29 +376,103 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		WaitTime:         waitTime,
 		NoDagsBaseDir:    noDagsBaseDir,
 		Interactive:      term.IsTerminal(int(os.Stdin.Fd())),
-	}, v2Deployer{client: astroV1Client})
+	}, newV2Deployer(astroV1Client))
 	if err != nil {
-		return err
+		return deployV2Err(cmd, format, err)
 	}
 
-	renderV2Deploy(&res)
+	return renderV2Deploy(out, format, &res)
+}
+
+// deployFormat selects how the v2 deploy path renders its result.
+type deployFormat string
+
+const (
+	formatText deployFormat = "text"
+	formatJSON deployFormat = "json"
+)
+
+// parseDeployFormat validates the --output value for the v2 deploy path.
+func parseDeployFormat(s string) (deployFormat, error) {
+	switch deployFormat(s) {
+	case formatText:
+		return formatText, nil
+	case formatJSON:
+		return formatJSON, nil
+	default:
+		return "", fmt.Errorf("unknown output format %q (supported: text, json)", s)
+	}
+}
+
+// deployJSON is the single object `astro deploy --output json` emits when a v2
+// deploy finishes. Fields that do not apply to a deploy kind are omitted: a
+// dags-only deploy carries no image_tag, an image-only deploy no
+// dag_bundle_version.
+type deployJSON struct {
+	Deployment       string `json:"deployment"`
+	Workspace        string `json:"workspace"`
+	Type             string `json:"type"`
+	ImageTag         string `json:"image_tag,omitempty"`
+	DagBundleVersion string `json:"dag_bundle_version,omitempty"`
+	RuntimeVersion   string `json:"runtime_version,omitempty"`
+	URL              string `json:"url,omitempty"`
+}
+
+// renderV2Deploy writes a finished v2 deploy: one JSON object in json mode, a
+// plain summary in text mode. Both render the same Result, so the two modes
+// never drift.
+func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) error {
+	if format == formatJSON {
+		return json.NewEncoder(w).Encode(deployJSON{
+			Deployment:       res.DeploymentID,
+			Workspace:        res.WorkspaceID,
+			Type:             res.Type,
+			ImageTag:         res.ImageTag,
+			DagBundleVersion: res.DagTarballVersion,
+			RuntimeVersion:   res.RuntimeVersion,
+			URL:              res.URL,
+		})
+	}
+	switch res.Type {
+	case "dag-only":
+		fmt.Fprintf(w, "Deployed DAGs (version %s) to deployment %s.\n", res.DagTarballVersion, res.DeploymentID)
+	case "image-only":
+		fmt.Fprintf(w, "Deployed image (tag %s) to deployment %s.\n", res.ImageTag, res.DeploymentID)
+	default: // image-and-dag
+		fmt.Fprintf(w, "Deployed image (tag %s) and DAGs (version %s) to deployment %s.\n", res.ImageTag, res.DagTarballVersion, res.DeploymentID)
+	}
+	if res.URL != "" {
+		fmt.Fprintf(w, "Deployment: %s\n", res.URL)
+	}
 	return nil
 }
 
-// renderV2Deploy prints a plain summary of a finished v2 deploy. --output json
-// is a later chunk; this is the text path.
-func renderV2Deploy(res *v2deploy.Result) {
-	switch res.Type {
-	case "dag-only":
-		fmt.Printf("Deployed DAGs (version %s) to deployment %s.\n", res.DagTarballVersion, res.DeploymentID)
-	case "image-only":
-		fmt.Printf("Deployed image (tag %s) to deployment %s.\n", res.ImageTag, res.DeploymentID)
-	default: // image-and-dag
-		fmt.Printf("Deployed image (tag %s) and DAGs (version %s) to deployment %s.\n", res.ImageTag, res.DagTarballVersion, res.DeploymentID)
+// deployV2Err renders a v2 deploy failure. In json mode it writes the
+// {"error","code"} object to stdout and silences cobra's error and usage
+// output so the object is the only thing on the streams; in text mode it
+// returns the error for cobra to print. It returns the error either way, so
+// the process still exits non-zero.
+func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
+	if format == formatJSON {
+		//nolint:errcheck // the command already failed; a write error changes nothing
+		json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
+			Error string `json:"error"`
+			Code  int    `json:"code"`
+		}{Error: err.Error(), Code: 1})
+		// A manifest or selection failure can return before deployV2 sets
+		// SilenceUsage, so set it here too — json mode must not dump the usage
+		// block onto stderr alongside the object.
+		cmd.SilenceErrors = true
+		cmd.SilenceUsage = true
 	}
-	if res.URL != "" {
-		fmt.Printf("Deployment: %s\n", res.URL)
-	}
+	return err
+}
+
+// newV2Deployer builds the transport the v2 deploy path drives. It is a var so a
+// test can swap in a fake and exercise the whole cmd path — flag parsing,
+// selection, and rendering — with no real daemon, registry, or API.
+var newV2Deployer = func(client astrov1.APIClient) v2deploy.Deployer {
+	return v2Deployer{client: client}
 }
 
 // v2Deployer wires internal/deploy's transport seam to the v1 cloud/deploy
