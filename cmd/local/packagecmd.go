@@ -37,13 +37,15 @@ func newPackageCmd(c *cli) *cobra.Command {
 		save     string
 		tag      string
 		platform string
+		outDir   string
 	}
 	cmd := &cobra.Command{
 		Use:   "package [target]",
 		Short: "Build the deployable artifact for an Airflow platform without shipping it",
 		Long: "Build the artifact a given Airflow platform consumes — for CI, or to hand a\n" +
 			"prebuilt image to `astro deploy --image-name`. TARGET is astro (the default),\n" +
-			"mwaa, composer, or oss; only astro builds today.",
+			"mwaa, composer, or oss. astro builds an image; mwaa and composer build a\n" +
+			"bucket-shaped directory; only oss is not built yet.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := pack.TargetAstro
@@ -54,12 +56,14 @@ func newPackageCmd(c *cli) *cobra.Command {
 				save:     opts.save,
 				tag:      opts.tag,
 				platform: opts.platform,
+				outDir:   opts.outDir,
 			})
 		},
 	}
-	cmd.Flags().StringVar(&opts.save, "save", "", "Also write the artifact to this path (a .tar for image targets)")
+	cmd.Flags().StringVar(&opts.save, "save", "", "Also write the artifact to this path (a .tar for image targets, a .zip for bucket targets)")
 	cmd.Flags().StringVar(&opts.tag, "tag", "", "Image reference for image targets (default astro-package/<name>:<runtime>-<hash>)")
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
+	cmd.Flags().StringVar(&opts.outDir, "out-dir", "", "Artifact directory for bucket targets (default dist/<target>)")
 	return cmd
 }
 
@@ -68,6 +72,7 @@ type packageOptions struct {
 	save     string
 	tag      string
 	platform string
+	outDir   string
 }
 
 func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOptions) error {
@@ -95,6 +100,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		Save:       opts.save,
 		Tag:        opts.tag,
 		Platform:   opts.platform,
+		OutDir:     opts.outDir,
 	}, c.callbacks(r))
 	if err != nil {
 		return err
@@ -113,36 +119,93 @@ func (c *cli) packageRegistry() *pack.Registry {
 }
 
 // renderPackage renders a finished build as text. json mode serializes the
-// Result directly, so this runs only for text.
+// Result directly, so this runs only for text. Each artifact shape has its own
+// renderer.
 func renderPackage(w io.Writer, res pack.Result) error {
 	if _, err := fmt.Fprintf(w, "target: %s\n", res.Target); err != nil {
 		return err
 	}
 	switch res.Kind {
 	case pack.KindImage:
-		if _, err := fmt.Fprintf(w, "image:  %s\n", res.Image); err != nil {
-			return err
-		}
-		if res.RuntimeVersion != "" {
-			if _, err := fmt.Fprintf(w, "runtime: %s\n", res.RuntimeVersion); err != nil {
-				return err
-			}
-		}
-		if res.SavedPath != "" {
-			if _, err := fmt.Fprintf(w, "saved:  %s\n", res.SavedPath); err != nil {
-				return err
-			}
-		}
-		// Point at the seam that consumes it, so the CI story is one copy-paste.
-		if _, err := fmt.Fprintf(w, "\nDeploy it with:\n  astro deploy --image-name %s\n", res.Image); err != nil {
-			return err
-		}
+		return renderImageResult(w, res)
 	case pack.KindTree:
-		if _, err := fmt.Fprintf(w, "tree:   %s\n", res.TreePath); err != nil {
+		return renderTreeResult(w, res)
+	case pack.KindBundle:
+		_, err := fmt.Fprintf(w, "bundle: %s\n", res.BundlePath)
+		return err
+	}
+	return nil
+}
+
+// renderImageResult renders an image target's tag, version, and the deploy
+// command that consumes it, so the CI story is one copy-paste.
+func renderImageResult(w io.Writer, res pack.Result) error {
+	if _, err := fmt.Fprintf(w, "image:  %s\n", res.Image); err != nil {
+		return err
+	}
+	if res.RuntimeVersion != "" {
+		if _, err := fmt.Fprintf(w, "runtime: %s\n", res.RuntimeVersion); err != nil {
 			return err
 		}
-	case pack.KindBundle:
-		if _, err := fmt.Fprintf(w, "bundle: %s\n", res.BundlePath); err != nil {
+	}
+	if res.SavedPath != "" {
+		if _, err := fmt.Fprintf(w, "saved:  %s\n", res.SavedPath); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintf(w, "\nDeploy it with:\n  astro deploy --image-name %s\n", res.Image)
+	return err
+}
+
+// renderTreeResult renders a bucket target's paths, any warnings, and the exact
+// upload commands — the hand-off the target cannot run itself.
+func renderTreeResult(w io.Writer, res pack.Result) error {
+	if _, err := fmt.Fprintf(w, "tree:   %s\n", res.TreePath); err != nil {
+		return err
+	}
+	if res.DepsFile != "" {
+		if _, err := fmt.Fprintf(w, "deps:   %s\n", res.DepsFile); err != nil {
+			return err
+		}
+	}
+	if res.SavedPath != "" {
+		if _, err := fmt.Fprintf(w, "saved:  %s\n", res.SavedPath); err != nil {
+			return err
+		}
+	}
+	if err := renderWarnings(w, res.Warnings); err != nil {
+		return err
+	}
+	return renderNextSteps(w, res.NextSteps)
+}
+
+// renderNextSteps prints the upload commands under a heading.
+func renderNextSteps(w io.Writer, steps []string) error {
+	if len(steps) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\nUpload it with:\n"); err != nil {
+		return err
+	}
+	for _, step := range steps {
+		if _, err := fmt.Fprintf(w, "  %s\n", step); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// renderWarnings prints any non-fatal findings under a heading. The build still
+// produced a valid artifact, so these inform rather than stop.
+func renderWarnings(w io.Writer, warnings []string) error {
+	if len(warnings) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\nwarnings:\n"); err != nil {
+		return err
+	}
+	for _, warning := range warnings {
+		if _, err := fmt.Fprintf(w, "  - %s\n", warning); err != nil {
 			return err
 		}
 	}

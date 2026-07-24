@@ -45,15 +45,16 @@ func TestPackageUnknownTargetLists(t *testing.T) {
 func TestPackageStagedTargetErrors(t *testing.T) {
 	d, _ := testDeps(t)
 	writeManifest(t, &d, t.TempDir())
-	err := execute(t, d, "package", "mwaa")
+	// oss is the one target still staged.
+	err := execute(t, d, "package", "oss")
 	if err == nil {
-		t.Fatal("want a staged error for mwaa")
+		t.Fatal("want a staged error for oss")
 	}
 	var staged *pack.StagedError
 	if !errors.As(err, &staged) {
 		t.Fatalf("want a StagedError, got %T: %v", err, err)
 	}
-	if staged.Target != "mwaa" {
+	if staged.Target != "oss" {
 		t.Errorf("staged error names the wrong target: %+v", staged)
 	}
 }
@@ -62,7 +63,7 @@ func TestPackageStagedTargetJSONError(t *testing.T) {
 	d, out := testDeps(t)
 	writeManifest(t, &d, t.TempDir())
 	// json mode still fails, and the shared wrapper writes one error object.
-	_ = execute(t, d, "package", "composer", "--output", "json")
+	_ = execute(t, d, "package", "oss", "--output", "json")
 	var obj struct {
 		Error string `json:"error"`
 		Code  int    `json:"code"`
@@ -70,8 +71,33 @@ func TestPackageStagedTargetJSONError(t *testing.T) {
 	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &obj); err != nil {
 		t.Fatalf("json error object did not decode: %v: %q", err, out.String())
 	}
-	if !strings.Contains(obj.Error, "composer") || obj.Code != 1 {
+	if !strings.Contains(obj.Error, "oss") || obj.Code != 1 {
 		t.Errorf("json error object wrong: %+v", obj)
+	}
+}
+
+func TestPackageMWAABuildsTree(t *testing.T) {
+	d, out := testDeps(t)
+	dir := t.TempDir()
+	writeManifest(t, &d, dir)
+	if err := os.MkdirAll(filepath.Join(dir, "dags"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "dags", "d.py"), []byte("x = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outDir := filepath.Join(t.TempDir(), "mwaa-artifact")
+	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
+		t.Fatalf("package mwaa: %v", err)
+	}
+	// The command reports the tree and the upload hand-off in text.
+	for _, want := range []string{"tree:", outDir, "requirements.txt", "aws s3 sync"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("text output missing %q:\n%s", want, out.String())
+		}
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "dags", "d.py")); err != nil {
+		t.Errorf("dag not copied into the artifact: %v", err)
 	}
 }
 

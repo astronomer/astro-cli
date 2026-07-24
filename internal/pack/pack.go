@@ -62,6 +62,9 @@ type Request struct {
 	// WorkDir is a scratch directory for the build context. Empty means the
 	// target makes and removes its own temp dir.
 	WorkDir string
+	// OutDir overrides where a tree target writes its artifact directory. Empty
+	// means the default: <ProjectDir>/dist/<target>.
+	OutDir string
 }
 
 // Result is the packaged artifact — the value both text and json render. The
@@ -77,9 +80,19 @@ type Result struct {
 	TreePath       string `json:"tree_path,omitempty"`
 	BundlePath     string `json:"bundle_path,omitempty"`
 	// SavedPath is set only with --save; Size is the saved artifact's size in
-	// bytes when it is cheap to read (the saved tarball), else 0.
+	// bytes when it is cheap to read (the saved tarball or zip), else 0.
 	SavedPath string `json:"saved_path,omitempty"`
 	Size      int64  `json:"size,omitempty"`
+	// DepsFile is the requirements/dependency file a tree target wrote — the
+	// file MWAA reads from its bucket, or the file the Composer environment
+	// update consumes. Empty for image targets.
+	DepsFile string `json:"deps_file,omitempty"`
+	// Warnings are non-fatal findings the artifact is still valid despite: an
+	// Airflow pin the platform does not list, OS packages it cannot install.
+	Warnings []string `json:"warnings,omitempty"`
+	// NextSteps are the exact commands to ship the artifact — the upload
+	// hand-off a tree target cannot do itself (it never touches the network).
+	NextSteps []string `json:"next_steps,omitempty"`
 }
 
 // Target packages a v2 project for one Airflow platform. Build validates the
@@ -98,15 +111,15 @@ type Registry struct {
 	order  []string
 }
 
-// NewRegistry builds the registry over a fully-built astro target. The other
-// three platforms register as staged stubs: named so the command lists them,
-// but erroring "not built yet" until their stage lands (docs/v2-deploy.md,
-// section 4).
+// NewRegistry builds the registry over a fully-built astro target. mwaa and
+// composer are built here too — they touch only the filesystem, so they need no
+// injected engine. oss stays a staged stub: named so the command lists it, but
+// erroring "not built yet" until its stage lands (docs/v2-deploy.md, section 4).
 func NewRegistry(astro Target) *Registry {
 	targets := []Target{
 		astro,
-		stagedTarget{name: TargetMWAA},
-		stagedTarget{name: TargetComposer},
+		NewMWAATarget(),
+		NewComposerTarget(),
 		stagedTarget{name: TargetOSS},
 	}
 	r := &Registry{byName: make(map[string]Target, len(targets))}

@@ -42,14 +42,25 @@ func TestRegistryLookupUnknownListsKnown(t *testing.T) {
 }
 
 func TestStagedTargetsRefuseToBuild(t *testing.T) {
+	// oss is the last staged target; mwaa and composer build for real now.
 	r := NewRegistry(nopTarget{name: TargetAstro})
-	for _, name := range []string{TargetMWAA, TargetComposer, TargetOSS} {
+	target, err := r.Lookup(TargetOSS)
+	require.NoError(t, err)
+	_, err = target.Build(context.Background(), Request{}, localrt.Callbacks{})
+	var staged *StagedError
+	require.ErrorAs(t, err, &staged, "oss should return a StagedError")
+	assert.Equal(t, TargetOSS, staged.Target)
+}
+
+func TestRegistryBuildsMWAAAndComposer(t *testing.T) {
+	// The registry wires the real mwaa and composer targets, not stubs.
+	r := NewRegistry(nopTarget{name: TargetAstro})
+	for _, name := range []string{TargetMWAA, TargetComposer} {
 		target, err := r.Lookup(name)
 		require.NoError(t, err)
-		_, err = target.Build(context.Background(), Request{}, localrt.Callbacks{})
-		var staged *StagedError
-		require.ErrorAs(t, err, &staged, "target %s should return a StagedError", name)
-		assert.Equal(t, name, staged.Target)
+		assert.Equal(t, name, target.Name())
+		_, isStaged := target.(stagedTarget)
+		assert.False(t, isStaged, "%s should be a real target, not a stub", name)
 	}
 }
 
