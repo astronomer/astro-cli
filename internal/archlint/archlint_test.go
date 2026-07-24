@@ -38,6 +38,7 @@ var v2BelowCmd = []string{
 	"internal/localshared",
 	"internal/localstandalone",
 	"internal/localstate",
+	"internal/pack",
 	"internal/plan",
 	"internal/project",
 	"internal/scaffold",
