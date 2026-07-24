@@ -13,6 +13,14 @@
 //   - [tool.astro.target.*] is backend-specific by design — a target section
 //     is meaningless to other targets — so Astro.Targets stays plain data and
 //     each backend types its own section.
+//
+// Deployment links come out resolved. [tool.astro] may set a default
+// workspace and a default target that every link inherits, and an absent
+// target means "astro". Parse folds those defaults in, so each Deployment in
+// Astro.Deployments already carries its own Workspace and Target — a consumer
+// reads link.Workspace and link.Target and never re-runs the fallback. The
+// top-level defaults stay visible on Astro.Workspace and Astro.Target for a
+// consumer that wants to show them.
 package manifest
 
 import (
@@ -50,8 +58,18 @@ type Astro struct {
 	// needs at the system level — v1's packages.txt. Docker mode installs
 	// them into the runtime image; standalone mode cannot and warns.
 	Packages []string
+	// Workspace is [tool.astro] workspace, the default workspace every
+	// deployment link inherits when the link sets none. Empty if unset. It is
+	// already folded into each Deployment.Workspace; kept here for display.
+	Workspace string
+	// Target is [tool.astro] target, the default target every deployment link
+	// inherits when the link sets none. Empty if unset (links then fall back
+	// to "astro"). It is already folded into each Deployment.Target; kept here
+	// for display.
+	Target string
 	// Deployments is the committed deployment inventory,
-	// [tool.astro.deployments.<name>].
+	// [tool.astro.deployments.<name>], with every link's Workspace and Target
+	// already resolved from the two levels.
 	Deployments map[string]Deployment
 	// Targets is [tool.astro.target.<name>], decoded but untyped: target
 	// config is backend-specific, so each backend types its own section.
@@ -62,11 +80,16 @@ type Astro struct {
 }
 
 // Deployment is one committed deployment link. Control-plane coordinates
-// only — no URL, no credential; those are resolved at request time.
+// only — no URL, no credential; those are resolved at request time. Target and
+// Workspace are already resolved: a link's own value if it set one, else the
+// [tool.astro] default, and for Target "astro" when neither level sets it.
 type Deployment struct {
 	Target     string
 	Workspace  string
 	Deployment string
+	// Default marks the link `astro deploy` ships to when the command names no
+	// link. At most one link in a manifest may set it.
+	Default bool
 }
 
 // ErrNoAstroSection reports a pyproject.toml without a [tool.astro] table: a
@@ -157,11 +180,18 @@ func Parse(data []byte) (*Manifest, error) {
 		return nil, ErrNoAstroSection
 	}
 
+	// [tool.astro] target is either a string (the default target for every
+	// link) or the [tool.astro.target.<name>] table of backend config. TOML
+	// forbids both spellings of one key in a file, so at most one arrives.
+	defaultTarget, targets, targetProblem := resolveTargetSection(f.Tool.Astro.Target)
+
 	m := &Manifest{
 		Astro: Astro{
 			AirflowVersion: f.Tool.Astro.Airflow,
 			Packages:       f.Tool.Astro.Packages,
-			Targets:        f.Tool.Astro.Target,
+			Workspace:      f.Tool.Astro.Workspace,
+			Target:         defaultTarget,
+			Targets:        targets,
 			Env:            f.Tool.Astro.Env,
 		},
 	}
@@ -172,17 +202,89 @@ func Parse(data []byte) (*Manifest, error) {
 			Dependencies:   f.Project.Dependencies,
 		}
 	}
+	// Problems the decode turns up, before the typed validation pass: the
+	// overloaded target key, and any per-link target set to an empty string —
+	// told apart from an absent key only here, at the wire pointer. validate
+	// works on the typed Manifest and cannot see either, so they come in as a
+	// seed.
+	var decodeProblems []Problem
+	if targetProblem != nil {
+		decodeProblems = append(decodeProblems, *targetProblem)
+	}
 	if len(f.Tool.Astro.Deployments) > 0 {
 		m.Astro.Deployments = make(map[string]Deployment, len(f.Tool.Astro.Deployments))
 		for name, d := range f.Tool.Astro.Deployments {
-			m.Astro.Deployments[name] = Deployment(d)
+			// Target is no longer required — it defaults to [tool.astro] target
+			// and then to "astro" — but a link that sets it to an empty string
+			// meant something and got it wrong.
+			if d.Target != nil && *d.Target == "" {
+				decodeProblems = append(decodeProblems, Problem{Key: "tool.astro.deployments." + name + ".target", Reason: "must not be empty"})
+			}
+			m.Astro.Deployments[name] = Deployment{
+				Deployment: d.Deployment,
+				Workspace:  firstNonEmpty(d.Workspace, m.Astro.Workspace),
+				Target:     firstNonEmpty(derefString(d.Target), defaultTarget, defaultTargetName),
+				Default:    d.Default,
+			}
 		}
 	}
 
-	if problems := validate(m); len(problems) > 0 {
+	if problems := validate(m, decodeProblems); len(problems) > 0 {
 		return nil, &ValidationError{Problems: problems}
 	}
 	return m, nil
+}
+
+// defaultTargetName is the target a link falls back to when neither the link
+// nor [tool.astro] names one.
+const defaultTargetName = "astro"
+
+// resolveTargetSection reads the [tool.astro] target key, which is overloaded:
+// a string is the default target name, a table is the [tool.astro.target.<name>]
+// backend config. It returns whichever is present, plus a Problem for a value
+// that is neither (an empty-string default, or a wrong type). TOML forbids one
+// key from being both a string and a table, so a file that sets a string
+// default cannot also carry target-config tables — fine while the Astro target
+// needs no table, a real limit to know before another target does.
+func resolveTargetSection(v any) (defaultTarget string, targets map[string]map[string]any, problem *Problem) {
+	const key = "tool.astro.target"
+	switch t := v.(type) {
+	case nil:
+		return "", nil, nil
+	case string:
+		if t == "" {
+			return "", nil, &Problem{Key: key, Reason: "must not be empty"}
+		}
+		return t, nil, nil
+	case map[string]any:
+		targets = make(map[string]map[string]any, len(t))
+		for name, cfg := range t {
+			section, ok := cfg.(map[string]any)
+			if !ok {
+				return "", nil, &Problem{Key: key + "." + name, Reason: "must be a table of target config"}
+			}
+			targets[name] = section
+		}
+		return "", targets, nil
+	default:
+		return "", nil, &Problem{Key: key, Reason: "must be a target name or a [tool.astro.target.<name>] table"}
+	}
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // projectNameRe is PEP 508's name grammar, which PEP 621 requires of
@@ -192,8 +294,11 @@ var projectNameRe = regexp.MustCompile(`^(?i:[a-z0-9]|[a-z0-9][a-z0-9._-]*[a-z0-
 // airflowVersionRe accepts a full or partial version: "3", "3.1", "3.1.2".
 var airflowVersionRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+){0,2}$`)
 
-func validate(m *Manifest) []Problem {
-	var ps []Problem
+// validate checks the typed manifest. seed carries the problems the decode
+// already found (see Parse), which validate sorts in with its own so the error
+// still lists every finding in a stable order.
+func validate(m *Manifest, seed []Problem) []Problem {
+	ps := seed
 	add := func(key, reason string) { ps = append(ps, Problem{Key: key, Reason: reason}) }
 
 	if m.Project.Name == "" {
@@ -215,17 +320,23 @@ func validate(m *Manifest) []Problem {
 		}
 	}
 
+	var defaults []string
 	for name, d := range m.Astro.Deployments {
 		key := "tool.astro.deployments." + name
-		if d.Target == "" {
-			add(key+".target", "required")
-		}
+		// Workspace must resolve from one of the two levels.
 		if d.Workspace == "" {
-			add(key+".workspace", "required")
+			add(key+".workspace", "no workspace: set workspace on the link or a default with [tool.astro] workspace")
 		}
 		if d.Deployment == "" {
 			add(key+".deployment", "required")
 		}
+		if d.Default {
+			defaults = append(defaults, name)
+		}
+	}
+	if len(defaults) > 1 {
+		sort.Strings(defaults)
+		add("tool.astro.deployments", fmt.Sprintf("more than one link sets default = true (%s): at most one may be the default", strings.Join(defaults, ", ")))
 	}
 
 	// Map iteration made the order random; error text must be stable.
@@ -253,15 +364,26 @@ type wireProject struct {
 }
 
 type wireAstro struct {
-	Airflow     string                    `toml:"airflow"`
-	Packages    []string                  `toml:"packages"`
-	Target      map[string]map[string]any `toml:"target"`
+	Airflow   string   `toml:"airflow"`
+	Packages  []string `toml:"packages"`
+	Workspace string   `toml:"workspace"`
+	// Target is overloaded: a string default target name, or the
+	// [tool.astro.target.<name>] table of backend config. resolveTargetSection
+	// splits the two. It stays any because TOML decodes each spelling to a
+	// different Go type and a file carries only one.
+	Target      any                       `toml:"target"`
 	Deployments map[string]wireDeployment `toml:"deployments"`
 	Env         map[string]any            `toml:"env"`
 }
 
+// wireDeployment mirrors the TOML spelling. Target is a pointer so an absent
+// key (nil, take the default) is told apart from target = "" (a rejected
+// empty string). Workspace stays a plain string: workspace = "" is treated as
+// absent — it falls back to the [tool.astro] default rather than erroring on
+// its own — so it needs no such distinction.
 type wireDeployment struct {
-	Target     string `toml:"target"`
-	Workspace  string `toml:"workspace"`
-	Deployment string `toml:"deployment"`
+	Target     *string `toml:"target"`
+	Workspace  string  `toml:"workspace"`
+	Deployment string  `toml:"deployment"`
+	Default    bool    `toml:"default"`
 }

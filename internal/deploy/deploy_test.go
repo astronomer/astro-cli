@@ -144,6 +144,48 @@ func TestResolveSelection(t *testing.T) {
 		assert.Equal(t, "prod", sel.linkName)
 	})
 
+	markedDefault := map[string]manifest.Deployment{
+		"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
+		"dev":  {Target: "astro", Workspace: "ws-dev", Deployment: "dep-dev", Default: true},
+	}
+
+	t.Run("the link marked default = true is chosen", func(t *testing.T) {
+		sel, err := resolveSelection(Request{Manifest: manifestWith(markedDefault)})
+		require.NoError(t, err)
+		assert.Equal(t, "dep-dev", sel.deploymentID)
+		assert.Equal(t, "dev", sel.linkName)
+	})
+
+	t.Run("a lone marked link is the default too", func(t *testing.T) {
+		sel, err := resolveSelection(Request{Manifest: manifestWith(map[string]manifest.Deployment{
+			"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod", Default: true},
+		})})
+		require.NoError(t, err)
+		assert.Equal(t, "dep-prod", sel.deploymentID)
+		assert.Equal(t, "prod", sel.linkName)
+	})
+
+	t.Run("--deployment beats the marked default", func(t *testing.T) {
+		sel, err := resolveSelection(Request{
+			Manifest:         manifestWith(markedDefault),
+			DeploymentID:     "dep-flag",
+			ContextWorkspace: "ws-ctx",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "dep-flag", sel.deploymentID)
+		assert.Empty(t, sel.linkName)
+	})
+
+	t.Run("a named link beats the marked default", func(t *testing.T) {
+		sel, err := resolveSelection(Request{
+			Manifest: manifestWith(markedDefault),
+			LinkName: "prod",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "dep-prod", sel.deploymentID)
+		assert.Equal(t, "prod", sel.linkName)
+	})
+
 	t.Run("no default with multiple links falls to unlinked", func(t *testing.T) {
 		sel, err := resolveSelection(Request{
 			Manifest:         manifestWith(twoLinks),

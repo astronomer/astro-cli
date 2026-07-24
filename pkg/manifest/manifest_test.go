@@ -110,6 +110,116 @@ func TestLoadMinimal(t *testing.T) {
 	}
 }
 
+func TestResolveDefaults(t *testing.T) {
+	cases := []struct {
+		name          string
+		content       string
+		wantWorkspace string // top-level Astro.Workspace
+		wantTarget    string // top-level Astro.Target
+		wantLinks     map[string]Deployment
+	}{
+		{
+			name: "top-level workspace inherited, implicit astro target",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-default"
+
+[tool.astro.deployments.prod]
+deployment = "dep-prod"
+`,
+			wantWorkspace: "ws-default",
+			wantLinks: map[string]Deployment{
+				"prod": {Target: "astro", Workspace: "ws-default", Deployment: "dep-prod"},
+			},
+		},
+		{
+			name: "link workspace overrides the top-level default",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-default"
+
+[tool.astro.deployments.prod]
+workspace = "ws-own"
+deployment = "dep-prod"
+`,
+			wantWorkspace: "ws-default",
+			wantLinks: map[string]Deployment{
+				"prod": {Target: "astro", Workspace: "ws-own", Deployment: "dep-prod"},
+			},
+		},
+		{
+			name: "top-level target inherited, link target wins",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-default"
+target = "mwaa"
+
+[tool.astro.deployments.cloud]
+target = "astro"
+deployment = "dep-cloud"
+
+[tool.astro.deployments.aws]
+deployment = "dep-aws"
+`,
+			wantWorkspace: "ws-default",
+			wantTarget:    "mwaa",
+			wantLinks: map[string]Deployment{
+				"cloud": {Target: "astro", Workspace: "ws-default", Deployment: "dep-cloud"},
+				"aws":   {Target: "mwaa", Workspace: "ws-default", Deployment: "dep-aws"},
+			},
+		},
+		{
+			name: "minimal link is deployment plus a workspace default",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-default"
+
+[tool.astro.deployments.prod]
+deployment = "dep-prod"
+default = true
+`,
+			wantWorkspace: "ws-default",
+			wantLinks: map[string]Deployment{
+				"prod": {Target: "astro", Workspace: "ws-default", Deployment: "dep-prod", Default: true},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := Load(write(t, tc.content))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m.Astro.Workspace != tc.wantWorkspace {
+				t.Errorf("Astro.Workspace = %q, want %q", m.Astro.Workspace, tc.wantWorkspace)
+			}
+			if m.Astro.Target != tc.wantTarget {
+				t.Errorf("Astro.Target = %q, want %q", m.Astro.Target, tc.wantTarget)
+			}
+			if !reflect.DeepEqual(m.Astro.Deployments, tc.wantLinks) {
+				t.Errorf("Deployments = %#v, want %#v", m.Astro.Deployments, tc.wantLinks)
+			}
+		})
+	}
+}
+
 func TestLoadMissingFile(t *testing.T) {
 	_, err := Load(filepath.Join(t.TempDir(), "pyproject.toml"))
 	if !errors.Is(err, ErrNotFound) {
@@ -193,8 +303,69 @@ target = "astro"
 			wantKeys: []string{
 				"project.name",
 				"tool.astro.airflow",
-				"tool.astro.deployments.d.target",
 			},
+		},
+		{
+			name: "missing workspace at both levels",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.prod]
+deployment = "dep-xyz"
+`,
+			wantKeys: []string{"tool.astro.deployments.prod.workspace"},
+		},
+		{
+			name: "empty per-link target rejected",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+
+[tool.astro.deployments.prod]
+target = ""
+deployment = "dep-xyz"
+`,
+			wantKeys: []string{"tool.astro.deployments.prod.target"},
+		},
+		{
+			name: "empty top-level target rejected",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+target = ""
+`,
+			wantKeys: []string{"tool.astro.target"},
+		},
+		{
+			name: "two links marked default",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+
+[tool.astro.deployments.prod]
+deployment = "dep-prod"
+default = true
+
+[tool.astro.deployments.dev]
+deployment = "dep-dev"
+default = true
+`,
+			wantKeys: []string{"tool.astro.deployments"},
 		},
 	}
 

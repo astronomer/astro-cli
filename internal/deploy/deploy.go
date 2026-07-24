@@ -198,7 +198,8 @@ type selection struct {
 
 // resolveSelection picks the deployment target from the flags and manifest, in
 // the order the design doc lays out: an explicit --deployment wins, then a
-// named link, then the default link, then the unlinked workspace-level flow.
+// named link, then the link marked default = true, then the lone-link default,
+// then the unlinked workspace-level flow.
 func resolveSelection(req Request) (selection, error) {
 	// --deployment always overrides the manifest, so CI can target a deployment
 	// that is not in the file.
@@ -227,10 +228,8 @@ func resolveSelection(req Request) (selection, error) {
 		}, nil
 	}
 
-	// Otherwise the default link. Until the manifest carries an explicit default
-	// marker (left to the schema work — design doc section 3), a project with
-	// exactly one link treats it as the default: the everyday "one project, one
-	// deployment" case.
+	// Otherwise the default link: a link marked default = true, or — the interim
+	// rule — a project's one link when nothing is marked (design doc section 3).
 	if name, link, ok := defaultLink(links); ok {
 		return selection{
 			deploymentID: link.Deployment,
@@ -245,14 +244,20 @@ func resolveSelection(req Request) (selection, error) {
 	}, nil
 }
 
-// defaultLink returns the single link when the manifest declares exactly one,
-// the interim spelling of "the default deployment".
+// defaultLink returns the link `astro deploy` ships to with no argument. A link
+// marked default = true wins; the manifest guarantees at most one. With none
+// marked, the interim rule keeps its promise: a project's one link is its
+// default. A one-link project behaves the same whether that link is marked.
 func defaultLink(links map[string]manifest.Deployment) (string, manifest.Deployment, bool) {
-	if len(links) != 1 {
-		return "", manifest.Deployment{}, false
-	}
 	for name, link := range links {
-		return name, link, true
+		if link.Default {
+			return name, link, true
+		}
+	}
+	if len(links) == 1 {
+		for name, link := range links {
+			return name, link, true
+		}
 	}
 	return "", manifest.Deployment{}, false
 }
