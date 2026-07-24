@@ -13,8 +13,8 @@ import (
 func newTeamCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "team",
-		Short: "Manage Astronomer Teams",
-		Long:  "Teams represents a team or a group from an IDP in the Astronomer Platform",
+		Short: "Manage APC Teams",
+		Long:  "Teams represents a team or a group from an IDP in the APC Platform",
 	}
 	cmd.AddCommand(
 		newTeamGetCmd(out),
@@ -29,8 +29,8 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get [TEAM ID]",
 		Aliases: []string{"g"},
-		Short:   "Get a team in the Astronomer Platform",
-		Long:    "Get a team in the Astronomer Platform",
+		Short:   "Get a team in the APC Platform",
+		Long:    "Get a team in the APC Platform",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
@@ -49,8 +49,8 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"l"},
-		Short:   "List all teams in the Astronomer Platform",
-		Long:    "List all teams in the Astronomer Platform",
+		Short:   "List all teams in the APC Platform",
+		Long:    "List all teams in the APC Platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return listTeam(cmd, out, paginated, pageSize)
@@ -66,8 +66,8 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TEAM ID]",
 		Aliases: []string{"u"},
-		Short:   "Update a team in the Astronomer Platform",
-		Long:    "Update a team in the Astronomer Platform",
+		Short:   "Update a team in the APC Platform",
+		Long:    "Update a team in the APC Platform",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

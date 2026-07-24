@@ -98,7 +98,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		w.Close()
 		s.NoError(err)
 		io.Copy(b, r)
-		s.Contains(b.String(), "Teams represents a team or a group from an IDP in the Astronomer Platform")
+		s.Contains(b.String(), "Teams represents a team or a group from an IDP in the APC Platform")
 	})
 
 	s.Run("1.0.1 platform with deployment adopt command", func() {

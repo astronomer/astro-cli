@@ -30,7 +30,7 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 		Use:     "service-account",
 		Aliases: []string{"sa"},
 		Short:   "Manage Workspace Service Accounts resources",
-		Long:    "Service Accounts represent a revokable token with access to an Astronomer Cluster",
+		Long:    "Service Accounts represent a revokable token with access to an APC Cluster",
 	}
 	cmd.AddCommand(
 		newWorkspaceSaCreateCmd(out),
@@ -45,8 +45,8 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a Service Account in an Astronomer Cluster",
-		Long:    "Create a Service Account in an Astronomer Cluster",
+		Short:   "Create a Service Account in an APC Cluster",
+		Long:    "Create a Service Account in an APC Cluster",
 		Example: workspaceSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaCreate(cmd, out)
@@ -80,8 +80,8 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [service-account id]",
 		Aliases: []string{"de"},
-		Short:   "Delete a Service Account in the Astro Private Cloud platform",
-		Long:    "Delete a Service Account in the Astro Private Cloud platform",
+		Short:   "Delete a Service Account in the APC platform",
+		Long:    "Delete a Service Account in the APC platform",
 		Args:    cobra.ExactArgs(1),
 		Example: "astro workspace sa delete cl0wh207g0496759fx0qof80q",
 		RunE: func(cmd *cobra.Command, args []string) error {

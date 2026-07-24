@@ -15,8 +15,8 @@ const (
 func newUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
-		Short: "Manage Astronomer user",
-		Long:  "Users represents a human who has authenticated with the Astronomer platform",
+		Short: "Manage APC user",
+		Long:  "Users represents a human who has authenticated with the APC platform",
 	}
 	cmd.AddCommand(
 		newUserCreateCmd(out),
@@ -32,8 +32,8 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a user in the astronomer platform",
-		Long:    "Create a user in the astronomer platform, user will receive an invite at the email address provided",
+		Short:   "Create a user in the APC platform",
+		Long:    "Create a user in the APC platform, user will receive an invite at the email address provided",
 		Example: createUserExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true

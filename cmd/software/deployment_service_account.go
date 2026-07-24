@@ -32,8 +32,8 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
-		Short:   "Manage astronomer service accounts",
-		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
+		Short:   "Manage APC service accounts",
+		Long:    "Service-accounts represent a revokable token with access to the APC platform",
 	}
 	cmd.AddCommand(
 		newDeploymentSaCreateCmd(out),
@@ -47,8 +47,8 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a service-account in the astronomer platform",
-		Long:    "Create a service-account in the astronomer platform",
+		Short:   "Create a service-account in the APC platform",
+		Long:    "Create a service-account in the APC platform",
 		Example: deploymentSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaCreate(cmd, out)
@@ -83,8 +83,8 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [service-account ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete a service-account in the astronomer platform",
-		Long:    "Delete a service-account in the astronomer platform",
+		Short:   "Delete a service-account in the APC platform",
+		Long:    "Delete a service-account in the APC platform",
 		Example: deploymentSaDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

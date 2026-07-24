@@ -3,8 +3,12 @@ package software
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -33,6 +37,43 @@ func (s *AddCmdSuite) SetupSuite() {
 }
 
 var _ suite.TearDownAllSuite = (*AddCmdSuite)(nil)
+
+// Command help must use APC branding: no "software", and no "Astronomer <noun>"
+// except the product/resource names below that legitimately keep the prefix.
+func (s *AddCmdSuite) TestNoLegacySoftwareBrandingInDescriptions() {
+	software := regexp.MustCompile(`(?i)software`)
+	astronomerNoun := regexp.MustCompile(`(?i)astronomer\s+(\w+)`)
+	kept := map[string]bool{"runtime": true, "deployment": true, "deployments": true, "workspace": true, "workspaces": true}
+
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{}, nil)
+	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
+
+	check := func(where, text string) {
+		s.NotRegexp(software, text, "%s contains legacy branding: %q", where, text)
+		for _, m := range astronomerNoun.FindAllStringSubmatch(text, -1) {
+			noun := strings.ToLower(m[1])
+			s.Truef(kept[noun], "%s uses legacy branding %q; rename to APC", where, m[0])
+		}
+	}
+
+	var walk func(cmd *cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		for _, text := range []string{cmd.Short, cmd.Long, cmd.Example} {
+			check(cmd.CommandPath(), text)
+		}
+		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+			check(fmt.Sprintf("%s --%s", cmd.CommandPath(), f.Name), f.Usage)
+		})
+		for _, sub := range cmd.Commands() {
+			walk(sub)
+		}
+	}
+
+	for _, cmd := range AddCmds(houstonMock, new(bytes.Buffer)) {
+		walk(cmd)
+	}
+}
 
 func (s *AddCmdSuite) TestAddCmds() {
 	appConfig = &houston.AppConfig{

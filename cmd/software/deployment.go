@@ -132,7 +132,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Use:     "deployment",
 		Aliases: []string{"de", "deployments"},
 		Short:   "Manage Astronomer Deployments",
-		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
+		Long:    "Deployments are individual Airflow clusters running on an installation of the APC platform.",
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "ID of the workspace in which you want to manage deployments, you can leave it empty if you want to use your current context's workspace ID")
 	cmd.AddCommand(
