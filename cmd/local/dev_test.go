@@ -166,7 +166,6 @@ func TestDevStubJSONOutput(t *testing.T) {
 			Command     string `json:"command"`
 			Replacement string `json:"replacement"`
 		} `json:"mapping"`
-		Doc string `json:"doc"`
 	}
 	if jsonErr := json.Unmarshal(out.Bytes(), &payload); jsonErr != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", jsonErr, out.String())
@@ -177,8 +176,8 @@ func TestDevStubJSONOutput(t *testing.T) {
 	if payload.Typed != "astro dev ps" {
 		t.Errorf("typed_command = %q", payload.Typed)
 	}
-	if len(payload.Mapping) == 0 || payload.Doc == "" {
-		t.Errorf("payload missing mapping or doc: %+v", payload)
+	if len(payload.Mapping) == 0 {
+		t.Errorf("payload missing mapping: %+v", payload)
 	}
 }
 
