@@ -66,7 +66,7 @@ def test_dev_json_output():
     assert payload["typed_command"] == "astro dev ps"
     assert payload["replacement"] == "astro local status"
     assert payload["mapping"]
-    assert payload["doc"]
+    assert "doc" not in payload
 
 
 def test_init_scaffolds_project(temp_dir):
