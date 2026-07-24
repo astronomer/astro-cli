@@ -67,6 +67,5 @@ func agentsContent() string {
 	for _, m := range DevReplacements() {
 		fmt.Fprintf(&b, "| `astro dev %s` | `%s` |\n", m.Command, m.Replacement)
 	}
-	fmt.Fprintf(&b, "\nFull mapping: %s\n", DevMappingDoc)
 	return b.String()
 }

@@ -218,7 +218,6 @@ func TestAgentsMdCarriesTheDevMapping(t *testing.T) {
 		row := "| `astro dev " + m.Command + "` | `" + m.Replacement + "` |"
 		assert.Contains(t, content, row)
 	}
-	assert.Contains(t, content, DevMappingDoc)
 	assert.Contains(t, content, "pyproject.toml")
 	assert.NotContains(t, content, DefaultAirflowVersion,
 		"AGENTS.md must reference the manifest, not duplicate its values")

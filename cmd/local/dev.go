@@ -14,8 +14,6 @@ import (
 
 // The dev-to-local mapping lives in internal/scaffold, which also publishes
 // it in every scaffolded AGENTS.md; the stub renders the same data.
-const devMappingDoc = scaffold.DevMappingDoc
-
 type devReplacement = scaffold.DevReplacement
 
 func devReplacements() []devReplacement { return scaffold.DevReplacements() }
@@ -27,7 +25,6 @@ type devRemoved struct {
 	Typed       string           `json:"typed_command,omitempty"`
 	Replacement string           `json:"replacement,omitempty"`
 	Mapping     []devReplacement `json:"mapping"`
-	Doc         string           `json:"doc"`
 	// V1Project is set when the current directory looks like an astro v1
 	// project, which v2 cannot run yet.
 	V1Project bool `json:"v1_project,omitempty"`
@@ -109,7 +106,6 @@ func buildDevRemoved(typed string, v1Project bool) devRemoved {
 	p := devRemoved{
 		Typed:     strings.TrimSpace("astro dev " + typed),
 		Mapping:   mapping,
-		Doc:       devMappingDoc,
 		V1Project: v1Project,
 	}
 	if typed == "" {
@@ -154,7 +150,6 @@ func renderDevRemoved(p devRemoved) string {
 		seen[e.Command] = true
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
-	fmt.Fprintf(&b, "\nFull mapping: %s", p.Doc)
 	if p.V1Project {
 		b.WriteString("\n\nThis directory holds an astro v1 project (Dockerfile and .astro/). Migration ships in a later release; use astro CLI 1.x with this project for now.")
 	}

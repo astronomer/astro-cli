@@ -84,9 +84,6 @@ func TestDevStubNamesTheReplacement(t *testing.T) {
 			if !strings.Contains(msg, "`"+typed+"` was removed") {
 				t.Errorf("error does not name the typed command %q:\n%s", typed, msg)
 			}
-			if !strings.Contains(msg, devMappingDoc) {
-				t.Errorf("error does not link the full mapping:\n%s", msg)
-			}
 		})
 	}
 }
@@ -104,9 +101,6 @@ func TestDevStubBareAndUnknown(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no direct replacement") {
 		t.Errorf("unknown subcommand should say there is no direct replacement: %v", err)
-	}
-	if !strings.Contains(err.Error(), devMappingDoc) {
-		t.Errorf("unknown subcommand should link the mapping: %v", err)
 	}
 }
 
@@ -191,7 +185,7 @@ func TestDevStubJSONOutput(t *testing.T) {
 func TestDevStubTextMatchesJSONData(t *testing.T) {
 	p := buildDevRemoved("ps", false)
 	text := renderDevRemoved(p)
-	if !strings.Contains(text, p.Error) || !strings.Contains(text, p.Replacement) || !strings.Contains(text, p.Doc) {
+	if !strings.Contains(text, p.Error) || !strings.Contains(text, p.Replacement) {
 		t.Errorf("text rendering dropped payload data:\n%s", text)
 	}
 }

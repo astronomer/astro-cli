@@ -1,9 +1,5 @@
 package scaffold
 
-// DevMappingDoc is the published full mapping from `astro dev` to the v2
-// surface.
-const DevMappingDoc = "astro.sh/v2/dev-to-local"
-
 // DevReplacement maps one v1 `astro dev` subcommand to what replaces it.
 // One source, two surfaces: the `astro dev` removal stub renders this data
 // as its error text, and the scaffold publishes it in AGENTS.md.
