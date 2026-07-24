@@ -24,7 +24,7 @@ import (
 const (
 	// MinVersion is the minimum astro-cosmos-boost version compatible with
 	// this CLI. Bump when the CLI starts depending on newer helper behavior.
-	MinVersion = "0.0.2-rc.1"
+	MinVersion = "0.0.1-alpha.1"
 
 	// defaultBaseURL is the production install CDN for the helper binary.
 	defaultBaseURL = "https://install.astronomer.io/astro-cosmos-boost"

@@ -46,12 +46,11 @@ func newDbtCmd() *cobra.Command {
 
 func newDbtCleanupCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:    "cleanup [path ...]",
-		Args:   cobra.ArbitraryArgs,
-		Short:  "Uninstall the Cosmos Boost plugin and its associated files",
-		Long:   "Uninstall the Cosmos Boost plugin and its associated files under each path (default: the current directory).",
-		Hidden: true,
-		RunE:   cleanupDbt,
+		Use:   "cleanup [path ...]",
+		Args:  cobra.ArbitraryArgs,
+		Short: "Uninstall the Cosmos Boost plugin and its associated files",
+		Long:  "Uninstall the Cosmos Boost plugin and its associated files under each path (default: the current directory).",
+		RunE:  cleanupDbt,
 	}
 	return cmd
 }
