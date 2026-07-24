@@ -43,6 +43,15 @@ type Deps struct {
 	// Checks runs `astro local check`'s DAG parse against the project venv.
 	Checks checks.Parser
 
+	// CheckVenv parses DAGs in a scratch venv for a `--target` pre-flight
+	// check. Production is the same *checks.VenvRunner as Checks; a test
+	// injects a stub.
+	CheckVenv checks.TargetParser
+
+	// Provisioner builds and caches the scratch venvs a target check needs.
+	// nil uses the uv-backed production provisioner; a test injects a fake.
+	Provisioner func(ctx context.Context) (checks.Provisioner, error)
+
 	// WorkingDir resolves the project path. Commands never call os.Getwd
 	// themselves so tests can pin it.
 	WorkingDir func() (string, error)
@@ -69,14 +78,17 @@ type Runtime interface {
 
 // NewDeps builds the production Deps. Call it once, from main.
 func NewDeps() Deps {
+	runner := checks.NewVenvRunner()
 	return Deps{
-		Stdin:      os.Stdin,
-		Stdout:     os.Stdout,
-		Stderr:     os.Stderr,
-		Runtime:    newModeRuntime(),
-		Checks:     checks.NewVenvRunner(),
-		WorkingDir: os.Getwd,
-		OpenURL:    browser.OpenURL,
+		Stdin:       os.Stdin,
+		Stdout:      os.Stdout,
+		Stderr:      os.Stderr,
+		Runtime:     newModeRuntime(),
+		Checks:      runner,
+		CheckVenv:   runner,
+		Provisioner: newUVProvisioner,
+		WorkingDir:  os.Getwd,
+		OpenURL:     browser.OpenURL,
 	}
 }
 

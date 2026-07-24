@@ -17,7 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"time"
 )
@@ -128,7 +127,7 @@ type Parser interface {
 func Run(ctx context.Context, opts Options, parser Parser) (Result, error) {
 	in := ParseInput{
 		ProjectPath: opts.ProjectPath,
-		DagsDir:     filepath.Join(opts.ProjectPath, "dags"),
+		DagsDir:     DefaultDagsDir(opts.ProjectPath),
 	}
 	report, err := parser.Parse(ctx, in)
 	if err != nil {

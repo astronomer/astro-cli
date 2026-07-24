@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/internal/platformversions"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -55,9 +56,9 @@ func (t *ComposerTarget) Build(_ context.Context, req Request, cb localrt.Callba
 		TreePath: outDir,
 		DepsFile: filepath.Join(outDir, composerDepsFile),
 	}
-	if _, ok := resolveVersion(m.Astro.AirflowVersion, composerAirflowVersions); !ok {
+	if _, ok := platformversions.Resolve(m.Astro.AirflowVersion, platformversions.Composer); !ok {
 		res.Warnings = append(res.Warnings, fmt.Sprintf("the manifest pins Airflow %q, which Composer 3 does not list (Composer offers: %s); pick a supported version when you create or upgrade the environment",
-			m.Astro.AirflowVersion, supportedList(composerAirflowVersions)))
+			m.Astro.AirflowVersion, platformversions.List(platformversions.Composer)))
 	}
 	if w := packagesWarning(m.Astro.Packages, "Composer"); w != "" {
 		res.Warnings = append(res.Warnings, w)

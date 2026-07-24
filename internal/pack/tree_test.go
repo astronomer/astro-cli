@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/internal/platformversions"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -193,14 +194,14 @@ func TestTreeTargetsNoSaveOmitsPath(t *testing.T) {
 func TestMWAARequirementsDropsAirflowAndPinsConstraint(t *testing.T) {
 	// A supported pin resolves to a real constraints URL. Drive it from the
 	// shipped data so the test never duplicates the version literals.
-	supported := mwaaAirflowVersions[1] // an exact, supported Airflow version
-	req := newProject(t, withAirflow(supported.airflow))
+	supported := platformversions.MWAA[1] // an exact, supported Airflow version
+	req := newProject(t, withAirflow(supported.Airflow))
 	res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.Empty(t, res.Warnings, "a supported version warns about nothing")
 
 	reqs := readArtifact(t, req.OutDir, "requirements.txt")
-	wantConstraint := fmt.Sprintf(`--constraint "https://raw.githubusercontent.com/apache/airflow/constraints-%s/constraints-%s.txt"`, supported.airflow, supported.python)
+	wantConstraint := fmt.Sprintf(`--constraint "https://raw.githubusercontent.com/apache/airflow/constraints-%s/constraints-%s.txt"`, supported.Airflow, supported.Python)
 	assert.Contains(t, reqs, wantConstraint)
 	assert.Contains(t, reqs, "apache-airflow-providers-standard")
 	assert.Contains(t, reqs, "pandas")
@@ -213,12 +214,12 @@ func TestMWAARequirementsDropsAirflowAndPinsConstraint(t *testing.T) {
 
 func TestMWAAPartialPinResolvesToNewest(t *testing.T) {
 	// "3" matches the newest supported Airflow 3 on MWAA (the list's first entry).
-	newest := mwaaAirflowVersions[0]
+	newest := platformversions.MWAA[0]
 	req := newProject(t, withAirflow("3"))
 	res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.Empty(t, res.Warnings)
-	want := fmt.Sprintf("constraints-%s/constraints-%s.txt", newest.airflow, newest.python)
+	want := fmt.Sprintf("constraints-%s/constraints-%s.txt", newest.Airflow, newest.Python)
 	assert.Contains(t, readArtifact(t, req.OutDir, "requirements.txt"), want)
 }
 

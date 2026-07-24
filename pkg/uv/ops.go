@@ -41,6 +41,51 @@ func (c *Client) Lock(ctx context.Context, project string, stdio Stdio) error {
 	return asResolution("lock", c.command(ctx, project, stdio, "lock"))
 }
 
+// VenvAt creates a standalone venv at dir — not the <project>/.venv Venv
+// makes — for a scratch environment that lives outside any project (a
+// pre-flight check against a platform's Airflow version). python selects the
+// interpreter version, e.g. "3.12"; uv provisions a managed CPython when the
+// host has none. "" lets uv choose.
+func (c *Client) VenvAt(ctx context.Context, dir, python string, stdio Stdio) error {
+	args := []string{"venv", dir, "--allow-existing"}
+	if python != "" {
+		args = append(args, "--python", python)
+	}
+	return c.command(ctx, "", stdio, args...)
+}
+
+// PipInstall installs reqs into the venv whose interpreter is pythonBin, using
+// `uv pip install`. constraint, when set, is passed as --constraint (a path or
+// URL). A solver failure surfaces as *ResolutionError. It backs a scratch
+// venv that is not driven from a pyproject.toml, so it takes an explicit
+// requirement list rather than a project directory.
+func (c *Client) PipInstall(ctx context.Context, pythonBin string, reqs []string, constraint string, stdio Stdio) error {
+	args := []string{"pip", "install", "--python", pythonBin}
+	if constraint != "" {
+		args = append(args, "--constraint", constraint)
+	}
+	args = append(args, reqs...)
+	return asResolution("pip install", c.command(ctx, "", stdio, args...))
+}
+
+// PipCompile resolves reqs (read from stdio.In as a requirements list on
+// stdin) against an optional constraint file, without installing anything —
+// the resolver runs, the output is discarded. constraint may be a path or a
+// URL; pythonVersion, when set, targets the resolve at that interpreter's
+// markers (e.g. "3.12") so a platform's Python-specific constraints resolve
+// faithfully. A conflict surfaces as *ResolutionError. It is how a caller asks
+// "does this dependency set solve under these constraints?" without an install.
+func (c *Client) PipCompile(ctx context.Context, constraint, pythonVersion string, stdio Stdio) error {
+	args := []string{"pip", "compile", "-", "--no-header", "--no-annotate"}
+	if constraint != "" {
+		args = append(args, "--constraint", constraint)
+	}
+	if pythonVersion != "" {
+		args = append(args, "--python-version", pythonVersion)
+	}
+	return asResolution("pip compile", c.command(ctx, "", stdio, args...))
+}
+
 // Sync makes <project>/.venv match the project's lockfile, locking first
 // when the lockfile is missing or stale — so it too can fail with
 // *ResolutionError. python is as for Venv.

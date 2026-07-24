@@ -283,3 +283,73 @@ func TestTailBufferKeepsTail(t *testing.T) {
 		t.Errorf("tailBuffer = %q, want the last 8 bytes %q", got, "456789ab")
 	}
 }
+
+func TestVenvAtPassesDirAndPython(t *testing.T) {
+	argsFile := filepath.Join(t.TempDir(), "args")
+	c := newTestClient(t, Options{}, "echo \"$@\" > \""+argsFile+"\"\nexit 0")
+
+	dir := filepath.Join(t.TempDir(), "scratch")
+	if err := c.VenvAt(t.Context(), dir, "3.12", Stdio{}); err != nil {
+		t.Fatalf("VenvAt() error = %v", err)
+	}
+	got := readCount(t, argsFile)
+	for _, want := range []string{"venv", dir, "--allow-existing", "--python 3.12"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("VenvAt args = %q, missing %q", got, want)
+		}
+	}
+}
+
+func TestPipInstallPassesInterpreterConstraintAndReqs(t *testing.T) {
+	argsFile := filepath.Join(t.TempDir(), "args")
+	c := newTestClient(t, Options{}, "echo \"$@\" > \""+argsFile+"\"\nexit 0")
+
+	err := c.PipInstall(t.Context(), "/scratch/bin/python", []string{"apache-airflow==3.0.6", "pandas"}, "https://c/constraints.txt", Stdio{})
+	if err != nil {
+		t.Fatalf("PipInstall() error = %v", err)
+	}
+	got := readCount(t, argsFile)
+	for _, want := range []string{"pip install", "--python /scratch/bin/python", "--constraint https://c/constraints.txt", "apache-airflow==3.0.6", "pandas"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("PipInstall args = %q, missing %q", got, want)
+		}
+	}
+}
+
+func TestPipInstallResolutionError(t *testing.T) {
+	c := newTestClient(t, Options{}, "cat \""+fixturePath(t)+"\" >&2\nexit 1")
+	err := c.PipInstall(t.Context(), "/p", []string{"pandas"}, "", Stdio{})
+	var re *ResolutionError
+	if !errors.As(err, &re) {
+		t.Fatalf("PipInstall() error = %v, want *ResolutionError", err)
+	}
+}
+
+func TestPipCompileReadsStdinAndTargetsPython(t *testing.T) {
+	argsFile := filepath.Join(t.TempDir(), "args")
+	stdinFile := filepath.Join(t.TempDir(), "stdin")
+	c := newTestClient(t, Options{}, "echo \"$@\" > \""+argsFile+"\"\ncat > \""+stdinFile+"\"\nexit 0")
+
+	err := c.PipCompile(t.Context(), "/tmp/constraints.txt", "3.12", Stdio{In: strings.NewReader("pandas\nnumpy\n")})
+	if err != nil {
+		t.Fatalf("PipCompile() error = %v", err)
+	}
+	got := readCount(t, argsFile)
+	for _, want := range []string{"pip compile", "-", "--constraint /tmp/constraints.txt", "--python-version 3.12"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("PipCompile args = %q, missing %q", got, want)
+		}
+	}
+	if in := readCount(t, stdinFile); !strings.Contains(in, "pandas") || !strings.Contains(in, "numpy") {
+		t.Errorf("PipCompile stdin = %q, want the requirements", in)
+	}
+}
+
+func TestPipCompileConflictIsResolutionError(t *testing.T) {
+	c := newTestClient(t, Options{}, "cat \""+fixturePath(t)+"\" >&2\nexit 1")
+	err := c.PipCompile(t.Context(), "", "", Stdio{In: strings.NewReader("pandas\n")})
+	var re *ResolutionError
+	if !errors.As(err, &re) {
+		t.Fatalf("PipCompile() error = %v, want *ResolutionError", err)
+	}
+}

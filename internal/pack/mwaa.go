@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/internal/platformversions"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -101,27 +102,20 @@ func mwaaRequirements(airflowPin string, deps []string) (content, warning string
 	if body != "" {
 		body += "\n"
 	}
-	v, ok := resolveVersion(airflowPin, mwaaAirflowVersions)
+	v, ok := platformversions.Resolve(airflowPin, platformversions.MWAA)
 	if ok {
-		header := fmt.Sprintf("--constraint %q\n", mwaaConstraintURL(v))
+		header := fmt.Sprintf("--constraint %q\n", platformversions.MWAAConstraintURL(v))
 		return header + body, ""
 	}
 	header := "" +
 		fmt.Sprintf("# The manifest pins Airflow %q, which MWAA does not offer.\n", airflowPin) +
-		fmt.Sprintf("# MWAA offers: %s.\n", supportedList(mwaaAirflowVersions)) +
+		fmt.Sprintf("# MWAA offers: %s.\n", platformversions.List(platformversions.MWAA)) +
 		"# Pick the version your environment runs and add its constraint, e.g.:\n" +
 		"#   --constraint \"https://raw.githubusercontent.com/apache/airflow/constraints-<version>/constraints-<python>.txt\"\n" +
 		"# Without a --constraint line MWAA supplies one for you.\n"
 	warning = fmt.Sprintf("the manifest pins Airflow %q, which MWAA does not list (MWAA offers: %s); requirements.txt carries a commented constraint template instead of a pinned one",
-		airflowPin, supportedList(mwaaAirflowVersions))
+		airflowPin, platformversions.List(platformversions.MWAA))
 	return header + body, warning
-}
-
-// mwaaConstraintURL is MWAA's documented constraint convention: the Apache
-// Airflow constraints file for the environment's Airflow and Python versions.
-// Source: https://docs.aws.amazon.com/mwaa/latest/userguide/best-practices-dependencies.html
-func mwaaConstraintURL(v platformVersion) string {
-	return fmt.Sprintf("https://raw.githubusercontent.com/apache/airflow/constraints-%s/constraints-%s.txt", v.airflow, v.python)
 }
 
 // mwaaNextSteps is the upload hand-off: sync the tree to the environment's S3

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 )
 
 // parseScript is the DAG-parse program, run with the project's own venv
@@ -84,14 +83,9 @@ func NewVenvRunner() *VenvRunner {
 	}
 }
 
-// venvPython is the interpreter inside a project's .venv. The layout differs
-// on Windows, so switch on GOOS for the value rather than build-tagging the
-// file (docs/v2-architecture.md conventions).
+// venvPython is the interpreter inside a project's .venv.
 func venvPython(projectPath string) string {
-	if runtime.GOOS == "windows" {
-		return filepath.Join(projectPath, ".venv", "Scripts", "python.exe")
-	}
-	return filepath.Join(projectPath, ".venv", "bin", "python")
+	return VenvInterpreter(filepath.Join(projectPath, ".venv"))
 }
 
 func defaultTempHome() (dir string, cleanup func(), err error) {
@@ -102,9 +96,9 @@ func defaultTempHome() (dir string, cleanup func(), err error) {
 	return dir, func() { _ = os.RemoveAll(dir) }, nil //nolint:errcheck // best-effort cleanup of the temp home
 }
 
-// Parse runs the embedded script and decodes its report. A missing venv
-// interpreter is ErrEnvNotReady; the script itself is fed on stdin so nothing
-// is written to the project.
+// Parse runs the embedded script with the project's own .venv interpreter and
+// decodes its report. A missing venv interpreter is ErrEnvNotReady; the script
+// itself is fed on stdin so nothing is written to the project.
 func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, error) {
 	python := r.pythonPath(in.ProjectPath)
 	if _, err := os.Stat(python); err != nil {
@@ -113,7 +107,19 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 			python, ErrEnvNotReady,
 		)
 	}
+	return r.parseWith(ctx, python, in)
+}
 
+// ParseWith runs the embedded script with an explicit interpreter, for a
+// pre-flight check whose scratch venv lives outside the project. The caller
+// owns provisioning that interpreter, so this does not check the project .venv.
+func (r *VenvRunner) ParseWith(ctx context.Context, python string, in ParseInput) (ParseReport, error) {
+	return r.parseWith(ctx, python, in)
+}
+
+// parseWith is the shared body: run the script with the given interpreter,
+// AIRFLOW_HOME pointed at a throwaway directory, and decode the JSON result.
+func (r *VenvRunner) parseWith(ctx context.Context, python string, in ParseInput) (ParseReport, error) {
 	home, cleanup, err := r.tempHome()
 	if err != nil {
 		return ParseReport{}, fmt.Errorf("preparing a scratch AIRFLOW_HOME: %w", err)
