@@ -1,0 +1,15 @@
+# Derived environment (rebuilt by the astro CLI; never commit it)
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Local Airflow runtime state, written by `astro local start`
+.astro/
+
+# Resolver lockfile, regenerated on the first `astro local start`
+uv.lock
+
+# Local-only files
+.env
+.DS_Store
