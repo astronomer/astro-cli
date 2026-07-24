@@ -4,13 +4,14 @@
 // on the runtime image's ONBUILD triggers to install the project's
 // dependencies and OS packages — the same path `astro dev` builds through.
 //
-// It was lifted out of internal/localdocker so the coming v2 deploy path can
-// build the same image the local Docker engine builds (docs/v2-deploy.md,
-// decision 7 and section 1). Its inputs are manifest-shaped — Python
-// dependencies, OS packages, a runtime base image, a tag — so it depends on
-// neither localdocker nor a deploy package; each caller resolves the manifest
-// to a Request and hands it over. Version-to-image resolution stays with the
-// caller, which needs it for its no-build path too.
+// It was lifted out of internal/localdocker so the v2 deploy path can build the
+// same image the local Docker engine builds (docs/v2-deploy.md, decision 7 and
+// section 1). Its inputs are manifest-shaped — Python dependencies, OS packages,
+// a runtime base image, a tag — so it depends on neither localdocker nor a
+// deploy package; each caller resolves the manifest to a Request and hands it
+// over. Build itself takes an already-resolved BaseImage; RuntimeImage maps an
+// Airflow version to that base and lives here now that both the local Docker
+// engine and deploy resolve it the same way.
 //
 // Per the layer rules (docs/v2-architecture.md) it prints nothing and never
 // exits: build output flows through localrt.Callbacks and a failed install
@@ -19,8 +20,10 @@ package imagebuild
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -29,6 +32,27 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
+
+// RuntimeImageRepo hosts Astro Runtime 3 images (Airflow 3). The tag is the
+// runtime version, e.g. "3.1-2" or a floating "3.1" the registry serves.
+const RuntimeImageRepo = "astrocrpublic.azurecr.io/runtime"
+
+// RuntimeImage maps an Airflow version to the runtime base image a build starts
+// FROM. The version arrives resolved by the caller — a pinned runtime tag
+// ("3.1-2") or a floating one ("3.1") — and is used as the tag directly. Only
+// Airflow 3 ships as Astro Runtime 3, so anything else is refused; the built
+// image's io.astronomer label gives back the exact version. Both the local
+// Docker engine and the deploy path resolve the base this way.
+func RuntimeImage(airflowVersion string) (string, error) {
+	v := strings.TrimSpace(airflowVersion)
+	if v == "" {
+		return "", errors.New("no Airflow version was given; one is needed to pick a runtime image")
+	}
+	if major, _, _ := strings.Cut(v, "."); major != "3" {
+		return "", fmt.Errorf("only Airflow 3 is supported in this release, not %q", v)
+	}
+	return RuntimeImageRepo + ":" + v, nil
+}
 
 const (
 	// dockerfileName is the one-line `FROM <base>` Dockerfile the build runs;
@@ -77,6 +101,9 @@ type Request struct {
 	Dependencies []string
 	// Packages are the manifest's OS (apt) package names.
 	Packages []string
+	// Platform is the build platform (e.g. "linux/amd64"). Empty builds for the
+	// host — what local Docker mode wants; the deploy path pins linux/amd64.
+	Platform string
 	// Bin is the container CLI to shell out to; Env reaches its daemon.
 	Bin string
 	Env []string
@@ -92,6 +119,22 @@ type Builder struct {
 // New builds a Builder over the given command runner and clock.
 func New(cmd Commander, now func() time.Time) *Builder {
 	return &Builder{cmd: cmd, now: now}
+}
+
+// NewExecCommander returns the production Commander, backed by os/exec. A caller
+// with no daemon seam of its own (the deploy path) uses it; localdocker keeps
+// its own runner because it also needs command output.
+func NewExecCommander() Commander { return execCommander{} }
+
+type execCommander struct{}
+
+func (execCommander) Run(ctx context.Context, extraEnv []string, s localrt.Stdio, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = append(os.Environ(), extraEnv...)
+	// A nil reader/writer means "none": os/exec routes a nil Stdout/Stderr to the
+	// null device, so a silent probe needs no extra plumbing.
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = s.In, s.Out, s.Err
+	return cmd.Run()
 }
 
 // Build installs the request's dependencies and OS packages into a layer over
@@ -138,9 +181,15 @@ func (b *Builder) Build(ctx context.Context, req Request, cb localrt.Callbacks) 
 		}
 	}}
 	// --pull keeps the base fresh for a floating tag; the daemon still caches
-	// the install layer when the requirements file is unchanged.
-	err := b.cmd.Run(ctx, req.Env, localrt.Stdio{Out: w, Err: w},
-		req.Bin, "build", "--tag", req.Tag, "--file", dfPath, "--pull", contextDir)
+	// the install layer when the requirements file is unchanged. A pinned
+	// platform (deploy wants linux/amd64) is added only when set, so the
+	// host-platform local build keeps its exact command.
+	args := []string{"build", "--tag", req.Tag, "--file", dfPath, "--pull"}
+	if req.Platform != "" {
+		args = append(args, "--platform", req.Platform)
+	}
+	args = append(args, contextDir)
+	err := b.cmd.Run(ctx, req.Env, localrt.Stdio{Out: w, Err: w}, req.Bin, args...)
 	w.Flush()
 	if err != nil {
 		return "", fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)

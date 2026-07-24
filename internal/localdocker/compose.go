@@ -2,7 +2,6 @@ package localdocker
 
 import (
 	_ "embed"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,9 +24,6 @@ import (
 var composeTemplate string
 
 const (
-	// runtimeImageRepo hosts Astro Runtime 3 images (Airflow 3). The tag is
-	// the runtime version, e.g. "3.1-2".
-	runtimeImageRepo = "astrocrpublic.azurecr.io/runtime"
 	// postgresImage matches v1's default metadata database image.
 	postgresImage = "docker.io/postgres:12.6"
 	// airflowHomeInImage is where the runtime image keeps AIRFLOW_HOME.
@@ -64,22 +60,6 @@ type composeInput struct {
 	PostgresPort  int
 	Env           []envVar
 	Mounts        []mount
-}
-
-// imageRef maps a Plan's Airflow version to the runtime image reference.
-// The version arrives resolved by plan building — either a pinned runtime
-// tag ("3.1-2") or a floating one the registry serves ("3.1") — and is
-// used as the tag directly. Only Airflow 3 ships as Astro Runtime 3;
-// docker mode has no image source for anything else.
-func imageRef(airflowVersion string) (string, error) {
-	v := strings.TrimSpace(airflowVersion)
-	if v == "" {
-		return "", errors.New("the plan carries no Airflow version; docker mode needs one to pick a runtime image")
-	}
-	if major, _, _ := strings.Cut(v, "."); major != "3" {
-		return "", fmt.Errorf("docker mode supports Airflow 3 in this release, not %q", v)
-	}
-	return runtimeImageRepo + ":" + v, nil
 }
 
 // composeProjectName derives the compose project name for a project

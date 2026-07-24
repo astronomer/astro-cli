@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/internal/imagebuild"
 	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -170,7 +171,7 @@ func TestStartInstallsDependenciesIntoImage(t *testing.T) {
 	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
 	require.NoError(t, err)
 	assert.Contains(t, string(compose), "image: "+tag)
-	assert.NotContains(t, string(compose), runtimeImageRepo)
+	assert.NotContains(t, string(compose), imagebuild.RuntimeImageRepo)
 	// The build context's contents (requirements.txt, packages.txt) are the
 	// builder's concern and are checked in internal/imagebuild.
 }

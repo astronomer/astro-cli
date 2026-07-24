@@ -179,6 +179,44 @@ func TestBuildStreamsOutput(t *testing.T) {
 	assert.Equal(t, fixedTime, lines[0].Time)
 }
 
+func TestRuntimeImage(t *testing.T) {
+	ref, err := RuntimeImage("3.1-2")
+	require.NoError(t, err)
+	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-2", ref)
+
+	// A floating tag passes through unchanged; the registry resolves it.
+	ref, err = RuntimeImage("3.1")
+	require.NoError(t, err)
+	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1", ref)
+
+	_, err = RuntimeImage("2.9.3")
+	assert.ErrorContains(t, err, "Airflow 3")
+
+	_, err = RuntimeImage("")
+	assert.ErrorContains(t, err, "no Airflow version")
+}
+
+func TestBuildPassesPlatform(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := testRequest(t)
+	req.Dependencies = []string{"pandas"}
+	req.Platform = "linux/amd64"
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.True(t, hasCall(cmd.calls, "--platform linux/amd64"), "expected --platform in the build, got %v", cmd.calls)
+}
+
+func TestBuildOmitsPlatformWhenUnset(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := testRequest(t)
+	req.Dependencies = []string{"pandas"} // no platform: host build, exact command
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.False(t, hasCall(cmd.calls, "--platform"), "host build must not pin a platform, got %v", cmd.calls)
+}
+
 func TestRuntimeDepsDropsAirflowOnly(t *testing.T) {
 	got := runtimeDeps([]string{
 		"apache-airflow==3.1.*",

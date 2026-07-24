@@ -89,18 +89,6 @@ func TestGenerateComposeNoMounts(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte(got), &doc), "an empty mount list must still render valid YAML")
 }
 
-func TestImageRef(t *testing.T) {
-	ref, err := imageRef("3.1-2")
-	require.NoError(t, err)
-	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-2", ref)
-
-	_, err = imageRef("2.9.3")
-	assert.ErrorContains(t, err, "Airflow 3")
-
-	_, err = imageRef("")
-	assert.ErrorContains(t, err, "no Airflow version")
-}
-
 func TestComposeProjectName(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "My Demo")
 	require.NoError(t, os.Mkdir(dir, 0o755))

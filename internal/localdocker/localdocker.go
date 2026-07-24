@@ -121,7 +121,7 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, err
 	}
 
-	image, err := imageRef(p.AirflowVersion)
+	image, err := imagebuild.RuntimeImage(p.AirflowVersion)
 	if err != nil {
 		return nil, err
 	}

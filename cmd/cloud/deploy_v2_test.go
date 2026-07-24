@@ -13,7 +13,6 @@ import (
 	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/config"
-	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -54,12 +53,13 @@ func TestDeployRoutesV2Project(t *testing.T) {
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = orig })
 
-	// A plain `astro deploy` on a v2 project is an image-and-dag deploy, which
-	// this slice does not ship. Routing to the v2 path surfaces that refusal,
-	// which is how we know it did not take the v1 path.
+	// The manifest names no deployment and the run is non-interactive (go test
+	// has no TTY), so the v2 path stops at selection asking for --deployment —
+	// before any build or transport work. That message is unique to the v2 path,
+	// so it proves routing did not fall through to v1.
 	err := execDeployCmd()
 	require.Error(t, err)
-	assert.ErrorIs(t, err, v2deploy.ErrImageDeploy)
+	assert.Contains(t, err.Error(), "--deployment")
 }
 
 func TestDeployRoutesV1Project(t *testing.T) {

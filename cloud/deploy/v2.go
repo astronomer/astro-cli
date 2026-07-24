@@ -1,11 +1,7 @@
 package deploy
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
@@ -71,28 +67,12 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		return DagDeployV2Result{}, err
 	}
 
-	uploadURL := ""
-	if created.DagsUploadUrl != nil {
-		uploadURL = *created.DagsUploadUrl
-	}
-	if uploadURL == "" {
-		return DagDeployV2Result{}, errors.New("no DAG upload URL received from Astro")
-	}
-
-	var deploymentType astrov1.DeploymentType
-	if dep.Type != nil {
-		deploymentType = *dep.Type
-	}
-	dagsPath := filepath.Join(in.ProjectDir, "dags")
-	tarballVersion, err := deployDags(in.ProjectDir, dagsPath, uploadURL, dep.RuntimeVersion, deploymentType, in.NoDagsBaseDir)
+	tarballVersion, err := uploadDeployDags(in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 	if err != nil {
-		if strings.Contains(err.Error(), dagDeployDisabled) {
-			return DagDeployV2Result{}, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
-		}
 		return DagDeployV2Result{}, err
 	}
 
-	if err := finalizeDagDeployV2(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
+	if err := finalizeDeployV2(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
 		return DagDeployV2Result{}, err
 	}
 
@@ -113,17 +93,4 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		DagTarballVersion: tarballVersion,
 		URL:               url,
 	}, nil
-}
-
-// finalizeDagDeployV2 marks a dags-only deploy final with the tarball version.
-// It is the v1 finalizeDeploy without the prints, so the v2 path renders in cmd
-// and stays ready for --output json.
-func finalizeDagDeployV2(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
-	resp, err := astroV1Client.FinalizeDeployWithResponse(context.Background(), organizationID, deploymentID, deployID, astrov1.FinalizeDeployRequest{
-		DagTarballVersion: &dagTarballVersion,
-	})
-	if err != nil {
-		return err
-	}
-	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }

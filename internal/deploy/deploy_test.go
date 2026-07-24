@@ -217,6 +217,11 @@ type fakeDeployer struct {
 	dagErr   error
 	dagInput DagDeploy
 	deploys  int
+
+	img        ImageResult
+	imgErr     error
+	imgInput   ImageDeploy
+	imgDeploys int
 }
 
 func (f *fakeDeployer) ResolveUnlinked(ws string) (string, error) {
@@ -231,20 +236,112 @@ func (f *fakeDeployer) DeployDags(in *DagDeploy) (DagResult, error) {
 	return f.dag, f.dagErr
 }
 
-func TestRun_ImageDeployRefused(t *testing.T) {
+func (f *fakeDeployer) DeployImage(in *ImageDeploy) (ImageResult, error) {
+	f.imgDeploys++
+	f.imgInput = *in
+	return f.img, f.imgErr
+}
+
+func TestRun_DagsWithImageSourceRejected(t *testing.T) {
 	cases := map[string]Request{
-		"default deploy (image and dag)": {DagsOnly: false},
-		"--image":                        {Image: true, DagsOnly: true},
-		"--image-name":                   {ImageName: true, DagsOnly: true},
+		"--dags --image":      {DagsOnly: true, Image: true},
+		"--dags --image-name": {DagsOnly: true, ImageName: "my-image:latest"},
 	}
 	for name, req := range cases {
 		t.Run(name, func(t *testing.T) {
 			d := &fakeDeployer{}
 			_, err := Run(req, d)
-			require.ErrorIs(t, err, ErrImageDeploy)
+			require.Error(t, err)
 			assert.Zero(t, d.deploys)
+			assert.Zero(t, d.imgDeploys)
 		})
 	}
+}
+
+func TestRun_DefaultIsImageAndDag(t *testing.T) {
+	d := &fakeDeployer{img: ImageResult{
+		WorkspaceID:       "ws-prod",
+		RuntimeVersion:    "3.1-2",
+		ImageTag:          "deploy-2026",
+		DagTarballVersion: "3-169",
+		URL:               "https://cloud/deployments/dep-prod",
+	}}
+	res, err := Run(Request{
+		ProjectDir: "/proj",
+		Manifest: &manifest.Manifest{
+			Project: manifest.Project{Dependencies: []string{"pandas"}},
+			Astro: manifest.Astro{
+				AirflowVersion: "3.1",
+				Packages:       []string{"libpq-dev"},
+				Deployments: map[string]manifest.Deployment{
+					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
+				},
+			},
+		},
+	}, d)
+	require.NoError(t, err)
+	assert.Equal(t, 1, d.imgDeploys)
+	assert.Zero(t, d.deploys)
+	// A default deploy ships both, from the manifest fields.
+	assert.True(t, d.imgInput.IncludeDags)
+	assert.Equal(t, "dep-prod", d.imgInput.DeploymentID)
+	assert.Equal(t, "3.1", d.imgInput.AirflowVersion)
+	assert.Equal(t, []string{"pandas"}, d.imgInput.Dependencies)
+	assert.Equal(t, []string{"libpq-dev"}, d.imgInput.Packages)
+	assert.Empty(t, d.imgInput.ImageName)
+	assert.Equal(t, "image-and-dag", res.Type)
+	assert.Equal(t, "deploy-2026", res.ImageTag)
+	assert.Equal(t, "3-169", res.DagTarballVersion)
+	assert.Equal(t, "prod", res.LinkName)
+}
+
+func TestRun_ImageOnlyDropsDags(t *testing.T) {
+	d := &fakeDeployer{img: ImageResult{ImageTag: "deploy-2026"}}
+	res, err := Run(Request{
+		Image: true,
+		Manifest: &manifest.Manifest{Astro: manifest.Astro{
+			AirflowVersion: "3.1",
+			Deployments: map[string]manifest.Deployment{
+				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
+			},
+		}},
+	}, d)
+	require.NoError(t, err)
+	assert.Equal(t, 1, d.imgDeploys)
+	assert.False(t, d.imgInput.IncludeDags)
+	assert.Equal(t, "image-only", res.Type)
+	assert.Empty(t, res.DagTarballVersion)
+}
+
+func TestRun_ImageNamePassesPrebuiltRef(t *testing.T) {
+	d := &fakeDeployer{img: ImageResult{ImageTag: "deploy-2026"}}
+	_, err := Run(Request{
+		ImageName: "astro-package/demo:3.1-2-abc",
+		Manifest: &manifest.Manifest{Astro: manifest.Astro{
+			AirflowVersion: "3.1",
+			Deployments: map[string]manifest.Deployment{
+				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
+			},
+		}},
+	}, d)
+	require.NoError(t, err)
+	assert.Equal(t, "astro-package/demo:3.1-2-abc", d.imgInput.ImageName)
+	// --image-name without --image still ships dags by default.
+	assert.True(t, d.imgInput.IncludeDags)
+}
+
+func TestRun_ImageTransportErrorPropagates(t *testing.T) {
+	sentinel := errors.New("build boom")
+	d := &fakeDeployer{imgErr: sentinel}
+	_, err := Run(Request{
+		Manifest: &manifest.Manifest{Astro: manifest.Astro{
+			AirflowVersion: "3.1",
+			Deployments: map[string]manifest.Deployment{
+				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
+			},
+		}},
+	}, d)
+	require.ErrorIs(t, err, sentinel)
 }
 
 func TestRun_DefaultLinkDeploysDags(t *testing.T) {

@@ -311,9 +311,9 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 }
 
 // deployV2 runs the v2 deploy path: load the manifest, gather flags and
-// context, resolve the deployment and run a dags-only deploy, then render the
-// result. The v2 logic lives in internal/deploy; this is the cmd shim that
-// parses, wires the transport, and prints.
+// context, resolve the deployment, and run the deploy — dags-only, image-only,
+// or both — then render the result. The v2 logic lives in internal/deploy; this
+// is the cmd shim that parses, wires the transport, and prints.
 func deployV2(cmd *cobra.Command, args []string) error {
 	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
 	if err != nil {
@@ -338,6 +338,16 @@ func deployV2(cmd *cobra.Command, args []string) error {
 
 	cmd.SilenceUsage = true
 
+	// An image build can run for minutes with no transport output yet, so say so
+	// before handing off; the transport itself stays silent (v2 layer rules).
+	if !dags {
+		if imageName != "" {
+			fmt.Printf("Deploying prebuilt image %s...\n", imageName)
+		} else {
+			fmt.Println("Building your project image, this can take a few minutes...")
+		}
+	}
+
 	res, err := v2deploy.Run(v2deploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
@@ -347,7 +357,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		ContextWorkspace: contextWorkspace,
 		DagsOnly:         dags,
 		Image:            image,
-		ImageName:        cmd.Flags().Changed(imageNameFlag),
+		ImageName:        imageName,
 		Description:      deployDescription,
 		Wait:             waitForDeploy,
 		WaitTime:         waitTime,
@@ -358,11 +368,24 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Deployed DAGs (version %s) to deployment %s.\n", res.DagTarballVersion, res.DeploymentID)
+	renderV2Deploy(&res)
+	return nil
+}
+
+// renderV2Deploy prints a plain summary of a finished v2 deploy. --output json
+// is a later chunk; this is the text path.
+func renderV2Deploy(res *v2deploy.Result) {
+	switch res.Type {
+	case "dag-only":
+		fmt.Printf("Deployed DAGs (version %s) to deployment %s.\n", res.DagTarballVersion, res.DeploymentID)
+	case "image-only":
+		fmt.Printf("Deployed image (tag %s) to deployment %s.\n", res.ImageTag, res.DeploymentID)
+	default: // image-and-dag
+		fmt.Printf("Deployed image (tag %s) and DAGs (version %s) to deployment %s.\n", res.ImageTag, res.DagTarballVersion, res.DeploymentID)
+	}
 	if res.URL != "" {
 		fmt.Printf("Deployment: %s\n", res.URL)
 	}
-	return nil
 }
 
 // v2Deployer wires internal/deploy's transport seam to the v1 cloud/deploy
@@ -397,6 +420,34 @@ func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, erro
 	return v2deploy.DagResult{
 		WorkspaceID:       res.WorkspaceID,
 		RuntimeVersion:    res.RuntimeVersion,
+		DagTarballVersion: res.DagTarballVersion,
+		URL:               res.URL,
+	}, nil
+}
+
+// DeployImage builds or adopts the project image and ships it through the
+// cloud/deploy transport.
+func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
+	res, err := cloud.DeployImageV2(cloud.ImageDeployV2Input{
+		ProjectDir:     in.ProjectDir,
+		DeploymentID:   in.DeploymentID,
+		AirflowVersion: in.AirflowVersion,
+		Dependencies:   in.Dependencies,
+		Packages:       in.Packages,
+		ImageName:      in.ImageName,
+		IncludeDags:    in.IncludeDags,
+		Description:    in.Description,
+		NoDagsBaseDir:  in.NoDagsBaseDir,
+		Wait:           in.Wait,
+		WaitTime:       in.WaitTime,
+	}, d.client)
+	if err != nil {
+		return v2deploy.ImageResult{}, err
+	}
+	return v2deploy.ImageResult{
+		WorkspaceID:       res.WorkspaceID,
+		RuntimeVersion:    res.RuntimeVersion,
+		ImageTag:          res.ImageTag,
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
 	}, nil
