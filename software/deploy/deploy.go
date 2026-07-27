@@ -325,7 +325,7 @@ func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandl
 		Labels:          deployLabels,
 	}
 
-	err = imageHandler.Build("", "", buildConfig)
+	err = imageHandler.Build("", nil, buildConfig)
 	return err
 }
 
