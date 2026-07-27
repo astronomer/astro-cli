@@ -70,6 +70,46 @@ func (s *Suite) TestList() {
 	s.Equal(buf.String(), expected)
 }
 
+func (s *Suite) TestGetWorkspacesPaginates() {
+	page1 := astrov1.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.WorkspacesPaginated{
+			Workspaces: []astrov1.Workspace{{Name: "ws-page1", Id: "ws-1"}},
+			TotalCount: 2,
+			Limit:      1000,
+			Offset:     0,
+		},
+	}
+	page2 := astrov1.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.WorkspacesPaginated{
+			Workspaces: []astrov1.Workspace{{Name: "ws-page2", Id: "ws-2"}},
+			TotalCount: 2,
+			Limit:      1000,
+			Offset:     1,
+		},
+	}
+	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+	// Assert the request offset advances: page 1 is fetched at offset 0, and after
+	// one result is collected page 2 is fetched at offset 1.
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, offsetIs(0)).Return(&page1, nil).Once()
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, offsetIs(1)).Return(&page2, nil).Once()
+
+	got, err := GetWorkspaces(mockClient)
+	s.NoError(err)
+	s.Len(got, 2)
+	s.Equal("ws-1", got[0].Id)
+	s.Equal("ws-2", got[1].Id)
+	mockClient.AssertExpectations(s.T())
+}
+
+// offsetIs matches ListWorkspacesParams whose Offset equals want.
+func offsetIs(want int) any {
+	return mock.MatchedBy(func(p *astrov1.ListWorkspacesParams) bool {
+		return p != nil && p.Offset != nil && *p.Offset == want
+	})
+}
+
 func (s *Suite) TestListError() {
 	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
@@ -229,6 +269,37 @@ func (s *Suite) TestSwitch() {
 		s.NoError(err)
 		s.Contains(buf.String(), "workspace-id-2")
 		mockV1Client.AssertExpectations(s.T())
+	})
+
+	s.Run("switch finds workspace on a later page", func() {
+		page1 := astrov1.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.WorkspacesPaginated{
+				Workspaces: []astrov1.Workspace{workspace1},
+				TotalCount: 2,
+				Limit:      1000,
+				Offset:     0,
+			},
+		}
+		page2 := astrov1.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.WorkspacesPaginated{
+				Workspaces: []astrov1.Workspace{workspace2},
+				TotalCount: 2,
+				Limit:      1000,
+				Offset:     1,
+			},
+		}
+		freshClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		// target is only on the second page
+		freshClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
+		freshClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := Switch("workspace-id-2", freshClient, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "workspace-id-2")
+		freshClient.AssertExpectations(s.T())
 	})
 
 	s.Run("list workspace failure", func() {
