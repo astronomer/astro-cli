@@ -515,7 +515,7 @@ func getDeploymentInfo(
 			currentDeployment.Id,
 			currentDeployment.Namespace,
 			airflow.ImageName(currentDeployment.Namespace, "latest"),
-			currentDeployment.RuntimeVersion,
+			currentDeployment.AstroRuntimeVersion,
 			currentDeployment.OrganizationId,
 			currentDeployment.WorkspaceId,
 			currentDeployment.WebServerUrl,
@@ -624,7 +624,7 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 		return deploymentInfo{}, err
 	}
 
-	currentVersion := resp.JSON200.RuntimeVersion
+	currentVersion := resp.JSON200.AstroRuntimeVersion
 	namespace := resp.JSON200.Namespace
 	workspaceID := resp.JSON200.WorkspaceId
 	webserverURL := resp.JSON200.WebServerUrl

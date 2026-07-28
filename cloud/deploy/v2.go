@@ -89,7 +89,7 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 
 	return DagDeployV2Result{
 		WorkspaceID:       dep.WorkspaceId,
-		RuntimeVersion:    dep.RuntimeVersion,
+		RuntimeVersion:    dep.AstroRuntimeVersion,
 		DagTarballVersion: tarballVersion,
 		URL:               url,
 	}, nil

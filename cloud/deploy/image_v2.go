@@ -169,7 +169,7 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ImageDeployV2In
 	}
 	// Check the image's runtime against the versions the deployment allows,
 	// which we fetch from the server (the print-free sibling of ValidRuntimeVersion).
-	if err := validateDeployRuntimeVersion(ctx, dep.OrganizationId, dep.RuntimeVersion, runtimeVersion, astroV1Client); err != nil {
+	if err := validateDeployRuntimeVersion(ctx, dep.OrganizationId, dep.AstroRuntimeVersion, runtimeVersion, astroV1Client); err != nil {
 		return astrov1.Deployment{}, err
 	}
 	return dep, nil
@@ -192,7 +192,7 @@ func uploadDeployDags(projectDir, deploymentID string, dep *astrov1.Deployment, 
 		deploymentType = *dep.Type
 	}
 	dagsPath := filepath.Join(projectDir, "dags")
-	tarballVersion, err := deployDags(projectDir, dagsPath, uploadURL, dep.RuntimeVersion, deploymentType, noDagsBaseDir)
+	tarballVersion, err := deployDags(projectDir, dagsPath, uploadURL, dep.AstroRuntimeVersion, deploymentType, noDagsBaseDir)
 	if err != nil {
 		if strings.Contains(err.Error(), dagDeployDisabled) {
 			return "", fmt.Errorf(enableDagDeployMsg, deploymentID)

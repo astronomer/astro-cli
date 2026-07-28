@@ -75,7 +75,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	}
 
 	// upload the bundle
-	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.RuntimeVersion)
+	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion)
 	if err != nil {
 		return err
 	}

@@ -34,14 +34,14 @@ func mockV2Deployment(client *astrov1_mocks.ClientWithResponsesInterface, dagDep
 	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		JSON200: &astrov1.Deployment{
-			Id:                 "test-deployment-id",
-			Name:               "test-deployment",
-			OrganizationId:     "test-org-id",
-			WorkspaceId:        "test-ws-id",
-			RuntimeVersion:     "7.0.0",
-			Type:               &standard,
-			IsDagDeployEnabled: dagDeployEnabled,
-			IsCicdEnforced:     cicdEnforced,
+			Id:                  "test-deployment-id",
+			Name:                "test-deployment",
+			OrganizationId:      "test-org-id",
+			WorkspaceId:         "test-ws-id",
+			AstroRuntimeVersion: "7.0.0",
+			Type:                &standard,
+			IsDagDeployEnabled:  dagDeployEnabled,
+			IsCicdEnforced:      cicdEnforced,
 		},
 	}, nil)
 }

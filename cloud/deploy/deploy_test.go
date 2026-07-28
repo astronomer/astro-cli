@@ -107,13 +107,13 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astrov1.Deployment{
-			Id:                 deploymentID,
-			RuntimeVersion:     "12.0.0",
-			Namespace:          "test-name",
-			WorkspaceId:        ws,
-			WebServerUrl:       "test-url",
-			IsDagDeployEnabled: false,
-			Type:               &hybridType,
+			Id:                  deploymentID,
+			AstroRuntimeVersion: "12.0.0",
+			Namespace:           "test-name",
+			WorkspaceId:         ws,
+			WebServerUrl:        "test-url",
+			IsDagDeployEnabled:  false,
+			Type:                &hybridType,
 		},
 	}
 	deploymentResponseCICD = astrov1.GetDeploymentResponse{
@@ -121,15 +121,15 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astrov1.Deployment{
-			Id:                 deploymentID,
-			RuntimeVersion:     "12.0.0",
-			Namespace:          "test-name",
-			WorkspaceId:        ws,
-			WebServerUrl:       "test-url",
-			IsDagDeployEnabled: false,
-			IsCicdEnforced:     true,
-			Type:               &hybridType,
-			Name:               "test-deployment",
+			Id:                  deploymentID,
+			AstroRuntimeVersion: "12.0.0",
+			Namespace:           "test-name",
+			WorkspaceId:         ws,
+			WebServerUrl:        "test-url",
+			IsDagDeployEnabled:  false,
+			IsCicdEnforced:      true,
+			Type:                &hybridType,
+			Name:                "test-deployment",
 		},
 	}
 	deploymentResponseRemoteExecution = astrov1.GetDeploymentResponse{
@@ -137,13 +137,13 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astrov1.Deployment{
-			Id:                 deploymentID,
-			RuntimeVersion:     "3.0-1",
-			Namespace:          "test-name",
-			WorkspaceId:        ws,
-			WebServerUrl:       "test-url",
-			IsDagDeployEnabled: false,
-			Type:               &hybridType,
+			Id:                  deploymentID,
+			AstroRuntimeVersion: "3.0-1",
+			Namespace:           "test-name",
+			WorkspaceId:         ws,
+			WebServerUrl:        "test-url",
+			IsDagDeployEnabled:  false,
+			Type:                &hybridType,
 			RemoteExecution: &astrov1.DeploymentRemoteExecution{
 				Enabled: true,
 			},
@@ -155,7 +155,7 @@ var (
 		},
 		JSON200: &astrov1.Deployment{
 			Id:                       deploymentID,
-			RuntimeVersion:           "12.0.0",
+			AstroRuntimeVersion:      "12.0.0",
 			Namespace:                "test-name",
 			WorkspaceId:              ws,
 			WebServerUrl:             "test-url",
@@ -2212,11 +2212,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
@@ -2248,11 +2248,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
@@ -2282,11 +2282,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
@@ -2317,11 +2317,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
@@ -2353,11 +2353,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
@@ -2390,11 +2390,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
@@ -2424,11 +2424,11 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			&astrov1.GetDeploymentResponse{
 				HTTPResponse: &http.Response{StatusCode: 200},
 				JSON200: &astrov1.Deployment{
-					Id:             "test-deployment-id",
-					RuntimeVersion: runtimeVersion,
-					Namespace:      "test-namespace",
-					WorkspaceId:    "test-workspace-id",
-					WebServerUrl:   "https://test.com",
+					Id:                  "test-deployment-id",
+					AstroRuntimeVersion: runtimeVersion,
+					Namespace:           "test-namespace",
+					WorkspaceId:         "test-workspace-id",
+					WebServerUrl:        "https://test.com",
 				},
 			}, nil)
 
