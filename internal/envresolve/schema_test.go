@@ -160,28 +160,3 @@ func TestParseSchemaNonTableSection(t *testing.T) {
 		t.Fatalf("want one 'expected a table' problem, got %v", err)
 	}
 }
-
-func TestVaultKeyRoundTrip(t *testing.T) {
-	cases := []struct {
-		key               string
-		kind, scope, name string
-		ok                bool
-	}{
-		{EnvVaultKey("", "API_URL"), VaultKindEnv, "", "API_URL", true},
-		{EnvVaultKey("/Users/x/proj", "AIRFLOW_VAR_BATCH"), VaultKindEnv, "/Users/x/proj", "AIRFLOW_VAR_BATCH", true},
-		{ConnVaultKey("/Users/x/proj", "Warehouse"), VaultKindConn, "/Users/x/proj", "warehouse", true},
-		// a scope path containing colons still parses from both ends
-		{EnvVaultKey(`C:\Users\x`, "FOO"), VaultKindEnv, `C:\Users\x`, "FOO", true},
-		{"auth:token", "", "", "", false}, // outside the namespace
-		{"env:", "", "", "", false},       // no name
-		{"env:/x:", "", "", "", false},    // empty name
-		{"plain", "", "", "", false},
-	}
-	for _, tc := range cases {
-		kind, scope, name, ok := ParseVaultKey(tc.key)
-		if kind != tc.kind || scope != tc.scope || name != tc.name || ok != tc.ok {
-			t.Errorf("ParseVaultKey(%q) = (%q,%q,%q,%v), want (%q,%q,%q,%v)",
-				tc.key, kind, scope, name, ok, tc.kind, tc.scope, tc.name, tc.ok)
-		}
-	}
-}

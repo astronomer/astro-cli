@@ -34,6 +34,7 @@ var v2BelowCmd = []string{
 	"internal/fsatomic",
 	"internal/imagebuild",
 	"internal/localdocker",
+	"internal/localenv",
 	"internal/localprune",
 	"internal/localshared",
 	"internal/localstandalone",

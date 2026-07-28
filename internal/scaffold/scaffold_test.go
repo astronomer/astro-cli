@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -157,11 +158,14 @@ func TestRunKeepsExistingFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, res.Skipped, ".gitignore")
 	assert.Contains(t, res.Skipped, "dags/")
-	assert.NotContains(t, res.Created, ".gitignore")
 
+	// The hand-written .gitignore is kept, but init heals it to cover .env so
+	// local values are never committed.
+	assert.Contains(t, res.Created, ".gitignore (.env rule)")
 	got, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
 	require.NoError(t, err)
-	assert.Equal(t, own, got)
+	assert.True(t, strings.HasPrefix(string(got), "# mine\n"), "original content kept: %q", string(got))
+	assert.Contains(t, string(got), "\n.env\n")
 }
 
 func TestRunSymlinksClaudeMdOnUnix(t *testing.T) {

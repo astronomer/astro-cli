@@ -130,6 +130,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 		newResetCmd(c),
 		newCheckCmd(c),
 		newInitCmd(c),
+		newEnvCmd(c),
 	)
 	markSkipPreRun(cmd)
 	return cmd

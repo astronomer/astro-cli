@@ -11,15 +11,15 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
-	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
 // Options carries the per-invocation choices the command line supplies. The
-// manifest, user state, and vault supply everything else.
+// manifest, user state, and the env files supply everything else.
 type Options struct {
 	// Mode is the runtime the command asked for. "" leaves the choice to
 	// the runtime, which defaults to standalone.
@@ -125,32 +125,26 @@ func PersistPort(projectPath string, chosen int) error {
 }
 
 // resolveEnv types the manifest's [tool.astro.env] section, resolves it
-// against the process env and the shared vault, and returns the assembled
-// Airflow environment. A required value with no source surfaces as
-// *MissingEnvError — the clone-and-run gate.
+// against the provider chain (shell env > project .env > global ~/.astro/env),
+// and returns the environment injected into Airflow at start. A required
+// value with no source surfaces as *MissingEnvError — the clone-and-run gate.
+//
+// Injection is not the resolved map: the project .env goes in wholesale
+// (every entry, docker-compose semantics) and the global file contributes
+// only its schema-declared entries (localenv.Sources.Injection). Both engines
+// apply the result identically through Plan.Env.
 func resolveEnv(m *manifest.Manifest, proj *project.Project) (map[string]string, error) {
 	schema, err := envresolve.ParseSchema(m.Astro.Env)
 	if err != nil {
 		return nil, err
 	}
-	// The vault is opened only when the schema declares names, so a project
-	// with no env schema never touches the OS keyring (which can prompt).
-	var store secrets.Store
-	if len(schema.EnvVars)+len(schema.AirflowVariables)+len(schema.Connections) > 0 {
-		store = openVault()
-	}
-	// Scope is the symlink-resolved absolute project path: scoped vault
-	// entries beat global ones (internal/envresolve). ProjectID hashes the
-	// same path, but the vault keys on the path itself.
-	scope, err := filepath.EvalSymlinks(proj.Dir)
+	src, err := localenv.LoadSources(os.Environ(), proj.Dir)
 	if err != nil {
 		return nil, err
 	}
 	res, err := envresolve.Resolve(envresolve.Inputs{
-		Schema:  schema,
-		Scope:   scope,
-		Store:   store,
-		Environ: os.Environ(),
+		Schema:    schema,
+		Providers: src.Providers(),
 	})
 	if err != nil {
 		return nil, err
@@ -163,30 +157,9 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project) (map[string]string,
 	// would split that responsibility across two commands.
 	if len(res.Missing) > 0 {
 		return nil, &MissingEnvError{
-			Project:          proj.Dir,
-			Missing:          res.Missing,
-			VaultUnavailable: res.VaultUnavailable,
+			Project: proj.Dir,
+			Missing: res.Missing,
 		}
 	}
-	return res.Env, nil
-}
-
-// openVault opens the shared local vault (secrets.DefaultService,
-// <astro home>/secrets), the same store desktop uses so a secret saved in
-// either is readable in both. A construction failure degrades to env-only
-// resolution: the store is nil and Resolve reports values may exist that this
-// machine cannot read.
-func openVault() secrets.Store {
-	home := os.Getenv("ASTRO_HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir() //nolint:errcheck // a lookup failure degrades to env-only resolution, per the doc above
-	}
-	store, err := secrets.NewKeyringStore(secrets.Config{
-		Service: secrets.DefaultService,
-		Dir:     filepath.Join(home, ".astro", "secrets"),
-	})
-	if err != nil {
-		return nil
-	}
-	return store
+	return src.Injection(schema), nil
 }

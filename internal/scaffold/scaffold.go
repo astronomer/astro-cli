@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
@@ -205,6 +206,15 @@ func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) 
 			return fmt.Errorf("creating %s: %w", f.name, err)
 		}
 		*created = append(*created, f.name)
+	}
+
+	// Ensure .gitignore covers .env even when it already existed and was kept
+	// above (a fresh template already lists it, so this only heals a pre-made
+	// or imported .gitignore). Local env values must never be committed.
+	if added, err := localenv.EnsureEnvIgnored(dir); err != nil {
+		return err
+	} else if added {
+		*created = append(*created, fileGitignore+" (.env rule)")
 	}
 
 	if !withSymlink {
