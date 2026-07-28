@@ -61,7 +61,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, err := resolveEnv(m, proj, opts)
+	env, passEnv, err := resolveEnv(m, proj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +88,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// concrete version.
 			StopWithSession: opts.StopWithSession,
 			Env:             env,
+			PassthroughEnv:  passEnv,
 			Hostname:        proj.Hostname,
 			StateDir:        stateDir,
 			RequestedPort:   choosePort(opts.RequestedPort, us.Port),
@@ -132,21 +133,22 @@ func PersistPort(projectPath string, chosen int) error {
 
 // resolveEnv types the manifest's [tool.astro.env] section, resolves it
 // against the provider chain (shell env > project .env > global ~/.astro/env),
-// and returns the environment injected into Airflow at start. A required
+// and returns the environment injected into Airflow at start plus the
+// declared names only the shell satisfies (Plan.PassthroughEnv). A required
 // value with no source surfaces as *MissingEnvError — the clone-and-run gate.
 //
 // Injection is not the resolved map: the project .env goes in wholesale
 // (every entry, docker-compose semantics) and the global file contributes
 // only its schema-declared entries (localenv.Sources.Injection). Both engines
 // apply the result identically through Plan.Env.
-func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (map[string]string, error) {
+func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env map[string]string, passthrough []string, err error) {
 	schema, err := envresolve.ParseSchema(m.Astro.Env)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	src, err := localenv.LoadSources(os.Environ(), proj.Dir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	in := envresolve.Inputs{Schema: schema, Providers: src.Providers()}
 	if opts.AstroV1Client != nil {
@@ -163,7 +165,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (map[
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// The start gate is missing-required only: a value with no source blocks
 	// the run (the clone-and-run message). Value-level problems on values
@@ -172,7 +174,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (map[
 	// whole job is validating without starting. Gating start on them too
 	// would split that responsibility across two commands.
 	if len(res.Missing) > 0 {
-		return nil, &MissingEnvError{
+		return nil, nil, &MissingEnvError{
 			Project: proj.Dir,
 			Missing: res.Missing,
 		}
@@ -184,5 +186,24 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (map[
 	for k, v := range res.Injected {
 		inj[k] = v
 	}
-	return inj, nil
+	return inj, passthroughKeys(res.Resolved, inj), nil
+}
+
+// passthroughKeys is the Airflow env-var names for declared values the shell
+// environment alone satisfies — in no file and not injected. Standalone
+// Airflow inherits them from the process, but docker containers inherit no
+// host shell env, so the plan carries the names — never the
+// values, which must stay off disk — for docker mode to pass through.
+func passthroughKeys(resolved []envresolve.ResolvedName, inj map[string]string) []string {
+	var keys []string
+	for _, r := range resolved {
+		if !r.Found || r.Source != localenv.SourceShell {
+			continue
+		}
+		if _, onDisk := inj[r.EnvKey]; onDisk {
+			continue
+		}
+		keys = append(keys, r.EnvKey)
+	}
+	return keys
 }

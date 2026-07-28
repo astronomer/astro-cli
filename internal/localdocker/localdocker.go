@@ -173,13 +173,15 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		return nil, err
 	}
 
+	env := airflowEnv(name, apiPort, p.Env)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName:   name,
 		Image:         image,
 		PostgresImage: postgresImage,
 		APIServerPort: apiPort,
 		PostgresPort:  pgPort,
-		Env:           airflowEnv(name, apiPort, p.Env),
+		Env:           env,
+		PassEnv:       passEnv(p.PassthroughEnv, env),
 		Mounts:        projectMounts(projectPath),
 	})
 	if err != nil {

@@ -57,6 +57,12 @@ type Plan struct {
 	StopWithSession bool
 	// Env is the fully layered process environment for Airflow.
 	Env map[string]string
+	// PassthroughEnv names env vars satisfied only by the calling shell's
+	// environment. It never carries values, so engines that persist their
+	// configuration (docker mode's compose file) can hand the names to the
+	// runtime without writing the values to disk. Standalone mode ignores
+	// it: the Airflow process inherits the shell environment directly.
+	PassthroughEnv []string
 	// Hostname is the display hostname for this project, computed by the
 	// caller (e.g. from pkg/proxy's derivation). localrt persists it into
 	// the state record and reports it in Status; it is a label, never an

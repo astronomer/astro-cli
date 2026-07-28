@@ -24,6 +24,7 @@ func goldenInput() composeInput {
 			"AIRFLOW__CORE__LOAD_EXAMPLES": "True", // user override wins
 			"MY_SECRET":                    "it's quoted",
 		}),
+		PassEnv: []string{"SHELL_ONLY_TOKEN"},
 		Mounts: []mount{
 			{Host: "/home/me/demo/dags", Container: "/usr/local/airflow/dags"},
 			{Host: "/home/me/demo/include", Container: "/usr/local/airflow/include"},
@@ -78,6 +79,33 @@ func TestGenerateComposeParses(t *testing.T) {
 		assert.Contains(t, doc.Services, svc)
 	}
 	assert.Empty(t, doc.Services["db-migration"].Volumes, "one-shot migration needs no project mounts")
+}
+
+// A pass-through name renders as a null-valued environment entry — compose's
+// "resolve from the invoking environment" form — with the value nowhere in
+// the file.
+func TestGenerateComposePassEnv(t *testing.T) {
+	got, err := generateCompose(goldenInput())
+	require.NoError(t, err)
+
+	var doc struct {
+		Services map[string]struct {
+			Environment map[string]*string `yaml:"environment"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(got), &doc))
+	env := doc.Services["scheduler"].Environment
+	val, present := env["SHELL_ONLY_TOKEN"]
+	require.True(t, present, "the pass-through name must appear in the common env")
+	assert.Nil(t, val, "the pass-through entry must carry no value")
+}
+
+// passEnv drops names the value-carrying env already holds: a duplicate YAML
+// key would be invalid, and the on-disk value already reaches the container.
+func TestPassEnvDedupes(t *testing.T) {
+	env := []envVar{{Name: "MY_SECRET", Value: "'x'"}}
+	got := passEnv([]string{"MY_SECRET", "ZED", "ALPHA"}, env)
+	assert.Equal(t, []string{"ALPHA", "ZED"}, got)
 }
 
 func TestGenerateComposeNoMounts(t *testing.T) {

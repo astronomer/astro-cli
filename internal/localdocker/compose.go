@@ -59,7 +59,12 @@ type composeInput struct {
 	APIServerPort int
 	PostgresPort  int
 	Env           []envVar
-	Mounts        []mount
+	// PassEnv is env-var names rendered with no value, which compose
+	// resolves from the CLI's own environment at invocation time. This is
+	// how a value satisfied only by the caller's shell reaches the
+	// containers without ever being written into the compose file.
+	PassEnv []string
+	Mounts  []mount
 }
 
 // composeProjectName derives the compose project name for a project
@@ -117,6 +122,24 @@ func quoteYAML(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
+// passEnv is the pass-through names to render, sorted, minus any name the
+// value-carrying env already holds — a duplicate YAML key would be invalid,
+// and a name with a value on disk does not need passing through.
+func passEnv(names []string, env []envVar) []string {
+	held := make(map[string]bool, len(env))
+	for _, e := range env {
+		held[e.Name] = true
+	}
+	var out []string
+	for _, n := range names {
+		if !held[n] {
+			out = append(out, n)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // projectMounts lists the project directories to mount into the Airflow
 // containers. Only directories that exist are mounted: docker would create
 // missing ones on the host as root-owned directories.
@@ -134,7 +157,7 @@ func projectMounts(projectPath string) []mount {
 // generateCompose renders the compose file for a plan with all ports and
 // the image already resolved.
 func generateCompose(in composeInput) (string, error) {
-	tmpl, err := template.New("compose").Parse(composeTemplate)
+	tmpl, err := template.New("compose").Funcs(template.FuncMap{"quote": quoteYAML}).Parse(composeTemplate)
 	if err != nil {
 		return "", fmt.Errorf("parsing compose template: %w", err)
 	}

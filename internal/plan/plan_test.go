@@ -115,6 +115,41 @@ func TestPersistPort(t *testing.T) {
 	}
 }
 
+// A declared value satisfied only by the calling shell must reach docker mode
+// by name: the plan carries it in PassthroughEnv, value-free, while
+// file-held values travel in Env as before.
+func TestBuildPassthroughEnv(t *testing.T) {
+	dir := t.TempDir()
+	manifest := manifestTOML + `
+[tool.astro.env]
+SHELL_ONLY = {}
+FILE_HELD = {}
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("FILE_HELD=from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("SHELL_ONLY", "from-shell")
+
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := built.Plan.PassthroughEnv; len(got) != 1 || got[0] != "SHELL_ONLY" {
+		t.Errorf("PassthroughEnv = %v, want [SHELL_ONLY]", got)
+	}
+	if _, held := built.Plan.Env["SHELL_ONLY"]; held {
+		t.Error("a shell-only value must not enter Plan.Env — it would be written to disk")
+	}
+	if built.Plan.Env["FILE_HELD"] != "from-file" {
+		t.Errorf("Env[FILE_HELD] = %q, want from-file", built.Plan.Env["FILE_HELD"])
+	}
+}
+
 func TestBuildMissingProject(t *testing.T) {
 	_, err := Build(t.TempDir(), Options{}) // no manifest anywhere above
 	var notFound *project.NotFoundError

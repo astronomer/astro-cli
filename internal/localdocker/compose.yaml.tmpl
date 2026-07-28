@@ -2,6 +2,9 @@ x-common-env: &common-env
 {{- range .Env}}
   {{.Name}}: {{.Value}}
 {{- end}}
+{{- range .PassEnv}}
+  {{quote .}}:
+{{- end}}
 
 networks:
   airflow:

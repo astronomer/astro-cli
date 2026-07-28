@@ -14,6 +14,7 @@ x-common-env: &common-env
   AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: 'True'
   ASTRONOMER_ENVIRONMENT: 'local'
   MY_SECRET: 'it''s quoted'
+  'SHELL_ONLY_TOKEN':
 
 networks:
   airflow:
