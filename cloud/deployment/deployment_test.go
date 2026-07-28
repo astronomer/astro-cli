@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -374,6 +376,74 @@ func (s *Suite) TestList() {
 
 		mockV1Client.AssertExpectations(s.T())
 	})
+}
+
+func (s *Suite) TestListDeploymentsPaginates() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	page1 := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.DeploymentsPaginated{
+			Deployments: []astrov1.Deployment{{Id: "deployment-page1"}},
+			TotalCount:  2,
+			Limit:       1000,
+			Offset:      0,
+		},
+	}
+	page2 := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.DeploymentsPaginated{
+			Deployments: []astrov1.Deployment{{Id: "deployment-page2"}},
+			TotalCount:  2,
+			Limit:       1000,
+			Offset:      1000,
+		},
+	}
+	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+	// First call returns page 1 (offset 0), second call returns page 2 (offset 1000).
+	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
+	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
+
+	got, err := ListDeployments("", "test-org", mockClient)
+	s.NoError(err)
+	s.Len(got, 2)
+	s.Equal("deployment-page1", got[0].Id)
+	s.Equal("deployment-page2", got[1].Id)
+	mockClient.AssertExpectations(s.T())
+}
+
+// TestListDeploymentsPaginatesOverHTTP drives a real astro-client-v1 client against
+// a stub API server, exercising the actual HTTP request building (offset/limit
+// query params), response parsing, and the pagination loop end-to-end.
+func (s *Suite) TestListDeploymentsPaginatesOverHTTP() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	var seenOffsets, seenLimits []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		seenOffsets = append(seenOffsets, q.Get("offset"))
+		seenLimits = append(seenLimits, q.Get("limit"))
+		w.Header().Set("Content-Type", "application/json")
+		if q.Get("offset") == "0" {
+			_, _ = io.WriteString(w, `{"deployments":[{"id":"dep-1"}],"limit":1000,"offset":0,"totalCount":2}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"deployments":[{"id":"dep-2"}],"limit":1000,"offset":1,"totalCount":2}`)
+	}))
+	defer ts.Close()
+
+	client, err := astrov1.NewClientWithResponses(ts.URL)
+	s.Require().NoError(err)
+
+	got, err := ListDeployments("", "test-org", client)
+	s.NoError(err)
+	s.Len(got, 2)
+	s.Equal("dep-1", got[0].Id)
+	s.Equal("dep-2", got[1].Id)
+	// The real client serialized limit and an advancing offset into the request query
+	// across two calls, proving pagination works over the wire (not just via mocks).
+	s.Equal([]string{"0", "1"}, seenOffsets)
+	s.Equal([]string{"1000", "1000"}, seenLimits)
 }
 
 func (s *Suite) TestListData() {

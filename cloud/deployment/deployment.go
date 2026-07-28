@@ -17,6 +17,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/pagination"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -1679,6 +1680,8 @@ var CoreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 	return nil
 }
 
+// ListDeployments returns every Deployment in the given Workspace (or the whole
+// Organization when ws is empty), paging through the API as needed.
 var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1687,26 +1690,20 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 		}
 		orgID = c.Organization
 	}
-	deploymentListParams := &astrov1.ListDeploymentsParams{
-		Limit: &listLimit,
-	}
-	if ws != "" {
-		deploymentListParams.WorkspaceIds = &[]string{ws}
-	}
-
-	resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
-	if err != nil {
-		return []astrov1.Deployment{}, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return []astrov1.Deployment{}, err
-	}
-
-	deploymentResponse := *resp.JSON200
-	deployments := deploymentResponse.Deployments
-
-	return deployments, nil
+	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
+		params := &astrov1.ListDeploymentsParams{Limit: &listLimit, Offset: &offset}
+		if ws != "" {
+			params.WorkspaceIds = &[]string{ws}
+		}
+		resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, params)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
+		}
+		return resp.JSON200.Deployments, resp.JSON200.TotalCount, nil
+	})
 }
 
 //nolint:dupl
