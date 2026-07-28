@@ -16,12 +16,11 @@ import (
 // sources only, so `list` is structurally value-free and safe for agent
 // surfaces.
 type ListItem struct {
-	Kind      Kind   `json:"kind"`
-	Name      string `json:"name"`
-	Required  bool   `json:"required"`
-	Sensitive bool   `json:"sensitive"`
-	// Source is where the value resolves from: shell, project, global, or
-	// absent (for a declared name with no value anywhere).
+	Kind Kind   `json:"kind"`
+	Name string `json:"name"`
+	// Source is where the value resolves from: shell, project, global,
+	// workspace, default, or absent (for a declared name with no value
+	// anywhere).
 	Source string `json:"source"`
 	// Orphan marks an entry present in a file that no schema declares.
 	Orphan bool `json:"orphan,omitempty"`
@@ -68,7 +67,7 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 
 	var items []ListItem
 	for _, rn := range res.Resolved {
-		items = append(items, declaredItem(rn, schema))
+		items = append(items, declaredItem(rn))
 	}
 	items = append(items, orphans(src, schema, opts, projectDir)...)
 	sort.SliceStable(items, func(i, j int) bool {
@@ -97,7 +96,7 @@ func listProviders(src Sources, scope Scope) []envresolve.Provider {
 	}
 }
 
-func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem {
+func declaredItem(rn envresolve.ResolvedName) ListItem {
 	item := ListItem{Name: rn.Name, Source: SourceAbsent}
 	// A resolved name carries its winning source; a workspace-source name that
 	// did not resolve still carries the "workspace" label (with any
@@ -109,16 +108,10 @@ func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem
 	switch rn.Section {
 	case envschema.SectionEnvVar:
 		item.Kind = KindEnv
-		spec := schema.EnvVars[rn.Name]
-		item.Required, item.Sensitive = spec.Required, spec.Sensitive
 	case envschema.SectionAirflowVariable:
 		item.Kind = KindVar
-		spec := schema.AirflowVariables[rn.Name]
-		item.Required, item.Sensitive = spec.Required, spec.Sensitive
 	case envschema.SectionConnection:
 		item.Kind = KindConn
-		spec := schema.Connections[rn.Name]
-		item.Required, item.Sensitive = spec.Required, true
 	}
 	return item
 }

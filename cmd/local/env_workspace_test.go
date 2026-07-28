@@ -23,9 +23,8 @@ requires-python = '>=3.10'
 airflow = '3.1'
 workspace = 'cmws'
 
-[tool.astro.env.vars.DATA_WAREHOUSE_URI]
-required = true
-source = 'workspace'
+[tool.astro.env]
+DATA_WAREHOUSE_URI = { source = 'workspace' }
 `
 
 func workspaceEnvProject(t *testing.T) string {

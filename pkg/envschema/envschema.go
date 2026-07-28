@@ -1,66 +1,57 @@
 // Package envschema declares and validates the environment a project
-// expects: env vars, Airflow variables, and connections — the shape, not the
-// values. The schema lives in the manifest ([tool.astro.env]); this package
+// expects: env vars, Airflow variables, and connections. The manifest carries
+// non-secret defaults; environments carry the overrides; secrets never go
+// inline. The schema lives in the manifest ([tool.astro.env]); this package
 // does no I/O. pkg/manifest parses, this validates, and the composition
 // happens in each consumer (sub-modules do not import each other).
 //
-// The validator is lifted from Astro Desktop's envschema package
-//.
+// # The grammar
+//
+// A string value is a committed default; a table means the value lives outside
+// the manifest. All three spellings sit under [tool.astro.env]:
+//
+//	LOG_LEVEL = 'info'                   // a string: a committed default
+//	WAREHOUSE_URI = {}                   // an empty table: the developer supplies it
+//	API_TOKEN = { source = 'workspace' } // also resolves from the workspace's EM values
+//
+// Connections and Airflow variables use the same grammar under their own
+// sub-sections, which pick the AIRFLOW_CONN_/AIRFLOW_VAR_ encoding.
+//
+// # Required and defaults
+//
+// Every declared name is required: it must resolve from somewhere or the run is
+// refused. A default counts as resolved (an empty-string default too — a string
+// is a string, no magic values) and sits at the bottom of the chain:
+//
+//	shell > project .env > global file > workspace EM > manifest default
 //
 // # Source
 //
-// A spec says what a project needs; its optional `source` says where the
-// value resolves from when it is not set locally. The default (empty source)
-// resolves from the local chain only. SourceWorkspace also resolves from the
-// workspace's Environment Manager objects for a logged-in user, below the
-// local files.
+// A table declaration's optional `source` says where the value resolves from
+// when no file supplies it. SourceWorkspace resolves from the workspace's
+// Environment Manager objects for a logged-in user, below the local files. It
+// is the only source today.
 package envschema
 
 // Schema is the [tool.astro.env] section, keyed by name.
 type Schema struct {
 	EnvVars          map[string]ValueSpec
 	AirflowVariables map[string]ValueSpec
-	Connections      map[string]ConnSpec
+	Connections      map[string]ValueSpec
 }
-
-// ValueType says how a declared value is checked. A named string rather
-// than an int enum so it reads the same in the manifest, in code, and in
-// --output json.
-type ValueType string
-
-const (
-	TypeString ValueType = "string"
-	TypeInt    ValueType = "int"
-	TypeNumber ValueType = "number"
-	TypeBool   ValueType = "bool"
-	TypePort   ValueType = "port"
-	TypeURL    ValueType = "url"
-	// TypeJSON is deliberately not validated: json values are often
-	// templated.
-	TypeJSON ValueType = "json"
-)
 
 // ValueSpec declares one expected value.
 type ValueSpec struct {
-	Type        ValueType
-	Required    bool
-	Sensitive   bool
-	Description string
-	// Enum, when non-empty, constrains the value to this set, whatever the
-	// base Type.
-	Enum []string
-	// Source is where the value resolves from when it is not set locally.
-	// Empty (the default) is local-only. See the package doc.
-	Source Source
-}
-
-// ConnSpec declares one expected Airflow connection.
-type ConnSpec struct {
-	ConnType    string
-	Required    bool
-	Description string
-	// Source is where the value resolves from when it is not set locally.
-	// Empty (the default) is local-only. See the package doc.
+	// Default is the committed value used when nothing higher in the chain
+	// supplies one. It is set only when HasDefault is true, and may then be the
+	// empty string — a string declaration always carries a default.
+	Default string
+	// HasDefault distinguishes a string declaration (a default, possibly empty)
+	// from a table declaration (no default: the value lives outside the
+	// manifest). It is what tells "required, supply it" from "defaults to ''".
+	HasDefault bool
+	// Source is where a table declaration resolves from when it is not set
+	// locally. Empty is local-only. See the package doc.
 	Source Source
 }
 
@@ -88,9 +79,10 @@ type Values struct {
 type ViolationKind string
 
 const (
-	// ViolationMissing: a required value is absent.
+	// ViolationMissing: a declared value resolved from nowhere.
 	ViolationMissing ViolationKind = "missing"
-	// ViolationWrongType: a value is present but fails its type check.
+	// ViolationWrongType: a value is present but malformed (a corrupt
+	// connection JSON is the only case today).
 	ViolationWrongType ViolationKind = "type"
 )
 

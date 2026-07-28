@@ -29,14 +29,8 @@ type Inputs struct {
 // exact command that provides it — "clone-and-run says exactly which env
 // values are missing and how to set them".
 type Missing struct {
-	Section     envschema.Section
-	Name        string
-	Description string
-	// Sensitive marks a value the schema flags sensitive. Connections are
-	// always sensitive.
-	Sensitive bool
-	// ConnType is the declared type, connections only.
-	ConnType string
+	Section envschema.Section
+	Name    string
 	// EnvKey is the Airflow env-var name that satisfies this value
 	// (NAME, AIRFLOW_VAR_<KEY>, or AIRFLOW_CONN_<ID>).
 	EnvKey string
@@ -47,9 +41,13 @@ type Missing struct {
 	SourceNote string `json:"source_note,omitempty"`
 }
 
+// SourceDefault is the source label a name carries when the manifest default
+// is what resolved — the bottom of the chain, below every file and the cloud.
+const SourceDefault = "default"
+
 // ResolvedName is one declared name with the source it resolved from — the
 // value-free record `list` reports. Source is a provider label ("shell",
-// "project", "global") or "" when nothing in the chain holds it.
+// "project", "global"), "default", or "" when nothing in the chain holds it.
 type ResolvedName struct {
 	Section envschema.Section
 	Name    string
@@ -70,15 +68,15 @@ type Result struct {
 	// Missing joins the missing-value violations with the schema: what to
 	// provide. Sorted by section then name.
 	Missing []Missing
-	// Injected is envKey -> value for the names that resolved from the
-	// WorkspaceProvider (Environment Manager). The composition root layers
-	// these into the Airflow environment on top of the file sources: unlike
-	// the file values, they are not on disk for the injection path to read.
-	// It deliberately overlaps Values for the env-var case (Values is
-	// name-keyed for the validator; Injected is envKey-keyed for injection and
-	// also carries raw connection values Values reduces to conn_type). Empty
-	// when no workspace-source name resolved from the cloud. Value-carrying —
-	// never hand it to an LLM-visible surface.
+	// Injected is envKey -> value for the names not on disk for the injection
+	// path to read: a value resolved from the WorkspaceProvider (Environment
+	// Manager) or a manifest default. The composition root layers these into the
+	// Airflow environment on top of the file sources. It deliberately overlaps
+	// Values for the env-var case (Values is name-keyed for the validator;
+	// Injected is envKey-keyed for injection and also carries raw connection
+	// values Values reduces to conn_type). Empty when every declared name
+	// resolved from a file or from nowhere. Value-carrying — never hand it to an
+	// LLM-visible surface.
 	Injected map[string]string
 }
 
@@ -107,7 +105,7 @@ func Resolve(in Inputs) (*Result, error) {
 	res.Resolved = r.resolved
 	res.Violations = append(envschema.Validate(in.Schema, res.Values), r.extraViolations...)
 	sortViolations(res.Violations)
-	res.Missing = r.missingReport(in.Schema, res.Violations)
+	res.Missing = r.missingReport(res.Violations)
 	res.Injected = r.injected
 	return res, nil
 }
@@ -122,9 +120,9 @@ type nameRef struct {
 type resolver struct {
 	in       Inputs
 	resolved []ResolvedName
-	// injected is envKey -> value for names that resolved from the workspace
-	// provider, the values the composition root layers into Airflow (the file
-	// sources are read from disk separately).
+	// injected is envKey -> value for names resolved from the workspace provider
+	// or a manifest default — the values not on disk that the composition root
+	// layers into Airflow (the file sources are read from disk separately).
 	injected map[string]string
 	// notes holds the SourceNote for a workspace-source name that could not be
 	// fetched, keyed by section+name, joined into Missing.
@@ -144,7 +142,7 @@ func (r *resolver) values(specs map[string]envschema.ValueSpec, section envschem
 	out := map[string]string{}
 	for name, spec := range specs {
 		key := envKey(name)
-		v, source, ok := r.resolveOne(spec.Source, section, name, key)
+		v, source, ok := r.resolveOne(spec, section, name, key)
 		r.resolved = append(r.resolved, ResolvedName{Section: section, Name: name, EnvKey: key, Source: source, Found: ok})
 		if ok {
 			out[name] = v
@@ -153,25 +151,26 @@ func (r *resolver) values(specs map[string]envschema.ValueSpec, section envschem
 	return out
 }
 
-// connTypes resolves the connections section down to conn id -> conn_type,
-// the shape the validator inspects.
-func (r *resolver) connTypes(specs map[string]envschema.ConnSpec) map[string]string {
+// connTypes resolves the connections section down to conn id -> a present
+// marker, the shape the validator inspects for presence. A resolved value that
+// is not valid connection JSON is a wrong-type violation, not a missing value.
+func (r *resolver) connTypes(specs map[string]envschema.ValueSpec) map[string]string {
 	if len(specs) == 0 {
 		return nil
 	}
 	out := map[string]string{}
 	for connID, spec := range specs {
 		connKey := airflowenv.EnvKeyForConnID(connID)
-		raw, source, ok := r.resolveOne(spec.Source, envschema.SectionConnection, connID, connKey)
+		raw, source, ok := r.resolveOne(spec, envschema.SectionConnection, connID, connKey)
 		r.resolved = append(r.resolved, ResolvedName{Section: envschema.SectionConnection, Name: connID, EnvKey: connKey, Source: source, Found: ok})
 		if !ok {
 			continue
 		}
 		conn, ok := airflowenv.DecodeConnEnv(connKey, raw)
 		if !ok {
-			// A corrupt value is present, not missing: record it with an
-			// empty conn_type (which the validator won't re-judge) so the
-			// user is told to fix the value, not to provide one.
+			// A corrupt value is present, not missing: record it so the user is
+			// told to fix the value, not to provide one. It stays present in the
+			// values map so the validator does not also flag it missing.
 			r.extraViolations = append(r.extraViolations, envschema.Violation{
 				Kind:    envschema.ViolationWrongType,
 				Section: envschema.SectionConnection,
@@ -186,20 +185,30 @@ func (r *resolver) connTypes(specs map[string]envschema.ConnSpec) map[string]str
 	return out
 }
 
-// resolveOne resolves one declared name for its source. The default (empty)
-// source walks the local provider chain. A workspace source checks the local
-// chain first (local always wins) and falls to the workspace's Environment
-// Manager scope.
-func (r *resolver) resolveOne(source envschema.Source, section envschema.Section, name, key string) (value, srcLabel string, found bool) {
-	switch source {
+// resolveOne resolves one declared name. The default (empty) source walks the
+// local provider chain and falls back to the manifest default when set; the
+// default sits at the very bottom, below every file. A workspace source checks
+// the local chain first (local always wins) and falls to the workspace's
+// Environment Manager scope.
+func (r *resolver) resolveOne(spec envschema.ValueSpec, section envschema.Section, name, key string) (value, srcLabel string, found bool) {
+	switch spec.Source {
 	case "":
-		return lookup(r.in.Providers, key)
+		if v, src, ok := lookup(r.in.Providers, key); ok {
+			return v, src, true
+		}
+		if spec.HasDefault {
+			// The default is not on disk; layer it into Airflow the same way a
+			// workspace value is layered, so start injects it too.
+			r.injected[key] = spec.Default
+			return spec.Default, SourceDefault, true
+		}
+		return "", "", false
 	case envschema.SourceWorkspace:
 		return r.resolveWorkspace(section, name, key)
 	default:
 		// ParseSchema rejects unknown sources; a hand-built schema could
 		// still carry one, and skipping it silently would fake "missing".
-		r.errs = append(r.errs, fmt.Errorf("%s %q: unknown source %q", section, name, source))
+		r.errs = append(r.errs, fmt.Errorf("%s %q: unknown source %q", section, name, spec.Source))
 		return "", "", false
 	}
 }
@@ -230,8 +239,9 @@ func (r *resolver) resolveWorkspace(section envschema.Section, name, key string)
 	return "", wp.Label(), false
 }
 
-// missingReport joins the missing-value violations back with the schema.
-func (r *resolver) missingReport(s *envschema.Schema, violations []envschema.Violation) []Missing {
+// missingReport turns the missing-value violations into the report cmd renders,
+// each with its Airflow env-var key and any workspace-source note.
+func (r *resolver) missingReport(violations []envschema.Violation) []Missing {
 	var out []Missing
 	for _, v := range violations {
 		if v.Kind != envschema.ViolationMissing {
@@ -240,17 +250,10 @@ func (r *resolver) missingReport(s *envschema.Schema, violations []envschema.Vio
 		m := Missing{Section: v.Section, Name: v.Key, SourceNote: r.notes[nameRef{v.Section, v.Key}]}
 		switch v.Section {
 		case envschema.SectionEnvVar:
-			spec := s.EnvVars[v.Key]
-			m.Description, m.Sensitive = spec.Description, spec.Sensitive
 			m.EnvKey = v.Key
 		case envschema.SectionAirflowVariable:
-			spec := s.AirflowVariables[v.Key]
-			m.Description, m.Sensitive = spec.Description, spec.Sensitive
 			m.EnvKey = airflowenv.EnvKeyForVarKey(v.Key)
 		case envschema.SectionConnection:
-			spec := s.Connections[v.Key]
-			m.Description, m.ConnType = spec.Description, spec.ConnType
-			m.Sensitive = true // connections always carry credentials
 			m.EnvKey = airflowenv.EnvKeyForConnID(v.Key)
 		}
 		out = append(out, m)

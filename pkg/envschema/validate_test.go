@@ -14,33 +14,18 @@ func TestValidateNilSchema(t *testing.T) {
 func TestValidateSatisfied(t *testing.T) {
 	s := &Schema{
 		EnvVars: map[string]ValueSpec{
-			"API_URL":   {Type: TypeURL, Required: true},
-			"BATCH":     {Type: TypeInt},
-			"RATE":      {Type: TypeNumber},
-			"DEBUG":     {Type: TypeBool},
-			"PORT":      {Type: TypePort},
-			"MODE":      {Type: TypeString, Enum: []string{"dev", "prod"}},
-			"CFG":       {Type: TypeJSON},
-			"FREEFORM":  {},
-			"MYSTERY":   {Type: ValueType("tensor")}, // unknown types are accepted
-			"OPTIONAL":  {Type: TypeInt},             // absent and not required: fine
-			"TEMPLATED": {Type: TypeJSON},
+			"API_URL":  {},
+			"FREEFORM": {},
+			"BLANK":    {}, // present as empty string counts as satisfied
 		},
-		AirflowVariables: map[string]ValueSpec{"batch_size": {Type: TypeInt, Required: true}},
-		Connections:      map[string]ConnSpec{"warehouse": {ConnType: "postgres", Required: true}},
+		AirflowVariables: map[string]ValueSpec{"batch_size": {}},
+		Connections:      map[string]ValueSpec{"warehouse": {}},
 	}
 	v := Values{
 		EnvVars: map[string]string{
-			"API_URL":   "https://example.com/x",
-			"BATCH":     "100",
-			"RATE":      "0.5",
-			"DEBUG":     "true",
-			"PORT":      "8080",
-			"MODE":      "dev",
-			"CFG":       "not even json", // json is deliberately unchecked
-			"FREEFORM":  "anything",
-			"MYSTERY":   "???",
-			"TEMPLATED": "{{ var.value.x }}",
+			"API_URL":  "https://example.com/x",
+			"FREEFORM": "anything",
+			"BLANK":    "",
 		},
 		AirflowVariables: map[string]string{"batch_size": "10"},
 		Connections:      map[string]string{"warehouse": "postgres"},
@@ -50,74 +35,35 @@ func TestValidateSatisfied(t *testing.T) {
 	}
 }
 
-// TestValidateGolden covers every violation kind against the full expected
-// slice, including the sorted output order.
+// TestValidateGolden covers the one violation kind, missing, against the full
+// expected slice, including the sorted output order across sections. Validate
+// judges presence in Values, not the spec — the resolver is what turns a
+// default into a present value.
 func TestValidateGolden(t *testing.T) {
 	s := &Schema{
 		EnvVars: map[string]ValueSpec{
-			"API_URL":  {Type: TypeURL, Required: true},           // missing
-			"BATCH":    {Type: TypeInt},                           // optional but present: still checked
-			"RATE":     {Type: TypeNumber},                        // wrong number
-			"DEBUG":    {Type: TypeBool},                          // wrong bool
-			"PORT_A":   {Type: TypePort},                          // not an int
-			"PORT_B":   {Type: TypePort},                          // out of range
-			"MODE":     {Enum: []string{"dev", "prod"}},           // enum on default string type
-			"WORKERS":  {Type: TypeInt, Enum: []string{"1", "2"}}, // right type, outside enum
-			"BAD_INT":  {Type: TypeInt, Enum: []string{"1", "2"}}, // type failure wins over enum
-			"OPTIONAL": {Type: TypeInt},                           // absent, not required: no finding
+			"API_URL": {}, // missing
+			"SET":     {}, // present
 		},
 		AirflowVariables: map[string]ValueSpec{
-			"batch_size": {Type: TypeInt, Required: true}, // missing
+			"batch_size": {}, // missing
 		},
-		Connections: map[string]ConnSpec{
-			"warehouse": {ConnType: "postgres", Required: true}, // missing
-			"api":       {ConnType: "http"},                     // type mismatch
-			"anytype":   {},                                     // no declared type: any conn_type fine
+		Connections: map[string]ValueSpec{
+			"warehouse": {}, // missing
+			"api":       {}, // present
 		},
 	}
 	v := Values{
-		EnvVars: map[string]string{
-			"BATCH":   "ten",
-			"RATE":    "fast",
-			"DEBUG":   "yep",
-			"PORT_A":  "http",
-			"PORT_B":  "70000",
-			"MODE":    "staging",
-			"WORKERS": "3",
-			"BAD_INT": "x",
-		},
-		Connections: map[string]string{"api": "postgres", "anytype": "snowflake"},
+		EnvVars:     map[string]string{"SET": "x"},
+		Connections: map[string]string{"api": "postgres"},
 	}
 	want := []Violation{
 		{Kind: ViolationMissing, Section: SectionAirflowVariable, Key: "batch_size", Reason: reasonRequired},
-		{Kind: ViolationWrongType, Section: SectionConnection, Key: "api", Reason: `expected type "http", got "postgres"`},
 		{Kind: ViolationMissing, Section: SectionConnection, Key: "warehouse", Reason: reasonRequired},
 		{Kind: ViolationMissing, Section: SectionEnvVar, Key: "API_URL", Reason: reasonRequired},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "BAD_INT", Reason: reasonInt},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "BATCH", Reason: reasonInt},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "DEBUG", Reason: "expected a boolean"},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "MODE", Reason: "expected one of [dev prod]"},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "PORT_A", Reason: reasonPort},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "PORT_B", Reason: reasonPort},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "RATE", Reason: "expected a number"},
-		{Kind: ViolationWrongType, Section: SectionEnvVar, Key: "WORKERS", Reason: "expected one of [1 2]"},
 	}
 	got := Validate(s, v)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Validate mismatch\n got: %+v\nwant: %+v", got, want)
-	}
-}
-
-func TestValidateURL(t *testing.T) {
-	spec := ValueSpec{Type: TypeURL}
-	for _, bad := range []string{"", "example.com", "https://", "not a url"} {
-		if valueError(&spec, bad) == "" {
-			t.Errorf("valueError(url, %q) accepted, want rejected", bad)
-		}
-	}
-	for _, good := range []string{"https://example.com", "postgres://db:5432/x"} {
-		if reason := valueError(&spec, good); reason != "" {
-			t.Errorf("valueError(url, %q) = %q, want accepted", good, reason)
-		}
 	}
 }

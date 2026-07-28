@@ -233,8 +233,8 @@ func TestListSourceAndOrphans(t *testing.T) {
 		t.Fatal(err)
 	}
 	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{
-		"DECLARED": {Required: true},
-		"MISSING":  {Required: true, Sensitive: true},
+		"DECLARED": {},
+		"MISSING":  {},
 	}}
 	items, err := List(nil, projDir, schema, ListOptions{})
 	if err != nil {
@@ -247,8 +247,8 @@ func TestListSourceAndOrphans(t *testing.T) {
 	if it := byName["DECLARED"]; it.Source != SourceProject || it.Orphan {
 		t.Errorf("DECLARED = %+v, want project source, not orphan", it)
 	}
-	if it := byName["MISSING"]; it.Source != SourceAbsent || !it.Required || !it.Sensitive {
-		t.Errorf("MISSING = %+v, want absent/required/sensitive", it)
+	if it := byName["MISSING"]; it.Source != SourceAbsent {
+		t.Errorf("MISSING = %+v, want absent source", it)
 	}
 	if it := byName["STRAY_PROJECT"]; !it.Orphan || it.RemoveHint == "" {
 		t.Errorf("STRAY_PROJECT = %+v, want orphan with a remove hint", it)

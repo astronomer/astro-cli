@@ -127,13 +127,13 @@ func TestMissingEnvError(t *testing.T) {
 	err := &MissingEnvError{
 		Project: "/p",
 		Missing: []envresolve.Missing{
-			{Section: envschema.SectionEnvVar, Name: "API_URL", Description: "upstream", EnvKey: "API_URL"},
-			{Section: envschema.SectionConnection, Name: "warehouse", ConnType: "postgres", EnvKey: "AIRFLOW_CONN_WAREHOUSE"},
+			{Section: envschema.SectionEnvVar, Name: "API_URL", EnvKey: "API_URL"},
+			{Section: envschema.SectionConnection, Name: "warehouse", EnvKey: "AIRFLOW_CONN_WAREHOUSE"},
 		},
 	}
 	msg := err.Error()
 	// The one hint form is the exact set command per kind.
-	for _, want := range []string{"API_URL", "upstream", "astro local env set API_URL --project", "astro local env set conn warehouse --project", "astro local start"} {
+	for _, want := range []string{"API_URL", "astro local env set API_URL --project", "astro local env set conn warehouse --project", "astro local start"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("message missing %q:\n%s", want, msg)
 		}

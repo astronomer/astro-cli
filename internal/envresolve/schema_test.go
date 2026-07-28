@@ -29,29 +29,18 @@ func decodeEnv(t *testing.T, body string) map[string]any {
 
 func TestParseSchemaFull(t *testing.T) {
 	env := decodeEnv(t, `
-[tool.astro.env.vars.API_URL]
-type = "url"
-required = true
-description = "the upstream API"
+[tool.astro.env]
+LOG_LEVEL = 'info'
+EMPTY_DEFAULT = ''
+API_TOKEN = { source = 'workspace' }
+WAREHOUSE_URI = {}
 
-[tool.astro.env.vars.MODE]
-enum = ["dev", "prod"]
-sensitive = false
+[tool.astro.env.connections]
+warehouse = {}
+reporting = { source = 'workspace' }
 
-[tool.astro.env.vars.API_TOKEN]
-required = true
-sensitive = true
-source = "workspace"
-
-[tool.astro.env.airflow_variables.batch_size]
-type = "int"
-required = true
-
-[tool.astro.env.connections.warehouse]
-conn_type = "postgres"
-required = true
-description = "the analytics DB"
-source = "workspace"
+[tool.astro.env.airflow_variables]
+batch_size = '500'
 `)
 	got, err := ParseSchema(env)
 	if err != nil {
@@ -59,18 +48,17 @@ source = "workspace"
 	}
 	want := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"API_URL":   {Type: envschema.TypeURL, Required: true, Description: "the upstream API"},
-			"MODE":      {Enum: []string{"dev", "prod"}},
-			"API_TOKEN": {Required: true, Sensitive: true, Source: envschema.SourceWorkspace},
+			"LOG_LEVEL":     {Default: "info", HasDefault: true},
+			"EMPTY_DEFAULT": {Default: "", HasDefault: true}, // '' is a real default, not a marker
+			"API_TOKEN":     {Source: envschema.SourceWorkspace},
+			"WAREHOUSE_URI": {}, // {} is required, no default
 		},
 		AirflowVariables: map[string]envschema.ValueSpec{
-			"batch_size": {Type: envschema.TypeInt, Required: true},
+			"batch_size": {Default: "500", HasDefault: true},
 		},
-		Connections: map[string]envschema.ConnSpec{
-			"warehouse": {
-				ConnType: "postgres", Required: true, Description: "the analytics DB",
-				Source: envschema.SourceWorkspace,
-			},
+		Connections: map[string]envschema.ValueSpec{
+			"warehouse": {},
+			"reporting": {Source: envschema.SourceWorkspace},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -92,27 +80,19 @@ func TestParseSchemaEmpty(t *testing.T) {
 
 func TestParseSchemaProblems(t *testing.T) {
 	env := decodeEnv(t, `
-[tool.astro.env.secrets]              # unknown section
+[tool.astro.env]
+"BAD-NAME" = {}                       # not an env-var name
+"1LEADING" = {}                       # env vars can't start with a digit
+BADSRC = { source = 'cloud' }         # unknown source
+EMPTYSRC = { source = '' }            # empty source rejected
+TYPO = { typo = true }                # unknown table field
+NOTVALUE = 5                          # not a string or table
 
-[tool.astro.env.vars."BAD-NAME"]      # not an env-var name
+[tool.astro.env.airflow_variables]
+"1ok" = {}                            # AIRFLOW_VAR_1OK is legal
 
-[tool.astro.env.vars."1LEADING"]      # env vars can't start with a digit
-
-[tool.astro.env.airflow_variables."1ok"] # but AIRFLOW_VAR_1OK is legal
-
-[tool.astro.env.vars.TYPO]
-typo = true                           # unknown field
-type = "tensor"                       # unknown value type
-required = "yes"                      # wrong field type
-enum = [1, 2]                         # non-string enum values
-
-[tool.astro.env.connections."my.conn"] # not a conn id
-
-[tool.astro.env.vars.BADSRC]
-source = "cloud"                      # unknown source
-
-[tool.astro.env.vars.EMPTYSRC]
-source = ""                           # empty source rejected (omit for local-only)
+[tool.astro.env.connections]
+"my.conn" = {}                        # not a conn id
 `)
 	_, err := ParseSchema(env)
 	var se *SchemaError
@@ -120,17 +100,13 @@ source = ""                           # empty source rejected (omit for local-on
 		t.Fatalf("want *SchemaError, got %v", err)
 	}
 	wantKeys := []string{
+		"tool.astro.env.1LEADING",
+		"tool.astro.env.BAD-NAME",
+		"tool.astro.env.BADSRC.source",
+		"tool.astro.env.EMPTYSRC.source",
+		"tool.astro.env.NOTVALUE",
+		"tool.astro.env.TYPO.typo",
 		"tool.astro.env.connections.my.conn",
-		"tool.astro.env.secrets",
-		"tool.astro.env.vars.1LEADING",
-		"tool.astro.env.vars.BAD-NAME",
-		"tool.astro.env.vars.BADSRC.source",
-		"tool.astro.env.vars.EMPTYSRC.source",
-		"tool.astro.env.vars.TYPO.enum[0]",
-		"tool.astro.env.vars.TYPO.enum[1]",
-		"tool.astro.env.vars.TYPO.required",
-		"tool.astro.env.vars.TYPO.type",
-		"tool.astro.env.vars.TYPO.typo",
 	}
 	var gotKeys []string
 	for _, p := range se.Problems {
@@ -142,7 +118,7 @@ source = ""                           # empty source rejected (omit for local-on
 }
 
 func TestParseSchemaNonTableSection(t *testing.T) {
-	_, err := ParseSchema(map[string]any{"vars": "nope"})
+	_, err := ParseSchema(map[string]any{"connections": "nope"})
 	var se *SchemaError
 	if !errors.As(err, &se) || len(se.Problems) != 1 || se.Problems[0].Reason != "expected a table" {
 		t.Fatalf("want one 'expected a table' problem, got %v", err)

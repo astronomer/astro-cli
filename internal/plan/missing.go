@@ -22,11 +22,7 @@ func (e *MissingEnvError) Error() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "this project needs %d environment value(s) that are not set on this machine:\n", len(e.Missing))
 	for _, m := range e.Missing {
-		fmt.Fprintf(&b, "  - %s %s", sectionLabel(m.Section), m.Name)
-		if m.Description != "" {
-			fmt.Fprintf(&b, " — %s", m.Description)
-		}
-		b.WriteByte('\n')
+		fmt.Fprintf(&b, "  - %s %s\n", sectionLabel(m.Section), m.Name)
 		if m.SourceNote != "" {
 			fmt.Fprintf(&b, "      %s\n", m.SourceNote)
 		}

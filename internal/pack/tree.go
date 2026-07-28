@@ -267,68 +267,32 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 		}
 		fmt.Fprintf(&b, "\n## %s\n\n", title)
 		for _, name := range sortedKeys(specs) {
-			spec := specs[name]
-			fmt.Fprintf(&b, "- [ ] %s%s%s\n", name, valueMeta(spec), describe(spec.Description))
+			fmt.Fprintf(&b, "- [ ] %s%s\n", name, valueMeta(specs[name]))
 		}
 	}
 	writeValues("Environment variables", schema.EnvVars)
 	writeValues("Airflow variables", schema.AirflowVariables)
-
-	if len(schema.Connections) > 0 {
-		b.WriteString("\n## Connections\n\n")
-		for _, id := range sortedConnKeys(schema.Connections) {
-			conn := schema.Connections[id]
-			meta := requiredMark(conn.Required)
-			if conn.ConnType != "" {
-				meta = fmt.Sprintf(" (%s%s)", conn.ConnType, requiredSuffix(conn.Required))
-			}
-			fmt.Fprintf(&b, "- [ ] %s%s%s\n", id, meta, describe(conn.Description))
-		}
-	}
+	writeValues("Connections", schema.Connections)
 
 	fmt.Fprintf(&b, "\n%s\n", note)
 	return b.String(), nil
 }
 
+// valueMeta annotates a checklist entry with where its value comes from: a
+// committed default, the workspace's Environment Manager, or neither (a value
+// the platform operator must supply).
 func valueMeta(spec envschema.ValueSpec) string {
-	t := string(spec.Type)
-	if t == "" {
-		t = "string"
-	}
-	return fmt.Sprintf(" (%s%s)", t, requiredSuffix(spec.Required))
-}
-
-func requiredSuffix(required bool) string {
-	if required {
-		return ", required"
-	}
-	return ", optional"
-}
-
-func requiredMark(required bool) string {
-	if required {
+	switch {
+	case spec.Source == envschema.SourceWorkspace:
+		return " (from workspace)"
+	case spec.HasDefault:
+		return " (has a default)"
+	default:
 		return " (required)"
 	}
-	return " (optional)"
-}
-
-func describe(d string) string {
-	if d == "" {
-		return ""
-	}
-	return " — " + d
 }
 
 func sortedKeys(m map[string]envschema.ValueSpec) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
-}
-
-func sortedConnKeys(m map[string]envschema.ConnSpec) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
 		out = append(out, k)

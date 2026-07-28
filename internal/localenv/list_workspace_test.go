@@ -19,7 +19,7 @@ func (f fakeWorkspace) Label() string                  { return f.label }
 
 func workspaceListSchema() *envschema.Schema {
 	return &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{
-		"DATA_WAREHOUSE_URI": {Required: true, Source: envschema.SourceWorkspace},
+		"DATA_WAREHOUSE_URI": {Source: envschema.SourceWorkspace},
 	}}
 }
 

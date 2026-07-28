@@ -368,7 +368,7 @@ func renderEnvList(w io.Writer, items []localenv.ListItem) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "KIND\tNAME\tREQUIRED\tSENSITIVE\tSOURCE\tNOTE")
+	fmt.Fprintln(tw, "KIND\tNAME\tSOURCE\tNOTE")
 	for _, it := range items {
 		note := ""
 		if it.Orphan {
@@ -377,17 +377,9 @@ func renderEnvList(w io.Writer, items []localenv.ListItem) error {
 				note = "orphan in " + it.Project + "; remove: " + it.RemoveHint
 			}
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			it.Kind, it.Name, yesNo(it.Required), yesNo(it.Sensitive), it.Source, note)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.Kind, it.Name, it.Source, note)
 	}
 	return tw.Flush()
-}
-
-func yesNo(b bool) string {
-	if b {
-		return "yes"
-	}
-	return "no"
 }
 
 // envStore resolves the scope flags to the one file a set/get/delete edits,

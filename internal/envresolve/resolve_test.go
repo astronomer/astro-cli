@@ -30,15 +30,15 @@ func connValue(t *testing.T, c connmodel.Connection) string {
 func TestResolveLayering(t *testing.T) {
 	schema := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"FROM_SHELL":   {Required: true}, // shell beats both files
-			"FROM_PROJECT": {Required: true}, // project beats global
-			"FROM_GLOBAL":  {Required: true},
+			"FROM_SHELL":   {}, // shell beats both files
+			"FROM_PROJECT": {}, // project beats global
+			"FROM_GLOBAL":  {},
 		},
 		AirflowVariables: map[string]envschema.ValueSpec{
-			"batch_size": {Type: envschema.TypeInt, Required: true}, // via AIRFLOW_VAR_*
+			"batch_size": {}, // via AIRFLOW_VAR_*
 		},
-		Connections: map[string]envschema.ConnSpec{
-			"warehouse": {ConnType: "postgres", Required: true},
+		Connections: map[string]envschema.ValueSpec{
+			"warehouse": {},
 		},
 	}
 	shell := mapProvider{label: "shell", vals: map[string]string{
@@ -69,9 +69,6 @@ func TestResolveLayering(t *testing.T) {
 	if got := res.Values.AirflowVariables["batch_size"]; got != "100" {
 		t.Fatalf("batch_size = %q, want 100", got)
 	}
-	if got := res.Values.Connections["warehouse"]; got != "postgres" {
-		t.Fatalf("warehouse conn_type = %q, want postgres", got)
-	}
 
 	// Resolved reports the winning source for every declared name.
 	wantSource := map[string]string{
@@ -88,14 +85,71 @@ func TestResolveLayering(t *testing.T) {
 	}
 }
 
+// A manifest default sits at the bottom of the chain: any file value beats it,
+// and it resolves a name nothing else supplies.
+func TestResolveDefaultAtBottom(t *testing.T) {
+	schema := &envschema.Schema{
+		EnvVars: map[string]envschema.ValueSpec{
+			"LOG_LEVEL":  {Default: "info", HasDefault: true}, // nothing else holds it: default wins
+			"OVERRIDDEN": {Default: "fallback", HasDefault: true},
+			"EMPTY_DEF":  {Default: "", HasDefault: true}, // an empty-string default still resolves
+		},
+		AirflowVariables: map[string]envschema.ValueSpec{
+			"batch_size": {Default: "500", HasDefault: true}, // default injected under AIRFLOW_VAR_*
+		},
+	}
+	project := mapProvider{label: "project", vals: map[string]string{
+		"OVERRIDDEN": "from-file",
+	}}
+	res, err := Resolve(Inputs{Schema: schema, Providers: []Provider{project}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Missing) != 0 {
+		t.Fatalf("unexpected missing: %+v", res.Missing)
+	}
+	if got := res.Values.EnvVars["LOG_LEVEL"]; got != "info" {
+		t.Fatalf("LOG_LEVEL = %q, want the default", got)
+	}
+	if got := res.Values.EnvVars["OVERRIDDEN"]; got != "from-file" {
+		t.Fatalf("OVERRIDDEN = %q, want the file value to beat the default", got)
+	}
+	if got, ok := res.Values.EnvVars["EMPTY_DEF"]; !ok || got != "" {
+		t.Fatalf("EMPTY_DEF = %q (present=%v), want an empty-string default that resolves", got, ok)
+	}
+	if got := res.Values.AirflowVariables["batch_size"]; got != "500" {
+		t.Fatalf("batch_size = %q, want the default", got)
+	}
+	// A default is not on disk, so it is injected for start; a file value is not.
+	if got := res.Injected["LOG_LEVEL"]; got != "info" {
+		t.Fatalf("Injected[LOG_LEVEL] = %q, want the default layered in", got)
+	}
+	if _, ok := res.Injected["OVERRIDDEN"]; ok {
+		t.Fatalf("Injected holds OVERRIDDEN, but a file already supplies it")
+	}
+	if got := res.Injected["AIRFLOW_VAR_BATCH_SIZE"]; got != "500" {
+		t.Fatalf("Injected[AIRFLOW_VAR_BATCH_SIZE] = %q, want the default under its env key", got)
+	}
+	bySource := map[string]string{}
+	for _, rn := range res.Resolved {
+		bySource[rn.Name] = rn.Source
+	}
+	if bySource["LOG_LEVEL"] != SourceDefault || bySource["batch_size"] != SourceDefault {
+		t.Fatalf("default source labels = %v, want %q", bySource, SourceDefault)
+	}
+	if bySource["OVERRIDDEN"] != "project" {
+		t.Fatalf("OVERRIDDEN source = %q, want project", bySource["OVERRIDDEN"])
+	}
+}
+
+// A blank declaration with nothing to resolve it is missing.
 func TestResolveMissing(t *testing.T) {
 	schema := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"NEEDED":   {Required: true, Sensitive: true, Description: "a token"},
-			"OPTIONAL": {},
+			"NEEDED": {}, // blank: required, no default
 		},
-		Connections: map[string]envschema.ConnSpec{
-			"warehouse": {ConnType: "postgres", Required: true},
+		Connections: map[string]envschema.ValueSpec{
+			"warehouse": {},
 		},
 	}
 	res, err := Resolve(Inputs{Schema: schema, Providers: nil})
@@ -109,18 +163,18 @@ func TestResolveMissing(t *testing.T) {
 	if res.Missing[0].Section != envschema.SectionConnection || res.Missing[0].Name != "warehouse" {
 		t.Errorf("missing[0] = %+v", res.Missing[0])
 	}
-	if res.Missing[0].EnvKey != "AIRFLOW_CONN_WAREHOUSE" || !res.Missing[0].Sensitive {
+	if res.Missing[0].EnvKey != "AIRFLOW_CONN_WAREHOUSE" {
 		t.Errorf("connection missing: %+v", res.Missing[0])
 	}
-	if res.Missing[1].Name != "NEEDED" || res.Missing[1].EnvKey != "NEEDED" || !res.Missing[1].Sensitive {
+	if res.Missing[1].Name != "NEEDED" || res.Missing[1].EnvKey != "NEEDED" {
 		t.Errorf("env missing: %+v", res.Missing[1])
 	}
 }
 
 func TestResolveCorruptConnection(t *testing.T) {
 	schema := &envschema.Schema{
-		Connections: map[string]envschema.ConnSpec{
-			"warehouse": {ConnType: "postgres", Required: true},
+		Connections: map[string]envschema.ValueSpec{
+			"warehouse": {},
 		},
 	}
 	project := mapProvider{label: "project", vals: map[string]string{
@@ -150,7 +204,7 @@ func TestResolveCorruptConnection(t *testing.T) {
 func TestResolveWorkspaceSourceNoProvider(t *testing.T) {
 	schema := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"TOKEN": {Required: true, Source: envschema.SourceWorkspace},
+			"TOKEN": {Source: envschema.SourceWorkspace},
 		},
 	}
 	res, err := Resolve(Inputs{Schema: schema})

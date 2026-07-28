@@ -318,12 +318,11 @@ func TestComposerNextStepsSplitBucketAndEnv(t *testing.T) {
 
 func envSchema() map[string]any {
 	return map[string]any{
-		"vars": map[string]any{
-			"API_URL": map[string]any{"type": "url", "required": true, "description": "upstream base URL"},
-			"DEBUG":   map[string]any{"type": "bool"},
-		},
+		"API_URL":   map[string]any{},                      // {} : required
+		"DEBUG":     "false",                               // a committed default
+		"API_TOKEN": map[string]any{"source": "workspace"}, // from Environment Manager
 		"connections": map[string]any{
-			"warehouse": map[string]any{"conn_type": "postgres", "required": true},
+			"warehouse": map[string]any{}, // {} : required
 		},
 	}
 }
@@ -335,10 +334,12 @@ func TestTreeTargetsWriteEnvChecklist(t *testing.T) {
 		require.NoError(t, err, target.Name())
 		body := readArtifact(t, res.TreePath, checklistName)
 		assert.Contains(t, body, "API_URL")
-		assert.Contains(t, body, "required")
-		assert.Contains(t, body, "upstream base URL")
+		assert.Contains(t, body, "(required)")
+		assert.Contains(t, body, "DEBUG")
+		assert.Contains(t, body, "(has a default)")
+		assert.Contains(t, body, "API_TOKEN")
+		assert.Contains(t, body, "(from workspace)")
 		assert.Contains(t, body, "warehouse")
-		assert.Contains(t, body, "postgres")
 	}
 }
 
@@ -352,7 +353,7 @@ func TestTreeTargetsNoEnvNoChecklist(t *testing.T) {
 
 func TestEnvChecklistSurfacesSchemaError(t *testing.T) {
 	req := newProject(t, withEnv(map[string]any{
-		"vars": map[string]any{"API_URL": map[string]any{"type": "nonsense"}},
+		"API_URL": map[string]any{"source": "nonsense"},
 	}))
 	_, err := NewComposerTarget().Build(context.Background(), req, localrt.Callbacks{})
 	require.Error(t, err, "a broken env schema should not pass silently")

@@ -120,7 +120,7 @@ func TestEnvSetConnAndVarWithValueFlag(t *testing.T) {
 }
 
 func TestEnvListJSONShapeAndOrphan(t *testing.T) {
-	envBody := "\n[tool.astro.env.vars.API_URL]\nrequired = true\n"
+	envBody := "\n[tool.astro.env]\nAPI_URL = {}\n"
 	dir := envProject(t, envBody)
 	// A declared value plus an orphan hand-added to the file.
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("API_URL=http://x\nLEFTOVER=old\n"), 0o600); err != nil {
@@ -135,12 +135,12 @@ func TestEnvListJSONShapeAndOrphan(t *testing.T) {
 	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
 		var it struct {
 			Kind, Name, Source string
-			Required, Orphan   bool
+			Orphan             bool
 		}
 		if err := json.Unmarshal([]byte(line), &it); err != nil {
 			t.Fatalf("line %q: %v", line, err)
 		}
-		if it.Name == "API_URL" && it.Source == "project" && it.Required && !it.Orphan {
+		if it.Name == "API_URL" && it.Source == "project" && !it.Orphan {
 			declared = true
 		}
 		if it.Name == "LEFTOVER" && it.Orphan {
@@ -212,7 +212,7 @@ func TestEnvSetWarnsWhenNotGitignored(t *testing.T) {
 }
 
 func TestStartMissingEnvHint(t *testing.T) {
-	envBody := "\n[tool.astro.env.vars.API_TOKEN]\nrequired = true\n"
+	envBody := "\n[tool.astro.env]\nAPI_TOKEN = {}\n"
 	dir := envProject(t, envBody)
 	d, _, _ := envDeps(t, dir, "")
 	err := execute(t, d, "local", "start")
