@@ -10,17 +10,19 @@ import (
 )
 
 // Inputs is everything Resolve needs; the caller (the composition root)
-// owns building the provider chain and choosing the environment.
+// owns building the provider chain.
 type Inputs struct {
 	Schema *envschema.Schema
-	// Environment picks which binding each name resolves with. Empty means
-	// envschema.EnvLocal — the only environment the MVP resolves;
-	// anything else is ErrNotLocal.
-	Environment string
 	// Providers is the ordered resolution chain: the first that holds a
 	// value wins. The shipped chain is shell env > project .env > global
 	// ~/.astro/env (internal/localenv builds it).
 	Providers []Provider
+	// WorkspaceProvider resolves a name declared `source = "workspace"`
+	// against the workspace's Environment Manager objects. The local files
+	// still win — source is a default, not a lock — so it answers only when no
+	// file did. nil leaves a workspace source unresolved (a required one gates
+	// as missing): a source is never silently resolved from another place.
+	WorkspaceProvider Provider
 }
 
 // Missing is one required-but-absent value plus what cmd needs to render the
@@ -38,6 +40,11 @@ type Missing struct {
 	// EnvKey is the Airflow env-var name that satisfies this value
 	// (NAME, AIRFLOW_VAR_<KEY>, or AIRFLOW_CONN_<ID>).
 	EnvKey string
+	// SourceNote explains why a workspace-source value could not be fetched —
+	// logged out, offline, no workspace set, access lost, org secret policy —
+	// so the missing-value message names the cause and the fix. Empty for a
+	// plain local miss.
+	SourceNote string `json:"source_note,omitempty"`
 }
 
 // ResolvedName is one declared name with the source it resolved from — the
@@ -63,51 +70,34 @@ type Result struct {
 	// Missing joins the missing-value violations with the schema: what to
 	// provide. Sorted by section then name.
 	Missing []Missing
-}
-
-// ErrNotLocal reports a Resolve for an environment other than local. The
-// MVP resolves only the local environment; deployment environments arrive
-// with the deployment-backed source (stage 2).
-var ErrNotLocal = errors.New("only the local environment can be resolved")
-
-// DeploymentBindingError reports a name whose binding for the resolved
-// environment names a deployment-backed source — declared in the manifest,
-// not implemented yet (stage 2). The error is deliberate and loud: falling
-// back to another source would silently resolve against the wrong
-// environment.
-type DeploymentBindingError struct {
-	Section    envschema.Section
-	Name       string
-	Deployment string
-}
-
-func (e *DeploymentBindingError) Error() string {
-	return fmt.Sprintf("%s %q is bound to deployment %q: deployment-backed values are not supported yet",
-		e.Section, e.Name, e.Deployment)
+	// Injected is envKey -> value for the names that resolved from the
+	// WorkspaceProvider (Environment Manager). The composition root layers
+	// these into the Airflow environment on top of the file sources: unlike
+	// the file values, they are not on disk for the injection path to read.
+	// It deliberately overlaps Values for the env-var case (Values is
+	// name-keyed for the validator; Injected is envKey-keyed for injection and
+	// also carries raw connection values Values reduces to conn_type). Empty
+	// when no workspace-source name resolved from the cloud. Value-carrying —
+	// never hand it to an LLM-visible surface.
+	Injected map[string]string
 }
 
 // Resolve assembles values for every declared name from the provider chain
-// (shell env > project .env > global ~/.astro/env), validates them, and
-// reports what is missing and where each present value came from. It never
-// writes and resolves only declared names — undeclared entries in any source
-// pass through untouched, unjudged.
+// (shell env > project .env > global ~/.astro/env, then the workspace source
+// for names that declare it), validates them, and reports what is missing and
+// where each present value came from. It never writes and resolves only
+// declared names — undeclared entries in any source pass through untouched,
+// unjudged.
 func Resolve(in Inputs) (*Result, error) {
-	env := in.Environment
-	if env == "" {
-		env = envschema.EnvLocal
-	}
-	if env != envschema.EnvLocal {
-		return nil, fmt.Errorf("%w: %q", ErrNotLocal, in.Environment)
-	}
 	res := &Result{}
 	if in.Schema == nil {
 		return res, nil
 	}
 
-	r := &resolver{in: in}
-	res.Values.EnvVars = r.values(in.Schema.EnvVars, env, envschema.SectionEnvVar, func(name string) string { return name })
-	res.Values.AirflowVariables = r.values(in.Schema.AirflowVariables, env, envschema.SectionAirflowVariable, airflowenv.EnvKeyForVarKey)
-	res.Values.Connections = r.connTypes(in.Schema.Connections, env)
+	r := &resolver{in: in, injected: map[string]string{}, notes: map[nameRef]string{}}
+	res.Values.EnvVars = r.values(in.Schema.EnvVars, envschema.SectionEnvVar, func(name string) string { return name })
+	res.Values.AirflowVariables = r.values(in.Schema.AirflowVariables, envschema.SectionAirflowVariable, airflowenv.EnvKeyForVarKey)
+	res.Values.Connections = r.connTypes(in.Schema.Connections)
 
 	if len(r.errs) > 0 {
 		return nil, errors.Join(r.errs...)
@@ -117,14 +107,29 @@ func Resolve(in Inputs) (*Result, error) {
 	res.Resolved = r.resolved
 	res.Violations = append(envschema.Validate(in.Schema, res.Values), r.extraViolations...)
 	sortViolations(res.Violations)
-	res.Missing = missingReport(in.Schema, res.Violations)
+	res.Missing = r.missingReport(in.Schema, res.Violations)
+	res.Injected = r.injected
 	return res, nil
+}
+
+// nameRef keys a declared name by its section, so an env var and a connection
+// of the same name never collide.
+type nameRef struct {
+	Section envschema.Section
+	Name    string
 }
 
 type resolver struct {
 	in       Inputs
 	resolved []ResolvedName
-	errs     []error
+	// injected is envKey -> value for names that resolved from the workspace
+	// provider, the values the composition root layers into Airflow (the file
+	// sources are read from disk separately).
+	injected map[string]string
+	// notes holds the SourceNote for a workspace-source name that could not be
+	// fetched, keyed by section+name, joined into Missing.
+	notes map[nameRef]string
+	errs  []error
 	// extraViolations holds findings the validator can't see, e.g. a stored
 	// connection whose value isn't valid connection JSON.
 	extraViolations []envschema.Violation
@@ -132,17 +137,14 @@ type resolver struct {
 
 // values resolves one ValueSpec section. envKey maps a declared name to its
 // Airflow env-var name.
-func (r *resolver) values(specs map[string]envschema.ValueSpec, env string, section envschema.Section, envKey func(string) string) map[string]string {
+func (r *resolver) values(specs map[string]envschema.ValueSpec, section envschema.Section, envKey func(string) string) map[string]string {
 	if len(specs) == 0 {
 		return nil
 	}
 	out := map[string]string{}
 	for name, spec := range specs {
-		if !r.checkBinding(spec.Bindings, env, section, name) {
-			continue
-		}
 		key := envKey(name)
-		v, source, ok := lookup(r.in.Providers, key)
+		v, source, ok := r.resolveOne(spec.Source, section, name, key)
 		r.resolved = append(r.resolved, ResolvedName{Section: section, Name: name, EnvKey: key, Source: source, Found: ok})
 		if ok {
 			out[name] = v
@@ -153,17 +155,14 @@ func (r *resolver) values(specs map[string]envschema.ValueSpec, env string, sect
 
 // connTypes resolves the connections section down to conn id -> conn_type,
 // the shape the validator inspects.
-func (r *resolver) connTypes(specs map[string]envschema.ConnSpec, env string) map[string]string {
+func (r *resolver) connTypes(specs map[string]envschema.ConnSpec) map[string]string {
 	if len(specs) == 0 {
 		return nil
 	}
 	out := map[string]string{}
 	for connID, spec := range specs {
-		if !r.checkBinding(spec.Bindings, env, envschema.SectionConnection, connID) {
-			continue
-		}
 		connKey := airflowenv.EnvKeyForConnID(connID)
-		raw, source, ok := lookup(r.in.Providers, connKey)
+		raw, source, ok := r.resolveOne(spec.Source, envschema.SectionConnection, connID, connKey)
 		r.resolved = append(r.resolved, ResolvedName{Section: envschema.SectionConnection, Name: connID, EnvKey: connKey, Source: source, Found: ok})
 		if !ok {
 			continue
@@ -187,32 +186,58 @@ func (r *resolver) connTypes(specs map[string]envschema.ConnSpec, env string) ma
 	return out
 }
 
-// checkBinding reports whether the name resolves locally. A deployment
-// binding records a typed error instead.
-func (r *resolver) checkBinding(bindings map[string]envschema.Binding, env string, section envschema.Section, name string) bool {
-	b := envschema.BindingFor(bindings, env)
-	switch b.Source {
-	case envschema.SourceVault:
-		// SourceVault is the default binding: resolve from the provider chain.
-		return true
-	case envschema.SourceDeployment:
-		r.errs = append(r.errs, &DeploymentBindingError{Section: section, Name: name, Deployment: b.Deployment})
+// resolveOne resolves one declared name for its source. The default (empty)
+// source walks the local provider chain. A workspace source checks the local
+// chain first (local always wins) and falls to the workspace's Environment
+// Manager scope.
+func (r *resolver) resolveOne(source envschema.Source, section envschema.Section, name, key string) (value, srcLabel string, found bool) {
+	switch source {
+	case "":
+		return lookup(r.in.Providers, key)
+	case envschema.SourceWorkspace:
+		return r.resolveWorkspace(section, name, key)
 	default:
 		// ParseSchema rejects unknown sources; a hand-built schema could
 		// still carry one, and skipping it silently would fake "missing".
-		r.errs = append(r.errs, fmt.Errorf("%s %q: unknown binding source %q", section, name, b.Source))
+		r.errs = append(r.errs, fmt.Errorf("%s %q: unknown source %q", section, name, source))
+		return "", "", false
 	}
-	return false
+}
+
+// resolveWorkspace resolves a name declared source = "workspace". The local
+// files win (source is a default, not a lock), so a set value keeps the network
+// off this path; only when nothing local answers does the workspace's
+// Environment Manager scope answer.
+func (r *resolver) resolveWorkspace(section envschema.Section, name, key string) (value, srcLabel string, found bool) {
+	if v, src, ok := lookup(r.in.Providers, key); ok {
+		return v, src, true
+	}
+	wp := r.in.WorkspaceProvider
+	if wp == nil {
+		// No workspace resolution wired for this run. Report the name
+		// unresolved with a plain note rather than resolving it elsewhere; a
+		// required one then gates as missing.
+		r.notes[nameRef{section, name}] = "declared source = \"workspace\", but workspace resolution is not available here"
+		return "", string(envschema.SourceWorkspace), false
+	}
+	if v, ok := wp.Lookup(key); ok {
+		r.injected[key] = v
+		return v, wp.Label(), true
+	}
+	// Nothing resolved it. The provider's label carries any "unavailable"
+	// reason for `list`; record the longer cause for the missing-value message.
+	r.notes[nameRef{section, name}] = "source \"workspace\": " + Diagnose(wp, key)
+	return "", wp.Label(), false
 }
 
 // missingReport joins the missing-value violations back with the schema.
-func missingReport(s *envschema.Schema, violations []envschema.Violation) []Missing {
+func (r *resolver) missingReport(s *envschema.Schema, violations []envschema.Violation) []Missing {
 	var out []Missing
 	for _, v := range violations {
 		if v.Kind != envschema.ViolationMissing {
 			continue
 		}
-		m := Missing{Section: v.Section, Name: v.Key}
+		m := Missing{Section: v.Section, Name: v.Key, SourceNote: r.notes[nameRef{v.Section, v.Key}]}
 		switch v.Section {
 		case envschema.SectionEnvVar:
 			spec := s.EnvVars[v.Key]

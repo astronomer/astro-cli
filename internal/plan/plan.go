@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -28,6 +30,10 @@ type Options struct {
 	RequestedPort int
 	// StopWithSession ties Airflow's lifetime to the calling process.
 	StopWithSession bool
+	// AstroV1Client, when set, turns on Environment Manager resolution for names
+	// declared `source = "workspace"`. nil leaves a workspace source unresolved
+	// (a required one gates as missing) — the offline default, no network.
+	AstroV1Client astrov1.APIClient
 }
 
 // Built is a resolved plan plus the discovered project, so cmd can persist the
@@ -55,7 +61,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, err := resolveEnv(m, proj)
+	env, err := resolveEnv(m, proj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +139,7 @@ func PersistPort(projectPath string, chosen int) error {
 // (every entry, docker-compose semantics) and the global file contributes
 // only its schema-declared entries (localenv.Sources.Injection). Both engines
 // apply the result identically through Plan.Env.
-func resolveEnv(m *manifest.Manifest, proj *project.Project) (map[string]string, error) {
+func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (map[string]string, error) {
 	schema, err := envresolve.ParseSchema(m.Astro.Env)
 	if err != nil {
 		return nil, err
@@ -142,10 +148,20 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project) (map[string]string,
 	if err != nil {
 		return nil, err
 	}
-	res, err := envresolve.Resolve(envresolve.Inputs{
-		Schema:    schema,
-		Providers: src.Providers(),
-	})
+	in := envresolve.Inputs{Schema: schema, Providers: src.Providers()}
+	if opts.AstroV1Client != nil {
+		if opts.Mode == localrt.ModeDocker {
+			// Docker start writes Plan.Env into the on-disk compose file, so a
+			// resolved Environment Manager value would land on disk — the one
+			// thing the read-through posture rules out. Withhold it in docker
+			// mode (stage 1); standalone injects it in memory only.
+			in.WorkspaceProvider = emenv.Unavailable("Environment Manager values are injected in standalone mode only; run without --docker, or set it locally")
+		} else {
+			// reveal = true: start needs the real values to run Airflow.
+			in.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, opts.AstroV1Client, true)
+		}
+	}
+	res, err := envresolve.Resolve(in)
 	if err != nil {
 		return nil, err
 	}
@@ -161,5 +177,12 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project) (map[string]string,
 			Missing: res.Missing,
 		}
 	}
-	return src.Injection(schema), nil
+	// The file sources inject from disk; the Environment Manager values are not
+	// on disk, so layer them in here. They only fill keys no local file held
+	// (local always wins), so this never overrides a file value.
+	inj := src.Injection(schema)
+	for k, v := range res.Injected {
+		inj[k] = v
+	}
+	return inj, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -44,7 +45,9 @@ func newEnvCmd(c *cli) *cobra.Command {
 		Long: "Manage the environment values local Airflow runs with: plain env vars, connections, and Airflow Variables.\n\n" +
 			"Values are stored in plain files — the project's .env (default inside a project) or the global ~/.astro/env " +
 			"(--global) — created readable only by you. Resolution order at start is shell env > project .env > " +
-			"global ~/.astro/env. This is the local sibling of `astro env`, which manages values on the platform.",
+			"global ~/.astro/env > the workspace's Environment Manager. A name resolves from Environment Manager only " +
+			"when the schema declares source = \"workspace\" and you are logged in; a local value always wins. This is " +
+			"the local sibling of `astro env`, which manages values on the platform.",
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -240,7 +243,54 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 			return emitValue(r, envValue{Kind: kind, Name: name, Source: p.Label(), Value: v})
 		}
 	}
+	// No local source held it. A name declared source = "workspace" resolves
+	// from Environment Manager — the one place `get` reveals a cloud value, and
+	// only for the single name asked.
+	v, source, ok, err := c.getFromWorkspace(projectDir, kind, name, key)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
+	}
 	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, or global ~/.astro/env)", kind, name)
+}
+
+// getFromWorkspace resolves a workspace-source name from Environment Manager
+// for `get`. It returns ok=false (no error) when the name has no workspace
+// source, so the caller reports the plain "not set anywhere". A workspace-source
+// name that cannot be fetched is an error naming the cause.
+func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key string) (value, source string, ok bool, err error) {
+	if projectDir == "" || c.d.AstroV1Client == nil {
+		return "", "", false, nil
+	}
+	m, schema, err := c.loadManifestSchema(projectDir)
+	if err != nil || schema == nil {
+		return "", "", false, err
+	}
+	if declaredSource(schema, kind, name) != envschema.SourceWorkspace {
+		return "", "", false, nil
+	}
+	// reveal = true: get is the one deliberate reveal of a value.
+	wp := emenv.NewProvider(m.Astro.Workspace, c.d.AstroV1Client, true)
+	if v, has := wp.Lookup(key); has {
+		return v, wp.Label(), true, nil
+	}
+	return "", "", false, fmt.Errorf("%s %q resolves from the workspace but has no value: %s", kind, name, envresolve.Diagnose(wp, key))
+}
+
+// declaredSource returns a declared name's source, so `get` knows to consult
+// Environment Manager for a workspace source.
+func declaredSource(schema *envschema.Schema, kind localenv.Kind, name string) envschema.Source {
+	switch kind {
+	case localenv.KindEnv:
+		return schema.EnvVars[name].Source
+	case localenv.KindVar:
+		return schema.AirflowVariables[name].Source
+	case localenv.KindConn:
+		return schema.Connections[name].Source
+	}
+	return ""
 }
 
 func emitValue(r Renderer, v envValue) error {
@@ -279,11 +329,16 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool) error {
 		return err
 	}
 	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global file
-	schema, err := c.loadSchema(projectDir)
+	m, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
 		return err
 	}
 	opts := localenv.ListOptions{All: all}
+	// reveal = false: list reports where each name resolves, never a value, so
+	// it reads Environment Manager for presence only and pulls no secret.
+	if m != nil && c.d.AstroV1Client != nil {
+		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, c.d.AstroV1Client, false)
+	}
 	switch {
 	case scope.project && scope.global:
 		return errors.New("--project and --global are mutually exclusive")
@@ -376,17 +431,23 @@ func (c *cli) discoverProject() (string, error) {
 	return proj.Dir, nil
 }
 
-// loadSchema types the project's [tool.astro.env] section for list. Outside a
-// project it is nil, so list shows only file entries.
-func (c *cli) loadSchema(projectDir string) (*envschema.Schema, error) {
+// loadManifestSchema loads the project's manifest and types its
+// [tool.astro.env] section. Outside a project both are nil, so list/get show
+// only file entries. The manifest is returned too, for the top-level workspace
+// a workspace-source name resolves through.
+func (c *cli) loadManifestSchema(projectDir string) (*manifest.Manifest, *envschema.Schema, error) {
 	if projectDir == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	m, err := manifest.Load(filepath.Join(projectDir, project.Marker))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return envresolve.ParseSchema(m.Astro.Env)
+	schema, err := envresolve.ParseSchema(m.Astro.Env)
+	if err != nil {
+		return nil, nil, err
+	}
+	return m, schema, nil
 }
 
 // readSetValue resolves the value for a `set`: --value inline, else --stdin or

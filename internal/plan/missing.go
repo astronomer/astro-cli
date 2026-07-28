@@ -26,7 +26,11 @@ func (e *MissingEnvError) Error() string {
 		if m.Description != "" {
 			fmt.Fprintf(&b, " — %s", m.Description)
 		}
-		fmt.Fprintf(&b, "\n      provide it:  %s\n", setHint(&m))
+		b.WriteByte('\n')
+		if m.SourceNote != "" {
+			fmt.Fprintf(&b, "      %s\n", m.SourceNote)
+		}
+		fmt.Fprintf(&b, "      provide it:  %s\n", setHint(&m))
 	}
 	b.WriteString("provide them, then run `astro local start` again.")
 	return b.String()

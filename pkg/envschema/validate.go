@@ -46,7 +46,7 @@ func Validate(s *Schema, v Values) []Violation {
 				}
 				continue
 			}
-			if reason := valueError(spec, val); reason != "" {
+			if reason := valueError(&spec, val); reason != "" {
 				out = append(out, Violation{Kind: ViolationWrongType, Section: section, Key: key, Reason: reason})
 			}
 		}
@@ -85,7 +85,7 @@ func Validate(s *Schema, v Values) []Violation {
 // valueError returns a reason string if value doesn't satisfy spec, or ""
 // if it's fine. Unknown / empty / string / json types are always accepted
 // (json validity isn't enforced — values are often templated).
-func valueError(spec ValueSpec, value string) string {
+func valueError(spec *ValueSpec, value string) string {
 	switch spec.Type {
 	case TypeInt:
 		if _, err := strconv.Atoi(value); err != nil {

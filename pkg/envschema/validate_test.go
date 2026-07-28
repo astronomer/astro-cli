@@ -111,33 +111,13 @@ func TestValidateGolden(t *testing.T) {
 func TestValidateURL(t *testing.T) {
 	spec := ValueSpec{Type: TypeURL}
 	for _, bad := range []string{"", "example.com", "https://", "not a url"} {
-		if valueError(spec, bad) == "" {
+		if valueError(&spec, bad) == "" {
 			t.Errorf("valueError(url, %q) accepted, want rejected", bad)
 		}
 	}
 	for _, good := range []string{"https://example.com", "postgres://db:5432/x"} {
-		if reason := valueError(spec, good); reason != "" {
+		if reason := valueError(&spec, good); reason != "" {
 			t.Errorf("valueError(url, %q) = %q, want accepted", good, reason)
 		}
-	}
-}
-
-func TestBindingFor(t *testing.T) {
-	bindings := map[string]Binding{
-		EnvLocal: {Source: SourceVault},
-		"prod":   {Source: SourceDeployment, Deployment: "prod"},
-	}
-	if got := BindingFor(bindings, "prod"); got.Source != SourceDeployment || got.Deployment != "prod" {
-		t.Errorf("BindingFor(prod) = %+v", got)
-	}
-	if got := BindingFor(bindings, EnvLocal); got != DefaultBinding {
-		t.Errorf("BindingFor(local) = %+v, want the vault", got)
-	}
-	// No entry and no bindings at all both fall back to the vault default.
-	if got := BindingFor(bindings, "staging"); got != DefaultBinding {
-		t.Errorf("BindingFor(staging) = %+v, want DefaultBinding", got)
-	}
-	if got := BindingFor(nil, EnvLocal); got != DefaultBinding {
-		t.Errorf("BindingFor(nil) = %+v, want DefaultBinding", got)
 	}
 }

@@ -19,12 +19,14 @@ import (
 	"github.com/spf13/cobra"
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/internal/checks"
 	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localprune"
 	"github.com/astronomer/astro-cli/internal/localshared"
 	"github.com/astronomer/astro-cli/internal/localstandalone"
 	"github.com/astronomer/astro-cli/internal/localstate"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
@@ -58,6 +60,12 @@ type Deps struct {
 
 	// OpenURL opens a URL in the user's browser (`astro local open`).
 	OpenURL func(url string) error
+
+	// AstroV1Client is the v1 API client the Environment Manager read-through
+	// provider reads workspace-source env values through. It authenticates
+	// from the current login context per request; a logged-out user just makes
+	// the provider absent. A test injects a fake.
+	AstroV1Client astrov1.APIClient
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -80,15 +88,16 @@ type Runtime interface {
 func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
 	return Deps{
-		Stdin:       os.Stdin,
-		Stdout:      os.Stdout,
-		Stderr:      os.Stderr,
-		Runtime:     newModeRuntime(),
-		Checks:      runner,
-		CheckVenv:   runner,
-		Provisioner: newUVProvisioner,
-		WorkingDir:  os.Getwd,
-		OpenURL:     browser.OpenURL,
+		Stdin:         os.Stdin,
+		Stdout:        os.Stdout,
+		Stderr:        os.Stderr,
+		Runtime:       newModeRuntime(),
+		Checks:        runner,
+		CheckVenv:     runner,
+		Provisioner:   newUVProvisioner,
+		WorkingDir:    os.Getwd,
+		OpenURL:       browser.OpenURL,
+		AstroV1Client: astrov1.NewV1Client(httputil.NewHTTPClient()),
 	}
 }
 

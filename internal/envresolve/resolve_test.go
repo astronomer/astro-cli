@@ -1,7 +1,6 @@
 package envresolve
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
@@ -146,24 +145,22 @@ func TestResolveCorruptConnection(t *testing.T) {
 	}
 }
 
-func TestResolveDeploymentBindingErrors(t *testing.T) {
+// A workspace source with no WorkspaceProvider wired gates the required name
+// as missing, with a note — never silently resolved from another place.
+func TestResolveWorkspaceSourceNoProvider(t *testing.T) {
 	schema := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"TOKEN": {Required: true, Bindings: map[string]envschema.Binding{
-				envschema.EnvLocal: {Source: envschema.SourceDeployment, Deployment: "prod"},
-			}},
+			"TOKEN": {Required: true, Source: envschema.SourceWorkspace},
 		},
 	}
-	_, err := Resolve(Inputs{Schema: schema})
-	var de *DeploymentBindingError
-	if !errors.As(err, &de) {
-		t.Fatalf("err = %v, want DeploymentBindingError", err)
+	res, err := Resolve(Inputs{Schema: schema})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
 	}
-}
-
-func TestResolveNonLocalRejected(t *testing.T) {
-	_, err := Resolve(Inputs{Schema: &envschema.Schema{}, Environment: "prod"})
-	if !errors.Is(err, ErrNotLocal) {
-		t.Fatalf("err = %v, want ErrNotLocal", err)
+	if len(res.Missing) != 1 || res.Missing[0].Name != "TOKEN" {
+		t.Fatalf("Missing = %+v, want TOKEN", res.Missing)
+	}
+	if res.Missing[0].SourceNote == "" {
+		t.Fatalf("want a SourceNote naming why the workspace source was unavailable")
 	}
 }

@@ -54,17 +54,13 @@ var validValueTypes = map[envschema.ValueType]bool{
 //	[tool.astro.env.connections.warehouse]
 //	conn_type = "postgres"
 //	required = true
-//	[tool.astro.env.connections.warehouse.bindings.prod]
-//	source = "deployment"
-//	deployment = "prod"
+//	source = "workspace"
 //
 // Decoding is strict — unknown sections, unknown spec fields, wrong field
-// types, and names that can't be env vars are all Problems — because this
-// is authored config and a typo silently dropping a declaration would
-// defeat the clone-and-run check. A nil/empty map yields an empty schema.
-// Binding environment keys and deployment names are not cross-checked
-// against [tool.astro.deployments] here; that join happens where both are
-// in hand (stage 2, with the deployment source itself).
+// types, unknown source values, and names that can't be env vars are all
+// Problems — because this is authored config and a typo silently dropping a
+// declaration would defeat the clone-and-run check. A nil/empty map yields an
+// empty schema.
 func ParseSchema(env map[string]any) (*envschema.Schema, error) {
 	p := &schemaParser{}
 	s := &envschema.Schema{}
@@ -147,8 +143,8 @@ func (p *schemaParser) valueSpecs(key string, raw any, validName func(string) bo
 				spec.Description, _ = p.str(fieldKey, v)
 			case "enum":
 				spec.Enum = p.strSlice(fieldKey, v)
-			case "bindings":
-				spec.Bindings = p.bindings(fieldKey, v)
+			case "source":
+				spec.Source = p.source(fieldKey, v)
 			default:
 				p.add(fieldKey, "unknown field")
 			}
@@ -185,8 +181,8 @@ func (p *schemaParser) connSpecs(key string, raw any) map[string]envschema.ConnS
 				spec.Required, _ = p.boolean(fieldKey, v)
 			case "description":
 				spec.Description, _ = p.str(fieldKey, v)
-			case "bindings":
-				spec.Bindings = p.bindings(fieldKey, v)
+			case "source":
+				spec.Source = p.source(fieldKey, v)
 			default:
 				p.add(fieldKey, "unknown field")
 			}
@@ -196,51 +192,20 @@ func (p *schemaParser) connSpecs(key string, raw any) map[string]envschema.ConnS
 	return out
 }
 
-// bindings decodes a bindings table: environment name -> {source, deployment}.
-func (p *schemaParser) bindings(key string, raw any) map[string]envschema.Binding {
-	table, ok := p.table(key, raw)
-	if !ok || len(table) == 0 {
-		return nil
+// source decodes a declaration's `source` field. The only value today is
+// "workspace"; anything else is a schema problem, per the package's strict
+// parse. An empty string is rejected too — omit the field for local-only.
+func (p *schemaParser) source(key string, raw any) envschema.Source {
+	s, ok := p.str(key, raw)
+	if !ok {
+		return ""
 	}
-	out := make(map[string]envschema.Binding, len(table))
-	for env, bindingRaw := range table {
-		bindingKey := key + "." + env
-		bindingTable, ok := p.table(bindingKey, bindingRaw)
-		if !ok {
-			continue
-		}
-		var b envschema.Binding
-		for field, v := range bindingTable {
-			fieldKey := bindingKey + "." + field
-			switch field {
-			case "source":
-				if s, ok := p.str(fieldKey, v); ok {
-					b.Source = envschema.BindingSource(s)
-					if b.Source != envschema.SourceVault && b.Source != envschema.SourceDeployment {
-						p.add(fieldKey, fmt.Sprintf("%q is not a source (vault, deployment)", s))
-					}
-				}
-			case "deployment":
-				b.Deployment, _ = p.str(fieldKey, v)
-			default:
-				p.add(fieldKey, "unknown field")
-			}
-		}
-		switch b.Source {
-		case "":
-			p.add(bindingKey+".source", "required")
-		case envschema.SourceDeployment:
-			if b.Deployment == "" {
-				p.add(bindingKey+".deployment", "required when source is deployment")
-			}
-		case envschema.SourceVault:
-			if b.Deployment != "" {
-				p.add(bindingKey+".deployment", "only meaningful when source is deployment")
-			}
-		}
-		out[env] = b
+	src := envschema.Source(s)
+	if src != envschema.SourceWorkspace {
+		p.add(key, fmt.Sprintf("%q is not a source (workspace)", s))
+		return ""
 	}
-	return out
+	return src
 }
 
 func (p *schemaParser) str(key string, v any) (string, bool) {

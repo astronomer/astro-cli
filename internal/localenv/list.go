@@ -41,6 +41,11 @@ type ListOptions struct {
 	// All widens the view to the global file plus every project's .env the
 	// CLI knows about, beyond the current project.
 	All bool
+	// WorkspaceProvider resolves names declared source = "workspace" against
+	// the workspace's Environment Manager objects, so `list` can label their
+	// source "workspace" (or its unavailable variant). nil leaves such a name
+	// unresolved. Built presence-only (no secret values pulled).
+	WorkspaceProvider envresolve.Provider
 }
 
 // List builds the resolver-backed listing: every schema-declared name with
@@ -52,7 +57,11 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 		return nil, err
 	}
 	providers := listProviders(src, opts.Scope)
-	res, err := envresolve.Resolve(envresolve.Inputs{Schema: schema, Providers: providers})
+	res, err := envresolve.Resolve(envresolve.Inputs{
+		Schema:            schema,
+		Providers:         providers,
+		WorkspaceProvider: opts.WorkspaceProvider,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +99,11 @@ func listProviders(src Sources, scope Scope) []envresolve.Provider {
 
 func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem {
 	item := ListItem{Name: rn.Name, Source: SourceAbsent}
-	if rn.Found {
+	// A resolved name carries its winning source; a workspace-source name that
+	// did not resolve still carries the "workspace" label (with any
+	// "unavailable" reason), so the row says where it was meant to come from.
+	// Only a value absent from every source has no label — shown as "absent".
+	if rn.Source != "" {
 		item.Source = rn.Source
 	}
 	switch rn.Section {

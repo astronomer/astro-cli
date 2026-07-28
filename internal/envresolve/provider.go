@@ -22,6 +22,28 @@ type Provider interface {
 	Label() string
 }
 
+// Diagnoser is an optional Provider capability: when a Lookup misses, it
+// explains why in a sentence, for the missing-value message a required-but-
+// absent bound name produces. The Environment Manager provider implements it
+// (logged out, access lost, workspace gone, org secret policy); the file
+// providers do not, so callers reach it through Diagnose.
+type Diagnoser interface {
+	Diagnose(envKey string) string
+}
+
+// Diagnose asks a provider why envKey did not resolve from it, for the message
+// a missed bound name shows. A provider with nothing to say (or none) falls
+// back to the generic cause. Both the resolver and `get` compose from this, so
+// the wording never drifts between them.
+func Diagnose(p Provider, envKey string) string {
+	if d, ok := p.(Diagnoser); ok {
+		if c := d.Diagnose(envKey); c != "" {
+			return c
+		}
+	}
+	return "Environment Manager holds no value for it"
+}
+
 // lookup walks the chain and returns the first provider that holds envKey,
 // with its label. ok is false when no provider holds it.
 func lookup(providers []Provider, envKey string) (value, source string, ok bool) {

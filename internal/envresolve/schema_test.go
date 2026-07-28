@@ -38,6 +38,11 @@ description = "the upstream API"
 enum = ["dev", "prod"]
 sensitive = false
 
+[tool.astro.env.vars.API_TOKEN]
+required = true
+sensitive = true
+source = "workspace"
+
 [tool.astro.env.airflow_variables.batch_size]
 type = "int"
 required = true
@@ -46,13 +51,7 @@ required = true
 conn_type = "postgres"
 required = true
 description = "the analytics DB"
-
-[tool.astro.env.connections.warehouse.bindings.local]
-source = "vault"
-
-[tool.astro.env.connections.warehouse.bindings.prod]
-source = "deployment"
-deployment = "prod"
+source = "workspace"
 `)
 	got, err := ParseSchema(env)
 	if err != nil {
@@ -60,8 +59,9 @@ deployment = "prod"
 	}
 	want := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"API_URL": {Type: envschema.TypeURL, Required: true, Description: "the upstream API"},
-			"MODE":    {Enum: []string{"dev", "prod"}},
+			"API_URL":   {Type: envschema.TypeURL, Required: true, Description: "the upstream API"},
+			"MODE":      {Enum: []string{"dev", "prod"}},
+			"API_TOKEN": {Required: true, Sensitive: true, Source: envschema.SourceWorkspace},
 		},
 		AirflowVariables: map[string]envschema.ValueSpec{
 			"batch_size": {Type: envschema.TypeInt, Required: true},
@@ -69,10 +69,7 @@ deployment = "prod"
 		Connections: map[string]envschema.ConnSpec{
 			"warehouse": {
 				ConnType: "postgres", Required: true, Description: "the analytics DB",
-				Bindings: map[string]envschema.Binding{
-					"local": {Source: envschema.SourceVault},
-					"prod":  {Source: envschema.SourceDeployment, Deployment: "prod"},
-				},
+				Source: envschema.SourceWorkspace,
 			},
 		},
 	}
@@ -111,18 +108,11 @@ enum = [1, 2]                         # non-string enum values
 
 [tool.astro.env.connections."my.conn"] # not a conn id
 
-[tool.astro.env.connections.a.bindings.local]
+[tool.astro.env.vars.BADSRC]
 source = "cloud"                      # unknown source
 
-[tool.astro.env.connections.b.bindings.local]
-deployment = "prod"                   # source missing
-
-[tool.astro.env.connections.c.bindings.prod]
-source = "deployment"                 # deployment name missing
-
-[tool.astro.env.connections.d.bindings.local]
-source = "vault"
-deployment = "prod"                   # deployment is deployment-source only
+[tool.astro.env.vars.EMPTYSRC]
+source = ""                           # empty source rejected (omit for local-only)
 `)
 	_, err := ParseSchema(env)
 	var se *SchemaError
@@ -130,14 +120,12 @@ deployment = "prod"                   # deployment is deployment-source only
 		t.Fatalf("want *SchemaError, got %v", err)
 	}
 	wantKeys := []string{
-		"tool.astro.env.connections.a.bindings.local.source",
-		"tool.astro.env.connections.b.bindings.local.source",
-		"tool.astro.env.connections.c.bindings.prod.deployment",
-		"tool.astro.env.connections.d.bindings.local.deployment",
 		"tool.astro.env.connections.my.conn",
 		"tool.astro.env.secrets",
 		"tool.astro.env.vars.1LEADING",
 		"tool.astro.env.vars.BAD-NAME",
+		"tool.astro.env.vars.BADSRC.source",
+		"tool.astro.env.vars.EMPTYSRC.source",
 		"tool.astro.env.vars.TYPO.enum[0]",
 		"tool.astro.env.vars.TYPO.enum[1]",
 		"tool.astro.env.vars.TYPO.required",
