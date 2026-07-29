@@ -118,6 +118,51 @@ var (
 )
 
 func Test_FetchDomainAuthConfig(t *testing.T) {
+	// Stub the package http client so the test builds the right URL per
+	// domain and parses the response without hitting live environments.
+	originalHTTPClient := httpClient
+	t.Cleanup(func() { httpClient = originalHTTPClient })
+
+	responses := map[string]Config{
+		"https://api.astronomer.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer.io/",
+		},
+		"https://api.astronomer-dev.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer-dev.io/",
+		},
+		"https://api.astronomer-stage.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "jsarDat3BeDXZ1monEAeqJPOvRvterpm",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer-stage.io/",
+		},
+		"https://pr1234.api.astronomer-dev.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		},
+	}
+
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		cfg, ok := responses[req.URL.String()]
+		if !ok {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(bytes.NewBufferString("unexpected URL: " + req.URL.String())),
+				Header:     make(http.Header),
+			}
+		}
+		body, _ := json.Marshal(cfg)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBuffer(body)),
+			Header:     make(http.Header),
+		}
+	})
+
 	domain := "astronomer.io"
 	actual, err := FetchDomainAuthConfig(domain)
 	assert.NoError(t, err)
@@ -126,13 +171,13 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer.io/")
 
 	domain = "gcp0001.us-east4.astronomer.io" // Gen1 CLI domain
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
@@ -145,7 +190,7 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-dev.io/")
 
 	domain = "fail.astronomer-dev.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
@@ -158,39 +203,24 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-stage.io/")
 
 	domain = "fail.astronomer-stage.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer-perf.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
 
 	t.Run("pr preview is a valid domain", func(t *testing.T) {
-		// mocking this as once a PR closes, test would fail
-		mockResponse := Config{
-			ClientID:  "client-id",
-			Audience:  "audience",
-			DomainURL: "https://myURL.com/",
-		}
-		jsonResponse, err := json.Marshal(mockResponse)
-		assert.NoError(t, err)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
 		domain = "pr1234.astronomer-dev.io"
 		actual, err = FetchDomainAuthConfig(domain)
 		assert.NoError(t, err)
-		assert.Equal(t, actual.ClientID, mockResponse.ClientID)
-		assert.Equal(t, actual.Audience, mockResponse.Audience)
-		assert.Equal(t, actual.DomainURL, mockResponse.DomainURL)
+		assert.Equal(t, actual.ClientID, "client-id")
+		assert.Equal(t, actual.Audience, "audience")
+		assert.Equal(t, actual.DomainURL, "https://myURL.com/")
 	})
 }
 
