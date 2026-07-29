@@ -58,6 +58,7 @@ var (
 	runtimeVersion          string
 	desiredRuntimeVersion   string
 	clusterID               string
+	deploymentMode          string
 
 	adoptName                    string
 	adoptNamespace               string
@@ -98,6 +99,9 @@ $ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airfl
 
 # Create new deployment with Astronomer Runtime.
 $ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1 --cluster-id=123
+
+# Create Operator deployment (APC 2.1.0+).
+$ astro deployment create --label=my-operator-deployment --executor=k8s --cluster-id=123 --mode=operator
 `
 
 	createExampleDagDeployment = `
@@ -166,7 +170,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	example := deploymentCreateExample
-	if localHoustonVersion >= "1.0.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		example = deploymentCreateExampleSoftwareV1
 	}
 	cmd := &cobra.Command{
@@ -197,7 +201,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if nfsMountDAGDeploymentEnabled {
-		if localHoustonVersion >= "1.0.0" {
+		if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 			cmd.Example += createExampleDagDeploymentSoftwareV1
 		} else {
 			cmd.Example += createExampleDagDeployment
@@ -223,9 +227,13 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 
-	if localHoustonVersion >= "1.0.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
 		_ = cmd.MarkFlagRequired("cluster-id")
+	}
+
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "2.1.0"}) {
+		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
 	}
 	_ = cmd.MarkFlagRequired("label")
 	return cmd
@@ -307,7 +315,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
-	if localHoustonVersion >= "1.0.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
 	}
 	return cmd
@@ -490,6 +498,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
+	if err := validateDeploymentModeArg(deploymentMode); err != nil {
+		return err
+	}
+
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
@@ -536,6 +548,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		GitSyncInterval:   gitSyncInterval,
 		TriggererReplicas: createTriggererReplicas,
 		ClusterID:         clusterID,
+		Mode:              deploymentMode,
 	}
 	return deployment.Create(req, houstonClient, out, appConfig)
 }

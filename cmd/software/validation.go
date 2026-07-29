@@ -18,6 +18,7 @@ var (
 	errGitRepoNotFound          = errors.New("please specify a valid git repository URL via --git-repository-url")
 	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	errNoWorkspaceFound         = errors.New("no valid workspace source found")
+	errInvalidDeploymentMode    = errors.New("please specify a valid deployment mode, one of: helm, operator")
 )
 
 var validGitScheme = map[string]struct{}{
@@ -98,6 +99,15 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string
 		return errGitRepoNotFound
 	}
 	return nil
+}
+
+func validateDeploymentModeArg(mode string) error {
+	switch mode {
+	case "", houston.HelmDeploymentMode, houston.OperatorDeploymentMode:
+		return nil
+	default:
+		return errInvalidDeploymentMode
+	}
 }
 
 func validateExecutorArg(executor string) (string, error) {

@@ -97,6 +97,10 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		vars["clusterId"] = req.ClusterID
 	}
 
+	if req.Mode != "" {
+		vars["mode"] = req.Mode
+	}
+
 	if appConfig.Flags.ManualNamespaceNames {
 		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID)
 		if err != nil {
