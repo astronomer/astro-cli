@@ -29,6 +29,10 @@ const (
 	ImageDeploymentType   = "image"
 	DagOnlyDeploymentType = "dag_deploy"
 
+	// Available on Houston >= 2.1.0.
+	HelmDeploymentMode     = "helm"
+	OperatorDeploymentMode = "operator"
+
 	DagDeployDocsLink    = "https://www.astronomer.io/docs/software/deploy-dags/"
 	DeployViaCLIDocsLink = "https://www.astronomer.io/docs/software/deploy-cli/"
 )
