@@ -22,7 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/software/auth"
+	"github.com/astronomer/astro-cli/apc/auth"
 )
 
 var (

@@ -12,7 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
-	softwareAuth "github.com/astronomer/astro-cli/software/auth"
+	softwareAuth "github.com/astronomer/astro-cli/apc/auth"
 )
 
 var (

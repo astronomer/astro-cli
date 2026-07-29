@@ -8,7 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/software/deployment"
+	"github.com/astronomer/astro-cli/apc/deployment"
 )
 
 const (

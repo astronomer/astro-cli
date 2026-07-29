@@ -8,9 +8,9 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/software/deployment"
-	"github.com/astronomer/astro-cli/software/utils"
-	"github.com/astronomer/astro-cli/software/workspace"
+	"github.com/astronomer/astro-cli/apc/deployment"
+	"github.com/astronomer/astro-cli/apc/utils"
+	"github.com/astronomer/astro-cli/apc/workspace"
 )
 
 const ListTeamLimit = 20

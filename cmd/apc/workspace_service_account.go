@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
-	sa "github.com/astronomer/astro-cli/software/service_account"
+	sa "github.com/astronomer/astro-cli/apc/service_account"
 )
 
 var (

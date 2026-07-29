@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/software/user"
+	"github.com/astronomer/astro-cli/apc/user"
 )
 
 const (

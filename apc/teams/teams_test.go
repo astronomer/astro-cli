@@ -9,7 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/astronomer/astro-cli/software/utils"
+	"github.com/astronomer/astro-cli/apc/utils"
 )
 
 var errMockHouston = errors.New("mock houston error")

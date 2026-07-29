@@ -7,7 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/software/teams"
+	"github.com/astronomer/astro-cli/apc/teams"
 )
 
 func newTeamCmd(out io.Writer) *cobra.Command {

@@ -11,7 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/git"
-	"github.com/astronomer/astro-cli/software/deploy"
+	"github.com/astronomer/astro-cli/apc/deploy"
 )
 
 var (

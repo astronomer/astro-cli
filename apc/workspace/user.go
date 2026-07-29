@@ -8,7 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/software/utils"
+	"github.com/astronomer/astro-cli/apc/utils"
 )
 
 var (

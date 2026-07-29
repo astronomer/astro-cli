@@ -8,7 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/astronomer/astro-cli/software/teams"
+	"github.com/astronomer/astro-cli/apc/teams"
 )
 
 func execTeamCmd(args ...string) (string, error) {
