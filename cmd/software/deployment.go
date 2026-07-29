@@ -100,7 +100,7 @@ $ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airfl
 # Create new deployment with Astronomer Runtime.
 $ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1 --cluster-id=123
 
-# Create Operator deployment (Houston 2.1.0+).
+# Create Operator deployment (APC 2.1.0+).
 $ astro deployment create --label=my-operator-deployment --executor=k8s --cluster-id=123 --mode=operator
 `
 
@@ -170,7 +170,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	example := deploymentCreateExample
-	if localHoustonVersion >= "1.0.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		example = deploymentCreateExampleSoftwareV1
 	}
 	cmd := &cobra.Command{
@@ -201,7 +201,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if nfsMountDAGDeploymentEnabled {
-		if localHoustonVersion >= "1.0.0" {
+		if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 			cmd.Example += createExampleDagDeploymentSoftwareV1
 		} else {
 			cmd.Example += createExampleDagDeployment
@@ -227,12 +227,12 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 
-	if localHoustonVersion >= "1.0.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
 		_ = cmd.MarkFlagRequired("cluster-id")
 	}
 
-	if localHoustonVersion >= "2.1.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "2.1.0"}) {
 		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
 	}
 	_ = cmd.MarkFlagRequired("label")
@@ -315,7 +315,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
-	if localHoustonVersion >= "1.0.0" {
+	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
 	}
 	return cmd
