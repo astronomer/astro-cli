@@ -33,7 +33,7 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 		Use:     "service-account",
 		Aliases: []string{"sa"},
 		Short:   "Manage APC service accounts",
-		Long:    "Service-accounts represent a revokable token with access to the APC platform",
+		Long:    "Service accounts represent revocable tokens with access to the APC platform",
 	}
 	cmd.AddCommand(
 		newDeploymentSaCreateCmd(out),

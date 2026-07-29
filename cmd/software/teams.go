@@ -14,7 +14,7 @@ func newTeamCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "team",
 		Short: "Manage APC Teams",
-		Long:  "Teams represents a team or a group from an IDP in the APC Platform",
+		Long:  "A team represents a group of users from an IDP in the APC Platform",
 	}
 	cmd.AddCommand(
 		newTeamGetCmd(out),

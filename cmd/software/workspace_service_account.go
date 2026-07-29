@@ -30,7 +30,7 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 		Use:     "service-account",
 		Aliases: []string{"sa"},
 		Short:   "Manage Workspace Service Accounts resources",
-		Long:    "Service Accounts represent a revokable token with access to an APC Cluster",
+		Long:    "Service accounts represent revocable tokens with access to an APC cluster",
 	}
 	cmd.AddCommand(
 		newWorkspaceSaCreateCmd(out),

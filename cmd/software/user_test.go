@@ -15,6 +15,6 @@ func (s *Suite) TestUserRootCommand() {
 	userCmd.SetOut(buf)
 	_, err := userCmd.ExecuteC()
 	s.NoError(err)
-	s.Contains(buf.String(), "Users represents a human who has authenticated with the APC platform")
+	s.Contains(buf.String(), "A user represents a human who has authenticated with the APC platform")
 	s.Contains(buf.String(), "create")
 }

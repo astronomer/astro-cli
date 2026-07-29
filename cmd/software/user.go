@@ -16,7 +16,7 @@ func newUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
 		Short: "Manage APC user",
-		Long:  "Users represents a human who has authenticated with the APC platform",
+		Long:  "A user represents a human who has authenticated with the APC platform",
 	}
 	cmd.AddCommand(
 		newUserCreateCmd(out),
