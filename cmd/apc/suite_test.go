@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/apc/deploy"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {

@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/houston"
 	sa "github.com/astronomer/astro-cli/apc/service_account"
+	"github.com/astronomer/astro-cli/houston"
 )
 
 var (

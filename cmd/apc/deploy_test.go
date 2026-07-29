@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/apc/deploy"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/astronomer/astro-cli/apc/deploy"
 )
 
 func execDeployCmd(args ...string) error {

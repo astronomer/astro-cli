@@ -8,8 +8,8 @@ import (
 
 	giturls "github.com/whilp/git-urls"
 
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/apc/workspace"
+	"github.com/astronomer/astro-cli/houston"
 )
 
 var (

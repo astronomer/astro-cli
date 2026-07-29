@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/apc/utils"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/apc/utils"
 )
 
 var (

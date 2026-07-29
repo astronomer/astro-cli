@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/apc/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/apc/deployment"
 )
 
 const (

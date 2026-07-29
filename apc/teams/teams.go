@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/apc/deployment"
 	"github.com/astronomer/astro-cli/apc/utils"
 	"github.com/astronomer/astro-cli/apc/workspace"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const ListTeamLimit = 20
