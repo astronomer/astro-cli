@@ -218,3 +218,43 @@ func (s *Suite) TestValidateExecutorArg() {
 		})
 	}
 }
+
+func (s *Suite) TestValidateDeploymentModeArg() {
+	tests := []struct {
+		name        string
+		mode        string
+		expectedErr string
+	}{
+		{
+			name:        "empty mode is allowed (Houston defaults to helm)",
+			mode:        "",
+			expectedErr: "",
+		},
+		{
+			name:        "valid helm mode",
+			mode:        houston.HelmDeploymentMode,
+			expectedErr: "",
+		},
+		{
+			name:        "valid operator mode",
+			mode:        houston.OperatorDeploymentMode,
+			expectedErr: "",
+		},
+		{
+			name:        "invalid mode",
+			mode:        "invalid",
+			expectedErr: "please specify a valid deployment mode, one of: helm, operator",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := validateDeploymentModeArg(tt.mode)
+			if tt.expectedErr != "" {
+				s.EqualError(err, tt.expectedErr)
+			} else {
+				s.NoError(err)
+			}
+		})
+	}
+}

@@ -19,4 +19,5 @@ type CreateDeploymentRequest struct {
 	GitSyncInterval   int
 	TriggererReplicas int
 	ClusterID         string
+	Mode              string
 }

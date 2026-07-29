@@ -58,6 +58,7 @@ var (
 	runtimeVersion          string
 	desiredRuntimeVersion   string
 	clusterID               string
+	deploymentMode          string
 
 	adoptName                    string
 	adoptNamespace               string
@@ -98,6 +99,9 @@ $ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airfl
 
 # Create new deployment with Astronomer Runtime.
 $ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1 --cluster-id=123
+
+# Create Operator deployment (Houston 2.1.0+).
+$ astro deployment create --label=my-operator-deployment --executor=k8s --cluster-id=123 --mode=operator
 `
 
 	createExampleDagDeployment = `
@@ -226,6 +230,10 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	if localHoustonVersion >= "1.0.0" {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
 		_ = cmd.MarkFlagRequired("cluster-id")
+	}
+
+	if localHoustonVersion >= "2.1.0" {
+		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
 	}
 	_ = cmd.MarkFlagRequired("label")
 	return cmd
@@ -490,6 +498,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
+	if err := validateDeploymentModeArg(deploymentMode); err != nil {
+		return err
+	}
+
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
@@ -536,6 +548,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		GitSyncInterval:   gitSyncInterval,
 		TriggererReplicas: createTriggererReplicas,
 		ClusterID:         clusterID,
+		Mode:              deploymentMode,
 	}
 	return deployment.Create(req, houstonClient, out, appConfig)
 }

@@ -188,7 +188,7 @@ func (s *Suite) TestCreate() {
 	nfsLocation := ""
 	triggerReplicas := 0
 	clusterID := "testClusterID"
-	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
+	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, ""}
 
 	s.Run("create success. Cluster is not passed in the payload", func() {
 		req.ClusterID = ""
@@ -216,6 +216,34 @@ func (s *Suite) TestCreate() {
 		api.AssertExpectations(s.T())
 	})
 
+	s.Run("create success. Mode is passed in the payload when set", func() {
+		req.Mode = houston.OperatorDeploymentMode
+		api := new(mocks.ClientInterface)
+		api.On("CreateDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool {
+			return vars["mode"] == houston.OperatorDeploymentMode
+		})).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Create(req, api, buf, mockAppConfig)
+		s.NoError(err)
+		api.AssertExpectations(s.T())
+		req.Mode = ""
+	})
+
+	s.Run("create success. Mode is omitted from the payload when empty", func() {
+		req.Mode = ""
+		api := new(mocks.ClientInterface)
+		api.On("CreateDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool {
+			_, ok := vars["mode"]
+			return !ok
+		})).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Create(req, api, buf, mockAppConfig)
+		s.NoError(err)
+		api.AssertExpectations(s.T())
+	})
+
 	s.Run("create trigger enabled", func() {
 		mockAppConfig.TriggererEnabled = true
 
@@ -238,7 +266,7 @@ func (s *Suite) TestCreate() {
 
 		triggerReplicas = -1
 		buf := new(bytes.Buffer)
-		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID}
+		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, ""}
 		err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
@@ -289,7 +317,7 @@ func (s *Suite) TestCreate() {
 
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID}
+			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID, ""}
 			err := Create(createReq, api, buf, mockAppConfig)
 			if tt.expectedError != "" {
 				s.EqualError(err, tt.expectedError)
