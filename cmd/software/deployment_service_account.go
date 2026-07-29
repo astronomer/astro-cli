@@ -47,17 +47,17 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a service-account in the APC platform",
-		Long:    "Create a service-account in the APC platform",
+		Short:   "Create a service account in the APC platform",
+		Long:    "Create a service account in the APC platform",
 		Example: deploymentSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage Service Accounts")
-	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the Service Account")
-	cmd.Flags().StringVarP(&deploymentSACreateLabel, "label", "l", "", "Label of the Service Account")
-	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the Service Account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
+	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the service account")
+	cmd.Flags().StringVarP(&deploymentSACreateLabel, "label", "l", "", "Label of the service account")
+	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	_ = cmd.MarkFlagRequired("label")
 	_ = cmd.MarkFlagRequired("deployment-id")
 	return cmd
@@ -67,14 +67,14 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Service Accounts inside a deployment",
-		Long:    "List Service Accounts inside a deployment",
+		Short:   "List service accounts inside a deployment",
+		Long:    "List service accounts inside a deployment",
 		Example: deploymentSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage Service Accounts")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
 	_ = cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
@@ -83,15 +83,15 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [service-account ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete a service-account in the APC platform",
-		Long:    "Delete a service-account in the APC platform",
+		Short:   "Delete a service account in the APC platform",
+		Long:    "Delete a service account in the APC platform",
 		Example: deploymentSaDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaDelete(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage Service Accounts")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
 	_ = cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }

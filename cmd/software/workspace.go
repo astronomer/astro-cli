@@ -35,7 +35,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"wo"},
-		Short:   "Manage Astronomer Workspaces",
+		Short:   "Manage APC Workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 	}
 	cmd.AddCommand(
@@ -55,8 +55,8 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Astronomer Workspaces",
-		Long:    "List Astronomer Workspaces",
+		Short:   "List APC Workspaces",
+		Long:    "List APC Workspaces",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, out)
 		},
@@ -68,8 +68,8 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create an Astronomer Workspace",
-		Long:    "Create an Astronomer Workspace",
+		Short:   "Create an APC Workspace",
+		Long:    "Create an APC Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceCreate(cmd, out)
 		},
@@ -85,8 +85,8 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [workspace ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete an Astronomer Workspace",
-		Long:    "Delete an Astronomer Workspace",
+		Short:   "Delete an APC Workspace",
+		Long:    "Delete an APC Workspace",
 		Example: workspaceDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -100,8 +100,8 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch [workspace ID]",
 		Aliases: []string{"sw"},
-		Short:   "Switch to a different Astronomer Workspace",
-		Long:    "Switch to a different Astronomer Workspace. If you do not provide the workspace ID, you will switch to the previously used workspace.",
+		Short:   "Switch to a different APC Workspace",
+		Long:    "Switch to a different APC Workspace. If you do not provide the workspace ID, you will switch to the previously used workspace.",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(cmd, out, args)
@@ -119,7 +119,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [workspace ID]",
 		Aliases: []string{"up"},
-		Short:   "Update an Astronomer Workspace",
+		Short:   "Update an APC Workspace",
 		Long:    "Update a Workspace name, as well as users and roles assigned to a Workspace",
 		Example: "astro workspace update cl0wftysg00137a93je05hngx --label=my-new-label --description=\"my new description\"",
 		Args:    cobra.ExactArgs(1),

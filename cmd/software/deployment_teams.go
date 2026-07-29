@@ -97,8 +97,8 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Teams inside an Astronomer Deployment",
-		Long:    "List Teams inside an Astronomer Deployment",
+		Short:   "List Teams inside an APC Deployment",
+		Long:    "List Teams inside an APC Deployment",
 		Example: deploymentTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentTeamsList(cmd, out, args)

@@ -87,8 +87,8 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List users inside an Astronomer Workspaces",
-		Long:    "List users inside an Astronomer Workspaces",
+		Short:   "List users inside an APC Workspace",
+		Long:    "List users inside an APC Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, out)
 		},

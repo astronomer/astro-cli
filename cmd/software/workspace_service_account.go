@@ -29,8 +29,8 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
-		Short:   "Manage Workspace Service Accounts resources",
-		Long:    "Service accounts represent revocable tokens with access to an APC cluster",
+		Short:   "Manage APC workspace service accounts",
+		Long:    "Service accounts represent revocable tokens with access to the APC platform",
 	}
 	cmd.AddCommand(
 		newWorkspaceSaCreateCmd(out),
@@ -45,8 +45,8 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a Service Account in an APC Cluster",
-		Long:    "Create a Service Account in an APC Cluster",
+		Short:   "Create a service account in the APC platform",
+		Long:    "Create a service account in the APC platform",
 		Example: workspaceSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaCreate(cmd, out)
@@ -65,8 +65,8 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Service Accounts inside a workspace",
-		Long:    "List Service Accounts inside a workspace",
+		Short:   "List service accounts inside a workspace",
+		Long:    "List service accounts inside a workspace",
 		Example: workspaceSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaList(cmd, out)
@@ -78,10 +78,10 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [service-account id]",
+		Use:     "delete [service-account ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete a Service Account in the APC platform",
-		Long:    "Delete a Service Account in the APC platform",
+		Short:   "Delete a service account in the APC platform",
+		Long:    "Delete a service account in the APC platform",
 		Args:    cobra.ExactArgs(1),
 		Example: "astro workspace sa delete cl0wh207g0496759fx0qof80q",
 		RunE: func(cmd *cobra.Command, args []string) error {

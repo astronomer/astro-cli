@@ -135,7 +135,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de", "deployments"},
-		Short:   "Manage Astronomer Deployments",
+		Short:   "Manage APC Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the APC platform.",
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "ID of the workspace in which you want to manage deployments, you can leave it empty if you want to use your current context's workspace ID")
@@ -176,8 +176,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a new Astronomer Deployment",
-		Long:    "Create a new Astronomer Deployment",
+		Short:   "Create a new APC Deployment",
+		Long:    "Create a new APC Deployment",
 		Example: example,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, out)

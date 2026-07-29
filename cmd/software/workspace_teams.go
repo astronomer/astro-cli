@@ -93,8 +93,8 @@ func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Teams inside an Astronomer Workspace",
-		Long:    "List Teams inside an Astronomer Workspace",
+		Short:   "List Teams inside an APC Workspace",
+		Long:    "List Teams inside an APC Workspace",
 		Example: workspaceTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamsList(cmd, out, args)
