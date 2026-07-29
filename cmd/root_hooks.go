@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
-	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/version"
@@ -20,7 +20,7 @@ import (
 // SetupLogging is a pre-run hook shared between software & cloud
 // setting up log verbosity.
 func SetupLogging(_ *cobra.Command, _ []string) error {
-	return softwareCmd.SetUpLogs(os.Stdout, verboseLevel)
+	return apcCmd.SetUpLogs(os.Stdout, verboseLevel)
 }
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra
@@ -35,7 +35,7 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 			// compare current version to latest
 			err := version.CompareVersions(cmd.Context(), httpClient)
 			if err != nil {
-				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
+				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
 			}
 		}
 		if context.IsCloudContext() {
@@ -47,10 +47,10 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 				if strings.Contains(err.Error(), "the API token given has expired") {
 					return errors.New("API Token is expired") //nolint
 				}
-				softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
+				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 			}
 		}
-		softwareCmd.PrintDebugLogs()
+		apcCmd.PrintDebugLogs()
 		return nil
 	}
 }

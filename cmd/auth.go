@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -117,7 +117,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
 	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
-	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for Astro Private Cloud (APC) login")
+	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for Astro Private Cloud login")
 	return cmd
 }
 

@@ -26,3 +26,6 @@ testbin/
 testbin/golangci-lint
 upgrade-test*
 vendor/github.com/theupdateframework/notary/Dockerfile
+
+# config flock sidecars (transient, created by saveConfig during tests/runs)
+*.yaml.lock

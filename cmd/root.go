@@ -10,9 +10,9 @@ import (
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
+	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
 	"github.com/astronomer/astro-cli/cmd/api"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
-	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
@@ -48,7 +48,7 @@ func NewRootCmd() *cobra.Command {
 		ctx = softwarePlatform
 		houstonVersion, err = houstonClient.GetPlatformVersion(nil)
 		if err != nil {
-			softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
+			apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
 		}
 	}
 
@@ -99,9 +99,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(
-			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
+			apcCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
-		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
+		apcCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
