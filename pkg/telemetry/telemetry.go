@@ -60,6 +60,45 @@ var agentEnvVars = []envMapping{
 	{"GEMINI_CLI", "gemini-cli"},
 	{"OPENCODE", "opencode"},
 	{"CODEX_API_KEY", "codex"},
+	// GitHub Copilot. COPILOT_CLI is set by the Copilot CLI, which is also the
+	// harness behind the cloud coding agent and, as of 2026, Copilot for
+	// JetBrains; github's own gh keys on it (cli/cli internal/agents/detect.go).
+	// COPILOT_AGENT is set on terminals VS Code creates for agent mode
+	// (microsoft/vscode toolTerminalCreator.ts), where it is described as
+	// backward compatibility for exactly this kind of detection.
+	{"COPILOT_CLI", "github-copilot"},
+	{"COPILOT_AGENT", "github-copilot"},
+}
+
+// aiAgentEnvVar is a cross-vendor convention where the value names the agent
+// rather than the variable: VS Code sets AI_AGENT=github_copilot_vscode_agent
+// for agent sessions and the Copilot desktop app sets github_copilot_app_agent
+// (microsoft/vscode aiAgentEnv.ts). gh reads it too.
+//
+// It is checked after agentEnvVars so a specific marker still wins, and only
+// prefixes we recognise are mapped. Values are not passed through: some vendors
+// put a version in theirs (claude-code_2-1-156_agent), which would spray one
+// agent across dozens of distinct values in the telemetry. A new vendor adopting
+// the convention is a one-line addition here.
+const aiAgentEnvVar = "AI_AGENT"
+
+var aiAgentPrefixes = []envMapping{
+	{"github_copilot", "github-copilot"},
+}
+
+// detectAIAgent maps the AI_AGENT convention to an agent name, or "" if the
+// value is empty or not one we recognise.
+func detectAIAgent() string {
+	value := strings.ToLower(os.Getenv(aiAgentEnvVar))
+	if value == "" {
+		return ""
+	}
+	for _, m := range aiAgentPrefixes {
+		if strings.HasPrefix(value, m.envVar) {
+			return m.name
+		}
+	}
+	return ""
 }
 
 // ciEnvVars is an ordered list of environment variables to detect CI contexts.
@@ -106,7 +145,7 @@ func DetectAgent() string {
 			return m.name
 		}
 	}
-	return ""
+	return detectAIAgent()
 }
 
 // DetectCISystem returns the name of the detected CI system (e.g. "github-actions"), or "" if none.

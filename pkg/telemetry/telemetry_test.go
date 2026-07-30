@@ -43,7 +43,7 @@ func TestIsDisabledByEnv(t *testing.T) {
 }
 
 func TestDetectAgent(t *testing.T) {
-	agentVars := envVarNames(agentEnvVars)
+	agentVars := append(envVarNames(agentEnvVars), aiAgentEnvVar)
 	savedVals := make(map[string]string)
 	for _, env := range agentVars {
 		savedVals[env] = os.Getenv(env)
@@ -73,6 +73,11 @@ func TestDetectAgent(t *testing.T) {
 		{"gemini cli", "GEMINI_CLI", "1", "gemini-cli"},
 		{"opencode", "OPENCODE", "1", "opencode"},
 		{"codex", "CODEX_API_KEY", "sk-test", "codex"},
+		{"copilot cli", "COPILOT_CLI", "1", "github-copilot"},
+		{"copilot vscode agent mode", "COPILOT_AGENT", "1", "github-copilot"},
+		{"ai_agent copilot vscode", "AI_AGENT", "github_copilot_vscode_agent", "github-copilot"},
+		{"ai_agent copilot app", "AI_AGENT", "github_copilot_app_agent", "github-copilot"},
+		{"ai_agent unrecognised vendor", "AI_AGENT", "some_other_agent", ""},
 		{"no agent", "", "", ""},
 	}
 
@@ -95,7 +100,7 @@ func TestDetectAgent(t *testing.T) {
 // session started from inside another agent still carries that agent's marker.
 // Otto is the proximate caller and must win.
 func TestDetectAgentOttoWinsOverInheritedMarker(t *testing.T) {
-	for _, env := range envVarNames(agentEnvVars) {
+	for _, env := range append(envVarNames(agentEnvVars), aiAgentEnvVar) {
 		saved := os.Getenv(env)
 		os.Unsetenv(env)
 		defer func(env, saved string) {
@@ -108,6 +113,29 @@ func TestDetectAgentOttoWinsOverInheritedMarker(t *testing.T) {
 	os.Setenv("CLAUDECODE", "1")
 	defer os.Unsetenv("CLAUDECODE")
 	assert.Equal(t, "claude-code", DetectAgent())
+
+	os.Setenv("OTTO", "1")
+	defer os.Unsetenv("OTTO")
+	assert.Equal(t, "otto", DetectAgent())
+}
+
+// AI_AGENT is the fallback, so a specific marker still decides. VS Code sets
+// both AI_AGENT and COPILOT_AGENT, and Otto inside a VS Code agent terminal
+// carries both plus its own.
+func TestDetectAgentSpecificMarkerBeatsAIAgent(t *testing.T) {
+	for _, env := range append(envVarNames(agentEnvVars), aiAgentEnvVar) {
+		saved := os.Getenv(env)
+		os.Unsetenv(env)
+		defer func(env, saved string) {
+			if saved != "" {
+				os.Setenv(env, saved)
+			}
+		}(env, saved)
+	}
+
+	os.Setenv("AI_AGENT", "github_copilot_vscode_agent")
+	defer os.Unsetenv("AI_AGENT")
+	assert.Equal(t, "github-copilot", DetectAgent())
 
 	os.Setenv("OTTO", "1")
 	defer os.Unsetenv("OTTO")
