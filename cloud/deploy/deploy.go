@@ -713,15 +713,15 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
-		// Stamp dbt projects in the build context with .astro/dbt_metadata.json
-		// sidecars so `docker build` bakes them into the image, letting the
-		// parse-time consumer skip hashing the project tree on every DAG parse.
-		// Opt-in and best-effort: a failure warns and never blocks the build.
+		// Run the Cosmos Boost pre-deploy step over the build context before
+		// `docker build`, so whatever the plugin contributes is baked into the
+		// image. Opt-in and best-effort: a failure warns and never blocks the
+		// build.
 		if config.CFG.CosmosBoostPreDeploy.GetBool() {
-			cosmosboost.BestEffortStamp(path)
+			cosmosboost.BestEffortPreDeploy(path)
 		} else {
-			// Disabled must also mean no stale sidecars from an earlier enabled
-			// deploy get baked into the image.
+			// With the feature off, clean up so an earlier deploy's plugin
+			// files are not baked into the image.
 			cosmosboost.BestEffortCleanup(path)
 		}
 

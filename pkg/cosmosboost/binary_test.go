@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -72,7 +72,7 @@ func buildTarGz(t *testing.T, binContent []byte) []byte {
 
 // fakeCDN serves the version file, archive, and checksums the way the
 // release workflow lays them out. tamperSums serves a wrong checksum.
-func (s *BinarySuite) fakeCDN(version string, archive []byte, tamperSums bool) (*httptest.Server, *int) {
+func (s *BinarySuite) fakeCDN(version string, archive []byte, tamperSums bool) *int {
 	archiveFile := archiveName(version)
 	sum := sha256.Sum256(archive)
 	digest := hex.EncodeToString(sum[:])
@@ -81,13 +81,13 @@ func (s *BinarySuite) fakeCDN(version string, archive []byte, tamperSums bool) (
 	}
 	sums := fmt.Sprintf("%s  %s\n", digest, archiveFile)
 
-	downloads := 0
+	count := 0
 	mux := http.NewServeMux()
 	mux.HandleFunc("/latest/version", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, version)
 	})
 	mux.HandleFunc("/v"+version+"/"+archiveFile, func(w http.ResponseWriter, _ *http.Request) {
-		downloads++
+		count++
 		_, _ = w.Write(archive)
 	})
 	mux.HandleFunc(fmt.Sprintf("/v%s/%s_%s_SHA256SUMS", version, binaryName, version), func(w http.ResponseWriter, _ *http.Request) {
@@ -97,7 +97,7 @@ func (s *BinarySuite) fakeCDN(version string, archive []byte, tamperSums bool) (
 	server := httptest.NewServer(mux)
 	s.T().Cleanup(server.Close)
 	require.NoError(s.T(), config.CFG.CosmosBoostBaseURL.SetHomeString(server.URL))
-	return server, &downloads
+	return &count
 }
 
 func (s *BinarySuite) skipOnWindows() {
@@ -136,7 +136,7 @@ func (s *BinarySuite) TestInstalledVersionNotInstalled() {
 func (s *BinarySuite) TestEnsureBinaryDownloadsVerifiesAndInstalls() {
 	s.skipOnWindows()
 	version := "1.0.0"
-	_, downloads := s.fakeCDN(version, buildTarGz(s.T(), fakeBinary(version)), false)
+	downloads := s.fakeCDN(version, buildTarGz(s.T(), fakeBinary(version)), false)
 
 	require.NoError(s.T(), EnsureBinary())
 
@@ -162,7 +162,7 @@ func (s *BinarySuite) TestEnsureBinaryRejectsChecksumMismatch() {
 func (s *BinarySuite) TestEnsureBinarySkipsWhenCurrent() {
 	s.skipOnWindows()
 	version := "9.9.9" // far above MinVersion
-	_, downloads := s.fakeCDN(version, buildTarGz(s.T(), fakeBinary(version)), false)
+	downloads := s.fakeCDN(version, buildTarGz(s.T(), fakeBinary(version)), false)
 
 	require.NoError(s.T(), EnsureBinary()) // installs
 	require.NoError(s.T(), EnsureBinary()) // already current — no re-download
@@ -176,39 +176,47 @@ func (s *BinarySuite) TestEnsureBinaryUpdatesBelowMinVersion() {
 	require.NoError(s.T(), os.WriteFile(BinaryPath(), fakeBinary("0.0.0"), binPerm))
 
 	latest := "1.0.0"
-	_, downloads := s.fakeCDN(latest, buildTarGz(s.T(), fakeBinary(latest)), false)
+	downloads := s.fakeCDN(latest, buildTarGz(s.T(), fakeBinary(latest)), false)
 
 	require.NoError(s.T(), EnsureBinary())
 	s.Equal(1, *downloads)
 	s.Equal(latest, InstalledVersion())
 }
 
-func (s *BinarySuite) TestMeetsMinVersionRejectsRetiredVersions() {
-	// Retired releases outrank the alpha line under plain semver, so the gate
-	// has to reject them by name. Guards against anyone "simplifying"
-	// meetsMinVersion back to a bare comparison.
-	for _, v := range []string{"0.0.1-rc.1", "0.0.1-rc.2", "0.0.2-rc.1", "0.0.3-rc.1", "0.0.3-rc.2"} {
-		minVer, err := semver.NewVersion(MinVersion)
-		require.NoError(s.T(), err)
-		iv, err := semver.NewVersion(v)
-		require.NoError(s.T(), err)
-
-		s.False(iv.LessThan(minVer), "%s is expected to outrank MinVersion %s under plain semver", v, MinVersion)
-		s.False(meetsMinVersion(v), "%s predates the subcommands this CLI calls and must not satisfy the gate", v)
-	}
+// usageExitErr returns a genuine *exec.ExitError carrying the usage exit code,
+// which is how an installed helper reports a call it does not understand.
+func usageExitErr(t *testing.T) error {
+	err := exec.Command("sh", "-c", fmt.Sprintf("exit %d", usageExitCode)).Run()
+	require.Error(t, err)
+	return err
 }
 
-func (s *BinarySuite) TestEnsureBinaryReplacesRetiredVersion() {
+func (s *BinarySuite) TestWithUpdateRetryUpdatesHelperTooOldForTheCall() {
 	s.skipOnWindows()
-	// A machine still carrying a retired build must be updated, not left alone.
+	// An installed helper that passes the version gate can still be too old to
+	// know a call we make: version ordering cannot express which release added
+	// what. Such a helper must be updated once and the call retried, rather than
+	// the CLI keeping a copy of the helper's release history to consult.
 	require.NoError(s.T(), os.MkdirAll(BinDir(), dirPerm))
-	require.NoError(s.T(), os.WriteFile(BinaryPath(), fakeBinary("0.0.2-rc.1"), binPerm))
+	old := "9.9.9" // outranks MinVersion, so the gate leaves it alone
+	require.NoError(s.T(), os.WriteFile(BinaryPath(), fakeBinary(old), binPerm))
+	require.NoError(s.T(), EnsureBinary(), "the gate must accept it on version alone")
 
 	latest := "0.0.1-alpha.2"
-	_, downloads := s.fakeCDN(latest, buildTarGz(s.T(), fakeBinary(latest)), false)
+	downloads := s.fakeCDN(latest, buildTarGz(s.T(), fakeBinary(latest)), false)
 
-	require.NoError(s.T(), EnsureBinary())
-	s.Equal(1, *downloads)
+	calls := 0
+	err := withUpdateRetry(func() error {
+		calls++
+		if calls == 1 {
+			return usageExitErr(s.T())
+		}
+		return nil
+	})
+
+	require.NoError(s.T(), err)
+	s.Equal(2, calls, "the call must be retried after the update")
+	s.Equal(1, *downloads, "the helper must be updated exactly once")
 	s.Equal(latest, InstalledVersion())
 }
 

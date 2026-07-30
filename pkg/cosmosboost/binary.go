@@ -66,6 +66,7 @@ func InstalledVersion() string {
 	if _, err := os.Stat(BinaryPath()); err != nil {
 		return ""
 	}
+	//nolint:gosec // BinaryPath() is a fixed path under the CLI's own bin dir, not user input
 	out, err := exec.Command(BinaryPath(), "version").Output()
 	if err != nil {
 		return ""
@@ -91,35 +92,18 @@ func LatestVersion() (string, error) {
 	return strings.TrimSpace(string(body)), nil
 }
 
-// retiredVersions are helper releases that predate the current version line.
-// Semver ranks every one of them above any 0.0.1-alpha.N: the 0.0.2 and 0.0.3
-// ones on the patch number, and 0.0.1-rc.N because "rc" sorts after "alpha".
-// They nonetheless lack subcommands this CLI calls, so no MinVersion on the
-// alpha line can exclude them and they have to be named. Their tags and
-// published artifacts are gone, so they only survive where one was installed
-// while they were current.
-//
-// This map becomes redundant once MinVersion reaches a stable 0.0.2 or higher,
-// which orders above all of them, and should be deleted then.
-var retiredVersions = map[string]bool{
-	"0.0.1-rc.1": true,
-	"0.0.1-rc.2": true,
-	"0.0.2-rc.1": true,
-	"0.0.3-rc.1": true,
-	"0.0.3-rc.2": true,
-}
-
 // meetsMinVersion reports whether an installed version string satisfies
-// MinVersion. Empty, unparseable and retired versions do not.
+// MinVersion. Empty and unparseable versions do not.
+//
+// Version ordering alone cannot prove an installed helper understands the calls
+// we make, so it is not asked to: a helper that rejects a call as a usage error
+// is updated once and retried (see withUpdateRetry).
 func meetsMinVersion(installed string) bool {
 	if installed == "" {
 		return false
 	}
 	iv, err := semver.NewVersion(installed)
 	if err != nil {
-		return false
-	}
-	if retiredVersions[iv.String()] {
 		return false
 	}
 	minVer, _ := semver.NewVersion(MinVersion)
@@ -221,9 +205,9 @@ func downloadToTemp(url string) (string, error) {
 
 // verifyChecksum downloads the release's SHA256SUMS from sumsURL and checks
 // that the sha256 of the file at path matches the entry for archive. Unlike
-// the otto downloader, a mismatch is fatal: the helper stamps files that are
-// shipped to a deployment, so we refuse to run a binary that doesn't match
-// its published checksum.
+// the otto downloader, a mismatch is fatal: the helper's output is shipped to a
+// deployment, so we refuse to run a binary that doesn't match its published
+// checksum.
 func verifyChecksum(path, archive, sumsURL string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(sumsURL)

@@ -217,16 +217,15 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Pre-deploy step: compute dbt project hashes into .astro/dbt_metadata.json
-	// sidecars so
-	// they ship inside the bundle, letting the parse-time consumer skip hashing
-	// the project tree on every DAG parse. Opt-in and best-effort: a missing or
-	// failing helper warns and never blocks the deploy.
+	// Run the Cosmos Boost pre-deploy step before the bundle is tarred, so
+	// whatever the plugin contributes travels inside the bundle. Opt-in and
+	// best-effort: a missing or failing helper warns and never blocks the
+	// deploy.
 	if config.CFG.CosmosBoostPreDeploy.GetBool() {
-		cosmosboost.BestEffortStamp(bundlePath)
+		cosmosboost.BestEffortPreDeploy(bundlePath)
 	} else {
-		// Disabled must also mean no stale sidecars from an earlier enabled
-		// deploy ship in the bundle — the consumer can't tell stale from fresh.
+		// With the feature off, clean up so an earlier deploy's plugin files
+		// are not tarred into this bundle.
 		cosmosboost.BestEffortCleanup(bundlePath)
 	}
 

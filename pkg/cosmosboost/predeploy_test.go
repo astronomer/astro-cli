@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,16 +43,29 @@ func (s *PreDeploySuite) installFake(script string) {
 	require.NoError(s.T(), os.WriteFile(BinaryPath(), []byte(script), binPerm))
 }
 
+// installRecordingFake installs a fake helper that answers `version` and
+// appends every invocation to the returned log path, so a test can assert which
+// subcommands the CLI ran, and in which order.
+func (s *PreDeploySuite) installRecordingFake() string {
+	log := filepath.Join(s.T().TempDir(), "invocations.log")
+	s.installFake("#!/bin/sh\n" +
+		"if [ \"$1\" = version ]; then echo 9.9.9; exit 0; fi\n" +
+		"echo \"$@\" >> " + log + "\n")
+	return log
+}
+
+func (s *PreDeploySuite) invocations(log string) string {
+	content, err := os.ReadFile(log)
+	require.NoError(s.T(), err)
+	return string(content)
+}
+
 func (s *PreDeploySuite) TestPreDeployRunsHelperOnPath() {
-	marker := filepath.Join(s.T().TempDir(), "ran")
-	// The fake records its args so we can assert the subcommand and path.
-	s.installFake("#!/bin/sh\necho \"$@\" > " + marker + "\n")
+	log := s.installRecordingFake()
 
 	require.NoError(s.T(), PreDeploy("/some/dbt/project"))
 
-	content, err := os.ReadFile(marker)
-	require.NoError(s.T(), err)
-	s.Contains(string(content), "pre-deploy /some/dbt/project")
+	s.Contains(s.invocations(log), "pre-deploy /some/dbt/project")
 }
 
 func (s *PreDeploySuite) TestPreDeploySurfacesFailureOutput() {
@@ -62,63 +76,52 @@ func (s *PreDeploySuite) TestPreDeploySurfacesFailureOutput() {
 	s.Contains(err.Error(), "boom")
 }
 
-func (s *PreDeploySuite) TestBestEffortStampNeverPanicsWhenHelperUnavailable() {
+func (s *PreDeploySuite) TestBestEffortPreDeployNeverPanicsWhenHelperUnavailable() {
 	// No binary installed and an unreachable CDN: must warn, not fail.
 	require.NoError(s.T(), config.CFG.CosmosBoostBaseURL.SetHomeString("http://127.0.0.1:1"))
-	s.NotPanics(func() { BestEffortStamp("/some/dbt/project") })
+	s.NotPanics(func() { BestEffortPreDeploy("/some/dbt/project") })
 	_, statErr := os.Stat(BinaryPath())
 	s.True(os.IsNotExist(statErr))
 }
 
-func (s *PreDeploySuite) TestBestEffortStampSwallowsHelperFailure() {
+func (s *PreDeploySuite) TestBestEffortPreDeploySwallowsHelperFailure() {
 	s.installFake("#!/bin/sh\nif [ \"$1\" = version ]; then echo 9.9.9; exit 0; fi\nexit 1\n")
-	s.NotPanics(func() { BestEffortStamp("/some/dbt/project") })
+	s.NotPanics(func() { BestEffortPreDeploy("/some/dbt/project") })
 }
 
-func (s *PreDeploySuite) TestRemoveSidecarsPreservesOtherAstroContent() {
-	root := s.T().TempDir()
-	// Project A: sidecar in an .astro dir that also holds user config.
-	require.NoError(s.T(), os.MkdirAll(filepath.Join(root, "a", ".astro"), 0o755))
-	require.NoError(s.T(), os.WriteFile(filepath.Join(root, "a", ".astro", "dbt_metadata.json"), []byte("{}"), 0o644))
-	require.NoError(s.T(), os.WriteFile(filepath.Join(root, "a", ".astro", "config.yaml"), []byte("project:\n"), 0o644))
-	// Project B (nested): sidecar alone — dir should be pruned.
-	require.NoError(s.T(), os.MkdirAll(filepath.Join(root, "include", "b", ".astro"), 0o755))
-	require.NoError(s.T(), os.WriteFile(filepath.Join(root, "include", "b", ".astro", "dbt_metadata.json"), []byte("{}"), 0o644))
-	// A dbt_metadata.json OUTSIDE an .astro dir must not be touched.
-	require.NoError(s.T(), os.WriteFile(filepath.Join(root, "a", "dbt_metadata.json"), []byte("user file"), 0o644))
+// Cleanup is entirely the helper's job: the CLI knows neither what the helper
+// leaves behind nor where, so it can only delegate.
+func (s *PreDeploySuite) TestBestEffortCleanupDelegatesToHelper() {
+	log := s.installRecordingFake()
 
-	removed, err := RemoveSidecars(root)
-	require.NoError(s.T(), err)
-	s.Equal(2, removed)
-	s.NoFileExists(filepath.Join(root, "a", ".astro", "dbt_metadata.json"))
-	s.FileExists(filepath.Join(root, "a", ".astro", "config.yaml"), "user config under .astro must survive")
-	s.NoDirExists(filepath.Join(root, "include", "b", ".astro"), "emptied .astro dir is pruned")
-	s.FileExists(filepath.Join(root, "a", "dbt_metadata.json"), "non-.astro files are never touched")
+	BestEffortCleanup("/some/dbt/project")
+
+	s.Contains(s.invocations(log), "uninstall /some/dbt/project")
 }
 
-func (s *PreDeploySuite) TestBestEffortStampRemovesStaleSidecarWhenHelperFails() {
-	s.installFake("#!/bin/sh\nif [ \"$1\" = version ]; then echo 9.9.9; exit 0; fi\nexit 1\n")
-
-	proj := s.T().TempDir()
-	require.NoError(s.T(), os.WriteFile(filepath.Join(proj, "dbt_project.yml"), []byte("name: shop\n"), 0o644))
-	require.NoError(s.T(), os.MkdirAll(filepath.Join(proj, ".astro"), 0o755))
-	require.NoError(s.T(), os.WriteFile(filepath.Join(proj, ".astro", "dbt_metadata.json"), []byte(`{"stale": true}`), 0o644))
-
-	BestEffortStamp(proj)
-
-	s.NoFileExists(filepath.Join(proj, ".astro", "dbt_metadata.json"),
-		"a failed stamping run must not leave the previous deploy's stale sidecar behind")
-}
-
-func (s *PreDeploySuite) TestBestEffortStampSkipsHelperWhenNoDbtContent() {
-	// Unreachable CDN + no installed helper: reaching EnsureBinary would warn
-	// and attempt a download. With no dbt content it must do neither.
+func (s *PreDeploySuite) TestBestEffortCleanupSkipsWhenHelperNotInstalled() {
+	// With the feature disabled we must not pull the helper onto the machine
+	// just to clean up: an unreachable CDN would otherwise surface as an error.
 	require.NoError(s.T(), config.CFG.CosmosBoostBaseURL.SetHomeString("http://127.0.0.1:1"))
 
-	dir := s.T().TempDir()
-	require.NoError(s.T(), os.WriteFile(filepath.Join(dir, "some_dag.py"), []byte("# dag"), 0o644))
+	s.NotPanics(func() { BestEffortCleanup(s.T().TempDir()) })
 
-	BestEffortStamp(dir)
+	s.NoFileExists(BinaryPath(), "a disabled feature may never trigger a download")
+}
 
-	s.NoFileExists(BinaryPath(), "no download may be attempted when there is nothing to stamp")
+func (s *PreDeploySuite) TestBestEffortCleanupSwallowsHelperFailure() {
+	s.installFake("#!/bin/sh\nif [ \"$1\" = version ]; then echo 9.9.9; exit 0; fi\nexit 1\n")
+	s.NotPanics(func() { BestEffortCleanup("/some/dbt/project") })
+}
+
+func (s *PreDeploySuite) TestBestEffortPreDeployCleansUpBeforeRunning() {
+	log := s.installRecordingFake()
+
+	BestEffortPreDeploy("/some/dbt/project")
+
+	// Order matters: a failed pre-deploy step must not leave an earlier
+	// deploy's artifacts in place, so cleanup runs first.
+	ran := s.invocations(log)
+	s.Less(strings.Index(ran, "uninstall"), strings.Index(ran, "pre-deploy"),
+		"cleanup must run before the pre-deploy step")
 }

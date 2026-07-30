@@ -39,19 +39,29 @@ func Uninstall(roots ...string) error {
 
 const usageExitCode = 2
 
-func runUninstall(roots []string) error {
-	err := execUninstall(roots)
+// withUpdateRetry runs call and, if the installed helper rejected it as a usage
+// error, updates the helper once and runs it again. That covers a helper too old
+// to know a call we make without the CLI having to reason about which release
+// introduced what: version ordering cannot express that, and any answer we hard
+// coded here would be a copy of the helper's own history.
+func withUpdateRetry(call func() error) error {
+	err := call()
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) && exitErr.ExitCode() == usageExitCode {
 		if err := downloadAndInstall(); err != nil {
 			return fmt.Errorf("updating astro-cosmos-boost: %w", err)
 		}
-		err = execUninstall(roots)
+		err = call()
 	}
 	return err
 }
 
+func runUninstall(roots []string) error {
+	return withUpdateRetry(func() error { return execUninstall(roots) })
+}
+
 func execUninstall(roots []string) error {
+	//nolint:gosec // BinaryPath() is a fixed path under the CLI's own bin dir; roots are the paths the user asked to clean
 	out, err := exec.Command(BinaryPath(), append([]string{"uninstall"}, roots...)...).CombinedOutput()
 	logger.Debugf("astro-cosmos-boost uninstall output:\n%s", out)
 	if err != nil {
