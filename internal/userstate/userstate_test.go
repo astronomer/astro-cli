@@ -124,7 +124,7 @@ func TestLoadHealsNonCanonicalFile(t *testing.T) {
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.NotContains(t, string(raw), "legacyField")
-	assert.JSONEq(t, `{"instance":"dep-1"}`, string(raw))
+	assert.JSONEq(t, `{"instance":"dep-1","deployment":"dep-1"}`, string(raw))
 
 	// A second load finds the file already canonical and leaves it alone.
 	info1, err := os.Stat(path)
@@ -134,6 +134,47 @@ func TestLoadHealsNonCanonicalFile(t *testing.T) {
 	info2, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, info1.ModTime(), info2.ModTime())
+}
+
+// The pin is written under both names for the rollout window, so a build from
+// before the rename still finds it.
+func TestSaveWritesBothPinNames(t *testing.T) {
+	setCache(t)
+	proj := t.TempDir()
+	require.NoError(t, Save(proj, State{Instance: "prod", Port: 8080}))
+
+	dir, err := Dir(proj)
+	require.NoError(t, err)
+	raw, err := os.ReadFile(filepath.Join(dir, "state.json"))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"instance":"prod","deployment":"prod","port":8080}`, string(raw))
+
+	// No pin, no key: the legacy name is not written empty.
+	require.NoError(t, Save(proj, State{Port: 8080}))
+	raw, err = os.ReadFile(filepath.Join(dir, "state.json"))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"port":8080}`, string(raw))
+}
+
+// A state file that cannot be rewritten still yields the state it parsed:
+// reading a pin must not fail because the cache directory is read-only.
+func TestLoadKeepsStateWhenHealCannotWrite(t *testing.T) {
+	if runtime.GOOS == windowsOS {
+		t.Skip("directory permissions do not stop writes the same way on windows")
+	}
+	setCache(t)
+	proj := t.TempDir()
+	dir, err := Dir(proj)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	path := filepath.Join(dir, "state.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"deployment":"dep-1","port":-4}`), 0o600))
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	s, err := Load(proj)
+	require.NoError(t, err)
+	assert.Equal(t, State{Instance: "dep-1"}, s)
 }
 
 func TestLoadPrefersInstanceOverOldDeploymentKey(t *testing.T) {

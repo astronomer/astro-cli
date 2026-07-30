@@ -287,7 +287,7 @@ func resolveSelection(req Request) (selection, error) {
 		}, nil
 	}
 
-	var links map[string]manifest.Deployment
+	var links map[string]manifest.Link
 	if req.Manifest != nil {
 		links = req.Manifest.Astro.Deployments
 	}
@@ -298,21 +298,13 @@ func resolveSelection(req Request) (selection, error) {
 		if !ok {
 			return selection{}, fmt.Errorf("no deployment link %q in the manifest%s", req.LinkName, knownLinks(links))
 		}
-		return selection{
-			deploymentID: link.Deployment,
-			workspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
-			linkName:     req.LinkName,
-		}, nil
+		return astroSelection(req, req.LinkName, link, links)
 	}
 
 	// Otherwise the default link: a link marked default = true, or — the interim
 	// rule — a project's one link when nothing is marked (design doc section 3).
 	if name, link, ok := defaultLink(links); ok {
-		return selection{
-			deploymentID: link.Deployment,
-			workspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
-			linkName:     name,
-		}, nil
+		return astroSelection(req, name, link, links)
 	}
 
 	// Nothing named or defaulted: the unlinked, workspace-level flow.
@@ -321,11 +313,28 @@ func resolveSelection(req Request) (selection, error) {
 	}, nil
 }
 
+// astroSelection turns a resolved link into a selection. Only an astro link
+// can be deployed to today: this command ships an image to an Astro
+// Deployment, and an mwaa or composer link has no deployment id to ship it to
+// — without this check the flow would fall through to the unlinked path and
+// prompt for some other Deployment, which is how you ship one project's DAGs
+// to another project's Airflow.
+func astroSelection(req Request, name string, link manifest.Link, links map[string]manifest.Link) (selection, error) {
+	if kind := link.Kind(); kind != manifest.KindAstro {
+		return selection{}, fmt.Errorf("link %q is %s, and astro deploy ships to Astro Deployments%s", name, kind, deployableLinks(links))
+	}
+	return selection{
+		deploymentID: link.Deployment,
+		workspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
+		linkName:     name,
+	}, nil
+}
+
 // defaultLink returns the link `astro deploy` ships to with no argument. A link
 // marked default = true wins; the manifest guarantees at most one. With none
 // marked, the interim rule keeps its promise: a project's one link is its
 // default. A one-link project behaves the same whether that link is marked.
-func defaultLink(links map[string]manifest.Deployment) (string, manifest.Deployment, bool) {
+func defaultLink(links map[string]manifest.Link) (string, manifest.Link, bool) {
 	// Ranged by key: a link is a wide struct, and copying one per iteration to
 	// read a single field is waste the linter is right about.
 	for name := range links {
@@ -338,19 +347,36 @@ func defaultLink(links map[string]manifest.Deployment) (string, manifest.Deploym
 			return name, links[name], true
 		}
 	}
-	return "", manifest.Deployment{}, false
+	return "", manifest.Link{}, false
 }
 
-func knownLinks(links map[string]manifest.Deployment) string {
+func knownLinks(links map[string]manifest.Link) string {
 	if len(links) == 0 {
 		return " (the manifest declares no deployment links)"
 	}
+	return ", known links: " + strings.Join(linkNames(links, nil), ", ")
+}
+
+// deployableLinks lists the links this command can ship to, for the message
+// that turns one away.
+func deployableLinks(links map[string]manifest.Link) string {
+	astro := linkNames(links, func(l manifest.Link) bool { return l.Kind() == manifest.KindAstro })
+	if len(astro) == 0 {
+		return " (this project has no astro links)"
+	}
+	return ", astro links: " + strings.Join(astro, ", ")
+}
+
+// linkNames lists the links keep accepts, sorted; a nil keep takes all of them.
+func linkNames(links map[string]manifest.Link, keep func(manifest.Link) bool) []string {
 	names := make([]string, 0, len(links))
 	for name := range links {
-		names = append(names, name)
+		if keep == nil || keep(links[name]) {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
-	return ", known links: " + strings.Join(names, ", ")
+	return names
 }
 
 func firstNonEmpty(vals ...string) string {

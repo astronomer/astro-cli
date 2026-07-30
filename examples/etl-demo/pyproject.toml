@@ -12,7 +12,7 @@ airflow = '3.1'  # Airflow version this project runs; keep the apache-airflow de
 packages = ['libpq-dev']  # OS (apt) packages; installed in Docker mode, skipped with a warning in standalone mode
 workspace = 'your-workspace-id'  # default workspace every deployment link inherits; replace with your real id
 
-[tool.astro.deployments.dev]  # one table per Astro Deployment; replace the placeholder ids
+[tool.astro.deployments.dev]  # one table per Airflow the project talks to; replace the placeholder ids
 deployment = 'your-dev-deployment-id'
 default = true  # astro deploy with no link named ships here
 

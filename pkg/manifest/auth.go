@@ -2,7 +2,6 @@ package manifest
 
 import (
 	"fmt"
-	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -56,94 +55,117 @@ type Auth struct {
 	// credentials (airflow-token).
 	ClientIDEnv     string
 	ClientSecretEnv string
-	// Command is the command exec runs to print a token.
-	Command string
+	// Command is exec's argv: the program to run and its arguments, run
+	// directly and never through a shell.
+	Command []string
 }
 
-// authFields lists the fields each method takes. A method missing from the map
-// takes none: it derives its credential from a session or an SDK's own chain,
-// so there is nothing for the manifest to name.
-var authFields = map[AuthMethod][]string{
-	AuthBasic:        {"username-env", "password-env"},
-	AuthToken:        {"token-env"},
-	AuthAirflowToken: {"client-id-env", "client-secret-env", "username-env", "password-env"},
-	AuthExec:         {"command"},
+// commandField is exec's one field, named here because it decodes as an array
+// while every other field is a string.
+const commandField = "command"
+
+// authSpec is what one method takes: the fields it accepts, in the order
+// messages list them, the ones it cannot work without, and any credentials
+// that come in pairs.
+type authSpec struct {
+	fields   []string
+	required []string
+	// pairs are credentials where each half needs the other, and exactly one
+	// whole pair belongs in the table.
+	pairs [][2]string
+}
+
+// authSpecs describes every method that takes fields. A method missing from
+// the map takes none: it derives its credential from a session or an SDK's own
+// chain, so there is nothing for the manifest to name.
+var authSpecs = map[AuthMethod]authSpec{
+	AuthBasic: {
+		fields:   []string{"username-env", "password-env"},
+		required: []string{"username-env", "password-env"},
+	},
+	AuthToken: {fields: []string{"token-env"}, required: []string{"token-env"}},
+	AuthExec:  {fields: []string{commandField}, required: []string{commandField}},
+	// airflow-token's credentials come in pairs because Airflow 3's token
+	// endpoint accepts different ones per auth manager: client id and secret
+	// under Keycloak, username and password under FAB or the simple auth
+	// manager. One pair is the credential; two would leave the resolver
+	// picking, so the table names the pair its instance wants.
+	AuthAirflowToken: {
+		fields: []string{"client-id-env", "client-secret-env", "username-env", "password-env"},
+		pairs:  [][2]string{{"client-id-env", "client-secret-env"}, {"username-env", "password-env"}},
+	},
 }
 
 // envNameRe is what a *-env field must name: an env var, not a value.
 var envNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // defaultAuthMethod is the method a link falls back to when it declares no
-// auth table. An endpoint link has no default — nothing about a bare URL says
-// how its Airflow checks callers — and gets an empty method, which parseAuth
-// turns into a problem.
-func defaultAuthMethod(k Kind) AuthMethod {
-	switch k {
-	case KindAstro:
-		return AuthAstro
-	case KindMWAA:
-		return AuthAWS
-	case KindComposer:
-		return AuthGoogle
-	case KindEndpoint:
-		return ""
-	}
-	return ""
+// auth table. An endpoint link is missing on purpose: nothing about a bare URL
+// says how its Airflow checks callers, so it has no default and gets an empty
+// method, which auth turns into a problem.
+var defaultAuthMethod = map[LinkKind]AuthMethod{
+	KindAstro:    AuthAstro,
+	KindMWAA:     AuthAWS,
+	KindComposer: AuthGoogle,
 }
 
-// parseAuth types a link's `auth` table, which arrives untyped because its
-// shape depends on the method it names. key is the table's dotted TOML key and
-// kind the link's, for the default. Decoding is strict, like the env schema's:
-// an unknown method, a field the method does not take, a missing credential
+// auth types a link's `auth` table, which arrives untyped because its shape
+// depends on the method it names. key is the table's dotted TOML key and kind
+// the link's, for the default. Decoding is strict, like the env schema's: an
+// unknown method, a field the method does not take, a missing credential
 // field, and a misshapen table are all problems — this is authored config, and
 // a typo that silently dropped a credential would surface much later as an
 // unexplained 401.
-func parseAuth(key string, raw any, kind Kind) (Auth, []Problem) {
+func (p *parser) auth(key string, raw any, kind LinkKind) Auth {
 	switch table := raw.(type) {
 	case nil:
-		method := defaultAuthMethod(kind)
+		method := defaultAuthMethod[kind]
 		if method == "" {
-			return Auth{}, []Problem{{
-				Key:    key,
-				Reason: "required on a url link: nothing about a url says how its Airflow checks callers — add auth = { method = '…' }, naming one of " + methodList(),
-			}}
+			p.add(key, "required on a url link: nothing about a url says how its Airflow checks callers — add an auth table naming one of: "+methodList())
+			return Auth{}
 		}
-		return Auth{Method: method}, nil
+		return Auth{Method: method}
 	case map[string]any:
-		return parseAuthTable(key, table)
+		return p.authTable(key, table)
 	default:
-		return Auth{}, []Problem{{Key: key, Reason: "must be a table like { method = 'token', token-env = 'AIRFLOW_TOKEN' }"}}
+		p.add(key, "must be a table like { method = 'token', token-env = 'AIRFLOW_TOKEN' }")
+		return Auth{}
 	}
 }
 
-func parseAuthTable(key string, table map[string]any) (Auth, []Problem) {
-	p := &authParser{key: key, seen: map[string]bool{}}
-	method, ok := p.method(table["method"])
+func (p *parser) authTable(key string, table map[string]any) Auth {
+	ap := &authParser{parser: p, key: key, seen: map[string]bool{}}
+	method, ok := ap.method(table["method"])
 	if !ok {
-		return Auth{}, p.problems
+		return Auth{}
 	}
 	a := Auth{Method: method}
-	allowed := authFields[method]
-	// Sorted, because a map's order must not decide which problem is reported
-	// first — the caller sorts by key, and two fields can share none.
-	for _, field := range slices.Sorted(maps.Keys(table)) {
+	spec := authSpecs[method]
+	// Ranged in map order: every problem here is keyed by its own field, and
+	// Parse sorts the whole set by key before reporting it.
+	for field, raw := range table {
 		if field == "method" {
 			continue
 		}
-		dest := authDest(&a, field)
-		if dest == nil || !slices.Contains(allowed, field) {
-			p.add(key+"."+field, notAField(method, allowed))
+		if !slices.Contains(spec.fields, field) {
+			ap.addField(field, notAField(method, spec.fields))
 			continue
 		}
-		p.seen[field] = true
-		*dest = p.value(key+"."+field, field, table[field])
+		ap.seen[field] = true
+		if field == commandField {
+			a.Command = ap.command(raw)
+			continue
+		}
+		*authDest(&a, field) = ap.value(field, raw)
 	}
-	p.required(method)
-	return a, p.problems
+	ap.required(method, spec)
+	return a
 }
 
 // authDest points at the Auth field a manifest field name fills. Names are
-// global: a field means the same thing under every method that takes it.
+// global: a field means the same thing under every method that takes it. Only
+// the string fields are here — exec's command is an array and decodes on its
+// own path.
 func authDest(a *Auth, field string) *string {
 	switch field {
 	case "token-env":
@@ -156,113 +178,123 @@ func authDest(a *Auth, field string) *string {
 		return &a.ClientIDEnv
 	case "client-secret-env":
 		return &a.ClientSecretEnv
-	case "command":
-		return &a.Command
 	default:
-		return nil
+		// Unreachable: the caller matched the field against the method's spec,
+		// and every string field in a spec is listed above.
+		return new(string)
 	}
 }
 
-// authParser collects one auth table's problems. seen records the fields the
-// table set, whatever their value: the required checks ask what was written,
-// not what decoded, so a field with a bad value is reported once rather than
-// also being reported missing.
+// authParser decodes one auth table: the shared parser, the table's key, and
+// which fields the table set. seen records a field whatever its value, so the
+// required checks ask what was written rather than what decoded, and a field
+// with a bad value is reported once instead of also being reported missing.
 type authParser struct {
-	key      string
-	seen     map[string]bool
-	problems []Problem
+	*parser
+	key  string
+	seen map[string]bool
 }
 
-func (p *authParser) add(key, reason string) {
-	p.problems = append(p.problems, Problem{Key: key, Reason: reason})
+// addField reports a problem against one field of this table.
+func (p *authParser) addField(field, reason string) {
+	p.add(p.key+"."+field, reason)
 }
 
 // method decodes the `method` field, the one field every auth table must
 // carry: the rest of the table means nothing until the method is known.
 func (p *authParser) method(raw any) (AuthMethod, bool) {
 	if raw == nil {
-		p.add(p.key+".method", "required: "+methodList())
+		p.addField("method", "required — name one of: "+methodList())
 		return "", false
 	}
 	s, ok := raw.(string)
 	if !ok {
-		p.add(p.key+".method", "expected a string")
+		p.addField("method", "expected a string")
 		return "", false
 	}
 	m := AuthMethod(s)
 	if !slices.Contains(authMethods, m) {
-		p.add(p.key+".method", fmt.Sprintf("%q is not an auth method (%s)", s, methodList()))
+		p.addField("method", fmt.Sprintf("%q is not an auth method — name one of: %s", s, methodList()))
 		return "", false
 	}
 	return m, true
 }
 
-// value decodes one field. A *-env field must name an env var rather than hold
-// a value, which is also the check that keeps literal secrets out of the file.
-func (p *authParser) value(key, field string, raw any) string {
+// value decodes one string field. A *-env field must name an env var rather
+// than hold a value, which is also the check that keeps literal secrets out of
+// the file.
+func (p *authParser) value(field string, raw any) string {
 	s, ok := raw.(string)
 	if !ok {
-		p.add(key, "expected a string")
+		p.addField(field, "expected a string")
 		return ""
 	}
 	if s == "" {
-		p.add(key, "must not be empty")
+		p.addField(field, "must not be empty")
 		return ""
 	}
 	if strings.HasSuffix(field, "-env") && !envNameRe.MatchString(s) {
-		p.add(key, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit) — this field names the variable holding the value, not the value", s))
+		p.addField(field, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit) — this field names the variable holding the value, not the value", s))
 		return ""
 	}
 	return s
 }
 
-// required checks the fields the method cannot work without. The methods with
-// no entry here name nothing: astro reads the session, aws and google their
-// SDK's credential chain, none sends nothing.
-func (p *authParser) required(method AuthMethod) {
-	switch method {
-	case AuthToken:
-		p.must("token-env")
-	case AuthBasic:
-		p.must("username-env")
-		p.must("password-env")
-	case AuthExec:
-		p.must("command")
-	case AuthAirflowToken:
-		p.airflowTokenPairs()
-	case AuthAstro, AuthAWS, AuthGoogle, AuthNone:
+// command decodes exec's argv. It is an array rather than a string because the
+// CLI runs the program directly and never through a shell: a string would
+// promise quoting and word splitting that nothing implements.
+func (p *authParser) command(raw any) []string {
+	items, ok := raw.([]any)
+	if !ok {
+		p.addField(commandField, "expected an array, argv style: command = ['acme-airflow-token', '--profile', 'prod']")
+		return nil
 	}
+	if len(items) == 0 {
+		p.addField(commandField, "must name a program to run")
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for i, item := range items {
+		s, ok := item.(string)
+		if !ok || s == "" {
+			p.add(fmt.Sprintf("%s.%s[%d]", p.key, commandField, i), "expected a non-empty string")
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
-func (p *authParser) must(field string) {
-	if !p.seen[field] {
-		p.add(p.key+"."+field, "required by this method")
+// required checks the fields the method cannot work without. A method with no
+// spec names nothing: astro reads the session, aws and google their SDK's
+// credential chain, none sends nothing.
+func (p *authParser) required(method AuthMethod, spec authSpec) {
+	for _, field := range spec.required {
+		if !p.seen[field] {
+			p.addField(field, fmt.Sprintf("required by the %s method", method))
+		}
 	}
-}
-
-// airflowTokenPairs checks the airflow-token credentials, which come in pairs
-// because Airflow 3's token endpoint accepts different ones per auth manager:
-// client id and secret under Keycloak, username and password under FAB or the
-// simple auth manager. Either pair on its own is enough, both together are
-// legal (a client-credentials grant that also carries user credentials), and
-// half a pair is always a mistake.
-func (p *authParser) airflowTokenPairs() {
-	p.pair("client-id-env", "client-secret-env")
-	p.pair("username-env", "password-env")
-	// seen holds only the method's own fields, so an empty set means the table
-	// named no credential at all.
-	if len(p.seen) == 0 {
-		p.add(p.key, "the airflow-token method needs credentials to exchange: client-id-env with client-secret-env, or username-env with password-env")
+	if len(spec.pairs) == 0 {
+		return
 	}
-}
-
-// pair reports half a credential pair, which is never what anyone meant.
-func (p *authParser) pair(firstField, secondField string) {
+	whole := 0
+	for _, pair := range spec.pairs {
+		switch {
+		case p.seen[pair[0]] && p.seen[pair[1]]:
+			whole++
+		case p.seen[pair[0]]:
+			p.addField(pair[1], "required alongside "+pair[0])
+		case p.seen[pair[1]]:
+			p.addField(pair[0], "required alongside "+pair[1])
+		}
+	}
 	switch {
-	case !p.seen[firstField] && p.seen[secondField]:
-		p.add(p.key+"."+firstField, "required alongside "+secondField)
-	case !p.seen[secondField] && p.seen[firstField]:
-		p.add(p.key+"."+secondField, "required alongside "+firstField)
+	// seen holds only this method's own fields, so an empty set means the
+	// table named no credential at all; half a pair has reported itself.
+	case len(p.seen) == 0:
+		p.add(p.key, fmt.Sprintf("the %s method needs credentials to exchange: %s", method, pairList(spec.pairs)))
+	case whole > 1:
+		p.add(p.key, fmt.Sprintf("the %s method takes one credential pair, not both: %s", method, pairList(spec.pairs)))
 	}
 }
 
@@ -271,6 +303,16 @@ func notAField(method AuthMethod, allowed []string) string {
 		return fmt.Sprintf("not a field of the %s method, which takes none", method)
 	}
 	return fmt.Sprintf("not a field of the %s method (%s)", method, strings.Join(allowed, ", "))
+}
+
+// pairList spells the credential pairs a method accepts, as
+// "a with b, or c with d".
+func pairList(pairs [][2]string) string {
+	each := make([]string, len(pairs))
+	for i, pair := range pairs {
+		each[i] = pair[0] + " with " + pair[1]
+	}
+	return strings.Join(each, ", or ")
 }
 
 func methodList() string {

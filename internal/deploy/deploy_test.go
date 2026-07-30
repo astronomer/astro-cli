@@ -72,15 +72,15 @@ func TestIsV2Project(t *testing.T) {
 	})
 }
 
-func manifestWith(links map[string]manifest.Deployment) *manifest.Manifest {
+func manifestWith(links map[string]manifest.Link) *manifest.Manifest {
 	return &manifest.Manifest{Astro: manifest.Astro{Deployments: links}}
 }
 
 func TestResolveSelection(t *testing.T) {
-	oneLink := map[string]manifest.Deployment{
+	oneLink := map[string]manifest.Link{
 		"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 	}
-	twoLinks := map[string]manifest.Deployment{
+	twoLinks := map[string]manifest.Link{
 		"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 		"dev":  {Target: "astro", Workspace: "ws-dev", Deployment: "dep-dev"},
 	}
@@ -144,7 +144,7 @@ func TestResolveSelection(t *testing.T) {
 		assert.Equal(t, "prod", sel.linkName)
 	})
 
-	markedDefault := map[string]manifest.Deployment{
+	markedDefault := map[string]manifest.Link{
 		"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 		"dev":  {Target: "astro", Workspace: "ws-dev", Deployment: "dep-dev", Default: true},
 	}
@@ -157,7 +157,7 @@ func TestResolveSelection(t *testing.T) {
 	})
 
 	t.Run("a lone marked link is the default too", func(t *testing.T) {
-		sel, err := resolveSelection(Request{Manifest: manifestWith(map[string]manifest.Deployment{
+		sel, err := resolveSelection(Request{Manifest: manifestWith(map[string]manifest.Link{
 			"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod", Default: true},
 		})})
 		require.NoError(t, err)
@@ -194,6 +194,46 @@ func TestResolveSelection(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, sel.deploymentID)
 		assert.Equal(t, "ws-ctx", sel.workspaceID)
+	})
+
+	// Only an astro link has a Deployment to ship to. Without this guard a
+	// non-astro link fell through to the unlinked flow, which prompts for some
+	// unrelated Deployment and ships this project's DAGs to it.
+	t.Run("a named non-astro link is turned away", func(t *testing.T) {
+		_, err := resolveSelection(Request{
+			Manifest: manifestWith(map[string]manifest.Link{
+				"prod":     {Target: "mwaa", Environment: "orders-prod"},
+				"dev":      {Target: "astro", Workspace: "ws-dev", Deployment: "dep-dev"},
+				"scratch":  {URL: "https://airflow.corp.dev"},
+				"analysis": {Target: "composer", Environment: "orders-prod"},
+			}),
+			LinkName: "prod",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `link "prod" is mwaa`)
+		assert.Contains(t, err.Error(), "astro links: dev")
+	})
+
+	t.Run("the default link is turned away too", func(t *testing.T) {
+		_, err := resolveSelection(Request{
+			Manifest: manifestWith(map[string]manifest.Link{
+				"prod": {Target: "composer", Environment: "orders-prod", Default: true},
+			}),
+			ContextWorkspace: "ws-ctx",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `link "prod" is composer`)
+		assert.Contains(t, err.Error(), "no astro links")
+	})
+
+	t.Run("an endpoint link is turned away", func(t *testing.T) {
+		_, err := resolveSelection(Request{
+			Manifest: manifestWith(map[string]manifest.Link{
+				"staging": {Target: "astro", URL: "https://airflow.staging.corp.dev"},
+			}),
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "endpoint")
 	})
 
 	t.Run("no links falls to unlinked", func(t *testing.T) {
@@ -273,7 +313,7 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 			Astro: manifest.Astro{
 				AirflowVersion: "3.1",
 				Packages:       []string{"libpq-dev"},
-				Deployments: map[string]manifest.Deployment{
+				Deployments: map[string]manifest.Link{
 					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 				},
 			},
@@ -301,7 +341,7 @@ func TestRun_ImageOnlyDropsDags(t *testing.T) {
 		Image: true,
 		Manifest: &manifest.Manifest{Astro: manifest.Astro{
 			AirflowVersion: "3.1",
-			Deployments: map[string]manifest.Deployment{
+			Deployments: map[string]manifest.Link{
 				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
 			},
 		}},
@@ -319,7 +359,7 @@ func TestRun_ImageNamePassesPrebuiltRef(t *testing.T) {
 		ImageName: "astro-package/demo:3.1-2-abc",
 		Manifest: &manifest.Manifest{Astro: manifest.Astro{
 			AirflowVersion: "3.1",
-			Deployments: map[string]manifest.Deployment{
+			Deployments: map[string]manifest.Link{
 				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
 			},
 		}},
@@ -336,7 +376,7 @@ func TestRun_ImageTransportErrorPropagates(t *testing.T) {
 	_, err := Run(Request{
 		Manifest: &manifest.Manifest{Astro: manifest.Astro{
 			AirflowVersion: "3.1",
-			Deployments: map[string]manifest.Deployment{
+			Deployments: map[string]manifest.Link{
 				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
 			},
 		}},
@@ -354,7 +394,7 @@ func TestRun_DefaultLinkDeploysDags(t *testing.T) {
 	res, err := Run(Request{
 		ProjectDir: "/proj",
 		DagsOnly:   true,
-		Manifest: manifestWith(map[string]manifest.Deployment{
+		Manifest: manifestWith(map[string]manifest.Link{
 			"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 		}),
 	}, d)
@@ -418,7 +458,7 @@ func TestRun_TransportErrorPropagates(t *testing.T) {
 	d := &fakeDeployer{dagErr: sentinel}
 	_, err := Run(Request{
 		DagsOnly: true,
-		Manifest: manifestWith(map[string]manifest.Deployment{
+		Manifest: manifestWith(map[string]manifest.Link{
 			"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 		}),
 	}, d)

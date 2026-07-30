@@ -10,19 +10,22 @@
 //     sub-modules do not import each other, so Astro.Env carries the decoded
 //     section as plain data and each consumer composes the two packages one
 //     layer up.
-//   - [tool.astro.target.*] is backend-specific by design — a target section
+//   - [tool.astro.targets.*] is backend-specific by design — a target section
 //     is meaningless to other targets — so Astro.Targets stays plain data and
 //     each backend types its own section.
 //
-// Deployment links come out resolved. [tool.astro] may set a default
-// workspace and a default target that every link inherits, and an absent
-// target means "astro". Parse folds those defaults in, so each Deployment in
-// Astro.Deployments already carries its own Workspace and Target — a consumer
-// reads link.Workspace and link.Target and never re-runs the fallback. The
-// top-level defaults stay visible on Astro.Workspace and Astro.Target for a
-// consumer that wants to show them. A link's auth method resolves the same
-// way: the link's own auth table when it has one, else the default for its
-// kind, so link.Auth.Method is always the effective one.
+// [tool.astro] is decoded by hand rather than through struct tags, because it
+// is authored config: an unknown key, a value of the wrong shape and a
+// contradictory link are all things its author should be told about, each
+// addressed by its dotted TOML key, and all of them at once.
+//
+// Links come out resolved. [tool.astro] may set a default workspace and a
+// default target that every link inherits, and an absent target means "astro".
+// Parse folds those defaults in, so each Link in Astro.Deployments already
+// carries its own Workspace, Target and auth method — a consumer reads
+// link.Workspace and never re-runs the fallback. The top-level defaults stay
+// visible on Astro.Workspace and Astro.Target for a consumer that wants to
+// show them.
 package manifest
 
 import (
@@ -32,6 +35,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -61,20 +65,20 @@ type Astro struct {
 	// needs at the system level — v1's packages.txt. Docker mode installs
 	// them into the runtime image; standalone mode cannot and warns.
 	Packages []string
-	// Workspace is [tool.astro] workspace, the default workspace every
-	// deployment link inherits when the link sets none. Empty if unset. It is
-	// already folded into each Deployment.Workspace; kept here for display.
+	// Workspace is [tool.astro] workspace, the default workspace every astro
+	// link inherits when the link sets none. Empty if unset. It is already
+	// folded into each Link.Workspace; kept here for display.
 	Workspace string
-	// Target is [tool.astro] target, the default target every deployment link
-	// inherits when the link sets none. Empty if unset (links then fall back
-	// to "astro"). It is already folded into each Deployment.Target; kept here
-	// for display.
+	// Target is [tool.astro] target, the default target every link inherits
+	// when the link sets none. Empty if unset (links then fall back to
+	// "astro"). It is already folded into each Link.Target; kept here for
+	// display.
 	Target string
 	// Deployments is the committed inventory of Airflows the project talks to,
 	// [tool.astro.deployments.<name>], with every link's Workspace, Target and
 	// auth method already resolved from the two levels.
-	Deployments map[string]Deployment
-	// Targets is [tool.astro.target.<name>], decoded but untyped: target
+	Deployments map[string]Link
+	// Targets is [tool.astro.targets.<name>], decoded but untyped: target
 	// config is backend-specific, so each backend types its own section.
 	Targets map[string]map[string]any
 	// Env is the decoded [tool.astro.env] section, untyped: its schema
@@ -82,8 +86,8 @@ type Astro struct {
 	Env map[string]any
 }
 
-// Deployment is one committed deployment link: an Airflow the project talks
-// to, named. A link carries coordinates for something the CLI can look up
+// Link is one committed deployment link: an Airflow the project talks to,
+// named. A link carries coordinates for something the CLI can look up
 // (Deployment for astro, Environment for mwaa and composer) or a URL for an
 // Airflow with no control plane to ask — never both. No credential is ever
 // stored here; Auth names how to prove yourself and the values themselves come
@@ -92,9 +96,12 @@ type Astro struct {
 // Target and Workspace are already resolved: a link's own value if it set one,
 // else the [tool.astro] default, and for Target "astro" when neither level
 // sets it.
-type Deployment struct {
-	Target     string
-	Workspace  string
+type Link struct {
+	Target string
+	// Workspace is the Astro workspace the Deployment lives in, and is set on
+	// astro links only — the other kinds are not in a workspace.
+	Workspace string
+	// Deployment is the Astro Deployment id on an astro link.
 	Deployment string
 	// Environment is the platform's own environment name on an mwaa or
 	// composer link — the coordinate that stands in for Deployment there.
@@ -111,31 +118,38 @@ type Deployment struct {
 	Default bool
 }
 
-// Kind is what a link points at. It is derived from the link's fields and
+// LinkKind is what a link points at. It is derived from the link's fields and
 // never written in the manifest, so a consumer switches on Kind() rather than
 // re-deriving the rule.
-type Kind string
+type LinkKind string
 
 // The mwaa and composer kinds are spelled the same as the targets that select
 // them, deliberately: one vocabulary for where a link deploys and what it
 // points at.
 const (
-	KindAstro    Kind = "astro"
-	KindMWAA     Kind = "mwaa"
-	KindComposer Kind = "composer"
-	KindEndpoint Kind = "endpoint"
+	KindAstro    LinkKind = "astro"
+	KindMWAA     LinkKind = "mwaa"
+	KindComposer LinkKind = "composer"
+	KindEndpoint LinkKind = "endpoint"
 )
+
+// linkTargets is the closed set of targets a link may carry. The package
+// targets are a wider set — `astro package oss` builds an artifact for an
+// Airflow there is nothing to link to — so a link keeps its own list.
+var linkTargets = []LinkKind{KindAstro, KindMWAA, KindComposer}
 
 // Kind reports what the link points at: a URL makes it an endpoint, the mwaa
 // and composer targets make it a coordinate link on that platform, and
-// anything else — including a project's own custom target — is an Astro link.
-func (d Deployment) Kind() Kind {
+// anything else is an Astro link.
+//
+//nolint:gocritic // hugeParam: the value receiver is the point — Kind() must be callable on a map element, which is not addressable
+func (l Link) Kind() LinkKind {
 	switch {
-	case d.URL != "":
+	case l.URL != "":
 		return KindEndpoint
-	case d.Target == string(KindMWAA):
+	case l.Target == string(KindMWAA):
 		return KindMWAA
-	case d.Target == string(KindComposer):
+	case l.Target == string(KindComposer):
 		return KindComposer
 	default:
 		return KindAstro
@@ -182,6 +196,9 @@ type ValidationError struct {
 	Problems []Problem
 }
 
+// Error lists every problem, one keyed line each: a caller that prints the
+// error shows the whole list, which is the promise the docs make about fixing
+// a manifest in one pass.
 func (e *ValidationError) Error() string {
 	where := e.Path
 	if where == "" {
@@ -190,7 +207,12 @@ func (e *ValidationError) Error() string {
 	if len(e.Problems) == 1 {
 		return fmt.Sprintf("invalid %s: %s: %s", where, e.Problems[0].Key, e.Problems[0].Reason)
 	}
-	return fmt.Sprintf("invalid %s: %d problems, first is %s: %s", where, len(e.Problems), e.Problems[0].Key, e.Problems[0].Reason)
+	var b strings.Builder
+	fmt.Fprintf(&b, "invalid %s: %d problems", where, len(e.Problems))
+	for _, p := range e.Problems {
+		fmt.Fprintf(&b, "\n  %s: %s", p.Key, p.Reason)
+	}
+	return b.String()
 }
 
 // Load reads and validates the manifest at path (a pyproject.toml). A
@@ -230,21 +252,8 @@ func Parse(data []byte) (*Manifest, error) {
 		return nil, ErrNoAstroSection
 	}
 
-	// [tool.astro] target is either a string (the default target for every
-	// link) or the [tool.astro.target.<name>] table of backend config. TOML
-	// forbids both spellings of one key in a file, so at most one arrives.
-	defaultTarget, targets, targetProblem := resolveTargetSection(f.Tool.Astro.Target)
-
-	m := &Manifest{
-		Astro: Astro{
-			AirflowVersion: f.Tool.Astro.Airflow,
-			Packages:       f.Tool.Astro.Packages,
-			Workspace:      f.Tool.Astro.Workspace,
-			Target:         defaultTarget,
-			Targets:        targets,
-			Env:            f.Tool.Astro.Env,
-		},
-	}
+	p := &parser{}
+	m := &Manifest{Astro: p.astro(*f.Tool.Astro)}
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,
@@ -252,90 +261,300 @@ func Parse(data []byte) (*Manifest, error) {
 			Dependencies:   f.Project.Dependencies,
 		}
 	}
-	// Problems the decode turns up, before the typed validation pass: the
-	// overloaded target key, and any per-link target set to an empty string —
-	// told apart from an absent key only here, at the wire pointer. validate
-	// works on the typed Manifest and cannot see either, so they come in as a
-	// seed.
-	var decodeProblems []Problem
-	if targetProblem != nil {
-		decodeProblems = append(decodeProblems, *targetProblem)
-	}
-	if len(f.Tool.Astro.Deployments) > 0 {
-		m.Astro.Deployments = make(map[string]Deployment, len(f.Tool.Astro.Deployments))
-		for name, d := range f.Tool.Astro.Deployments {
-			key := "tool.astro.deployments." + name
-			// Target is no longer required — it defaults to [tool.astro] target
-			// and then to "astro" — but a link that sets it to an empty string
-			// meant something and got it wrong.
-			if d.Target != nil && *d.Target == "" {
-				decodeProblems = append(decodeProblems, Problem{Key: key + ".target", Reason: "must not be empty"})
-			}
-			link := Deployment{
-				Deployment:  d.Deployment,
-				Environment: d.Environment,
-				URL:         d.URL,
-				Workspace:   firstNonEmpty(d.Workspace, m.Astro.Workspace),
-				Target:      firstNonEmpty(derefString(d.Target), defaultTarget, defaultTargetName),
-				Default:     d.Default,
-			}
-			// The auth table arrives untyped, so it is decoded here rather than
-			// in validate: the kind it defaults from is known only once the
-			// target has been folded in.
-			auth, authProblems := parseAuth(key+".auth", d.Auth, link.Kind())
-			link.Auth = auth
-			decodeProblems = append(decodeProblems, authProblems...)
-			m.Astro.Deployments[name] = link
-		}
-	}
-
-	if problems := validate(m, decodeProblems); len(problems) > 0 {
-		return nil, &ValidationError{Problems: problems}
+	p.validate(m)
+	if len(p.problems) > 0 {
+		// Map iteration made the order random; error text must be stable.
+		sort.Slice(p.problems, func(i, j int) bool { return p.problems[i].Key < p.problems[j].Key })
+		return nil, &ValidationError{Problems: p.problems}
 	}
 	return m, nil
 }
 
-// defaultTargetName is the target a link falls back to when neither the link
-// nor [tool.astro] names one.
-const defaultTargetName = "astro"
+// astroRoot prefixes every key under the section this package owns.
+const astroRoot = "tool.astro"
 
-// resolveTargetSection reads the [tool.astro] target key, which is overloaded:
-// a string is the default target name, a table is the [tool.astro.target.<name>]
-// backend config. It returns whichever is present, plus a Problem for a value
-// that is neither (an empty-string default, or a wrong type). TOML forbids one
-// key from being both a string and a table, so a file that sets a string
-// default cannot also carry target-config tables — fine while the Astro target
-// needs no table, a real limit to know before another target does.
-func resolveTargetSection(v any) (defaultTarget string, targets map[string]map[string]any, problem *Problem) {
-	const key = "tool.astro.target"
-	switch t := v.(type) {
-	case nil:
-		return "", nil, nil
-	case string:
-		if t == "" {
-			return "", nil, &Problem{Key: key, Reason: "must not be empty"}
+// The keys each table defines. Anything else is a problem: this is authored
+// config, and a key that decodes to nothing — a misspelled `default` on the
+// link meant to be the default — would otherwise send a deploy somewhere else
+// in silence.
+var (
+	astroKeys = []string{"airflow", "deployments", "env", "packages", "target", "targets", "workspace"}
+	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
+)
+
+// reservedLinkName is the name instance resolution keeps for the Airflow
+// running on this machine, so a link may not take it.
+const reservedLinkName = "local"
+
+// parser accumulates the findings of one decode. Every helper takes the dotted
+// key it is decoding, records a Problem when the value is the wrong shape, and
+// returns the zero value, so the decode carries on and the caller reports
+// every finding at once.
+type parser struct {
+	problems []Problem
+}
+
+func (p *parser) add(key, reason string) {
+	p.problems = append(p.problems, Problem{Key: key, Reason: reason})
+}
+
+// astro decodes [tool.astro]. Links come last: they resolve against the
+// defaults the section sets above them.
+func (p *parser) astro(raw map[string]any) Astro {
+	p.unknownKeys(astroRoot, raw, astroKeys)
+	a := Astro{
+		AirflowVersion: p.reqStr(astroRoot+".airflow", raw["airflow"]),
+		Packages:       p.packages(raw["packages"]),
+		Workspace:      p.str(astroRoot+".workspace", raw["workspace"]),
+		Target:         p.defaultTarget(raw["target"]),
+		Targets:        p.targets(raw["targets"]),
+		Env:            p.table(astroRoot+".env", raw["env"]),
+	}
+	a.Deployments = p.links(raw["deployments"], &a)
+	return a
+}
+
+// defaultTarget reads [tool.astro] target, the default every link inherits. It
+// is a target name; a table here is the old spelling of the backend-config
+// section, which is [tool.astro.targets.<name>] now — one TOML key cannot be
+// both a string and a table, which is why the config side moved.
+func (p *parser) defaultTarget(v any) string {
+	const key = astroRoot + ".target"
+	if _, isTable := v.(map[string]any); isTable {
+		p.add(key, "is a target name; backend config lives in [tool.astro.targets.<name>]")
+		return ""
+	}
+	return p.str(key, v)
+}
+
+// targets decodes [tool.astro.targets], one plain-data section per backend.
+func (p *parser) targets(v any) map[string]map[string]any {
+	const key = astroRoot + ".targets"
+	table := p.table(key, v)
+	if len(table) == 0 {
+		return nil
+	}
+	out := make(map[string]map[string]any, len(table))
+	for name, cfg := range table {
+		if section := p.table(key+"."+name, cfg); section != nil {
+			out[name] = section
 		}
-		return t, nil, nil
-	case map[string]any:
-		targets = make(map[string]map[string]any, len(t))
-		for name, cfg := range t {
-			section, ok := cfg.(map[string]any)
-			if !ok {
-				return "", nil, &Problem{Key: key + "." + name, Reason: "must be a table of target config"}
-			}
-			targets[name] = section
+	}
+	return out
+}
+
+// links decodes [tool.astro.deployments], the named inventory.
+func (p *parser) links(v any, a *Astro) map[string]Link {
+	const key = astroRoot + ".deployments"
+	table := p.table(key, v)
+	if len(table) == 0 {
+		return nil
+	}
+	out := make(map[string]Link, len(table))
+	for name, raw := range table {
+		switch name {
+		case "":
+			p.add(key, "a link needs a name")
+			continue
+		case reservedLinkName:
+			p.add(key+"."+name, "reserved: local always means the Airflow running on this machine — name the link something else")
+			continue
 		}
-		return "", targets, nil
-	default:
-		return "", nil, &Problem{Key: key, Reason: "must be a target name or a [tool.astro.target.<name>] table"}
+		linkKey := key + "." + name
+		fields := p.table(linkKey, raw)
+		if fields == nil {
+			continue
+		}
+		out[name] = p.link(linkKey, fields, a)
+	}
+	return out
+}
+
+// link decodes and checks one link. The order matters: an unusable target is
+// reported on its own, because every rule below it is a rule about a kind the
+// target no longer names.
+func (p *parser) link(key string, table map[string]any, a *Astro) Link {
+	p.unknownKeys(key, table, linkKeys)
+	own := p.str(key+".target", table["target"])
+	link := Link{
+		Target:      firstNonEmpty(own, a.Target, string(KindAstro)),
+		Deployment:  p.str(key+".deployment", table["deployment"]),
+		Environment: p.str(key+".environment", table["environment"]),
+		URL:         p.str(key+".url", table["url"]),
+		Default:     p.boolean(key+".default", table["default"]),
+	}
+	if !slices.Contains(linkTargets, LinkKind(link.Target)) {
+		p.badTarget(key, link.Target, own != "")
+		return link
+	}
+	kind := link.Kind()
+	p.coordinates(key, kind, &link)
+	link.Workspace = p.workspace(key, kind, table["workspace"], a.Workspace)
+	link.Auth = p.auth(key+".auth", table["auth"], kind)
+	return link
+}
+
+// badTarget says where the target came from, because the fix differs: the
+// link's own key, or the [tool.astro] default it inherited.
+func (p *parser) badTarget(key, target string, own bool) {
+	const supported = " — supported: astro, mwaa, composer, in lower case"
+	if own {
+		p.add(key+".target", fmt.Sprintf("%q is not a target a link can use", target)+supported)
+		return
+	}
+	p.add(key+".target", fmt.Sprintf("inherits target = %q from [tool.astro], which is not a target a link can use", target)+supported)
+}
+
+// coordinates checks that the link names the one coordinate its kind uses, and
+// only that one.
+func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
+	if link.URL != "" && link.Target != string(KindAstro) {
+		p.add(key, fmt.Sprintf("target = %q names an environment, not a url: set environment = '<%s environment name>', or drop target for a plain url link", link.Target, link.Target))
+		return
+	}
+	switch kind {
+	case KindEndpoint:
+		if link.Deployment != "" || link.Environment != "" {
+			p.add(key, "sets both a url and coordinates: a link names either a url or deployment/environment coordinates, never both")
+			return
+		}
+		p.url(key+".url", link.URL)
+	case KindMWAA, KindComposer:
+		if link.Deployment != "" {
+			p.add(key+".deployment", fmt.Sprintf("a %s link has no Astro deployment id: name the environment with environment = '<%s environment name>'", kind, kind))
+		}
+		if link.Environment == "" {
+			p.add(key+".environment", fmt.Sprintf("required: the name of the %s environment", kind))
+		}
+	case KindAstro:
+		if link.Environment != "" {
+			p.add(key+".environment", "only an mwaa or composer link sets environment; this is an astro link")
+		}
+		if link.Deployment == "" {
+			p.add(key+".deployment", "required on an astro link: the Deployment id — or set target = 'mwaa' or target = 'composer' with an environment, or a url")
+		}
 	}
 }
 
-func derefString(s *string) string {
-	if s == nil {
+// url checks an endpoint link's address: it must be one the CLI can dial, and
+// it must not smuggle a credential into a committed file.
+func (p *parser) url(key, raw string) {
+	u, err := url.Parse(raw)
+	switch {
+	case err != nil:
+		p.add(key, fmt.Sprintf("%q is not a URL", raw))
+	case u.Scheme == "":
+		p.add(key, fmt.Sprintf("%q has no scheme: write the address in full, like https://%s", raw, raw))
+	case u.Scheme != "http" && u.Scheme != "https":
+		p.add(key, fmt.Sprintf("%q is not an http(s) URL", raw))
+	case u.Host == "":
+		p.add(key, fmt.Sprintf("%q names no host", raw))
+	case u.User != nil:
+		p.add(key, "a url must not carry a username or password: name env vars instead, with auth = { method = 'basic', username-env = 'AIRFLOW_USER', password-env = 'AIRFLOW_PASSWORD' }")
+	}
+}
+
+// workspace resolves the workspace, which only an astro link has: the other
+// kinds are not in an Astro workspace, so the [tool.astro] default does not
+// reach them and setting one on them is a mistake.
+func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) string {
+	own := p.str(key+".workspace", raw)
+	if kind != KindAstro {
+		if own != "" {
+			p.add(key+".workspace", fmt.Sprintf("only an astro link has a workspace; this is a %s link", kind))
+		}
 		return ""
 	}
-	return *s
+	ws := firstNonEmpty(own, fallback)
+	if ws == "" {
+		p.add(key+".workspace", "no workspace: set workspace on the link or a default with [tool.astro] workspace")
+	}
+	return ws
+}
+
+// unknownKeys reports every key the table does not define.
+func (p *parser) unknownKeys(key string, table map[string]any, known []string) {
+	for name := range table {
+		if !slices.Contains(known, name) {
+			p.add(key+"."+name, "unknown key")
+		}
+	}
+}
+
+// str decodes an optional string. An absent key is the empty string and no
+// problem; a key that is present must carry a non-empty string, since an empty
+// value in authored config means someone meant something and got it wrong.
+func (p *parser) str(key string, v any) string {
+	if v == nil {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		p.add(key, "expected a string")
+		return ""
+	}
+	if s == "" {
+		p.add(key, "must not be empty")
+		return ""
+	}
+	return s
+}
+
+// reqStr decodes a string the section cannot do without.
+func (p *parser) reqStr(key string, v any) string {
+	if v == nil {
+		p.add(key, "required")
+		return ""
+	}
+	return p.str(key, v)
+}
+
+func (p *parser) boolean(key string, v any) bool {
+	if v == nil {
+		return false
+	}
+	b, ok := v.(bool)
+	if !ok {
+		p.add(key, "expected true or false")
+	}
+	return b
+}
+
+func (p *parser) table(key string, v any) map[string]any {
+	if v == nil {
+		return nil
+	}
+	t, ok := v.(map[string]any)
+	if !ok {
+		p.add(key, "expected a table")
+		return nil
+	}
+	return t
+}
+
+// packages decodes [tool.astro] packages, an array of OS package names. Each
+// entry is checked in place so a problem carries the index of the entry that
+// caused it.
+func (p *parser) packages(v any) []string {
+	const key = astroRoot + ".packages"
+	if v == nil {
+		return nil
+	}
+	items, ok := v.([]any)
+	if !ok {
+		p.add(key, "expected an array of strings")
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for i, item := range items {
+		s, ok := item.(string)
+		if !ok || strings.TrimSpace(s) == "" {
+			p.add(fmt.Sprintf("%s[%d]", key, i), "must be a non-empty string")
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -354,139 +573,50 @@ var projectNameRe = regexp.MustCompile(`^(?i:[a-z0-9]|[a-z0-9][a-z0-9._-]*[a-z0-
 // airflowVersionRe accepts a full or partial version: "3", "3.1", "3.1.2".
 var airflowVersionRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+){0,2}$`)
 
-// validate checks the typed manifest. seed carries the problems the decode
-// already found (see Parse), which validate sorts in with its own so the error
-// still lists every finding in a stable order.
-func validate(m *Manifest, seed []Problem) []Problem {
-	ps := seed
-	add := func(key, reason string) { ps = append(ps, Problem{Key: key, Reason: reason}) }
-
-	if m.Project.Name == "" {
-		add("project.name", "required")
-	} else if !projectNameRe.MatchString(m.Project.Name) {
-		add("project.name", "not a valid project name (letters, digits, -._; must start and end with a letter or digit)")
-	}
-
+// validate checks what the decode could not: the standard [project] table,
+// which is typed, and the rules that span more than one key.
+func (p *parser) validate(m *Manifest) {
 	switch {
-	case m.Astro.AirflowVersion == "":
-		add("tool.astro.airflow", "required")
-	case !airflowVersionRe.MatchString(m.Astro.AirflowVersion):
-		add("tool.astro.airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", m.Astro.AirflowVersion))
+	case m.Project.Name == "":
+		p.add("project.name", "required")
+	case !projectNameRe.MatchString(m.Project.Name):
+		p.add("project.name", "not a valid project name (letters, digits, -._; must start and end with a letter or digit)")
 	}
 
-	for i, p := range m.Astro.Packages {
-		if strings.TrimSpace(p) == "" {
-			add(fmt.Sprintf("tool.astro.packages[%d]", i), "must be a non-empty string")
-		}
+	if v := m.Astro.AirflowVersion; v != "" && !airflowVersionRe.MatchString(v) {
+		p.add(astroRoot+".airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", v))
 	}
 
 	var defaults []string
-	for name, d := range m.Astro.Deployments {
-		ps = append(ps, linkProblems("tool.astro.deployments."+name, d)...)
-		if d.Default {
+	for name := range m.Astro.Deployments {
+		if m.Astro.Deployments[name].Default {
 			defaults = append(defaults, name)
 		}
 	}
 	if len(defaults) > 1 {
 		sort.Strings(defaults)
-		add("tool.astro.deployments", fmt.Sprintf("more than one link sets default = true (%s): at most one may be the default", strings.Join(defaults, ", ")))
+		p.add(astroRoot+".deployments", fmt.Sprintf("more than one link sets default = true (%s): at most one may be the default", strings.Join(defaults, ", ")))
 	}
-
-	// Map iteration made the order random; error text must be stable.
-	sort.Slice(ps, func(i, j int) bool { return ps[i].Key < ps[j].Key })
-	return ps
 }
 
-// linkProblems checks one deployment link, keyed by its dotted TOML key. What
-// a link must carry follows from its kind, so the coordinate fields are
-// checked against the kind rather than one by one: a URL and coordinates in
-// the same link contradict each other, and each coordinate belongs to the
-// kinds that can use it.
-func linkProblems(key string, d Deployment) []Problem {
-	var ps []Problem
-	add := func(k, reason string) { ps = append(ps, Problem{Key: k, Reason: reason}) }
-
-	switch {
-	case d.URL != "" && (d.Deployment != "" || d.Environment != ""):
-		add(key, "sets both a url and coordinates: a link names either a url or deployment/environment coordinates, never both")
-	case d.URL != "":
-		if !httpURL(d.URL) {
-			add(key+".url", fmt.Sprintf("%q is not an http(s) URL", d.URL))
-		}
-	case d.Target == string(KindMWAA) || d.Target == string(KindComposer):
-		if d.Deployment != "" {
-			add(key+".deployment", fmt.Sprintf("a %s link has no Astro deployment id: name the environment with environment = '<%s environment name>'", d.Target, d.Target))
-		}
-		if d.Environment == "" {
-			add(key+".environment", fmt.Sprintf("required: the name of the %s environment", d.Target))
-		}
-	default:
-		if d.Environment != "" {
-			add(key+".environment", fmt.Sprintf("only an mwaa or composer link sets environment; this link's target is %q", d.Target))
-		}
-		if d.Deployment == "" {
-			add(key+".deployment", "required")
-		}
-		// Workspace must resolve from one of the two levels. Only an astro
-		// link has one: the other kinds are not in a workspace.
-		if d.Workspace == "" {
-			add(key+".workspace", "no workspace: set workspace on the link or a default with [tool.astro] workspace")
-		}
-	}
-	return ps
-}
-
-// httpURL reports whether s is an absolute http(s) URL, the only address an
-// endpoint link can be dialed at.
-func httpURL(s string) bool {
-	u, err := url.Parse(s)
-	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
-}
-
-// wire types mirror the TOML spelling; the exported types keep Go names.
-// wireDeployment duplicates Deployment so the tags pin the file format:
-// untagged decoding matches Go names case-insensitively, and a field
-// rename could then change the format without anyone noticing.
+// wire types mirror the TOML spelling. [project] is standard packaging and
+// decodes by tag; [tool.astro] arrives as plain data and parser types it, so
+// that this package's own section can report a wrong shape as a keyed problem
+// rather than a decode failure.
 type wireFile struct {
 	Project *wireProject `toml:"project"`
 	Tool    wireTool     `toml:"tool"`
 }
 
+// Astro is a pointer so that a present-but-empty [tool.astro] is told apart
+// from an absent one: go-toml leaves a plain map nil for both, and the
+// difference decides between "not an astro project" and "a manifest to fix".
 type wireTool struct {
-	Astro *wireAstro `toml:"astro"`
+	Astro *map[string]any `toml:"astro"`
 }
 
 type wireProject struct {
 	Name           string   `toml:"name"`
 	RequiresPython string   `toml:"requires-python"`
 	Dependencies   []string `toml:"dependencies"`
-}
-
-type wireAstro struct {
-	Airflow   string   `toml:"airflow"`
-	Packages  []string `toml:"packages"`
-	Workspace string   `toml:"workspace"`
-	// Target is overloaded: a string default target name, or the
-	// [tool.astro.target.<name>] table of backend config. resolveTargetSection
-	// splits the two. It stays any because TOML decodes each spelling to a
-	// different Go type and a file carries only one.
-	Target      any                       `toml:"target"`
-	Deployments map[string]wireDeployment `toml:"deployments"`
-	Env         map[string]any            `toml:"env"`
-}
-
-// wireDeployment mirrors the TOML spelling. Target is a pointer so an absent
-// key (nil, take the default) is told apart from target = "" (a rejected
-// empty string). The other strings need no such distinction: an empty value
-// reads as absent and the link then fails the check for whatever its kind
-// requires. Auth stays any so an absent table (nil) is told apart from a
-// present one, and so parseAuth can decode it strictly.
-type wireDeployment struct {
-	Target      *string `toml:"target"`
-	Workspace   string  `toml:"workspace"`
-	Deployment  string  `toml:"deployment"`
-	Environment string  `toml:"environment"`
-	URL         string  `toml:"url"`
-	Auth        any     `toml:"auth"`
-	Default     bool    `toml:"default"`
 }

@@ -19,6 +19,26 @@ func write(t *testing.T, content string) string {
 	return path
 }
 
+// validationError asserts that err is a *ValidationError and returns it.
+func validationError(t *testing.T, err error) *ValidationError {
+	t.Helper()
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("want *ValidationError, got %T: %v", err, err)
+	}
+	return ve
+}
+
+// problemKeys is what the validation tests assert on: every problem is
+// addressed by the dotted TOML key it concerns, and that key is the contract.
+func problemKeys(ve *ValidationError) []string {
+	var keys []string
+	for _, p := range ve.Problems {
+		keys = append(keys, p.Key)
+	}
+	return keys
+}
+
 const full = `
 [project]
 name = "my-pipelines"
@@ -29,7 +49,7 @@ dependencies = ["pandas>=2.1", "apache-airflow-providers-snowflake"]
 airflow = "3.1"
 packages = ["libpq-dev", "build-essential"]
 
-[tool.astro.target.astro]
+[tool.astro.targets.astro]
 image = { os = "ubi", python = "3.12" }
 system-packages = ["libaio"]
 
@@ -72,12 +92,12 @@ func TestLoadFull(t *testing.T) {
 		t.Errorf("Packages = %#v, want %#v", m.Astro.Packages, wantPackages)
 	}
 
-	wantDeployments := map[string]Deployment{
+	wantLinks := map[string]Link{
 		"preview": {Target: "astro", Workspace: "ws-abc", Deployment: "dep-preview", Auth: Auth{Method: AuthAstro}},
 		"prod":    {Target: "astro", Workspace: "ws-abc", Deployment: "dep-xyz", Auth: Auth{Method: AuthAstro}},
 	}
-	if !reflect.DeepEqual(m.Astro.Deployments, wantDeployments) {
-		t.Errorf("Deployments = %#v, want %#v", m.Astro.Deployments, wantDeployments)
+	if !reflect.DeepEqual(m.Astro.Deployments, wantLinks) {
+		t.Errorf("Deployments = %#v, want %#v", m.Astro.Deployments, wantLinks)
 	}
 
 	wantTarget := map[string]any{
@@ -117,7 +137,7 @@ func TestResolveDefaults(t *testing.T) {
 		content       string
 		wantWorkspace string // top-level Astro.Workspace
 		wantTarget    string // top-level Astro.Target
-		wantLinks     map[string]Deployment
+		wantLinks     map[string]Link
 	}{
 		{
 			name: "top-level workspace inherited, implicit astro target",
@@ -133,7 +153,7 @@ workspace = "ws-default"
 deployment = "dep-prod"
 `,
 			wantWorkspace: "ws-default",
-			wantLinks: map[string]Deployment{
+			wantLinks: map[string]Link{
 				"prod": {Target: "astro", Workspace: "ws-default", Deployment: "dep-prod", Auth: Auth{Method: AuthAstro}},
 			},
 		},
@@ -152,12 +172,12 @@ workspace = "ws-own"
 deployment = "dep-prod"
 `,
 			wantWorkspace: "ws-default",
-			wantLinks: map[string]Deployment{
+			wantLinks: map[string]Link{
 				"prod": {Target: "astro", Workspace: "ws-own", Deployment: "dep-prod", Auth: Auth{Method: AuthAstro}},
 			},
 		},
 		{
-			name: "top-level target inherited, link target wins",
+			name: "top-level target inherited, link target wins, workspace stays astro-only",
 			content: `
 [project]
 name = "p"
@@ -176,9 +196,9 @@ environment = "orders-prod"
 `,
 			wantWorkspace: "ws-default",
 			wantTarget:    "mwaa",
-			wantLinks: map[string]Deployment{
+			wantLinks: map[string]Link{
 				"cloud": {Target: "astro", Workspace: "ws-default", Deployment: "dep-cloud", Auth: Auth{Method: AuthAstro}},
-				"aws":   {Target: "mwaa", Workspace: "ws-default", Environment: "orders-prod", Auth: Auth{Method: AuthAWS}},
+				"aws":   {Target: "mwaa", Environment: "orders-prod", Auth: Auth{Method: AuthAWS}},
 			},
 		},
 		{
@@ -196,7 +216,7 @@ deployment = "dep-prod"
 default = true
 `,
 			wantWorkspace: "ws-default",
-			wantLinks: map[string]Deployment{
+			wantLinks: map[string]Link{
 				"prod": {Target: "astro", Workspace: "ws-default", Deployment: "dep-prod", Default: true, Auth: Auth{Method: AuthAstro}},
 			},
 		},
@@ -254,7 +274,7 @@ func TestLinkKinds(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]struct {
-		kind Kind
+		kind LinkKind
 		auth Auth
 	}{
 		"dev":           {KindAstro, Auth{Method: AuthAstro}},
@@ -279,6 +299,12 @@ func TestLinkKinds(t *testing.T) {
 	}
 	if env := m.Astro.Deployments["prod-mwaa"].Environment; env != "orders-prod" {
 		t.Errorf("prod-mwaa Environment = %q", env)
+	}
+	// Only an astro link is in a workspace, whatever [tool.astro] sets.
+	for _, name := range []string{"prod-mwaa", "prod-composer", "staging"} {
+		if ws := m.Astro.Deployments[name].Workspace; ws != "" {
+			t.Errorf("%s: Workspace = %q, want empty", name, ws)
+		}
 	}
 }
 
@@ -319,9 +345,9 @@ func TestAuthMethods(t *testing.T) {
 			want: Auth{Method: AuthAirflowToken, UsernameEnv: "AF_USER", PasswordEnv: "AF_PASSWORD"},
 		},
 		{
-			name: "exec",
-			auth: `auth = { method = "exec", command = "acme-airflow-token" }`,
-			want: Auth{Method: AuthExec, Command: "acme-airflow-token"},
+			name: "exec, argv style",
+			auth: `auth = { method = "exec", command = ["acme-airflow-token", "--profile", "prod"] }`,
+			want: Auth{Method: AuthExec, Command: []string{"acme-airflow-token", "--profile", "prod"}},
 		},
 		{
 			name: "google, on a self-hosted Airflow behind IAP",
@@ -436,6 +462,27 @@ func TestValidation(t *testing.T) {
 			wantKeys: []string{"tool.astro.packages[1]"},
 		},
 		{
+			name:     "unknown key in [tool.astro]",
+			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nairflw = \"3.1\"\n",
+			wantKeys: []string{"tool.astro.airflw"},
+		},
+		{
+			name: "unknown key on a link",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+
+[tool.astro.deployments.prod]
+deployment = "dep-xyz"
+defaults = true
+`,
+			wantKeys: []string{"tool.astro.deployments.prod.defaults"},
+		},
+		{
 			name: "incomplete deployment",
 			content: `
 [project]
@@ -503,6 +550,52 @@ target = ""
 			wantKeys: []string{"tool.astro.target"},
 		},
 		{
+			name: "target as a table is the old spelling of targets",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.target.astro]
+image = { os = "ubi" }
+`,
+			wantKeys: []string{"tool.astro.target"},
+		},
+		{
+			name: "target a link cannot use",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+
+[tool.astro.deployments.prod]
+target = "MWAA"
+environment = "orders-prod"
+`,
+			wantKeys: []string{"tool.astro.deployments.prod.target"},
+		},
+		{
+			name: "link inherits a target it cannot use",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+target = "oss"
+
+[tool.astro.deployments.prod]
+deployment = "dep-xyz"
+`,
+			wantKeys: []string{"tool.astro.deployments.prod.target"},
+		},
+		{
 			name: "two links marked default",
 			content: `
 [project]
@@ -540,6 +633,22 @@ auth = { method = "none" }
 			wantKeys: []string{"tool.astro.deployments.mixed"},
 		},
 		{
+			name: "an mwaa link with a url",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.prod]
+target = "mwaa"
+url = "https://airflow.corp.dev"
+auth = { method = "aws" }
+`,
+			wantKeys: []string{"tool.astro.deployments.prod"},
+		},
+		{
 			name: "environment on an astro link",
 			content: `
 [project]
@@ -572,6 +681,22 @@ deployment = "dep-xyz"
 			wantKeys: []string{"tool.astro.deployments.prod.deployment"},
 		},
 		{
+			name: "workspace on an mwaa link",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.prod]
+target = "mwaa"
+environment = "orders-prod"
+workspace = "ws-abc"
+`,
+			wantKeys: []string{"tool.astro.deployments.prod.workspace"},
+		},
+		{
 			name: "composer link without an environment",
 			content: `
 [project]
@@ -586,7 +711,7 @@ target = "composer"
 			wantKeys: []string{"tool.astro.deployments.prod.environment"},
 		},
 		{
-			name: "url that is not an http address",
+			name: "url with no scheme",
 			content: `
 [project]
 name = "p"
@@ -600,24 +725,62 @@ auth = { method = "none" }
 `,
 			wantKeys: []string{"tool.astro.deployments.staging.url"},
 		},
+		{
+			name: "url carrying a username and password",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "https://admin:hunter2@airflow.corp.dev"
+auth = { method = "none" }
+`,
+			wantKeys: []string{"tool.astro.deployments.staging.url"},
+		},
+		{
+			name: "a link named local",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+
+[tool.astro.deployments.local]
+deployment = "dep-xyz"
+`,
+			wantKeys: []string{"tool.astro.deployments.local"},
+		},
+		{
+			name: "a link with no name",
+			content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "ws-abc"
+
+[tool.astro.deployments.""]
+deployment = "dep-xyz"
+`,
+			wantKeys: []string{"tool.astro.deployments"},
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			path := write(t, tc.content)
 			_, err := Load(path)
-			var ve *ValidationError
-			if !errors.As(err, &ve) {
-				t.Fatalf("want *ValidationError, got %T: %v", err, err)
-			}
+			ve := validationError(t, err)
 			if ve.Path != path {
 				t.Errorf("ValidationError.Path = %q, want %q", ve.Path, path)
 			}
-			var keys []string
-			for _, p := range ve.Problems {
-				keys = append(keys, p.Key)
-			}
-			if !reflect.DeepEqual(keys, tc.wantKeys) {
+			if keys := problemKeys(ve); !reflect.DeepEqual(keys, tc.wantKeys) {
 				t.Errorf("problem keys = %v, want %v", keys, tc.wantKeys)
 			}
 		})
@@ -626,26 +789,34 @@ auth = { method = "none" }
 
 func TestParseWithoutPath(t *testing.T) {
 	_, err := Parse([]byte("[tool.astro]\nairflow = \"3.1\"\n"))
-	var ve *ValidationError
-	if !errors.As(err, &ve) {
-		t.Fatalf("want *ValidationError, got %T: %v", err, err)
-	}
+	ve := validationError(t, err)
 	if ve.Path != "" {
 		t.Errorf("Path should be empty for Parse, got %q", ve.Path)
 	}
 }
 
-func TestAirflowVersions(t *testing.T) {
-	good := []string{"3", "3.1", "3.1.2", "2.10"}
-	bad := []string{"three", "3.", ".1", "3.1.2.3", "v3", "3.x", ""}
-	for _, v := range good {
-		if !airflowVersionRe.MatchString(v) {
-			t.Errorf("%q should be accepted", v)
-		}
-	}
-	for _, v := range bad {
-		if airflowVersionRe.MatchString(v) {
-			t.Errorf("%q should be rejected", v)
+// The error lists every problem, because a caller that prints it is how the
+// author of the file finds out what to fix.
+func TestValidationErrorListsEveryProblem(t *testing.T) {
+	_, err := Load(write(t, `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.prod]
+target = "astro"
+`))
+	ve := validationError(t, err)
+	got := ve.Error()
+	for _, want := range []string{
+		"2 problems",
+		"tool.astro.deployments.prod.deployment: required on an astro link",
+		"tool.astro.deployments.prod.workspace: no workspace",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("error text %q should contain %q", got, want)
 		}
 	}
 }
@@ -674,7 +845,7 @@ func TestAuthValidation(t *testing.T) {
 			name:       "auth table names no method",
 			auth:       `auth = { token-env = "AIRFLOW_TOKEN" }`,
 			wantKeys:   []string{key + ".method"},
-			wantReason: "required: astro, aws, google, basic, token, airflow-token, exec, none",
+			wantReason: "required",
 		},
 		{
 			name:       "unknown method",
@@ -686,13 +857,13 @@ func TestAuthValidation(t *testing.T) {
 			name:       "field on the wrong method",
 			auth:       `auth = { method = "basic", username-env = "U", password-env = "P", token-env = "T" }`,
 			wantKeys:   []string{key + ".token-env"},
-			wantReason: "not a field of the basic method (username-env, password-env)",
+			wantReason: "not a field of the basic method",
 		},
 		{
 			name:       "field on a method that takes none",
 			auth:       `auth = { method = "google", token-env = "T" }`,
 			wantKeys:   []string{key + ".token-env"},
-			wantReason: "not a field of the google method, which takes none",
+			wantReason: "not a field of the google method",
 		},
 		{
 			name:       "unknown field",
@@ -704,7 +875,7 @@ func TestAuthValidation(t *testing.T) {
 			name:       "token method without its env var",
 			auth:       `auth = { method = "token" }`,
 			wantKeys:   []string{key + ".token-env"},
-			wantReason: "required by this method",
+			wantReason: "required by the token method",
 		},
 		{
 			name:     "basic method missing both env vars",
@@ -719,21 +890,45 @@ func TestAuthValidation(t *testing.T) {
 		},
 		{
 			name:       "empty field value",
-			auth:       `auth = { method = "exec", command = "" }`,
-			wantKeys:   []string{key + ".command"},
+			auth:       `auth = { method = "token", token-env = "" }`,
+			wantKeys:   []string{key + ".token-env"},
 			wantReason: "must not be empty",
 		},
 		{
 			name:       "field value of the wrong type",
-			auth:       `auth = { method = "exec", command = 7 }`,
-			wantKeys:   []string{key + ".command"},
+			auth:       `auth = { method = "token", token-env = 7 }`,
+			wantKeys:   []string{key + ".token-env"},
 			wantReason: "expected a string",
+		},
+		{
+			name:       "exec command as a string",
+			auth:       `auth = { method = "exec", command = "acme-airflow-token --profile prod" }`,
+			wantKeys:   []string{key + ".command"},
+			wantReason: "expected an array, argv style",
+		},
+		{
+			name:       "exec command with nothing in it",
+			auth:       `auth = { method = "exec", command = [] }`,
+			wantKeys:   []string{key + ".command"},
+			wantReason: "must name a program to run",
+		},
+		{
+			name:       "exec command with a non-string argument",
+			auth:       `auth = { method = "exec", command = ["acme-token", 7] }`,
+			wantKeys:   []string{key + ".command[1]"},
+			wantReason: "expected a non-empty string",
 		},
 		{
 			name:       "half an airflow-token credential pair",
 			auth:       `auth = { method = "airflow-token", client-id-env = "AF_CLIENT_ID" }`,
 			wantKeys:   []string{key + ".client-secret-env"},
 			wantReason: "required alongside client-id-env",
+		},
+		{
+			name:       "airflow-token with both credential pairs",
+			auth:       `auth = { method = "airflow-token", client-id-env = "ID", client-secret-env = "SECRET", username-env = "U", password-env = "P" }`,
+			wantKeys:   []string{key},
+			wantReason: "takes one credential pair, not both",
 		},
 		{
 			name:       "airflow-token with nothing to exchange",
@@ -746,20 +941,28 @@ func TestAuthValidation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Load(write(t, endpointLink(tc.auth)))
-			var ve *ValidationError
-			if !errors.As(err, &ve) {
-				t.Fatalf("want *ValidationError, got %T: %v", err, err)
-			}
-			var keys []string
-			for _, p := range ve.Problems {
-				keys = append(keys, p.Key)
-			}
-			if !reflect.DeepEqual(keys, tc.wantKeys) {
+			ve := validationError(t, err)
+			if keys := problemKeys(ve); !reflect.DeepEqual(keys, tc.wantKeys) {
 				t.Fatalf("problem keys = %v, want %v", keys, tc.wantKeys)
 			}
 			if tc.wantReason != "" && !strings.Contains(ve.Problems[0].Reason, tc.wantReason) {
 				t.Errorf("first reason = %q, want it to contain %q", ve.Problems[0].Reason, tc.wantReason)
 			}
 		})
+	}
+}
+
+func TestAirflowVersions(t *testing.T) {
+	good := []string{"3", "3.1", "3.1.2", "2.10"}
+	bad := []string{"three", "3.", ".1", "3.1.2.3", "v3", "3.x", ""}
+	for _, v := range good {
+		if !airflowVersionRe.MatchString(v) {
+			t.Errorf("%q should be accepted", v)
+		}
+	}
+	for _, v := range bad {
+		if airflowVersionRe.MatchString(v) {
+			t.Errorf("%q should be rejected", v)
+		}
 	}
 }

@@ -41,11 +41,17 @@ type State struct {
 	DevMode bool `json:"devMode,omitempty"`
 }
 
-// UnmarshalJSON decodes a state file, taking the pin from the field's older
-// name when the new one is absent. The pin was called `deployment` while an
-// Astro Deployment was the only thing a project could point at; a file written
-// by an older build still spells it that way, and Load's rewrite then puts it
-// back in the current spelling.
+// The pin was called `deployment` while an Astro Deployment was the only thing
+// a project could point at. Both halves of the rename handle both names —
+// UnmarshalJSON falls back to the old one, MarshalJSON writes both — so a
+// machine that flips between a build from before the rename and one from after
+// keeps its pin either way.
+//
+// Drop the fallback and the dual write together at cutover, when no build in
+// the field reads the old name (docs/v2-release.md, D2).
+//
+// UnmarshalJSON decodes a state file, taking the pin from the older name when
+// the current one is absent.
 func (s *State) UnmarshalJSON(data []byte) error {
 	type stateJSON State // sheds this method, so Unmarshal does not recurse
 	aux := struct {
@@ -59,6 +65,16 @@ func (s *State) UnmarshalJSON(data []byte) error {
 		s.Instance = aux.Deployment
 	}
 	return nil
+}
+
+// MarshalJSON writes the pin under both names, current and old — see
+// UnmarshalJSON.
+func (s State) MarshalJSON() ([]byte, error) {
+	type stateJSON State // sheds this method, so Marshal does not recurse
+	return json.Marshal(struct {
+		stateJSON
+		Deployment string `json:"deployment,omitempty"`
+	}{stateJSON: stateJSON(s), Deployment: s.Instance})
 }
 
 // DecodeError reports a state file that exists but could not be parsed.
@@ -90,8 +106,8 @@ func Dir(projectPath string) (string, error) {
 // Load reads the project's state. A missing file is an empty State, not an
 // error. After parsing, the state is normalized, and when the normalized
 // encoding differs from what was on disk (older schema, dropped fields,
-// hand edits) the file is rewritten — so the file on disk always matches
-// what this build would write.
+// hand edits) the file is rewritten — so the file on disk usually matches what
+// this build would write, and always parses to what the caller gets back.
 func Load(projectPath string) (State, error) {
 	dir, err := Dir(projectPath)
 	if err != nil {
@@ -116,7 +132,11 @@ func Load(projectPath string) (State, error) {
 	}
 	if !bytes.Equal(canonical, raw) {
 		if err := fsatomic.WriteFile(path, canonical, filePerm); err != nil {
-			return State{}, err
+			// Healing is best effort: the state parsed fine, and a cache
+			// directory that cannot be written should not fail a command that
+			// only wanted to read the pin. The file stays as it is and heals
+			// the next time it can.
+			return s, nil
 		}
 	}
 	return s, nil
