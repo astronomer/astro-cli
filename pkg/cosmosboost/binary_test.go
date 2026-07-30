@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -175,6 +176,35 @@ func (s *BinarySuite) TestEnsureBinaryUpdatesBelowMinVersion() {
 	require.NoError(s.T(), os.WriteFile(BinaryPath(), fakeBinary("0.0.0"), binPerm))
 
 	latest := "1.0.0"
+	_, downloads := s.fakeCDN(latest, buildTarGz(s.T(), fakeBinary(latest)), false)
+
+	require.NoError(s.T(), EnsureBinary())
+	s.Equal(1, *downloads)
+	s.Equal(latest, InstalledVersion())
+}
+
+func (s *BinarySuite) TestMeetsMinVersionRejectsRetiredVersions() {
+	// Retired releases outrank the alpha line under plain semver, so the gate
+	// has to reject them by name. Guards against anyone "simplifying"
+	// meetsMinVersion back to a bare comparison.
+	for _, v := range []string{"0.0.1-rc.1", "0.0.1-rc.2", "0.0.2-rc.1", "0.0.3-rc.1", "0.0.3-rc.2"} {
+		minVer, err := semver.NewVersion(MinVersion)
+		require.NoError(s.T(), err)
+		iv, err := semver.NewVersion(v)
+		require.NoError(s.T(), err)
+
+		s.False(iv.LessThan(minVer), "%s is expected to outrank MinVersion %s under plain semver", v, MinVersion)
+		s.False(meetsMinVersion(v), "%s predates the subcommands this CLI calls and must not satisfy the gate", v)
+	}
+}
+
+func (s *BinarySuite) TestEnsureBinaryReplacesRetiredVersion() {
+	s.skipOnWindows()
+	// A machine still carrying a retired build must be updated, not left alone.
+	require.NoError(s.T(), os.MkdirAll(BinDir(), dirPerm))
+	require.NoError(s.T(), os.WriteFile(BinaryPath(), fakeBinary("0.0.2-rc.1"), binPerm))
+
+	latest := "0.0.1-alpha.2"
 	_, downloads := s.fakeCDN(latest, buildTarGz(s.T(), fakeBinary(latest)), false)
 
 	require.NoError(s.T(), EnsureBinary())

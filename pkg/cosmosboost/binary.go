@@ -24,7 +24,7 @@ import (
 const (
 	// MinVersion is the minimum astro-cosmos-boost version compatible with
 	// this CLI. Bump when the CLI starts depending on newer helper behavior.
-	MinVersion = "0.0.1-alpha.1"
+	MinVersion = "0.0.1-alpha.2"
 
 	// defaultBaseURL is the production install CDN for the helper binary.
 	defaultBaseURL = "https://install.astronomer.io/astro-cosmos-boost"
@@ -91,14 +91,35 @@ func LatestVersion() (string, error) {
 	return strings.TrimSpace(string(body)), nil
 }
 
+// retiredVersions are helper releases that predate the current version line.
+// Semver ranks every one of them above any 0.0.1-alpha.N: the 0.0.2 and 0.0.3
+// ones on the patch number, and 0.0.1-rc.N because "rc" sorts after "alpha".
+// They nonetheless lack subcommands this CLI calls, so no MinVersion on the
+// alpha line can exclude them and they have to be named. Their tags and
+// published artifacts are gone, so they only survive where one was installed
+// while they were current.
+//
+// This map becomes redundant once MinVersion reaches a stable 0.0.2 or higher,
+// which orders above all of them, and should be deleted then.
+var retiredVersions = map[string]bool{
+	"0.0.1-rc.1": true,
+	"0.0.1-rc.2": true,
+	"0.0.2-rc.1": true,
+	"0.0.3-rc.1": true,
+	"0.0.3-rc.2": true,
+}
+
 // meetsMinVersion reports whether an installed version string satisfies
-// MinVersion. Empty or unparseable versions do not.
+// MinVersion. Empty, unparseable and retired versions do not.
 func meetsMinVersion(installed string) bool {
 	if installed == "" {
 		return false
 	}
 	iv, err := semver.NewVersion(installed)
 	if err != nil {
+		return false
+	}
+	if retiredVersions[iv.String()] {
 		return false
 	}
 	minVer, _ := semver.NewVersion(MinVersion)
