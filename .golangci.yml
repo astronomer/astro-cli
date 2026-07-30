@@ -128,11 +128,11 @@ linters:
         text: 'shadow: declaration of .err. shadows declaration'
       - path: (.+)\.go$
         text: 'sloppyTestFuncName: function cleanUpInitFiles should be of form'
-      # v2 tree: Deps and the contract structs (localrt, envresolve Inputs)
-      # are passed by value on purpose (docs/v2-architecture.md), so
-      # hugeParam does not apply
+      # v2 tree: Deps and the contract structs (localrt, envresolve Inputs,
+      # airflowapi's per-call options) are passed by value on purpose
+      # (docs/v2-architecture.md), so hugeParam does not apply
       - linters: [gocritic]
-        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|pack))
+        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|pack)|pkg/airflowapi)
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

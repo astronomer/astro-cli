@@ -51,6 +51,9 @@ jobs:
       - name: Run golangci-lint
         run: make lint
 
+      - name: Run golangci-lint on the sub-modules
+        run: make lint-submodules
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -64,6 +67,9 @@ jobs:
         env:
           HOUSTON_HOST: houston
         run: make test
+
+      - name: Run sub-module unit tests
+        run: make test-submodules
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2

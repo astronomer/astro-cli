@@ -44,6 +44,7 @@ var v2BelowCmd = []string{
 	"internal/project",
 	"internal/scaffold",
 	"internal/userstate",
+	"pkg/airflowapi",
 	"pkg/airflowenv",
 	"pkg/connmodel",
 	"pkg/envschema",

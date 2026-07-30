@@ -10,11 +10,38 @@ generate:
 lint:
 	prek run golangci-lint --all-files
 
+# golangci-lint does not descend into a nested module, so a root run has never
+# reached the pkg/* sub-modules and each has to be linted on its own. prek runs
+# from the repo root whatever directory invokes it, so this calls the linter
+# directly — at the version prek.toml pins, which stays the one place that
+# version is written down.
+GOLANGCI_VERSION=$(shell sed -n 's/.*golangci-lint@\(v[0-9.]*\).*/\1/p' prek.toml | head -1)
+
+# The sub-modules that lint clean today and must stay that way. Ten others do
+# not yet: never having been linted, they have collected unused nolint
+# directives and unchecked errors. Each joins this list when its backlog is
+# cleared, which is its own change rather than a rider on someone else's.
+LINT_SUBMODULES=pkg/airflowapi pkg/connmodel pkg/envschema
+
+lint-submodules:
+	@set -e; for mod in ${LINT_SUBMODULES}; do \
+		echo "==> $$mod"; \
+		(cd $$mod && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION} run --timeout 5m); \
+	done
+
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
 test:
 	go test -count=1 -race -shuffle=on -timeout=15m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
+
+# Each pkg/* sub-module has its own go.mod, which the root `go test ./...`
+# never descends into, so their tests need a run of their own.
+test-submodules:
+	@set -e; for mod in pkg/*/go.mod; do \
+		echo "==> $$(dirname $$mod)"; \
+		(cd $$(dirname $$mod) && go test -count=1 -race -shuffle=on -timeout=15m ./...); \
+	done
 
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
