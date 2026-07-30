@@ -134,7 +134,7 @@ func TestBuildImageStampsBuildContextWhenEnabled(t *testing.T) {
 	}
 	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	_, err := buildImage(projectDir, "4.2.5", "", "", "", "", false, false, mockV1Client)
+	_, err := buildImage(projectDir, "4.2.5", "", "", "", nil, false, false, mockV1Client)
 	assert.ErrorIs(t, err, errMock)
 
 	assert.FileExists(t, filepath.Join(projectDir, ".astro", "dbt_metadata.json"),
