@@ -1,8 +1,7 @@
-// Package userstate stores per-user, per-project local state: which
-// deployment the project points at, the preferred port, dev mode. It lives
-// under the astro cache directory, keyed by project path hash
-// (localrt.ProjectID), so worktrees and copies of a project each get
-// their own state.
+// Package userstate stores per-user, per-project local state: which instance
+// the project points at, the preferred port, dev mode. It lives under the
+// astro cache directory, keyed by project path hash (localrt.ProjectID), so
+// worktrees and copies of a project each get their own state.
 package userstate
 
 import (
@@ -30,12 +29,36 @@ const (
 // committed and not shared; everything here is rebuildable or re-choosable,
 // which is why it lives under the cache directory.
 type State struct {
-	Deployment string `json:"deployment,omitempty"`
+	// Instance is the pinned instance: the name of a manifest deployment link,
+	// or the local Airflow. It is one layer of instance resolution, below the
+	// --instance flag and ASTRO_INSTANCE and above what is running locally
+	// (docs/v2-instances.md).
+	Instance string `json:"instance,omitempty"`
 	// Port is the preferred webserver port. The runtime may pick another;
 	// this is the request, not the fact.
 	Port int `json:"port,omitempty"`
 	// DevMode records whether dev-mode Airflow overrides are on.
 	DevMode bool `json:"devMode,omitempty"`
+}
+
+// UnmarshalJSON decodes a state file, taking the pin from the field's older
+// name when the new one is absent. The pin was called `deployment` while an
+// Astro Deployment was the only thing a project could point at; a file written
+// by an older build still spells it that way, and Load's rewrite then puts it
+// back in the current spelling.
+func (s *State) UnmarshalJSON(data []byte) error {
+	type stateJSON State // sheds this method, so Unmarshal does not recurse
+	aux := struct {
+		*stateJSON
+		Deployment string `json:"deployment"`
+	}{stateJSON: (*stateJSON)(s)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if s.Instance == "" {
+		s.Instance = aux.Deployment
+	}
+	return nil
 }
 
 // DecodeError reports a state file that exists but could not be parsed.

@@ -76,7 +76,7 @@ func TestLoadMissingFileIsEmptyState(t *testing.T) {
 func TestSaveThenLoadRoundtrip(t *testing.T) {
 	setCache(t)
 	proj := t.TempDir()
-	want := State{Deployment: "dep-123", Port: 8080, DevMode: true}
+	want := State{Instance: "prod", Port: 8080, DevMode: true}
 
 	require.NoError(t, Save(proj, want))
 	got, err := Load(proj)
@@ -96,12 +96,12 @@ func TestSaveReplacesExistingState(t *testing.T) {
 	setCache(t)
 	proj := t.TempDir()
 
-	require.NoError(t, Save(proj, State{Deployment: "old"}))
-	require.NoError(t, Save(proj, State{Deployment: "new", Port: 9090}))
+	require.NoError(t, Save(proj, State{Instance: "old"}))
+	require.NoError(t, Save(proj, State{Instance: "new", Port: 9090}))
 
 	got, err := Load(proj)
 	require.NoError(t, err)
-	assert.Equal(t, State{Deployment: "new", Port: 9090}, got)
+	assert.Equal(t, State{Instance: "new", Port: 9090}, got)
 }
 
 func TestLoadHealsNonCanonicalFile(t *testing.T) {
@@ -112,18 +112,19 @@ func TestLoadHealsNonCanonicalFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	path := filepath.Join(dir, "state.json")
 
-	// Older schema: unknown field, no trailing newline, odd formatting.
+	// Older schema: the pin under its old name, an unknown field, no trailing
+	// newline, odd formatting.
 	stale := `{"deployment":"dep-1","legacyField":true,"port":-4}`
 	require.NoError(t, os.WriteFile(path, []byte(stale), 0o600))
 
 	s, err := Load(proj)
 	require.NoError(t, err)
-	assert.Equal(t, State{Deployment: "dep-1"}, s) // negative port healed to zero
+	assert.Equal(t, State{Instance: "dep-1"}, s) // negative port healed to zero
 
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.NotContains(t, string(raw), "legacyField")
-	assert.JSONEq(t, `{"deployment":"dep-1"}`, string(raw))
+	assert.JSONEq(t, `{"instance":"dep-1"}`, string(raw))
 
 	// A second load finds the file already canonical and leaves it alone.
 	info1, err := os.Stat(path)
@@ -133,6 +134,20 @@ func TestLoadHealsNonCanonicalFile(t *testing.T) {
 	info2, err := os.Stat(path)
 	require.NoError(t, err)
 	assert.Equal(t, info1.ModTime(), info2.ModTime())
+}
+
+func TestLoadPrefersInstanceOverOldDeploymentKey(t *testing.T) {
+	setCache(t)
+	proj := t.TempDir()
+	dir, err := Dir(proj)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	path := filepath.Join(dir, "state.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"instance":"prod","deployment":"stale"}`), 0o600))
+
+	s, err := Load(proj)
+	require.NoError(t, err)
+	assert.Equal(t, State{Instance: "prod"}, s)
 }
 
 func TestLoadCorruptFile(t *testing.T) {
@@ -160,8 +175,8 @@ func TestSymlinkedProjectSharesState(t *testing.T) {
 	link := filepath.Join(root, "link")
 	require.NoError(t, os.Symlink(target, link))
 
-	require.NoError(t, Save(target, State{Deployment: "shared"}))
+	require.NoError(t, Save(target, State{Instance: "shared"}))
 	got, err := Load(link)
 	require.NoError(t, err)
-	assert.Equal(t, "shared", got.Deployment)
+	assert.Equal(t, "shared", got.Instance)
 }
