@@ -156,6 +156,31 @@ func (l Link) Kind() LinkKind {
 	}
 }
 
+// DefaultLink returns the link a command acts on when none is named: the one
+// marked default = true — validation allows at most one — or, the interim
+// rule, a project's only link, so a one-link project behaves the same whether
+// that link is marked.
+//
+// It lives here because it is a fact about the manifest, and because both the
+// deploy path and instance resolution ask it. Two copies of this rule would
+// drift, and the day they did, `astro deploy` and `astro dags list` would
+// disagree about where a project points.
+func DefaultLink(links map[string]Link) (string, Link, bool) {
+	// Ranged by key: a link is a wide struct, and copying one per iteration to
+	// read a single field is waste.
+	for name := range links {
+		if links[name].Default {
+			return name, links[name], true
+		}
+	}
+	if len(links) == 1 {
+		for name := range links {
+			return name, links[name], true
+		}
+	}
+	return "", Link{}, false
+}
+
 // ErrNoAstroSection reports a pyproject.toml without a [tool.astro] table: a
 // Python project, but not an astro project. Callers branch on it with
 // errors.Is, typically to offer init or import.
@@ -282,9 +307,11 @@ var (
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
-// reservedLinkName is the name instance resolution keeps for the Airflow
-// running on this machine, so a link may not take it.
-const reservedLinkName = "local"
+// ReservedLinkName is the name instance resolution keeps for the Airflow
+// running on this machine, so a link may not take it. It is exported so the
+// resolver names the same string this package refuses, rather than the two
+// agreeing by coincidence.
+const ReservedLinkName = "local"
 
 // parser accumulates the findings of one decode. Every helper takes the dotted
 // key it is decoding, records a Problem when the value is the wrong shape, and
@@ -356,7 +383,7 @@ func (p *parser) links(v any, a *Astro) map[string]Link {
 		case "":
 			p.add(key, "a link needs a name")
 			continue
-		case reservedLinkName:
+		case ReservedLinkName:
 			p.add(key+"."+name, "reserved: local always means the Airflow running on this machine — name the link something else")
 			continue
 		}

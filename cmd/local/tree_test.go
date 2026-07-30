@@ -64,7 +64,7 @@ func TestLocalTreeHasEverySpecCommand(t *testing.T) {
 func TestRootHasAliasesInitAndDev(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs"} {
+	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs", "use", "instance"} {
 		found := false
 		for _, sub := range root.Commands() {
 			if sub.Name() == name {

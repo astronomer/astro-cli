@@ -209,9 +209,13 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 		PID:         pid,
 		// launch sets Setpgid, so the child leads its own group and the
 		// pgid equals its PID.
-		Pgid:            pid,
-		Port:            port,
-		Hostname:        hostname,
+		Pgid:     pid,
+		Port:     port,
+		Hostname: hostname,
+		// The generation this process was launched for, so whatever talks to it
+		// later follows the process rather than a manifest that may since have
+		// been edited.
+		AirflowMajor:    major,
 		StartedAt:       e.now().UTC(),
 		StopWithSession: p.StopWithSession,
 	}

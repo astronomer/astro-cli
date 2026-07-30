@@ -161,7 +161,8 @@ func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem
 		current, _ = localrt.CanonicalPath(projectDir) //nolint:errcheck // a canonicalize failure just means we don't dedupe against it
 	}
 	var out []ListItem
-	for _, rec := range recs {
+	for i := range recs {
+		rec := &recs[i]
 		if current != "" {
 			if canon, cerr := localrt.CanonicalPath(rec.ProjectPath); cerr == nil && canon == current {
 				continue // the current project's file is already listed above

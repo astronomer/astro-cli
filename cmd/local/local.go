@@ -438,7 +438,7 @@ func (c *cli) runList(all, clean bool) error {
 		return err
 	}
 	rows := buildListRows(statuses, all, time.Now())
-	return emitListRows(r, rows, renderListTable)
+	return emitRows(r, rows, renderListTable)
 }
 
 func (c *cli) runListClean(r Renderer) error {
@@ -448,7 +448,7 @@ func (c *cli) runListClean(r Renderer) error {
 	}
 	// Everything PruneStale returns is stale by definition; show it all.
 	rows := buildListRows(removed, true, time.Now())
-	return emitListRows(r, rows, renderRemovedRows)
+	return emitRows(r, rows, renderRemovedRows)
 }
 
 // State labels for a list row. Stale means the record outlived its runtime.
@@ -475,7 +475,8 @@ type listRow struct {
 // uptime is testable.
 func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow {
 	rows := make([]listRow, 0, len(statuses))
-	for _, st := range statuses {
+	for i := range statuses {
+		st := &statuses[i]
 		running := st.State == localrt.StateRunning
 		if !running && !all {
 			continue
@@ -503,9 +504,11 @@ func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow
 	return rows
 }
 
-// emitListRows renders rows: one JSON object per line in json mode (so the
-// output is NDJSON, not one array), the text renderer once otherwise.
-func emitListRows(r Renderer, rows []listRow, text func(io.Writer, []listRow) error) error {
+// emitRows renders a table of rows: one JSON object per line in json mode (so
+// the output is NDJSON, not one array), the text renderer once otherwise. It is
+// generic because every listing surface wants exactly this and only differs in
+// what a row is.
+func emitRows[T any](r Renderer, rows []T, text func(io.Writer, []T) error) error {
 	if r.Format == FormatJSON {
 		for _, row := range rows {
 			if err := r.Emit(row, nil); err != nil {

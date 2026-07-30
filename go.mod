@@ -35,6 +35,7 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.7.0
+	github.com/astronomer/astro-cli/pkg/airflowapi v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowenv v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
@@ -333,3 +334,5 @@ replace github.com/astronomer/astro-cli/pkg/secrets => ./pkg/secrets
 replace github.com/astronomer/astro-cli/pkg/connmodel => ./pkg/connmodel
 
 replace github.com/astronomer/astro-cli/pkg/airflowenv => ./pkg/airflowenv
+
+replace github.com/astronomer/astro-cli/pkg/airflowapi => ./pkg/airflowapi

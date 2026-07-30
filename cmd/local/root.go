@@ -32,6 +32,8 @@ func AddCmds(d Deps) []*cobra.Command {
 		NewInitCmd(d),
 		NewDevCmd(d),
 		NewPackageCmd(d),
+		NewUseCmd(d),
+		NewInstanceCmd(d),
 		newSuperviseCmd(d),
 		newSessionWatchCmd(d),
 		newProxyServeCmd(d),

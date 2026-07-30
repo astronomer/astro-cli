@@ -114,7 +114,7 @@ linters:
       # Keep this list in sync with v2BelowCmd in internal/archlint/archlint_test.go
       # when a new internal/ v2 package lands.
       - linters: [forbidigo]
-        path-except: ^internal/(checks|envresolve|fsatomic|imagebuild|localdocker|localprune|localshared|localstandalone|localstate|pack|plan|project|scaffold|userstate)/
+        path-except: ^internal/(checks|envresolve|fsatomic|imagebuild|instances|localdocker|localprune|localshared|localstandalone|localstate|pack|plan|project|scaffold|userstate)/
       - linters:
           - dupl
           - errcheck
@@ -132,7 +132,7 @@ linters:
       # airflowapi's per-call options) are passed by value on purpose
       # (docs/v2-architecture.md), so hugeParam does not apply
       - linters: [gocritic]
-        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|pack)|pkg/airflowapi)
+        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|instances|pack)|pkg/airflowapi)
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

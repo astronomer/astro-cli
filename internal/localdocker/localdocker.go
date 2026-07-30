@@ -44,6 +44,10 @@ const (
 	// gracefulStopTimeout is how long compose waits on SIGTERM before
 	// killing; Stop with Force uses 0.
 	gracefulStopTimeout = 10
+	// dockerAirflowMajor is the Airflow generation this engine runs. The
+	// compose template is Airflow 3 throughout — an api-server, the simple
+	// auth manager — so there is nothing to derive it from.
+	dockerAirflowMajor = "3"
 )
 
 // ErrNotDockerMode reports a record this engine does not own.
@@ -194,11 +198,14 @@ func (e *Engine) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks
 	}
 
 	rec := localstate.Record{
-		ProjectPath:     projectPath,
-		Mode:            localrt.ModeDocker,
-		ComposeProject:  name,
-		Port:            apiPort,
-		Hostname:        hostname,
+		ProjectPath:    projectPath,
+		Mode:           localrt.ModeDocker,
+		ComposeProject: name,
+		Port:           apiPort,
+		Hostname:       hostname,
+		// The compose template runs Airflow 3 and nothing else, so the
+		// generation is not derived from the plan — it is what this engine is.
+		AirflowMajor:    dockerAirflowMajor,
 		StartedAt:       e.now().UTC(),
 		StopWithSession: p.StopWithSession,
 	}

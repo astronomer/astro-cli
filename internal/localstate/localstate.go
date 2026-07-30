@@ -49,10 +49,17 @@ type Record struct {
 	// PID). Stop signals and liveness checks address the group, not the
 	// master: `airflow standalone` spawns its components into the group
 	// and the master often exits before they do.
-	Pgid            int       `json:"pgid,omitempty"`
-	ComposeProject  string    `json:"composeProject,omitempty"`
-	Port            int       `json:"port"`
-	Hostname        string    `json:"hostname,omitempty"`
+	Pgid           int    `json:"pgid,omitempty"`
+	ComposeProject string `json:"composeProject,omitempty"`
+	Port           int    `json:"port"`
+	Hostname       string `json:"hostname,omitempty"`
+	// AirflowMajor is the Airflow generation this runtime runs ("2" or "3"),
+	// recorded at start. It is here rather than re-read from the manifest
+	// because it is a fact about the process: the pin can be edited while
+	// Airflow keeps running, and anything that talks to that Airflow — the
+	// health probe's paths, the credentials it accepts — must follow the
+	// process. Empty on a record written before this field existed.
+	AirflowMajor    string    `json:"airflowMajor,omitempty"`
 	StartedAt       time.Time `json:"startedAt"`
 	StopWithSession bool      `json:"stopWithSession,omitempty"`
 }
@@ -152,6 +159,7 @@ func (r Record) Status(running bool) localrt.Status {
 		StopWithSession: r.StopWithSession,
 		State:           localrt.StateStopped,
 		Hostname:        r.Hostname,
+		AirflowMajor:    r.AirflowMajor,
 		StartedAt:       r.StartedAt,
 	}
 	if running {

@@ -17,9 +17,11 @@ import (
 
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/checks"
 	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localprune"
@@ -66,6 +68,18 @@ type Deps struct {
 	// from the current login context per request; a logged-out user just makes
 	// the provider absent. A test injects a fake.
 	AstroV1Client astrov1.APIClient
+
+	// Session hands instance resolution the current login's bearer, for a link
+	// that proves itself with the astro auth method. It is a seam because the
+	// read touches config/, which this tree never imports directly; nil reads
+	// as logged out.
+	Session func(ctx context.Context) (string, error)
+
+	// Interactive reports whether this run may ask the user a question. It is a
+	// seam rather than a stdin type-assertion so a test can drive the prompt
+	// path without a pty. nil means non-interactive, which is the safe default:
+	// a run that cannot be asked is never blocked waiting for an answer.
+	Interactive func() bool
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -98,7 +112,14 @@ func NewDeps() Deps {
 		WorkingDir:    os.Getwd,
 		OpenURL:       browser.OpenURL,
 		AstroV1Client: astrov1.NewV1Client(httputil.NewHTTPClient()),
+		Session:       astrosession.Bearer,
+		Interactive:   stdinIsTerminal,
 	}
+}
+
+// stdinIsTerminal is the production answer to "can this run ask a question".
+func stdinIsTerminal() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // modeRuntime is the production Runtime: it dispatches on localrt.Mode
@@ -262,8 +283,8 @@ func (r modeRuntime) List() ([]localrt.Status, error) {
 		}
 	}
 	statuses := make([]localrt.Status, 0, len(recs))
-	for _, rec := range recs {
-		st := r.statusOf(rec)
+	for i := range recs {
+		st := r.statusOf(recs[i])
 		if st.Hostname == "" {
 			st.Hostname = hostByProject[st.ProjectPath]
 		}
@@ -287,7 +308,8 @@ func (r modeRuntime) PruneStale() ([]localrt.Status, error) {
 		return nil, err
 	}
 	var removed []localrt.Status
-	for _, st := range statuses {
+	for i := range statuses {
+		st := &statuses[i]
 		if st.State == localrt.StateRunning {
 			continue
 		}
@@ -311,7 +333,7 @@ func (r modeRuntime) PruneStale() ([]localrt.Status, error) {
 		if rerr := localstate.Remove(st.ProjectPath); rerr != nil {
 			return removed, rerr
 		}
-		removed = append(removed, st)
+		removed = append(removed, *st)
 	}
 	return removed, nil
 }

@@ -966,3 +966,33 @@ func TestAirflowVersions(t *testing.T) {
 		}
 	}
 }
+
+// TestDefaultLink pins the rule both the deploy path and instance resolution
+// ask for: the marked link, or a project's only link, and nothing otherwise.
+func TestDefaultLink(t *testing.T) {
+	marked := map[string]Link{
+		"dev":  {Deployment: "clm2xk9dq000108l7a2b3c4d5", Default: true},
+		"prod": {Deployment: "clm2xk9dq000108l7a2b3c4d6"},
+	}
+	if name, link, ok := DefaultLink(marked); !ok || name != "dev" || !link.Default {
+		t.Errorf("marked default = %q, %v, %v; want dev", name, link.Default, ok)
+	}
+
+	lone := map[string]Link{"only": {Deployment: "clm2xk9dq000108l7a2b3c4d5"}}
+	if name, _, ok := DefaultLink(lone); !ok || name != "only" {
+		t.Errorf("lone link = %q, %v; want only", name, ok)
+	}
+
+	// Several links and none marked: no default, which is what sends a command
+	// to its prompt or its error.
+	several := map[string]Link{
+		"dev":  {Deployment: "clm2xk9dq000108l7a2b3c4d5"},
+		"prod": {Deployment: "clm2xk9dq000108l7a2b3c4d6"},
+	}
+	if name, _, ok := DefaultLink(several); ok {
+		t.Errorf("several links defaulted to %q", name)
+	}
+	if _, _, ok := DefaultLink(nil); ok {
+		t.Error("no links produced a default")
+	}
+}

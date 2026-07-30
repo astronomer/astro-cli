@@ -303,7 +303,7 @@ func resolveSelection(req Request) (selection, error) {
 
 	// Otherwise the default link: a link marked default = true, or — the interim
 	// rule — a project's one link when nothing is marked (design doc section 3).
-	if name, link, ok := defaultLink(links); ok {
+	if name, link, ok := manifest.DefaultLink(links); ok {
 		return astroSelection(req, name, link, links)
 	}
 
@@ -328,26 +328,6 @@ func astroSelection(req Request, name string, link manifest.Link, links map[stri
 		workspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
 		linkName:     name,
 	}, nil
-}
-
-// defaultLink returns the link `astro deploy` ships to with no argument. A link
-// marked default = true wins; the manifest guarantees at most one. With none
-// marked, the interim rule keeps its promise: a project's one link is its
-// default. A one-link project behaves the same whether that link is marked.
-func defaultLink(links map[string]manifest.Link) (string, manifest.Link, bool) {
-	// Ranged by key: a link is a wide struct, and copying one per iteration to
-	// read a single field is waste the linter is right about.
-	for name := range links {
-		if links[name].Default {
-			return name, links[name], true
-		}
-	}
-	if len(links) == 1 {
-		for name := range links {
-			return name, links[name], true
-		}
-	}
-	return "", manifest.Link{}, false
 }
 
 func knownLinks(links map[string]manifest.Link) string {

@@ -97,14 +97,19 @@ const (
 // keys, and the fields a stopped Airflow zeroes (pid, port, startedAt) drop out
 // rather than reporting a false 0 or a zero-value timestamp.
 type Status struct {
-	ProjectPath     string    `json:"projectPath"`
-	Mode            Mode      `json:"mode,omitempty"`
-	StopWithSession bool      `json:"stopWithSession,omitempty"`
-	State           State     `json:"state"`
-	PID             int       `json:"pid,omitempty"`
-	Port            int       `json:"port,omitempty"`
-	Hostname        string    `json:"hostname,omitempty"`
-	StartedAt       time.Time `json:"startedAt,omitzero"`
+	ProjectPath     string `json:"projectPath"`
+	Mode            Mode   `json:"mode,omitempty"`
+	StopWithSession bool   `json:"stopWithSession,omitempty"`
+	State           State  `json:"state"`
+	PID             int    `json:"pid,omitempty"`
+	Port            int    `json:"port,omitempty"`
+	Hostname        string `json:"hostname,omitempty"`
+	// AirflowMajor is the Airflow generation this runtime was started for
+	// ("2" or "3"), carried from the record. It describes the running
+	// process, not the manifest, which may have been edited since. Empty on
+	// a record written before the field existed.
+	AirflowMajor string    `json:"airflowMajor,omitempty"`
+	StartedAt    time.Time `json:"startedAt,omitzero"`
 }
 
 // LogLine is one parsed line of component output.

@@ -27,6 +27,7 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	cloudenv "github.com/astronomer/astro-cli/cloud/env"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 )
 
 // sourceLabel is the source name a workspace-resolved value reports.
@@ -116,9 +117,11 @@ func (p *provider) Diagnose(key string) string {
 func (p *provider) load() {
 	p.once.Do(func() {
 		// The current context picks the login and the org; a logged-out user
-		// has none, and the provider is simply absent.
+		// has none, and the provider is simply absent. What counts as logged
+		// out comes from internal/astrosession, so this and the query commands
+		// never disagree about whether there is a session.
 		ctx, err := config.GetCurrentContext()
-		if err != nil || ctx.Token == "" {
+		if err != nil || astrosession.Credential(ctx.Token) == "" {
 			p.down = &outage{short: "logged out", cause: "you are not logged in — log in with 'astro login'"}
 			return
 		}
