@@ -65,6 +65,7 @@ func TestDetectAgent(t *testing.T) {
 		envValue string
 		expected string
 	}{
+		{"otto", "OTTO", "1", "otto"},
 		{"claude code", "CLAUDECODE", "1", "claude-code"},
 		{"claude code entrypoint", "CLAUDE_CODE_ENTRYPOINT", "cli", "claude-code"},
 		{"cursor", "CURSOR_TRACE_ID", "abc123", "cursor"},
@@ -88,6 +89,29 @@ func TestDetectAgent(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// Otto passes its own environment through to every command it runs, so an Otto
+// session started from inside another agent still carries that agent's marker.
+// Otto is the proximate caller and must win.
+func TestDetectAgentOttoWinsOverInheritedMarker(t *testing.T) {
+	for _, env := range envVarNames(agentEnvVars) {
+		saved := os.Getenv(env)
+		os.Unsetenv(env)
+		defer func(env, saved string) {
+			if saved != "" {
+				os.Setenv(env, saved)
+			}
+		}(env, saved)
+	}
+
+	os.Setenv("CLAUDECODE", "1")
+	defer os.Unsetenv("CLAUDECODE")
+	assert.Equal(t, "claude-code", DetectAgent())
+
+	os.Setenv("OTTO", "1")
+	defer os.Unsetenv("OTTO")
+	assert.Equal(t, "otto", DetectAgent())
 }
 
 func TestDetectCISystem(t *testing.T) {

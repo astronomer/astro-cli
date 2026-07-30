@@ -43,8 +43,13 @@ type envMapping struct {
 	name   string
 }
 
-// agentEnvVars is an ordered list of environment variables to detect agent contexts
+// agentEnvVars is an ordered list of environment variables to detect agent
+// contexts. Order matters: the first match wins. Otto is first because it
+// passes its own environment through to every command it runs, so an Otto
+// session started from inside another agent still carries that agent's marker.
+// Otto is the proximate caller, so it takes precedence.
 var agentEnvVars = []envMapping{
+	{"OTTO", "otto"},
 	{"CLAUDECODE", "claude-code"},
 	{"CLAUDE_CODE_ENTRYPOINT", "claude-code"},
 	{"CURSOR_TRACE_ID", "cursor"},
