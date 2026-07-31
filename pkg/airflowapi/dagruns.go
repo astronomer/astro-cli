@@ -3,6 +3,7 @@ package airflowapi
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -52,6 +53,14 @@ type ListDAGRunsOptions struct {
 	ListOptions
 	// States keeps only runs in one of these states.
 	States []string
+	// StartDateFrom and StartDateTo bound when the runs started. Either may
+	// stand alone, so one end can be left open.
+	//
+	// Unlike the run's own date — which Airflow 2 calls execution_date and
+	// Airflow 3 calls logical_date — both generations spell this filter
+	// start_date_gte/start_date_lte, so there is nothing to adapt here.
+	StartDateFrom time.Time
+	StartDateTo   time.Time
 }
 
 // ListDAGRuns lists a DAG's runs. An empty dagID lists runs of every DAG,
@@ -61,9 +70,20 @@ func (c *Client) ListDAGRuns(ctx context.Context, dagID string, opts ListDAGRuns
 	for _, state := range opts.States {
 		query.Add("state", state)
 	}
+	setTime(query, "start_date_gte", opts.StartDateFrom)
+	setTime(query, "start_date_lte", opts.StartDateTo)
 	var list DAGRunList
 	err := c.getCollection(ctx, pathf("/dags/%s/dagRuns", orAnyID(dagID)), query, &list)
 	return list, err
+}
+
+// setTime adds a timestamp filter, leaving it out when the time is unset. Both
+// generations read these as RFC 3339.
+func setTime(query url.Values, name string, at time.Time) {
+	if at.IsZero() {
+		return
+	}
+	query.Set(name, at.UTC().Format(time.RFC3339))
 }
 
 // GetDAGRun reads one run.

@@ -1,0 +1,358 @@
+package local
+
+import (
+	"context"
+	"io"
+
+	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/pkg/airflowapi"
+)
+
+// NewConnectionsCmd builds `astro connections` for the root. It and the two
+// families below are the Airflow objects this surface reads but never writes:
+// setting them belongs to `astro local env` on the machine, and to the platform
+// commands on a deployment.
+func NewConnectionsCmd(d Deps) *cobra.Command {
+	return newQueryCmd(d, &cobra.Command{
+		Use:   "connections",
+		Short: "List and read the connections on an Airflow",
+		Long: "Read the connections on whichever Airflow this project resolves to: which systems it can reach, " +
+			"and how.\n\nNo password is ever shown. The client this runs on does not decode the field at all, " +
+			"so a password cannot reach a table, a log, or a json stream by accident — not with --output json, " +
+			"not on `get`. Read one with `astro api airflow` if you genuinely need it.\n\n" +
+			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+	},
+		newConnectionsListCmd,
+		newConnectionsGetCmd,
+	)
+}
+
+// connectionListRow is a connection in a listing: where it points, and nothing
+// that could be a credential. Extra is deliberately absent — it is a free-form
+// blob that routinely holds tokens, keys, and passwords under names Airflow
+// does not mask, so listing every connection on an instance must not hand them
+// out. The family's no-secrets promise has to hold for --output json, not just
+// for the table.
+type connectionListRow struct {
+	ConnectionID string `json:"connection_id"`
+	ConnType     string `json:"conn_type,omitempty"`
+	Host         string `json:"host,omitempty"`
+	Port         int    `json:"port,omitempty"`
+	Schema       string `json:"schema,omitempty"`
+	Login        string `json:"login,omitempty"`
+	Description  string `json:"description,omitempty"`
+}
+
+// connectionRow is one connection read on purpose, Extra included. Asking for a
+// single connection by name is a deliberate act, the way `astro variables get`
+// is; the password is still absent, because the client never decodes it.
+type connectionRow struct {
+	connectionListRow
+	Extra string `json:"extra,omitempty"`
+}
+
+func newConnectionListRow(c airflowapi.Connection) connectionListRow {
+	return connectionListRow{
+		ConnectionID: c.ConnectionID,
+		ConnType:     c.ConnType,
+		Host:         c.Host,
+		Port:         c.Port,
+		Schema:       c.Schema,
+		Login:        c.Login,
+		Description:  c.Description,
+	}
+}
+
+func newConnectionsListCmd(q *query) *cobra.Command {
+	var list listFlags
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List the connections on this Airflow",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return q.runConnectionsList(cmd.Context(), list.options())
+		},
+	}
+	addListFlags(cmd, &list, "")
+	return cmd
+}
+
+func (q *query) runConnectionsList(ctx context.Context, opts airflowapi.ListOptions) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	list, err := client.ListConnections(ctx, opts)
+	if err != nil {
+		return err
+	}
+	return emitRows(r, mapRows(list.Connections, newConnectionListRow), renderConnectionTable)
+}
+
+func renderConnectionTable(w io.Writer, rows []connectionListRow) error {
+	return renderTable(w, rows, "No connections on this Airflow.",
+		[]string{"CONN_ID", "TYPE", "HOST", "PORT", "SCHEMA", "LOGIN"},
+		func(row connectionListRow) []string {
+			return []string{row.ConnectionID, row.ConnType, row.Host, omitZero(row.Port), row.Schema, row.Login}
+		})
+}
+
+func newConnectionsGetCmd(q *query) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <CONN_ID>",
+		Short: "Show one connection, without its password",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return q.runConnectionsGet(cmd.Context(), args[0])
+		},
+	}
+}
+
+func (q *query) runConnectionsGet(ctx context.Context, id string) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	conn, err := client.GetConnection(ctx, id)
+	if err != nil {
+		return err
+	}
+	row := connectionRow{connectionListRow: newConnectionListRow(conn), Extra: conn.Extra}
+	return emitDetail(r, row, func(row connectionRow) []field {
+		return []field{
+			{"connection id", row.ConnectionID},
+			{"type", row.ConnType},
+			{"host", row.Host},
+			{"port", omitZero(row.Port)},
+			{"schema", row.Schema},
+			{"login", row.Login},
+			{"description", row.Description},
+			{"extra", row.Extra},
+		}
+	})
+}
+
+// NewVariablesCmd builds `astro variables` for the root.
+func NewVariablesCmd(d Deps) *cobra.Command {
+	return newQueryCmd(d, &cobra.Command{
+		Use:   "variables",
+		Short: "List and read the Airflow Variables on an Airflow",
+		Long: "Read the Airflow Variables on whichever Airflow this project resolves to.\n\n" +
+			"`list` shows keys and descriptions but no values: a Variable holds whatever someone put in it, " +
+			"and printing every value to answer \"what variables are there\" is how a secret ends up in a " +
+			"terminal scrollback. Read one deliberately with `astro variables get <KEY>`.\n\n" +
+			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+	},
+		newVariablesListCmd,
+		newVariablesGetCmd,
+	)
+}
+
+// variableListRow is a Variable in a listing: no value, deliberately.
+type variableListRow struct {
+	Key         string `json:"key"`
+	Description string `json:"description,omitempty"`
+	IsEncrypted bool   `json:"is_encrypted"`
+}
+
+// variableRow is one Variable read on purpose, value and all.
+type variableRow struct {
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+	IsEncrypted bool   `json:"is_encrypted"`
+}
+
+func newVariablesListCmd(q *query) *cobra.Command {
+	var list listFlags
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List the Variable keys on this Airflow, without their values",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return q.runVariablesList(cmd.Context(), list.options())
+		},
+	}
+	addListFlags(cmd, &list, "")
+	return cmd
+}
+
+func (q *query) runVariablesList(ctx context.Context, opts airflowapi.ListOptions) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	list, err := client.ListVariables(ctx, opts)
+	if err != nil {
+		return err
+	}
+	rows := mapRows(list.Variables, func(v airflowapi.Variable) variableListRow {
+		return variableListRow{Key: v.Key, Description: v.Description, IsEncrypted: v.IsEncrypted}
+	})
+	return emitRows(r, rows, renderVariableTable)
+}
+
+func renderVariableTable(w io.Writer, rows []variableListRow) error {
+	return renderTable(w, rows, "No Variables on this Airflow.",
+		[]string{"KEY", "DESCRIPTION"},
+		func(row variableListRow) []string { return []string{row.Key, row.Description} })
+}
+
+func newVariablesGetCmd(q *query) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <KEY>",
+		Short: "Show one Variable and its value",
+		Long: "Print one Variable's value. Airflow masks the values of Variables whose keys look sensitive, and " +
+			"what comes back is whatever it sent.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return q.runVariablesGet(cmd.Context(), args[0])
+		},
+	}
+}
+
+func (q *query) runVariablesGet(ctx context.Context, key string) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	variable, err := client.GetVariable(ctx, key)
+	if err != nil {
+		return err
+	}
+	row := variableRow{
+		Key:         variable.Key,
+		Value:       variable.Value,
+		Description: variable.Description,
+		IsEncrypted: variable.IsEncrypted,
+	}
+	return emitDetail(r, row, func(row variableRow) []field {
+		return []field{
+			{"key", row.Key},
+			{"value", row.Value},
+			{"description", row.Description},
+			{"encrypted", onlyIf(row.IsEncrypted, "yes")},
+		}
+	})
+}
+
+// NewPoolsCmd builds `astro pools` for the root.
+func NewPoolsCmd(d Deps) *cobra.Command {
+	return newQueryCmd(d, &cobra.Command{
+		Use:   "pools",
+		Short: "List and read the concurrency pools on an Airflow",
+		Long: "Read the pools on whichever Airflow this project resolves to: how many slots each has, and how " +
+			"many of them tasks are sitting in right now. A pool with no open slots is why a task is queued.\n\n" +
+			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+	},
+		newPoolsListCmd,
+		newPoolsGetCmd,
+	)
+}
+
+// poolRow is a concurrency pool as this surface reports it.
+type poolRow struct {
+	Name            string `json:"name"`
+	Slots           int    `json:"slots"`
+	OccupiedSlots   int    `json:"occupied_slots"`
+	RunningSlots    int    `json:"running_slots"`
+	QueuedSlots     int    `json:"queued_slots"`
+	ScheduledSlots  int    `json:"scheduled_slots"`
+	DeferredSlots   int    `json:"deferred_slots"`
+	OpenSlots       int    `json:"open_slots"`
+	Description     string `json:"description,omitempty"`
+	IncludeDeferred bool   `json:"include_deferred"`
+}
+
+func newPoolRow(p airflowapi.Pool) poolRow {
+	return poolRow{
+		Name:            p.Name,
+		Slots:           p.Slots,
+		OccupiedSlots:   p.OccupiedSlots,
+		RunningSlots:    p.RunningSlots,
+		QueuedSlots:     p.QueuedSlots,
+		ScheduledSlots:  p.ScheduledSlots,
+		DeferredSlots:   p.DeferredSlots,
+		OpenSlots:       p.OpenSlots,
+		Description:     p.Description,
+		IncludeDeferred: p.IncludeDeferred,
+	}
+}
+
+func newPoolsListCmd(q *query) *cobra.Command {
+	var list listFlags
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List the pools on this Airflow",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return q.runPoolsList(cmd.Context(), list.options())
+		},
+	}
+	addListFlags(cmd, &list, "")
+	return cmd
+}
+
+func (q *query) runPoolsList(ctx context.Context, opts airflowapi.ListOptions) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	list, err := client.ListPools(ctx, opts)
+	if err != nil {
+		return err
+	}
+	return emitRows(r, mapRows(list.Pools, newPoolRow), renderPoolTable)
+}
+
+func renderPoolTable(w io.Writer, rows []poolRow) error {
+	return renderTable(w, rows, "No pools on this Airflow.",
+		[]string{"NAME", "SLOTS", "RUNNING", "QUEUED", "SCHEDULED", "OPEN"},
+		func(row poolRow) []string {
+			return []string{
+				row.Name,
+				count(row.Slots),
+				count(row.RunningSlots),
+				count(row.QueuedSlots),
+				count(row.ScheduledSlots),
+				count(row.OpenSlots),
+			}
+		})
+}
+
+func newPoolsGetCmd(q *query) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <NAME>",
+		Short: "Show one pool's slots and how they are used",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return q.runPoolsGet(cmd.Context(), args[0])
+		},
+	}
+}
+
+func (q *query) runPoolsGet(ctx context.Context, name string) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	pool, err := client.GetPool(ctx, name)
+	if err != nil {
+		return err
+	}
+	return emitDetail(r, newPoolRow(pool), func(row poolRow) []field {
+		return []field{
+			{"name", row.Name},
+			{"description", row.Description},
+			{"slots", count(row.Slots)},
+			{"occupied", count(row.OccupiedSlots)},
+			{"running", count(row.RunningSlots)},
+			{"queued", count(row.QueuedSlots)},
+			{"scheduled", count(row.ScheduledSlots)},
+			{"deferred", count(row.DeferredSlots)},
+			{"open", count(row.OpenSlots)},
+			{"counts deferred", onlyIf(row.IncludeDeferred, "yes")},
+		}
+	})
+}

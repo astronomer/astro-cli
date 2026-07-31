@@ -24,6 +24,59 @@ func TestListDAGRunsWildcardsAnEmptyDAGID(t *testing.T) {
 	}
 }
 
+// The start-date bounds are one of the few filters both generations spell the
+// same way, so the same options reach the same parameters on either.
+func TestListDAGRunsSendsStartDateBounds(t *testing.T) {
+	from := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 7, 31, 23, 59, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name string
+		stub func(*testing.T) *airflowStub
+		path string
+	}{
+		{"airflow 3", newAF3Stub, "/api/v2/dags/etl/dagRuns"},
+		{"airflow 2", newAF2Stub, "/api/v1/dags/etl/dagRuns"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub := tc.stub(t)
+			stub.route(http.MethodGet, tc.path, `{"dag_runs":[],"total_entries":0}`)
+			client := stub.client()
+
+			_, err := client.ListDAGRuns(t.Context(), "etl", ListDAGRunsOptions{StartDateFrom: from, StartDateTo: to})
+			if err != nil {
+				t.Fatal(err)
+			}
+			query := stub.lastRequest().Query
+			if got := query.Get("start_date_gte"); got != "2026-07-01T00:00:00Z" {
+				t.Errorf("start_date_gte = %q", got)
+			}
+			if got := query.Get("start_date_lte"); got != "2026-07-31T23:59:00Z" {
+				t.Errorf("start_date_lte = %q", got)
+			}
+		})
+	}
+}
+
+// Either end may stand alone, and an unset one is left out rather than sent as
+// year one — which would filter out every run there is.
+func TestListDAGRunsLeavesAnUnsetBoundOut(t *testing.T) {
+	stub := newAF3Stub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/~/dagRuns", `{"dag_runs":[],"total_entries":0}`)
+	client := stub.client()
+
+	from := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := client.ListDAGRuns(t.Context(), "", ListDAGRunsOptions{StartDateFrom: from}); err != nil {
+		t.Fatal(err)
+	}
+	query := stub.lastRequest().Query
+	if query.Get("start_date_gte") == "" {
+		t.Error("the bound that was set was not sent")
+	}
+	if _, ok := query["start_date_lte"]; ok {
+		t.Errorf("an unset bound was sent as %q", query.Get("start_date_lte"))
+	}
+}
+
 func TestGetDAGRunReadsTheDates(t *testing.T) {
 	stub := newAF3Stub(t)
 	stub.route(http.MethodGet, "/api/v2/dags/etl/dagRuns/r1",

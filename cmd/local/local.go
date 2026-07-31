@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -529,7 +528,7 @@ func renderListTable(w io.Writer, rows []listRow) error {
 	fmt.Fprintln(tw, "PROJECT\tHOSTNAME\tMODE\tSTATE\tPORT\tUPTIME")
 	for _, row := range rows {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			row.Project, dash(row.Hostname), row.Mode, row.State, dash(portLabel(row.Port)), dash(row.Uptime))
+			row.Project, dash(row.Hostname), row.Mode, row.State, dash(omitZero(row.Port)), dash(row.Uptime))
 	}
 	return tw.Flush()
 }
@@ -557,13 +556,6 @@ func modeLabel(m localrt.Mode) string {
 		return string(localrt.ModeStandalone)
 	}
 	return string(m)
-}
-
-func portLabel(port int) string {
-	if port == 0 {
-		return ""
-	}
-	return strconv.Itoa(port)
 }
 
 func dash(s string) string {
@@ -752,10 +744,8 @@ func (c *cli) runReset(ctx context.Context, yes bool) error {
 	if _, err := c.renderer(); err != nil {
 		return err
 	}
-	if !yes {
-		if err := c.confirm("Wipe this project's local Airflow state?"); err != nil {
-			return err
-		}
+	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
+		return err
 	}
 	return c.runStop(ctx, localrt.StopOptions{Clean: true})
 }

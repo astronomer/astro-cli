@@ -73,13 +73,13 @@ func newUseCmd(c *cli) *cobra.Command {
 	return cmd
 }
 
-// newInstanceCmd builds `astro instance`, the inventory of what this project
-// can act on.
+// newInstanceCmd builds `astro instance`: the inventory of what this project
+// can act on, plus the commands that describe one of them.
 func newInstanceCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "instance",
 		Aliases: []string{"instances"},
-		Short:   "Show the Airflows this project can act on",
+		Short:   "Show the Airflows this project can act on, and describe one",
 		Args:    cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -88,7 +88,7 @@ func newInstanceCmd(c *cli) *cobra.Command {
 			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
 		},
 	}
-	cmd.AddCommand(newInstanceListCmd(c))
+	cmd.AddCommand(append([]*cobra.Command{newInstanceListCmd(c)}, instanceQueryCmds(c)...)...)
 	return cmd
 }
 
