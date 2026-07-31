@@ -63,9 +63,11 @@ func runUninstall(roots []string) error {
 func execUninstall(roots []string) error {
 	//nolint:gosec // BinaryPath() is a fixed path under the CLI's own bin dir; roots are the paths the user asked to clean
 	out, err := exec.Command(BinaryPath(), append([]string{"uninstall"}, roots...)...).CombinedOutput()
-	logger.Debugf("astro-cosmos-boost uninstall output:\n%s", out)
+	// As in PreDeploy: the helper's report is debug-only and never reaches the
+	// error, which surfaces to the user.
+	logger.Debugf("astro-cosmos-boost uninstall output:\n%s", strings.TrimSpace(string(out)))
 	if err != nil {
-		return fmt.Errorf("running astro-cosmos-boost uninstall: %w (output: %s)", err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("running astro-cosmos-boost uninstall: %w (re-run with --verbosity debug for details)", err)
 	}
 	return nil
 }

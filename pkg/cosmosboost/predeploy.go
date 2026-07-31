@@ -13,9 +13,11 @@ import (
 func PreDeploy(path string) error {
 	//nolint:gosec // BinaryPath() is a fixed path under the CLI's own bin dir; path is the deploy target
 	out, err := exec.Command(BinaryPath(), "pre-deploy", path).CombinedOutput()
-	logger.Debugf("astro-cosmos-boost pre-deploy output:\n%s", out)
+	// The helper's own report stays behind --verbosity debug and is deliberately
+	// kept out of the returned error, which callers print as a warning.
+	logger.Debugf("astro-cosmos-boost pre-deploy output:\n%s", strings.TrimSpace(string(out)))
 	if err != nil {
-		return fmt.Errorf("running astro-cosmos-boost pre-deploy: %w (output: %s)", err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("running astro-cosmos-boost pre-deploy: %w (re-run with --verbosity debug for details)", err)
 	}
 	return nil
 }

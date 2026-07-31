@@ -68,12 +68,28 @@ func (s *PreDeploySuite) TestPreDeployRunsHelperOnPath() {
 	s.Contains(s.invocations(log), "pre-deploy /some/dbt/project")
 }
 
-func (s *PreDeploySuite) TestPreDeploySurfacesFailureOutput() {
-	s.installFake("#!/bin/sh\necho boom >&2\nexit 3\n")
+// The helper's output can name the files it manages, so it must never reach a
+// user-visible message. Callers print these errors as warnings, so the detail
+// belongs behind --verbosity debug and nowhere else.
+func (s *PreDeploySuite) TestPreDeployKeepsHelperOutputOutOfTheError() {
+	s.installFake("#!/bin/sh\necho 'removed /proj/.astro/secret_artifact.json' >&2\nexit 3\n")
 
 	err := PreDeploy("/some/dbt/project")
+
 	require.Error(s.T(), err)
-	s.Contains(err.Error(), "boom")
+	s.NotContains(err.Error(), "secret_artifact.json", "helper output must not leak into the error")
+	s.Contains(err.Error(), "exit status 3", "the failure itself must still be reported")
+	s.Contains(err.Error(), "--verbosity debug", "point the user at where the detail lives")
+}
+
+func (s *PreDeploySuite) TestUninstallKeepsHelperOutputOutOfTheError() {
+	s.installFake("#!/bin/sh\necho 'kept /proj/.astro/secret_artifact.json' >&2\nexit 3\n")
+
+	err := execUninstall([]string{"/some/dbt/project"})
+
+	require.Error(s.T(), err)
+	s.NotContains(err.Error(), "secret_artifact.json", "helper output must not leak into the error")
+	s.Contains(err.Error(), "exit status 3")
 }
 
 func (s *PreDeploySuite) TestBestEffortPreDeployNeverPanicsWhenHelperUnavailable() {
