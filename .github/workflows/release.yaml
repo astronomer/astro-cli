@@ -184,7 +184,7 @@ jobs:
           version: ${{ needs.detect.outputs.version }}
           release-tag: ${{ needs.detect.outputs.tag }}
           installers-regex: '\.exe$'
-          token: ${{ steps.winget-token.outputs.token }}
+          token: ${{ secrets.WINGET_PAT }}
 
   cleanup-nightlies:
     needs: [detect, release]
