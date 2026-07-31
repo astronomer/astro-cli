@@ -10,7 +10,8 @@
 // Instance.Transport reaches out, and only for the one instance a command acts
 // on. Nothing here prints, exits, or reads config: the session, env, and
 // coordinate lookups arrive through Deps, and every failure travels as an
-// error naming its cause and its fix.
+// error naming its cause and its fix. The AWS and Google credential chains are
+// the exception, resolved through their own SDKs — see Deps.
 package instances
 
 import (
@@ -73,6 +74,15 @@ type Instance struct {
 	// Link is the manifest link this instance came from, including its auth
 	// table. Zero for a discovered local Airflow.
 	Link manifest.Link
+	// TargetConfig is the link's [tool.astro.targets.<target>] section, plain
+	// data as the manifest carries it. It travels with the instance because a
+	// link names only its environment: which region that MWAA environment is
+	// in, and which project and location that Composer environment is in, are
+	// facts about the backend rather than the link, and the resolver needs
+	// both halves to reach the Airflow. Read it through TargetString. Nil for a
+	// link whose target declares no section, and read-only — it is the
+	// manifest's own map rather than a copy of it.
+	TargetConfig map[string]any
 	// Project is the project root of a discovered local Airflow, empty for a
 	// manifest link.
 	Project string
@@ -155,13 +165,14 @@ func Build(in Inputs) Set {
 		for name := range in.Manifest.Astro.Deployments {
 			link := in.Manifest.Astro.Deployments[name]
 			byName[name] = Instance{
-				Name:   name,
-				Kind:   Kind(link.Kind()),
-				Source: SourceManifest,
-				Where:  linkWhere(link),
-				URL:    link.URL,
-				Link:   link,
-				Own:    true,
+				Name:         name,
+				Kind:         Kind(link.Kind()),
+				Source:       SourceManifest,
+				Where:        linkWhere(link),
+				URL:          link.URL,
+				Link:         link,
+				TargetConfig: in.Manifest.Astro.Targets[link.Target],
+				Own:          true,
 			}
 		}
 	}

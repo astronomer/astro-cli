@@ -3,7 +3,6 @@ package instances
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -58,10 +57,11 @@ func TestTransportCarriesTheCredentialToTheEndpoint(t *testing.T) {
 func TestTransportAsksTheLocatorForACoordinateLink(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
 
-	// Nothing wired: the message names the work rather than failing obscurely.
+	// Nothing wired: the message names the missing lookup rather than failing
+	// obscurely.
 	_, err := i.Transport(context.Background(), Deps{LookupEnv: env(nil)})
-	if err == nil || !strings.Contains(err.Error(), "an earlier fix") {
-		t.Fatalf("err = %v, want the not-implemented message", err)
+	if err == nil || !strings.Contains(err.Error(), "no lookup is wired") {
+		t.Fatalf("err = %v, want the unwired-lookup message", err)
 	}
 
 	// Wired: the locator says where the deployment's Airflow is, and that is
@@ -104,19 +104,19 @@ func TestTransportDispatchesOnTheAuthMethod(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod-mwaa]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
 	// A locator is wired and still never asked: there is no URL in this door.
 	asked := false
-	_, err := i.Transport(context.Background(), Deps{
+	transport, err := i.Transport(context.Background(), Deps{
 		LookupEnv: env(nil),
+		AWSConfig: stubAWSConfig(t, "https://unused"),
 		Locator: locatorFunc(func(context.Context, Instance) (string, error) {
 			asked = true
 			return "https://never", nil
 		}),
 	})
-	var notImplemented *NotImplementedError
-	if !errors.As(err, &notImplemented) {
-		t.Fatalf("err = %v, want a NotImplementedError", err)
+	if err != nil {
+		t.Fatalf("transport: %v", err)
 	}
-	if !strings.Contains(notImplemented.What, "AWS API") || notImplemented.Issue != authIssue {
-		t.Errorf("error = %+v, want the AWS door", notImplemented)
+	if _, ok := transport.(*awsTransport); !ok {
+		t.Fatalf("transport = %T, want the AWS door", transport)
 	}
 	if asked {
 		t.Error("the URL locator was asked about an MWAA environment")

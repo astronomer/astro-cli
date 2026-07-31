@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -198,5 +199,67 @@ func TestTokenMinterDrivesATransportThroughAnExpiredToken(t *testing.T) {
 	}
 	if got := stub.lastRequest().Header.Get("Authorization"); got != "Bearer fresh" {
 		t.Errorf("Authorization = %q, want the re-minted token", got)
+	}
+}
+
+func TestClientCredentialsMinterSendsTheOAuthFieldNames(t *testing.T) {
+	// Keycloak's auth manager reads client_id and client_secret. Same endpoint,
+	// same answer, different names — which is the whole difference.
+	stub := newStub(t)
+	stub.route(http.MethodPost, airflowAuthPath, `{"access_token":"jwt-kc"}`)
+	minter, err := NewClientCredentialsMinter(stub.URL, "cli", "s3cr3t")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scheme, value, err := minter.Credentials(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scheme != bearerScheme || value != "jwt-kc" {
+		t.Errorf("credentials = %q %q, want the minted bearer", scheme, value)
+	}
+	// The exact request the Keycloak auth manager's documentation publishes:
+	// grant_type, client_id, client_secret, as JSON.
+	if got := stub.lastRequest().Body; got != `{"client_id":"cli","client_secret":"s3cr3t","grant_type":"client_credentials"}` {
+		t.Errorf("body = %q, want the documented client-credentials request", got)
+	}
+}
+
+// TestTokenMinterSendsNoGrantTypeForAPassword: every auth manager defaults to
+// the password grant, and the ones that are not Keycloak have never heard of
+// the field, so sending it would be a new way to fail on the common instance.
+func TestTokenMinterSendsNoGrantTypeForAPassword(t *testing.T) {
+	stub := newStub(t)
+	stub.route(http.MethodPost, airflowAuthPath, `{"access_token":"jwt"}`)
+	minter, err := NewTokenMinter(stub.URL, "user", "pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := minter.Credentials(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := stub.lastRequest().Body; strings.Contains(got, "grant_type") {
+		t.Errorf("body = %q, want no grant_type on the password grant", got)
+	}
+}
+
+func TestClientCredentialsMinterRefusesToFallBackToBasic(t *testing.T) {
+	// A client secret is not a password. An Airflow with no /auth/token has no
+	// auth manager to exchange one, so say that rather than send the secret on
+	// to a server that never asked for it.
+	stub := newStub(t)
+	stub.routeStatus(http.MethodPost, airflowAuthPath, http.StatusNotFound, `{"detail":"nope"}`)
+	minter, err := NewClientCredentialsMinter(stub.URL, "cli", "s3cr3t")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = minter.Credentials(t.Context())
+	if err == nil || !strings.Contains(err.Error(), airflowAuthPath) {
+		t.Fatalf("err = %v, want one naming %s", err, airflowAuthPath)
+	}
+	if strings.Contains(err.Error(), "s3cr3t") {
+		t.Errorf("the secret is in the message: %v", err)
 	}
 }

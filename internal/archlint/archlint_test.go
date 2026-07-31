@@ -17,6 +17,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,11 +55,57 @@ var v2BelowCmd = []string{
 	"pkg/secrets",
 }
 
-// v2All lists every v2 package, none of which may import config/ or the v1
-// cmd tree.
+// v2ConfigReaders lists the v2 packages that read config/ on purpose. Each
+// exists so exactly one place in the tree touches it — the login session, the
+// Environment Manager provider, the coordinate lookups — and the packages that
+// need what they read take them as a seam instead. They are below cmd/, so the
+// no-printing rule applies; the no-config rule cannot.
+var v2ConfigReaders = []string{
+	"internal/astrosession",
+	"internal/emenv",
+	"internal/instancelocate",
+}
+
+// v1Internal lists the packages under internal/ that predate v2 and are held
+// to none of its rules. It exists so the check below can tell "this package is
+// v1" from "somebody added a v2 package and forgot to register it".
+var v1Internal = []string{
+	"internal/archlint",
+	"internal/platformversions",
+	"internal/telemetry",
+}
+
+// v2All lists every v2 package barred from importing config/ or the v1 cmd
+// tree.
 var v2All = append([]string{
 	"cmd/local",
 }, v2BelowCmd...)
+
+// TestEveryInternalPackageIsAccountedFor: the lists above are what the rules
+// are made of, and a rule nobody is on is not a rule. A new package under
+// internal/ has to say which it is — a v2 package, a v2 package that reads
+// config/ on purpose, or one of the v1 ones — so that forgetting is a failing
+// test rather than a package that quietly obeys nothing.
+func TestEveryInternalPackageIsAccountedFor(t *testing.T) {
+	root := repoRoot(t)
+	known := map[string]bool{}
+	for _, pkg := range slices.Concat(v2BelowCmd, v2ConfigReaders, v1Internal) {
+		known[pkg] = true
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "internal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pkg := "internal/" + entry.Name()
+		if !known[pkg] {
+			t.Errorf("%s is in none of v2BelowCmd, v2ConfigReaders, or v1Internal: add it to the one it belongs to (and to .golangci.yml's forbidigo path list if it is a v2 package)", pkg)
+		}
+	}
+}
 
 func repoRoot(t *testing.T) string {
 	t.Helper()
@@ -157,7 +204,7 @@ var forbiddenCalls = map[string]map[string]bool{
 
 func TestV2PackagesBelowCmdNeverPrintOrExit(t *testing.T) {
 	root := repoRoot(t)
-	for _, pkg := range v2BelowCmd {
+	for _, pkg := range slices.Concat(v2BelowCmd, v2ConfigReaders) {
 		goFiles(t, root, pkg, func(rel string) {
 			if strings.HasSuffix(rel, "_test.go") {
 				return

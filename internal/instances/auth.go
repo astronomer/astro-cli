@@ -52,28 +52,20 @@ func credentials(i Instance, baseURL string, d Deps) (airflowapi.CredentialSourc
 			return nil, nil, err
 		}
 		return airflowapi.BasicAuth(username, password), nil, nil
-	case manifest.AuthAWS, manifest.AuthGoogle, manifest.AuthAirflowToken, manifest.AuthExec:
-		return nil, nil, &NotImplementedError{What: string(i.Link.Auth.Method) + " auth method", Issue: authIssue}
+	case manifest.AuthGoogle:
+		source, refresh := googleCredentials(d)
+		return source, refresh, nil
+	case manifest.AuthAirflowToken:
+		return airflowTokenCredentials(i, baseURL, d)
+	case manifest.AuthExec:
+		return execCredentials(i)
+	case manifest.AuthAWS:
+		// The AWS door is not a credential on an HTTP request at all, so it
+		// never reaches here: Instance.Transport dispatches on the method
+		// before any credential is built.
+		return nil, nil, fmt.Errorf("instance %q proves itself to the AWS API rather than to an Airflow URL", i.Name)
 	}
 	return nil, nil, fmt.Errorf("instance %q declares no auth method", i.Name)
-}
-
-// authIssue is where the remaining auth methods and the MWAA door are built.
-const authIssue = "an earlier fix"
-
-// NotImplementedError reports something the manifest accepts but no resolver
-// serves yet. It is typed so a caller can tell "not built" from "misconfigured"
-// — the first is a wait, the second is a fix — and so the issue travels with
-// the message rather than only inside it.
-type NotImplementedError struct {
-	// What is the thing, phrased to follow "the": "aws auth method".
-	What string
-	// Issue is the tracking issue that builds it.
-	Issue string
-}
-
-func (e *NotImplementedError) Error() string {
-	return fmt.Sprintf("the %s is not implemented yet (%s); the manifest accepts it, but nothing resolves it", e.What, e.Issue)
 }
 
 // errLoggedOut reports a machine with neither a session nor the CI token. Both

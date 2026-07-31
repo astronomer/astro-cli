@@ -6,14 +6,23 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Deps is what the network-touching half of resolution needs from the process.
-// Every field is a seam: this package reads no config, no session file, and no
-// SDK credential chain itself, so its logic stays testable and the layer rules
-// hold (docs/v2-architecture.md).
+// Every field is a seam, so the logic stays testable and the layer rules hold
+// (docs/v2-architecture.md).
+//
+// The seams are not all the same kind of thing. Astro's session and the
+// coordinate lookups live behind a seam because reading them touches config/
+// and the cloud clients, which this layer may not import — the implementations
+// sit in internal/astrosession and internal/instancelocate. The AWS and Google
+// chains are different: their SDKs touch nothing this layer is barred from, so
+// nil means "ask the SDK", and the seam exists only so a test can answer
+// without an account.
 type Deps struct {
 	// Session hands back the current Astro login's bearer token for the astro
 	// auth method, or an error naming why it cannot — logged out, expired,
@@ -22,11 +31,24 @@ type Deps struct {
 	// LookupEnv reads an env var. nil uses the process environment.
 	LookupEnv func(name string) (string, bool)
 	// Locator resolves the base URL of a link whose coordinates must be looked
-	// up. nil until the query commands wire it.
+	// up — an astro deployment's web server, a Composer environment's Airflow
+	// URI. nil means no lookup is wired, which only a coordinate link needs.
 	Locator Locator
 	// HTTPClient carries every request, including the local token mint. nil
 	// uses the transport's own client.
 	HTTPClient *http.Client
+	// AWSConfig loads the AWS SDK's configuration for a region: the credential
+	// chain, and the region itself when the manifest names none. nil uses the
+	// SDK's own loader, which is the whole chain — environment, profile, SSO,
+	// credential_process, instance role. It is a seam so the MWAA door can be
+	// driven against a stub without an AWS account.
+	AWSConfig func(ctx context.Context, region string) (aws.Config, error)
+	// GoogleToken hands back an Application Default Credentials access token,
+	// and GoogleAccount names the principal it speaks for — the fact that turns
+	// a Composer 403 from a shrug into a fix. nil on either asks the Google
+	// SDK's own chain, which is what a real run wants.
+	GoogleToken   func(ctx context.Context) (string, error)
+	GoogleAccount func(ctx context.Context) string
 }
 
 // Locator turns a link's coordinates into an Airflow base URL — an astro
@@ -56,17 +78,49 @@ func (d Deps) httpOptions() []airflowapi.HTTPOption {
 	return []airflowapi.HTTPOption{airflowapi.WithHTTPClient(d.HTTPClient)}
 }
 
+// baseHTTPClient is the client to build on when this package needs one of its
+// own — the MWAA web session, which needs a cookie jar the airflowapi options
+// cannot install.
+func (d Deps) baseHTTPClient() *http.Client {
+	if d.HTTPClient != nil {
+		return d.HTTPClient
+	}
+	return airflowapi.DefaultHTTPClient()
+}
+
+// TargetString reads one string field of this instance's
+// [tool.astro.targets.<target>] section. A section that is absent, or a field
+// that is, reads as the empty string rather than an error: whether a backend
+// can do without is the backend's own question — an MWAA region can also come
+// from the AWS credential chain, while a Composer project cannot come from
+// anywhere else.
+//
+// It is exported because the Composer lookup lives outside this package and
+// reads the same section; two readers of one manifest table would otherwise
+// give two different sentences for the same mistake.
+func (i Instance) TargetString(field string) (string, error) {
+	raw, ok := i.TargetConfig[field]
+	if !ok {
+		return "", nil
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("[tool.astro.targets.%s] %s must be a string, not %T", i.Link.Target, field, raw)
+	}
+	return value, nil
+}
+
 // Transport opens the door to an instance. It is the one step that can reach
 // the network, and a command calls it once.
 //
 // The auth method picks the door, not just the credential: every method here
 // speaks HTTP to an Airflow URL, but aws does not — MWAA's InvokeRestApi wraps
-// the request in a signed AWS call with no URL in sight. Dispatching on the
-// method now means that door arrives as another case rather than a rewrite.
+// the request in a signed AWS call with no URL in sight, so it is dispatched
+// before anything looks a URL up.
 func (i Instance) Transport(ctx context.Context, d Deps) (airflowapi.Transport, error) {
 	switch i.authMethod() {
 	case manifest.AuthAWS:
-		return nil, &NotImplementedError{What: "AWS API door an MWAA environment is reached through", Issue: authIssue}
+		return i.mwaaTransport(ctx, d)
 	case manifest.AuthAstro, manifest.AuthGoogle, manifest.AuthBasic, manifest.AuthToken,
 		manifest.AuthAirflowToken, manifest.AuthExec, manifest.AuthNone:
 		return i.httpTransport(ctx, d)
@@ -122,7 +176,9 @@ func (i Instance) baseURL(ctx context.Context, d Deps) (string, error) {
 		return "", fmt.Errorf("the local Airflow for %s records no port; restart it with `astro local restart`", i.Project)
 	}
 	if d.Locator == nil {
-		return "", &NotImplementedError{What: fmt.Sprintf("lookup of an %s link's Airflow URL (needed by %q)", i.Kind, i.Name), Issue: authIssue}
+		// Only reachable when a caller builds Deps by hand and leaves the
+		// lookup out; the command tree wires it once, in its composition root.
+		return "", fmt.Errorf("cannot reach %q: no lookup is wired for the Airflow URL of an %s link", i.Name, i.Kind)
 	}
 	url, err := d.Locator.BaseURL(ctx, i)
 	if err != nil {

@@ -177,7 +177,13 @@ func mediaType(header http.Header) string {
 //     returned error means the request did not complete: no connection, no
 //     credentials, a refusal by the door itself. Turning a status into a
 //     typed error is the Client's job, so every door reports alike.
-//   - Apply Request.Header over its own headers, Authorization included.
+//   - Apply Request.Header over its own headers, Authorization included. An
+//     implementation with nowhere to put them — MWAA's InvokeRestApi takes a
+//     path, a method, a query, and a body, and no headers at all — returns an
+//     error naming what it cannot carry rather than dropping it. Authorization
+//     is the header a caller is most likely to set and this contract promises
+//     it wins; sending the request as somebody else instead would be a
+//     surprise nobody could see.
 type Transport interface {
 	Do(ctx context.Context, req Request) (Response, error)
 }

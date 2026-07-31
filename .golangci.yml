@@ -111,10 +111,10 @@ linters:
       # fires on the v1 tree, which prints by design. The v2 pkg/* modules have
       # their own go.mod and aren't reached by a root run, so archlint (which
       # walks the tree) is their only guard.
-      # Keep this list in sync with v2BelowCmd in internal/archlint/archlint_test.go
-      # when a new internal/ v2 package lands.
+      # Keep this list in sync with v2BelowCmd and v2ConfigReaders in
+      # internal/archlint/archlint_test.go when a new internal/ v2 package lands.
       - linters: [forbidigo]
-        path-except: ^internal/(checks|envresolve|fsatomic|imagebuild|instances|localdocker|localprune|localshared|localstandalone|localstate|pack|plan|project|scaffold|userstate)/
+        path-except: ^internal/(astrosession|checks|emenv|envresolve|fsatomic|imagebuild|instancelocate|instances|localdocker|localprune|localshared|localstandalone|localstate|pack|plan|project|scaffold|userstate)/
       - linters:
           - dupl
           - errcheck
@@ -129,10 +129,12 @@ linters:
       - path: (.+)\.go$
         text: 'sloppyTestFuncName: function cleanUpInitFiles should be of form'
       # v2 tree: Deps and the contract structs (localrt, envresolve Inputs,
-      # airflowapi's per-call options) are passed by value on purpose
-      # (docs/v2-architecture.md), so hugeParam does not apply
+      # airflowapi's per-call options, instances.Instance) are passed by value
+      # on purpose (docs/v2-architecture.md), so hugeParam does not apply.
+      # `local` and `instance` are prefixes: they cover localdocker/localstate/…
+      # and instances/instancelocate respectively. Do not "fix" them to plurals.
       - linters: [gocritic]
-        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|instances|pack)|pkg/airflowapi)
+        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|instance|pack)|pkg/airflowapi)
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

@@ -23,6 +23,8 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/checks"
+	"github.com/astronomer/astro-cli/internal/instancelocate"
+	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/internal/localdocker"
 	"github.com/astronomer/astro-cli/internal/localprune"
 	"github.com/astronomer/astro-cli/internal/localshared"
@@ -75,6 +77,13 @@ type Deps struct {
 	// as logged out.
 	Session func(ctx context.Context) (string, error)
 
+	// Locator turns a coordinate link into an Airflow base URL: a Deployment's
+	// web server from the control plane, a Composer environment's Airflow URI
+	// from the Composer API. It is a seam for the same reason Session is — the
+	// lookups touch config/ and the cloud clients — and nil means a coordinate
+	// link cannot be reached, which is what a test that declares none wants.
+	Locator instances.Locator
+
 	// Interactive reports whether this run may ask the user a question. It is a
 	// seam rather than a stdin type-assertion so a test can drive the prompt
 	// path without a pty. nil means non-interactive, which is the safe default:
@@ -101,6 +110,7 @@ type Runtime interface {
 // NewDeps builds the production Deps. Call it once, from main.
 func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
+	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
 	return Deps{
 		Stdin:         os.Stdin,
 		Stdout:        os.Stdout,
@@ -111,8 +121,9 @@ func NewDeps() Deps {
 		Provisioner:   newUVProvisioner,
 		WorkingDir:    os.Getwd,
 		OpenURL:       browser.OpenURL,
-		AstroV1Client: astrov1.NewV1Client(httputil.NewHTTPClient()),
+		AstroV1Client: astroV1Client,
 		Session:       astrosession.Bearer,
+		Locator:       instancelocate.New(astroV1Client),
 		Interactive:   stdinIsTerminal,
 	}
 }

@@ -12,17 +12,27 @@ package astrosession
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
 )
 
-// The two ways a session can be unusable. Both name the one way back, because
-// there is only one.
+// EnvAPIToken is the Astro API token CI supplies instead of a login on the
+// machine. It is read here rather than only by the caller that wants a bearer,
+// so "is there an identity" has one answer across the v2 tree.
+const EnvAPIToken = "ASTRO_API_TOKEN" //nolint:gosec // the name of a variable, not a credential
+
+// The two ways a session can be unusable. Both name both ways back, because a
+// machine with no login has two.
+//
+// ErrLoggedOut is exported so every v2 reader of the session says the same
+// sentence: a machine with no login should not get one answer from the
+// credential path and a different one from the coordinate lookup.
 var (
-	errLoggedOut = errors.New("you are not logged in — log in with `astro login`")
-	errExpired   = errors.New("your session expired — log in with `astro login`")
+	ErrLoggedOut = errors.New("you are not logged in — log in with `astro login`, or set " + EnvAPIToken)
+	errExpired   = errors.New("your session expired — log in with `astro login`, or set " + EnvAPIToken)
 )
 
 // Credential is the credential inside a stored context token, empty when there
@@ -38,19 +48,27 @@ func Credential(stored string) string {
 	return strings.TrimSpace(strings.TrimPrefix(stored, "Bearer "))
 }
 
-// Bearer returns the current session's token exactly as the config stores it,
-// scheme and all: airflowapi.BearerToken normalizes that away, and a second
+// Bearer returns the current identity's token exactly as it is stored, scheme
+// and all: airflowapi.BearerToken normalizes that away, and a second
 // implementation of the same trimming here is one more place for the two to
 // disagree. It matches the seam internal/instances takes for the astro auth
 // method, context and all, though nothing about reading the local config
 // blocks.
+//
+// ASTRO_API_TOKEN wins when it is set. That is how CI supplies an identity with
+// no login on the machine at all, and reading it here rather than only where a
+// bearer is wanted is what lets a CI run reach an Astro Deployment it has to
+// look up first, not just one whose URL it already holds.
 func Bearer(context.Context) (string, error) {
+	if token := os.Getenv(EnvAPIToken); strings.TrimSpace(token) != "" {
+		return token, nil
+	}
 	ctx, err := config.GetCurrentContext()
 	if err != nil {
-		return "", errLoggedOut
+		return "", ErrLoggedOut
 	}
 	if Credential(ctx.Token) == "" {
-		return "", errLoggedOut
+		return "", ErrLoggedOut
 	}
 	// The token carries an expiry the config records at login. Refreshing it on
 	// this path is the known gap, so an expired session is reported

@@ -166,25 +166,32 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	}
 }
 
-func TestUnimplementedMethodsNameTheIssue(t *testing.T) {
-	cases := map[string]string{
-		"aws":           "\n[tool.astro.deployments.x]\ntarget = 'mwaa'\nenvironment = 'orders'\n",
-		"google":        "\n[tool.astro.deployments.x]\ntarget = 'composer'\nenvironment = 'orders'\n",
-		"airflow-token": "\n[tool.astro.deployments.x]\nurl = 'https://af3.corp.dev'\nauth = { method = 'airflow-token', client-id-env = 'AF_ID', client-secret-env = 'AF_SECRET' }\n",
-		"exec":          "\n[tool.astro.deployments.x]\nurl = 'https://af.corp.dev'\nauth = { method = 'exec', command = ['acme-airflow-token', '--profile', 'prod'] }\n",
+func TestGoogleMethodCarriesTheADCToken(t *testing.T) {
+	i := link(t, "\n[tool.astro.deployments.legacy]\nurl = 'https://airflow.internal.corp'\nauth = { method = 'google' }\n")
+	src, _, err := credentials(i, i.URL, Deps{
+		LookupEnv:   env(nil),
+		GoogleToken: func(context.Context) (string, error) { return "ya29.token", nil },
+	})
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
 	}
-	for method, body := range cases {
-		i := link(t, body)
-		_, _, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
-		// Typed, so a caller can tell "not built yet" from "you configured this
-		// wrong" without reading the sentence.
-		var notImplemented *NotImplementedError
-		if !errors.As(err, &notImplemented) {
-			t.Fatalf("%s err = %v, want a NotImplementedError", method, err)
-		}
-		if !strings.Contains(notImplemented.What, method) || notImplemented.Issue != authIssue {
-			t.Errorf("%s error = %+v", method, notImplemented)
-		}
+	if got := header(t, src); got != "Bearer ya29.token" {
+		t.Fatalf("header = %q", got)
+	}
+}
+
+func TestGoogleMethodNamesTheMissingChain(t *testing.T) {
+	i := link(t, "\n[tool.astro.deployments.prod]\ntarget = 'composer'\nenvironment = 'orders-prod'\n")
+	src, _, err := credentials(i, "https://composer.example", Deps{
+		LookupEnv:   env(nil),
+		GoogleToken: func(context.Context) (string, error) { return "", ErrNoGoogleCredentials },
+	})
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	_, _, err = src(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "gcloud auth application-default login") {
+		t.Fatalf("err = %v, want the ADC message", err)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
@@ -427,10 +428,20 @@ func (c *cli) instanceClient(ctx context.Context, f instanceFlags) (instances.Se
 	return sel, airflowapi.New(transport), nil
 }
 
-// instanceDeps hands resolution what it needs from the process: the login, and
-// nothing else it could read for itself.
+// instanceDeps hands resolution what it needs from the process: the login and
+// the coordinate lookups, the two reads that touch config/ and the cloud
+// clients this tree cannot import. Everything else it asks for itself.
+//
+// The Google chain rides along when the lookup exposes one, so a Composer link
+// resolves its URL and proves itself to the Airflow behind it through the same
+// credentials. Two chains would mean a run that finds an environment it cannot
+// then talk to.
 func (c *cli) instanceDeps() instances.Deps {
-	return instances.Deps{Session: c.d.Session}
+	deps := instances.Deps{Session: c.d.Session, Locator: c.d.Locator}
+	if chain, ok := c.d.Locator.(instancelocate.GoogleChain); ok {
+		deps.GoogleToken, deps.GoogleAccount = chain.Google()
+	}
+	return deps
 }
 
 // resolveInstance is the entry point for a command that is about to act on an
