@@ -713,15 +713,9 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
-		// Run the Cosmos Boost pre-deploy step over the build context before
-		// `docker build`, so whatever the plugin contributes is baked into the
-		// image. Opt-in and best-effort: a failure warns and never blocks the
-		// build.
 		if config.CFG.CosmosBoostPreDeploy.GetBool() {
 			cosmosboost.BestEffortPreDeploy(path)
 		} else {
-			// With the feature off, clean up so an earlier deploy's plugin
-			// files are not baked into the image.
 			cosmosboost.BestEffortCleanup(path)
 		}
 

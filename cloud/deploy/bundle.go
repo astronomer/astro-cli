@@ -217,15 +217,11 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Run the Cosmos Boost pre-deploy step before the bundle is tarred, so
-	// whatever the plugin contributes travels inside the bundle. Opt-in and
-	// best-effort: a missing or failing helper warns and never blocks the
-	// deploy.
+	// Pre-deploy step: execute cosmos-boost pre-deploy command
+	// Opt-in and best-effort: a missing or failing helper warns and never blocks the deploy.
 	if config.CFG.CosmosBoostPreDeploy.GetBool() {
 		cosmosboost.BestEffortPreDeploy(bundlePath)
 	} else {
-		// With the feature off, clean up so an earlier deploy's plugin files
-		// are not tarred into this bundle.
 		cosmosboost.BestEffortCleanup(bundlePath)
 	}
 
