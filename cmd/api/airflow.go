@@ -1,37 +1,35 @@
 package api
 
 import (
-	"bytes"
 	stdctx "context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/ansi"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
-const (
-	airflowAPIDefaultURL  = "http://localhost:8080/api/v2"
-	defaultAirflowVersion = "3.0.3" // Fallback version when detection fails
-)
+const defaultAirflowVersion = "3.0.3" // Fallback version when detection fails
 
 // AirflowOptions holds all options for the airflow api command.
 type AirflowOptions struct {
 	RequestOptions
 
-	// Airflow-specific options
+	// Deployment is -d/--deployment: a deployment link the manifest declares,
+	// or — for a name no link declares — an Astro Deployment id.
+	Deployment string
+	// URL is --url: an Airflow no project declares, addressed directly.
+	URL string
+
+	// APIURL and DeploymentID are the deprecated spellings of URL and
+	// Deployment, kept working for one release.
 	APIURL         string
 	DeploymentID   string
 	OrganizationID string
@@ -65,13 +63,17 @@ The argument can be either:
   - A path of an Airflow API endpoint (e.g., /dags, /dags/my_dag)
   - An operation ID from the API spec (e.g., get_dags, get_dag)
 
-By default, requests are made to localhost:8080/api/v2. You can override
-this with --api-url, or provide --deployment-id to use the Airflow API
-URL from an Astro Cloud deployment.
+By default, requests go to the Airflow on localhost:8080. Pass -d/--deployment
+to talk to a deployment your project links in pyproject.toml — an Astro
+Deployment, an MWAA or Composer environment, or a plain URL, each reached with
+the credentials that deployment's link calls for. A name no link declares is
+read as an Astro Deployment id. Pass --url to reach an Airflow no project
+declares.
 
-The Airflow version is auto-detected from the target instance to load the
-correct API specification. Use --airflow-version to override if the instance
-is unreachable.
+The API generation is detected from the instance itself, so /dags reaches
+/api/v2/dags on Airflow 3 and /api/v1/dags on Airflow 2. The version it reports
+also picks the API specification; use --airflow-version to override it if the
+instance is unreachable.
 
 The default HTTP request method is GET normally and POST if any parameters
 were added. Override the method with --method. When using an operation ID,
@@ -107,11 +109,14 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
   # Use jq filter on response
   astro api airflow /dags --jq '.dags[].dag_id'
 
-  # Use custom API URL
-  astro api airflow --api-url http://airflow.example.com:8080/api/v2 /dags
+  # Use an Airflow no project declares
+  astro api airflow --url http://airflow.example.com:8080 /dags
 
-  # Use Airflow from a specific Astro Cloud deployment
-  astro api airflow --deployment-id clxyz123 /dags
+  # Use a deployment this project links in pyproject.toml
+  astro api airflow -d prod /dags
+
+  # Use an Astro Deployment by id
+  astro api airflow -d clxyz123 /dags
 
   # Generate curl command instead of executing
   astro api airflow /dags --generate
@@ -134,8 +139,16 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	}
 
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
-	cmd.PersistentFlags().StringVar(&opts.APIURL, "api-url", "", "Override the Airflow API base URL (default: localhost:8080/api/v2)")
-	cmd.PersistentFlags().StringVarP(&opts.DeploymentID, "deployment-id", "d", "", "Use Airflow URL from this Astro Cloud deployment")
+	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
+	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
+	// The two spellings this command shipped with. They still work, under the
+	// names above, for one release.
+	cmd.PersistentFlags().StringVar(&opts.APIURL, "api-url", "", "Override the Airflow API base URL")
+	cmd.PersistentFlags().StringVar(&opts.DeploymentID, "deployment-id", "", "Use Airflow URL from this Astro Cloud deployment")
+	//nolint:errcheck // both flags are defined just above; this only errors on an unknown flag name
+	cmd.PersistentFlags().MarkDeprecated("api-url", "use --url")
+	//nolint:errcheck // see above
+	cmd.PersistentFlags().MarkDeprecated("deployment-id", "use -d/--deployment")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace-id", "W", "", "Override workspace ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", "admin", "Username for Airflow API authentication (local only)")
@@ -172,23 +185,30 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 
 // runAirflow executes the airflow API request.
 func runAirflow(opts *AirflowOptions) error {
-	// Resolve the API base URL
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
+	ctx := stdctx.Background()
+	target, err := resolveAirflowTarget(ctx, opts)
 	if err != nil {
 		return err
 	}
 
-	// Initialize the spec cache if needed (for operation ID resolution).
-	// Preserve the original baseURL in case init fails — initAirflowSpecCache
-	// returns "" on error and we still need the URL to make raw-path requests.
-	if correctedURL, err := initAirflowSpecCache(opts, baseURL, authToken); err != nil {
-		// Only fail if we need the spec (for operation ID resolution)
-		if isOperationID(opts.RequestPath) {
-			return err
+	// Work out which API generation to address, and load the spec that goes with
+	// it. A failure here is a failure for every argument shape, not only for an
+	// operation id: the generation decides the path, so carrying on would send
+	// the request somewhere this run could not work out — and report success.
+	//
+	// The one survivor is the fallback initAirflowSpecCache makes for a target
+	// nobody named: the localhost default may simply not be running, so it warns
+	// and assumes the current generation. That still yields a base with a prefix
+	// on it, never the bare host root.
+	baseURL, err := initAirflowSpecCache(ctx, opts, target)
+	if err != nil {
+		// An instance that never answered is unreachable, not mysterious. Say
+		// that, rather than reporting the version probe that happened to be the
+		// first thing to notice.
+		if isConnectionError(err) && target.isHTTP() {
+			return airflowConnectionError(target.hostRoot)
 		}
-		// Otherwise, continue without the spec — baseURL keeps its original value.
-	} else {
-		baseURL = correctedURL
+		return err
 	}
 
 	// Resolve operation ID to path if needed
@@ -231,122 +251,89 @@ func runAirflow(opts *AirflowOptions) error {
 		method = http.MethodPost
 	}
 
+	if !target.isHTTP() {
+		return runAirflowThroughTransport(ctx, opts, target, method, requestPath, params)
+	}
+
 	// Build the full URL
-	url := buildURL(baseURL, requestPath)
+	requestURL := buildURL(baseURL, requestPath)
 
 	// Generate curl command if requested
 	if opts.GenerateCurl {
-		return generateCurl(opts.Out, method, url, authToken, opts.RequestHeaders, params, opts.RequestInputFile)
+		return generateCurl(opts.Out, opts.GetErrOut(), method, requestURL,
+			withheldAuth(target.authorization, airflowTokenEnv), opts.RequestHeaders, params, opts.RequestInputFile)
 	}
 
 	// Build and execute the request
-	err = executeRequest(&opts.RequestOptions, method, url, authToken, params)
+	err = executeRequest(&opts.RequestOptions, method, requestURL, target.authorization, params)
 	if isConnectionError(err) {
-		return airflowConnectionError(url)
+		return airflowConnectionError(requestURL)
 	}
 	return err
 }
 
-// resolveAirflowAPIURL determines the Airflow API base URL based on options.
-func resolveAirflowAPIURL(opts *AirflowOptions) (baseURL, authToken string, err error) {
-	// If deployment ID is provided, fetch the deployment's Airflow URL
-	if opts.DeploymentID != "" {
-		return resolveDeploymentAirflowURL(opts)
-	}
-
-	// Determine base URL
-	if opts.APIURL != "" {
-		baseURL = opts.APIURL
-	} else {
-		baseURL = airflowAPIDefaultURL
-	}
-
-	// Check if user already provided an Authorization header
-	for _, h := range opts.RequestHeaders {
-		if strings.HasPrefix(strings.ToLower(h), "authorization:") {
-			// User provided their own auth, don't fetch token
-			return baseURL, "", nil
+// runAirflowThroughTransport sends the request through the deployment's own
+// door, for a target with no Airflow URL to build a request against: MWAA under
+// InvokeRestApi, which carries the call inside a signed AWS API request.
+//
+// What comes back is unwrapped faithfully — the doc's open question 1, settled.
+// InvokeRestApi answers with the Airflow status in RestApiStatusCode and the
+// Airflow body in RestApiResponse; the transport maps both onto an ordinary
+// airflowapi.Response, and this prints exactly that. So `astro api airflow
+// /dags -d prod-mwaa` gives the same status and the same body as it would
+// against any HTTP Airflow, and a script branching on the exit code does not
+// have to know which door it went through. The AWS envelope is machinery, not
+// the answer.
+//
+// The flags that only make sense against a URL are refused rather than ignored:
+// there is no curl command for a signed AWS call, and nothing to trace on the
+// wire.
+func runAirflowThroughTransport(ctx stdctx.Context, opts *AirflowOptions, target *airflowTarget, method, requestPath string, params map[string]interface{}) error {
+	for _, unusable := range []struct {
+		flag string
+		set  bool
+	}{
+		{"--generate", opts.GenerateCurl},
+		{"--paginate", opts.Paginate},
+		{"--verbose", opts.Verbose},
+		{"--include", opts.ShowResponseHeaders},
+		{"--input", opts.RequestInputFile != ""},
+		{"--header", len(opts.RequestHeaders) > 0},
+	} {
+		if unusable.set {
+			return fmt.Errorf("%s needs an Airflow URL, and %s is reached through the AWS API instead", unusable.flag, target.name)
 		}
 	}
 
-	// Fetch token from Airflow's auth endpoint
-	token, err := fetchAirflowToken(opts.GetHTTPClient(), baseURL, opts.Username, opts.Password)
+	req := airflowapi.Request{Method: strings.ToUpper(method), Path: requestPath}
+	if len(params) > 0 {
+		if strings.EqualFold(method, http.MethodGet) {
+			req.Query = queryFromParams(params)
+		} else {
+			req.Body = params
+		}
+	}
+	resp, err := target.client().Do(ctx, req)
 	if err != nil {
-		// If the user explicitly passed credentials, treat failure as an error.
-		if opts.CredentialsExplicit {
-			return "", "", fmt.Errorf("authentication failed: %w", err)
-		}
-		// Suppress the warning for connection errors — the actual request will
-		// report a clear, actionable error if the host is truly unreachable.
-		if !isConnectionError(err) {
-			fmt.Fprintf(opts.GetErrOut(), "Warning: could not fetch auth token (%v), continuing without authentication\n", err)
-		}
-		return baseURL, "", nil
+		return err
 	}
-
-	return baseURL, token, nil
+	if resp.StatusCode >= httpStatusError {
+		if len(resp.Body) > 0 {
+			_ = writeColorizedJSON(opts.Out, resp.Body, isColorEnabled(opts.Out), "  ") //nolint:errcheck // the request already failed; a write error changes nothing
+		}
+		return &SilentError{StatusCode: resp.StatusCode}
+	}
+	return outputResponseBody(&opts.RequestOptions, resp.Body)
 }
 
-// fetchAirflowToken retrieves an auth token from a local Airflow instance.
-// It tries the Airflow 3.x /auth/token endpoint first, then falls back to
-// basic auth encoding for Airflow 2.x.
-func fetchAirflowToken(client *http.Client, baseURL, username, password string) (string, error) {
-	root := airflowHostRoot(baseURL)
-	tokenURL := root + "/auth/token"
-
-	// Create request body
-	reqBody := map[string]string{
-		"username": username,
-		"password": password,
+// queryFromParams turns the -f/-F fields into a query string, the same encoding
+// addQueryParams applies to a URL.
+func queryFromParams(params map[string]interface{}) url.Values {
+	query := url.Values{}
+	for key, value := range params {
+		addQueryParam(query, key, value)
 	}
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshaling auth request: %w", err)
-	}
-
-	// Make request with timeout context
-	ctx, cancel := stdctx.WithTimeout(stdctx.Background(), 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return "", fmt.Errorf("creating auth request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("fetching auth token: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// If the /auth/token endpoint doesn't exist (Airflow 2.x), fall back to basic auth
-	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
-		return "Basic " + basicAuth(username, password), nil
-	}
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("auth endpoint returned status %d", resp.StatusCode)
-	}
-
-	// Parse response
-	var tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return "", fmt.Errorf("decoding auth response: %w", err)
-	}
-
-	if tokenResp.AccessToken == "" {
-		return "", fmt.Errorf("no access_token in auth response")
-	}
-
-	return "Bearer " + tokenResp.AccessToken, nil
-}
-
-// basicAuth returns the base64-encoded "username:password" string.
-func basicAuth(username, password string) string {
-	return base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+	return query
 }
 
 // airflowHostRoot strips any /api/v1 or /api/v2 suffix to get the bare host URL.
@@ -363,76 +350,12 @@ func airflowConnectionError(requestURL string) error {
 	if isLocalhostURL(host) {
 		return fmt.Errorf("could not connect to Airflow at %s\n\n"+
 			"Is Airflow running? Try one of:\n"+
-			"  astro dev start              Start a local Airflow environment\n"+
-			"  --api-url <url>              Use a different Airflow instance\n"+
-			"  --deployment-id <id>         Connect to an Astro Cloud deployment", host)
+			"  astro local start            Start a local Airflow environment\n"+
+			"  --url <url>                  Use a different Airflow instance\n"+
+			"  -d <name or id>              Use a deployment this project links, or an Astro Deployment id", host)
 	}
 	return fmt.Errorf("could not connect to Airflow at %s\n\n"+
 		"Check that the URL is correct and the server is running", host)
-}
-
-// FetchAirflowVersion detects the Airflow version from a running instance.
-// It tries /api/v2/version first (Airflow 3.x) then /api/v1/version (Airflow 2.x).
-// If authToken is provided, it will be included in the Authorization header.
-func FetchAirflowVersion(client *http.Client, baseURL, authToken string) (string, error) {
-	root := airflowHostRoot(baseURL)
-
-	// Try v2 first (Airflow 3.x), then v1 (Airflow 2.x)
-	versionURLs := []string{
-		root + "/api/v2/version",
-		root + "/api/v1/version",
-	}
-
-	var lastErr error
-	for _, versionURL := range versionURLs {
-		version, err := fetchVersionFromURL(client, versionURL, authToken)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return version, nil
-	}
-
-	return "", fmt.Errorf("could not detect version from any endpoint: %w", lastErr)
-}
-
-// fetchVersionFromURL tries to fetch the Airflow version from a single URL.
-func fetchVersionFromURL(client *http.Client, versionURL, authToken string) (string, error) {
-	ctx, cancel := stdctx.WithTimeout(stdctx.Background(), 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, http.NoBody)
-	if err != nil {
-		return "", fmt.Errorf("creating version request: %w", err)
-	}
-
-	// Add auth header if token provided (token may already include "Bearer " prefix)
-	if authToken != "" {
-		req.Header.Set("Authorization", authToken)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("fetching Airflow version: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("version endpoint returned status %d", resp.StatusCode)
-	}
-
-	var versionResp struct {
-		Version string `json:"version"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&versionResp); err != nil {
-		return "", fmt.Errorf("decoding version response: %w", err)
-	}
-
-	if versionResp.Version == "" {
-		return "", fmt.Errorf("no version in response")
-	}
-
-	return versionResp.Version, nil
 }
 
 // apiPrefixForVersion returns "/api/v1" for Airflow 2.x, "/api/v2" for 3.x+.
@@ -444,66 +367,16 @@ func apiPrefixForVersion(version string) string {
 	return "/api/v2"
 }
 
-// resolveDeploymentAirflowURL fetches the Airflow API URL from an Astro Cloud deployment.
-func resolveDeploymentAirflowURL(opts *AirflowOptions) (baseURL, authToken string, err error) {
-	// Check if we're in a cloud context
-	if !context.IsCloudContext() {
-		return "", "", fmt.Errorf("--deployment-id requires cloud context. Run 'astro login' to connect to Astro Cloud")
-	}
-
-	// Get current context for auth
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return "", "", fmt.Errorf("getting current context: %w", err)
-	}
-
-	// Check for token
-	if ctx.Token == "" {
-		return "", "", fmt.Errorf("not authenticated. Run 'astro login' to authenticate")
-	}
-
-	// Use organization from flag or context
-	orgID := opts.OrganizationID
-	if orgID == "" {
-		orgID = ctx.Organization
-	}
-	if orgID == "" {
-		return "", "", fmt.Errorf("organization ID not set. Use --organization-id or run 'astro organization switch'")
-	}
-
-	// Create platform client
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
-
-	// Fetch deployment
-	dep, err := deployment.GetDeploymentByID(orgID, opts.DeploymentID, astroV1Client)
-	if err != nil {
-		return "", "", fmt.Errorf("fetching deployment: %w", err)
-	}
-
-	// Get the Airflow API URL
-	if dep.WebServerAirflowApiUrl == "" {
-		return "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", opts.DeploymentID)
-	}
-
-	// Ensure URL has a scheme
-	airflowURL := dep.WebServerAirflowApiUrl
-	if !strings.HasPrefix(airflowURL, "http://") && !strings.HasPrefix(airflowURL, "https://") {
-		airflowURL = "https://" + airflowURL
-	}
-
-	return airflowURL, ctx.Token, nil
-}
-
 // runAirflowInteractive runs the airflow API command in interactive mode.
 func runAirflowInteractive(opts *AirflowOptions) error {
-	// Resolve the API base URL (handles deployment ID if provided)
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
+	ctx := stdctx.Background()
+	target, err := resolveAirflowTarget(ctx, opts)
 	if err != nil {
 		return err
 	}
 
 	// Initialize the spec cache
-	if _, err = initAirflowSpecCache(opts, baseURL, authToken); err != nil {
+	if _, err = initAirflowSpecCache(ctx, opts, target); err != nil {
 		return err
 	}
 
@@ -524,40 +397,52 @@ func runAirflowInteractive(opts *AirflowOptions) error {
 	return nil
 }
 
-// initAirflowSpecCache initializes the spec cache for the given Airflow instance.
-// It detects the Airflow version (unless overridden) and creates the appropriate cache.
-// It returns the (possibly corrected) base URL — e.g. /api/v2 → /api/v1 for Airflow 2.x.
-func initAirflowSpecCache(opts *AirflowOptions, baseURL, authToken string) (string, error) {
+// initAirflowSpecCache settles which API generation this target speaks and
+// loads the spec that goes with it. It asks the instance what version it runs
+// (unless --airflow-version says) and returns the base URL with the
+// generation's prefix on it — /api/v1 for Airflow 2, /api/v2 for Airflow 3 —
+// or "" for a target that is not addressed by URL at all.
+//
+// The asking is pkg/airflowapi's: one Client.Version call over the target's own
+// door, which probes both generations and reads the generation off the version
+// Airflow reports rather than off whichever probe answered. That is why an
+// Astronomer-patched Airflow 2 — which answers some /api/v2 paths — still gets
+// /api/v1 here.
+//
+// An error here ends the run, whatever the caller was going to ask for. The
+// generation decides the path, so a run that could not work it out has nowhere
+// to send the request — and a request sent to the wrong path that reports
+// success is worse than a refusal. The one target that falls back instead is
+// the one nobody named: the localhost default may simply not be running, so it
+// warns and assumes the current generation, which still yields a prefixed base.
+func initAirflowSpecCache(ctx stdctx.Context, opts *AirflowOptions, target *airflowTarget) (string, error) {
 	// Skip if already initialized
 	if opts.specCache != nil {
-		return baseURL, nil
+		return target.apiBase(opts.detectedVersion), nil
 	}
 
 	// Determine the Airflow version
 	version := opts.AirflowVersion
 	if version == "" {
-		// Try to detect version from the running instance
-		detectedVersion, err := FetchAirflowVersion(opts.GetHTTPClient(), baseURL, authToken)
-		if err != nil {
-			// When targeting a remote deployment, detection failure is an error
-			// since the instance should be reachable.
-			if opts.DeploymentID != "" {
-				return "", fmt.Errorf("could not detect Airflow version from deployment %s: %w. Use --airflow-version to specify manually", opts.DeploymentID, err)
-			}
-			// For local instances, warn and fall back — the instance may not be running.
-			// Suppress the warning for connection errors since the actual request
-			// will report a clear, actionable error.
+		info, err := target.client().Version(ctx)
+		switch {
+		case err == nil:
+			version = info.Version
+		case target.isNamedDeployment():
+			// A deployment resolves through a control plane that says it
+			// exists, so failing to read its version is a failure rather than a
+			// fallback.
+			return "", fmt.Errorf("could not detect Airflow version from %s: %w. Use --airflow-version to specify manually", target.name, err)
+		default:
+			// The localhost default and a bare --url may simply not be running.
+			// Warn and fall back — except on a connection failure, which the
+			// request itself is about to report far better.
 			if !isConnectionError(err) {
 				fmt.Fprintf(opts.RequestOptions.GetErrOut(), "Warning: Could not detect Airflow version (%v), using default %s. Use --airflow-version to override.\n", err, defaultAirflowVersion)
 			}
 			version = defaultAirflowVersion
-		} else {
-			version = detectedVersion
 		}
 	}
-
-	// Correct the base URL to match the detected API version
-	baseURL = airflowHostRoot(baseURL) + apiPrefixForVersion(version)
 
 	// Create the spec cache for this version
 	cache, err := openapi.NewAirflowCacheForVersion(version)
@@ -568,7 +453,7 @@ func initAirflowSpecCache(opts *AirflowOptions, baseURL, authToken string) (stri
 	cache.SetHTTPClient(opts.GetHTTPClient())
 	opts.specCache = cache
 	opts.detectedVersion = openapi.NormalizeAirflowVersion(version)
-	return baseURL, nil
+	return target.apiBase(version), nil
 }
 
 // NewAirflowListCmd creates the 'astro api airflow ls' command.
@@ -603,14 +488,14 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 				filter = args[0]
 			}
 
-			// Resolve the API base URL (handles deployment ID if provided)
-			baseURL, authToken, err := resolveAirflowAPIURL(parentOpts)
+			ctx := cmd.Context()
+			target, err := resolveAirflowTarget(ctx, parentOpts)
 			if err != nil {
 				return err
 			}
 
 			// Initialize the spec cache
-			if _, err := initAirflowSpecCache(parentOpts, baseURL, authToken); err != nil {
+			if _, err := initAirflowSpecCache(ctx, parentOpts, target); err != nil {
 				return err
 			}
 
@@ -665,14 +550,14 @@ The endpoint can be specified as a path or as an operation ID.`,
   astro api airflow describe get_dag`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Resolve the API base URL (handles deployment ID if provided)
-			baseURL, authToken, err := resolveAirflowAPIURL(parentOpts)
+			ctx := cmd.Context()
+			target, err := resolveAirflowTarget(ctx, parentOpts)
 			if err != nil {
 				return err
 			}
 
 			// Initialize the spec cache
-			if _, err := initAirflowSpecCache(parentOpts, baseURL, authToken); err != nil {
+			if _, err := initAirflowSpecCache(ctx, parentOpts, target); err != nil {
 				return err
 			}
 

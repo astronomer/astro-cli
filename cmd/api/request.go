@@ -553,8 +553,56 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
+// The env vars a generated curl command reads its credential from, in place of
+// the one this run resolved.
+const (
+	airflowTokenEnv  = "AIRFLOW_TOKEN"   //nolint:gosec // the name of a variable, not a credential
+	astroAPITokenEnv = "ASTRO_API_TOKEN" //nolint:gosec // see above
+)
+
+// curlAuth is the Authorization header a generated curl command prints: the
+// scheme the live credential used, and the name of an env var to read the value
+// from. The value itself is never in it, which is the whole point — a generated
+// command goes into shell history, a bug report, a screen share, and the
+// credential behind it may be an Astro session, a Google OAuth token, or
+// whatever a link's auth resolved to. --verbose has always masked this header;
+// this makes --generate agree with it.
+type curlAuth struct {
+	// scheme is "Bearer", "Basic", or "" for a credential that carried none.
+	scheme string
+	// envVar is the variable the printed command reads, without the $. Empty
+	// means there is no credential to carry.
+	envVar string
+}
+
+// withheldAuth turns a live Authorization value into that placeholder.
+func withheldAuth(authorization, envVar string) curlAuth {
+	if authorization == "" {
+		return curlAuth{}
+	}
+	scheme, _, found := strings.Cut(authorization, " ")
+	if !found {
+		scheme = ""
+	}
+	return curlAuth{scheme: scheme, envVar: envVar}
+}
+
+// header is the Authorization header line, or "" when there is nothing to send.
+func (a curlAuth) header() string {
+	if a.envVar == "" {
+		return ""
+	}
+	value := "$" + a.envVar
+	if a.scheme != "" {
+		value = a.scheme + " " + value
+	}
+	// Double quotes rather than shellQuote: the point of the placeholder is for
+	// the shell to expand it when the command is run.
+	return `"Authorization: ` + value + `"`
+}
+
 // generateCurl generates a curl command for the request.
-func generateCurl(out io.Writer, method, requestURL, token string, headers []string, params map[string]interface{}, inputFile string) error {
+func generateCurl(out, errOut io.Writer, method, requestURL string, auth curlAuth, headers []string, params map[string]interface{}, inputFile string) error {
 	method = strings.ToUpper(method)
 
 	parts := make([]string, 0, 10+len(headers)*2)
@@ -574,8 +622,10 @@ func generateCurl(out io.Writer, method, requestURL, token string, headers []str
 	}
 	// URL and standard headers
 	parts = append(parts, shellQuote(requestURL))
-	if token != "" {
-		parts = append(parts, "-H", shellQuote("Authorization: "+token))
+	if header := auth.header(); header != "" {
+		parts = append(parts, "-H", header)
+		fmt.Fprintf(errOut, "The credential was withheld: the command reads $%s instead of the token this run resolved. Export %s before running it.\n",
+			auth.envVar, auth.envVar)
 	}
 	parts = append(parts, "-H", shellQuote("Accept: application/json"))
 

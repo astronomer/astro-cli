@@ -113,8 +113,12 @@ type Link struct {
 	// Auth is how the CLI proves itself to this link's Airflow, with Method
 	// already resolved from the link's own auth table or its kind's default.
 	Auth Auth
-	// Default marks the link `astro deploy` ships to when the command names no
-	// link. At most one link in a manifest may set it.
+	// Default marks the link a command falls through to when nothing else
+	// picked one: the last layer of the query commands' resolution rule, and
+	// the entry `astro deploy` highlights in its prompt. It does not decide a
+	// deploy — deploy always asks, and this only moves the cursor
+	// (docs/v2-instances.md decision 2). At most one link in a manifest may set
+	// it.
 	Default bool
 }
 

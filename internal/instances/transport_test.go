@@ -3,6 +3,7 @@ package instances
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -127,5 +128,42 @@ func TestTransportRefusesALocalRecordWithNoPort(t *testing.T) {
 	_, err := i.Transport(context.Background(), Deps{})
 	if err == nil || !strings.Contains(err.Error(), "astro local restart") {
 		t.Fatalf("err = %v, want the restart hint", err)
+	}
+}
+
+// TestHTTPDoorForHandsBackTheURLAndTheCredential: `astro api airflow` builds its
+// own requests, so it needs the two things a Transport hides.
+func TestHTTPDoorForHandsBackTheURLAndTheCredential(t *testing.T) {
+	i := link(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'STAGING_TOKEN' }\n")
+	door, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: env(map[string]string{"STAGING_TOKEN": "abc123"})})
+	if err != nil {
+		t.Fatalf("door: %v", err)
+	}
+	if door.BaseURL != "https://airflow.staging.corp.dev" {
+		t.Errorf("base url = %q", door.BaseURL)
+	}
+	if door.Authorization != "Bearer abc123" {
+		t.Errorf("authorization = %q", door.Authorization)
+	}
+}
+
+// An Airflow that wants no credential is a real answer, not a missing one.
+func TestHTTPDoorForSendsNothingWhenNothingIsNeeded(t *testing.T) {
+	i := link(t, "\n[tool.astro.deployments.open]\nurl = 'https://airflow.corp.dev'\nauth = { method = 'none' }\n")
+	door, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: env(nil)})
+	if err != nil {
+		t.Fatalf("door: %v", err)
+	}
+	if door.Authorization != "" {
+		t.Errorf("authorization = %q, want none", door.Authorization)
+	}
+}
+
+// The MWAA door has no URL at all, and saying so is the whole point: a caller
+// that can only speak HTTP has to hear it rather than get an empty string.
+func TestHTTPDoorForRefusesTheAWSDoor(t *testing.T) {
+	i := link(t, "\n[tool.astro.deployments.prod-mwaa]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
+	if _, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: env(nil)}); !errors.Is(err, ErrNotHTTP) {
+		t.Fatalf("err = %v, want ErrNotHTTP", err)
 	}
 }

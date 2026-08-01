@@ -292,6 +292,38 @@ func TestPromptNeedsAnExplicitChoice(t *testing.T) {
 	}
 }
 
+// TestPromptTakesANameOverAPosition: a deployment may legally be called "2".
+// Reading the answer as a position first would pin whichever entry happened to
+// sit there instead — here `prod`, the other one.
+func TestPromptTakesANameOverAPosition(t *testing.T) {
+	d, _, _ := instanceDeps(t, t.TempDir())
+	d.Stdin = strings.NewReader("2\n")
+	c := &cli{d: d}
+
+	name, err := c.promptForDeployment([]string{"2", "prod"})
+	if err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	if name != "2" {
+		t.Fatalf("answer = %q, want the deployment the user named", name)
+	}
+}
+
+// A number still works where no deployment claims that spelling.
+func TestPromptStillTakesANumber(t *testing.T) {
+	d, _, _ := instanceDeps(t, t.TempDir())
+	d.Stdin = strings.NewReader("2\n")
+	c := &cli{d: d}
+
+	name, err := c.promptForDeployment([]string{"dev", "prod"})
+	if err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	if name != "prod" {
+		t.Fatalf("answer = %q, want the second choice", name)
+	}
+}
+
 func TestPromptEndsOnAClosedStdin(t *testing.T) {
 	d, _, _ := instanceDeps(t, t.TempDir())
 	d.Stdin = strings.NewReader("")

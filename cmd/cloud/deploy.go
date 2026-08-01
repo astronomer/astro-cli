@@ -1,11 +1,15 @@
 package cloud
 
 import (
+	"bufio"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,6 +23,8 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
+	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -113,7 +119,10 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.Flags().StringVar(&v2Deployment, "deployment", "", "Deployment id to deploy to, overriding the manifest link. For v2 projects (a pyproject.toml with [tool.astro])")
+	// No -d shorthand: on this command -d has meant --dags since v1, and moving
+	// it would turn `astro deploy -d` from a DAG-only deploy into a target
+	// selector. -d/--deployment is the spelling everywhere the letter is free.
+	cmd.Flags().StringVar(&v2Deployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id. For v2 projects (a pyproject.toml with [tool.astro])")
 	cmd.Flags().StringVar(&v2Workspace, "workspace", "", "Workspace for the deploy, overriding the context. For v2 projects (a pyproject.toml with [tool.astro])")
 	cmd.Flags().StringVar(&deployOutput, "output", string(formatText), "Output format for v2 projects: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
@@ -347,23 +356,25 @@ func deployV2(cmd *cobra.Command, args []string) error {
 
 	cmd.SilenceUsage = true
 
-	// An image build can run for minutes with no transport output yet, so say so
-	// before handing off; the transport itself stays silent (v2 layer rules).
-	// json mode drops these lines so the single result object is the only thing
-	// this command adds to stdout.
-	if !dags && format == formatText {
-		if imageName != "" {
-			fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
-		} else {
-			fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
-		}
-	}
+	// A prompt has to be answered by someone, and json output has to stay a
+	// stream a program can parse — a question on stderr with the run blocked on
+	// stdin is not that. So json mode is non-interactive whatever stdin is, and
+	// must name its target like any other script.
+	interactive := format == formatText && stdinIsTerminal()
 
+	// Only a run that is going to ask has any use for the ambient layers, and
+	// reading the pin is not free — it creates the project's state directory.
+	willPrompt := interactive && linkName == "" && v2Deployment == ""
+	preselect, preselectFrom := deployPreselect(config.WorkingPath, willPrompt)
+
+	errOut := cmd.ErrOrStderr()
 	res, err := v2deploy.Run(v2deploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
-		DeploymentID:     v2Deployment,
+		Deployment:       v2Deployment,
+		Preselect:        preselect,
+		PreselectFrom:    preselectFrom,
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: contextWorkspace,
 		DagsOnly:         dags,
@@ -373,13 +384,84 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		Wait:             waitForDeploy,
 		WaitTime:         waitTime,
 		NoDagsBaseDir:    noDagsBaseDir,
-		Interactive:      term.IsTerminal(int(os.Stdin.Fd())),
-	}, newV2Deployer(astroV1Client))
+		Interactive:      interactive,
+		// Two lines, once the target is settled and before anything is built.
+		// The first is the → line every resolving command prints, so a deploy
+		// says what it is about to act on the way `astro dags list` does. The
+		// second says an image build can run for minutes with no transport
+		// output yet; the transport itself stays silent (v2 layer rules).
+		//
+		// Both fire after the target is settled, so a deploy refused at the
+		// prompt claims nothing. They go to stderr and stdout respectively —
+		// the announce line is context, the progress line is this command's
+		// own output — and json mode drops both, so the single result object is
+		// all it adds.
+		Announce: func(target v2deploy.Target) {
+			if format != formatText {
+				return
+			}
+			announceDeployTarget(errOut, target)
+			if dags {
+				// A dags-only deploy builds nothing, so there is no wait to
+				// explain.
+				return
+			}
+			if imageName != "" {
+				fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
+			} else {
+				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
+			}
+		},
+	}, newV2Deployer(astroV1Client, cmd.InOrStdin(), errOut))
 	if err != nil {
 		return deployV2Err(cmd, format, err)
 	}
 
 	return renderV2Deploy(out, format, &res)
+}
+
+// announceDeployTarget prints the one line every resolving command puts on
+// stderr before it acts, so a deploy's target is never invisible either. It
+// matches cmd/local's announceInstance: the name, then what the name does not
+// already say. A deployment named by id has nothing to add.
+func announceDeployTarget(w io.Writer, target v2deploy.Target) {
+	if target.LinkName == "" {
+		fmt.Fprintf(w, "→ %s\n", target.DeploymentID)
+		return
+	}
+	fmt.Fprintf(w, "→ %s (astro deployment %s)\n", target.LinkName, target.DeploymentID)
+}
+
+// stdinIsTerminal reports whether this run can be asked which deployment to
+// ship to. It is a var rather than the call itself so a test can drive the
+// prompt without a pty.
+var stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+
+// deployPreselect is what the ambient layers point at, for the prompt's cursor
+// and nothing else: ASTRO_DEPLOYMENT, then this project's `astro use` pin, in
+// the order the query commands rank them. It reports which one answered, so the
+// prompt can label the highlight with the thing that actually caused it.
+//
+// A pin that cannot be read is not worth failing a deploy over — the worst it
+// costs is a cursor on the first entry — so the error is dropped. And a run with
+// no prompt coming never reads the pin at all: userstate.Load creates the
+// project's state directory on the way past, and a `astro deploy prod` in CI
+// should not leave a cache directory behind for a question nobody asked.
+func deployPreselect(projectDir string, willPrompt bool) (name, from string) {
+	if name := os.Getenv(instances.EnvVar); name != "" {
+		return name, instances.EnvVar
+	}
+	if !willPrompt {
+		return "", ""
+	}
+	state, err := userstate.Load(projectDir)
+	if err != nil {
+		return "", ""
+	}
+	if state.Instance == "" {
+		return "", ""
+	}
+	return state.Instance, v2deploy.PinnedBy
 }
 
 // deployFormat selects how the v2 deploy path renders its result.
@@ -407,7 +489,11 @@ func parseDeployFormat(s string) (deployFormat, error) {
 // dags-only deploy carries no image_tag, an image-only deploy no
 // dag_bundle_version.
 type deployJSON struct {
-	Deployment       string `json:"deployment"`
+	Deployment string `json:"deployment"`
+	// Link is the manifest link the deploy resolved to, omitted when the target
+	// was named by id. It is what the person typed and what their teammates
+	// call it; the id alone makes a consumer look it up again.
+	Link             string `json:"link,omitempty"`
 	Workspace        string `json:"workspace"`
 	Type             string `json:"type"`
 	ImageTag         string `json:"image_tag,omitempty"`
@@ -423,6 +509,7 @@ func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) erro
 	if format == formatJSON {
 		return json.NewEncoder(w).Encode(deployJSON{
 			Deployment:       res.DeploymentID,
+			Link:             res.LinkName,
 			Workspace:        res.WorkspaceID,
 			Type:             res.Type,
 			ImageTag:         res.ImageTag,
@@ -431,18 +518,29 @@ func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) erro
 			URL:              res.URL,
 		})
 	}
+	target := deployTargetName(res)
 	switch res.Type {
 	case "dag-only":
-		fmt.Fprintf(w, "Deployed DAGs (version %s) to deployment %s.\n", res.DagTarballVersion, res.DeploymentID)
+		fmt.Fprintf(w, "Deployed DAGs (version %s) to %s.\n", res.DagTarballVersion, target)
 	case "image-only":
-		fmt.Fprintf(w, "Deployed image (tag %s) to deployment %s.\n", res.ImageTag, res.DeploymentID)
+		fmt.Fprintf(w, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
 	default: // image-and-dag
-		fmt.Fprintf(w, "Deployed image (tag %s) and DAGs (version %s) to deployment %s.\n", res.ImageTag, res.DagTarballVersion, res.DeploymentID)
+		fmt.Fprintf(w, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
 	}
 	if res.URL != "" {
 		fmt.Fprintf(w, "Deployment: %s\n", res.URL)
 	}
 	return nil
+}
+
+// deployTargetName is what the summary line calls where the code went: the link
+// name the user chose, with the id in tow, because the id alone is the one thing
+// nobody recognizes at a glance.
+func deployTargetName(res *v2deploy.Result) string {
+	if res.LinkName == "" {
+		return "deployment " + res.DeploymentID
+	}
+	return fmt.Sprintf("%s (deployment %s)", res.LinkName, res.DeploymentID)
 }
 
 // deployV2Err renders a v2 deploy failure. In json mode it writes the
@@ -451,6 +549,15 @@ func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) erro
 // returns the error for cobra to print. It returns the error either way, so
 // the process still exits non-zero.
 func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
+	if goerrors.Is(err, v2deploy.ErrAborted) {
+		// The user was asked and said no. Reading their own answer back at them
+		// as "Error: no deployment selected" adds nothing; the exit code carries
+		// the whole message. Only an interactive run can reach here, so this
+		// never eats the object json mode promises.
+		cmd.SilenceErrors = true
+		cmd.SilenceUsage = true
+		return err
+	}
 	if format == formatJSON {
 		//nolint:errcheck // the command already failed; a write error changes nothing
 		json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
@@ -469,14 +576,92 @@ func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
 // newV2Deployer builds the transport the v2 deploy path drives. It is a var so a
 // test can swap in a fake and exercise the whole cmd path — flag parsing,
 // selection, and rendering — with no real daemon, registry, or API.
-var newV2Deployer = func(client astrov1.APIClient) v2deploy.Deployer {
-	return v2Deployer{client: client}
+var newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+	return v2Deployer{client: client, in: in, errOut: errOut}
 }
 
 // v2Deployer wires internal/deploy's transport seam to the v1 cloud/deploy
 // transport and the deployment selection flow.
 type v2Deployer struct {
 	client astrov1.APIClient
+	// in and errOut carry the deploy prompt. It asks on stderr and reads stdin,
+	// so stdout stays the deploy's own output.
+	in     io.Reader
+	errOut io.Writer
+}
+
+// deployPromptAttempts bounds the re-asking, so a stdin that answers but never
+// answers usefully ends rather than loops. It matches the query surface's
+// picker (cmd/local).
+const deployPromptAttempts = 3
+
+// ConfirmTarget asks which deployment to ship to. Every interactive deploy that
+// did not name its target comes through here — a pin, ASTRO_DEPLOYMENT, or a
+// `default = true` marker moves the cursor and never skips the question
+// (docs/v2-instances.md decision 2).
+//
+// The highlight is labeled with what put it there, not with one word for all
+// three: a cursor sitting on an entry because a variable is exported in this
+// shell is a different fact from one sitting there because the committed
+// manifest says so, and only the reader can tell which they meant.
+//
+// It takes a name or a number, and Enter takes the highlighted entry when there
+// is one. With nothing highlighted there is no default on Enter: the safe answer
+// to "where should I ship this code" is never one the CLI picked by itself.
+func (d v2Deployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.Preselect) (string, error) {
+	fmt.Fprintln(d.errOut, "Deploy to which deployment?")
+	chosen := 0
+	for i, choice := range choices {
+		marker := ""
+		if preselect.Name != "" && choice.Name == preselect.Name {
+			marker, chosen = "  ← "+preselect.From, i+1
+		}
+		fmt.Fprintf(d.errOut, "  %d) %s (%s)%s\n", i+1, choice.Name, choice.Where, marker)
+	}
+	prompt := fmt.Sprintf("Choose 1-%d: ", len(choices))
+	if chosen > 0 {
+		prompt = fmt.Sprintf("Choose 1-%d [%d]: ", len(choices), chosen)
+	}
+	in := bufio.NewReader(d.in)
+	for attempt := 0; attempt < deployPromptAttempts; attempt++ {
+		fmt.Fprintf(d.errOut, "%s", prompt)
+		line, err := in.ReadString('\n')
+		answer := strings.TrimSpace(line)
+		if answer == "" && chosen > 0 && err == nil {
+			return preselect.Name, nil
+		}
+		if err != nil && answer == "" {
+			if goerrors.Is(err, io.EOF) {
+				return "", errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")
+			}
+			return "", err
+		}
+		if name, ok := matchDeployChoice(choices, answer); ok {
+			return name, nil
+		}
+		fmt.Fprintf(d.errOut, "Not one of the choices. ")
+	}
+	// Asked three times, told three times that the answer was not one of the
+	// choices, and still no pick. The prompt has already said everything there
+	// is to say, so this ends quietly — that is what the sentinel is for.
+	return "", v2deploy.ErrAborted
+}
+
+// matchDeployChoice reads an answer as a name or a number, names first. A link
+// may legally be called "2", and a project with one offered second in the list
+// would otherwise read "2" as "the second entry" and ship somewhere else
+// entirely. What the user typed is what they meant; the numbers are only a
+// shorthand for names nobody wants to retype.
+func matchDeployChoice(choices []v2deploy.Choice, answer string) (string, bool) {
+	for _, choice := range choices {
+		if choice.Name == answer {
+			return choice.Name, true
+		}
+	}
+	if n, err := strconv.Atoi(answer); err == nil && n >= 1 && n <= len(choices) {
+		return choices[n-1].Name, true
+	}
+	return "", false
 }
 
 // ResolveUnlinked runs v1's workspace-level pick/create flow and returns the

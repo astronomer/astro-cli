@@ -403,21 +403,83 @@ func TestCombinePages_Empty(t *testing.T) {
 // --- generateCurl ------------------------------------------------------------
 
 func TestGenerateCurl_GET(t *testing.T) {
-	var buf bytes.Buffer
-	err := generateCurl(&buf, "GET", "https://api.example.com/test", "Bearer tok", nil, nil, "")
+	var buf, errOut bytes.Buffer
+	err := generateCurl(&buf, &errOut, "GET", "https://api.example.com/test",
+		withheldAuth("Bearer tok", airflowTokenEnv), nil, nil, "")
 	require.NoError(t, err)
 	output := buf.String()
 
 	assert.Contains(t, output, "curl")
 	assert.Contains(t, output, "https://api.example.com/test")
-	assert.Contains(t, output, "Authorization: Bearer tok")
+	// The scheme is kept so the command has the right shape; the value is not.
+	assert.Contains(t, output, "Authorization: Bearer $AIRFLOW_TOKEN")
+	assert.NotContains(t, output, "tok")
 	assert.NotContains(t, output, "-X") // GET is default
+	assert.Contains(t, errOut.String(), "AIRFLOW_TOKEN")
+}
+
+// The credential a run resolved never lands in the generated command. It may be
+// an Astro session bearer, a Google OAuth token, or whatever a link's auth
+// produced, and the command it is printed into goes into shell history.
+func TestGenerateCurl_WithholdsTheCredential(t *testing.T) {
+	var buf, errOut bytes.Buffer
+	err := generateCurl(&buf, &errOut, "GET", "https://api.example.com/test",
+		withheldAuth("Bearer s3cr3t-not-for-your-scrollback", airflowTokenEnv), nil, nil, "")
+	require.NoError(t, err)
+
+	assert.NotContains(t, buf.String(), "s3cr3t-not-for-your-scrollback")
+	assert.Contains(t, buf.String(), `"Authorization: Bearer $AIRFLOW_TOKEN"`)
+	// Double quotes, so the shell expands it when the command is run.
+	assert.NotContains(t, buf.String(), `'Authorization`)
+	assert.Contains(t, errOut.String(), "The credential was withheld")
+}
+
+// A basic-auth credential keeps its own scheme.
+func TestGenerateCurl_KeepsTheScheme(t *testing.T) {
+	var buf, errOut bytes.Buffer
+	err := generateCurl(&buf, &errOut, "GET", "https://api.example.com/test",
+		withheldAuth("Basic YWRtaW46YWRtaW4=", airflowTokenEnv), nil, nil, "")
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "Authorization: Basic $AIRFLOW_TOKEN")
+	assert.NotContains(t, buf.String(), "YWRtaW46YWRtaW4=")
+}
+
+// The Astro session bearer `astro api cloud` sends is withheld the same way,
+// under the env var CI already uses for it.
+func TestGenerateCurl_WithholdsTheAstroSession(t *testing.T) {
+	var buf, errOut bytes.Buffer
+	err := generateCurl(&buf, &errOut, "GET", "https://api.astronomer.io/v1/organizations",
+		withheldAuth("Bearer eyJhbGciOi-a-real-looking-session", astroAPITokenEnv), nil, nil, "")
+	require.NoError(t, err)
+	assert.NotContains(t, buf.String(), "eyJhbGciOi-a-real-looking-session")
+	assert.Contains(t, buf.String(), "Authorization: Bearer $ASTRO_API_TOKEN")
+}
+
+// A credential with no scheme on it stays scheme-less rather than being handed
+// one it never had.
+func TestGenerateCurl_SchemelessCredential(t *testing.T) {
+	var buf, errOut bytes.Buffer
+	err := generateCurl(&buf, &errOut, "GET", "https://api.example.com/test",
+		withheldAuth("raw-token-no-scheme", airflowTokenEnv), nil, nil, "")
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `"Authorization: $AIRFLOW_TOKEN"`)
+	assert.NotContains(t, buf.String(), "raw-token-no-scheme")
+}
+
+// Nothing to withhold means no header and no note.
+func TestGenerateCurl_NoCredentialNoNote(t *testing.T) {
+	var buf, errOut bytes.Buffer
+	err := generateCurl(&buf, &errOut, "GET", "https://api.example.com/test",
+		withheldAuth("", airflowTokenEnv), nil, nil, "")
+	require.NoError(t, err)
+	assert.NotContains(t, buf.String(), "Authorization")
+	assert.Empty(t, errOut.String())
 }
 
 func TestGenerateCurl_POST_WithBody(t *testing.T) {
 	var buf bytes.Buffer
 	params := map[string]interface{}{"key": "value"}
-	err := generateCurl(&buf, "POST", "https://api.example.com/test", "", nil, params, "")
+	err := generateCurl(&buf, io.Discard, "POST", "https://api.example.com/test", curlAuth{}, nil, params, "")
 	require.NoError(t, err)
 	output := buf.String()
 
@@ -430,13 +492,14 @@ func TestGenerateCurl_POST_WithBody(t *testing.T) {
 func TestGenerateCurl_ShellQuoting(t *testing.T) {
 	// H1 fix: values with single quotes should be properly escaped
 	var buf bytes.Buffer
-	err := generateCurl(&buf, "GET", "https://api.example.com/test?q=it's", "Bearer it's-a-token", nil, nil, "")
+	err := generateCurl(&buf, io.Discard, "GET", "https://api.example.com/test?q=it's",
+		withheldAuth("Bearer it's-a-token", airflowTokenEnv), nil, nil, "")
 	require.NoError(t, err)
 	output := buf.String()
 
-	// Should NOT contain bare single quotes that break quoting
-	assert.NotContains(t, output, "it's-a-token'")
-	assert.Contains(t, output, `'\''`) // The shell escape idiom
+	// The token never reaches the output at all now, quoted or otherwise.
+	assert.NotContains(t, output, "it's-a-token")
+	assert.Contains(t, output, `'\''`) // The shell escape idiom, on the URL
 }
 
 // --- shellQuote --------------------------------------------------------------
@@ -656,7 +719,7 @@ func TestExecuteSingleRequest_Template(t *testing.T) {
 
 func TestGenerateCurl_CustomHeaders(t *testing.T) {
 	var buf bytes.Buffer
-	err := generateCurl(&buf, "GET", "https://example.com", "", []string{"X-Custom: val"}, nil, "")
+	err := generateCurl(&buf, io.Discard, "GET", "https://example.com", curlAuth{}, []string{"X-Custom: val"}, nil, "")
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "X-Custom: val")
 }
@@ -664,7 +727,7 @@ func TestGenerateCurl_CustomHeaders(t *testing.T) {
 func TestGenerateCurl_GETWithParams(t *testing.T) {
 	var buf bytes.Buffer
 	params := map[string]interface{}{"q": "test"}
-	err := generateCurl(&buf, "GET", "https://example.com/search", "", nil, params, "")
+	err := generateCurl(&buf, io.Discard, "GET", "https://example.com/search", curlAuth{}, nil, params, "")
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "q=test")
 	assert.NotContains(t, buf.String(), "-X") // GET omits -X
@@ -676,7 +739,7 @@ func TestGenerateCurl_POSTWithInputFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmpFile, []byte(`{"key":"val"}`), 0o600))
 
 	var buf bytes.Buffer
-	err := generateCurl(&buf, "POST", "https://example.com/test", "", nil, nil, tmpFile)
+	err := generateCurl(&buf, io.Discard, "POST", "https://example.com/test", curlAuth{}, nil, nil, tmpFile)
 	require.NoError(t, err)
 	output := buf.String()
 	assert.Contains(t, output, "-X")
@@ -692,21 +755,21 @@ func TestGenerateCurl_InputFileWithParams(t *testing.T) {
 
 	var buf bytes.Buffer
 	params := map[string]interface{}{"foo": "bar"}
-	err := generateCurl(&buf, "POST", "https://example.com/test", "", nil, params, tmpFile)
+	err := generateCurl(&buf, io.Discard, "POST", "https://example.com/test", curlAuth{}, nil, params, tmpFile)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "foo=bar") // params as query string
 }
 
 func TestGenerateCurl_InputFileNotFound(t *testing.T) {
 	var buf bytes.Buffer
-	err := generateCurl(&buf, "POST", "https://example.com", "", nil, nil, "/nonexistent/file")
+	err := generateCurl(&buf, io.Discard, "POST", "https://example.com", curlAuth{}, nil, nil, "/nonexistent/file")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reading input file")
 }
 
 func TestGenerateCurl_NoToken(t *testing.T) {
 	var buf bytes.Buffer
-	err := generateCurl(&buf, "GET", "https://example.com", "", nil, nil, "")
+	err := generateCurl(&buf, io.Discard, "GET", "https://example.com", curlAuth{}, nil, nil, "")
 	require.NoError(t, err)
 	assert.NotContains(t, buf.String(), "Authorization")
 }

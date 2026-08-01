@@ -1,8 +1,9 @@
 // Package deploy holds the v2 deploy logic that `astro deploy` routes into
 // when the working directory is a v2 project (a pyproject.toml with a
-// [tool.astro] table). It classifies the project for routing, resolves which
-// deployment to ship to from the manifest and flags, and drives the deploy
-// through an injected transport — a dags-only deploy, an image deploy, or both.
+// [tool.astro] table). It classifies the project for routing, settles which
+// deployment to ship to — named on the command line, or asked for and answered
+// — and drives the deploy through an injected transport: a dags-only deploy, an
+// image deploy, or both.
 //
 // The package keeps to the v2 layer rules (docs/v2-architecture.md): it never
 // prints, never exits, and never touches config, Docker, or the network
@@ -14,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -49,8 +51,20 @@ type Request struct {
 	Manifest *manifest.Manifest
 	// LinkName is the positional argument naming a deployment link, "" if none.
 	LinkName string
-	// DeploymentID is the --deployment override; it always beats the manifest.
-	DeploymentID string
+	// Deployment is --deployment. It names a manifest link, or — when the
+	// project links nothing by that name — an Astro Deployment id, which is
+	// what the flag meant before it learned link names and what v1 spells
+	// --deployment-id. Either way it names the target on the command line,
+	// which is the only thing a deploy will resolve from.
+	Deployment string
+	// Preselect is what the ambient layers point at: ASTRO_DEPLOYMENT, then the
+	// project's `astro use` pin. It moves the cursor in the prompt and does
+	// nothing else — a deploy is never decided by state the user cannot see on
+	// the command line (docs/v2-instances.md decision 2).
+	Preselect string
+	// PreselectFrom names where Preselect came from, for the prompt's label:
+	// the env var's name, or "pinned". Ignored when Preselect is empty.
+	PreselectFrom string
 	// WorkspaceID is the --workspace override, "" if unset.
 	WorkspaceID string
 	// ContextWorkspace is the workspace from the current context, the fallback.
@@ -69,9 +83,15 @@ type Request struct {
 	WaitTime time.Duration
 	// NoDagsBaseDir drops the dags/ prefix from the bundle (Airflow 3 layouts).
 	NoDagsBaseDir bool
-	// Interactive reports whether the run may prompt (stdin is a TTY). A
-	// non-interactive run with no named or default link must pass --deployment.
+	// Interactive reports whether the run may ask which deployment to ship to
+	// (stdin is a TTY, and the output is not json). A run that cannot be asked
+	// must name its target on the command line.
 	Interactive bool
+	// Announce runs once the target is settled and before anything is built or
+	// uploaded. It is how "building your project image" lands after the
+	// question rather than before it: a deploy refused at the prompt says
+	// nothing about building anything. nil skips it.
+	Announce func(Target)
 }
 
 // Result is what a finished v2 deploy reports back to cmd for rendering. Text
@@ -144,9 +164,17 @@ type ImageResult struct {
 // dag tarball, finalize); tests supply a fake. The interface keeps the v2 logic
 // free of config, Docker, and the network so it stays unit-testable.
 type Deployer interface {
+	// ConfirmTarget presents the project's deployable links and returns the
+	// name of the one to ship to. It is called on every interactive deploy that
+	// did not name its target, and an answer of "no" comes back as an error.
+	//
+	// It sits on the transport rather than on the Request because asking is a
+	// cmd job — this package never prints — and ResolveUnlinked already asks
+	// through the same seam.
+	ConfirmTarget(choices []Choice, preselect Preselect) (name string, err error)
 	// ResolveUnlinked runs the workspace-level pick/create flow and returns the
-	// chosen deployment id. It is called only when no link is named or
-	// defaulted, and only in an interactive run.
+	// chosen deployment id. It is called only for a project that links nothing
+	// at all, and only in an interactive run.
 	ResolveUnlinked(workspaceID string) (deploymentID string, err error)
 	// DeployDags creates a DAG-only deploy, uploads the project's dags/
 	// directory, and finalizes.
@@ -160,47 +188,37 @@ type Deployer interface {
 // Run resolves the deployment and drives the deploy for a v2 project: a
 // dags-only deploy (--dags), an image-only deploy (--image), or the default
 // "both" (image + dags).
+//
+// The target is settled first, and Request.Announce fires between the two
+// halves, so nothing about building an image is printed before the deploy has
+// something to ship to.
 func Run(req Request, d Deployer) (Result, error) {
 	// --dags ships only the dags/ directory, so an image source makes no sense
-	// with it.
+	// with it. Checked before anything else, so an impossible combination fails
+	// rather than asking a question whose answer it will throw away.
 	if req.DagsOnly && (req.Image || req.ImageName != "") {
 		return Result{}, errors.New("--dags deploys only your DAGs; drop --image and --image-name")
 	}
 
-	sel, err := resolveSelection(req)
+	target, err := resolveTarget(req, d)
 	if err != nil {
 		return Result{}, err
 	}
-
-	if sel.deploymentID == "" {
-		// The unlinked, workspace-level flow: no link named or defaulted.
-		if sel.workspaceID == "" {
-			return Result{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
-		}
-		if !req.Interactive {
-			return Result{}, errors.New("no deployment link is named or defaulted, and this is a non-interactive run: pass --deployment <id>")
-		}
-		id, err := d.ResolveUnlinked(sel.workspaceID)
-		if err != nil {
-			return Result{}, err
-		}
-		if id == "" {
-			return Result{}, errors.New("no deployment selected")
-		}
-		sel.deploymentID = id
+	if req.Announce != nil {
+		req.Announce(target)
 	}
 
 	if req.DagsOnly {
-		return runDagsOnly(req, sel, d)
+		return runDagsOnly(req, target, d)
 	}
-	return runImage(req, sel, d)
+	return runImage(req, target, d)
 }
 
 // runDagsOnly ships just the dags/ directory through the transport.
-func runDagsOnly(req Request, sel selection, d Deployer) (Result, error) {
+func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 	dag, err := d.DeployDags(&DagDeploy{
-		DeploymentID:  sel.deploymentID,
-		WorkspaceID:   sel.workspaceID,
+		DeploymentID:  target.DeploymentID,
+		WorkspaceID:   target.WorkspaceID,
 		ProjectDir:    req.ProjectDir,
 		Description:   req.Description,
 		NoDagsBaseDir: req.NoDagsBaseDir,
@@ -211,19 +229,19 @@ func runDagsOnly(req Request, sel selection, d Deployer) (Result, error) {
 		return Result{}, err
 	}
 	return Result{
-		DeploymentID:      sel.deploymentID,
-		WorkspaceID:       firstNonEmpty(dag.WorkspaceID, sel.workspaceID),
+		DeploymentID:      target.DeploymentID,
+		WorkspaceID:       firstNonEmpty(dag.WorkspaceID, target.WorkspaceID),
 		Type:              "dag-only",
 		RuntimeVersion:    dag.RuntimeVersion,
 		DagTarballVersion: dag.DagTarballVersion,
 		URL:               dag.URL,
-		LinkName:          sel.linkName,
+		LinkName:          target.LinkName,
 	}, nil
 }
 
 // runImage builds or adopts the project image and ships it, plus the dags for a
 // default "both" deploy. --image drops the dags.
-func runImage(req Request, sel selection, d Deployer) (Result, error) {
+func runImage(req Request, target Target, d Deployer) (Result, error) {
 	var deps, packages []string
 	airflowVersion := ""
 	if req.Manifest != nil {
@@ -233,8 +251,8 @@ func runImage(req Request, sel selection, d Deployer) (Result, error) {
 	}
 	includeDags := !req.Image
 	img, err := d.DeployImage(&ImageDeploy{
-		DeploymentID:   sel.deploymentID,
-		WorkspaceID:    sel.workspaceID,
+		DeploymentID:   target.DeploymentID,
+		WorkspaceID:    target.WorkspaceID,
 		ProjectDir:     req.ProjectDir,
 		AirflowVersion: airflowVersion,
 		Dependencies:   deps,
@@ -254,80 +272,211 @@ func runImage(req Request, sel selection, d Deployer) (Result, error) {
 		kind = "image-and-dag"
 	}
 	return Result{
-		DeploymentID:      sel.deploymentID,
-		WorkspaceID:       firstNonEmpty(img.WorkspaceID, sel.workspaceID),
+		DeploymentID:      target.DeploymentID,
+		WorkspaceID:       firstNonEmpty(img.WorkspaceID, target.WorkspaceID),
 		Type:              kind,
 		RuntimeVersion:    img.RuntimeVersion,
 		ImageTag:          img.ImageTag,
 		DagTarballVersion: img.DagTarballVersion,
 		URL:               img.URL,
-		LinkName:          sel.linkName,
+		LinkName:          target.LinkName,
 	}, nil
 }
 
-// selection is the resolved deployment target. An empty deploymentID means the
-// unlinked, workspace-level flow.
-type selection struct {
-	deploymentID string
-	workspaceID  string
-	linkName     string
+// Target is the deployment a run ships to, once it is settled.
+type Target struct {
+	DeploymentID string
+	WorkspaceID  string
+	// LinkName is the manifest link the deploy resolved to, "" when the target
+	// was named by id or picked through the workspace-level flow.
+	LinkName string
 }
 
-// resolveSelection picks the deployment target from the flags and manifest, in
-// the order the design doc lays out: an explicit --deployment wins, then a
-// named link, then the link marked default = true, then the lone-link default,
-// then the unlinked workspace-level flow.
-func resolveSelection(req Request) (selection, error) {
-	// --deployment always overrides the manifest, so CI can target a deployment
-	// that is not in the file.
-	if req.DeploymentID != "" {
-		return selection{
-			deploymentID: req.DeploymentID,
-			workspaceID:  firstNonEmpty(req.WorkspaceID, req.ContextWorkspace),
-		}, nil
-	}
+// Choice is one deployable link as the prompt offers it.
+type Choice struct {
+	Name string
+	// Where is the coordinate as the manifest writes it, so two links are told
+	// apart by where they point and not only by what they are called.
+	Where string
+}
 
+// ErrAborted reports a deploy prompt the user declined. It is exported so cmd
+// can keep quiet about it: someone who was asked and said no does not need the
+// answer read back to them as an error. The run still exits non-zero.
+var ErrAborted = errors.New("no deployment selected")
+
+// resolveTarget settles which deployment this run ships to.
+//
+// Deploy is the one command that never resolves from ambient state
+// (docs/v2-instances.md decision 2): shipping code is too consequential to
+// decide from a pin, an exported variable, or a marker in a file nobody looked
+// at. So there are exactly two ways here — the target is named on the command
+// line, or an interactive run is asked and answers. A pin, ASTRO_DEPLOYMENT, or
+// `default = true` only move the cursor in that prompt.
+func resolveTarget(req Request, d Deployer) (Target, error) {
 	var links map[string]manifest.Link
 	if req.Manifest != nil {
 		links = req.Manifest.Astro.Deployments
 	}
 
-	// A named argument wins over the default.
-	if req.LinkName != "" {
-		link, ok := links[req.LinkName]
-		if !ok {
-			return selection{}, fmt.Errorf("no deployment link %q in the manifest%s", req.LinkName, knownLinks(links))
+	if req.LinkName != "" && req.Deployment != "" && req.LinkName != req.Deployment {
+		return Target{}, fmt.Errorf("this deploy names two targets, %q and --deployment %q: name one", req.LinkName, req.Deployment)
+	}
+	if name := firstNonEmpty(req.LinkName, req.Deployment); name != "" {
+		return namedTarget(req, name, links)
+	}
+
+	deployable := linkNames(links, isAstroLink)
+	switch {
+	case len(links) == 0:
+		// A project that links nothing at all: the workspace-level flow, which
+		// asks too.
+		return unlinkedTarget(req, d)
+	case len(deployable) == 0:
+		// Links, but none of them anywhere this command can ship to. Falling
+		// through to the workspace-level flow here would offer some unrelated
+		// Deployment, which is how one project's DAGs land on another
+		// project's Airflow.
+		return Target{}, fmt.Errorf("astro deploy ships to Astro Deployments, and this project links none%s", nonAstroLinks(links))
+	case !req.Interactive:
+		return Target{}, fmt.Errorf("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>. "+
+			"Deploy never picks for you — a pin, %s, or `default = true` only preselect the prompt. Deployable links: %s",
+			deploymentEnvVar, strings.Join(deployable, ", "))
+	}
+
+	choices := make([]Choice, 0, len(deployable))
+	for _, name := range deployable {
+		choices = append(choices, Choice{Name: name, Where: "astro deployment " + links[name].Deployment})
+	}
+	name, err := d.ConfirmTarget(choices, preselect(req, links, deployable))
+	if err != nil {
+		return Target{}, err
+	}
+	if name == "" {
+		return Target{}, ErrAborted
+	}
+	link, ok := links[name]
+	if !ok {
+		return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+	}
+	return astroTarget(req, name, link, links)
+}
+
+// namedTarget resolves a target named on the command line: a manifest link, or
+// — for --deployment only — an Astro Deployment id. The id fall-through is what
+// the flag meant before it learned link names, so a CI job that passes one keeps
+// working. The positional argument stays a link name, so a typo there is caught
+// rather than shipped at some id the control plane has never heard of.
+func namedTarget(req Request, name string, links map[string]manifest.Link) (Target, error) {
+	if link, ok := links[name]; ok {
+		return astroTarget(req, name, link, links)
+	}
+	if req.Deployment == name {
+		return Target{
+			DeploymentID: name,
+			WorkspaceID:  firstNonEmpty(req.WorkspaceID, req.ContextWorkspace),
+		}, nil
+	}
+	return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+}
+
+// unlinkedTarget runs the workspace-level pick/create flow, for a project whose
+// manifest declares no deployment links at all.
+func unlinkedTarget(req Request, d Deployer) (Target, error) {
+	workspaceID := firstNonEmpty(req.WorkspaceID, req.ContextWorkspace)
+	if workspaceID == "" {
+		return Target{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
+	}
+	if !req.Interactive {
+		return Target{}, errors.New("this project links no deployment and this run cannot be asked: pass --deployment <name or id>")
+	}
+	id, err := d.ResolveUnlinked(workspaceID)
+	if err != nil {
+		return Target{}, err
+	}
+	if id == "" {
+		return Target{}, ErrAborted
+	}
+	return Target{DeploymentID: id, WorkspaceID: workspaceID}, nil
+}
+
+// Preselect is the entry the prompt highlights, and why.
+//
+// The reason travels with the name because the label is a claim about where the
+// highlight came from, and only one of the three sources is the manifest's
+// marker. A prompt that says "← default" over an entry ASTRO_DEPLOYMENT put
+// there is telling the reader their file says something it does not — which is
+// the invisible-state surprise decision 2 exists to prevent, reintroduced as a
+// caption.
+type Preselect struct {
+	// Name is the deployment to highlight, "" when nothing points anywhere.
+	Name string
+	// From is what put it there, for the label: an env var's name, "pinned",
+	// or "default = true".
+	From string
+}
+
+// The three things that can move the prompt's cursor. DefaultMarker is spelled
+// as the manifest spells it, so the label and the file agree.
+const (
+	PinnedBy      = "pinned"
+	DefaultMarker = "default = true"
+	// deploymentEnvVar is the ephemeral layer of the query commands' rule,
+	// named here so the non-interactive refusal tells the reader what deploy is
+	// deliberately ignoring. It is spelled out rather than imported because
+	// internal/instances is the resolver deploy does not use.
+	deploymentEnvVar = "ASTRO_DEPLOYMENT"
+)
+
+// preselect works out which entry to highlight: whatever the ambient layers
+// point at, else the manifest's default link. A value that names nothing this
+// command can ship to highlights nothing — it must not silently move the cursor
+// onto a neighbor.
+//
+// The order — env, then pin, then marker — is the query commands' resolution
+// chain, so the cursor lands where `astro dags list` would have gone. Only the
+// deciding is different here; the ranking is the same one rule.
+func preselect(req Request, links map[string]manifest.Link, deployable []string) Preselect {
+	if req.Preselect != "" && slices.Contains(deployable, req.Preselect) {
+		from := req.PreselectFrom
+		if from == "" {
+			// A caller that named no source still gets a label, because a bare
+			// arrow tells the reader less than nothing.
+			from = "selected"
 		}
-		return astroSelection(req, req.LinkName, link, links)
+		return Preselect{Name: req.Preselect, From: from}
 	}
-
-	// Otherwise the default link: a link marked default = true, or — the interim
-	// rule — a project's one link when nothing is marked (design doc section 3).
-	if name, link, ok := manifest.DefaultLink(links); ok {
-		return astroSelection(req, name, link, links)
+	if name, _, ok := manifest.DefaultLink(links); ok && slices.Contains(deployable, name) {
+		return Preselect{Name: name, From: DefaultMarker}
 	}
+	return Preselect{}
+}
 
-	// Nothing named or defaulted: the unlinked, workspace-level flow.
-	return selection{
-		workspaceID: firstNonEmpty(req.WorkspaceID, req.ContextWorkspace),
+// astroTarget turns a resolved link into a target. Only an astro link can be
+// deployed to today: this command ships an image to an Astro Deployment, and an
+// mwaa or composer link has no deployment id to ship it to.
+func astroTarget(req Request, name string, link manifest.Link, links map[string]manifest.Link) (Target, error) {
+	if kind := link.Kind(); kind != manifest.KindAstro {
+		return Target{}, fmt.Errorf("link %q is %s, and astro deploy ships to Astro Deployments%s", name, kind, deployableLinks(links))
+	}
+	return Target{
+		DeploymentID: link.Deployment,
+		WorkspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
+		LinkName:     name,
 	}, nil
 }
 
-// astroSelection turns a resolved link into a selection. Only an astro link
-// can be deployed to today: this command ships an image to an Astro
-// Deployment, and an mwaa or composer link has no deployment id to ship it to
-// — without this check the flow would fall through to the unlinked path and
-// prompt for some other Deployment, which is how you ship one project's DAGs
-// to another project's Airflow.
-func astroSelection(req Request, name string, link manifest.Link, links map[string]manifest.Link) (selection, error) {
-	if kind := link.Kind(); kind != manifest.KindAstro {
-		return selection{}, fmt.Errorf("link %q is %s, and astro deploy ships to Astro Deployments%s", name, kind, deployableLinks(links))
+func isAstroLink(l manifest.Link) bool { return l.Kind() == manifest.KindAstro }
+
+// nonAstroLinks names what a project full of unshippable links actually
+// declares, so the refusal above says what is there rather than only what is
+// not.
+func nonAstroLinks(links map[string]manifest.Link) string {
+	named := make([]string, 0, len(links))
+	for _, name := range linkNames(links, nil) {
+		named = append(named, fmt.Sprintf("%s is %s", name, links[name].Kind()))
 	}
-	return selection{
-		deploymentID: link.Deployment,
-		workspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
-		linkName:     name,
-	}, nil
+	return " (" + strings.Join(named, ", ") + ")"
 }
 
 func knownLinks(links map[string]manifest.Link) string {

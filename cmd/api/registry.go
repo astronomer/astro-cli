@@ -173,7 +173,8 @@ func runRegistry(opts *RegistryOptions) error {
 
 	// Generate curl command if requested
 	if opts.GenerateCurl {
-		return generateCurl(opts.Out, method, url, "", opts.RequestHeaders, params, opts.RequestInputFile)
+		return generateCurl(opts.Out, opts.GetErrOut(), method, url,
+			curlAuth{}, opts.RequestHeaders, params, opts.RequestInputFile)
 	}
 
 	// Build and execute the request

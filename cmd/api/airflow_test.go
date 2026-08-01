@@ -2,18 +2,25 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -42,8 +49,15 @@ func TestAirflowCmdFlags(t *testing.T) {
 	cmd := NewAirflowCmd(out)
 
 	// Check airflow-specific flags exist (these are persistent flags so they're inherited by subcommands)
-	assert.NotNil(t, cmd.PersistentFlags().Lookup("api-url"))
-	assert.NotNil(t, cmd.PersistentFlags().Lookup("deployment-id"))
+	assert.NotNil(t, cmd.PersistentFlags().Lookup("deployment"))
+	assert.Equal(t, "d", cmd.PersistentFlags().ShorthandLookup("d").Name[:1])
+	assert.NotNil(t, cmd.PersistentFlags().Lookup("url"))
+	// The two spellings this command shipped with still parse, marked deprecated.
+	for _, name := range []string{"api-url", "deployment-id"} {
+		flag := cmd.PersistentFlags().Lookup(name)
+		require.NotNil(t, flag, name)
+		assert.NotEmpty(t, flag.Deprecated, name)
+	}
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("organization-id"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("workspace-id"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("airflow-version"))
@@ -67,187 +81,6 @@ func TestAirflowCmdFlags(t *testing.T) {
 
 	// Check other flags exist
 	assert.NotNil(t, cmd.Flags().Lookup("generate"))
-}
-
-func TestResolveAirflowAPIURL_Default(t *testing.T) {
-	opts := &AirflowOptions{}
-
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
-	require.NoError(t, err)
-	assert.Equal(t, airflowAPIDefaultURL, baseURL)
-	// authToken may be empty (if Airflow is not running), "Bearer ..." (Airflow 3), or "Basic ..." (Airflow 2)
-	if authToken != "" {
-		hasValidPrefix := strings.HasPrefix(authToken, "Bearer ") || strings.HasPrefix(authToken, "Basic ")
-		assert.True(t, hasValidPrefix, "authToken should be empty, start with 'Bearer ', or start with 'Basic '")
-	}
-}
-
-func TestResolveAirflowAPIURL_Default_WithAuthHeader(t *testing.T) {
-	// When user provides Authorization header, token fetch should be skipped
-	opts := &AirflowOptions{
-		RequestOptions: RequestOptions{
-			RequestHeaders: []string{"Authorization: Bearer custom-token"},
-		},
-	}
-
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
-	require.NoError(t, err)
-	assert.Equal(t, airflowAPIDefaultURL, baseURL)
-	assert.Empty(t, authToken) // Token fetch skipped when user provides auth
-}
-
-func TestResolveAirflowAPIURL_CustomURL(t *testing.T) {
-	customURL := "http://custom.airflow.example.com:8080/api/v2"
-	opts := &AirflowOptions{
-		APIURL: customURL,
-	}
-
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
-	require.NoError(t, err)
-	assert.Equal(t, customURL, baseURL)
-	assert.Empty(t, authToken)
-}
-
-func TestResolveAirflowAPIURL_DeploymentID_NotCloudContext(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	opts := &AirflowOptions{
-		DeploymentID: "test-deployment-id",
-	}
-
-	_, _, err := resolveAirflowAPIURL(opts)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "requires cloud context")
-}
-
-func TestResolveAirflowAPIURL_DeploymentID_NoToken(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err := config.CFG.ProjectDeployment.SetProjectString("")
-	require.NoError(t, err)
-
-	// Set up context without token
-	ctx, err := config.GetCurrentContext()
-	require.NoError(t, err)
-	ctx.Token = ""
-	err = ctx.SetContext()
-	require.NoError(t, err)
-
-	opts := &AirflowOptions{
-		DeploymentID: "test-deployment-id",
-	}
-
-	_, _, err = resolveAirflowAPIURL(opts)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not authenticated")
-}
-
-func TestResolveAirflowAPIURL_DeploymentID_Success(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err := config.CFG.ProjectDeployment.SetProjectString("")
-	require.NoError(t, err)
-
-	// Set up context with token and organization
-	ctx, err := config.GetCurrentContext()
-	require.NoError(t, err)
-	ctx.Token = "test-token"
-	ctx.Organization = "test-org"
-	err = ctx.SetContext()
-	require.NoError(t, err)
-
-	// Mock GetDeploymentByID
-	expectedURL := "https://deployment.airflow.astronomer.io/api/v2"
-	origGetDeploymentByID := deployment.GetDeploymentByID
-	defer func() { deployment.GetDeploymentByID = origGetDeploymentByID }()
-
-	deployment.GetDeploymentByID = func(orgID, deploymentID string, client astrov1.APIClient) (astrov1.Deployment, error) {
-		assert.Equal(t, "test-org", orgID)
-		assert.Equal(t, "test-deployment-id", deploymentID)
-		return astrov1.Deployment{
-			Id:                     deploymentID,
-			WebServerAirflowApiUrl: expectedURL,
-		}, nil
-	}
-
-	opts := &AirflowOptions{
-		DeploymentID: "test-deployment-id",
-	}
-
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
-	require.NoError(t, err)
-	assert.Equal(t, expectedURL, baseURL)
-	assert.Equal(t, "test-token", authToken)
-}
-
-func TestResolveAirflowAPIURL_DeploymentID_WithOrgOverride(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err := config.CFG.ProjectDeployment.SetProjectString("")
-	require.NoError(t, err)
-
-	// Set up context with token but different organization
-	ctx, err := config.GetCurrentContext()
-	require.NoError(t, err)
-	ctx.Token = "test-token"
-	ctx.Organization = "context-org"
-	err = ctx.SetContext()
-	require.NoError(t, err)
-
-	// Mock GetDeploymentByID
-	expectedURL := "https://deployment.airflow.astronomer.io/api/v2"
-	origGetDeploymentByID := deployment.GetDeploymentByID
-	defer func() { deployment.GetDeploymentByID = origGetDeploymentByID }()
-
-	deployment.GetDeploymentByID = func(orgID, deploymentID string, client astrov1.APIClient) (astrov1.Deployment, error) {
-		// Should use the override org, not context org
-		assert.Equal(t, "override-org", orgID)
-		assert.Equal(t, "test-deployment-id", deploymentID)
-		return astrov1.Deployment{
-			Id:                     deploymentID,
-			WebServerAirflowApiUrl: expectedURL,
-		}, nil
-	}
-
-	opts := &AirflowOptions{
-		DeploymentID:   "test-deployment-id",
-		OrganizationID: "override-org",
-	}
-
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
-	require.NoError(t, err)
-	assert.Equal(t, expectedURL, baseURL)
-	assert.Equal(t, "test-token", authToken)
-}
-
-func TestResolveAirflowAPIURL_DeploymentID_NoAirflowURL(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err := config.CFG.ProjectDeployment.SetProjectString("")
-	require.NoError(t, err)
-
-	// Set up context with token and organization
-	ctx, err := config.GetCurrentContext()
-	require.NoError(t, err)
-	ctx.Token = "test-token"
-	ctx.Organization = "test-org"
-	err = ctx.SetContext()
-	require.NoError(t, err)
-
-	// Mock GetDeploymentByID to return deployment without Airflow URL
-	origGetDeploymentByID := deployment.GetDeploymentByID
-	defer func() { deployment.GetDeploymentByID = origGetDeploymentByID }()
-
-	deployment.GetDeploymentByID = func(orgID, deploymentID string, client astrov1.APIClient) (astrov1.Deployment, error) {
-		return astrov1.Deployment{
-			Id:                     deploymentID,
-			WebServerAirflowApiUrl: "", // empty string means no URL configured
-		}, nil
-	}
-
-	opts := &AirflowOptions{
-		DeploymentID: "test-deployment-id",
-	}
-
-	_, _, err = resolveAirflowAPIURL(opts)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "does not have an Airflow API URL")
 }
 
 func TestNewAirflowListCmd(t *testing.T) {
@@ -287,19 +120,8 @@ func TestNewAirflowDescribeCmd(t *testing.T) {
 
 func TestAirflowConstants(t *testing.T) {
 	// Verify the constants are set correctly
-	assert.Equal(t, "http://localhost:8080/api/v2", airflowAPIDefaultURL)
+	assert.Equal(t, "http://localhost:8080", airflowLocalhost)
 	assert.Equal(t, "3.0.3", defaultAirflowVersion)
-}
-
-// --- basicAuth ---------------------------------------------------------------
-
-func TestBasicAuth(t *testing.T) {
-	result := basicAuth("admin", "admin")
-	// "admin:admin" -> base64
-	assert.Equal(t, "YWRtaW46YWRtaW4=", result)
-
-	result = basicAuth("user", "pass")
-	assert.Equal(t, "dXNlcjpwYXNz", result)
 }
 
 // --- airflowHostRoot ---------------------------------------------------------
@@ -343,181 +165,51 @@ func TestApiPrefixForVersion(t *testing.T) {
 	}
 }
 
-// --- fetchAirflowToken -------------------------------------------------------
-
-func TestFetchAirflowToken_Success(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/auth/token", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"access_token":"my-jwt-token"}`))
-	}))
-	defer ts.Close()
-
-	token, err := fetchAirflowToken(http.DefaultClient, ts.URL+"/api/v2", "admin", "admin")
-	require.NoError(t, err)
-	assert.Equal(t, "Bearer my-jwt-token", token)
-}
-
-func TestFetchAirflowToken_FallbackToBasicAuth(t *testing.T) {
-	// Airflow 2.x: /auth/token returns 404, so we fall back to basic auth
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer ts.Close()
-
-	token, err := fetchAirflowToken(http.DefaultClient, ts.URL+"/api/v1", "admin", "admin")
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(token, "Basic "))
-}
-
-func TestFetchAirflowToken_MethodNotAllowed(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}))
-	defer ts.Close()
-
-	token, err := fetchAirflowToken(http.DefaultClient, ts.URL, "admin", "admin")
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(token, "Basic "))
-}
-
-func TestFetchAirflowToken_ErrorStatus(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-	}))
-	defer ts.Close()
-
-	_, err := fetchAirflowToken(http.DefaultClient, ts.URL, "admin", "wrong")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "status 401")
-}
-
-func TestFetchAirflowToken_EmptyToken(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"access_token":""}`))
-	}))
-	defer ts.Close()
-
-	_, err := fetchAirflowToken(http.DefaultClient, ts.URL, "admin", "admin")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no access_token")
-}
-
-// --- FetchAirflowVersion -----------------------------------------------------
-
-func TestFetchAirflowVersion_V2First(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v2/version" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"version":"3.0.3"}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer ts.Close()
-
-	version, err := FetchAirflowVersion(http.DefaultClient, ts.URL+"/api/v2", "")
-	require.NoError(t, err)
-	assert.Equal(t, "3.0.3", version)
-}
-
-func TestFetchAirflowVersion_FallbackToV1(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/version" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"version":"2.10.0"}`))
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer ts.Close()
-
-	version, err := FetchAirflowVersion(http.DefaultClient, ts.URL+"/api/v2", "")
-	require.NoError(t, err)
-	assert.Equal(t, "2.10.0", version)
-}
-
-func TestFetchAirflowVersion_WithAuthToken(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer my-token", r.Header.Get("Authorization"))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"version":"3.1.0"}`))
-	}))
-	defer ts.Close()
-
-	version, err := FetchAirflowVersion(http.DefaultClient, ts.URL, "Bearer my-token")
-	require.NoError(t, err)
-	assert.Equal(t, "3.1.0", version)
-}
-
-func TestFetchAirflowVersion_AllFail(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer ts.Close()
-
-	_, err := FetchAirflowVersion(http.DefaultClient, ts.URL, "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "could not detect version")
-}
-
-func TestFetchAirflowVersion_EmptyVersion(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"version":""}`))
-	}))
-	defer ts.Close()
-
-	_, err := FetchAirflowVersion(http.DefaultClient, ts.URL, "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "could not detect version")
-}
-
-// --- resolveAirflowAPIURL with explicit credentials --------------------------
-
-func TestResolveAirflowAPIURL_ExplicitCredentials_Failure(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-	}))
-	defer ts.Close()
-
-	opts := &AirflowOptions{
-		APIURL:              ts.URL,
-		Username:            "admin",
-		Password:            "wrong",
-		CredentialsExplicit: true,
-		RequestOptions:      RequestOptions{ErrOut: new(bytes.Buffer)},
-	}
-
-	_, _, err := resolveAirflowAPIURL(opts)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "authentication failed")
-}
-
 // --- initAirflowSpecCache ----------------------------------------------------
+
+// targetFor resolves the target the way the command does, so a test exercises
+// the real flag folding rather than a hand-built struct.
+func targetFor(t *testing.T, opts *AirflowOptions) *airflowTarget {
+	t.Helper()
+	if opts.HTTPClient == nil {
+		opts.HTTPClient = http.DefaultClient
+	}
+	if opts.ErrOut == nil {
+		opts.ErrOut = new(bytes.Buffer)
+	}
+	if opts.Username == "" {
+		// Nothing to mint with, so supply the credential instead — a test that
+		// is not about the mint should not make a mint call.
+		opts.RequestHeaders = append(opts.RequestHeaders, "Authorization: Bearer supplied")
+	}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	return target
+}
 
 func TestInitAirflowSpecCache_AlreadyInitialized(t *testing.T) {
 	cache, _ := openapi.NewAirflowCacheForVersion("3.0.3")
 	opts := &AirflowOptions{
+		URL:            "http://localhost:8080",
 		RequestOptions: RequestOptions{specCache: cache},
 	}
+	opts.detectedVersion = "3.0.3"
 
-	result, err := initAirflowSpecCache(opts, "http://localhost:8080/api/v2", "")
+	result, err := initAirflowSpecCache(context.Background(), opts, targetFor(t, opts))
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:8080/api/v2", result)
 }
 
 func TestInitAirflowSpecCache_ManualVersion(t *testing.T) {
 	opts := &AirflowOptions{
+		URL:            "http://localhost:8080/api/v2",
 		AirflowVersion: "2.10.0",
-		RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)},
 	}
 
-	result, err := initAirflowSpecCache(opts, "http://localhost:8080/api/v2", "")
+	result, err := initAirflowSpecCache(context.Background(), opts, targetFor(t, opts))
 	require.NoError(t, err)
-	// Should correct the URL to /api/v1 for Airflow 2.x
+	// The /api/v2 the deprecated spelling carried is dropped, and the version
+	// asked for decides the prefix.
 	assert.Equal(t, "http://localhost:8080/api/v1", result)
 	assert.NotNil(t, opts.specCache)
 	assert.Equal(t, "2.10.0", opts.detectedVersion)
@@ -535,17 +227,471 @@ func TestInitAirflowSpecCache_DetectsVersion(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	opts := &AirflowOptions{
-		RequestOptions: RequestOptions{
-			ErrOut:     new(bytes.Buffer),
-			HTTPClient: http.DefaultClient,
-		},
-	}
+	opts := &AirflowOptions{URL: ts.URL}
 
-	result, err := initAirflowSpecCache(opts, ts.URL+"/api/v2", "")
+	result, err := initAirflowSpecCache(context.Background(), opts, targetFor(t, opts))
 	require.NoError(t, err)
 	assert.Equal(t, ts.URL+"/api/v2", result)
 	assert.Equal(t, "3.0.3", opts.detectedVersion)
+}
+
+// An Astronomer-patched Airflow 2 answers an /api/v2 probe, so the generation
+// has to be read off the version it reports rather than off the probe that
+// answered. This is pkg/airflowapi's rule, and it now governs this command too.
+func TestInitAirflowSpecCache_PatchedAirflow2GetsV1(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "version") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"version":"2.10.5+astro.4"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	opts := &AirflowOptions{URL: ts.URL}
+
+	result, err := initAirflowSpecCache(context.Background(), opts, targetFor(t, opts))
+	require.NoError(t, err)
+	assert.Equal(t, ts.URL+"/api/v1", result)
+}
+
+// --- targeting ---------------------------------------------------------------
+
+func TestResolveAirflowTarget_DefaultsToLocalhost(t *testing.T) {
+	// A supplied Authorization header means nothing is minted, which is what
+	// keeps this test off the network — whatever is listening on this machine's
+	// port 8080 is nobody's business here.
+	opts := &AirflowOptions{RequestOptions: RequestOptions{
+		ErrOut:         new(bytes.Buffer),
+		RequestHeaders: []string{"Authorization: Bearer supplied"},
+	}}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, airflowLocalhost, target.hostRoot)
+	assert.True(t, target.isHTTP())
+	assert.False(t, target.isNamedDeployment())
+}
+
+// The credential for a bare URL is minted at the instance's own /auth/token,
+// through pkg/airflowapi's TokenMinter — the mint this command used to hand-roll.
+func TestResolveAirflowTarget_MintsAToken(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/auth/token", r.URL.Path)
+		_, _ = w.Write([]byte(`{"access_token":"minted"}`))
+	}))
+	defer ts.Close()
+
+	opts := &AirflowOptions{URL: ts.URL, Username: "admin", Password: "admin"}
+	target := targetFor(t, opts)
+	assert.Equal(t, "Bearer minted", target.authorization)
+}
+
+// An Airflow 2 serves no /auth/token, so the username and password go on the
+// request itself.
+func TestResolveAirflowTarget_FallsBackToBasicAuth(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	opts := &AirflowOptions{URL: ts.URL, Username: "admin", Password: "admin"}
+	target := targetFor(t, opts)
+	assert.Equal(t, "Basic YWRtaW46YWRtaW4=", target.authorization)
+}
+
+// Every path into hostRoot strips the API prefix, because the generation is
+// detected and put back on top. A link whose url carries one — and a control
+// plane whose WebServerAirflowApiUrl already ends in /api/v2, which is what
+// this repo's own fixture for it looks like — would otherwise be addressed at
+// /api/v1/api/v2/dags.
+func TestResolveAirflowTarget_LinkURLDropsTheAPIPrefix(t *testing.T) {
+	writeAPIProject(t, `[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "https://airflow.staging.corp.dev/api/v1"
+auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
+`)
+	t.Setenv("STAGING_AIRFLOW_TOKEN", "tok")
+
+	opts := &AirflowOptions{Deployment: "staging", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, "https://airflow.staging.corp.dev", target.hostRoot)
+	assert.Equal(t, "https://airflow.staging.corp.dev/api/v2", target.apiBase("3.0.3"))
+}
+
+// The same, end to end: the request lands on the API rather than under a
+// doubled prefix.
+func TestRunAirflow_LinkWithAPrefixedURLLandsOnTheAPI(t *testing.T) {
+	var mu sync.Mutex
+	var paths []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v2/version", "/api/v1/version":
+			_, _ = w.Write([]byte(`{"version":"3.0.3"}`))
+		default:
+			_, _ = w.Write([]byte(`{"dags":[]}`))
+		}
+	}))
+	defer ts.Close()
+
+	writeAPIProject(t, `[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "`+ts.URL+`/api/v1"
+auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
+`)
+	t.Setenv("STAGING_AIRFLOW_TOKEN", "tok")
+
+	opts := &AirflowOptions{
+		Deployment:     "staging",
+		RequestOptions: RequestOptions{Out: new(bytes.Buffer), ErrOut: new(bytes.Buffer), RequestPath: "/dags", RequestMethod: "GET"},
+	}
+	require.NoError(t, runAirflow(opts))
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.NotContains(t, paths, "/api/v1/api/v2/dags")
+	assert.Contains(t, paths, "/api/v2/dags")
+}
+
+// A named deployment whose version cannot be read fails, whatever was asked
+// for. The generation decides the path, so carrying on would send a raw path
+// somewhere this run could not work out — and report success doing it.
+func TestRunAirflow_ProbeFailureOnANamedDeploymentFails(t *testing.T) {
+	var mu sync.Mutex
+	var paths []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		if strings.HasSuffix(r.URL.Path, "/version") {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"dags":[]}`))
+	}))
+	defer ts.Close()
+
+	writeAPIProject(t, `[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "`+ts.URL+`"
+auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
+`)
+	t.Setenv("STAGING_AIRFLOW_TOKEN", "tok")
+
+	opts := &AirflowOptions{
+		Deployment:     "staging",
+		RequestOptions: RequestOptions{Out: new(bytes.Buffer), ErrOut: new(bytes.Buffer), RequestPath: "/dags", RequestMethod: "GET"},
+	}
+	err := runAirflow(opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--airflow-version")
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.NotContains(t, paths, "/dags", "a request went out under no API prefix at all")
+}
+
+// The localhost default is allowed to fall back — it may simply not be running
+// — but the fallback still carries a generation prefix.
+func TestInitAirflowSpecCache_FallbackKeepsThePrefix(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	errOut := new(bytes.Buffer)
+	opts := &AirflowOptions{RequestOptions: RequestOptions{ErrOut: errOut, HTTPClient: http.DefaultClient}}
+	// A target nobody named, pointed at a server that refuses the probe.
+	target, err := opts.httpTarget("the Airflow on localhost", ts.URL, "")
+	require.NoError(t, err)
+
+	base, err := initAirflowSpecCache(context.Background(), opts, target)
+	require.NoError(t, err)
+	assert.Equal(t, ts.URL+"/api/v2", base)
+	assert.Contains(t, errOut.String(), "Could not detect Airflow version")
+}
+
+// The generated curl command carries a placeholder, never the credential this
+// run resolved. --verbose has always masked the same header.
+func TestRunAirflow_GenerateWithholdsTheCredential(t *testing.T) {
+	writeAPIProject(t, `[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "https://airflow.staging.corp.dev"
+auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
+`)
+	t.Setenv("STAGING_AIRFLOW_TOKEN", "s3cr3t-not-for-your-scrollback")
+
+	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
+	opts := &AirflowOptions{
+		Deployment:     "staging",
+		AirflowVersion: "3.0.3",
+		RequestOptions: RequestOptions{
+			Out: out, ErrOut: errOut,
+			RequestPath: "/dags", RequestMethod: "GET",
+			GenerateCurl: true,
+		},
+	}
+	require.NoError(t, runAirflow(opts))
+	assert.NotContains(t, out.String(), "s3cr3t-not-for-your-scrollback")
+	assert.Contains(t, out.String(), "Authorization: Bearer $AIRFLOW_TOKEN")
+	assert.Contains(t, errOut.String(), "The credential was withheld")
+}
+
+// The conflict message names the flags the reader typed, not the ones they did
+// not: half of these four spellings are deprecated aliases.
+func TestResolveAirflowTarget_ConflictNamesTheFlagsTyped(t *testing.T) {
+	opts := &AirflowOptions{APIURL: "https://a.dev", DeploymentID: "clx"}
+	_, err := resolveAirflowTarget(context.Background(), opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--api-url")
+	assert.Contains(t, err.Error(), "--deployment-id")
+	assert.NotContains(t, err.Error(), "--url and")
+}
+
+// --deployment falls through to an Astro Deployment id for a name no link
+// declares, which is what --deployment-id always meant.
+func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	ctx, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	ctx.Token, ctx.Organization = "test-token", "test-org"
+	require.NoError(t, ctx.SetContext())
+
+	orig := deployment.GetDeploymentByID
+	t.Cleanup(func() { deployment.GetDeploymentByID = orig })
+	deployment.GetDeploymentByID = func(orgID, deploymentID string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+		assert.Equal(t, "test-org", orgID)
+		assert.Equal(t, "clxyz123", deploymentID)
+		return astrov1.Deployment{Id: deploymentID, WebServerAirflowApiUrl: "deployment.airflow.astronomer.io/api/v2"}, nil
+	}
+
+	opts := &AirflowOptions{Deployment: "clxyz123", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	// A URL with no scheme gets https, and the /api/v2 the control plane
+	// appends is dropped — the generation is detected, not taken on trust.
+	assert.Equal(t, "https://deployment.airflow.astronomer.io", target.hostRoot)
+	// The session token is stored without its scheme on some machines; the
+	// header carries one either way.
+	assert.Equal(t, "Bearer test-token", target.authorization)
+}
+
+// The deprecated flag still reaches the same place.
+func TestResolveAirflowTarget_DeploymentIDAliasStillWorks(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	opts := &AirflowOptions{DeploymentID: "clxyz123", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	_, err := resolveAirflowTarget(context.Background(), opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires cloud context")
+}
+
+// An explicit --username or --password is a claim about how to log in, so
+// failing to log in is this command's failure rather than a shrug.
+func TestResolveAirflowTarget_ExplicitCredentialsMustWork(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	opts := &AirflowOptions{
+		URL:                 ts.URL,
+		Username:            "admin",
+		Password:            "wrong",
+		CredentialsExplicit: true,
+		RequestOptions:      RequestOptions{ErrOut: new(bytes.Buffer), HTTPClient: http.DefaultClient},
+	}
+	_, err := resolveAirflowTarget(context.Background(), opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "authentication failed")
+}
+
+func TestResolveAirflowTarget_URLDropsTheAPIPrefix(t *testing.T) {
+	opts := &AirflowOptions{
+		URL:            "https://airflow.corp.dev/api/v2",
+		RequestOptions: RequestOptions{RequestHeaders: []string{"Authorization: Bearer supplied"}},
+	}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, "https://airflow.corp.dev", target.hostRoot)
+	// The caller said how to prove themselves, so nothing is minted over it.
+	assert.Empty(t, target.authorization)
+}
+
+func TestResolveAirflowTarget_APIURLIsAnAliasOfURL(t *testing.T) {
+	opts := &AirflowOptions{
+		APIURL:         "https://airflow.corp.dev/api/v1",
+		RequestOptions: RequestOptions{RequestHeaders: []string{"Authorization: Bearer supplied"}},
+	}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, "https://airflow.corp.dev", target.hostRoot)
+	// A URL is a guess someone typed, so a version probe that fails against it
+	// warns and falls back rather than failing the command.
+	assert.False(t, target.isNamedDeployment())
+}
+
+func TestResolveAirflowTarget_RefusesTwoTargets(t *testing.T) {
+	cases := map[string]*AirflowOptions{
+		"--url with --deployment":    {URL: "https://a.dev", Deployment: "prod"},
+		"--url with --api-url":       {URL: "https://a.dev", APIURL: "https://b.dev"},
+		"--url with --deployment-id": {URL: "https://a.dev", DeploymentID: "clx"},
+	}
+	for name, opts := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := resolveAirflowTarget(context.Background(), opts)
+			require.Error(t, err)
+		})
+	}
+}
+
+// A deployment link the manifest declares is reached through the same
+// resolution the query commands use.
+func TestResolveAirflowTarget_ManifestLink(t *testing.T) {
+	writeAPIProject(t, `[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "https://airflow.staging.corp.dev"
+auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
+`)
+	t.Setenv("STAGING_AIRFLOW_TOKEN", "from-the-environment")
+
+	opts := &AirflowOptions{Deployment: "staging", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
+	assert.Equal(t, "staging", target.name)
+	assert.Equal(t, "https://airflow.staging.corp.dev", target.hostRoot)
+	assert.Equal(t, "Bearer from-the-environment", target.authorization)
+	assert.True(t, target.isNamedDeployment())
+}
+
+// An MWAA link has no Airflow URL at all: its requests travel inside a signed
+// AWS API call, so resolution hands back the door itself rather than a URL. The
+// AWS half needs credentials no test machine should need, so this holds the
+// seam that decides it: HTTPDoorFor refuses, and the target then carries the
+// transport (TestRunAirflowThroughTransport_UnwrapsTheAnswer covers what
+// happens after).
+func TestMWAALinkHasNoHTTPDoor(t *testing.T) {
+	m, err := manifest.Parse([]byte(`[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.prod]
+target = "mwaa"
+environment = "orders-prod"
+
+[tool.astro.targets.mwaa]
+region = "us-east-1"
+`))
+	require.NoError(t, err)
+
+	instance, ok := instances.Build(m).Lookup("prod")
+	require.True(t, ok)
+	_, err = instance.HTTPDoorFor(context.Background(), instances.Deps{})
+	require.ErrorIs(t, err, instances.ErrNotHTTP)
+}
+
+// stubTransport stands in for the MWAA door: it answers the generation probe
+// like an Airflow 3, and everything else with the canned response.
+type stubTransport struct{ resp airflowapi.Response }
+
+func (s stubTransport) Do(_ context.Context, req airflowapi.Request) (airflowapi.Response, error) {
+	if req.Path == "/version" {
+		return airflowapi.Response{StatusCode: http.StatusOK, Body: []byte(`{"version":"3.0.3"}`)}, nil
+	}
+	return s.resp, nil
+}
+
+// The doc's open question 1, settled: InvokeRestApi wraps the answer in
+// RestApiStatusCode and RestApiResponse, the transport maps both onto an
+// ordinary airflowapi.Response, and this command prints exactly that — the same
+// status and the same body it would print for any HTTP Airflow. The AWS
+// envelope is machinery, not the answer.
+func TestRunAirflowThroughTransport_UnwrapsTheAnswer(t *testing.T) {
+	out := new(bytes.Buffer)
+	target := &airflowTarget{
+		name: "prod",
+		transport: stubTransport{resp: airflowapi.Response{
+			StatusCode: http.StatusOK,
+			Body:       []byte(`{"dags":[{"dag_id":"orders_etl"}],"total_entries":1}`),
+		}},
+	}
+	opts := &AirflowOptions{RequestOptions: RequestOptions{Out: out, FilterOutput: ".dags[].dag_id"}}
+
+	require.NoError(t, runAirflowThroughTransport(context.Background(), opts, target, http.MethodGet, "/dags", nil))
+	assert.Contains(t, out.String(), "orders_etl")
+}
+
+func TestRunAirflowThroughTransport_ReportsTheStatusItWasGiven(t *testing.T) {
+	out := new(bytes.Buffer)
+	target := &airflowTarget{
+		name: "prod",
+		transport: stubTransport{resp: airflowapi.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       []byte(`{"detail":"DAG not found"}`),
+		}},
+	}
+	opts := &AirflowOptions{RequestOptions: RequestOptions{Out: out}}
+
+	err := runAirflowThroughTransport(context.Background(), opts, target, http.MethodGet, "/dags/nope", nil)
+	var silent *SilentError
+	require.ErrorAs(t, err, &silent)
+	assert.Equal(t, http.StatusNotFound, silent.StatusCode)
+	assert.Contains(t, out.String(), "DAG not found")
+}
+
+// writeAPIProject points config.WorkingPath at a fresh project carrying this
+// manifest, so -d resolves against it.
+func writeAPIProject(t *testing.T, toml string) {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(toml), 0o600))
+	orig := config.WorkingPath
+	config.WorkingPath = dir
+	t.Cleanup(func() { config.WorkingPath = orig })
+}
+
+// The flags that only make sense against a URL are refused rather than quietly
+// ignored on a door that has none.
+func TestRunAirflowThroughTransport_RefusesURLOnlyFlags(t *testing.T) {
+	opts := &AirflowOptions{RequestOptions: RequestOptions{Out: new(bytes.Buffer), GenerateCurl: true}}
+	target := &airflowTarget{name: "prod"}
+	err := runAirflowThroughTransport(context.Background(), opts, target, http.MethodGet, "/dags", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--generate")
+	assert.Contains(t, err.Error(), "prod")
 }
 
 // --- airflowConnectionError --------------------------------------------------
@@ -555,16 +701,16 @@ func TestAirflowConnectionError_Localhost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
 	assert.Contains(t, err.Error(), "localhost:8080")
-	assert.Contains(t, err.Error(), "astro dev start")
-	assert.Contains(t, err.Error(), "--api-url")
-	assert.Contains(t, err.Error(), "--deployment-id")
+	assert.Contains(t, err.Error(), "astro local start")
+	assert.Contains(t, err.Error(), "--url")
+	assert.Contains(t, err.Error(), "-d <name or id>")
 }
 
 func TestAirflowConnectionError_Loopback(t *testing.T) {
 	err := airflowConnectionError("http://127.0.0.1:8080/api/v2/dags")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
-	assert.Contains(t, err.Error(), "astro dev start")
+	assert.Contains(t, err.Error(), "astro local start")
 }
 
 func TestAirflowConnectionError_RemoteHost(t *testing.T) {
@@ -572,7 +718,7 @@ func TestAirflowConnectionError_RemoteHost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
 	assert.Contains(t, err.Error(), "airflow.example.com")
-	assert.NotContains(t, err.Error(), "astro dev start")
+	assert.NotContains(t, err.Error(), "astro local start")
 	assert.Contains(t, err.Error(), "Check that the URL is correct")
 }
 
@@ -600,7 +746,7 @@ func TestRunAirflow_ConnectionRefused(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
 	// The closed httptest server is on 127.0.0.1, so we get the localhost suggestion
-	assert.Contains(t, err.Error(), "astro dev start")
+	assert.Contains(t, err.Error(), "astro local start")
 
 	// Should NOT print noisy warnings about auth or version detection
 	assert.NotContains(t, errOut.String(), "could not fetch auth token")
@@ -628,32 +774,10 @@ func TestRunAirflow_ConnectionRefused_OperationID(t *testing.T) {
 	err := runAirflow(opts)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
-	assert.Contains(t, err.Error(), "astro dev start")
+	assert.Contains(t, err.Error(), "astro local start")
 }
 
 // --- warning suppression on connection errors --------------------------------
-
-func TestResolveAirflowAPIURL_ConnectionError_SuppressesWarning(t *testing.T) {
-	// Start and immediately close a server to get a refused connection
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
-	closedURL := ts.URL
-	ts.Close()
-
-	errOut := new(bytes.Buffer)
-	opts := &AirflowOptions{
-		APIURL: closedURL,
-		RequestOptions: RequestOptions{
-			ErrOut: errOut,
-		},
-	}
-
-	baseURL, authToken, err := resolveAirflowAPIURL(opts)
-	require.NoError(t, err)
-	assert.Equal(t, closedURL, baseURL)
-	assert.Empty(t, authToken)
-	// The noisy warning should be suppressed for connection errors
-	assert.Empty(t, errOut.String())
-}
 
 func TestInitAirflowSpecCache_ConnectionError_SuppressesWarning(t *testing.T) {
 	// Start and immediately close a server
@@ -663,12 +787,13 @@ func TestInitAirflowSpecCache_ConnectionError_SuppressesWarning(t *testing.T) {
 
 	errOut := new(bytes.Buffer)
 	opts := &AirflowOptions{
-		RequestOptions: RequestOptions{
-			ErrOut: errOut,
-		},
+		URL:            closedURL,
+		RequestOptions: RequestOptions{ErrOut: errOut, HTTPClient: http.DefaultClient},
 	}
+	target, err := resolveAirflowTarget(context.Background(), opts)
+	require.NoError(t, err)
 
-	_, err := initAirflowSpecCache(opts, closedURL+"/api/v2", "")
+	_, err = initAirflowSpecCache(context.Background(), opts, target)
 	require.NoError(t, err)
 	assert.NotNil(t, opts.specCache)
 	// The noisy warning should be suppressed for connection errors

@@ -305,18 +305,18 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 // answers usefully ends with the message naming the flags rather than looping.
 const promptAttempts = 3
 
-// matchChoice reads an answer as a number or a name.
+// matchChoice reads an answer as a name or a number, names first. A deployment
+// may legally be called "2", and reading the number first would pin whichever
+// entry happened to sit in that position instead. What the user typed is what
+// they meant; the numbers are only a shorthand for names nobody wants to retype.
 func matchChoice(choices []string, answer string) (string, bool) {
-	if n, err := strconv.Atoi(answer); err == nil {
-		if n < 1 || n > len(choices) {
-			return "", false
-		}
-		return choices[n-1], true
-	}
 	for _, name := range choices {
 		if name == answer {
 			return name, true
 		}
+	}
+	if n, err := strconv.Atoi(answer); err == nil && n >= 1 && n <= len(choices) {
+		return choices[n-1], true
 	}
 	return "", false
 }

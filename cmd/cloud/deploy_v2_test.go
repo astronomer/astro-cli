@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -17,6 +19,7 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/config"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
+	"github.com/astronomer/astro-cli/internal/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -47,9 +50,10 @@ func resetDeployFlagVars() {
 	deployOutput = string(formatText)
 }
 
-// v2ManifestWithDefaultLink is a v2 project whose one link is the default, so
-// `astro deploy` resolves a deployment with no prompt and no --deployment — the
-// setup every json/text render test below shares.
+// v2ManifestWithDefaultLink is a v2 project with two links, one marked default.
+// Deploy never resolves from the marker, so the render tests below
+// name their target with --deployment; the marker's only job here is
+// preselecting the prompt, which TestDeployV2PromptPreselectsDefault drives.
 const v2ManifestWithDefaultLink = `[project]
 name = "demo"
 dependencies = ["pandas"]
@@ -62,6 +66,9 @@ packages = ["libpq-dev"]
 [tool.astro.deployments.prod]
 deployment = "clx-dep"
 default = true
+
+[tool.astro.deployments.dev]
+deployment = "clx-dev"
 `
 
 // fakeCmdDeployer stands in for the real transport so a cmd-level test drives
@@ -73,6 +80,10 @@ type fakeCmdDeployer struct {
 	imgErr   error
 	dagInput *v2deploy.DagDeploy
 	imgInput *v2deploy.ImageDeploy
+}
+
+func (f *fakeCmdDeployer) ConfirmTarget([]v2deploy.Choice, v2deploy.Preselect) (string, error) {
+	return "", errors.New("the transport should not be asked when the target is named")
 }
 
 func (f *fakeCmdDeployer) ResolveUnlinked(string) (string, error) { return "", nil }
@@ -92,18 +103,24 @@ func (f *fakeCmdDeployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageR
 // gets its own mock.
 func setupV2Deploy(t *testing.T, d v2deploy.Deployer) {
 	t.Helper()
+	setupV2DeployWith(t, d, v2ManifestWithDefaultLink)
+}
+
+// setupV2DeployWith is setupV2Deploy over a manifest of the test's choosing.
+func setupV2DeployWith(t *testing.T, d v2deploy.Deployer, toml string) {
+	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(v2ManifestWithDefaultLink), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(toml), 0o600))
 
 	origPath := config.WorkingPath
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = origPath })
 
 	origDeployer := newV2Deployer
-	newV2Deployer = func(astrov1.APIClient) v2deploy.Deployer { return d }
+	newV2Deployer = func(astrov1.APIClient, io.Reader, io.Writer) v2deploy.Deployer { return d }
 	t.Cleanup(func() { newV2Deployer = origDeployer })
 }
 
@@ -120,6 +137,31 @@ func execDeployCapture(args ...string) (string, error) {
 	return buf.String(), err
 }
 
+// execDeployIO runs the deploy command with its three streams under the test's
+// control: answers is what stdin hands the prompt, and stdout and stderr come
+// back apart, because the ordering this command has to get right is a prompt on
+// one and a progress line on the other.
+func execDeployIO(answers string, args ...string) (out, errOut string, err error) {
+	testUtil.SetupOSArgsForGinkgo()
+	cmd := NewDeployCmd()
+	var outBuf, errBuf bytes.Buffer
+	cmd.SetOut(&outBuf)
+	cmd.SetErr(&errBuf)
+	cmd.SetIn(strings.NewReader(answers))
+	cmd.SetArgs(args)
+	_, err = cmd.ExecuteC()
+	return outBuf.String(), errBuf.String(), err
+}
+
+// interactiveDeploy makes this run one that can be asked a question, the way a
+// terminal would.
+func interactiveDeploy(t *testing.T) {
+	t.Helper()
+	orig := stdinIsTerminal
+	stdinIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stdinIsTerminal = orig })
+}
+
 func TestDeployV2JSONImageAndDag(t *testing.T) {
 	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{
 		WorkspaceID:       "clw-ws",
@@ -129,7 +171,7 @@ func TestDeployV2JSONImageAndDag(t *testing.T) {
 		URL:               "https://cloud.astronomer.io/deployments/clx-dep",
 	}})
 
-	out, err := execDeployCapture("--output", "json")
+	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
 	require.NoError(t, err)
 
 	m := decodeOneJSON(t, out)
@@ -150,7 +192,7 @@ func TestDeployV2JSONImageOnly(t *testing.T) {
 		URL:            "https://cloud.astronomer.io/deployments/clx-dep",
 	}})
 
-	out, err := execDeployCapture("--image", "--output", "json")
+	out, err := execDeployCapture("--deployment", "prod", "--image", "--output", "json")
 	require.NoError(t, err)
 
 	m := decodeOneJSON(t, out)
@@ -169,7 +211,7 @@ func TestDeployV2JSONDagsOnly(t *testing.T) {
 		URL:               "https://cloud.astronomer.io/deployments/clx-dep",
 	}})
 
-	out, err := execDeployCapture("--dags", "--output", "json")
+	out, err := execDeployCapture("--deployment", "prod", "--dags", "--output", "json")
 	require.NoError(t, err)
 
 	m := decodeOneJSON(t, out)
@@ -190,7 +232,7 @@ func TestDeployV2JSONImageName(t *testing.T) {
 	}}
 	setupV2Deploy(t, fake)
 
-	out, err := execDeployCapture("--image-name", "astro-package/demo:3.1-2-abc", "--output", "json")
+	out, err := execDeployCapture("--deployment", "prod", "--image-name", "astro-package/demo:3.1-2-abc", "--output", "json")
 	require.NoError(t, err)
 
 	// The prebuilt ref reaches the transport, and --image-name without --image
@@ -207,7 +249,7 @@ func TestDeployV2JSONImageName(t *testing.T) {
 func TestDeployV2JSONError(t *testing.T) {
 	setupV2Deploy(t, &fakeCmdDeployer{imgErr: errors.New("build boom")})
 
-	out, err := execDeployCapture("--output", "json")
+	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
 	require.Error(t, err)
 
 	m := decodeOneJSON(t, out)
@@ -251,15 +293,237 @@ func TestDeployV2TextUnchanged(t *testing.T) {
 		URL:               "https://cloud.astronomer.io/deployments/clx-dep",
 	}})
 
-	out, err := execDeployCapture()
+	out, errOut, err := execDeployIO("", "prod")
 	require.NoError(t, err)
 
-	// The text path is byte-for-byte what it printed before --output landed: the
-	// progress line, then the summary, then the URL.
+	// stdout is this command's own output: the progress line, the summary, the
+	// URL — and nothing else.
 	want := "Building your project image, this can take a few minutes...\n" +
-		"Deployed image (tag deploy-2026-07-23T18-40) and DAGs (version 3-1690000000) to deployment clx-dep.\n" +
+		"Deployed image (tag deploy-2026-07-23T18-40) and DAGs (version 3-1690000000) to prod (deployment clx-dep).\n" +
 		"Deployment: https://cloud.astronomer.io/deployments/clx-dep\n"
 	assert.Equal(t, want, out)
+	// The target goes on stderr, the way every resolving command announces one.
+	assert.Equal(t, "→ prod (astro deployment clx-dep)\n", errOut)
+}
+
+// The announce line lands before the build line and after the target is
+// settled, so the order a reader sees is: what I am about to act on, then what
+// I am doing to it.
+func TestDeployV2AnnouncesBeforeItBuilds(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+
+	out, errOut, err := execDeployIO("\n")
+	require.NoError(t, err)
+	assert.Contains(t, errOut, "→ prod (astro deployment clx-dep)")
+	// The prompt comes first, the announce line after it — nothing is claimed
+	// about a target before there is one.
+	assert.Less(t, strings.Index(errOut, "Deploy to which deployment?"), strings.Index(errOut, "→ prod"))
+	assert.Contains(t, out, "Building your project image")
+}
+
+// A deployment named by id has no link name to show, so the line carries the id
+// alone rather than an empty parenthetical.
+func TestDeployV2AnnouncesAnIDWithNoLinkName(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+
+	out, errOut, err := execDeployIO("", "--deployment", "clx-not-a-link")
+	require.NoError(t, err)
+	assert.Equal(t, "→ clx-not-a-link\n", errOut)
+	assert.Contains(t, out, "to deployment clx-not-a-link.")
+}
+
+// A declined prompt exits non-zero and says nothing: the user was asked and
+// answered, and reading their answer back as an error adds nothing.
+func TestDeployV2DeclinedPromptIsQuiet(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &v2deploy.ImageResult{})
+
+	// Three answers that are not choices, which is how the prompt gives up.
+	out, _, err := execDeployIO("nope\nnope\nnope\n")
+	require.ErrorIs(t, err, v2deploy.ErrAborted)
+	assert.Empty(t, out)
+}
+
+// The link name reaches the json object, so a consumer sees what the person
+// typed and not only the id they would have to look up.
+func TestDeployV2JSONCarriesTheLinkName(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+
+	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, "prod", m["link"])
+	assert.Equal(t, "clx-dep", m["deployment"])
+}
+
+// A target named by id has no link, and the field is omitted rather than empty.
+func TestDeployV2JSONOmitsAnAbsentLinkName(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+
+	out, err := execDeployCapture("--deployment", "clx-not-a-link", "--output", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	_, has := m["link"]
+	assert.False(t, has)
+}
+
+// The highlight is labeled with what put it there. ASTRO_DEPLOYMENT outranks
+// the manifest's marker for the cursor, and saying "default" over an entry an
+// exported variable chose tells the reader their committed file says something
+// it does not.
+func TestDeployV2PromptNamesWhatMovedTheCursor(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	t.Setenv(instances.EnvVar, "dev")
+
+	out, errOut, err := execDeployIO("\n")
+	require.NoError(t, err)
+	assert.Contains(t, errOut, "dev (astro deployment clx-dev)  ← ASTRO_DEPLOYMENT")
+	assert.NotContains(t, errOut, "← default")
+	// And Enter took the highlighted entry, which is the one it named.
+	assert.Contains(t, out, "to dev (deployment clx-dev).")
+}
+
+// A link may legally be called "2". Typing its name must select it, not the
+// second entry in the list.
+func TestDeployV2NumericLinkNameSelectsItself(t *testing.T) {
+	interactiveDeploy(t)
+	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}}}
+	setupV2DeployWith(t, fake, `[project]
+name = "demo"
+
+[tool.astro]
+airflow = "3.1"
+workspace = "clw-ws"
+
+[tool.astro.deployments."2"]
+deployment = "clx-two"
+
+[tool.astro.deployments.prod]
+deployment = "clx-prod"
+`)
+	origDeployer := newV2Deployer
+	newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+		fake.prompt = v2Deployer{client: client, in: in, errOut: errOut}
+		return fake
+	}
+	t.Cleanup(func() { newV2Deployer = origDeployer })
+
+	// Sorted, "2" is offered first and "prod" second. Reading the answer as a
+	// number would ship to prod.
+	out, _, err := execDeployIO("2\n")
+	require.NoError(t, err)
+	assert.Contains(t, out, "to 2 (deployment clx-two).")
+}
+
+// Nothing to prompt about means nothing to read the pin for, and reading it
+// creates the project's state directory on the way past.
+func TestDeployPreselectSkipsTheDiskWhenNoQuestionIsComing(t *testing.T) {
+	dir := t.TempDir()
+	name, from := deployPreselect(dir, false)
+	assert.Empty(t, name)
+	assert.Empty(t, from)
+
+	// The env var is free to read and outranks the pin, so it still answers.
+	t.Setenv(instances.EnvVar, "prod")
+	name, from = deployPreselect(dir, false)
+	assert.Equal(t, "prod", name)
+	assert.Equal(t, instances.EnvVar, from)
+}
+
+// promptDeployer answers nothing itself; the prompt under test is the real
+// v2Deployer.ConfirmTarget, wired to the streams execDeployIO controls.
+type promptDeployer struct {
+	fakeCmdDeployer
+	prompt v2deploy.Deployer
+}
+
+func (p *promptDeployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.Preselect) (string, error) {
+	return p.prompt.ConfirmTarget(choices, preselect)
+}
+
+// newPromptDeploy wires the real prompt onto the command's own streams, so a
+// test drives the question a user would actually see.
+func newPromptDeploy(t *testing.T, img *v2deploy.ImageResult) {
+	t.Helper()
+	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: *img}}
+	setupV2Deploy(t, fake)
+	orig := newV2Deployer
+	newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+		fake.prompt = v2Deployer{client: client, in: in, errOut: errOut}
+		return fake
+	}
+	t.Cleanup(func() { newV2Deployer = orig })
+}
+
+func TestDeployV2PromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+
+	// The manifest marks prod default, so the prompt highlights it — and still
+	// asks. An empty answer takes the highlighted entry.
+	out, errOut, err := execDeployIO("\n")
+	require.NoError(t, err)
+
+	assert.Contains(t, errOut, "Deploy to which deployment?")
+	assert.Contains(t, errOut, "prod (astro deployment clx-dep)  ← default = true")
+	assert.Contains(t, errOut, "dev (astro deployment clx-dev)")
+	assert.Contains(t, errOut, "Choose 1-2 [2]: ")
+	assert.Contains(t, out, "to prod (deployment clx-dep).")
+}
+
+func TestDeployV2PromptTakesTheOtherLink(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+
+	out, _, err := execDeployIO("dev\n")
+	require.NoError(t, err)
+	assert.Contains(t, out, "to dev (deployment clx-dev).")
+}
+
+// The known ordering wart this issue names: the build line used to print before
+// anything had been decided, so a deploy nobody agreed to still announced that
+// it was building an image.
+func TestDeployV2AbortedPromptSaysNothingAboutBuilding(t *testing.T) {
+	interactiveDeploy(t)
+	fake := &promptDeployer{}
+	setupV2Deploy(t, fake)
+	origDeployer := newV2Deployer
+	newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+		fake.prompt = v2Deployer{client: client, in: in, errOut: errOut}
+		return fake
+	}
+	t.Cleanup(func() { newV2Deployer = origDeployer })
+
+	// Closed stdin: nobody answered.
+	out, _, err := execDeployIO("")
+	require.Error(t, err)
+	assert.NotContains(t, out, "Building your project image")
+	assert.Nil(t, fake.imgInput)
+	assert.Nil(t, fake.dagInput)
+}
+
+func TestDeployV2NonInteractiveMustNameTheTarget(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{})
+
+	out, err := execDeployCapture()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
+	assert.Contains(t, err.Error(), "ASTRO_DEPLOYMENT")
+	assert.Contains(t, err.Error(), "dev, prod")
+	assert.NotContains(t, out, "Building your project image")
+}
+
+// A pin is ambient state, and ambient state never decides a deploy — not even
+// the one the query commands would resolve to.
+func TestDeployV2PinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{})
+	t.Setenv(instances.EnvVar, "prod")
+
+	_, err := execDeployCapture()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
 }
 
 // decodeOneJSON parses out as a single JSON object and fails if it is not

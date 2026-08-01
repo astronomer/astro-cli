@@ -2,6 +2,7 @@ package instances
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -160,6 +161,56 @@ func (i Instance) httpTransport(ctx context.Context, d Deps) (airflowapi.Transpo
 		opts = append(opts, airflowapi.WithRefresh(refresh))
 	}
 	return airflowapi.NewHTTPTransport(baseURL, opts...)
+}
+
+// HTTPDoor is an Airflow reachable over plain HTTP: where it answers, and the
+// Authorization header value that proves the caller to it. Authorization is
+// empty when this instance sends no credential at all, which is a real answer —
+// an open dev server.
+type HTTPDoor struct {
+	BaseURL       string
+	Authorization string
+}
+
+// ErrNotHTTP reports an instance whose door is not HTTP to an Airflow URL.
+// MWAA under InvokeRestApi is the case: the request travels inside a signed AWS
+// API call, and there is no URL to point an HTTP client at. Reach it through
+// Transport.
+var ErrNotHTTP = errors.New("this deployment is not reached over HTTP: its requests travel inside a signed AWS API call, so there is no Airflow URL to address")
+
+// HTTPDoorFor resolves an instance to a base URL and an Authorization header
+// value, running the credential source once.
+//
+// It exists for one caller: `astro api airflow`, whose request machinery
+// predates this package and builds its own HTTP requests — it generates curl
+// commands, paginates by rewriting the query string, and traces the wire — so a
+// Transport, which deliberately hides both halves, cannot serve it. New code
+// takes a Transport. The credential is resolved once here rather than per
+// request, which is the cost of handing it over as a string; one command run is
+// short enough that a token minted at the start is still good at the end.
+func (i Instance) HTTPDoorFor(ctx context.Context, d Deps) (HTTPDoor, error) {
+	if i.authMethod() == manifest.AuthAWS {
+		return HTTPDoor{}, ErrNotHTTP
+	}
+	baseURL, err := i.baseURL(ctx, d)
+	if err != nil {
+		return HTTPDoor{}, err
+	}
+	creds, _, err := credentials(i, baseURL, d)
+	if err != nil {
+		return HTTPDoor{}, err
+	}
+	if creds == nil {
+		return HTTPDoor{BaseURL: baseURL}, nil
+	}
+	scheme, value, err := creds(ctx)
+	if err != nil {
+		return HTTPDoor{}, err
+	}
+	if scheme == "" {
+		return HTTPDoor{BaseURL: baseURL}, nil
+	}
+	return HTTPDoor{BaseURL: baseURL, Authorization: scheme + " " + value}, nil
 }
 
 // baseURL is where the instance's Airflow answers. An endpoint link and a
