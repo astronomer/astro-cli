@@ -130,7 +130,12 @@ func NewLocalCmd(d Deps) *cobra.Command {
 		newCheckCmd(c),
 		newInitCmd(c),
 		newEnvCmd(c),
+		newAPICmd(c),
 	)
+	// The query surface again, this time fixed to the Airflow this machine is
+	// running: `astro local dags list` reads the laptop, `astro dags list`
+	// reads a deployment, and neither can ever be the other.
+	cmd.AddCommand(queryFamilies(d, func() target { return machineTarget{} })...)
 	markSkipPreRun(cmd)
 	return cmd
 }

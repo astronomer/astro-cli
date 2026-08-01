@@ -63,9 +63,9 @@ func credentials(i Instance, baseURL string, d Deps) (airflowapi.CredentialSourc
 		// The AWS door is not a credential on an HTTP request at all, so it
 		// never reaches here: Instance.Transport dispatches on the method
 		// before any credential is built.
-		return nil, nil, fmt.Errorf("instance %q proves itself to the AWS API rather than to an Airflow URL", i.Name)
+		return nil, nil, fmt.Errorf("deployment %q proves itself to the AWS API rather than to an Airflow URL", i.Name)
 	}
-	return nil, nil, fmt.Errorf("instance %q declares no auth method", i.Name)
+	return nil, nil, fmt.Errorf("deployment %q declares no auth method", i.Name)
 }
 
 // errLoggedOut reports a machine with neither a session nor the CI token. Both
@@ -122,10 +122,10 @@ func urlCredentials(d Deps) (airflowapi.CredentialSource, func(context.Context) 
 // refuses an empty one. A name the machine has no value for is reported the way
 // the env machinery reports any missing value: the variable, and the command
 // that sets it.
-func (d Deps) envValue(instance, name string) (string, error) {
+func (d Deps) envValue(deployment, name string) (string, error) {
 	value, ok := d.credentialEnv(name)
 	if !ok {
-		return "", fmt.Errorf("instance %q needs the env var %s, which is not set on this machine.\n      provide it:  astro local env set %s --project", instance, name, name)
+		return "", fmt.Errorf("deployment %q needs the env var %s, which is not set on this machine.\n      provide it:  astro local env set %s --project", deployment, name, name)
 	}
 	return value, nil
 }

@@ -20,6 +20,19 @@ type stubRuntime struct {
 func (s stubRuntime) List() ([]localrt.Status, error)       { return s.list, nil }
 func (s stubRuntime) PruneStale() ([]localrt.Status, error) { return s.pruned, nil }
 
+// ReadStatus answers from the same records List does, so a case that says an
+// Airflow is running says it once and every reader agrees. Paths are compared
+// canonically because the real runtime keys its records by the symlink-resolved
+// path, and a test that pretends otherwise would pass on a lie.
+func (s stubRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
+	for i := range s.list {
+		if canonical(s.list[i].ProjectPath) == canonical(projectPath) {
+			return s.list[i], nil
+		}
+	}
+	return localrt.Status{ProjectPath: projectPath, State: localrt.StateStopped}, nil
+}
+
 func TestBuildListRows(t *testing.T) {
 	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
 	statuses := []localrt.Status{

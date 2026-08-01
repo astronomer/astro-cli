@@ -14,101 +14,42 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// instanceQueryCmds builds the `astro instance` leaves that describe an Airflow
-// rather than the inventory. Each takes its own instance flags rather than
-// sharing them on the parent, because `astro instance list` reads the manifest
-// and the machine — pointing it at one instance would mean nothing — while
-// these three have to be told which Airflow to describe. They share the
-// family's cli, so one --output on `astro instance` covers all of them.
-func instanceQueryCmds(c *cli) []*cobra.Command {
-	builders := []func(*query) *cobra.Command{
-		newInstanceConfigCmd,
-		newInstanceVersionCmd,
-		newInstanceHealthCmd,
-	}
-	cmds := make([]*cobra.Command, 0, len(builders))
-	for _, build := range builders {
-		q := &query{cli: c}
-		cmd := build(q)
-		addInstanceFlags(cmd, &q.f)
-		cmds = append(cmds, cmd)
-	}
-	return cmds
-}
-
-// configNotExposed is what a refused `astro instance config` reports. Airflow
-// answers 403 here for a setting rather than for a permission, so the message
-// names the setting instead of sending the reader after their own access.
-const configNotExposed = "this Airflow does not expose its configuration; it serves /config only when " +
-	"expose_config is set in its [webserver] (Airflow 2) or [api] (Airflow 3) section"
-
-func newInstanceConfigCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "config",
-		Short: "Show the running configuration of the Airflow this resolves to",
-		Long: "Print the configuration Airflow is running with, by section.\n\nAirflow refuses this unless " +
-			"expose_config is on, which most deployments leave off; a refusal here is that setting, not a " +
-			"missing permission on your account.",
+// newHealthCmd builds `health` over whichever Airflow the target names. It is
+// a leaf rather than a family, so it registers the target's flags on itself.
+func newHealthCmd(d Deps, t target) *cobra.Command {
+	q := &query{cli: &cli{d: d}, t: t}
+	cmd := &cobra.Command{
+		Use:   "health",
+		Short: "Report an Airflow's version, import errors, DAG warnings, and run counts",
+		Long: "Read the four things that answer \"is this Airflow in good shape\" on " + t.which() + ": what " +
+			"version it runs, which DAG files failed to parse, what the scheduler is warning about, and how its " +
+			"runs are distributed across states.\n\nEach part is read on its own and a part that fails is reported " +
+			"as failed rather than ending the command, so an Airflow that serves three of the four still gives " +
+			"you three. The command itself succeeds whenever it could produce a report; overall_status is the " +
+			"verdict.\n\nFor the raw configuration this Airflow runs with, ask its /config endpoint: `" +
+			rawAPIForm(t) + " /config`.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return q.runInstanceConfig(cmd.Context())
+			return q.runHealth(cmd.Context())
 		},
 	}
+	attachTarget(q, cmd)
+	return cmd
 }
 
-func (q *query) runInstanceConfig(ctx context.Context) error {
-	r, client, err := q.open(ctx)
-	if err != nil {
-		return err
+// rawAPIForm is the passthrough command on this surface: `astro local api` for
+// the machine, and the spec-backed `astro api airflow` for a deployment. Help
+// that sends a reader to the raw endpoint has to know which side it is on,
+// and the two are spelled too differently to build from a prefix.
+func rawAPIForm(t target) string {
+	if _, machine := t.(machineTarget); machine {
+		return "astro local api"
 	}
-	config, err := client.Config(ctx)
-	if err != nil {
-		if errors.Is(err, airflowapi.ErrForbidden) {
-			return errors.New(configNotExposed)
-		}
-		return notServed("its configuration", err)
-	}
-	// The client's Config already carries the keys this surface wants, so it is
-	// emitted as it stands; see the row-type note in query.go.
-	return r.Emit(config, func(w io.Writer) error { return renderConfig(w, config) })
+	return "astro api airflow"
 }
 
-func renderConfig(w io.Writer, config airflowapi.Config) error {
-	if len(config.Sections) == 0 {
-		_, err := fmt.Fprintln(w, "This Airflow reported no configuration.")
-		return err
-	}
-	for i, section := range config.Sections {
-		if i > 0 {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprintf(w, "[%s]\n", section.Name); err != nil {
-			return err
-		}
-		for _, option := range section.Options {
-			if _, err := fmt.Fprintf(w, "%s = %s\n", option.Key, option.Value); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func newInstanceVersionCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "version",
-		Short: "Show the Airflow version this resolves to, and its API generation",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return q.runInstanceVersion(cmd.Context())
-		},
-	}
-}
-
-// versionRow is an Airflow's own account of itself, and the whole of what
-// `astro instance version` emits.
+// versionRow is an Airflow's own account of itself, as the health report's
+// version section carries it.
 type versionRow struct {
 	Version    string `json:"version,omitempty"`
 	GitVersion string `json:"git_version,omitempty"`
@@ -124,40 +65,6 @@ func newVersionRow(v airflowapi.VersionInfo) versionRow {
 	}
 }
 
-func (q *query) runInstanceVersion(ctx context.Context) error {
-	r, client, err := q.open(ctx)
-	if err != nil {
-		return err
-	}
-	info, err := client.Version(ctx)
-	if err != nil {
-		return err
-	}
-	return emitDetail(r, newVersionRow(info), func(row versionRow) []field {
-		return []field{
-			{"version", row.Version},
-			{"git version", row.GitVersion},
-			{"api generation", row.Generation},
-		}
-	})
-}
-
-func newInstanceHealthCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "health",
-		Short: "Report an Airflow's version, import errors, DAG warnings, and run counts",
-		Long: "Read the four things that answer \"is this Airflow in good shape\": what version it runs, which " +
-			"DAG files failed to parse, what the scheduler is warning about, and how its runs are distributed " +
-			"across states.\n\nEach part is read on its own and a part that fails is reported as failed rather " +
-			"than ending the command, so an Airflow that serves three of the four still gives you three. The " +
-			"command itself succeeds whenever it could produce a report; overall_status is the verdict.",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return q.runInstanceHealth(cmd.Context())
-		},
-	}
-}
-
 // The verdicts a health report reaches, in the order severity runs.
 const (
 	healthUnhealthy = "unhealthy"
@@ -165,7 +72,7 @@ const (
 	healthHealthy   = "healthy"
 )
 
-// healthReport is the composite `astro instance health` renders. Every section
+// healthReport is the composite `health` renders. Every section
 // carries its own error, because the whole point is that one unserved endpoint
 // does not cost you the other three.
 type healthReport struct {
@@ -182,8 +89,8 @@ type healthReport struct {
 	Unread []string `json:"unread,omitempty"`
 }
 
-// healthVersion is the version section: the same row `astro instance version`
-// emits, plus why it could not be read.
+// healthVersion is the version section: what Airflow says about itself, plus
+// why it could not be read.
 type healthVersion struct {
 	versionRow
 	Error string `json:"error,omitempty"`
@@ -227,7 +134,7 @@ type dagWarningRow struct {
 	Timestamp   string `json:"timestamp,omitempty"`
 }
 
-func (q *query) runInstanceHealth(ctx context.Context) error {
+func (q *query) runHealth(ctx context.Context) error {
 	r, client, err := q.open(ctx)
 	if err != nil {
 		return err

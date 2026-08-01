@@ -10,14 +10,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// NewAssetsCmd builds `astro assets` for the root.
-func NewAssetsCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+// newAssetsCmd builds the `assets` family over whichever Airflow the target
+// names.
+func newAssetsCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "assets",
 		Short: "List the data assets an Airflow tracks, and their updates",
-		Long: "Read the data assets on whichever Airflow this project resolves to, and the events that update " +
-			"them. Airflow 2 calls the same thing a dataset; both answer here.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+		Long: "Read the data assets on " + t.which() + ", and the events that update " +
+			"them. Airflow 2 calls the same thing a dataset; both answer here.",
 	},
 		newAssetsListCmd,
 		newAssetsEventsCmd,
@@ -121,7 +121,7 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 	// Most recent first, for the same reason `astro runs list` sorts that way:
 	// the question behind an event listing is nearly always "what just changed".
 	addListFlags(cmd, &list, "-timestamp")
-	cmd.Flags().StringVarP(&source.dagID, "dag-id", "d", "", "Only events produced by this DAG")
+	cmd.Flags().StringVar(&source.dagID, "dag-id", "", "Only events produced by this DAG")
 	cmd.Flags().StringVarP(&source.runID, "run-id", "r", "", "Only events produced by this run")
 	cmd.Flags().StringVar(&source.taskID, "task-id", "", "Only events produced by this task")
 	return cmd

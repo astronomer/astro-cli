@@ -2,13 +2,12 @@ package instances
 
 import (
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// twoLinks is the shape that reaches every layer: a default link, a second
-// link, and room for a running local Airflow.
+// twoLinks is the shape that reaches every layer: a default link and a second
+// one.
 const twoLinks = `
 [tool.astro.deployments.dev]
 deployment = 'clm2xk9dq000108l7a2b3c4d5'
@@ -18,16 +17,11 @@ default = true
 deployment = 'clm2xk9dq000108l7a2b3c4d6'
 `
 
-// fullSet is every layer at once: two links (one default) plus this project's
-// running Airflow, so each precedence test only has to say what it passes.
+// fullSet is every layer at once: two links, one of them the default, so each
+// precedence test only has to say what it passes.
 func fullSet(t *testing.T) Set {
 	t.Helper()
-	project := filepath.Join(t.TempDir(), "orders")
-	return Build(Inputs{
-		ProjectPath: project,
-		Manifest:    parseManifest(t, twoLinks),
-		Running:     []Local{{ProjectPath: project, Port: 8080}},
-	})
+	return Build(parseManifest(t, twoLinks))
 }
 
 // TestPrecedence walks the rule one step at a time: each case supplies one
@@ -40,10 +34,10 @@ func TestPrecedence(t *testing.T) {
 		want string
 		from Layer
 	}{
-		{"nothing said falls to the running local", Request{}, LocalName, LayerRunning},
-		{"the pin beats what is running", Request{Pin: "prod"}, "prod", LayerPin},
+		{"nothing said falls to the default link", Request{}, "dev", LayerDefault},
+		{"the pin beats the default link", Request{Pin: "prod"}, "prod", LayerPin},
 		{"the env beats the pin", Request{Pin: "prod", Env: "dev"}, "dev", LayerEnv},
-		{"the flag beats the env", Request{Pin: "prod", Env: "dev", Flag: LocalName}, LocalName, LayerFlag},
+		{"the flag beats the env", Request{Pin: "dev", Env: "dev", Flag: "prod"}, "prod", LayerFlag},
 		{"--url beats everything and needs no name", Request{Pin: "prod", Env: "dev", URL: "https://airflow.corp.dev"}, "https://airflow.corp.dev", LayerURL},
 	}
 	for _, tc := range cases {
@@ -59,24 +53,24 @@ func TestPrecedence(t *testing.T) {
 	}
 }
 
-func TestDefaultLinkIsTheFloor(t *testing.T) {
-	project := filepath.Join(t.TempDir(), "orders")
-	// Nothing running: the marked default link is what is left.
-	set := Build(Inputs{ProjectPath: project, Manifest: parseManifest(t, twoLinks)})
-	sel, err := set.Select(Request{})
-	if err != nil {
-		t.Fatalf("select: %v", err)
+// TestLocalIsNotASelectableName covers the layer that left the rule. Every way
+// of saying `local` — a flag, the exported variable, a pin an older release
+// wrote — is answered with where the machine went, not with a name listing.
+func TestLocalIsNotASelectableName(t *testing.T) {
+	set := fullSet(t)
+	for _, req := range []Request{{Flag: LocalName}, {Env: LocalName}, {Pin: LocalName}} {
+		_, err := set.Select(req)
+		if !errors.Is(err, ErrLocalNotADeployment) {
+			t.Fatalf("select(%+v) = %v, want the machine's own commands named", req, err)
+		}
 	}
-	if sel.Instance.Name != "dev" || sel.From != LayerDefault {
-		t.Fatalf("selected %s from %s, want dev from the default link", sel.Instance.Name, sel.From)
+	if !strings.Contains(ErrLocalNotADeployment.Error(), "astro local dags list") {
+		t.Errorf("the refusal does not show the new spelling: %s", ErrLocalNotADeployment)
 	}
 }
 
 func TestLoneLinkIsItsOwnDefault(t *testing.T) {
-	set := Build(Inputs{
-		ProjectPath: filepath.Join(t.TempDir(), "orders"),
-		Manifest:    parseManifest(t, "\n[tool.astro.deployments.only]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"),
-	})
+	set := Build(parseManifest(t, "\n[tool.astro.deployments.only]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"))
 	sel, err := set.Select(Request{})
 	if err != nil {
 		t.Fatalf("select: %v", err)
@@ -86,7 +80,7 @@ func TestLoneLinkIsItsOwnDefault(t *testing.T) {
 	}
 }
 
-func TestSelectRefusesInstanceAndURLTogether(t *testing.T) {
+func TestSelectRefusesDeploymentAndURLTogether(t *testing.T) {
 	set := fullSet(t)
 	if _, err := set.Select(Request{Flag: "dev", URL: "https://airflow.corp.dev"}); !errors.Is(err, ErrMutuallyExclusive) {
 		t.Fatalf("select: %v, want the mutually-exclusive error", err)
@@ -99,9 +93,9 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 		req  Request
 		want string
 	}{
-		{Request{Flag: "nope"}, `no instance named "nope"; known instances: dev, local, prod`},
-		{Request{Env: "nope"}, `no instance named "nope" (from ASTRO_INSTANCE); known instances: dev, local, prod`},
-		{Request{Pin: "nope"}, `no instance named "nope" (pinned for this project; clear it with ` + "`astro use --unset`" + `); known instances: dev, local, prod`},
+		{Request{Flag: "nope"}, `no deployment named "nope"; known deployments: dev, prod`},
+		{Request{Env: "nope"}, `no deployment named "nope" (from ASTRO_DEPLOYMENT); known deployments: dev, prod`},
+		{Request{Pin: "nope"}, `no deployment named "nope" (pinned for this project; clear it with ` + "`astro use --unset`" + `); known deployments: dev, prod`},
 	}
 	for _, tc := range cases {
 		_, err := set.Select(tc.req)
@@ -116,17 +110,14 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 }
 
 func TestAmbiguousNamesEveryWayToDecide(t *testing.T) {
-	// Two links, neither marked default, nothing running: the fall-through.
-	set := Build(Inputs{
-		ProjectPath: filepath.Join(t.TempDir(), "orders"),
-		Manifest: parseManifest(t, `
+	// Two links, neither marked default: the fall-through.
+	set := Build(parseManifest(t, `
 [tool.astro.deployments.dev]
 deployment = 'clm2xk9dq000108l7a2b3c4d5'
 
 [tool.astro.deployments.prod]
 deployment = 'clm2xk9dq000108l7a2b3c4d6'
-`),
-	})
+`))
 	_, err := set.Select(Request{})
 	var ambiguous *AmbiguousError
 	if !errors.As(err, &ambiguous) {
@@ -135,17 +126,30 @@ deployment = 'clm2xk9dq000108l7a2b3c4d6'
 	if got := ambiguous.Choices; len(got) != 2 || got[0] != "dev" || got[1] != "prod" {
 		t.Fatalf("choices = %v, want dev and prod", got)
 	}
-	for _, want := range []string{"-i <name>", EnvVar, "astro use <name>"} {
+	// The machine's spelling is left to the command layer here: this project
+	// has real deployments to choose between, and the caller appends its own
+	// `astro local <family>` form (see localForm in cmd/local).
+	for _, want := range []string{"-d <name>", EnvVar, "astro use <name>"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("message does not name %s: %s", want, err)
 		}
 	}
 }
 
-func TestNothingToActOnAtAll(t *testing.T) {
-	set := Build(Inputs{ProjectPath: filepath.Join(t.TempDir(), "orders"), Manifest: parseManifest(t, "")})
-	if _, err := set.Select(Request{}); !errors.Is(err, ErrNone) {
+// TestNothingToActOnNamesBothSpellings: a project with no links resolves to
+// nothing, and the message has to name the machine's spelling as well as the
+// deployment one — the split's whole promise is that neither world is reached
+// by accident, so neither may be hidden either.
+func TestNothingToActOnNamesBothSpellings(t *testing.T) {
+	set := Build(parseManifest(t, ""))
+	_, err := set.Select(Request{})
+	if !errors.Is(err, ErrNone) {
 		t.Fatalf("select: %v, want ErrNone", err)
+	}
+	for _, want := range []string{"astro local", "--url", "[tool.astro.deployments]"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message does not name %s: %s", want, err)
+		}
 	}
 }
 
@@ -165,7 +169,6 @@ func TestExplainShowsEveryLayerAndTheWinner(t *testing.T) {
 	}{
 		{LayerEnv, "", false},
 		{LayerPin, "prod", true},
-		{LayerRunning, LocalName, false},
 		{LayerDefault, "dev", false},
 	}
 	if len(rows) != len(want) {
@@ -178,18 +181,35 @@ func TestExplainShowsEveryLayerAndTheWinner(t *testing.T) {
 	}
 }
 
-func TestExplainFlagsALayerNamingSomethingUnknown(t *testing.T) {
+// TestExplainSeparatesDetailFromFault: a layer naming something gone is a
+// problem; a layer naming something real carries its coordinate. They are
+// different columns because they mean opposite things.
+func TestExplainSeparatesDetailFromFault(t *testing.T) {
 	set := fullSet(t)
 	rows, _, err := set.Explain(Request{Pin: "gone"})
 	if err == nil {
 		t.Fatal("a pin naming nothing resolved")
 	}
 	for _, row := range rows {
-		if row.Layer != LayerPin {
-			continue
+		switch row.Layer {
+		case LayerPin:
+			if row.Problem == "" || row.Where != "" || row.Wins {
+				t.Errorf("a pin naming nothing = %+v, want a problem, no coordinate, and no win", row)
+			}
+		case LayerDefault:
+			if row.Where == "" || row.Problem != "" {
+				t.Errorf("the default link = %+v, want its coordinate and no problem", row)
+			}
+		case LayerEnv, LayerFlag, LayerURL:
 		}
-		if row.Problem == "" || row.Wins {
-			t.Fatalf("stale pin row = %+v, want a note and no win", row)
+	}
+
+	// A pin naming the reserved word is its own problem, with its own fix — not
+	// "names no deployment".
+	rows, _, _ = set.Explain(Request{Pin: LocalName})
+	for _, row := range rows {
+		if row.Layer == LayerPin && !strings.Contains(row.Problem, "astro local") {
+			t.Errorf("a pin naming the machine = %+v", row)
 		}
 	}
 }

@@ -123,7 +123,7 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 	case instances.KindEndpoint, instances.KindLocal:
 		return "", fmt.Errorf("%q already knows where its Airflow is; nothing to look up", i.Name)
 	}
-	return "", fmt.Errorf("cannot look up the Airflow URL of a %s instance", i.Kind)
+	return "", fmt.Errorf("cannot look up the Airflow URL of a %s deployment", i.Kind)
 }
 
 // currentOrganization reads the org out of the current login context. It is

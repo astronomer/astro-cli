@@ -1,6 +1,9 @@
 package local
 
 import (
+	"fmt"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -50,7 +53,7 @@ func TestTreeInvariants(t *testing.T) {
 func TestLocalTreeHasEverySpecCommand(t *testing.T) {
 	d, _ := testDeps(t)
 	localCmd := NewLocalCmd(d)
-	want := []string{"start", "stop", "restart", "status", "list", "logs", "run", "shell", "open", "reset", "check", "init"}
+	want := []string{"start", "stop", "restart", "status", "list", "logs", "run", "shell", "open", "reset", "check", "init", "api"}
 	have := map[string]bool{}
 	for _, sub := range localCmd.Commands() {
 		have[sub.Name()] = true
@@ -65,7 +68,7 @@ func TestLocalTreeHasEverySpecCommand(t *testing.T) {
 func TestRootHasAliasesInitAndDev(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs", "use", "instance"} {
+	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs", "use"} {
 		found := false
 		for _, sub := range root.Commands() {
 			if sub.Name() == name {
@@ -78,64 +81,183 @@ func TestRootHasAliasesInitAndDev(t *testing.T) {
 	}
 }
 
-// The query surface spelled out: the families at the top level and the verbs
-// under each. It is a table rather than a walk because these exact spellings
-// are the contract, and a walk would pass whatever the tree happened to hold.
-func TestQuerySurfaceHasEveryCommand(t *testing.T) {
-	want := map[string][]string{
-		"dags":        {"list", "get", "source", "stats", "pause", "unpause"},
-		"runs":        {"list", "get", "trigger", "delete", "clear"},
-		"tasks":       {"list", "get", "instance", "logs", "clear"},
-		"assets":      {"list", "events"},
-		"connections": {"list", "get"},
-		"variables":   {"list", "get"},
-		"pools":       {"list", "get"},
-		// list reads the inventory; the other three describe whichever Airflow
-		// resolution picked.
-		"instance": {"list", "config", "version", "health"},
-	}
+// The `instance` and `instances` names stay unclaimed, so the noun a reader
+// types means one thing: a deployment is a deployment, and the machine is
+// `astro local`.
+func TestTheInstanceNamesStayUnclaimed(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	for family, verbs := range want {
-		cmd, _, err := root.Find([]string{family})
-		if err != nil || cmd.Name() != family {
-			t.Errorf("astro %s is missing from the v2 root", family)
-			continue
+	for _, name := range []string{"instance", "instances"} {
+		if cmd, _, err := root.Find([]string{name}); err == nil && cmd.Name() == name {
+			t.Errorf("astro %s still exists", name)
 		}
-		have := map[string]bool{}
-		for _, sub := range cmd.Commands() {
-			have[sub.Name()] = true
-		}
-		for _, verb := range verbs {
-			if !have[verb] {
-				t.Errorf("astro %s %s is missing", family, verb)
+	}
+}
+
+// querySurface is the query families and the verbs under each, spelled out. It
+// is a table rather than a walk because these exact spellings are the contract,
+// and a walk would pass whatever the tree happened to hold.
+var querySurface = map[string][]string{
+	"dags":        {"list", "get", "source", "stats", "pause", "unpause"},
+	"runs":        {"list", "get", "trigger", "delete", "clear"},
+	"tasks":       {"list", "get", "instance", "logs", "clear"},
+	"assets":      {"list", "events"},
+	"connections": {"list", "get"},
+	"variables":   {"list", "get"},
+	"pools":       {"list", "get"},
+	// health is a leaf rather than a family: it reads four things and prints
+	// one report.
+	"health": nil,
+}
+
+func TestQuerySurfaceHasEveryCommand(t *testing.T) {
+	d, _ := testDeps(t)
+	root := NewRootCmd(d)
+	localCmd, _, err := root.Find([]string{"local"})
+	if err != nil {
+		t.Fatalf("astro local is missing: %v", err)
+	}
+	// Both spellings carry the whole surface: the machine's under `astro local`,
+	// a deployment's at the top level.
+	for _, parent := range []*cobra.Command{root, localCmd} {
+		for family, verbs := range querySurface {
+			cmd, _, err := parent.Find([]string{family})
+			if err != nil || cmd.Name() != family {
+				t.Errorf("%s %s is missing", parent.CommandPath(), family)
+				continue
+			}
+			have := map[string]bool{}
+			for _, sub := range cmd.Commands() {
+				have[sub.Name()] = true
+			}
+			for _, verb := range verbs {
+				if !have[verb] {
+					t.Errorf("%s %s %s is missing", parent.CommandPath(), family, verb)
+				}
 			}
 		}
 	}
 }
 
-// Every command that acts on an Airflow reaches the same two flags, spelled the
-// same way. One registration is what keeps the families from drifting into
-// three spellings of one idea.
-func TestQueryFamiliesShareTheInstanceFlags(t *testing.T) {
+// TestBothRegistrationsAreTheSameCommands is the hard requirement of an earlier fix,
+// checked structurally: every family exists twice — once against a deployment,
+// once against this machine — and the two registrations are identical except
+// for the selector flags, which only the deployment side carries. A forked
+// command body shows up here as a flag, a verb, or a usage line that differs.
+func TestBothRegistrationsAreTheSameCommands(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	for _, family := range []string{"dags", "runs", "tasks", "assets", "connections", "variables", "pools"} {
+	localCmd, _, err := root.Find([]string{"local"})
+	if err != nil {
+		t.Fatalf("astro local is missing: %v", err)
+	}
+	// The flags the top-level registration adds and the machine's does not.
+	selectors := map[string]bool{"deployment": true, "url": true}
+
+	for family := range querySurface {
+		top, _, err := root.Find([]string{family})
+		if err != nil {
+			t.Errorf("astro %s is missing", family)
+			continue
+		}
+		machine, _, err := localCmd.Find([]string{family})
+		if err != nil {
+			t.Errorf("astro local %s is missing", family)
+			continue
+		}
+		// The selectors sit on the top-level family and nowhere else.
+		for name := range selectors {
+			if top.PersistentFlags().Lookup(name) == nil {
+				t.Errorf("astro %s cannot reach --%s", family, name)
+			}
+		}
+		compareRegistrations(t, top, machine, selectors)
+	}
+}
+
+// compareRegistrations walks two registrations of one command in step.
+func compareRegistrations(t *testing.T, top, machine *cobra.Command, selectors map[string]bool) {
+	t.Helper()
+	where := machine.CommandPath()
+	if got, want := flagNames(machine, nil), flagNames(top, selectors); !equalNames(got, want) {
+		t.Errorf("%s flags = %v, want %v (the same flags modulo the selectors)", where, got, want)
+	}
+	for name := range selectors {
+		if machine.PersistentFlags().Lookup(name) != nil || machine.Flags().Lookup(name) != nil {
+			t.Errorf("%s takes --%s: the machine is not selectable", where, name)
+		}
+	}
+	if top.Use != machine.Use {
+		t.Errorf("%s: Use = %q, want %q", where, machine.Use, top.Use)
+	}
+	if top.Short != machine.Short {
+		t.Errorf("%s: Short differs from the top-level registration", where)
+	}
+	subs := map[string]*cobra.Command{}
+	for _, sub := range machine.Commands() {
+		subs[sub.Name()] = sub
+	}
+	for _, sub := range top.Commands() {
+		twin, ok := subs[sub.Name()]
+		if !ok {
+			t.Errorf("%s %s is missing", where, sub.Name())
+			continue
+		}
+		delete(subs, sub.Name())
+		compareRegistrations(t, sub, twin, selectors)
+	}
+	for name := range subs {
+		t.Errorf("%s %s has no top-level twin", where, name)
+	}
+}
+
+// flagNames is every flag a command declares, local and persistent, minus the
+// ones the caller is willing to differ on.
+//
+// Name and shorthand are not enough. The builders take the target as an
+// argument and already branch on it for help text, so a default or a
+// description could just as easily be branched — and a `--limit` that defaults
+// to 100 on one surface and 25 on the other is the same command in name only.
+// Comparing DefValue and Usage catches that on the day it is written.
+func flagNames(cmd *cobra.Command, skip map[string]bool) []string {
+	var names []string
+	collect := func(f *pflag.Flag) {
+		if !skip[f.Name] {
+			names = append(names, fmt.Sprintf("%s/%s default=%q usage=%q", f.Name, f.Shorthand, f.DefValue, f.Usage))
+		}
+	}
+	cmd.Flags().VisitAll(collect)
+	cmd.PersistentFlags().VisitAll(collect)
+	sort.Strings(names)
+	return names
+}
+
+func equalNames(a, b []string) bool {
+	return strings.Join(a, ",") == strings.Join(b, ",")
+}
+
+// Every top-level command that acts on an Airflow reaches the same two flags,
+// spelled the same way. One registration is what keeps the families from
+// drifting into three spellings of one idea.
+func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
+	d, _ := testDeps(t)
+	root := NewRootCmd(d)
+	for _, family := range []string{"dags", "runs", "tasks", "assets", "connections", "variables", "pools", "health"} {
 		cmd, _, err := root.Find([]string{family})
 		if err != nil {
 			t.Errorf("astro %s is missing", family)
 			continue
 		}
-		instance := cmd.PersistentFlags().Lookup("instance")
-		if instance == nil || instance.Shorthand != "i" {
-			t.Errorf("astro %s: --instance = %+v, want it registered with -i", family, instance)
+		deployment := cmd.PersistentFlags().Lookup("deployment")
+		if deployment == nil || deployment.Shorthand != "d" {
+			t.Errorf("astro %s: --deployment = %+v, want it registered with -d", family, deployment)
 		}
 		if cmd.PersistentFlags().Lookup("url") == nil {
 			t.Errorf("astro %s cannot reach --url", family)
 		}
 		for _, sub := range cmd.Commands() {
-			if sub.InheritedFlags().Lookup("instance") == nil {
-				t.Errorf("astro %s %s cannot reach -i", family, sub.Name())
+			if sub.InheritedFlags().Lookup("deployment") == nil {
+				t.Errorf("astro %s %s cannot reach -d", family, sub.Name())
 			}
 		}
 	}
@@ -172,8 +294,13 @@ func TestShorthandsMeanOneThingEachAcrossTheV2Tree(t *testing.T) {
 			cmd.PersistentFlags().VisitAll(check)
 		})
 	}
-	// The one that would break every json consumer if it ever drifted.
+	// The two that would break a consumer if they ever drifted: -o is the json
+	// switch, and -d is the deployment selector everywhere, which is
+	// why --dag-id gave the letter up.
 	if got := meaning["o"]; got.flag != "output" {
 		t.Errorf("-o is --%s, want --output", got.flag)
+	}
+	if got := meaning["d"]; got.flag != "deployment" {
+		t.Errorf("-d is --%s, want --deployment", got.flag)
 	}
 }

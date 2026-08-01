@@ -6,12 +6,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
 // The query surface is tested end to end through the root command against an
@@ -127,13 +130,47 @@ func (s *airflowStub) sawRequest(method, path string) bool {
 	return false
 }
 
-// runQuery drives a query command against the stub through the real root, with
-// --url so nothing depends on a project or a manifest.
+// runQuery drives a top-level query command against the stub through the real
+// root, with --url so nothing depends on a project or a manifest.
 func runQuery(t *testing.T, stub *airflowStub, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	d, out, errOut := queryDeps(t)
 	err = execute(t, d, append(args, "--url", stub.URL)...)
 	return out.String(), errOut.String(), err
+}
+
+// runLocalQuery drives an `astro local` query command against the stub, which
+// stands in for the Airflow this project has running. There is no flag to pass:
+// the machine registration takes none, so the stub has to arrive as a runtime
+// record, exactly as `astro local start` would leave one.
+func runLocalQuery(t *testing.T, stub *airflowStub, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+	dir := instanceProject(t, twoLinkManifest)
+	d, out, errOut := queryDeps(t)
+	d.Runtime = stubRuntime{list: []localrt.Status{{
+		ProjectPath:  dir,
+		State:        localrt.StateRunning,
+		Port:         stubPort(t, stub),
+		AirflowMajor: "3",
+	}}}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	err = execute(t, d, args...)
+	return out.String(), errOut.String(), err
+}
+
+// stubPort is the port the stub listens on, which is all a runtime record
+// carries — the machine's URL is rebuilt from it.
+func stubPort(t *testing.T, stub *airflowStub) int {
+	t.Helper()
+	u, err := url.Parse(stub.URL)
+	if err != nil {
+		t.Fatalf("stub url: %v", err)
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatalf("stub port: %v", err)
+	}
+	return port
 }
 
 // queryDeps is the process a query command sees: buffers for both streams, a
@@ -184,7 +221,7 @@ func decodeJSON(t *testing.T, out string) map[string]any {
 }
 
 // The families all resolve through --url above, which is the escape hatch. This
-// is the everyday path instead: a link the manifest declares, named with -i.
+// is the everyday path instead: a link the manifest declares, named with -d.
 // It proves the family's persistent flag actually reaches the composition root
 // rather than being registered and ignored.
 func TestQueryCommandResolvesAManifestLink(t *testing.T) {
@@ -195,8 +232,8 @@ func TestQueryCommandResolvesAManifestLink(t *testing.T) {
 	d, out, errOut := queryDeps(t)
 	d.WorkingDir = func() (string, error) { return dir, nil }
 
-	if err := execute(t, d, "pools", "list", "-i", "staging"); err != nil {
-		t.Fatalf("pools list -i staging: %v", err)
+	if err := execute(t, d, "pools", "list", "-d", "staging"); err != nil {
+		t.Fatalf("pools list -d staging: %v", err)
 	}
 	if !strings.Contains(out.String(), "default_pool") {
 		t.Errorf("stdout = %q", out)
@@ -210,7 +247,7 @@ func TestQueryCommandResolvesAManifestLink(t *testing.T) {
 	// A name no link declares fails, and says what there is.
 	d2, _, _ := queryDeps(t)
 	d2.WorkingDir = func() (string, error) { return dir, nil }
-	err := execute(t, d2, "pools", "list", "-i", "nope")
+	err := execute(t, d2, "pools", "list", "-d", "nope")
 	if err == nil || !strings.Contains(err.Error(), "staging") {
 		t.Fatalf("err = %v, want it to name the links that exist", err)
 	}

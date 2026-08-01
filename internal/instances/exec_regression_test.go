@@ -33,9 +33,9 @@ func shellHelper(t *testing.T, body string) string {
 // bound is 30s plus however long the grandchild feels like living.
 func TestExecTimeoutIsAWallClockBound(t *testing.T) {
 	h := &execHelper{
-		instance: "prod",
-		argv:     []string{shellHelper(t, "sleep 30")},
-		timeout:  200 * time.Millisecond,
+		deployment: "prod",
+		argv:       []string{shellHelper(t, "sleep 30")},
+		timeout:    200 * time.Millisecond,
 	}
 	start := time.Now()
 	_, err := h.run(context.Background())
@@ -53,9 +53,9 @@ func TestExecTimeoutIsAWallClockBound(t *testing.T) {
 // command the helper serves.
 func TestExecHelperMayLeaveAChildBehind(t *testing.T) {
 	h := &execHelper{
-		instance: "prod",
-		argv:     []string{shellHelper(t, "sleep 30 &\nprintf 'tok\\n'\nexit 0")},
-		timeout:  30 * time.Second,
+		deployment: "prod",
+		argv:       []string{shellHelper(t, "sleep 30 &\nprintf 'tok\\n'\nexit 0")},
+		timeout:    30 * time.Second,
 	}
 	start := time.Now()
 	token, err := h.run(context.Background())
@@ -94,7 +94,7 @@ func TestExecTokenShapes(t *testing.T) {
 		{"stderr on success", `printf 'renewing soon\n' >&2; printf 'tok\n'`, "tok"},
 	}
 	for _, tc := range cases {
-		h := &execHelper{instance: "prod", argv: []string{shellHelper(t, tc.body)}, timeout: 10 * time.Second}
+		h := &execHelper{deployment: "prod", argv: []string{shellHelper(t, tc.body)}, timeout: 10 * time.Second}
 		token, err := h.run(context.Background())
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
@@ -110,7 +110,7 @@ func TestExecTokenShapes(t *testing.T) {
 // then failed did not succeed, and using what it printed would send a token it
 // disowned.
 func TestExecNonzeroExitBeatsATokenOnStdout(t *testing.T) {
-	h := &execHelper{instance: "prod", argv: []string{shellHelper(t, `printf 'tok\n'; exit 3`)}, timeout: 10 * time.Second}
+	h := &execHelper{deployment: "prod", argv: []string{shellHelper(t, `printf 'tok\n'; exit 3`)}, timeout: 10 * time.Second}
 	if _, err := h.run(context.Background()); err == nil {
 		t.Fatal("a helper that exited 3 was taken at its word")
 	}
@@ -120,7 +120,7 @@ func TestExecNonzeroExitBeatsATokenOnStdout(t *testing.T) {
 // than the helper's own bound is the one that ran out, and saying "30s" would
 // send the reader hunting a slow helper.
 func TestExecReportsTheDeadlineThatActuallyExpired(t *testing.T) {
-	h := &execHelper{instance: "prod", argv: []string{shellHelper(t, "sleep 30")}, timeout: 30 * time.Second}
+	h := &execHelper{deployment: "prod", argv: []string{shellHelper(t, "sleep 30")}, timeout: 30 * time.Second}
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 	_, err := h.run(ctx)
@@ -137,9 +137,9 @@ func TestExecReportsTheDeadlineThatActuallyExpired(t *testing.T) {
 func TestExecRunsOnceUnderConcurrentCallers(t *testing.T) {
 	counter := filepath.Join(t.TempDir(), "runs")
 	h := &execHelper{
-		instance: "prod",
-		argv:     []string{shellHelper(t, "printf x >> "+counter+"\nsleep 0.2\nprintf 'tok\\n'")},
-		timeout:  10 * time.Second,
+		deployment: "prod",
+		argv:       []string{shellHelper(t, "printf x >> "+counter+"\nsleep 0.2\nprintf 'tok\\n'")},
+		timeout:    10 * time.Second,
 	}
 	var wg sync.WaitGroup
 	for range 8 {
@@ -164,7 +164,7 @@ func TestExecRunsOnceUnderConcurrentCallers(t *testing.T) {
 // TestExecMissingProgramSaysSo: a typo in the manifest, which is the most
 // likely thing to be wrong here.
 func TestExecMissingProgramSaysSo(t *testing.T) {
-	h := &execHelper{instance: "prod", argv: []string{"no-such-astro-helper-xyz"}, timeout: time.Second}
+	h := &execHelper{deployment: "prod", argv: []string{"no-such-astro-helper-xyz"}, timeout: time.Second}
 	_, err := h.run(context.Background())
 	if err == nil {
 		t.Fatal("a missing program resolved")

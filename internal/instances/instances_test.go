@@ -1,7 +1,6 @@
 package instances
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -39,40 +38,28 @@ url = 'https://airflow.staging.corp.dev'
 auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 `
 
-func TestBuildCoversEveryLinkKindAndTheRunningLocals(t *testing.T) {
-	project := filepath.Join(t.TempDir(), "orders")
-	other := filepath.Join(t.TempDir(), "billing")
-	set := Build(Inputs{
-		ProjectPath: project,
-		Manifest:    parseManifest(t, fourKinds),
-		Running: []Local{
-			{ProjectPath: project, Port: 8080},
-			{ProjectPath: other, Port: 8081},
-		},
-	})
+func TestBuildCoversEveryLinkKind(t *testing.T) {
+	set := Build(parseManifest(t, fourKinds))
 
 	want := map[string]struct {
-		kind   Kind
-		source Source
-		where  string
+		kind  Kind
+		where string
 	}{
-		"prod":          {KindAstro, SourceManifest, "deployment clm2xk9dq000108l7a2b3c4d5"},
-		"prod-mwaa":     {KindMWAA, SourceManifest, "environment orders-prod"},
-		"prod-composer": {KindComposer, SourceManifest, "environment orders-composer"},
-		"staging":       {KindEndpoint, SourceManifest, "https://airflow.staging.corp.dev"},
-		"local":         {KindLocal, SourceRunning, "http://localhost:8080"},
-		"billing":       {KindLocal, SourceRunning, "http://localhost:8081"},
+		"prod":          {KindAstro, "deployment clm2xk9dq000108l7a2b3c4d5"},
+		"prod-mwaa":     {KindMWAA, "environment orders-prod"},
+		"prod-composer": {KindComposer, "environment orders-composer"},
+		"staging":       {KindEndpoint, "https://airflow.staging.corp.dev"},
 	}
 	if got := len(set.All()); got != len(want) {
-		t.Fatalf("set has %d instances, want %d: %v", got, len(want), set.Names())
+		t.Fatalf("set has %d deployments, want %d: %v", got, len(want), set.Names())
 	}
 	for name, exp := range want {
 		it, ok := set.Lookup(name)
 		if !ok {
 			t.Fatalf("%s missing from the set: %v", name, set.Names())
 		}
-		if it.Kind != exp.kind || it.Source != exp.source || it.Where != exp.where {
-			t.Errorf("%s = {%s %s %q}, want {%s %s %q}", name, it.Kind, it.Source, it.Where, exp.kind, exp.source, exp.where)
+		if it.Kind != exp.kind || it.Source != SourceManifest || it.Where != exp.where {
+			t.Errorf("%s = {%s %s %q}, want {%s manifest %q}", name, it.Kind, it.Source, it.Where, exp.kind, exp.where)
 		}
 	}
 
@@ -85,31 +72,43 @@ func TestBuildCoversEveryLinkKindAndTheRunningLocals(t *testing.T) {
 	}
 }
 
-// TestBuildReservesTheLocalName covers the collision the manifest cannot stop:
-// it refuses a link named `local`, but nothing stops another project's
-// directory from being called that.
-func TestBuildReservesTheLocalName(t *testing.T) {
-	project := filepath.Join(t.TempDir(), "orders")
-	impostor := filepath.Join(t.TempDir(), "local")
-	set := Build(Inputs{
-		ProjectPath: project,
-		Manifest:    parseManifest(t, twoLinks),
-		Running:     []Local{{ProjectPath: impostor, Port: 8081}, {ProjectPath: project, Port: 8080}},
-	})
-	it, ok := set.Lookup(LocalName)
-	if !ok {
-		t.Fatal("no local instance")
+// TestBuildHoldsDeploymentsOnly is the local split as a structural fact: the
+// machine never enters the set, so nothing a top-level command resolves can
+// point at localhost.
+func TestBuildHoldsDeploymentsOnly(t *testing.T) {
+	set := Build(parseManifest(t, twoLinks))
+	if _, ok := set.Lookup(LocalName); ok {
+		t.Error("the machine is in the deployment set")
 	}
-	if it.Project != project || it.Where != "http://localhost:8080" {
-		t.Fatalf("local = %+v, want this project's own Airflow", it)
+	for _, it := range set.All() {
+		if it.Kind == KindLocal || it.Source == SourceRunning {
+			t.Errorf("%s is a local Airflow, not a deployment: %+v", it.Name, it)
+		}
 	}
 }
 
-// TestManifestRefusesTheReservedName pins the other half of the rule, which
-// pkg/manifest enforces: a link may not take the name resolution keeps for the
-// local Airflow. The manifest spells that name in its own package, so the test
-// builds the link from LocalName — if the two ever disagree, this fails rather
-// than leaving a link nobody can address.
+// TestLocalInstanceIsBuiltNotResolved: the machine's Airflow is addressed by
+// spelling the command `astro local …`, and this is the instance that spelling
+// acts on.
+func TestLocalInstanceIsBuiltNotResolved(t *testing.T) {
+	own := LocalInstance(Local{ProjectPath: "/w/orders", Port: 8080, AirflowMajor: "3"}, LocalName)
+	if own.Name != LocalName || own.Kind != KindLocal || own.Source != SourceRunning {
+		t.Fatalf("own = %+v", own)
+	}
+	if own.URL != "http://localhost:8080" || own.Where != own.URL || own.Project != "/w/orders" || own.AirflowMajor != "3" {
+		t.Fatalf("own = %+v, want the record's own coordinates", own)
+	}
+	// A record with no port has no URL to offer, which Transport reports.
+	if got := LocalInstance(Local{ProjectPath: "/w/orders"}, LocalName); got.URL != "" {
+		t.Fatalf("a portless record built the URL %q", got.URL)
+	}
+}
+
+// TestManifestRefusesTheReservedName pins the naming hygiene the split keeps:
+// a link may not be called `local`, because that word means the machine and
+// `astro local …` is how you say it. The manifest spells that name in its own
+// package, so the test builds the link from LocalName — if the two ever
+// disagree, this fails rather than leaving a link nobody can address.
 func TestManifestRefusesTheReservedName(t *testing.T) {
 	_, err := manifest.Parse([]byte("[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_abc123'\n\n[tool.astro.deployments." + LocalName + "]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"))
 	if err == nil || !strings.Contains(err.Error(), "reserved") {
@@ -117,29 +116,8 @@ func TestManifestRefusesTheReservedName(t *testing.T) {
 	}
 }
 
-func TestBuildNamesOtherProjectsAndKeepsTheFirstOnACollision(t *testing.T) {
-	a := filepath.Join(t.TempDir(), "a", "orders")
-	b := filepath.Join(t.TempDir(), "b", "orders")
-	first, second := a, b
-	if b < a {
-		first, second = b, a
-	}
-	set := Build(Inputs{
-		ProjectPath: filepath.Join(t.TempDir(), "elsewhere"),
-		Running:     []Local{{ProjectPath: second, Port: 8081}, {ProjectPath: first, Port: 8080}},
-	})
-	if got := set.Names(); len(got) != 1 || got[0] != "orders" {
-		t.Fatalf("names = %v, want just orders", got)
-	}
-	it, _ := set.Lookup("orders")
-	if it.Project != first {
-		t.Fatalf("orders resolved to %s, want the first path %s", it.Project, first)
-	}
-}
-
-func TestBuildWithoutAProjectOrAManifest(t *testing.T) {
-	set := Build(Inputs{})
-	if len(set.All()) != 0 {
-		t.Fatalf("empty inputs built %v", set.Names())
+func TestBuildWithoutAManifest(t *testing.T) {
+	if set := Build(nil); len(set.All()) != 0 {
+		t.Fatalf("a nil manifest built %v", set.Names())
 	}
 }

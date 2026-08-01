@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -33,7 +32,7 @@ func TestTransportCarriesTheCredentialToTheEndpoint(t *testing.T) {
 	defer server.Close()
 
 	m := parseManifest(t, "\n[tool.astro.deployments.staging]\nurl = '"+server.URL+"'\nauth = { method = 'token', token-env = 'AF_TOKEN' }\n")
-	set := Build(Inputs{ProjectPath: filepath.Join(t.TempDir(), "orders"), Manifest: m})
+	set := Build(m)
 	sel, err := set.Select(Request{})
 	if err != nil {
 		t.Fatalf("select: %v", err)

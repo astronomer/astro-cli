@@ -8,10 +8,11 @@ import (
 
 // Layer is one level of the resolution rule, in precedence order:
 //
-//	--instance/-i  >  ASTRO_INSTANCE  >  pin  >  running local  >  default link
+//	--deployment/-d  >  ASTRO_DEPLOYMENT  >  pin  >  default link
 //
-// --url sits alongside --instance as the stateless escape hatch for an Airflow
-// no project declares.
+// --url sits alongside --deployment as the stateless escape hatch for an
+// Airflow no project declares. The machine's own Airflow is on none of these
+// layers: it is reached by spelling the command `astro local …`.
 type Layer string
 
 const (
@@ -19,18 +20,16 @@ const (
 	LayerURL     Layer = "url"
 	LayerEnv     Layer = "env"
 	LayerPin     Layer = "pin"
-	LayerRunning Layer = "running"
 	LayerDefault Layer = "default"
 )
 
 // layerLabel is how each layer names itself to a user: the thing they would
 // type or change.
 var layerLabel = map[Layer]string{
-	LayerFlag:    "--instance",
+	LayerFlag:    "--deployment",
 	LayerURL:     "--url",
 	LayerEnv:     EnvVar,
 	LayerPin:     "astro use",
-	LayerRunning: "running local Airflow",
 	LayerDefault: "manifest default link",
 }
 
@@ -45,11 +44,11 @@ func (l Layer) Label() string {
 // Request is what the command layer knows about this invocation: the flags it
 // parsed, the env var it read, and the pin it loaded.
 type Request struct {
-	// Flag is -i/--instance.
+	// Flag is -d/--deployment.
 	Flag string
 	// URL is --url, the stateless target. It is mutually exclusive with Flag.
 	URL string
-	// Env is the value of ASTRO_INSTANCE.
+	// Env is the value of ASTRO_DEPLOYMENT.
 	Env string
 	// Pin is the project's userstate pin, written by `astro use`.
 	Pin string
@@ -61,33 +60,31 @@ type Selection struct {
 	From     Layer
 }
 
-// ErrMutuallyExclusive reports --instance and --url together: one names
+// ErrMutuallyExclusive reports --deployment and --url together: one names
 // something the project declares, the other deliberately declares nothing, and
 // obeying both is impossible.
-var ErrMutuallyExclusive = errors.New("--instance and --url cannot be used together: --instance names an instance this project knows, --url targets an Airflow with no name at all")
+var ErrMutuallyExclusive = errors.New("--deployment and --url cannot be used together: --deployment names a deployment this project links, --url targets an Airflow with no name at all")
 
-// ErrNone reports a project with nothing of its own to act on.
-var ErrNone = errors.New("no Airflow to act on: this project declares no deployment links ([tool.astro.deployments] in pyproject.toml) and no local Airflow is running (`astro local start`). To reach one this project does not know, pass --url")
+// localSpelling closes the failures a project with no links can reach. The
+// whole point of the split is that the machine is spelled differently rather
+// than waiting quietly at the bottom of the rule, so a run that finds no
+// deployment must not leave the reader thinking there is nothing to talk to.
+// The command layer adds the family's own `astro local` form on top.
+const localSpelling = "The Airflow on this machine is not a deployment and never resolves here; it has its own commands, under `astro local`."
 
-// NotRunningError reports a name that only this project's own local Airflow
-// answers to, when nothing is running. It is its own error because the fix is
-// the opposite of the one a stale pin needs: start Airflow, not clear the pin.
-type NotRunningError struct {
-	// Layer is where the name came from, so the message can say `astro use
-	// --unset` only when a pin is what asked.
-	Layer Layer
-}
+// ErrNone reports a project with no deployment to act on.
+var ErrNone = errors.New("no deployment to act on: this project links none ([tool.astro.deployments] in pyproject.toml). " +
+	"To reach an Airflow no project declares, pass --url. " + localSpelling)
 
-func (e *NotRunningError) Error() string {
-	msg := "no local Airflow is running for this project — start one with `astro local start`"
-	if e.Layer == LayerPin {
-		msg += ", or point this project elsewhere with `astro use <name>` (`astro use --unset` clears the pin)"
-	}
-	return msg
-}
+// ErrLocalNotADeployment reports `local` used where a deployment name belongs —
+// a flag, the env var, or a pin left by an older release. The name is reserved
+// rather than unknown, so the message says where the machine went instead of
+// listing deployments it is not one of.
+var ErrLocalNotADeployment = errors.New("`" + LocalName + "` is not a deployment: it is this machine, and it has its own commands — " +
+	"`astro local start` runs it, `astro local dags list` and `astro local health` read it. " +
+	"`astro use` pins deployments only")
 
-// UnknownError reports a name that no link declares and no local Airflow
-// answers to.
+// UnknownError reports a name no link declares.
 type UnknownError struct {
 	// Layer is where the name came from, so the message points at the thing to
 	// fix — a flag, an exported variable, or a stale pin.
@@ -98,37 +95,49 @@ type UnknownError struct {
 
 func (e *UnknownError) Error() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "no instance named %q", e.Name)
+	fmt.Fprintf(&b, "no deployment named %q", e.Name)
 	switch e.Layer {
 	case LayerEnv:
 		fmt.Fprintf(&b, " (from %s)", EnvVar)
 	case LayerPin:
 		b.WriteString(" (pinned for this project; clear it with `astro use --unset`)")
-	case LayerFlag, LayerURL, LayerRunning, LayerDefault:
+	case LayerFlag, LayerURL, LayerDefault:
 	}
 	if len(e.Known) == 0 {
-		b.WriteString("; this project knows none — declare one under [tool.astro.deployments] in pyproject.toml, or start a local Airflow with `astro local start`")
+		b.WriteString("; this project links none — declare one under [tool.astro.deployments] in pyproject.toml. " + localSpelling)
 		return b.String()
 	}
-	b.WriteString("; known instances: " + strings.Join(e.Known, ", "))
+	b.WriteString("; known deployments: " + strings.Join(e.Known, ", "))
 	return b.String()
 }
 
-// AmbiguousError reports resolution falling all the way through with several of
-// this project's own instances available and none of them the default. An
-// interactive command prompts on this and pins the answer; a non-interactive
-// one returns it, and the message names all three ways to say which one.
-//
-// Choices holds this project's own instances only. Another project's running
-// Airflow is addressable by name and listed, but offering it here would invite
-// someone to make a neighbor's Airflow this project's default.
+// AmbiguousError reports resolution falling all the way through with several
+// deployments available and none of them the default. An interactive command
+// prompts on this and pins the answer; a non-interactive one returns it, and
+// the message names every way to say which one.
 type AmbiguousError struct {
 	Choices []string
 }
 
 func (e *AmbiguousError) Error() string {
-	return fmt.Sprintf("several instances are available and none is the default (%s): pick one with -i <name>, export %s=<name>, or pin one with `astro use <name>`",
+	return fmt.Sprintf("several deployments are linked and none is the default (%s): pick one with -d <name>, export %s=<name>, or pin one with `astro use <name>`",
 		strings.Join(e.Choices, ", "), EnvVar)
+}
+
+// Unknown is the error for a name this set does not hold, named at layer. It is
+// one call rather than a constructor per caller so `astro use` and the
+// resolution rule refuse the same names the same way — the reserved `local`
+// above all, which is a name with a new home rather than a typo.
+func (s Set) Unknown(layer Layer, name string) error {
+	if name != LocalName {
+		return &UnknownError{Layer: layer, Name: name, Known: s.Names()}
+	}
+	if layer == LayerPin {
+		// A pin an older release wrote fails every command until it is cleared,
+		// so the way out has to travel with the refusal.
+		return fmt.Errorf("%w (clear the pin with `astro use --unset`)", ErrLocalNotADeployment)
+	}
+	return ErrLocalNotADeployment
 }
 
 // Select applies the resolution rule. It reads only the set and the request —
@@ -154,49 +163,31 @@ func (s Set) Select(req Request) (Selection, error) {
 		}
 		it, ok := s.Lookup(named.name)
 		if !ok {
-			// The reserved name always means something; it just may not be
-			// running yet, which is a different problem with a different fix.
-			if named.name == LocalName {
-				return Selection{}, &NotRunningError{Layer: named.layer}
-			}
-			return Selection{}, &UnknownError{Layer: named.layer, Name: named.name, Known: s.Names()}
+			return Selection{}, s.Unknown(named.layer, named.name)
 		}
 		return Selection{Instance: it, From: named.layer}, nil
 	}
-	// Nothing was said, so the machine answers — from this project's own
-	// instances only. What is running here beats what the manifest defaults to.
-	if it, ok := s.Lookup(LocalName); ok {
-		return Selection{Instance: it, From: LayerRunning}, nil
-	}
+	// Nothing was said, so the manifest answers.
 	if it, ok := s.defaultInstance(); ok {
 		return Selection{Instance: it, From: LayerDefault}, nil
 	}
-	own := s.ownNames()
-	switch len(own) {
+	switch names := s.Names(); len(names) {
 	case 0:
-		if names := s.Names(); len(names) > 0 {
-			// Other projects' Airflows are running and addressable, but none of
-			// them is this project's default.
-			return Selection{}, fmt.Errorf("%w. Other projects' Airflows are running (%s); name one with -i if that is what you meant", ErrNone, strings.Join(names, ", "))
-		}
 		return Selection{}, ErrNone
 	case 1:
-		// One instance of its own and no default marked. Today the lone-link
-		// rule in manifest.DefaultLink already catches this, so nothing reaches
-		// here — but a set of one is never a choice, and the day another kind of
-		// own instance exists it must not be announced as "several".
-		it, _ := s.Lookup(own[0])
-		return Selection{Instance: it, From: LayerDefault}, nil
+		// One link and no default marked. Today the lone-link rule in
+		// manifest.DefaultLink already catches this, so nothing reaches here —
+		// but a set of one is never a choice, and it must not be announced as
+		// "several".
+		return Selection{Instance: s.items[0], From: LayerDefault}, nil
 	default:
-		return Selection{}, &AmbiguousError{Choices: own}
+		return Selection{}, &AmbiguousError{Choices: names}
 	}
 }
 
 // defaultInstance is the manifest's default link as an instance. The rule
 // itself lives in manifest.DefaultLink, which `astro deploy` calls too; Build
-// applies it, so all this does is look up the name it settled on. Nothing can
-// have taken that name in between: `local` is the only name a discovered
-// instance claims outright, and the manifest refuses to declare it.
+// applies it, so all this does is look up the name it settled on.
 func (s Set) defaultInstance() (Instance, bool) {
 	if s.defaultLink == "" {
 		return Instance{}, false
@@ -218,7 +209,7 @@ func URLInstance(url string) Instance {
 type Row struct {
 	Layer Layer  `json:"layer"`
 	Value string `json:"value,omitempty"`
-	// Where is the coordinate the layer's instance points at — detail about
+	// Where is the coordinate the layer's deployment points at — detail about
 	// something that works.
 	Where string `json:"where,omitempty"`
 	// Problem is why the layer's value cannot be used, such as a pin naming a
@@ -226,7 +217,7 @@ type Row struct {
 	// one is reassurance and the other is a fault, and a reader scanning a
 	// column should not have to tell them apart by wording.
 	Problem string `json:"problem,omitempty"`
-	// Wins marks the layer that decides the instance right now.
+	// Wins marks the layer that decides the deployment right now.
 	Wins bool `json:"wins"`
 }
 
@@ -246,18 +237,13 @@ func (s Set) Explain(req Request) (rows []Row, sel Selection, err error) {
 		{Layer: LayerEnv, Value: req.Env},
 		{Layer: LayerPin, Value: req.Pin},
 	}
-	if it, ok := s.Lookup(LocalName); ok {
-		rows = append(rows, Row{Layer: LayerRunning, Value: it.Name, Where: it.Where})
-	} else {
-		rows = append(rows, Row{Layer: LayerRunning})
-	}
 	if it, ok := s.defaultInstance(); ok {
 		rows = append(rows, Row{Layer: LayerDefault, Value: it.Name, Where: it.Where})
 	} else {
 		rows = append(rows, Row{Layer: LayerDefault})
 	}
 	// The two layers a user types into are the two that can name something that
-	// is not there; the machine-filled rows below them are read from the set.
+	// is not there; the default row below them is read from the set.
 	for i := range rows {
 		rows[i].Wins = rows[i].Layer == winner
 		if rows[i].Value == "" || (rows[i].Layer != LayerEnv && rows[i].Layer != LayerPin) {
@@ -267,9 +253,9 @@ func (s Set) Explain(req Request) (rows []Row, sel Selection, err error) {
 		case known:
 			rows[i].Where = it.Where
 		case rows[i].Value == LocalName:
-			rows[i].Problem = "no local Airflow is running for this project"
+			rows[i].Problem = "the machine is not a deployment; spell the command `astro local …`"
 		default:
-			rows[i].Problem = "names no instance this project knows"
+			rows[i].Problem = "names no deployment this project links"
 		}
 	}
 	return rows, sel, err

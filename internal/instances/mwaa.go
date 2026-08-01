@@ -80,7 +80,7 @@ func awsCredentialFailure(err error, environment, region string) error {
 func (i Instance) mwaaTransport(ctx context.Context, d Deps) (airflowapi.Transport, error) {
 	environment := i.Link.Environment
 	if environment == "" {
-		return nil, fmt.Errorf("instance %q names no MWAA environment: set environment = '<environment name>' on the link", i.Name)
+		return nil, fmt.Errorf("deployment %q names no MWAA environment: set environment = '<environment name>' on the link", i.Name)
 	}
 	region, err := i.TargetString(awsRegionKey)
 	if err != nil {

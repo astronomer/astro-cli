@@ -41,7 +41,7 @@ func TestAssetsEventsFilterBySource(t *testing.T) {
 		 "timestamp":"2024-05-01T00:00:00Z","created_dagruns":[{"dag_id":"reports","run_id":"run_9"}]}
 	],"total_entries":1}`)
 
-	out, _, err := runQuery(t, stub, "assets", "events", "-d", "orders_etl", "--task-id", "load")
+	out, _, err := runQuery(t, stub, "assets", "events", "--dag-id", "orders_etl", "--task-id", "load")
 	if err != nil {
 		t.Fatalf("assets events: %v", err)
 	}

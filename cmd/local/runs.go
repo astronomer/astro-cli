@@ -12,14 +12,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// NewRunsCmd builds `astro runs` for the root.
-func NewRunsCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+// newRunsCmd builds the `runs` family over whichever Airflow the target names.
+func newRunsCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "runs",
 		Short: "List, trigger, and clear DAG runs on an Airflow",
-		Long: "Work with the runs on whichever Airflow this project resolves to: list them, read one, start " +
-			"one, and delete or clear one.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+		Long: "Work with the runs on " + t.which() + ": list them, read one, start " +
+			"one, and delete or clear one.",
 	},
 		newRunsListCmd,
 		newRunsGetCmd,
@@ -103,7 +102,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 	// Most recent first without being asked: a bare `astro runs list` is nearly
 	// always "what just happened", and Airflow's own default order is not that.
 	addListFlags(cmd, &list, "-start_date")
-	cmd.Flags().StringVarP(&opts.dagID, "dag-id", "d", "", "Only runs of this DAG (default: every DAG)")
+	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this DAG (default: every DAG)")
 	cmd.Flags().StringSliceVarP(&opts.states, "state", "s", nil, "Only runs in these states, such as running or failed (repeatable)")
 	cmd.Flags().StringVar(&opts.startDateGTE, "start-date-gte", "", "Only runs that started at or after this RFC 3339 time")
 	cmd.Flags().StringVar(&opts.startDateLTE, "start-date-lte", "", "Only runs that started at or before this RFC 3339 time")
@@ -257,7 +256,7 @@ func (q *query) runRunsTrigger(ctx context.Context, dagID string, opts airflowap
 		if unpaused {
 			// The unpause already happened and outlives this failure, so say so
 			// rather than leave the DAG changed by a command that reported none.
-			return fmt.Errorf("%w\n%s is now unpaused; pause it again with `astro dags pause %s`", err, dagID, dagID)
+			return fmt.Errorf("%w\n%s is now unpaused; pause it again with `%s`", err, dagID, q.t.suggest("dags pause "+dagID))
 		}
 		return err
 	}
@@ -281,7 +280,7 @@ func (q *query) ensureUnpaused(ctx context.Context, client *airflowapi.Client, d
 		return false, nil
 	}
 	if !auto {
-		return false, fmt.Errorf("DAG %q is paused, so a new run would never be scheduled; unpause it with `astro dags unpause %s`, or drop --no-auto-unpause", dagID, dagID)
+		return false, fmt.Errorf("DAG %q is paused, so a new run would never be scheduled; unpause it with `%s`, or drop --no-auto-unpause", dagID, q.t.suggest("dags unpause "+dagID))
 	}
 	if _, err := client.UnpauseDAG(ctx, dagID); err != nil {
 		return false, err

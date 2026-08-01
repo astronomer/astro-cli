@@ -11,14 +11,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// NewTasksCmd builds `astro tasks` for the root.
-func NewTasksCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+// newTasksCmd builds the `tasks` family over whichever Airflow the target
+// names.
+func newTasksCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "tasks",
 		Short: "Read a DAG's tasks, their runs, and their logs",
-		Long: "Work with tasks on whichever Airflow this project resolves to: what a DAG defines, what one run " +
-			"of a task did, its log, and clearing tasks so they run again.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+		Long: "Work with tasks on " + t.which() + ": what a DAG defines, what one run " +
+			"of a task did, its log, and clearing tasks so they run again.",
 	},
 		newTasksListCmd,
 		newTasksGetCmd,

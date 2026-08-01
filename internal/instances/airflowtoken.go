@@ -46,7 +46,7 @@ func airflowTokenCredentials(i Instance, baseURL string, d Deps) (airflowapi.Cre
 	source := func(ctx context.Context) (string, string, error) {
 		scheme, value, err := minter.Credentials(ctx)
 		if err != nil {
-			return "", "", fmt.Errorf("instance %q could not mint a token at its own %s: %w", i.Name, airflowTokenPath, err)
+			return "", "", fmt.Errorf("deployment %q could not mint a token at its own %s: %w", i.Name, airflowTokenPath, err)
 		}
 		return scheme, value, nil
 	}

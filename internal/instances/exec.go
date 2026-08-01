@@ -48,16 +48,16 @@ const execWaitDelay = 2 * time.Second
 func execCredentials(i Instance) (airflowapi.CredentialSource, func(context.Context) error, error) {
 	argv := i.Link.Auth.Command
 	if len(argv) == 0 {
-		return nil, nil, fmt.Errorf("instance %q declares the exec method with no command to run", i.Name)
+		return nil, nil, fmt.Errorf("deployment %q declares the exec method with no command to run", i.Name)
 	}
-	h := &execHelper{instance: i.Name, argv: argv, timeout: execTimeout}
+	h := &execHelper{deployment: i.Name, argv: argv, timeout: execTimeout}
 	return h.credentials, h.refresh, nil
 }
 
 type execHelper struct {
-	instance string
-	argv     []string
-	timeout  time.Duration
+	deployment string
+	argv       []string
+	timeout    time.Duration
 
 	mu    sync.Mutex
 	token string
@@ -152,23 +152,23 @@ func (h *execHelper) run(parent context.Context) (string, error) {
 		err = nil
 	}
 	if deadline := ctx.Err(); errors.Is(deadline, context.DeadlineExceeded) {
-		return "", fmt.Errorf("the auth command for instance %q did not finish within %s: %s%s",
-			h.instance, h.waited(parent), h.quoted(), stderrDetail(stderr.String()))
+		return "", fmt.Errorf("the auth command for deployment %q did not finish within %s: %s%s",
+			h.deployment, h.waited(parent), h.quoted(), stderrDetail(stderr.String()))
 	}
 	if err != nil {
-		return "", fmt.Errorf("the auth command for instance %q failed: %s: %w%s", h.instance, h.quoted(), err, stderrDetail(stderr.String()))
+		return "", fmt.Errorf("the auth command for deployment %q failed: %s: %w%s", h.deployment, h.quoted(), err, stderrDetail(stderr.String()))
 	}
 
 	token := trimToken(stdout.String())
 	switch {
 	case token == "":
-		return "", fmt.Errorf("the auth command for instance %q printed no token: %s%s", h.instance, h.quoted(), stderrDetail(stderr.String()))
+		return "", fmt.Errorf("the auth command for deployment %q printed no token: %s%s", h.deployment, h.quoted(), stderrDetail(stderr.String()))
 	case strings.ContainsAny(token, "\r\n"):
 		// A helper that prints a token plus a log line, or a whole JSON
 		// document, is a helper being asked for the wrong thing. Sending the
 		// first line and hoping would produce a 401 nobody could explain.
-		return "", fmt.Errorf("the auth command for instance %q printed %d lines, and a token is one: %s",
-			h.instance, len(strings.Split(token, "\n")), h.quoted())
+		return "", fmt.Errorf("the auth command for deployment %q printed %d lines, and a token is one: %s",
+			h.deployment, len(strings.Split(token, "\n")), h.quoted())
 	}
 	return token, nil
 }

@@ -12,14 +12,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// NewDagsCmd builds `astro dags` for the root.
-func NewDagsCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+// newDagsCmd builds the `dags` family over whichever Airflow the target names.
+func newDagsCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "dags",
 		Short: "List and control the DAGs on an Airflow",
-		Long: "Read and control the DAGs on whichever Airflow this project resolves to: list them, read one, " +
-			"print its source, count its runs by state, and pause or unpause it.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+		Long: "Read and control the DAGs on " + t.which() + ": list them, read one, " +
+			"print its source, count its runs by state, and pause or unpause it.",
 	},
 		newDagsListCmd,
 		newDagsGetCmd,
@@ -191,7 +190,7 @@ func newDagsSourceCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "source <DAG_ID>",
 		Short: "Print a DAG's source file",
-		Long: "Print the Python source Airflow parsed for this DAG. It comes from the instance, not from your " +
+		Long: "Print the Python source Airflow parsed for this DAG. It comes from that Airflow, not from your " +
 			"checkout, so it is what is actually running there.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -234,7 +233,7 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 			return q.runDagsStats(cmd.Context(), dagIDs)
 		},
 	}
-	cmd.Flags().StringSliceVarP(&dagIDs, "dag-id", "d", nil, "Count only these DAGs (repeatable)")
+	cmd.Flags().StringSliceVar(&dagIDs, "dag-id", nil, "Count only these DAGs (repeatable)")
 	return cmd
 }
 

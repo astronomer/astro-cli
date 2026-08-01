@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -25,12 +24,17 @@ func TestURLTargetNeedsNoProject(t *testing.T) {
 	d, _, errOut := instanceDeps(t, outside)
 	c := &cli{d: d}
 
-	sel, err := c.resolveInstance("", "https://airflow.corp.dev")
+	sel, err := c.resolveDeployment(deploymentFlags{url: "https://airflow.corp.dev"})
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
 	if sel.From != instances.LayerURL || sel.Instance.URL != "https://airflow.corp.dev" {
 		t.Fatalf("selected %+v", sel)
+	}
+	// Opening the client is what announces the target, so the URL a run is
+	// about to talk to is never invisible.
+	if _, err := c.clientFor(context.Background(), sel.Instance); err != nil {
+		t.Fatalf("client: %v", err)
 	}
 	if !strings.Contains(errOut.String(), "→ https://airflow.corp.dev") {
 		t.Errorf("stderr = %q", errOut)
@@ -38,66 +42,115 @@ func TestURLTargetNeedsNoProject(t *testing.T) {
 
 	// The same directory without --url still reports the missing project, so
 	// the escape hatch is the exception rather than a hole.
-	if _, err := c.resolveInstance("", ""); err == nil {
+	if _, err := c.resolveDeployment(deploymentFlags{}); err == nil {
 		t.Fatal("resolution outside a project succeeded")
 	}
 }
 
-// TestInstanceFlagsRegisterOnce pins the spelling every Airflow-facing command
-// will inherit: -i is settled for --instance, and --url takes no
-// shorthand. One registration is what keeps the query surface from drifting
-// into three spellings of the same idea.
-func TestInstanceFlagsRegisterOnce(t *testing.T) {
+// TestDeploymentFlagsRegisterOnce pins the spelling every top-level
+// Airflow-facing command inherits: -d is settled for --deployment,
+// and --url takes no shorthand. One registration is what keeps the query
+// surface from drifting into three spellings of the same idea.
+func TestDeploymentFlagsRegisterOnce(t *testing.T) {
 	cmd := &cobra.Command{Use: "dags"}
-	f := &instanceFlags{}
-	addInstanceFlags(cmd, f)
+	f := &deploymentFlags{}
+	addDeploymentFlags(cmd, f)
 
-	instance := cmd.PersistentFlags().Lookup("instance")
-	if instance == nil || instance.Shorthand != "i" {
-		t.Fatalf("--instance = %+v, want it registered with -i", instance)
+	deployment := cmd.PersistentFlags().Lookup("deployment")
+	if deployment == nil || deployment.Shorthand != "d" {
+		t.Fatalf("--deployment = %+v, want it registered with -d", deployment)
 	}
 	url := cmd.PersistentFlags().Lookup("url")
 	if url == nil || url.Shorthand != "" {
 		t.Fatalf("--url = %+v, want it registered with no shorthand", url)
 	}
-	if err := cmd.PersistentFlags().Parse([]string{"-i", "prod", "--url", "https://x"}); err != nil {
+	if err := cmd.PersistentFlags().Parse([]string{"-d", "prod", "--url", "https://x"}); err != nil {
 		t.Fatal(err)
 	}
-	if f.instance != "prod" || f.url != "https://x" {
+	if f.deployment != "prod" || f.url != "https://x" {
 		t.Fatalf("parsed into %+v", f)
 	}
 }
 
-func TestInstanceAndURLTogetherAreRefused(t *testing.T) {
+func TestDeploymentAndURLTogetherAreRefused(t *testing.T) {
 	d, _, _ := instanceDeps(t, t.TempDir())
 	c := &cli{d: d}
-	_, err := c.resolveInstance("prod", "https://airflow.corp.dev")
+	_, err := c.resolveDeployment(deploymentFlags{deployment: "prod", url: "https://airflow.corp.dev"})
 	if !errors.Is(err, instances.ErrMutuallyExclusive) {
 		t.Fatalf("err = %v, want the mutually-exclusive refusal", err)
 	}
 }
 
-// TestInstanceClientOpensAClientOnWhatResolved covers the composition root the
-// query commands will call: one resolve, one transport, one client.
-func TestInstanceClientOpensAClientOnWhatResolved(t *testing.T) {
+// TestDeploymentClientOpensAClientOnWhatResolved covers the composition root
+// the query commands call: one resolve, one transport, one client.
+func TestDeploymentClientOpensAClientOnWhatResolved(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
-	d, _, _ := instanceDeps(t, dir, localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080})
+	d, _, errOut := instanceDeps(t, dir)
+	d.Session = func(context.Context) (string, error) { return "Bearer t", nil }
+	d.Locator = locatorFunc(func(context.Context, instances.Instance) (string, error) {
+		return "https://airflow.example.com", nil
+	})
 	c := &cli{d: d}
 
-	sel, client, err := c.instanceClient(context.Background(), instanceFlags{})
+	client, err := c.deploymentClient(context.Background(), deploymentFlags{})
 	if err != nil {
-		t.Fatalf("instanceClient: %v", err)
+		t.Fatalf("deploymentClient: %v", err)
 	}
-	if sel.Instance.Name != instances.LocalName || client == nil {
-		t.Fatalf("selection = %+v, client = %v", sel, client)
+	if client == nil {
+		t.Fatal("no client")
+	}
+	// Nothing said, so the manifest's default link answered — never the Airflow
+	// running on this machine, which is a different command now.
+	if !strings.Contains(errOut.String(), "→ dev") {
+		t.Fatalf("stderr = %q, want the default link", errOut)
 	}
 }
 
-// TestSymlinkedProjectKeepsItsLocal: the record was written from the resolved
+// TestMachineInstanceIsThisProjectsOwnAirflow: `astro local <query>` acts on
+// the Airflow this project has running, whatever else is on the machine and
+// whatever the pin says.
+func TestMachineInstanceIsThisProjectsOwnAirflow(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	if err := savePin(dir, "prod"); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(t.TempDir(), "billing")
+	d, _, _ := instanceDeps(t, dir,
+		localrt.Status{ProjectPath: other, State: localrt.StateRunning, Port: 8081},
+		localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080},
+	)
+	c := &cli{d: d}
+
+	i, err := c.machineInstance()
+	if err != nil {
+		t.Fatalf("machineInstance: %v", err)
+	}
+	if i.Name != instances.LocalName || i.URL != "http://localhost:8080" {
+		t.Fatalf("machine = %+v, want this project's own Airflow", i)
+	}
+}
+
+// TestMachineInstanceNeedsSomethingRunning: with nothing up, the fix is to
+// start Airflow. Pointing somewhere else is what the top-level spelling is for,
+// so this error never offers one.
+func TestMachineInstanceNeedsSomethingRunning(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	d, _, _ := instanceDeps(t, dir)
+	c := &cli{d: d}
+	_, err := c.machineInstance()
+	if !errors.Is(err, errNoLocalAirflow) {
+		t.Fatalf("err = %v, want the start-it message", err)
+	}
+	if !strings.Contains(err.Error(), "astro local start") {
+		t.Errorf("the fix named is %q", err)
+	}
+}
+
+// TestSymlinkedProjectKeepsItsMachine: the record was written from the resolved
 // path and the command runs from a symlinked one — the everyday macOS case,
 // where /tmp is a link to /private/tmp. Both spellings key the same state
 // directory, so they have to be the same project here too.
-func TestSymlinkedProjectKeepsItsLocal(t *testing.T) {
+func TestSymlinkedProjectKeepsItsMachine(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "target")
 	if err := os.MkdirAll(filepath.Join(target, "orders"), 0o755); err != nil {
@@ -117,12 +170,14 @@ func TestSymlinkedProjectKeepsItsLocal(t *testing.T) {
 	t.Setenv(instances.EnvVar, "")
 
 	started := filepath.Join(target, "orders")
-	d, out, _ := instanceDeps(t, dir, localrt.Status{ProjectPath: started, State: localrt.StateRunning, Port: 8080})
-	if err := execute(t, d, "use"); err != nil {
-		t.Fatal(err)
+	d, _, _ := instanceDeps(t, dir, localrt.Status{ProjectPath: started, State: localrt.StateRunning, Port: 8080})
+	c := &cli{d: d}
+	i, err := c.machineInstance()
+	if err != nil {
+		t.Fatalf("the project's own Airflow was not recognized: %v", err)
 	}
-	if !strings.Contains(out.String(), "resolves to local") {
-		t.Fatalf("the project's own Airflow was not recognized:\n%s", out)
+	if i.Name != instances.LocalName {
+		t.Fatalf("machine = %+v", i)
 	}
 }
 
@@ -148,6 +203,17 @@ func TestUseUnsetHealsACorruptState(t *testing.T) {
 		t.Fatalf("err = %v, want it to name the command that heals this", err)
 	}
 
+	// Pinning reads the file before it writes it, so it meets the same wall and
+	// has to name the same way out rather than surfacing a bare decode error.
+	d, _, errOut := instanceDeps(t, dir)
+	err = execute(t, d, "use", "prod")
+	if err == nil || !strings.Contains(err.Error(), "astro use --unset") {
+		t.Fatalf("err = %v, want the pin write to name the command that heals this", err)
+	}
+	if strings.Contains(errOut.String(), "→ prod") {
+		t.Errorf("a pin that was never written was announced anyway: %q", errOut)
+	}
+
 	d, _, _ = instanceDeps(t, dir)
 	if err := execute(t, d, "use", "--unset"); err != nil {
 		t.Fatalf("--unset could not clear state it cannot parse: %v", err)
@@ -171,7 +237,7 @@ func TestPromptPinsAndIsNeverAskedTwice(t *testing.T) {
 	d.Interactive = func() bool { return true }
 	c := &cli{d: d}
 
-	sel, err := c.resolveInstance("", "")
+	sel, err := c.resolveDeployment(deploymentFlags{})
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -194,14 +260,14 @@ func TestPromptPinsAndIsNeverAskedTwice(t *testing.T) {
 	d2.Stdin = strings.NewReader("")
 	d2.Interactive = func() bool { return true }
 	c2 := &cli{d: d2}
-	sel, err = c2.resolveInstance("", "")
+	sel, err = c2.resolveDeployment(deploymentFlags{})
 	if err != nil {
 		t.Fatalf("second resolve: %v", err)
 	}
 	if sel.From != instances.LayerPin || sel.Instance.Name != "prod" {
 		t.Fatalf("second resolve = %+v, want the pin", sel)
 	}
-	if strings.Contains(errOut2.String(), "Which instance") {
+	if strings.Contains(errOut2.String(), "Which deployment") {
 		t.Errorf("asked a second time: %q", errOut2)
 	}
 }
@@ -214,7 +280,7 @@ func TestPromptNeedsAnExplicitChoice(t *testing.T) {
 	d.Stdin = strings.NewReader("\n\n2\n")
 	c := &cli{d: d}
 
-	name, err := c.promptForInstance([]string{"dev", "prod"})
+	name, err := c.promptForDeployment([]string{"dev", "prod"})
 	if err != nil {
 		t.Fatalf("prompt: %v", err)
 	}
@@ -230,7 +296,7 @@ func TestPromptEndsOnAClosedStdin(t *testing.T) {
 	d, _, _ := instanceDeps(t, t.TempDir())
 	d.Stdin = strings.NewReader("")
 	c := &cli{d: d}
-	_, err := c.promptForInstance([]string{"dev", "prod"})
+	_, err := c.promptForDeployment([]string{"dev", "prod"})
 	var ambiguous *instances.AmbiguousError
 	if !errors.As(err, &ambiguous) {
 		t.Fatalf("err = %v, want the message naming every way to decide", err)
@@ -247,112 +313,55 @@ func TestJSONRunsNeverPrompt(t *testing.T) {
 	d.Interactive = func() bool { return true }
 	c := &cli{d: d, output: string(FormatJSON)}
 
-	_, err := c.resolveInstance("", "")
+	_, err := c.resolveDeployment(deploymentFlags{})
 	var ambiguous *instances.AmbiguousError
 	if !errors.As(err, &ambiguous) {
 		t.Fatalf("err = %v, want the ambiguous error rather than a prompt", err)
 	}
-	if strings.Contains(errOut.String(), "Which instance") {
+	if strings.Contains(errOut.String(), "Which deployment") {
 		t.Errorf("a json run prompted: %q", errOut)
 	}
 }
 
-// TestEmptyInstanceListSaysSoInJSON: zero instances is zero NDJSON lines, which
-// is correct and indistinguishable from a crash, so the explanation goes to
-// stderr where it cannot corrupt the stream.
-func TestEmptyInstanceListSaysSoInJSON(t *testing.T) {
-	dir := instanceProject(t, "")
-	d, out, errOut := instanceDeps(t, dir)
-	if err := execute(t, d, "instance", "list", "--output", "json"); err != nil {
-		t.Fatal(err)
-	}
-	if out.Len() != 0 {
-		t.Errorf("stdout should stay an empty stream, got %q", out)
-	}
-	if !strings.Contains(errOut.String(), "No instances") {
-		t.Errorf("stderr does not explain the empty stream: %q", errOut)
+// A run with nothing to resolve names both worlds: the ways to say which
+// deployment, and this family's own `astro local` form, which needs no decision
+// at all. Driven through the real command, because the family's name is the
+// point and only the registration knows it.
+func TestFallThroughNamesTheLocalSpelling(t *testing.T) {
+	for _, tc := range []struct{ name, links string }{
+		{"nothing linked", ""},
+		{"several linked, none default", ambiguousManifest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := instanceProject(t, tc.links)
+			d, _, _ := instanceDeps(t, dir)
+			err := execute(t, d, "dags", "list")
+			if err == nil {
+				t.Fatal("resolution succeeded with nothing to go on")
+			}
+			if !strings.Contains(err.Error(), "astro local dags") {
+				t.Errorf("message does not spell out the machine's form: %s", err)
+			}
+		})
 	}
 }
 
-// TestInstanceListShowsAShadowedAirflow: two projects with the same directory
-// name. One answers to it; the other is listed with the reason and a way in,
-// because the command promises every Airflow running on this machine.
-func TestInstanceListShowsAShadowedAirflow(t *testing.T) {
+// A pin an older release left behind names the machine's commands rather than
+// reading as an unknown deployment — and says how to clear itself, since it
+// fails every command until someone does.
+func TestPinnedLocalPointsAtTheNewSpelling(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
-	root := t.TempDir()
-	first := filepath.Join(root, "a", "etl")
-	second := filepath.Join(root, "b", "etl")
-	for _, p := range []string{first, second} {
-		if err := os.MkdirAll(p, 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	d, out, _ := instanceDeps(t, dir,
-		localrt.Status{ProjectPath: first, State: localrt.StateRunning, Port: 8081},
-		localrt.Status{ProjectPath: second, State: localrt.StateRunning, Port: 8082},
-	)
-	if err := execute(t, d, "instance", "list"); err != nil {
+	if err := savePin(dir, instances.LocalName); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(out.String(), "etl") < 2 {
-		t.Errorf("only one of the two same-named Airflows is listed:\n%s", out)
-	}
-	if !strings.Contains(out.String(), "--url http://localhost:8082") {
-		t.Errorf("the shadowed row does not say how to reach it:\n%s", out)
-	}
-}
-
-// TestInstanceListJSONCarriesURLAndAuthMethod: a consumer needs to tell a
-// resolved address from a coordinate that still needs a lookup, and to know how
-// a link proves itself before it tries.
-func TestInstanceListJSONCarriesURLAndAuthMethod(t *testing.T) {
-	dir := instanceProject(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'AF_TOKEN' }\n")
-	d, out, _ := instanceDeps(t, dir)
-	if err := execute(t, d, "instance", "list", "--output", "json"); err != nil {
-		t.Fatal(err)
-	}
-	var row struct {
-		Name, Kind, Where, URL, Source string
-		AuthMethod                     string `json:"auth_method"`
-		Current                        bool
-	}
-	if err := json.Unmarshal(out.Bytes(), &row); err != nil {
-		t.Fatalf("json: %v\n%s", err, out)
-	}
-	if row.URL != "https://airflow.staging.corp.dev" || row.AuthMethod != "token" {
-		t.Fatalf("row = %+v", row)
-	}
-}
-
-// TestUseLocalSaysNothingIsRunningYet: pinning the reserved name before
-// starting Airflow is allowed and normal, and saying so beats silence.
-func TestUseLocalSaysNothingIsRunningYet(t *testing.T) {
-	dir := instanceProject(t, twoLinkManifest)
-	d, _, errOut := instanceDeps(t, dir)
-	if err := execute(t, d, "use", "local"); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(errOut.String(), "astro local start") {
-		t.Errorf("stderr = %q, want it to say nothing is running yet", errOut)
-	}
-}
-
-// TestPinnedLocalNamesTheRightFix: every command between `astro use local` and
-// `astro local start` fails, and has to point at starting Airflow.
-func TestPinnedLocalNamesTheRightFix(t *testing.T) {
-	dir := instanceProject(t, twoLinkManifest)
 	d, _, _ := instanceDeps(t, dir)
-	if err := execute(t, d, "use", "local"); err != nil {
-		t.Fatal(err)
-	}
-	d, _, _ = instanceDeps(t, dir)
 	c := &cli{d: d}
-	_, err := c.resolveInstance("", "")
-	if err == nil {
-		t.Fatal("resolution succeeded with the pin naming nothing running")
+	_, err := c.resolveDeployment(deploymentFlags{})
+	if !errors.Is(err, instances.ErrLocalNotADeployment) {
+		t.Fatalf("err = %v, want the machine's own commands named", err)
 	}
-	if !strings.Contains(err.Error(), "astro local start") {
-		t.Errorf("the fix named is %q", err)
+	if !strings.Contains(err.Error(), "astro use --unset") {
+		t.Errorf("a stale pin was not told how to clear itself: %s", err)
 	}
 }
 

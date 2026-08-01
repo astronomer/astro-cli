@@ -56,7 +56,7 @@ func TestRunsListFiltersByStateAndDAG(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns", twoRunsAF3)
 
-	if _, _, err := runQuery(t, stub, "runs", "list", "-d", "orders_etl", "-s", "failed", "-s", "running", "-l", "5"); err != nil {
+	if _, _, err := runQuery(t, stub, "runs", "list", "--dag-id", "orders_etl", "-s", "failed", "-s", "running", "-l", "5"); err != nil {
 		t.Fatalf("runs list: %v", err)
 	}
 	query := stub.request(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns").Query
@@ -178,13 +178,69 @@ func TestRunsTriggerReportsTheUnpauseItLeavesBehind(t *testing.T) {
 	stub.route(http.MethodPatch, "/api/v2/dags/orders_etl", `{"dag_id":"orders_etl","is_paused":false}`)
 	// The trigger itself is left unrouted, so it fails after the unpause landed.
 
+	// runQuery targets the stub with --url, so the undo has to carry --url too:
+	// without it the suggested command resolves through the project's own rule
+	// and would pause a DAG on a different Airflow entirely.
 	_, _, err := runQuery(t, stub, "runs", "trigger", "orders_etl")
 	if err == nil {
 		t.Fatal("the trigger must fail")
 	}
-	if !strings.Contains(err.Error(), "astro dags pause orders_etl") {
-		t.Errorf("err = %q, want it to name the state it left and how to undo it", err)
+	want := "astro dags pause orders_etl --url " + stub.URL
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %q, want it to name the state it left and how to undo it on this Airflow (%q)", err, want)
 	}
+}
+
+// The undo names the Airflow that errored, whichever way the run named it —
+// so a fix pasted from a failure lands where the failure did.
+func TestRecoveryCommandsCarryTheSelector(t *testing.T) {
+	pausedDAG := func(t *testing.T) *airflowStub {
+		t.Helper()
+		stub := newAirflowStub(t)
+		stub.route(http.MethodGet, "/api/v2/dags/orders_etl", `{"dag_id":"orders_etl","is_paused":true}`)
+		// The trigger is left unrouted, so it fails after the unpause landed.
+		stub.route(http.MethodPatch, "/api/v2/dags/orders_etl", `{"dag_id":"orders_etl","is_paused":false}`)
+		return stub
+	}
+
+	t.Run("--url carries through", func(t *testing.T) {
+		stub := pausedDAG(t)
+		_, _, err := runQuery(t, stub, "runs", "trigger", "orders_etl")
+		if err == nil {
+			t.Fatal("the trigger must fail")
+		}
+		if !strings.Contains(err.Error(), "--url "+stub.URL) {
+			t.Errorf("err = %q, want the undo to carry --url", err)
+		}
+	})
+
+	t.Run("-d carries through", func(t *testing.T) {
+		stub := pausedDAG(t)
+		dir := instanceProject(t, "\n[tool.astro.deployments.staging]\nurl = '"+stub.URL+"'\nauth = { method = 'none' }\n")
+		d, _, _ := queryDeps(t)
+		d.WorkingDir = func() (string, error) { return dir, nil }
+		err := execute(t, d, "runs", "trigger", "orders_etl", "-d", "staging")
+		if err == nil {
+			t.Fatal("the trigger must fail")
+		}
+		if !strings.Contains(err.Error(), "astro dags pause orders_etl -d staging") {
+			t.Errorf("err = %q, want the undo to carry -d staging", err)
+		}
+	})
+
+	t.Run("the machine keeps its own spelling", func(t *testing.T) {
+		stub := pausedDAG(t)
+		_, _, err := runLocalQuery(t, stub, "local", "runs", "trigger", "orders_etl")
+		if err == nil {
+			t.Fatal("the trigger must fail")
+		}
+		if !strings.Contains(err.Error(), "astro local dags pause orders_etl") {
+			t.Errorf("err = %q, want the undo spelled for this machine", err)
+		}
+		if strings.Contains(err.Error(), "--url") || strings.Contains(err.Error(), "-d ") {
+			t.Errorf("err = %q, want no selector: the machine takes none", err)
+		}
+	})
 }
 
 // Delete and clear are destructive, so a run that cannot be asked and did not

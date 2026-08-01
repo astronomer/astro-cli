@@ -105,7 +105,7 @@ func (l *locator) composerBaseURL(ctx context.Context, i instances.Instance) (st
 func composerCoordinatesOf(i instances.Instance) (composerCoordinates, error) {
 	at := composerCoordinates{environment: i.Link.Environment}
 	if at.environment == "" {
-		return at, fmt.Errorf("instance %q names no Composer environment: set environment = '<environment name>' on the link", i.Name)
+		return at, fmt.Errorf("deployment %q names no Composer environment: set environment = '<environment name>' on the link", i.Name)
 	}
 	for _, field := range []struct {
 		key  string
@@ -119,7 +119,7 @@ func composerCoordinatesOf(i instances.Instance) (composerCoordinates, error) {
 			return at, err
 		}
 		if value == "" {
-			return at, fmt.Errorf("instance %q needs %s = '<%s>' under [tool.astro.targets.composer]: an environment name alone does not say where it lives",
+			return at, fmt.Errorf("deployment %q needs %s = '<%s>' under [tool.astro.targets.composer]: an environment name alone does not say where it lives",
 				i.Name, field.key, field.key)
 		}
 		*field.into = value

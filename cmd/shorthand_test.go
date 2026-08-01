@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -10,31 +11,39 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// v1ShorthandExceptions are the flag names that held -i before the v2 query
-// surface settled it for --instance. They are grandfathered, not
-// endorsed: an earlier fix takes -i away from them, and when it does, the entry
-// should be deleted rather than the test relaxed. Nothing may be added here —
-// a new flag wanting -i is the collision this test exists to catch.
-var v1ShorthandExceptions = map[string]bool{
-	"image-name":            true, // astro deploy, astro remote deploy, software deploy
-	"conn-id":               true, // astro deployment connection create/update
-	"info":                  true, // astro deployment logs
-	"wait":                  true, // astro deployment update
-	"include":               true, // astro organization audit-logs
-	"include-default-roles": true, // astro organization team/user list
+// v1DashDExceptions are the v1 flags that spell -d as something other than a
+// deployment. They are grandfathered, not endorsed: an earlier fix settled -d for
+// --deployment across the v2 tree, harmonizing with v1's own --deployment-id,
+// and every one of these predates that. Nothing may be added — a new flag
+// wanting -d for something else is the collision this test exists to catch,
+// and an entry that goes away is a line to delete.
+//
+// The exemption is by flag name, not by command, which is the known weakness:
+// a new `--description` taking -d anywhere in the v1 tree inherits this pass
+// without anyone deciding it should. Keying on command path instead would mean
+// listing every one of the dozen-odd places `--description` already appears,
+// and re-listing them whenever one moves. Named here so the next person to
+// widen the tree knows what this does not catch.
+var v1DashDExceptions = map[string]bool{
+	"dag-file":    true, // astro run
+	"dags":        true, // astro deploy (and software deploy, where houston allows)
+	"description": true, // deployment, workspace, team, and token create/update
+	"domain":      true, // astro auth token
+	"for":         true, // astro deployment hibernate, astro deployment wake-up
 }
 
-// TestDashIMeansInstanceOutsideTheAllowlist guards the seam the per-tree test
+// TestDashDMeansDeploymentOutsideTheAllowlist guards the seam the per-tree test
 // cannot see: cmd/local enforces one meaning per shorthand inside the v2 tree,
-// but that tree mounts on the v1 root, where older commands spell -i several
-// other ways. an earlier fix settled -i for --instance, so every new -i has to be
-// that; the survivors are grandfathered by name above and go away at an earlier fix.
+// but that tree mounts on the v1 root, where older commands spell -d several
+// other ways. an earlier fix settled -d for the deployment selector, matching v1's
+// own --deployment-id, so every new -d has to be one of those two; the
+// survivors are grandfathered by name above.
 //
-// This checks -i alone rather than every letter. The two trees disagree about
-// plenty of shorthands (-d, -r, -c, -f, -t all mean one thing in v1 and another
-// in the query surface), and reconciling those is its own decision with its own
+// This checks -d alone rather than every letter. The two trees disagree about
+// plenty of shorthands (-r, -c, -f, -t all mean one thing in v1 and another in
+// the query surface), and reconciling those is its own decision with its own
 // compatibility cost — not something to smuggle in under a test.
-func TestDashIMeansInstanceOutsideTheAllowlist(t *testing.T) {
+func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 	testUtil.SetupOSArgsForGinkgo()
 
 	v2 := map[string]string{}
@@ -45,8 +54,8 @@ func TestDashIMeansInstanceOutsideTheAllowlist(t *testing.T) {
 			collect(cmd, func(f *pflag.Flag) { v2[f.Shorthand] = f.Name })
 		})
 	}
-	if v2["i"] != "instance" {
-		t.Fatalf("-i in the v2 tree is --%s, want --instance", v2["i"])
+	if v2["d"] != "deployment" {
+		t.Fatalf("-d in the v2 tree is --%s, want --deployment", v2["d"])
 	}
 
 	root := NewRootCmd()
@@ -56,35 +65,40 @@ func TestDashIMeansInstanceOutsideTheAllowlist(t *testing.T) {
 		}
 		walkCmd(top, func(cmd *cobra.Command) {
 			collect(cmd, func(f *pflag.Flag) {
-				if f.Shorthand != "i" || f.Name == "instance" || v1ShorthandExceptions[f.Name] {
+				if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || v1DashDExceptions[f.Name] {
 					return
 				}
-				t.Errorf("%s: -i is --%s; an earlier fix settled -i for --instance", cmd.CommandPath(), f.Name)
+				t.Errorf("%s: -d is --%s; an earlier fix settled -d for the deployment selector", cmd.CommandPath(), f.Name)
 			})
 		})
 	}
 }
 
-// TestV1ShorthandExceptionsAreAllStillReal keeps the allowlist honest: an entry
-// whose flag no longer takes -i is a line to delete, and leaving it behind
+// TestV1DashDExceptionsAreAllStillReal keeps the allowlist honest: an entry
+// whose flag no longer takes -d is a line to delete, and leaving it behind
 // would quietly re-open the hole for a future flag of the same name.
-func TestV1ShorthandExceptionsAreAllStillReal(t *testing.T) {
+func TestV1DashDExceptionsAreAllStillReal(t *testing.T) {
 	testUtil.SetupOSArgsForGinkgo()
 	seen := map[string]bool{}
 	root := NewRootCmd()
 	for _, top := range root.Commands() {
 		walkCmd(top, func(cmd *cobra.Command) {
 			collect(cmd, func(f *pflag.Flag) {
-				if f.Shorthand == "i" {
+				if f.Shorthand == "d" {
 					seen[f.Name] = true
 				}
 			})
 		})
 	}
-	for name := range v1ShorthandExceptions {
+	var stale []string
+	for name := range v1DashDExceptions {
 		if !seen[name] {
-			t.Errorf("--%s no longer takes -i; drop it from v1ShorthandExceptions", name)
+			stale = append(stale, name)
 		}
+	}
+	sort.Strings(stale)
+	for _, name := range stale {
+		t.Errorf("--%s no longer takes -d; drop it from v1DashDExceptions", name)
 	}
 }
 

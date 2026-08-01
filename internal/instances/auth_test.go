@@ -28,7 +28,7 @@ func env(pairs map[string]string) func(string) (string, bool) {
 // reads as the manifest a user would write.
 func link(t *testing.T, body string) Instance {
 	t.Helper()
-	set := Build(Inputs{ProjectPath: filepath.Join(t.TempDir(), "orders"), Manifest: parseManifest(t, body)})
+	set := Build(parseManifest(t, body))
 	all := set.All()
 	if len(all) != 1 {
 		t.Fatalf("expected one link, got %v", set.Names())
@@ -70,7 +70,7 @@ func TestMissingCredentialNamesTheVariableAndTheFix(t *testing.T) {
 	if err == nil {
 		t.Fatal("a missing credential resolved")
 	}
-	for _, want := range []string{`instance "staging"`, "STAGING_AIRFLOW_TOKEN", "astro local env set STAGING_AIRFLOW_TOKEN --project"} {
+	for _, want := range []string{`deployment "staging"`, "STAGING_AIRFLOW_TOKEN", "astro local env set STAGING_AIRFLOW_TOKEN --project"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("message does not name %s: %s", want, err)
 		}

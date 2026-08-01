@@ -33,22 +33,44 @@ func AddCmds(d Deps) []*cobra.Command {
 		NewDevCmd(d),
 		NewPackageCmd(d),
 		NewUseCmd(d),
-		NewInstanceCmd(d),
-		NewDagsCmd(d),
-		NewRunsCmd(d),
-		NewTasksCmd(d),
-		NewAssetsCmd(d),
-		NewConnectionsCmd(d),
-		NewVariablesCmd(d),
-		NewPoolsCmd(d),
 		newSuperviseCmd(d),
 		newSessionWatchCmd(d),
 		newProxyServeCmd(d),
 	}
+	// The query surface at the top level acts on a deployment. The same
+	// commands, built by the same code, act on this machine under
+	// `astro local` (NewLocalCmd).
+	cmds = append(cmds, queryFamilies(d, func() target { return &deploymentTarget{} })...)
 	cmds = append(cmds, rootAliasCmds(d)...)
 	for _, cmd := range cmds {
 		silenceUsage(cmd)
 		wrapErrorOutput(d, cmd)
+	}
+	return cmds
+}
+
+// queryFamilies builds every Airflow-facing command family from one
+// implementation. It is called twice — once at the top level against a
+// deployment, once under `astro local` against this machine — and newTarget is
+// the only thing that differs between the two: flags, service calls,
+// rendering, and json rows are the same code either way.
+//
+// A new family goes in this list and lands on both surfaces at once, which is
+// what keeps them from drifting into two half-implementations of one idea.
+func queryFamilies(d Deps, newTarget func() target) []*cobra.Command {
+	builders := []func(Deps, target) *cobra.Command{
+		newDagsCmd,
+		newRunsCmd,
+		newTasksCmd,
+		newAssetsCmd,
+		newConnectionsCmd,
+		newVariablesCmd,
+		newPoolsCmd,
+		newHealthCmd,
+	}
+	cmds := make([]*cobra.Command, 0, len(builders))
+	for _, build := range builders {
+		cmds = append(cmds, build(d, newTarget()))
 	}
 	return cmds
 }

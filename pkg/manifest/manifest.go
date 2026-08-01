@@ -307,10 +307,12 @@ var (
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
-// ReservedLinkName is the name instance resolution keeps for the Airflow
-// running on this machine, so a link may not take it. It is exported so the
-// resolver names the same string this package refuses, rather than the two
-// agreeing by coincidence.
+// ReservedLinkName is the word that means the Airflow running on this machine
+// — the whole `astro local` surface — so a link may not take it. Nothing
+// resolves it: a deployment called `local` would simply read as the machine to
+// everyone who saw it, which is a name to refuse rather than a collision to
+// arbitrate. It is exported so the resolver names the same string this package
+// refuses, rather than the two agreeing by coincidence.
 const ReservedLinkName = "local"
 
 // parser accumulates the findings of one decode. Every helper takes the dotted

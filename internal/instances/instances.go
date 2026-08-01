@@ -1,37 +1,41 @@
-// Package instances answers "what am I acting on?" for every Airflow-facing
-// command. It builds the project's named instance set — the manifest's
-// deployment links plus the local Airflows running on this machine — applies
-// one precedence rule to pick a winner, and opens a pkg/airflowapi transport
-// to it (docs/v2-instances.md).
+// Package instances answers "which deployment am I acting on?" for every
+// Airflow-facing command. It builds the project's named deployment set from
+// the manifest's links, applies one precedence rule to pick a winner, and
+// opens a pkg/airflowapi transport to it (docs/v2-instances.md).
+//
+// The machine's own Airflow is not in that set. It is not a deployment and it
+// never competes for a name: `astro local dags list` acts on it, spelled that
+// way so a top-level command can never silently hit localhost. LocalInstance
+// builds it for the commands that do act on it, and for the inventory bare
+// `astro use` prints.
 //
 // The two halves are deliberately separate. Building the set and picking a
-// winner touch nothing but the inputs handed in, so `astro use` and
-// `astro instance list` render them with no network call at all; only
-// Instance.Transport reaches out, and only for the one instance a command acts
-// on. Nothing here prints, exits, or reads config: the session, env, and
-// coordinate lookups arrive through Deps, and every failure travels as an
-// error naming its cause and its fix. The AWS and Google credential chains are
-// the exception, resolved through their own SDKs — see Deps.
+// winner touch nothing but the inputs handed in, so `astro use` renders with
+// no network call at all; only Instance.Transport reaches out, and only for
+// the one instance a command acts on. Nothing here prints, exits, or reads
+// config: the session, env, and coordinate lookups arrive through Deps, and
+// every failure travels as an error naming its cause and its fix. The AWS and
+// Google credential chains are the exception, resolved through their own SDKs
+// — see Deps.
 package instances
 
 import (
-	"path/filepath"
 	"sort"
 	"strconv"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// LocalName is the reserved name of this project's own local Airflow. It is
-// never declared anywhere: `astro local start` makes it exist and
-// `astro use local` points back at it. It is the manifest's own constant, so
-// the name this resolves and the name the manifest refuses cannot drift apart.
+// LocalName is the reserved word for the Airflow running on this machine: the
+// name the inventory shows it under, the name resolution refuses at every
+// layer, and the link name the manifest rejects (manifest.ReservedLinkName).
+// It is that same constant, so the three cannot drift apart.
 const LocalName = manifest.ReservedLinkName
 
 // EnvVar is the ephemeral layer of the resolution rule. It is an env var
 // rather than CLI-managed session state because the shell already owns session
 // lifetime — one exported value makes this terminal the prod terminal.
-const EnvVar = "ASTRO_INSTANCE"
+const EnvVar = "ASTRO_DEPLOYMENT"
 
 // Kind is what an instance points at: the four manifest link kinds, plus the
 // local Airflow, which no manifest declares.
@@ -57,7 +61,8 @@ const (
 	SourceURL Source = "url"
 )
 
-// Instance is one named Airflow a command can act on.
+// Instance is one Airflow a command can act on: a deployment the manifest
+// links, the Airflow running on this machine, or a bare --url.
 type Instance struct {
 	Name   string
 	Kind   Kind
@@ -72,7 +77,7 @@ type Instance struct {
 	// looked up first, which Instance.Transport does.
 	URL string
 	// Link is the manifest link this instance came from, including its auth
-	// table. Zero for a discovered local Airflow.
+	// table. Zero for the machine's Airflow.
 	Link manifest.Link
 	// TargetConfig is the link's [tool.astro.targets.<target>] section, plain
 	// data as the manifest carries it. It travels with the instance because a
@@ -83,30 +88,20 @@ type Instance struct {
 	// link whose target declares no section, and read-only — it is the
 	// manifest's own map rather than a copy of it.
 	TargetConfig map[string]any
-	// Project is the project root of a discovered local Airflow, empty for a
-	// manifest link.
+	// Project is the project root of a local Airflow, empty for a manifest
+	// link.
 	Project string
-	// AirflowMajor is the generation a discovered local Airflow was started
-	// for, from its runtime record.
+	// AirflowMajor is the generation a local Airflow was started for, from its
+	// runtime record.
 	AirflowMajor string
-	// Own marks an instance belonging to the project in front of the user: its
-	// own manifest links and its own local Airflow. Another project's running
-	// Airflow is addressable and listed, but never wins by default and is never
-	// offered in the prompt — defaulting to someone else's Airflow is how you
-	// act on the wrong one.
-	Own bool
-	// Problem is why this instance cannot be reached by name, empty when it
-	// can. A listed instance with a problem is shown and explained rather than
-	// dropped, so nothing on the machine goes missing without a word.
-	Problem string
 }
 
 // Local is one running local Airflow, as the caller discovered it. It mirrors
-// the fields of a localstate record (internal/localstate) that resolution
+// the fields of a localstate record (internal/localstate) that this package
 // needs; the caller passes only the ones whose runtime is actually alive,
-// because "running local Airflow" is a layer of the rule and a dead record is
-// not one. ProjectPath must already be canonical — the caller resolves it, so
-// this package touches no filesystem.
+// because a leftover record is not an Airflow to talk to. ProjectPath must
+// already be canonical — the caller resolves it, so this package touches no
+// filesystem.
 type Local struct {
 	ProjectPath string
 	Port        int
@@ -115,27 +110,31 @@ type Local struct {
 	AirflowMajor string
 }
 
-// Inputs is everything set building reads.
-type Inputs struct {
-	// ProjectPath is the project the set belongs to, canonical (symlinks
-	// resolved) so it compares equal to the record paths in Running. The local
-	// Airflow of this project is the one that takes the reserved name; every
-	// other running Airflow is addressed by its own project's name.
-	ProjectPath string
-	// Manifest is the loaded pyproject.toml, nil outside a project.
-	Manifest *manifest.Manifest
-	// Running is the local Airflows alive on this machine.
-	Running []Local
+// LocalInstance is a running local Airflow as an instance: what every
+// `astro local` query command acts on, and how the inventory lists it. The
+// project in front of the user passes LocalName; another project's Airflow is
+// listed under a name of the caller's choosing, since only the caller knows
+// which project it is looking at.
+//
+// It is built rather than resolved. The machine is reached by spelling the
+// command `astro local …`, never by winning a precedence rule, so nothing here
+// can make a top-level command hit localhost.
+func LocalInstance(l Local, name string) Instance {
+	url := localURL(l)
+	return Instance{
+		Name:         name,
+		Kind:         KindLocal,
+		Source:       SourceRunning,
+		Where:        url,
+		URL:          url,
+		Project:      l.ProjectPath,
+		AirflowMajor: l.AirflowMajor,
+	}
 }
 
-// Set is the named instances a project can act on, sorted by name.
+// Set is the deployments a project can act on, sorted by name.
 type Set struct {
 	items []Instance
-	// shadowed are instances that exist but whose name another instance holds.
-	// They are listed, with the problem that explains them, and are not
-	// addressable by name — `astro instance list` promises every Airflow
-	// running on this machine, and quietly dropping one breaks that promise.
-	shadowed []Instance
 	// defaultLink is the manifest's default link by name, "" when the manifest
 	// names none. It comes from manifest.DefaultLink, the same call
 	// `astro deploy` makes, so the two can never disagree about a project's
@@ -143,115 +142,41 @@ type Set struct {
 	defaultLink string
 }
 
-// Build assembles the set: every manifest link, plus every running local
-// Airflow.
-//
-// Naming is where the cases live. This project's own Airflow is always `local`
-// — the manifest refuses that name, so nothing declared competes for it, and a
-// foreign project whose directory happens to be called `local` does not take it
-// either: the reserved name means "this machine, this project" or it means
-// nothing. Another project's Airflow takes its directory name when nothing
-// holds it; when something does — a link of that name, or another project with
-// the same basename — it is shadowed: still listed, with the problem that says
-// how to reach it, but not addressable by name.
-func Build(in Inputs) Set {
-	byName := map[string]Instance{}
-	var shadowed []Instance
+// Build assembles the set: every link the manifest declares, and nothing else.
+// A nil manifest — no project in front of the user — is an empty set.
+func Build(m *manifest.Manifest) Set {
+	if m == nil {
+		return Set{}
+	}
 	defaultLink := ""
-	if in.Manifest != nil {
-		if name, _, ok := manifest.DefaultLink(in.Manifest.Astro.Deployments); ok {
-			defaultLink = name
-		}
-		for name := range in.Manifest.Astro.Deployments {
-			link := in.Manifest.Astro.Deployments[name]
-			byName[name] = Instance{
-				Name:         name,
-				Kind:         Kind(link.Kind()),
-				Source:       SourceManifest,
-				Where:        linkWhere(link),
-				URL:          link.URL,
-				Link:         link,
-				TargetConfig: in.Manifest.Astro.Targets[link.Target],
-				Own:          true,
-			}
-		}
+	if name, _, ok := manifest.DefaultLink(m.Astro.Deployments); ok {
+		defaultLink = name
 	}
-
-	running := append([]Local(nil), in.Running...)
-	sort.Slice(running, func(i, j int) bool { return running[i].ProjectPath < running[j].ProjectPath })
-	for _, l := range running {
-		own := in.ProjectPath != "" && l.ProjectPath == in.ProjectPath
-		name := filepath.Base(l.ProjectPath)
-		if own {
-			name = LocalName
-		}
-		if name == "." || name == string(filepath.Separator) {
-			continue
-		}
-		url := localURL(l)
-		it := Instance{
+	items := make([]Instance, 0, len(m.Astro.Deployments))
+	for name := range m.Astro.Deployments {
+		link := m.Astro.Deployments[name]
+		items = append(items, Instance{
 			Name:         name,
-			Kind:         KindLocal,
-			Source:       SourceRunning,
-			Where:        url,
-			URL:          url,
-			Project:      l.ProjectPath,
-			AirflowMajor: l.AirflowMajor,
-			Own:          own,
-		}
-		if !own {
-			// The reserved name is this project's alone. A foreign project that
-			// happens to be called `local` keeps its Airflow reachable through
-			// --url rather than answering to a name that means something else.
-			if name == LocalName {
-				it.Problem = "`" + LocalName + "` names this project's own Airflow, so this one has no name here — reach it with --url " + it.URL
-				shadowed = append(shadowed, it)
-				continue
-			}
-			if held, taken := byName[name]; taken {
-				it.Problem = shadowedBy(held, it.URL)
-				shadowed = append(shadowed, it)
-				continue
-			}
-		}
-		byName[name] = it
+			Kind:         Kind(link.Kind()),
+			Source:       SourceManifest,
+			Where:        linkWhere(link),
+			URL:          link.URL,
+			Link:         link,
+			TargetConfig: m.Astro.Targets[link.Target],
+		})
 	}
-
-	items := make([]Instance, 0, len(byName))
-	for name := range byName {
-		items = append(items, byName[name])
-	}
-	sortByName(items)
-	sortByName(shadowed)
-	return Set{items: items, shadowed: shadowed, defaultLink: defaultLink}
-}
-
-// shadowedBy explains a name already taken, naming the thing that took it and
-// the way to reach this one anyway.
-func shadowedBy(held Instance, url string) string {
-	what := "a deployment link of this name"
-	if held.Source == SourceRunning {
-		what = "the Airflow at " + held.Project
-	}
-	return "name already taken by " + what + " — reach this one with --url " + url
-}
-
-func sortByName(items []Instance) {
+	// Sorted, because a map's order is not one, and every rendering below is
+	// expected to be stable between runs.
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+	return Set{items: items, defaultLink: defaultLink}
 }
 
-// All returns every instance this project can see, addressable or not, sorted
-// by name. The shadowed ones carry the Problem that says why they have no name
-// here.
+// All returns every deployment in the set, sorted by name.
 func (s Set) All() []Instance {
-	all := make([]Instance, 0, len(s.items)+len(s.shadowed))
-	all = append(all, s.items...)
-	all = append(all, s.shadowed...)
-	sortByName(all)
-	return all
+	return append([]Instance(nil), s.items...)
 }
 
-// Names returns every addressable instance name, sorted.
+// Names returns every deployment name, sorted.
 func (s Set) Names() []string {
 	names := make([]string, len(s.items))
 	for i := range s.items {
@@ -260,20 +185,7 @@ func (s Set) Names() []string {
 	return names
 }
 
-// ownNames returns the names of this project's own instances — its links and
-// its own local Airflow — sorted. These are the only candidates the default
-// fall-through considers and the only ones a prompt offers.
-func (s Set) ownNames() []string {
-	var names []string
-	for i := range s.items {
-		if s.items[i].Own {
-			names = append(names, s.items[i].Name)
-		}
-	}
-	return names
-}
-
-// Lookup finds an instance by name.
+// Lookup finds a deployment by name.
 func (s Set) Lookup(name string) (Instance, bool) {
 	for i := range s.items {
 		if s.items[i].Name == name {

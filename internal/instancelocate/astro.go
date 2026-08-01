@@ -23,7 +23,7 @@ import (
 func (l *locator) astroBaseURL(ctx context.Context, i instances.Instance) (string, error) {
 	deploymentID := i.Link.Deployment
 	if deploymentID == "" {
-		return "", fmt.Errorf("instance %q names no Deployment: set deployment = '<id>' on the link", i.Name)
+		return "", fmt.Errorf("deployment %q names no Deployment: set deployment = '<id>' on the link", i.Name)
 	}
 	if l.session == nil {
 		return "", astrosession.ErrLoggedOut

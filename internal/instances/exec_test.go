@@ -109,7 +109,7 @@ func TestExecMethodNamesEveryWayItCanFail(t *testing.T) {
 		behavior string
 		want     []string
 	}{
-		{"fail", []string{`instance "bespoke"`, "exit status 3", "no SSO session"}},
+		{"fail", []string{`deployment "bespoke"`, "exit status 3", "no SSO session"}},
 		{"empty", []string{"printed no token"}},
 		{"whitespace", []string{"printed no token"}},
 		{"multiline", []string{"printed 2 lines", "a token is one"}},
@@ -137,7 +137,7 @@ func TestExecMethodNamesEveryWayItCanFail(t *testing.T) {
 
 func TestExecMethodBoundsAHelperThatHangs(t *testing.T) {
 	t.Setenv(helperEnv, "hang")
-	h := &execHelper{instance: "bespoke", argv: helperArgv(), timeout: 100 * time.Millisecond}
+	h := &execHelper{deployment: "bespoke", argv: helperArgv(), timeout: 100 * time.Millisecond}
 	_, _, err := h.credentials(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "did not finish within 100ms") {
 		t.Fatalf("err = %v, want the timeout named", err)

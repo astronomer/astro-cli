@@ -40,23 +40,25 @@ project = 'acme-data'
 location = 'us-central1'
 `
 
-// TestInstanceListShowsEveryCloudLink: the inventory renders whole, with each
-// kind's own coordinate and the auth method that kind defaults to, and not one
-// network call is made to build it.
-func TestInstanceListShowsEveryCloudLink(t *testing.T) {
+// TestUseListsEveryCloudLink: the inventory renders whole, with each kind's own
+// coordinate and the auth method that kind defaults to, and not one network
+// call is made to build it.
+func TestUseListsEveryCloudLink(t *testing.T) {
 	dir := instanceProject(t, cloudManifest)
 	d, out, _ := instanceDeps(t, dir)
 	d.Locator = failingLocator{t}
-	if err := execute(t, d, "instance", "list", "--output", "json"); err != nil {
+	if err := execute(t, d, "use", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
 
+	var report struct {
+		Instances []map[string]any `json:"instances"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatalf("decode %q: %v", out, err)
+	}
 	byName := map[string]map[string]any{}
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
-		row := map[string]any{}
-		if err := json.Unmarshal([]byte(line), &row); err != nil {
-			t.Fatalf("decode %q: %v", line, err)
-		}
+	for _, row := range report.Instances {
 		byName[row["name"].(string)] = row
 	}
 	want := map[string][2]string{
@@ -127,12 +129,9 @@ func TestAstroLinkTalksToTheAirflowTheLookupFound(t *testing.T) {
 	})
 
 	c := &cli{d: d}
-	sel, client, err := c.instanceClient(context.Background(), instanceFlags{instance: "prod"})
+	client, err := c.deploymentClient(context.Background(), deploymentFlags{deployment: "prod"})
 	if err != nil {
-		t.Fatalf("instanceClient: %v", err)
-	}
-	if sel.Instance.Name != "prod" {
-		t.Fatalf("resolved to %s", sel.Instance.Name)
+		t.Fatalf("deploymentClient: %v", err)
 	}
 	if _, err := client.Do(context.Background(), airflowapi.Request{Path: "/dags"}); err != nil {
 		t.Fatalf("do: %v", err)
@@ -155,7 +154,7 @@ func TestComposerLinkCarriesTheLookupsFailure(t *testing.T) {
 	})
 
 	c := &cli{d: d}
-	_, _, err := c.instanceClient(context.Background(), instanceFlags{instance: "prod-composer"})
+	_, err := c.deploymentClient(context.Background(), deploymentFlags{deployment: "prod-composer"})
 	if err == nil || !strings.Contains(err.Error(), "gcloud auth application-default login") {
 		t.Fatalf("err = %v, want the lookup's own cause", err)
 	}

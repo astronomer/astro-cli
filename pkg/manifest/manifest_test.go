@@ -741,6 +741,9 @@ auth = { method = "none" }
 			wantKeys: []string{"tool.astro.deployments.staging.url"},
 		},
 		{
+			// `local` is the machine's own word — `astro local start`,
+			// `astro local dags list`. A link may not take it, so nobody has to
+			// work out which one a reader meant.
 			name: "a link named local",
 			content: `
 [project]

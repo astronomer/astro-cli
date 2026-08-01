@@ -9,19 +9,19 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// NewConnectionsCmd builds `astro connections` for the root. It and the two
+// newConnectionsCmd builds the `connections` family over whichever Airflow the
+// target names. It and the two
 // families below are the Airflow objects this surface reads but never writes:
 // setting them belongs to `astro local env` on the machine, and to the platform
 // commands on a deployment.
-func NewConnectionsCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+func newConnectionsCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "connections",
 		Short: "List and read the connections on an Airflow",
-		Long: "Read the connections on whichever Airflow this project resolves to: which systems it can reach, " +
+		Long: "Read the connections on " + t.which() + ": which systems it can reach, " +
 			"and how.\n\nNo password is ever shown. The client this runs on does not decode the field at all, " +
 			"so a password cannot reach a table, a log, or a json stream by accident — not with --output json, " +
-			"not on `get`. Read one with `astro api airflow` if you genuinely need it.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+			"not on `get`. Read one with `" + rawAPIForm(t) + "` if you genuinely need it.",
 	},
 		newConnectionsListCmd,
 		newConnectionsGetCmd,
@@ -133,16 +133,16 @@ func (q *query) runConnectionsGet(ctx context.Context, id string) error {
 	})
 }
 
-// NewVariablesCmd builds `astro variables` for the root.
-func NewVariablesCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+// newVariablesCmd builds the `variables` family over whichever Airflow the
+// target names.
+func newVariablesCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "variables",
 		Short: "List and read the Airflow Variables on an Airflow",
-		Long: "Read the Airflow Variables on whichever Airflow this project resolves to.\n\n" +
+		Long: "Read the Airflow Variables on " + t.which() + ".\n\n" +
 			"`list` shows keys and descriptions but no values: a Variable holds whatever someone put in it, " +
 			"and printing every value to answer \"what variables are there\" is how a secret ends up in a " +
-			"terminal scrollback. Read one deliberately with `astro variables get <KEY>`.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+			"terminal scrollback. Read one deliberately with `variables get <KEY>`.",
 	},
 		newVariablesListCmd,
 		newVariablesGetCmd,
@@ -237,14 +237,14 @@ func (q *query) runVariablesGet(ctx context.Context, key string) error {
 	})
 }
 
-// NewPoolsCmd builds `astro pools` for the root.
-func NewPoolsCmd(d Deps) *cobra.Command {
-	return newQueryCmd(d, &cobra.Command{
+// newPoolsCmd builds the `pools` family over whichever Airflow the target
+// names.
+func newPoolsCmd(d Deps, t target) *cobra.Command {
+	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "pools",
 		Short: "List and read the concurrency pools on an Airflow",
-		Long: "Read the pools on whichever Airflow this project resolves to: how many slots each has, and how " +
-			"many of them tasks are sitting in right now. A pool with no open slots is why a task is queued.\n\n" +
-			"Which Airflow depends on -i/--instance, " + instanceEnvSentence,
+		Long: "Read the pools on " + t.which() + ": how many slots each has, and how " +
+			"many of them tasks are sitting in right now. A pool with no open slots is why a task is queued.",
 	},
 		newPoolsListCmd,
 		newPoolsGetCmd,
