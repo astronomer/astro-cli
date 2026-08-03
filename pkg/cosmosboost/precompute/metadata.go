@@ -19,7 +19,9 @@ const (
 	schemaVersion = 1
 
 	// algoProjectTree hashes a whole dbt project directory (source files).
-	algoProjectTree = "sha256-tree-v1"
+	// v2 excludes .git, which never ships in a deploy payload, so VCS activity
+	// (commits, fetches, gc) cannot change the hash of unchanged content.
+	algoProjectTree = "sha256-tree-v2"
 	// algoManifestJSON hashes a dbt manifest.json by content, ignoring volatile
 	// metadata. Used for manifest-only deployments.
 	algoManifestJSON = "sha256-manifest-v1"

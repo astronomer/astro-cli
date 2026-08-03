@@ -71,6 +71,28 @@ func TestHashProjectExcludesGeneratedContent(t *testing.T) {
 	}
 }
 
+// TestHashProjectExcludesGit pins that VCS metadata never affects project
+// identity: .git is not deployed, so commits, fetches, and gc must not change
+// the hash. Both the .git directory form and the pointer-file form (linked
+// worktrees, submodules) are covered.
+func TestHashProjectExcludesGit(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"dbt_project.yml": "name: shop\n",
+		"models/a.sql":    "select 1",
+	})
+	before := mustHashProject(t, dir)
+
+	writeFiles(t, dir, map[string]string{
+		".git/HEAD":              "ref: refs/heads/main\n",
+		".git/objects/ab/cdef01": "packed",
+		"vendored/.git":          "gitdir: ../../.git/modules/vendored\n",
+	})
+	if got := mustHashProject(t, dir); got != before {
+		t.Fatalf("git metadata changed the hash:\n want %s\n got  %s", before, got)
+	}
+}
+
 // mustHashProject hashes dir and fails the test on error, for tests that only
 // care about the hash value.
 func mustHashProject(t *testing.T, dir string) string {

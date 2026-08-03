@@ -59,7 +59,13 @@ func excludedRelDirsFor(cfg dbtConfig) map[string]bool {
 	return out
 }
 
-// hashProject computes the "sha256-tree-v1" hash of a dbt project directory: the
+// gitDir is VCS metadata: never part of the deploy payload (bundle creation
+// excludes it too), so it must not affect project identity. In linked worktrees
+// and submodules .git is a pointer file rather than a directory, so both forms
+// are skipped.
+const gitDir = ".git"
+
+// hashProject computes the "sha256-tree-v2" hash of a dbt project directory: the
 // sha256 of the path-sorted list of "<relative-path>\x00<sha256(file)>\n" entries.
 // cfg carries the dbt_project.yml directory settings that widen the exclusion set.
 //
@@ -92,13 +98,16 @@ func hashProject(dir string, cfg dbtConfig) (hash string, files int, totalBytes 
 			// .astro is always our output, never dbt source, so skipping it by name
 			// everywhere is safe (unlike target/logs, which are matched root-relative
 			// to avoid over-excluding a same-named source dir).
-			if d.Name() == sidecarDir {
+			if d.Name() == sidecarDir || d.Name() == gitDir {
 				return filepath.SkipDir
 			}
 			// Skip excluded directories by their root-relative path (never the root).
 			if rel != "." && excludedRel[rel] {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if d.Name() == gitDir { // a worktree's or submodule's .git pointer file
 			return nil
 		}
 		if excludedFiles[rel] { // root-level files only (rel has no slash)
