@@ -42,7 +42,15 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 			if err != nil {
 				return err
 			}
-			if d.IsDir() || d.Name() != sidecarName || filepath.Base(filepath.Dir(path)) != sidecarDir {
+			if d.IsDir() {
+				// Never traverse (or mutate anything inside) VCS internals:
+				// .git is not deployed, so nothing under it is ours to touch.
+				if d.Name() == gitDir {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.Name() != sidecarName || filepath.Base(filepath.Dir(path)) != sidecarDir {
 				return nil
 			}
 			// Key on the canonical path, not the walked one. Roots that name the

@@ -191,3 +191,24 @@ func TestCleanupWriteReport(t *testing.T) {
 		t.Fatalf("kept sidecar not explained in report: %q", got)
 	}
 }
+
+// TestCleanupSkipsGitInternals pins that cleanup never traverses .git: even a
+// sidecar this tool's own (buggy or interrupted) run left there is not touched,
+// because mutating VCS internals is worse than leaving an undeployed file.
+func TestCleanupSkipsGitInternals(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		".git/trap/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`,
+	})
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if got := len(summary.Results); got != 0 {
+		t.Fatalf("results = %d, want 0 (nothing under .git may be visited)", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".git", "trap", ".astro", "dbt_metadata.json")); err != nil {
+		t.Fatalf("file under .git was touched: %v", err)
+	}
+}

@@ -285,3 +285,29 @@ func TestShortHash(t *testing.T) {
 		t.Fatalf("shortHash(long) = %q, want 0123456789ab", got)
 	}
 }
+
+// TestRunSkipsGitInternals pins that discovery never descends into .git: a
+// dbt_project.yml or manifest.json inside VCS internals is not a deployable
+// unit, and stamping it would write into (and later delete from) .git.
+func TestRunSkipsGitInternals(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"proj/dbt_project.yml":      "name: shop\n",
+		"proj/models/a.sql":         "select 1",
+		".git/trap/dbt_project.yml": "name: trap\n",
+		".git/deep/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{dir}, "test")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := len(summary.Results); got != 1 {
+		t.Fatalf("results = %d, want 1 (only the real project)", got)
+	}
+	for _, rel := range []string{".git/trap/.astro", ".git/deep/.astro", ".git/.astro"} {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rel))); !os.IsNotExist(err) {
+			t.Fatalf("wrote into VCS internals: %s exists (%v)", rel, err)
+		}
+	}
+}

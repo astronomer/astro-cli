@@ -49,6 +49,7 @@ var manifestSkipDirs = map[string]bool{
 	"logs":         true,
 	"dbt_packages": true,
 	sidecarDir:     true, // .astro
+	gitDir:         true, // VCS internals can't hold a project's manifest
 }
 
 // findManifests walks root and returns manifest.json file paths.

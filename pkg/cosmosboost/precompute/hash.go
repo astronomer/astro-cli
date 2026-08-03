@@ -23,6 +23,7 @@ var excludedDirs = map[string]bool{
 	"logs":             true,
 	defaultPackagesDir: true, // "dbt_packages"
 	sidecarDir:         true, // ".astro"
+	gitDir:             true, // VCS internals can't hold a real project
 }
 
 // excludedFiles are non-source files (matched at the project root only — see
