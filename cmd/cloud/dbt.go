@@ -49,7 +49,7 @@ func newDbtCleanupCmd() *cobra.Command {
 		Use:   "cleanup [path ...]",
 		Args:  cobra.ArbitraryArgs,
 		Short: "Remove the Cosmos Boost artifacts under each path",
-		Long:  "Remove the artifacts the Cosmos Boost pre-deploy step wrote under each path (default: the current directory), along with the retired standalone helper binary if one is still installed.",
+		Long:  "Remove the artifacts the Cosmos Boost pre-deploy step wrote under each path (default: the current directory).",
 		RunE:  cleanupDbt,
 	}
 	return cmd
