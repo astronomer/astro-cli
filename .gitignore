@@ -1,6 +1,7 @@
 !airflow/include/*/requirements.txt
 *.ndjson.gz
 *.test
+*.yaml.lock
 .astro/
 .DS_Store
 .env
@@ -26,6 +27,3 @@ testbin/
 testbin/golangci-lint
 upgrade-test*
 vendor/github.com/theupdateframework/notary/Dockerfile
-
-# test artifacts
-*.yaml.lock
