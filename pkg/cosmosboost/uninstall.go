@@ -1,73 +1,48 @@
 package cosmosboost
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
+	"runtime"
 
-	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/config"
 )
 
-// Uninstall removes the Cosmos Boost plugin and its associated files under
-// the given roots (default ".").
+// Uninstall removes the Cosmos Boost artifacts under the given roots (default
+// ".") and, if one is still installed, the retired standalone helper binary
+// that pre-release builds of this integration downloaded.
 func Uninstall(roots ...string) error {
 	if len(roots) == 0 {
 		roots = []string{"."}
 	}
-
-	if err := EnsureBinary(); err != nil {
-		return fmt.Errorf("fetching astro-cosmos-boost: %w", err)
-	}
-	if err := runUninstall(roots); err != nil {
+	if err := removeArtifacts(roots); err != nil {
 		return err
 	}
-
-	if err := os.Remove(BinaryPath()); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("removing %s: %w", BinaryPath(), err)
+	if err := removeRetiredHelper(); err != nil {
+		return err
 	}
-	if leftovers, err := filepath.Glob(filepath.Join(BinDir(), ".cosmosboost-*")); err == nil {
-		for _, path := range leftovers {
-			_ = os.Remove(path)
-		}
-	}
-	fmt.Println("Uninstalled the Cosmos Boost plugin and its associated files")
+	fmt.Println("Removed the Cosmos Boost artifacts")
 	return nil
 }
 
-const usageExitCode = 2
-
-// withUpdateRetry runs call and, if the installed helper rejected it as a usage
-// error, updates the helper once and runs it again. That covers a helper too old
-// to know a call we make without the CLI having to reason about which release
-// introduced what: version ordering cannot express that, and any answer we hard
-// coded here would be a copy of the helper's own history.
-func withUpdateRetry(call func() error) error {
-	err := call()
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) && exitErr.ExitCode() == usageExitCode {
-		if err := downloadAndInstall(); err != nil {
-			return fmt.Errorf("updating astro-cosmos-boost: %w", err)
-		}
-		err = call()
+// removeRetiredHelper deletes the standalone astro-cosmos-boost binary (and
+// any partial extracts) that pre-release builds installed under the Astro
+// CLI's bin directory. Nothing installs it anymore; the pre-deploy step runs
+// in-process. This is migration cleanup only.
+func removeRetiredHelper() error {
+	binDir := filepath.Join(config.HomeConfigPath, "bin")
+	name := "astro-cosmos-boost"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
 	}
-	return err
-}
-
-func runUninstall(roots []string) error {
-	return withUpdateRetry(func() error { return execUninstall(roots) })
-}
-
-func execUninstall(roots []string) error {
-	//nolint:gosec // BinaryPath() is a fixed path under the CLI's own bin dir; roots are the paths the user asked to clean
-	out, err := exec.Command(BinaryPath(), append([]string{"uninstall"}, roots...)...).CombinedOutput()
-	// As in PreDeploy: the helper's report is debug-only and never reaches the
-	// error, which surfaces to the user.
-	logger.Debugf("astro-cosmos-boost uninstall output:\n%s", strings.TrimSpace(string(out)))
-	if err != nil {
-		return fmt.Errorf("running astro-cosmos-boost uninstall: %w (re-run with --verbosity debug for details)", err)
+	if err := os.Remove(filepath.Join(binDir, name)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing the retired astro-cosmos-boost helper: %w", err)
+	}
+	if leftovers, err := filepath.Glob(filepath.Join(binDir, ".cosmosboost-*")); err == nil {
+		for _, path := range leftovers {
+			_ = os.Remove(path)
+		}
 	}
 	return nil
 }

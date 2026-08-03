@@ -64,7 +64,6 @@ type cfgs struct {
 	ProxyPort               cfg
 	OttoAutoUpdate          cfg
 	CosmosBoostPreDeploy    cfg
-	CosmosBoostBaseURL      cfg
 }
 
 // Creates a new cfg struct

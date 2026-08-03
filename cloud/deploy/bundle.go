@@ -217,8 +217,8 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Pre-deploy step: execute cosmos-boost pre-deploy command
-	// Opt-in and best-effort: a missing or failing helper warns and never blocks the deploy.
+	// Cosmos Boost pre-deploy step, opt-in and best-effort: a failure warns and
+	// never blocks the deploy.
 	if config.CFG.CosmosBoostPreDeploy.GetBool() {
 		cosmosboost.BestEffortPreDeploy(bundlePath)
 	} else {

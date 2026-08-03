@@ -1,62 +1,79 @@
 package cosmosboost
 
 import (
+	"bytes"
 	"fmt"
-	"os"
-	"os/exec"
+	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/version"
 )
 
-// PreDeploy runs the plugin's pre-deploy step over path.
+// PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
+// (dbt_project.yml) and standalone dbt manifest.json under it gets a
+// .astro/dbt_metadata.json sidecar carrying its content hash, which the Cosmos
+// Boost plugin uses as a cache version key at parse time instead of hashing
+// the project tree itself.
 func PreDeploy(path string) error {
-	//nolint:gosec // BinaryPath() is a fixed path under the CLI's own bin dir; path is the deploy target
-	out, err := exec.Command(BinaryPath(), "pre-deploy", path).CombinedOutput()
-	// The helper's own report stays behind --verbosity debug and is deliberately
-	// kept out of the returned error, which callers print as a warning.
-	logger.Debugf("astro-cosmos-boost pre-deploy output:\n%s", strings.TrimSpace(string(out)))
+	summary, err := precompute.Run([]string{path}, version.CurrVersion)
 	if err != nil {
-		return fmt.Errorf("running astro-cosmos-boost pre-deploy: %w (re-run with --verbosity debug for details)", err)
+		return fmt.Errorf("running the Cosmos Boost pre-deploy step: %w", err)
+	}
+	debugReport("pre-deploy", summary)
+	if failed := summary.CountFailed(); failed > 0 {
+		return fmt.Errorf("the Cosmos Boost pre-deploy step failed for %d unit(s) (re-run with --verbosity debug for details)", failed)
 	}
 	return nil
 }
 
-// BestEffortCleanup asks the helper to remove what it left under path, so that
-// neither a deploy with the feature disabled nor a failed pre-deploy step ships
-// artifacts produced by an earlier deploy.
-//
-// It never downloads the helper: a machine with no helper installed has nothing
-// for us to clean up, and pulling one down for a disabled feature would be
-// wrong. Failures are warnings, because cleanup must not block a deploy.
-func BestEffortCleanup(path string) {
-	if _, err := os.Stat(BinaryPath()); err != nil {
-		logger.Debugf("astro-cosmos-boost is not installed; nothing to clean up under %s", path)
-		return
+// removeArtifacts deletes the sidecars earlier pre-deploy runs wrote under
+// roots. Files this integration did not write are left in place.
+func removeArtifacts(roots []string) error {
+	summary, err := precompute.Uninstall(roots)
+	if err != nil {
+		return fmt.Errorf("removing the Cosmos Boost artifacts: %w", err)
 	}
-	if err := execUninstall([]string{path}); err != nil {
+	debugReport("cleanup", summary)
+	if failed := summary.CountFailed(); failed > 0 {
+		return fmt.Errorf("could not remove %d Cosmos Boost artifact(s) (re-run with --verbosity debug for details)", failed)
+	}
+	return nil
+}
+
+// BestEffortCleanup removes the Cosmos Boost artifacts under path, so that
+// neither a deploy with the feature disabled nor a failed pre-deploy step
+// ships artifacts produced by an earlier deploy. Failures are warnings,
+// because cleanup must not block a deploy.
+func BestEffortCleanup(path string) {
+	if err := removeArtifacts([]string{path}); err != nil {
 		fmt.Printf("Warning: could not remove the Cosmos Boost artifacts: %s\n", err)
 	}
 }
 
-// BestEffortPreDeploy runs the plugin's pre-deploy step over path ahead of a
-// deploy. Failures are reported as warnings and never returned: an unavailable
-// or failing helper must not block a deploy. What there is to do under path,
-// and what the step produces, is the helper's business.
+// BestEffortPreDeploy runs the Cosmos Boost pre-deploy step over path ahead of
+// a deploy. Failures are reported as warnings and never returned: a failing
+// pre-deploy step must not block a deploy. Without a sidecar the plugin simply
+// falls back to hashing at parse time.
 func BestEffortPreDeploy(path string) {
-	if err := EnsureBinary(); err != nil {
-		fmt.Printf("Warning: skipping the Cosmos Boost pre-deploy step: %s\n", err)
-		return
-	}
-	// Clean up before running, so that a failure below cannot leave this deploy
-	// carrying an earlier one's artifacts. The helper is installed by the line
-	// above, so this delegates rather than doing nothing.
-	if err := withUpdateRetry(func() error { return execUninstall([]string{path}) }); err != nil {
-		fmt.Printf("Warning: could not remove the Cosmos Boost artifacts: %s\n", err)
-	}
-	if err := withUpdateRetry(func() error { return PreDeploy(path) }); err != nil {
+	// Clear earlier runs' artifacts first, so a failure below cannot leave
+	// this deploy carrying a stale hash for since-edited content.
+	BestEffortCleanup(path)
+	if err := PreDeploy(path); err != nil {
 		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", err)
 		return
 	}
 	fmt.Println("Cosmos Boost pre-deploy step complete")
+}
+
+// reporter is the common shape of the precompute summaries.
+type reporter interface{ WriteReport(io.Writer) }
+
+// debugReport keeps the step's detailed report behind --verbosity debug; the
+// deploy output stays to one line either way.
+func debugReport(step string, r reporter) {
+	var buf bytes.Buffer
+	r.WriteReport(&buf)
+	logger.Debugf("cosmos boost %s report:\n%s", step, strings.TrimSpace(buf.String()))
 }
