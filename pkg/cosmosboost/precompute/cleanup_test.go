@@ -9,7 +9,7 @@ import (
 )
 
 // stampProject creates a minimal dbt project under dir and runs the real
-// pre-deploy over it, so uninstall tests exercise sidecars exactly as the
+// pre-deploy over it, so cleanup tests exercise sidecars exactly as the
 // producer writes them.
 func stampProject(t *testing.T, dir string) {
 	t.Helper()
@@ -23,13 +23,13 @@ func stampProject(t *testing.T, dir string) {
 	}
 }
 
-func TestUninstallRemovesSidecarAndPrunesDir(t *testing.T) {
+func TestCleanupRemovesSidecarAndPrunesDir(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)
 
-	summary, err := Uninstall([]string{dir})
+	summary, err := Cleanup([]string{dir})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if got := len(summary.Results); got != 1 {
 		t.Fatalf("results = %d, want 1", got)
@@ -46,13 +46,13 @@ func TestUninstallRemovesSidecarAndPrunesDir(t *testing.T) {
 	}
 }
 
-func TestUninstallLeavesNonEmptyAstroDir(t *testing.T) {
+func TestCleanupLeavesNonEmptyAstroDir(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)
 	writeFiles(t, dir, map[string]string{".astro/config.yaml": "project:\n  name: shop\n"})
 
-	if _, err := Uninstall([]string{dir}); err != nil {
-		t.Fatalf("Uninstall: %v", err)
+	if _, err := Cleanup([]string{dir}); err != nil {
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, sidecarDir, sidecarName)); !os.IsNotExist(err) {
 		t.Fatalf("sidecar still present: %v", err)
@@ -62,19 +62,19 @@ func TestUninstallLeavesNonEmptyAstroDir(t *testing.T) {
 	}
 }
 
-// TestUninstallKeepsForeignSidecars pins the safety property: a
+// TestCleanupKeepsForeignSidecars pins the safety property: a
 // .astro/dbt_metadata.json this tool did not write — another producer's, or
 // one that isn't JSON at all — is never deleted.
-func TestUninstallKeepsForeignSidecars(t *testing.T) {
+func TestCleanupKeepsForeignSidecars(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
 		"other/.astro/dbt_metadata.json":   `{"generated_by": {"application": "someone-else"}}`,
 		"invalid/.astro/dbt_metadata.json": "not json",
 	})
 
-	summary, err := Uninstall([]string{dir})
+	summary, err := Cleanup([]string{dir})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if got := summary.CountKept(); got != 2 {
 		t.Fatalf("kept = %d, want 2", got)
@@ -86,17 +86,17 @@ func TestUninstallKeepsForeignSidecars(t *testing.T) {
 	}
 }
 
-// TestUninstallRemovesLegacySidecars: sidecars written by the retired
+// TestCleanupRemovesLegacySidecars: sidecars written by the retired
 // standalone astro-cosmos-boost helper are still ours to remove.
-func TestUninstallRemovesLegacySidecars(t *testing.T) {
+func TestCleanupRemovesLegacySidecars(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
 		"proj/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro-cosmos-boost"}}`,
 	})
 
-	summary, err := Uninstall([]string{dir})
+	summary, err := Cleanup([]string{dir})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if summary.CountKept() != 0 || summary.CountFailed() != 0 || len(summary.Results) != 1 {
 		t.Fatalf("results=%d kept=%d failed=%d, want 1/0/0", len(summary.Results), summary.CountKept(), summary.CountFailed())
@@ -106,17 +106,17 @@ func TestUninstallRemovesLegacySidecars(t *testing.T) {
 	}
 }
 
-// TestUninstallIgnoresLookalikes: only dbt_metadata.json directly inside a
+// TestCleanupIgnoresLookalikes: only dbt_metadata.json directly inside a
 // .astro directory is a sidecar; same-named files elsewhere are untouched.
-func TestUninstallIgnoresLookalikes(t *testing.T) {
+func TestCleanupIgnoresLookalikes(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
 		"data/dbt_metadata.json": `{"generated_by": {"application": "astro-cosmos-boost"}}`,
 	})
 
-	summary, err := Uninstall([]string{dir})
+	summary, err := Cleanup([]string{dir})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if got := len(summary.Results); got != 0 {
 		t.Fatalf("results = %d, want 0", got)
@@ -126,25 +126,25 @@ func TestUninstallIgnoresLookalikes(t *testing.T) {
 	}
 }
 
-func TestUninstallOverlappingRoots(t *testing.T) {
+func TestCleanupOverlappingRoots(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)
 
-	summary, err := Uninstall([]string{dir, dir})
+	summary, err := Cleanup([]string{dir, dir})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if got := len(summary.Results); got != 1 {
 		t.Fatalf("overlapping roots reported %d results, want 1", got)
 	}
 }
 
-// TestUninstallRootsSpelledDifferently covers one tree named two ways: an
+// TestCleanupRootsSpelledDifferently covers one tree named two ways: an
 // absolute path and a relative one. A sidecar we remove cannot be double-counted
 // (it is gone by the second walk), but a foreign one is deliberately left in
 // place, so keying the seen-set on the raw walked path finds it again under the
 // other spelling and reports it kept twice.
-func TestUninstallRootsSpelledDifferently(t *testing.T) {
+func TestCleanupRootsSpelledDifferently(t *testing.T) {
 	parent := t.TempDir()
 	project := filepath.Join(parent, "shop")
 	writeFiles(t, project, map[string]string{
@@ -153,9 +153,9 @@ func TestUninstallRootsSpelledDifferently(t *testing.T) {
 
 	t.Chdir(parent) // so "shop" and the absolute path name one tree
 
-	summary, err := Uninstall([]string{project, "shop"})
+	summary, err := Cleanup([]string{project, "shop"})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	if got := len(summary.Results); got != 1 {
 		t.Fatalf("roots spelled differently reported %d results, want 1", got)
@@ -165,21 +165,21 @@ func TestUninstallRootsSpelledDifferently(t *testing.T) {
 	}
 }
 
-func TestUninstallNonexistentRoot(t *testing.T) {
+func TestCleanupNonexistentRoot(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "does-not-exist")
-	if _, err := Uninstall([]string{missing}); err == nil {
-		t.Fatal("Uninstall on a nonexistent root: error = nil, want non-nil")
+	if _, err := Cleanup([]string{missing}); err == nil {
+		t.Fatal("Cleanup on a nonexistent root: error = nil, want non-nil")
 	}
 }
 
-func TestUninstallWriteReport(t *testing.T) {
+func TestCleanupWriteReport(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)
 	writeFiles(t, dir, map[string]string{"other/.astro/dbt_metadata.json": "not json"})
 
-	summary, err := Uninstall([]string{dir})
+	summary, err := Cleanup([]string{dir})
 	if err != nil {
-		t.Fatalf("Uninstall: %v", err)
+		t.Fatalf("Cleanup: %v", err)
 	}
 	var out bytes.Buffer
 	summary.WriteReport(&out)

@@ -57,7 +57,7 @@ func newDbtCleanupCmd() *cobra.Command {
 
 func cleanupDbt(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
-	return cosmosboost.Uninstall(args...)
+	return cosmosboost.Cleanup(args...)
 }
 
 //nolint:dupl

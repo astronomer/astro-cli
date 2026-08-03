@@ -24,20 +24,20 @@ func isolateHome(t *testing.T) string {
 	return home
 }
 
-func TestUninstallDefaultRootRemovesArtifact(t *testing.T) {
+func TestCleanupDefaultRootRemovesArtifact(t *testing.T) {
 	isolateHome(t)
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 	require.NoError(t, PreDeploy(dir))
 	t.Chdir(dir)
 
-	require.NoError(t, Uninstall())
+	require.NoError(t, Cleanup())
 
 	_, err := os.Stat(filepath.Join(dir, artifactRelPath))
 	require.True(t, os.IsNotExist(err), "artifact under the default root must be removed")
 }
 
-func TestUninstallRemovesRetiredHelper(t *testing.T) {
+func TestCleanupRemovesRetiredHelper(t *testing.T) {
 	home := isolateHome(t)
 	binDir := filepath.Join(home, "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0o755))
@@ -50,7 +50,7 @@ func TestUninstallRemovesRetiredHelper(t *testing.T) {
 	leftover := filepath.Join(binDir, ".cosmosboost-12345")
 	require.NoError(t, os.WriteFile(leftover, []byte("partial"), 0o644))
 
-	require.NoError(t, Uninstall(t.TempDir()))
+	require.NoError(t, Cleanup(t.TempDir()))
 
 	_, err := os.Stat(helper)
 	require.True(t, os.IsNotExist(err), "the retired standalone helper must be removed")
@@ -58,12 +58,12 @@ func TestUninstallRemovesRetiredHelper(t *testing.T) {
 	require.True(t, os.IsNotExist(err), "partial extracts from interrupted installs must be removed")
 }
 
-func TestUninstallNothingToRemove(t *testing.T) {
+func TestCleanupNothingToRemove(t *testing.T) {
 	isolateHome(t)
-	require.NoError(t, Uninstall(t.TempDir()), "an already-clean machine is not an error")
+	require.NoError(t, Cleanup(t.TempDir()), "an already-clean machine is not an error")
 }
 
-func TestUninstallNonexistentRoot(t *testing.T) {
+func TestCleanupNonexistentRoot(t *testing.T) {
 	isolateHome(t)
-	require.Error(t, Uninstall(filepath.Join(t.TempDir(), "does-not-exist")))
+	require.Error(t, Cleanup(filepath.Join(t.TempDir(), "does-not-exist")))
 }

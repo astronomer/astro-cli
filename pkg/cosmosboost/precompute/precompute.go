@@ -171,7 +171,7 @@ func (s Summary) CountSkipped() int {
 
 // WriteReport prints a short, human-readable report of the run.
 // Per-entry glyphs, shared by every command's WriteReport (see also
-// UninstallSummary.WriteReport in uninstall.go) so the two reports keep one
+// CleanupSummary.WriteReport in cleanup.go) so the two reports keep one
 // convention: acted on, deliberately left alone, failed, and a note attached to
 // an entry that otherwise succeeded.
 const (
@@ -183,7 +183,7 @@ const (
 
 func (s Summary) WriteReport(w io.Writer) {
 	stamped := len(s.Results) - s.CountFailed() - s.CountSkipped()
-	fmt.Fprintf(w, "astro-cosmos-boost pre-deploy: %d stamped, %d skipped, %d failed in %s total (incl. discovery)\n",
+	fmt.Fprintf(w, "cosmos boost pre-deploy: %d stamped, %d skipped, %d failed in %s total (incl. discovery)\n",
 		stamped, s.CountSkipped(), s.CountFailed(), s.Duration.Round(time.Microsecond))
 	for _, r := range s.Results {
 		switch {

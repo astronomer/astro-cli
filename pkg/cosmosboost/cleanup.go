@@ -9,10 +9,10 @@ import (
 	"github.com/astronomer/astro-cli/config"
 )
 
-// Uninstall removes the Cosmos Boost artifacts under the given roots (default
+// Cleanup removes the Cosmos Boost artifacts under the given roots (default
 // ".") and, if one is still installed, the retired standalone helper binary
 // that pre-release builds of this integration downloaded.
-func Uninstall(roots ...string) error {
+func Cleanup(roots ...string) error {
 	if len(roots) == 0 {
 		roots = []string{"."}
 	}

@@ -31,7 +31,7 @@ func PreDeploy(path string) error {
 // removeArtifacts deletes the sidecars earlier pre-deploy runs wrote under
 // roots. Files this integration did not write are left in place.
 func removeArtifacts(roots []string) error {
-	summary, err := precompute.Uninstall(roots)
+	summary, err := precompute.Cleanup(roots)
 	if err != nil {
 		return fmt.Errorf("removing the Cosmos Boost artifacts: %w", err)
 	}

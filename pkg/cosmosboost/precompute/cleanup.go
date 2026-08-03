@@ -10,33 +10,33 @@ import (
 	"time"
 )
 
-// UninstallResult records what happened to one sidecar found during Uninstall.
-type UninstallResult struct {
+// CleanupResult records what happened to one sidecar found during Cleanup.
+type CleanupResult struct {
 	Path string // sidecar file path
 	Kept bool   // left in place: the file was not written by this tool
 	Err  error  // non-nil if removal failed
 }
 
-// UninstallSummary is the structured outcome of an uninstall run.
-type UninstallSummary struct {
+// CleanupSummary is the structured outcome of an cleanup run.
+type CleanupSummary struct {
 	Duration time.Duration
-	Results  []UninstallResult
+	Results  []CleanupResult
 }
 
-// Uninstall removes every .astro/dbt_metadata.json sidecar under the given
+// Cleanup removes every .astro/dbt_metadata.json sidecar under the given
 // roots that this tool wrote, pruning each containing .astro directory when
 // removal leaves it empty. A dbt_metadata.json whose generated_by.application
 // is not ours — or that isn't valid JSON — is left in place and reported as
-// kept, so uninstalling never deletes a file some other tool owns.
+// kept, so cleanup never deletes a file some other tool owns.
 //
 // Per-file removal failures are recorded in their Result and do not stop the
 // others; like Run, a non-nil error is returned only for a top-level problem
 // such as a root that cannot be walked.
-func Uninstall(roots []string) (UninstallSummary, error) {
+func Cleanup(roots []string) (CleanupSummary, error) {
 	start := time.Now()
 
 	seen := map[string]bool{}
-	var results []UninstallResult
+	var results []CleanupResult
 	for _, root := range roots {
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -59,11 +59,11 @@ func Uninstall(roots []string) (UninstallSummary, error) {
 			return nil
 		})
 		if err != nil {
-			return UninstallSummary{}, fmt.Errorf("scanning %q for sidecars: %w", root, err)
+			return CleanupSummary{}, fmt.Errorf("scanning %q for sidecars: %w", root, err)
 		}
 	}
 
-	return UninstallSummary{Duration: time.Since(start), Results: results}, nil
+	return CleanupSummary{Duration: time.Since(start), Results: results}, nil
 }
 
 // canonicalPath returns a path suitable for identifying one file across roots
@@ -86,26 +86,26 @@ func canonicalPath(path string) string {
 // prunes the containing .astro directory if removal left it empty. Only the
 // sidecar file is ever removed — anything else under .astro (e.g. an Astro
 // project's config.yaml) is never touched.
-func removeSidecar(path string) UninstallResult {
+func removeSidecar(path string) CleanupResult {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return UninstallResult{Path: path, Err: err}
+		return CleanupResult{Path: path, Err: err}
 	}
 	var meta Metadata
 	if json.Unmarshal(data, &meta) != nil ||
 		(meta.GeneratedBy.Application != application && meta.GeneratedBy.Application != legacyApplication) {
-		return UninstallResult{Path: path, Kept: true}
+		return CleanupResult{Path: path, Kept: true}
 	}
 	if err := os.Remove(path); err != nil {
-		return UninstallResult{Path: path, Err: err}
+		return CleanupResult{Path: path, Err: err}
 	}
 	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
-	return UninstallResult{Path: path}
+	return CleanupResult{Path: path}
 }
 
 // CountKept returns the number of sidecars left in place because this tool
 // did not write them.
-func (s UninstallSummary) CountKept() int {
+func (s CleanupSummary) CountKept() int {
 	n := 0
 	for _, r := range s.Results {
 		if r.Kept {
@@ -116,7 +116,7 @@ func (s UninstallSummary) CountKept() int {
 }
 
 // CountFailed returns the number of sidecars that could not be removed.
-func (s UninstallSummary) CountFailed() int {
+func (s CleanupSummary) CountFailed() int {
 	n := 0
 	for _, r := range s.Results {
 		if r.Err != nil {
@@ -129,10 +129,10 @@ func (s UninstallSummary) CountFailed() int {
 // WriteReport prints a short, human-readable report of the run. It follows the
 // same shape as Summary.WriteReport (precompute.go): a counts line, then one
 // line per entry using the shared glyphs. The columns differ because the entries
-// do — an uninstall has nothing to say about hashes or bytes.
-func (s UninstallSummary) WriteReport(w io.Writer) {
+// do — a cleanup has nothing to say about hashes or bytes.
+func (s CleanupSummary) WriteReport(w io.Writer) {
 	removed := len(s.Results) - s.CountKept() - s.CountFailed()
-	fmt.Fprintf(w, "astro-cosmos-boost uninstall: %d removed, %d kept, %d failed in %s\n",
+	fmt.Fprintf(w, "cosmos boost cleanup: %d removed, %d kept, %d failed in %s\n",
 		removed, s.CountKept(), s.CountFailed(), s.Duration.Round(time.Microsecond))
 	for _, r := range s.Results {
 		switch {
