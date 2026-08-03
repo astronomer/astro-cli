@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -65,7 +66,11 @@ func TestPreDeployNonexistentPath(t *testing.T) {
 	require.Error(t, PreDeploy(filepath.Join(t.TempDir(), "does-not-exist")))
 }
 
-func TestBestEffortPreDeployReplacesStaleArtifacts(t *testing.T) {
+// TestEnsureCleanRemovesStaleArtifacts covers the sequence the deploy hooks
+// run: EnsureClean first, then (opt-in) BestEffortPreDeploy — so an artifact
+// from an earlier deploy, even one whose project no longer exists, cannot
+// survive into the payload.
+func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 
@@ -75,6 +80,7 @@ func TestBestEffortPreDeployReplacesStaleArtifacts(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
 	require.NoError(t, os.WriteFile(stale, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
 
+	require.NoError(t, EnsureClean(dir))
 	BestEffortPreDeploy(dir)
 
 	_, err := os.Stat(stale)
@@ -82,7 +88,7 @@ func TestBestEffortPreDeployReplacesStaleArtifacts(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, artifactRelPath), "the current project must be stamped")
 }
 
-func TestBestEffortCleanupRemovesOursKeepsForeign(t *testing.T) {
+func TestEnsureCleanRemovesOursKeepsForeign(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 	require.NoError(t, PreDeploy(dir))
@@ -91,9 +97,31 @@ func TestBestEffortCleanupRemovesOursKeepsForeign(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
 	require.NoError(t, os.WriteFile(foreign, []byte(`{"generated_by": {"application": "someone-else"}}`), 0o644))
 
-	BestEffortCleanup(dir)
+	require.NoError(t, EnsureClean(dir))
 
 	_, err := os.Stat(filepath.Join(dir, artifactRelPath))
 	require.True(t, os.IsNotExist(err), "our artifact must be removed")
 	require.FileExists(t, foreign, "a file another tool wrote must never be deleted")
+}
+
+// TestEnsureCleanFailsWhenArtifactUnremovable pins the safety property behind
+// the hooks: when a stale artifact's absence cannot be guaranteed, EnsureClean
+// errors so the deploy stops instead of shipping it.
+func TestEnsureCleanFailsWhenArtifactUnremovable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory write-permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	astroDir := filepath.Join(dir, "proj", ".astro")
+	require.NoError(t, os.MkdirAll(astroDir, 0o755))
+	artifact := filepath.Join(astroDir, "dbt_metadata.json")
+	require.NoError(t, os.WriteFile(artifact, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
+	require.NoError(t, os.Chmod(astroDir, 0o555)) // file cannot be unlinked
+	t.Cleanup(func() { _ = os.Chmod(astroDir, 0o755) })
+
+	err := EnsureClean(dir)
+
+	require.Error(t, err, "an artifact that cannot be removed must fail the clean")
+	require.ErrorContains(t, err, "astro dbt cleanup")
+	require.FileExists(t, artifact)
 }

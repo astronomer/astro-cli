@@ -713,10 +713,14 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
+		// Cosmos Boost pre-deploy step. Removing leftover artifacts is
+		// mandatory — a stale one must not ship inside the image — while
+		// stamping fresh ones is opt-in and best-effort.
+		if err := cosmosboost.EnsureClean(path); err != nil {
+			return "", err
+		}
 		if config.CFG.CosmosBoostPreDeploy.GetBool() {
 			cosmosboost.BestEffortPreDeploy(path)
-		} else {
-			cosmosboost.BestEffortCleanup(path)
 		}
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {

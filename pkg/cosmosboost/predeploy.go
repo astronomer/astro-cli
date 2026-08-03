@@ -42,24 +42,23 @@ func removeArtifacts(roots []string) error {
 	return nil
 }
 
-// BestEffortCleanup removes the Cosmos Boost artifacts under path, so that
-// neither a deploy with the feature disabled nor a failed pre-deploy step
-// ships artifacts produced by an earlier deploy. Failures are warnings,
-// because cleanup must not block a deploy.
-func BestEffortCleanup(path string) {
+// EnsureClean removes the Cosmos Boost artifacts earlier deploys left under
+// path, and fails when their absence cannot be guaranteed. Consumers cannot
+// tell fresh output from stale, so a deploy must not proceed while a stale
+// artifact may still be in the payload.
+func EnsureClean(path string) error {
 	if err := removeArtifacts([]string{path}); err != nil {
-		fmt.Printf("Warning: could not remove the Cosmos Boost artifacts: %s\n", err)
+		return fmt.Errorf("%w; remove the reported files (or run 'astro dbt cleanup %s') and retry", err, path)
 	}
+	return nil
 }
 
 // BestEffortPreDeploy runs the Cosmos Boost pre-deploy step over path ahead of
-// a deploy. Failures are reported as warnings and never returned: a failing
-// pre-deploy step must not block a deploy. Without a sidecar the plugin simply
-// falls back to hashing at parse time.
+// a deploy. Stamping is best-effort — failures are warnings, never errors —
+// because without a sidecar the plugin simply falls back to hashing at parse
+// time. Callers must run EnsureClean first: writing nothing is safe, leaving
+// something stale is not.
 func BestEffortPreDeploy(path string) {
-	// Clear earlier runs' artifacts first, so a failure below cannot leave
-	// this deploy carrying a stale hash for since-edited content.
-	BestEffortCleanup(path)
 	if err := PreDeploy(path); err != nil {
 		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", err)
 		return

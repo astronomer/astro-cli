@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -126,6 +127,32 @@ func TestBuildImageRunsPreDeployOnBuildContextWhenEnabled(t *testing.T) {
 	assert.FileExists(t, filepath.Join(projectDir, cosmosBoostArtifact),
 		"the pre-deploy step must run against the build context before docker build")
 	mockImageHandler.AssertExpectations(t)
+}
+
+// TestUploadBundleFailsWhenStaleArtifactUnremovable pins the safety property:
+// a deploy that cannot guarantee the payload is free of stale artifacts must
+// fail rather than ship one, because consumers cannot tell fresh from stale.
+func TestUploadBundleFailsWhenStaleArtifactUnremovable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory write-permission semantics differ on windows")
+	}
+	setupCosmosBoostEnv(t)
+
+	bundleDir := writeDbtBundle(t)
+	stale := filepath.Join(bundleDir, cosmosBoostArtifact)
+	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
+	require.NoError(t, os.WriteFile(stale, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
+	require.NoError(t, os.Chmod(filepath.Dir(stale), 0o555)) // file cannot be unlinked
+	t.Cleanup(func() { _ = os.Chmod(filepath.Dir(stale), 0o755) })
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+
+	require.Error(t, err, "the deploy must not proceed with a stale artifact it could not remove")
+	assert.ErrorContains(t, err, "Cosmos Boost")
 }
 
 func TestUploadBundleCleansUpWhenDisabled(t *testing.T) {

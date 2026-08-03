@@ -217,12 +217,14 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Cosmos Boost pre-deploy step, opt-in and best-effort: a failure warns and
-	// never blocks the deploy.
+	// Cosmos Boost pre-deploy step. Removing leftover artifacts is mandatory —
+	// a stale one must not ship inside the bundle — while stamping fresh ones
+	// is opt-in and best-effort.
+	if err := cosmosboost.EnsureClean(bundlePath); err != nil {
+		return "", err
+	}
 	if config.CFG.CosmosBoostPreDeploy.GetBool() {
 		cosmosboost.BestEffortPreDeploy(bundlePath)
-	} else {
-		cosmosboost.BestEffortCleanup(bundlePath)
 	}
 
 	// Generate the bundle tar
