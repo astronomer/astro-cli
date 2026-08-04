@@ -71,6 +71,7 @@ var v2ConfigReaders = []string{
 // v1" from "somebody added a v2 package and forgot to register it".
 var v1Internal = []string{
 	"internal/archlint",
+	"internal/otto",
 	"internal/platformversions",
 	"internal/telemetry",
 }

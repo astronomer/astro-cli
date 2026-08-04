@@ -1,6 +1,7 @@
 package otto
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/localstate"
+	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
@@ -21,6 +25,9 @@ type Config struct {
 }
 
 // NewConfigFromContext builds a Config from the current astro login context.
+// AirflowURL stays empty here: detection costs health-probe round trips, so
+// Start fills it in only after the launch is past the gates that would
+// discard it (not logged in, --help, --version).
 func NewConfigFromContext() *Config {
 	cfg := &Config{}
 
@@ -31,20 +38,63 @@ func NewConfigFromContext() *Config {
 		cfg.Organization = ctx.Organization
 	}
 
-	cfg.AirflowURL = DetectAirflow()
 	return cfg
 }
 
 // DetectAirflow returns a URL to the Airflow belonging to the current project
-// directory, or "" if none is unambiguously attributable. It prefers the proxy
-// hostname URL because it's stable across `astro dev restart` — the container
-// port rotates, the hostname doesn't.
+// directory, or "" if there is none. The nearest enclosing v2 project's
+// running Airflow wins — even over a v1 route registered on cwd itself;
+// otherwise the v1 proxy routes decide.
 func DetectAirflow() string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return ""
 	}
+	if url := detectV2Airflow(cwd); url != "" {
+		return url
+	}
+	return detectV1Airflow(cwd)
+}
 
+// detectV2Airflow reports the running local Airflow of the v2 project cwd
+// sits in, or "" when there is none. The health probe subsumes an engine
+// liveness check — a stale record fails it the same way a stopped Airflow
+// does. localhost:<port> rather than the record's hostname URL: the hostname
+// needs the proxy daemon up, and the record is rewritten on every start, so
+// the direct port is always current.
+func detectV2Airflow(cwd string) string {
+	proj, err := project.Discover(cwd)
+	if err != nil {
+		var notFound *project.NotFoundError
+		if !errors.As(err, &notFound) {
+			logger.Debugf("otto: discovering v2 project: %v", err)
+		}
+		return ""
+	}
+	rec, err := localstate.Load(proj.Dir)
+	if err != nil {
+		if !errors.Is(err, localstate.ErrNotRunning) {
+			logger.Debugf("otto: reading local state for %s: %v", proj.Dir, err)
+		}
+		return ""
+	}
+	// Airflow 2's standalone generates its own admin password, which otto
+	// doesn't read — BuildEnv would pair the URL with admin/admin and the
+	// token exchange would fail. Better no URL than a half-wired one.
+	if rec.AirflowMajor == "2" || rec.Port == 0 {
+		return ""
+	}
+	url := fmt.Sprintf("http://localhost:%d", rec.Port)
+	if !isAirflowHealthy(url) {
+		return ""
+	}
+	return url
+}
+
+// detectV1Airflow resolves through the v1 proxy routes. It prefers the proxy
+// hostname URL because it's stable across `astro dev restart` — the container
+// port rotates, the hostname doesn't.
+func detectV1Airflow(cwd string) string {
 	route, err := proxy.Routes().GetRouteByProject(cwd)
 	if err != nil || route == nil || route.Port == "" {
 		return ""

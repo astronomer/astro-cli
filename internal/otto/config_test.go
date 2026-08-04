@@ -15,6 +15,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/localstate"
+	"github.com/astronomer/astro-cli/internal/project"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -34,6 +36,9 @@ func (s *ConfigSuite) SetupTest() {
 	// them up.
 	testUtil.InitTestConfig(config.CloudPlatform)
 	config.HomeConfigPath = s.tmpDir
+	// localstate lives under XDG_CACHE_HOME — isolate it so a real running
+	// Airflow's record can't leak into these tests.
+	s.T().Setenv("XDG_CACHE_HOME", s.T().TempDir())
 }
 
 func (s *ConfigSuite) TearDownTest() {
@@ -144,6 +149,67 @@ func (s *ConfigSuite) TestBuildEnv_OverridesExisting() {
 	s.Equal("new-token", value)
 }
 
+func (s *ConfigSuite) TestDetectAirflow_V2ProjectHealthy() {
+	srv := s.startFakeAirflow()
+	defer srv.Close()
+
+	cwd := s.chdirV2Project("v2-healthy")
+	s.writeV2Record(cwd, serverPort(srv))
+
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), DetectAirflow())
+}
+
+func (s *ConfigSuite) TestDetectAirflow_V2StaleRecord() {
+	// A record whose Airflow is gone fails the health probe and must yield
+	// nothing rather than a dead URL.
+	cwd := s.chdirV2Project("v2-stale")
+	s.writeV2Record(cwd, unusedPort(s.T()))
+
+	s.Empty(DetectAirflow())
+}
+
+func (s *ConfigSuite) TestDetectAirflow_V2Airflow2Refused() {
+	// An Airflow 2 record means a generated admin password otto can't read —
+	// detection must yield nothing rather than a URL with wrong credentials.
+	srv := s.startFakeAirflow()
+	defer srv.Close()
+
+	cwd := s.chdirV2Project("v2-airflow2")
+	s.Require().NoError(localstate.Save(localstate.Record{
+		ProjectPath:  cwd,
+		Port:         serverPort(srv),
+		AirflowMajor: "2",
+	}))
+
+	s.Empty(DetectAirflow())
+}
+
+func (s *ConfigSuite) TestDetectAirflow_V2ProjectNoRecord() {
+	s.chdirV2Project("v2-not-started")
+
+	s.Empty(DetectAirflow())
+}
+
+func (s *ConfigSuite) TestDetectAirflow_V2WinsOverV1Route() {
+	// A directory can carry both a v2 state record and a stale v1 route (a
+	// project migrated in place). The v2 project's own Airflow wins.
+	v2srv := s.startFakeAirflow()
+	defer v2srv.Close()
+	v1srv := s.startFakeAirflow()
+	defer v1srv.Close()
+
+	cwd := s.chdirV2Project("v2-migrated")
+	s.writeV2Record(cwd, serverPort(v2srv))
+	s.writeRoute(&pkgproxy.Route{
+		Hostname:   "v2-migrated.localhost",
+		Port:       urlPort(s.T(), v1srv.URL),
+		ProjectDir: cwd,
+		PID:        os.Getpid(),
+	})
+
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(v2srv)), DetectAirflow())
+}
+
 func (s *ConfigSuite) TestDetectAirflow_NoRouteForProject() {
 	// With a fresh tmpDir HomeConfigPath, there is no routes.json at all.
 	// Previously DetectAirflow would fall through to probing the home-global
@@ -157,7 +223,7 @@ func (s *ConfigSuite) TestDetectAirflow_NoRouteForProject() {
 func (s *ConfigSuite) TestDetectAirflow_RouteExistsAndHealthy() {
 	// Spin up a fake Airflow that answers the health endpoint, write a route
 	// pointing the CWD to its port, and verify DetectAirflow picks it up.
-	srv := s.startFakeAirflow(http.StatusOK)
+	srv := s.startFakeAirflow()
 	defer srv.Close()
 
 	port := urlPort(s.T(), srv.URL)
@@ -179,7 +245,7 @@ func (s *ConfigSuite) TestDetectAirflow_RouteExistsButUnhealthy() {
 	cwd := s.chdirTempProject("unhealthy-project")
 	s.writeRoute(&pkgproxy.Route{
 		Hostname:   "unhealthy-project.localhost",
-		Port:       unusedPort(s.T()),
+		Port:       fmt.Sprint(unusedPort(s.T())),
 		ProjectDir: cwd,
 		PID:        os.Getpid(),
 	})
@@ -191,7 +257,7 @@ func (s *ConfigSuite) TestDetectAirflow_IgnoresOtherProjectsRoutes() {
 	// Another project is healthy on routes.json, but it's not *this* project's
 	// directory. The old behavior would fall back to the home-global webserver
 	// port and match it anyway; the new behavior must return empty.
-	srv := s.startFakeAirflow(http.StatusOK)
+	srv := s.startFakeAirflow()
 	defer srv.Close()
 
 	port := urlPort(s.T(), srv.URL)
@@ -224,15 +290,34 @@ func (s *ConfigSuite) chdirTempProject(name string) string {
 	return resolved
 }
 
+// chdirV2Project is chdirTempProject plus a project manifest. Discovery keys
+// on the file's presence alone; the [tool.astro] body just makes the fixture
+// look like a real project.
+func (s *ConfigSuite) chdirV2Project(name string) string {
+	dir := s.chdirTempProject(name)
+	manifest := "[tool.astro]\nairflow = '3.1'\n"
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600))
+	return dir
+}
+
+// writeV2Record writes the smallest record detection reads: path and port.
+func (s *ConfigSuite) writeV2Record(projectPath string, port int) {
+	s.T().Helper()
+	s.Require().NoError(localstate.Save(localstate.Record{
+		ProjectPath: projectPath,
+		Port:        port,
+	}))
+}
+
 func (s *ConfigSuite) writeRoute(r *pkgproxy.Route) {
 	s.T().Helper()
 	s.Require().NoError(proxy.Routes().AddRoute(r))
 }
 
-func (s *ConfigSuite) startFakeAirflow(status int) *httptest.Server {
+func (s *ConfigSuite) startFakeAirflow() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v2/monitor/health" || r.URL.Path == "/api/v1/health" {
-			w.WriteHeader(status)
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -248,7 +333,11 @@ func urlPort(t *testing.T, rawURL string) string {
 	return u.Port()
 }
 
-func unusedPort(t *testing.T) string {
+func serverPort(srv *httptest.Server) int {
+	return srv.Listener.Addr().(*net.TCPAddr).Port
+}
+
+func unusedPort(t *testing.T) int {
 	t.Helper()
 	// Listen on :0 to grab a free port, then close the listener so the port
 	// is unused by the time the caller tries to health-check it.
@@ -256,7 +345,7 @@ func unusedPort(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("reserving port: %v", err)
 	}
-	port := fmt.Sprint(l.Addr().(*net.TCPAddr).Port)
+	port := l.Addr().(*net.TCPAddr).Port
 	_ = l.Close()
 	return port
 }

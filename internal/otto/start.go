@@ -78,6 +78,10 @@ func Start(args []string) error {
 		logger.Warnf("otto: failed to install af wrapper: %v (will fall back to uvx)", err)
 	}
 
+	// Deferred from NewConfigFromContext: detection health-probes local
+	// ports, so it runs only once the launch is definitely spawning Otto.
+	cfg.AirflowURL = DetectAirflow()
+
 	env := cfg.BuildEnv()
 
 	cmd := exec.Command(BinaryPath(), args...) //nolint:gosec // forwarding user args to the Otto binary is the whole point of this command

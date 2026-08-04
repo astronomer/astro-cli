@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/pkg/otto"
+	"github.com/astronomer/astro-cli/internal/otto"
 )
 
 func hasHelpFlag(args []string) bool {
