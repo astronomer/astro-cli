@@ -314,8 +314,57 @@ func TestRunSkipsGitInternals(t *testing.T) {
 }
 
 func TestReadDbtConfigMissingFile(t *testing.T) {
-	if got := readDbtConfig(t.TempDir()); got != (dbtConfig{}) {
+	got := readDbtConfig(t.TempDir())
+	if got.packagesInstallPath != "" || got.targetPath != "" || got.logPath != "" || len(got.templatedSettings) != 0 {
 		t.Fatalf("readDbtConfig on a dir without dbt_project.yml = %+v, want zero value", got)
+	}
+}
+
+// TestRunWarnsOnAllTemplatedDirSettings: the Jinja guard covers target-path
+// and log-path the same way it covers packages-install-path, and the warning
+// names every templated setting.
+func TestRunWarnsOnAllTemplatedDirSettings(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"proj/dbt_project.yml": "name: shop\n" +
+			"packages-install-path: \"{{ env_var('P') }}\"\n" +
+			"target-path: \"{{ env_var('T') }}\"\n" +
+			"log-path: \"{{ env_var('L') }}\"\n",
+		"proj/models/a.sql": "select 1",
+	})
+
+	summary, err := Run([]string{dir}, "test")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(summary.Results) != 1 {
+		t.Fatalf("results = %d, want 1", len(summary.Results))
+	}
+	w := summary.Results[0].Warning
+	for _, setting := range []string{"packages-install-path", "target-path", "log-path"} {
+		if !strings.Contains(w, setting) {
+			t.Fatalf("warning %q does not name templated setting %s", w, setting)
+		}
+	}
+}
+
+// TestReadDbtConfigTemplatedValuesFallBackToDefaults: a templated setting is
+// treated as unset, so the dbt default directory stays excluded rather than a
+// meaningless literal.
+func TestReadDbtConfigTemplatedValuesFallBackToDefaults(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"dbt_project.yml": "name: shop\ntarget-path: \"{{ var('t') }}\"\nlog-path: logs_custom\n",
+	})
+	cfg := readDbtConfig(dir)
+	if cfg.targetPath != "" {
+		t.Fatalf("templated target-path must resolve to unset, got %q", cfg.targetPath)
+	}
+	if cfg.logPath != "logs_custom" {
+		t.Fatalf("literal log-path must survive, got %q", cfg.logPath)
+	}
+	if len(cfg.templatedSettings) != 1 || cfg.templatedSettings[0] != "target-path" {
+		t.Fatalf("templatedSettings = %v, want [target-path]", cfg.templatedSettings)
 	}
 }
 

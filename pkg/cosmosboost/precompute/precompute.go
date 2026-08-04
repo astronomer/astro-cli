@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -119,8 +120,9 @@ func processProject(dir, version string) Result {
 		r.Err = err
 		return r
 	}
-	if cfg.templatedPackages {
-		r.Warning = "packages-install-path is a Jinja template; not resolved, using default dbt_packages (real packages dir may add cache churn)"
+	if len(cfg.templatedSettings) > 0 {
+		r.Warning = strings.Join(cfg.templatedSettings, ", ") +
+			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
 	r.Err = writeSidecar(dir, algoProjectTree, hash, version)
 	r.Duration = time.Since(start)
