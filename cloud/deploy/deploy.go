@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -711,6 +712,19 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 	if imageName == "" {
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
+
+		// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy;
+		// with the setting off the build does not touch the tree at all.
+		// Cleanup runs first and is fatal on failure (a stale artifact must
+		// not ship inside the image), while stamping is best-effort (a
+		// missing artifact is safe). Artifacts left by earlier enabled
+		// deploys are removed with `astro dbt cleanup`.
+		if config.CFG.CosmosBoostPreDeploy.GetBool() {
+			if err := cosmosboost.EnsureClean(path); err != nil {
+				return "", err
+			}
+			cosmosboost.BestEffortPreDeploy(path)
+		}
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {
 			err := buildImageWithoutDags(path, buildSecrets, imageHandler)
