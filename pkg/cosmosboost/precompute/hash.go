@@ -146,7 +146,36 @@ func hashProject(dir string, cfg dbtConfig) (hash string, files int, totalBytes 
 // volatileManifestKeys are dbt manifest metadata fields that change on every
 // invocation even when the source is unchanged. They must be ignored, or every
 // recompile would produce a new hash and defeat the cache.
-var volatileManifestKeys = []string{"generated_at", "invocation_id", "invocation_started_at"}
+var volatileManifestKeys = []string{"generated_at", "invocation_id", "invocation_started_at", "run_started_at"}
+
+// stripEntityCreatedAt removes the dbt-owned created_at field from every
+// resource entry in every top-level manifest collection (nodes, sources,
+// macros, exposures, disabled, ...). dbt regenerates these timestamps on
+// every full parse, so a CI-built manifest would never hash-match a locally
+// built one. Only depth-2 entries are touched: a user-defined
+// meta.created_at inside a resource sits deeper and is preserved. The
+// disabled collection maps each name to a LIST of resources, so list
+// elements are handled as well.
+func stripEntityCreatedAt(doc map[string]any) {
+	for _, v := range doc {
+		collection, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, e := range collection {
+			switch entity := e.(type) {
+			case map[string]any:
+				delete(entity, "created_at")
+			case []any:
+				for _, item := range entity {
+					if m, ok := item.(map[string]any); ok {
+						delete(m, "created_at")
+					}
+				}
+			}
+		}
+	}
+}
 
 // isDbtManifest reports whether doc looks like a dbt manifest. dbt always writes
 // metadata.dbt_schema_version, which unrelated manifest.json files (web app/PWA,
@@ -160,7 +189,7 @@ func isDbtManifest(doc map[string]any) bool {
 	return ok && v != ""
 }
 
-// hashManifest computes the "sha256-manifest-v1" hash of a dbt manifest.json: the
+// hashManifest computes the "sha256-manifest-v2" hash of a dbt manifest.json: the
 // sha256 of its JSON content with the volatile metadata fields removed, so the
 // value is stable across recompiles of unchanged source.
 //
@@ -188,6 +217,7 @@ func hashManifest(path string) (hash string, bytes int64, isDbt bool, err error)
 			delete(meta, k)
 		}
 	}
+	stripEntityCreatedAt(doc)
 	// json.Marshal emits object keys in sorted order, so this is deterministic;
 	// doc came from json.Unmarshal, so it holds only JSON-native types and
 	// re-marshaling cannot fail.

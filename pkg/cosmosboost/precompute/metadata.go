@@ -23,8 +23,11 @@ const (
 	// (commits, fetches, gc) cannot change the hash of unchanged content.
 	algoProjectTree = "sha256-tree-v2"
 	// algoManifestJSON hashes a dbt manifest.json by content, ignoring volatile
-	// metadata. Used for manifest-only deployments.
-	algoManifestJSON = "sha256-manifest-v1"
+	// metadata. Used for manifest-only deployments. v2 also strips the
+	// dbt-owned created_at stamped on every resource and
+	// metadata.run_started_at, which dbt regenerates on every full parse, so
+	// CI-built manifests hash-match locally built ones.
+	algoManifestJSON = "sha256-manifest-v2"
 
 	sidecarDir  = ".astro"
 	sidecarName = "dbt_metadata.json"

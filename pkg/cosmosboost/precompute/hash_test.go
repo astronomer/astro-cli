@@ -288,7 +288,7 @@ func TestReadDbtConfig(t *testing.T) {
 			writeFiles(t, dir, map[string]string{"dbt_project.yml": tc.yml})
 			cfg := readDbtConfig(dir)
 			if cfg.packagesInstallPath != tc.wantPackages || cfg.targetPath != tc.wantTarget ||
-				cfg.logPath != tc.wantLog || cfg.templatedPackages != tc.wantTemplated {
+				cfg.logPath != tc.wantLog || (len(cfg.templatedSettings) > 0) != tc.wantTemplated {
 				t.Fatalf("readDbtConfig = %+v, want packages=%q target=%q log=%q templated=%v",
 					cfg, tc.wantPackages, tc.wantTarget, tc.wantLog, tc.wantTemplated)
 			}
@@ -420,5 +420,74 @@ func TestHashProjectSurfacesRelError(t *testing.T) {
 
 	if _, _, _, err := hashProject(dir, dbtConfig{}); err == nil {
 		t.Fatal("hashProject: error = nil, want the rel error surfaced")
+	}
+}
+
+// TestHashManifestStableAcrossFullParses is the regression for cold-parse
+// stability: dbt regenerates created_at on every resource (and
+// metadata.run_started_at) whenever it fully parses, so two manifests built
+// from identical source in different environments must still hash-match.
+func TestHashManifestStableAcrossFullParses(t *testing.T) {
+	manifest := func(createdAt, runStartedAt, sql string) string {
+		return `{
+  "metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+               "generated_at": "` + runStartedAt + `", "invocation_id": "` + runStartedAt + `",
+               "run_started_at": "` + runStartedAt + `"},
+  "nodes": {"model.shop.a": {"name": "a", "created_at": ` + createdAt + `, "raw_code": "` + sql + `",
+            "meta": {"created_at": "user-owned"}}},
+  "sources": {"source.shop.raw": {"name": "raw", "created_at": ` + createdAt + `}},
+  "macros": {"macro.shop.m": {"name": "m", "created_at": ` + createdAt + `}},
+  "disabled": {"model.shop.old": [{"name": "old", "created_at": ` + createdAt + `}]}
+}`
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"first/manifest.json":   manifest("1754300000.1", "2026-08-04T09:00:00Z", "select 1"),
+		"second/manifest.json":  manifest("1754399999.9", "2026-08-05T21:30:00Z", "select 1"),
+		"changed/manifest.json": manifest("1754300000.1", "2026-08-04T09:00:00Z", "select 2"),
+	})
+
+	h1, _, isDbt1, err := hashManifest(filepath.Join(dir, "first", "manifest.json"))
+	if err != nil || !isDbt1 {
+		t.Fatalf("first manifest: err=%v isDbt=%v", err, isDbt1)
+	}
+	h2, _, _, err := hashManifest(filepath.Join(dir, "second", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h1 != h2 {
+		t.Fatalf("full-parse timestamp churn changed the hash:\n want %s\n got  %s", h1, h2)
+	}
+	h3, _, _, err := hashManifest(filepath.Join(dir, "changed", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h1 == h3 {
+		t.Fatal("changed model content must change the hash")
+	}
+}
+
+// TestHashManifestKeepsUserMetaCreatedAt pins the depth guard: only dbt's own
+// resource-level created_at is stripped, never user content inside meta.
+func TestHashManifestKeepsUserMetaCreatedAt(t *testing.T) {
+	// The scalar top-level key pins that the created_at stripper tolerates
+	// non-collection values in the document root.
+	base := `{"metadata": {"dbt_schema_version": "v12"}, "unrelated_scalar": 7,
+  "nodes": {"model.shop.a": {"name": "a", "created_at": 1.0, "meta": {"created_at": "%s"}}}}`
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"one/manifest.json": fmt.Sprintf(base, "2001-01-01"),
+		"two/manifest.json": fmt.Sprintf(base, "2002-02-02"),
+	})
+	h1, _, _, err := hashManifest(filepath.Join(dir, "one", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h2, _, _, err := hashManifest(filepath.Join(dir, "two", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h1 == h2 {
+		t.Fatal("user-owned meta.created_at must still affect the hash")
 	}
 }
