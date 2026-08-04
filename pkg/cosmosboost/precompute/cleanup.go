@@ -10,15 +10,17 @@ import (
 	"time"
 )
 
-// cleanupSkipDirs are never traversed. Discovery never writes sidecars under
-// them (both discovery walks skip these names at any depth), and generated
-// directories like a root-owned logs/ left by a container bind mount may not
-// even be readable - aborting a deploy over a directory we never write to
-// helps nobody. .git additionally must never be mutated. target/ is
-// deliberately NOT here: a compiled manifest's sidecar lives at
+// cleanupSkipDirs are not traversed below the walked root. Discovery never
+// writes sidecars under them (both discovery walks skip these names at any
+// depth), and generated directories like a root-owned logs/ left by a
+// container bind mount may not even be readable - aborting a deploy over a
+// directory we never write to helps nobody. The root itself is exempt,
+// mirroring discovery: a project that happens to live in a directory named
+// logs or dbt_packages can be stamped, so it must be cleanable too. .git is
+// skipped unconditionally - VCS internals are never ours to mutate. target/
+// is deliberately absent: a compiled manifest's sidecar lives at
 // target/.astro/.
 var cleanupSkipDirs = map[string]bool{
-	gitDir:             true,
 	"logs":             true,
 	defaultPackagesDir: true,
 }
@@ -56,7 +58,7 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 				return err
 			}
 			if d.IsDir() {
-				if cleanupSkipDirs[d.Name()] {
+				if d.Name() == gitDir || (path != root && cleanupSkipDirs[d.Name()]) {
 					return filepath.SkipDir
 				}
 				return nil

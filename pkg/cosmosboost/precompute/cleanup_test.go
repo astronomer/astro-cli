@@ -296,3 +296,44 @@ func TestCleanupStillVisitsTarget(t *testing.T) {
 		t.Fatalf("results = %+v, want the target/.astro sidecar removed", summary.Results)
 	}
 }
+
+// TestCleanupCleansRootsNamedLikeSkipDirs mirrors discovery's root exemption:
+// a project living in a directory named logs or dbt_packages can be stamped,
+// so cleanup of that same root must not skip it - otherwise a sidecar could
+// survive EnsureClean and ship stale. .git stays skipped even as the root.
+func TestCleanupCleansRootsNamedLikeSkipDirs(t *testing.T) {
+	for _, name := range []string{"logs", "dbt_packages"} {
+		t.Run(name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), name)
+			writeFiles(t, root, map[string]string{
+				"proj/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`,
+			})
+
+			summary, err := Cleanup([]string{root})
+			if err != nil {
+				t.Fatalf("Cleanup: %v", err)
+			}
+			if len(summary.Results) != 1 || summary.CountFailed() != 0 || summary.CountKept() != 0 {
+				t.Fatalf("results = %+v, want the sidecar under the %s root removed", summary.Results, name)
+			}
+		})
+	}
+
+	t.Run(".git stays protected", func(t *testing.T) {
+		root := filepath.Join(t.TempDir(), ".git")
+		writeFiles(t, root, map[string]string{
+			"trap/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`,
+		})
+
+		summary, err := Cleanup([]string{root})
+		if err != nil {
+			t.Fatalf("Cleanup: %v", err)
+		}
+		if len(summary.Results) != 0 {
+			t.Fatalf("results = %+v, want nothing visited under a .git root", summary.Results)
+		}
+		if _, err := os.Stat(filepath.Join(root, "trap", ".astro", "dbt_metadata.json")); err != nil {
+			t.Fatalf("file under .git was touched: %v", err)
+		}
+	})
+}
