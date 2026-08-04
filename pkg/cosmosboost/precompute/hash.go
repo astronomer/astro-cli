@@ -66,6 +66,11 @@ func excludedRelDirsFor(cfg dbtConfig) map[string]bool {
 // are skipped.
 const gitDir = ".git"
 
+// relPath is filepath.Rel behind a variable so tests can exercise the guard
+// in hashProject's walk: WalkDir yields paths rooted at the walked directory,
+// so Rel cannot otherwise be made to fail.
+var relPath = filepath.Rel
+
 // hashProject computes the "sha256-tree-v2" hash of a dbt project directory: the
 // sha256 of the path-sorted list of "<relative-path>\x00<sha256(file)>\n" entries.
 // cfg carries the dbt_project.yml directory settings that widen the exclusion set.
@@ -84,7 +89,7 @@ func hashProject(dir string, cfg dbtConfig) (hash string, files int, totalBytes 
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(dir, path)
+		rel, err := relPath(dir, path)
 		if err != nil {
 			return err
 		}
@@ -183,11 +188,10 @@ func hashManifest(path string) (hash string, bytes int64, isDbt bool, err error)
 			delete(meta, k)
 		}
 	}
-	// json.Marshal emits object keys in sorted order, so this is deterministic.
-	canonical, err := json.Marshal(doc)
-	if err != nil {
-		return "", bytes, true, err
-	}
+	// json.Marshal emits object keys in sorted order, so this is deterministic;
+	// doc came from json.Unmarshal, so it holds only JSON-native types and
+	// re-marshaling cannot fail.
+	canonical, _ := json.Marshal(doc)
 	return sha256Hex(canonical), bytes, true, nil
 }
 

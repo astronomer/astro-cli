@@ -179,3 +179,35 @@ func TestUploadBundleIsANoOpWhenDisabled(t *testing.T) {
 	assert.FileExists(t, leftover,
 		"a disabled deploy must not touch the tree; leftovers are cleaned by astro dbt cleanup")
 }
+
+// TestBuildImageFailsWhenStaleArtifactUnremovable mirrors the bundle-path
+// safety test for the image path: an enabled build that cannot guarantee the
+// context is free of stale artifacts must fail before docker build runs.
+func TestBuildImageFailsWhenStaleArtifactUnremovable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory write-permission semantics differ on windows")
+	}
+	setupCosmosBoostEnv(t)
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
+
+	projectDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "dbt_project.yml"), []byte("name: shop\n"), 0o644))
+	stale := filepath.Join(projectDir, cosmosBoostArtifact)
+	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
+	require.NoError(t, os.WriteFile(stale, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
+	require.NoError(t, os.Chmod(filepath.Dir(stale), 0o555))
+	t.Cleanup(func() { _ = os.Chmod(filepath.Dir(stale), 0o755) })
+
+	// No Build expectation: the failure must happen before docker build.
+	mockImageHandler := new(mocks.ImageHandler)
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		return mockImageHandler
+	}
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	_, err := buildImage(projectDir, "4.2.5", "", "", "", nil, false, false, mockV1Client)
+
+	require.Error(t, err, "the build must not proceed with a stale artifact it could not remove")
+	assert.ErrorContains(t, err, "Cosmos Boost")
+	mockImageHandler.AssertExpectations(t)
+}

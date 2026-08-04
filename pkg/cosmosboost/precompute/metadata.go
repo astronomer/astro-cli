@@ -66,10 +66,8 @@ func writeSidecar(dir, algo, hash, version string) error {
 		GeneratedBy: GeneratedBy{Application: application, Version: version},
 	}
 
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return err
-	}
+	// Metadata holds only strings and ints, so marshaling cannot fail.
+	data, _ := json.MarshalIndent(meta, "", "  ")
 	data = append(data, '\n')
 
 	out := filepath.Join(dir, sidecarDir)

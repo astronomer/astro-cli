@@ -80,11 +80,10 @@ func Run(roots []string, version string) (Summary, error) {
 	for m := range manifests {
 		units = append(units, unit{kindManifest, m})
 	}
+	// Composite sort key: path first, kind as the tiebreaker. NUL sorts below
+	// every other byte, so prefix relationships between paths are preserved.
 	sort.Slice(units, func(i, j int) bool {
-		if units[i].path != units[j].path {
-			return units[i].path < units[j].path
-		}
-		return units[i].kind < units[j].kind
+		return units[i].path+"\x00"+units[i].kind < units[j].path+"\x00"+units[j].kind
 	})
 
 	results := make([]Result, len(units))

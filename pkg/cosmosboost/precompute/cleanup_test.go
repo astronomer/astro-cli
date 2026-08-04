@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -210,5 +211,63 @@ func TestCleanupSkipsGitInternals(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".git", "trap", ".astro", "dbt_metadata.json")); err != nil {
 		t.Fatalf("file under .git was touched: %v", err)
+	}
+}
+
+func TestCanonicalPathFallsBackOnMissingPath(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	if got := canonicalPath(missing); got != filepath.Clean(missing) {
+		t.Fatalf("canonicalPath(%q) = %q, want the cleaned path", missing, got)
+	}
+}
+
+// TestCleanupReportsUnreadableSidecar: a sidecar whose content cannot be read
+// cannot be provenance-checked, so it is a failure (not silently kept).
+func TestCleanupReportsUnreadableSidecar(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"proj/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`})
+	sidecar := filepath.Join(dir, "proj", ".astro", "dbt_metadata.json")
+	if err := os.Chmod(sidecar, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(sidecar, 0o644) })
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if summary.CountFailed() != 1 {
+		t.Fatalf("failed = %d, want 1", summary.CountFailed())
+	}
+	var out bytes.Buffer
+	summary.WriteReport(&out)
+	if !strings.Contains(out.String(), "✗") {
+		t.Fatalf("failure missing from report: %q", out.String())
+	}
+}
+
+// TestCleanupReportsUnremovableSidecar: a sidecar that passes the provenance
+// check but cannot be unlinked is recorded as failed, not dropped.
+func TestCleanupReportsUnremovableSidecar(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory write-permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"proj/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`})
+	astroDir := filepath.Join(dir, "proj", ".astro")
+	if err := os.Chmod(astroDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(astroDir, 0o755) })
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if summary.CountFailed() != 1 {
+		t.Fatalf("failed = %d, want 1", summary.CountFailed())
 	}
 }

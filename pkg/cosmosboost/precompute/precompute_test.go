@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -309,5 +310,117 @@ func TestRunSkipsGitInternals(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rel))); !os.IsNotExist(err) {
 			t.Fatalf("wrote into VCS internals: %s exists (%v)", rel, err)
 		}
+	}
+}
+
+func TestReadDbtConfigMissingFile(t *testing.T) {
+	if got := readDbtConfig(t.TempDir()); got != (dbtConfig{}) {
+		t.Fatalf("readDbtConfig on a dir without dbt_project.yml = %+v, want zero value", got)
+	}
+}
+
+func TestRunErrorsOnUnreadableDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	locked := filepath.Join(dir, "locked")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	if _, err := Run([]string{dir}, "test"); err == nil {
+		t.Fatal("Run over a tree with an unreadable directory: error = nil, want non-nil")
+	}
+}
+
+// TestRunErrorsOnUnreadableTargetDir hits the manifest walk's error path:
+// project discovery skips target/ by name and never descends into a found
+// project, so only the manifest walk reaches the unreadable directory.
+func TestRunErrorsOnUnreadableTargetDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"proj/dbt_project.yml": "name: shop\n"})
+	target := filepath.Join(dir, "proj", "target")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(target, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(target, 0o755) })
+
+	if _, err := Run([]string{dir}, "test"); err == nil {
+		t.Fatal("Run: error = nil, want manifest-scan error")
+	}
+}
+
+// TestRunSkipsManifestInProjectRoot: a manifest sitting in a discovered
+// project's root is covered by the project's tree hash and gets no unit of
+// its own.
+func TestRunSkipsManifestInProjectRoot(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"proj/dbt_project.yml": "name: shop\n",
+		"proj/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{dir}, "test")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject {
+		t.Fatalf("results = %+v, want exactly one project unit", summary.Results)
+	}
+}
+
+// TestRunReportsFailedUnits: per-unit failures land in the unit's Result and
+// do not abort the run.
+func TestRunReportsFailedUnits(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"broken/dbt_project.yml":   "name: broken\n",
+		"broken/models/a.sql":      "select 1",
+		"lockdir/dbt_project.yml":  "name: lockdir\n",
+		"standalone/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	// An unreadable file fails hashing mid-walk.
+	if err := os.Chmod(filepath.Join(dir, "broken", "models", "a.sql"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "broken", "models", "a.sql"), 0o644) })
+	// An unreadable directory inside a project fails the hash walk itself.
+	// models/logs is skipped by BOTH discovery walks (name-based) but visited
+	// by the hash walk (whose logs exclusion is root-relative only), so the
+	// failure surfaces in the unit, not in discovery.
+	locked := filepath.Join(dir, "lockdir", "models", "logs")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	// An unreadable manifest fails its unit.
+	if err := os.Chmod(filepath.Join(dir, "standalone", "manifest.json"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "standalone", "manifest.json"), 0o644) })
+
+	summary, err := Run([]string{dir}, "test")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := summary.CountFailed(); got != 3 {
+		t.Fatalf("failed = %d, want 3 (broken project, locked project, unreadable manifest)", got)
 	}
 }

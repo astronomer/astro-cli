@@ -125,3 +125,26 @@ func TestEnsureCleanFailsWhenArtifactUnremovable(t *testing.T) {
 	require.ErrorContains(t, err, "astro dbt cleanup")
 	require.FileExists(t, artifact)
 }
+
+// TestPreDeployReportsFailedUnits: a unit that cannot be hashed turns into an
+// error naming the failure count, so the hook can warn with substance.
+func TestPreDeployReportsFailedUnits(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	writeDbtProject(t, dir)
+	model := filepath.Join(dir, "models", "a.sql")
+	require.NoError(t, os.Chmod(model, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(model, 0o644) })
+
+	err := PreDeploy(dir)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed for 1 unit(s)")
+}
+
+// TestBestEffortPreDeployWarnsAndContinues: stamping failures never propagate.
+func TestBestEffortPreDeployWarnsAndContinues(t *testing.T) {
+	BestEffortPreDeploy(filepath.Join(t.TempDir(), "does-not-exist"))
+}

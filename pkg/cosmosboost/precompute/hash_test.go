@@ -1,9 +1,11 @@
 package precompute
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -389,5 +391,34 @@ func TestHashManifestReadError(t *testing.T) {
 	}
 	if isDbt {
 		t.Fatal("a missing file should not be reported as a dbt manifest")
+	}
+}
+
+// TestHashFileErrorsOnDirectory: opening succeeds but reading a directory
+// fails, exercising hashFile's read-error path.
+func TestHashFileErrorsOnDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("reading a directory handle behaves differently on windows")
+	}
+	if _, _, err := hashFile(t.TempDir()); err == nil {
+		t.Fatal("hashFile on a directory: error = nil, want non-nil")
+	}
+}
+
+// TestHashProjectSurfacesRelError drives the defensive guard on relative-path
+// computation through its test seam; the guard protects against silent hash
+// corruption if the walk's rooted-path invariant ever breaks.
+func TestHashProjectSurfacesRelError(t *testing.T) {
+	orig := relPath
+	relPath = func(basepath, targpath string) (string, error) {
+		return "", errors.New("rel exploded")
+	}
+	t.Cleanup(func() { relPath = orig })
+
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"dbt_project.yml": "name: shop\n"})
+
+	if _, _, _, err := hashProject(dir, dbtConfig{}); err == nil {
+		t.Fatal("hashProject: error = nil, want the rel error surfaced")
 	}
 }
