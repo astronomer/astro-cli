@@ -96,9 +96,20 @@ func (s *BinarySuite) TestInstalledVersion_InvalidJSON() {
 func (s *BinarySuite) TestDownloadURL() {
 	url := downloadURL()
 	s.Contains(url, cdnBaseURL)
-	s.Contains(url, "/latest/")
+	s.Contains(url, "/"+defaultChannel+"/")
 	s.Contains(url, "otto-")
 	s.Contains(url, ".tar.gz")
+}
+
+func (s *BinarySuite) TestChannel_Default() {
+	s.T().Setenv("OTTO_CHANNEL", "")
+	s.Equal(defaultChannel, Channel())
+}
+
+func (s *BinarySuite) TestChannel_EnvOverride() {
+	s.T().Setenv("OTTO_CHANNEL", "latest")
+	s.Equal("latest", Channel())
+	s.Contains(downloadURL(), "/latest/")
 }
 
 func (s *BinarySuite) TestIsUpdateAvailable_NotInstalled() {

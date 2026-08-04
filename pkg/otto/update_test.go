@@ -131,6 +131,7 @@ func (s *UpdateSuite) TestRefreshUpdateCache_SkipsWhenFresh() {
 	fresh := updateState{
 		LastCheck:   time.Now().UTC().Format(time.RFC3339),
 		LatestKnown: "0.0.3",
+		Channel:     Channel(),
 	}
 	s.writeCache(fresh)
 
@@ -147,6 +148,7 @@ func (s *UpdateSuite) TestUpdateStateFile_RoundTrip() {
 	want := updateState{
 		LastCheck:   "2026-04-01T12:00:00Z",
 		LatestKnown: "0.0.9",
+		Channel:     "next",
 	}
 	s.Require().NoError(writeUpdateState(want))
 

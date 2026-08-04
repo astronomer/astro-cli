@@ -24,6 +24,7 @@ const (
 type updateState struct {
 	LastCheck   string `json:"lastCheck"`
 	LatestKnown string `json:"latestKnown"`
+	Channel     string `json:"channel,omitempty"`
 }
 
 // hintUpdateAvailable writes a one-line upgrade notice to w if the cached
@@ -85,11 +86,18 @@ func autoUpdateEnabled() bool {
 // unreachable; LatestKnown is preserved so the hint still works.
 func refreshUpdateCacheIfStale() {
 	state, _ := readUpdateState() //nolint:errcheck // error deliberately ignored in this v1 path
-	if t, err := time.Parse(time.RFC3339, state.LastCheck); err == nil {
-		if time.Since(t) < updateCheckInterval {
-			return
+	if state.Channel == Channel() {
+		if t, err := time.Parse(time.RFC3339, state.LastCheck); err == nil {
+			if time.Since(t) < updateCheckInterval {
+				return
+			}
 		}
+	} else {
+		// A version cached from another channel must not drive autoUpdate
+		// or the hint — a channel switch invalidates the cache.
+		state.LatestKnown = ""
 	}
+	state.Channel = Channel()
 	state.LastCheck = time.Now().UTC().Format(time.RFC3339)
 	if latest, err := LatestVersion(); err == nil {
 		state.LatestKnown = latest

@@ -24,7 +24,14 @@ const (
 	// Bump this when breaking changes are made to the RPC/flag interface.
 	MinVersion = "0.0.2"
 
-	cdnBaseURL    = "https://install.astronomer.io/otto"
+	cdnBaseURL = "https://install.astronomer.io/otto"
+
+	// defaultChannel is the CDN release channel this CLI pulls Otto from.
+	// The v2 CLI dogfoods the internal "next" channel, whose builds carry
+	// the v2-aware surface. Flip to "latest" at cutover, when the public
+	// Otto build learns v2.
+	defaultChannel = "next"
+
 	binaryName    = "otto"
 	pkgJSON       = "package.json"
 	windowsGOOS   = "windows"
@@ -70,10 +77,19 @@ func InstalledVersion() (string, error) {
 	return info.Version, nil
 }
 
-// LatestVersion fetches the latest version string from the CDN.
+// Channel returns the CDN release channel Otto is downloaded from and
+// version-checked against. OTTO_CHANNEL overrides the built-in default.
+func Channel() string {
+	if c := os.Getenv("OTTO_CHANNEL"); c != "" {
+		return c
+	}
+	return defaultChannel
+}
+
+// LatestVersion fetches the channel's current version string from the CDN.
 func LatestVersion() (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(cdnBaseURL + "/latest/version")
+	resp, err := client.Get(fmt.Sprintf("%s/%s/version", cdnBaseURL, Channel()))
 	if err != nil {
 		return "", fmt.Errorf("checking latest otto version: %w", err)
 	}
@@ -137,7 +153,8 @@ func Update() error {
 	return downloadAndInstall()
 }
 
-// downloadURL constructs the CDN URL for the latest Otto on this platform.
+// downloadURL constructs the CDN URL for the channel's current Otto on this
+// platform.
 func downloadURL() string {
 	goos := runtime.GOOS   // "darwin", "linux", "windows"
 	arch := runtime.GOARCH // "arm64", "amd64"
@@ -145,9 +162,9 @@ func downloadURL() string {
 		arch = "x64"
 	}
 	if goos == windowsGOOS {
-		return fmt.Sprintf("%s/latest/%s-%s-%s.exe.zip", cdnBaseURL, binaryName, goos, arch)
+		return fmt.Sprintf("%s/%s/%s-%s-%s.exe.zip", cdnBaseURL, Channel(), binaryName, goos, arch)
 	}
-	return fmt.Sprintf("%s/latest/%s-%s-%s.tar.gz", cdnBaseURL, binaryName, goos, arch)
+	return fmt.Sprintf("%s/%s/%s-%s-%s.tar.gz", cdnBaseURL, Channel(), binaryName, goos, arch)
 }
 
 // downloadAndInstall fetches the Otto archive and extracts it to BinDir().
