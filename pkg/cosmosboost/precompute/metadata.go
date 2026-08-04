@@ -10,10 +10,6 @@ import (
 // by the caller and passed in to Run.)
 const application = "astro"
 
-// legacyApplication is the producer name written by the retired standalone
-// astro-cosmos-boost helper; its sidecars are still ours to remove.
-const legacyApplication = "astro-cosmos-boost"
-
 const (
 	// schemaVersion lets the read-side cope with future format changes.
 	schemaVersion = 1

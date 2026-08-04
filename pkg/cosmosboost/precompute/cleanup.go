@@ -111,8 +111,7 @@ func removeSidecar(path string) CleanupResult {
 		return CleanupResult{Path: path, Err: err}
 	}
 	var meta Metadata
-	if json.Unmarshal(data, &meta) != nil ||
-		(meta.GeneratedBy.Application != application && meta.GeneratedBy.Application != legacyApplication) {
+	if json.Unmarshal(data, &meta) != nil || meta.GeneratedBy.Application != application {
 		return CleanupResult{Path: path, Kept: true}
 	}
 	if err := os.Remove(path); err != nil {

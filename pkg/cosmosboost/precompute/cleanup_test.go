@@ -87,32 +87,12 @@ func TestCleanupKeepsForeignSidecars(t *testing.T) {
 	}
 }
 
-// TestCleanupRemovesLegacySidecars: sidecars written by the retired
-// standalone astro-cosmos-boost helper are still ours to remove.
-func TestCleanupRemovesLegacySidecars(t *testing.T) {
-	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"proj/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro-cosmos-boost"}}`,
-	})
-
-	summary, err := Cleanup([]string{dir})
-	if err != nil {
-		t.Fatalf("Cleanup: %v", err)
-	}
-	if summary.CountKept() != 0 || summary.CountFailed() != 0 || len(summary.Results) != 1 {
-		t.Fatalf("results=%d kept=%d failed=%d, want 1/0/0", len(summary.Results), summary.CountKept(), summary.CountFailed())
-	}
-	if _, err := os.Stat(filepath.Join(dir, "proj", sidecarDir, sidecarName)); !os.IsNotExist(err) {
-		t.Fatalf("legacy sidecar still present: %v", err)
-	}
-}
-
 // TestCleanupIgnoresLookalikes: only dbt_metadata.json directly inside a
 // .astro directory is a sidecar; same-named files elsewhere are untouched.
 func TestCleanupIgnoresLookalikes(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
-		"data/dbt_metadata.json": `{"generated_by": {"application": "astro-cosmos-boost"}}`,
+		"data/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`,
 	})
 
 	summary, err := Cleanup([]string{dir})
