@@ -271,3 +271,48 @@ func TestCleanupReportsUnremovableSidecar(t *testing.T) {
 		t.Fatalf("failed = %d, want 1", summary.CountFailed())
 	}
 }
+
+// TestCleanupSkipsUnreadableGeneratedDirs: logs/ and dbt_packages/ never hold
+// sidecars (discovery skips them by name), so cleanup must not fail over
+// them even when they are unreadable, e.g. a root-owned bind-mount leftover.
+func TestCleanupSkipsUnreadableGeneratedDirs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	for _, name := range []string{"logs", "dbt_packages"} {
+		locked := filepath.Join(dir, "proj", name)
+		if err := os.MkdirAll(locked, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(locked, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	}
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup must not fail over generated dirs it never writes to: %v", err)
+	}
+	if len(summary.Results) != 0 {
+		t.Fatalf("results = %d, want 0", len(summary.Results))
+	}
+}
+
+// TestCleanupStillVisitsTarget: target/ can legitimately hold a compiled
+// manifest's sidecar at target/.astro/, so it is NOT among the skipped names.
+func TestCleanupStillVisitsTarget(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"proj/target/.astro/dbt_metadata.json": `{"generated_by": {"application": "astro"}}`,
+	})
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if len(summary.Results) != 1 || summary.CountFailed() != 0 || summary.CountKept() != 0 {
+		t.Fatalf("results = %+v, want the target/.astro sidecar removed", summary.Results)
+	}
+}

@@ -28,27 +28,50 @@ func PreDeploy(path string) error {
 	return nil
 }
 
-// removeArtifacts deletes the sidecars earlier pre-deploy runs wrote under
-// roots. Files this integration did not write are left in place.
-func removeArtifacts(roots []string) error {
+// cleanupRoots deletes the sidecars earlier pre-deploy runs wrote under
+// roots. Files this integration did not write are left in place; the summary
+// is returned so callers with stricter needs can inspect what was kept.
+func cleanupRoots(roots []string) (precompute.CleanupSummary, error) {
 	summary, err := precompute.Cleanup(roots)
 	if err != nil {
-		return fmt.Errorf("removing the Cosmos Boost artifacts: %w", err)
+		return summary, fmt.Errorf("removing the Cosmos Boost artifacts: %w", err)
 	}
 	debugReport("cleanup", summary)
 	if failed := summary.CountFailed(); failed > 0 {
-		return fmt.Errorf("could not remove %d Cosmos Boost artifact(s) (re-run with --verbosity debug for details)", failed)
+		return summary, fmt.Errorf("could not remove %d Cosmos Boost artifact(s) (re-run with --verbosity debug for details)", failed)
 	}
-	return nil
+	return summary, nil
+}
+
+// removeArtifacts is cleanupRoots for callers that only need the error.
+func removeArtifacts(roots []string) error {
+	_, err := cleanupRoots(roots)
+	return err
 }
 
 // EnsureClean removes the Cosmos Boost artifacts earlier deploys left under
 // path, and fails when their absence cannot be guaranteed. Consumers cannot
 // tell fresh output from stale, so a deploy must not proceed while a stale
 // artifact may still be in the payload.
+//
+// That includes sidecars from an unrecognized producer: cleanup deliberately
+// never deletes a file it does not own, but the plugin would consume its
+// version.hash all the same if the deploy shipped it - so an enabled deploy
+// stops and asks for manual removal instead. `astro dbt cleanup` keeps
+// preserving such files.
 func EnsureClean(path string) error {
-	if err := removeArtifacts([]string{path}); err != nil {
+	summary, err := cleanupRoots([]string{path})
+	if err != nil {
 		return fmt.Errorf("%w; remove the reported files (or run 'astro dbt cleanup %s') and retry", err, path)
+	}
+	var kept []string
+	for _, r := range summary.Results {
+		if r.Kept {
+			kept = append(kept, r.Path)
+		}
+	}
+	if len(kept) > 0 {
+		return fmt.Errorf("found dbt_metadata.json files from an unrecognized producer: %s; the deploy cannot prove they are fresh, and cleanup will not delete files it does not own - remove them manually and retry", strings.Join(kept, ", "))
 	}
 	return nil
 }

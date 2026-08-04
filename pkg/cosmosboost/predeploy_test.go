@@ -88,7 +88,11 @@ func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, artifactRelPath), "the current project must be stamped")
 }
 
-func TestEnsureCleanRemovesOursKeepsForeign(t *testing.T) {
+// TestEnsureCleanFailsOnForeignSidecar pins the strict-ownership contract for
+// deploys: cleanup never deletes a file it does not own, but the plugin would
+// consume its version.hash all the same - so an enabled deploy must stop and
+// ask for manual removal instead of shipping it.
+func TestEnsureCleanFailsOnForeignSidecar(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 	require.NoError(t, PreDeploy(dir))
@@ -97,11 +101,26 @@ func TestEnsureCleanRemovesOursKeepsForeign(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
 	require.NoError(t, os.WriteFile(foreign, []byte(`{"generated_by": {"application": "someone-else"}}`), 0o644))
 
-	require.NoError(t, EnsureClean(dir))
+	err := EnsureClean(dir)
 
-	_, err := os.Stat(filepath.Join(dir, artifactRelPath))
-	require.True(t, os.IsNotExist(err), "our artifact must be removed")
+	require.Error(t, err, "an unrecognized sidecar must fail the clean")
+	require.ErrorContains(t, err, foreign)
+	require.ErrorContains(t, err, "remove them manually")
+	_, statErr := os.Stat(filepath.Join(dir, artifactRelPath))
+	require.True(t, os.IsNotExist(statErr), "our artifact must still be removed")
 	require.FileExists(t, foreign, "a file another tool wrote must never be deleted")
+}
+
+// TestCleanupKeepsForeignSidecarWithoutError: the explicit command keeps
+// preserving unrecognized files and reports success, unlike EnsureClean.
+func TestCleanupKeepsForeignSidecarWithoutError(t *testing.T) {
+	dir := t.TempDir()
+	foreign := filepath.Join(dir, "other", ".astro", "dbt_metadata.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
+	require.NoError(t, os.WriteFile(foreign, []byte(`{"generated_by": {"application": "someone-else"}}`), 0o644))
+
+	require.NoError(t, Cleanup(dir))
+	require.FileExists(t, foreign)
 }
 
 // TestEnsureCleanFailsWhenArtifactUnremovable pins the safety property behind

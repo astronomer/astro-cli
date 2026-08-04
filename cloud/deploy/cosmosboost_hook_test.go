@@ -211,3 +211,26 @@ func TestBuildImageFailsWhenStaleArtifactUnremovable(t *testing.T) {
 	assert.ErrorContains(t, err, "Cosmos Boost")
 	mockImageHandler.AssertExpectations(t)
 }
+
+// TestUploadBundleFailsOnForeignSidecar: an enabled deploy must not ship a
+// sidecar from an unrecognized producer - cleanup will not delete it, the
+// plugin would consume it, so the deploy stops and asks for manual removal.
+func TestUploadBundleFailsOnForeignSidecar(t *testing.T) {
+	setupCosmosBoostEnv(t)
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
+
+	bundleDir := writeDbtBundle(t)
+	foreign := filepath.Join(bundleDir, cosmosBoostArtifact)
+	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
+	require.NoError(t, os.WriteFile(foreign, []byte(`{"schema": 1, "version": {"hash": "abc"}, "generated_by": {"application": "someone-else"}}`), 0o644))
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unrecognized producer")
+	assert.FileExists(t, foreign, "the foreign file must be preserved")
+}
