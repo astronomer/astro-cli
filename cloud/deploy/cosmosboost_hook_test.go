@@ -129,14 +129,16 @@ func TestBuildImageRunsPreDeployOnBuildContextWhenEnabled(t *testing.T) {
 	mockImageHandler.AssertExpectations(t)
 }
 
-// TestUploadBundleFailsWhenStaleArtifactUnremovable pins the safety property:
-// a deploy that cannot guarantee the payload is free of stale artifacts must
-// fail rather than ship one, because consumers cannot tell fresh from stale.
+// TestUploadBundleFailsWhenStaleArtifactUnremovable pins the safety property
+// of ENABLED deploys: a deploy that cannot guarantee the payload is free of
+// stale artifacts must fail rather than ship one, because consumers cannot
+// tell fresh from stale.
 func TestUploadBundleFailsWhenStaleArtifactUnremovable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("directory write-permission semantics differ on windows")
 	}
 	setupCosmosBoostEnv(t)
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
 
 	bundleDir := writeDbtBundle(t)
 	stale := filepath.Join(bundleDir, cosmosBoostArtifact)
@@ -155,15 +157,17 @@ func TestUploadBundleFailsWhenStaleArtifactUnremovable(t *testing.T) {
 	assert.ErrorContains(t, err, "Cosmos Boost")
 }
 
-func TestUploadBundleCleansUpWhenDisabled(t *testing.T) {
+// TestUploadBundleIsANoOpWhenDisabled pins the opt-out contract (review ask on
+// astronomer/astro-cli#2236): with the gate off the deploy neither walks nor
+// mutates the tree - even an artifact left by an earlier enabled deploy stays
+// in place, and removing it is `astro dbt cleanup`'s job.
+func TestUploadBundleIsANoOpWhenDisabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 
-	// Gate off (default), with an earlier enabled deploy's artifact still in
-	// the tree. The deploy must remove it rather than tar it.
 	bundleDir := writeDbtBundle(t)
-	stale := filepath.Join(bundleDir, cosmosBoostArtifact)
-	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
-	require.NoError(t, os.WriteFile(stale, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
+	leftover := filepath.Join(bundleDir, cosmosBoostArtifact)
+	require.NoError(t, os.MkdirAll(filepath.Dir(leftover), 0o755))
+	require.NoError(t, os.WriteFile(leftover, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -172,6 +176,6 @@ func TestUploadBundleCleansUpWhenDisabled(t *testing.T) {
 	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
 	require.NoError(t, err)
 
-	assert.NoFileExists(t, stale,
-		"disabling the feature must actively clean up the bundle")
+	assert.FileExists(t, leftover,
+		"a disabled deploy must not touch the tree; leftovers are cleaned by astro dbt cleanup")
 }

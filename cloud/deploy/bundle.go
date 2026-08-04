@@ -217,13 +217,16 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Cosmos Boost pre-deploy step. Removing leftover artifacts is mandatory —
-	// a stale one must not ship inside the bundle — while stamping fresh ones
-	// is opt-in and best-effort.
-	if err := cosmosboost.EnsureClean(bundlePath); err != nil {
-		return "", err
-	}
+	// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy; with
+	// the setting off the deploy does not touch the tree at all. Cleanup runs
+	// first and is fatal on failure (a stale artifact must not ship inside the
+	// bundle), while stamping is best-effort (a missing artifact is safe).
+	// Artifacts left by earlier enabled deploys are removed with
+	// `astro dbt cleanup`.
 	if config.CFG.CosmosBoostPreDeploy.GetBool() {
+		if err := cosmosboost.EnsureClean(bundlePath); err != nil {
+			return "", err
+		}
 		cosmosboost.BestEffortPreDeploy(bundlePath)
 	}
 

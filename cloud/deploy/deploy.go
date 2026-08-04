@@ -713,13 +713,16 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
-		// Cosmos Boost pre-deploy step. Removing leftover artifacts is
-		// mandatory — a stale one must not ship inside the image — while
-		// stamping fresh ones is opt-in and best-effort.
-		if err := cosmosboost.EnsureClean(path); err != nil {
-			return "", err
-		}
+		// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy;
+		// with the setting off the build does not touch the tree at all.
+		// Cleanup runs first and is fatal on failure (a stale artifact must
+		// not ship inside the image), while stamping is best-effort (a
+		// missing artifact is safe). Artifacts left by earlier enabled
+		// deploys are removed with `astro dbt cleanup`.
 		if config.CFG.CosmosBoostPreDeploy.GetBool() {
+			if err := cosmosboost.EnsureClean(path); err != nil {
+				return "", err
+			}
 			cosmosboost.BestEffortPreDeploy(path)
 		}
 
