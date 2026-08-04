@@ -1,0 +1,213 @@
+package precompute
+
+import (
+	"fmt"
+	"io"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+// The two kinds of unit a run processes.
+const (
+	kindProject  = "project"
+	kindManifest = "manifest"
+)
+
+// Result records what happened for one unit of work: either a dbt project
+// directory or a standalone manifest.json.
+type Result struct {
+	Kind     string        // "project" or "manifest"
+	Path     string        // project directory, or manifest.json path
+	Hash     string        // version hash (empty if Err != nil or Skipped)
+	Files    int           // files hashed (1 for a manifest)
+	Bytes    int64         // total bytes hashed
+	Duration time.Duration // time spent on this unit
+	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar written)
+	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
+	Err      error         // non-nil if hashing or writing the sidecar failed
+}
+
+// Summary is the structured outcome of a precompute run. It backs both the
+// human-readable report and the tracking of this step's deploy-time overhead.
+type Summary struct {
+	Duration time.Duration
+	Results  []Result
+}
+
+// Run finds every dbt project (a directory with dbt_project.yml) and standalone
+// dbt manifest.json under the given roots, and writes a .astro/dbt_metadata.json
+// hash sidecar next to each. Units are processed concurrently — one worker each,
+// bounded by GOMAXPROCS — and each is hashed over sorted input, so results are
+// deterministic with no cross-worker coordination.
+//
+// Per-unit failures are best-effort: a unit that fails is recorded in its Result
+// and does not stop the others. Run only returns a non-nil error for a top-level
+// problem, such as a root that cannot be walked. version is recorded in each
+// sidecar's generated_by.
+func Run(roots []string, version string) (Summary, error) {
+	start := time.Now()
+
+	projectDirs := map[string]bool{}
+	for _, root := range roots {
+		found, err := findProjects(root)
+		if err != nil {
+			return Summary{}, fmt.Errorf("scanning %q for dbt projects: %w", root, err)
+		}
+		for _, d := range found {
+			projectDirs[d] = true
+		}
+	}
+
+	manifests := map[string]bool{}
+	for _, root := range roots {
+		found, err := findManifests(root, projectDirs)
+		if err != nil {
+			return Summary{}, fmt.Errorf("scanning %q for manifests: %w", root, err)
+		}
+		for _, m := range found {
+			manifests[m] = true
+		}
+	}
+
+	type unit struct{ kind, path string }
+	var units []unit
+	for d := range projectDirs {
+		units = append(units, unit{kindProject, d})
+	}
+	for m := range manifests {
+		units = append(units, unit{kindManifest, m})
+	}
+	// Composite sort key: path first, kind as the tiebreaker. NUL sorts below
+	// every other byte, so prefix relationships between paths are preserved.
+	sort.Slice(units, func(i, j int) bool {
+		return units[i].path+"\x00"+units[i].kind < units[j].path+"\x00"+units[j].kind
+	})
+
+	results := make([]Result, len(units))
+	sem := make(chan struct{}, max(1, runtime.GOMAXPROCS(0)))
+	var wg sync.WaitGroup
+	for i, u := range units {
+		wg.Add(1)
+		sem <- struct{}{} // acquire a worker slot
+		go func(i int, u unit) {
+			defer wg.Done()
+			defer func() { <-sem }() // release the slot
+			if u.kind == kindProject {
+				results[i] = processProject(u.path, version)
+			} else {
+				results[i] = processManifest(u.path, version)
+			}
+		}(i, u)
+	}
+	wg.Wait()
+
+	return Summary{Duration: time.Since(start), Results: results}, nil
+}
+
+// processProject hashes one dbt project directory and writes its sidecar. It reads
+// dbt_project.yml once (readDbtConfig) and threads the result through hashing and the
+// templated-packages warning, so the file isn't parsed more than once per project.
+func processProject(dir, version string) Result {
+	start := time.Now()
+	cfg := readDbtConfig(dir)
+	hash, files, totalBytes, err := hashProject(dir, cfg)
+	r := Result{Kind: kindProject, Path: dir, Hash: hash, Files: files, Bytes: totalBytes, Duration: time.Since(start)}
+	if err != nil {
+		r.Err = err
+		return r
+	}
+	if len(cfg.templatedSettings) > 0 {
+		r.Warning = strings.Join(cfg.templatedSettings, ", ") +
+			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
+	}
+	r.Err = writeSidecar(dir, algoProjectTree, hash, version)
+	r.Duration = time.Since(start)
+	return r
+}
+
+// processManifest hashes one manifest.json and writes a sidecar next to it. A
+// file that isn't a dbt manifest is skipped (no sidecar) so unrelated
+// manifest.json files in the project aren't stamped.
+func processManifest(path, version string) Result {
+	start := time.Now()
+	hash, bytes, isDbt, err := hashManifest(path)
+	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
+	switch {
+	case err != nil:
+		r.Err = err
+	case !isDbt:
+		r.Skipped = true
+	default:
+		r.Err = writeSidecar(filepath.Dir(path), algoManifestJSON, hash, version)
+	}
+	return r
+}
+
+// CountFailed returns the number of units that errored.
+func (s Summary) CountFailed() int {
+	n := 0
+	for _, r := range s.Results {
+		if r.Err != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// CountSkipped returns the number of units skipped (manifest.json files that aren't
+// dbt manifests).
+func (s Summary) CountSkipped() int {
+	n := 0
+	for _, r := range s.Results {
+		if r.Skipped {
+			n++
+		}
+	}
+	return n
+}
+
+// WriteReport prints a short, human-readable report of the run.
+// Per-entry glyphs, shared by every command's WriteReport (see also
+// CleanupSummary.WriteReport in cleanup.go) so the two reports keep one
+// convention: acted on, deliberately left alone, failed, and a note attached to
+// an entry that otherwise succeeded.
+const (
+	glyphDone = "✓"
+	glyphLeft = "⊘"
+	glyphFail = "✗"
+	glyphNote = "⚠"
+)
+
+func (s Summary) WriteReport(w io.Writer) {
+	stamped := len(s.Results) - s.CountFailed() - s.CountSkipped()
+	fmt.Fprintf(w, "cosmos boost pre-deploy: %d stamped, %d skipped, %d failed in %s total (incl. discovery)\n",
+		stamped, s.CountSkipped(), s.CountFailed(), s.Duration.Round(time.Microsecond))
+	for _, r := range s.Results {
+		switch {
+		case r.Err != nil:
+			fmt.Fprintf(w, "  %s %-8s %s  (%v)\n", glyphFail, r.Kind, r.Path, r.Err)
+		case r.Skipped:
+			fmt.Fprintf(w, "  %s %-8s %s  (not a dbt manifest)\n", glyphLeft, r.Kind, r.Path)
+		default:
+			fmt.Fprintf(w, "  %s %-8s %s  hash=%s files=%d bytes=%d %s\n",
+				glyphDone, r.Kind, r.Path, shortHash(r.Hash), r.Files, r.Bytes, r.Duration.Round(time.Microsecond))
+			if r.Warning != "" {
+				fmt.Fprintf(w, "    %s %s\n", glyphNote, r.Warning)
+			}
+		}
+	}
+}
+
+// shortHashLen is how much of the hash the human-readable report shows.
+const shortHashLen = 12
+
+func shortHash(hash string) string {
+	if len(hash) > shortHashLen {
+		return hash[:shortHashLen]
+	}
+	return hash
+}

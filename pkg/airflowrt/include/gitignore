@@ -13,3 +13,5 @@ airflow.cfg
 airflow.db
 .astro/*.local.yml
 .astro/*.local.yaml
+
+**/.astro/dbt_metadata.json
