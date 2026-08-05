@@ -55,25 +55,24 @@ func IsInteractive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
-// currentToken returns the Astro bearer token for the active context, or "" when
-// the user has not logged in and no API token is configured.
+// currentToken returns the bearer token for the active context, or "" when the
+// user is logged out — in which case the event still sends, unattributed.
 //
-// It reads local state only — no network call and no token refresh. The sender
-// runs in a detached subprocess alongside the main command, so refreshing here
-// would race the main process for ~/.astro/config.yaml. A stale token means the
-// server cannot attribute that one event, which is an acceptable loss for
-// telemetry and never blocks the user's actual command.
-//
-// An empty result is expected and fine: the event still sends, unattributed.
+// Deliberately does not refresh an expired token: the sender runs in a detached
+// subprocess, so refreshing would race the main process for ~/.astro/config.yaml.
+// A stale token costs one unattributed event.
+// Returns the raw token: contexts persist it with a "Bearer " prefix already
+// (see cmd/cloud/setup.go), while ASTRO_API_TOKEN holds it without one.
+// SendWithToken supplies the scheme.
 func currentToken() string {
 	if t := os.Getenv("ASTRO_API_TOKEN"); t != "" {
-		return t
+		return strings.TrimPrefix(t, "Bearer ")
 	}
 	ctx, err := config.GetCurrentContext()
 	if err != nil {
 		return ""
 	}
-	return ctx.Token
+	return strings.TrimPrefix(ctx.Token, "Bearer ")
 }
 
 // GetCommandPath extracts the command path from a cobra.Command
@@ -87,13 +86,10 @@ func GetCommandPath(cmd *cobra.Command) string {
 	return ""
 }
 
-// noticeVersion identifies the wording of the telemetry notice below. Bump it
-// whenever the notice makes a materially different claim about what is
-// collected, so users who accepted an earlier version are told about the change
-// instead of silently inheriting it.
-//
-// v1 (unversioned, stored as "true") promised fully anonymous collection.
-// v2 added organization attribution for logged-in users.
+// noticeVersion tracks the wording of the notice below. Bump it whenever the
+// notice makes a materially different claim about what is collected, so users
+// who accepted earlier wording see the change instead of inheriting it silently.
+// v1 predates this constant and is stored as "true".
 const noticeVersion = "2"
 
 // showFirstRunNotice prints a notice about telemetry on the first CLI invocation,
@@ -223,19 +219,9 @@ func sendDebug(payload sharedtel.TelemetryPayload, apiURL, token string) {
 	fmt.Fprintf(os.Stderr, "[telemetry] response: %d OK\n", status)
 }
 
-// spawnTelemetrySender spawns a detached subprocess to send telemetry.
-//
-// The struct below must match pkg/telemetry's unexported senderPayload field for
-// field, JSON tag for JSON tag — the subprocess unmarshals into that one. A
-// mismatch fails silently, dropping the affected field. See the note there.
+// spawnTelemetrySender spawns a detached subprocess to send telemetry
 func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL, token string) {
-	type senderPayload struct {
-		sharedtel.TelemetryPayload
-		APIURL string `json:"api_url"`
-		Token  string `json:"token,omitempty"`
-	}
-
-	sp := senderPayload{
+	sp := sharedtel.SenderPayload{
 		TelemetryPayload: payload,
 		APIURL:           apiURL,
 		Token:            token,

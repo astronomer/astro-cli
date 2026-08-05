@@ -18,23 +18,18 @@ const (
 	maxStdinBytes = 64 * 1024 // 64KB
 )
 
-// Send posts a TelemetryPayload to the given API URL synchronously, without
-// credentials. It returns the HTTP status code and any error encountered.
-//
-// Kept for callers outside this repo (e.g. Desktop) that have no Astro token.
-// Callers that do have one should use SendWithToken so the server can attribute
-// the event to an organization.
+// Send posts a TelemetryPayload synchronously without credentials, returning the
+// HTTP status code. Callers holding an Astro token should use SendWithToken.
 func Send(payload TelemetryPayload, apiURL string) (int, error) {
 	return SendWithToken(payload, apiURL, "")
 }
 
-// SendWithToken posts a TelemetryPayload synchronously, attaching the given
-// Astro token as a bearer credential when it is non-empty.
+// SendWithToken posts a TelemetryPayload synchronously, attaching token as a
+// bearer credential when it is non-empty.
 //
-// An empty token is normal, not an error: users who have never run `astro login`
-// are exactly the population these events measure, so the request still goes out
-// and simply lands unattributed. The token is never written into the payload
-// body — it travels only as a header, so it cannot leak into debug output.
+// An empty token is normal, not an error — logged-out usage is still recorded,
+// just unattributed. The token is sent as a header only, never serialized into
+// the payload body.
 func SendWithToken(payload TelemetryPayload, apiURL, token string) (int, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -77,7 +72,7 @@ func SendEvent() error {
 		return err
 	}
 
-	var sp senderPayload
+	var sp SenderPayload
 	if err := json.Unmarshal(payloadBytes, &sp); err != nil {
 		return err
 	}

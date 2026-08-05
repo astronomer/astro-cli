@@ -163,21 +163,33 @@ func TestCurrentToken(t *testing.T) {
 	origEnv := os.Getenv("ASTRO_API_TOKEN")
 	defer os.Setenv("ASTRO_API_TOKEN", origEnv)
 
-	// A context with a stored token, as `astro login` would leave it.
+	// A context as `astro login` leaves it: the token is stored WITH its
+	// "Bearer " prefix, which currentToken must strip.
 	withContext := func(t *testing.T) {
 		t.Helper()
 		fs := afero.NewMemMapFs()
-		configRaw := []byte("context: test_com\ncontexts:\n  test_com:\n    domain: test.com\n    token: ctx-token\n    organization: org-1\ntelemetry:\n  enabled: true\n")
+		configRaw := []byte("context: test_com\ncontexts:\n  test_com:\n    domain: test.com\n    token: Bearer ctx-token\n    organization: org-1\ntelemetry:\n  enabled: true\n")
 		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
 		config.InitConfig(fs)
 	}
 
-	t.Run("returns the context token when logged in", func(t *testing.T) {
+	t.Run("strips the stored Bearer prefix from the context token", func(t *testing.T) {
 		os.Setenv("ASTRO_API_TOKEN", "")
 		withContext(t)
 		assert.Equal(t, "ctx-token", currentToken())
 	})
 
+	// A context that was never populated stores the bare prefix.
+	t.Run("returns empty for a context holding only the Bearer prefix", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		fs := afero.NewMemMapFs()
+		configRaw := []byte("context: test_com\ncontexts:\n  test_com:\n    domain: test.com\n    token: \"Bearer \"\ntelemetry:\n  enabled: true\n")
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		config.InitConfig(fs)
+		assert.Empty(t, currentToken())
+	})
+
+	// ASTRO_API_TOKEN holds a raw token; the prefix is only added when persisted.
 	t.Run("prefers ASTRO_API_TOKEN over the context token", func(t *testing.T) {
 		withContext(t)
 		os.Setenv("ASTRO_API_TOKEN", "env-token")
