@@ -55,6 +55,27 @@ func IsInteractive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
+// currentToken returns the Astro bearer token for the active context, or "" when
+// the user has not logged in and no API token is configured.
+//
+// It reads local state only — no network call and no token refresh. The sender
+// runs in a detached subprocess alongside the main command, so refreshing here
+// would race the main process for ~/.astro/config.yaml. A stale token means the
+// server cannot attribute that one event, which is an acceptable loss for
+// telemetry and never blocks the user's actual command.
+//
+// An empty result is expected and fine: the event still sends, unattributed.
+func currentToken() string {
+	if t := os.Getenv("ASTRO_API_TOKEN"); t != "" {
+		return t
+	}
+	ctx, err := config.GetCurrentContext()
+	if err != nil {
+		return ""
+	}
+	return ctx.Token
+}
+
 // GetCommandPath extracts the command path from a cobra.Command
 // Returns the full command path (e.g., "deploy", "dev start")
 func GetCommandPath(cmd *cobra.Command) string {
@@ -66,16 +87,28 @@ func GetCommandPath(cmd *cobra.Command) string {
 	return ""
 }
 
-// showFirstRunNotice prints a one-time notice about telemetry on the first CLI invocation.
+// noticeVersion identifies the wording of the telemetry notice below. Bump it
+// whenever the notice makes a materially different claim about what is
+// collected, so users who accepted an earlier version are told about the change
+// instead of silently inheriting it.
+//
+// v1 (unversioned, stored as "true") promised fully anonymous collection.
+// v2 added organization attribution for logged-in users.
+const noticeVersion = "2"
+
+// showFirstRunNotice prints a notice about telemetry on the first CLI invocation,
+// and again whenever noticeVersion changes.
 func showFirstRunNotice() {
-	if config.CFG.TelemetryNoticeShown.GetHomeString() != "" {
+	if config.CFG.TelemetryNoticeShown.GetHomeString() == noticeVersion {
 		return
 	}
 	fmt.Fprintln(os.Stderr,
-		"The Astro CLI now collects anonymous usage data to help us prioritize and invest in CLI features.\n"+
-			"Only commands, OS, and CLI version are tracked — no personal information is collected.\n"+
+		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
+			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
+			"While you are logged in, events are linked to your Astro organization.\n"+
+			"Logged-out usage stays anonymous.\n"+
 			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
-	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
+	_ = config.CFG.TelemetryNoticeShown.SetHomeString(noticeVersion)
 }
 
 // buildCommandProperties constructs the telemetry property map for a command.
@@ -134,13 +167,14 @@ func TrackCommand(cmd *cobra.Command) {
 	}
 
 	apiURL := sharedtel.GetTelemetryAPIURL()
+	token := currentToken()
 
 	if isDebugMode() {
-		sendDebug(payload, apiURL)
+		sendDebug(payload, apiURL, token)
 		return
 	}
 
-	spawnTelemetrySender(payload, apiURL)
+	spawnTelemetrySender(payload, apiURL, token)
 }
 
 // CreateTrackingHook returns a RunE function that tracks command execution
@@ -171,12 +205,17 @@ func isDebugMode() bool {
 	return val == "1" || strings.EqualFold(val, "true")
 }
 
-// sendDebug sends telemetry synchronously and prints debug output
-func sendDebug(payload sharedtel.TelemetryPayload, apiURL string) {
+// sendDebug sends telemetry synchronously and prints debug output.
+// It prints the event body and whether a token was attached, never the token.
+func sendDebug(payload sharedtel.TelemetryPayload, apiURL, token string) {
 	body, _ := json.MarshalIndent(payload, "", "  ")
-	fmt.Fprintf(os.Stderr, "[telemetry] POST %s\n%s\n", apiURL, body)
+	authState := "anonymous"
+	if token != "" {
+		authState = "authenticated"
+	}
+	fmt.Fprintf(os.Stderr, "[telemetry] POST %s (%s)\n%s\n", apiURL, authState, body)
 
-	status, err := sharedtel.Send(payload, apiURL)
+	status, err := sharedtel.SendWithToken(payload, apiURL, token)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[telemetry] error: %v\n", err)
 		return
@@ -184,16 +223,22 @@ func sendDebug(payload sharedtel.TelemetryPayload, apiURL string) {
 	fmt.Fprintf(os.Stderr, "[telemetry] response: %d OK\n", status)
 }
 
-// spawnTelemetrySender spawns a detached subprocess to send telemetry
-func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL string) {
+// spawnTelemetrySender spawns a detached subprocess to send telemetry.
+//
+// The struct below must match pkg/telemetry's unexported senderPayload field for
+// field, JSON tag for JSON tag — the subprocess unmarshals into that one. A
+// mismatch fails silently, dropping the affected field. See the note there.
+func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL, token string) {
 	type senderPayload struct {
 		sharedtel.TelemetryPayload
 		APIURL string `json:"api_url"`
+		Token  string `json:"token,omitempty"`
 	}
 
 	sp := senderPayload{
 		TelemetryPayload: payload,
 		APIURL:           apiURL,
+		Token:            token,
 	}
 	payloadJSON, err := json.Marshal(sp)
 	if err != nil {

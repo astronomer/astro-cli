@@ -13,15 +13,18 @@ import (
 func newTelemetryCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "telemetry",
-		Short: "Manage anonymous telemetry settings",
-		Long: `Manage anonymous telemetry settings for the Astro CLI.
+		Short: "Manage telemetry settings",
+		Long: `Manage telemetry settings for the Astro CLI.
 
 Telemetry helps us understand how the CLI is used and improve it.
-We collect anonymous usage data including:
+We collect usage data including:
 - Commands used (not arguments or values)
 - CLI version
 - Operating system
 - Invocation context (CI, interactive, etc.)
+
+While you are logged in, events are linked to your Astro organization so we can
+see how the CLI is used across accounts. Logged-out usage stays anonymous.
 
 No personally identifiable information is collected.
 You can opt out at any time using 'astro telemetry disable' or by setting

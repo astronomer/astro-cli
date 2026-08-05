@@ -107,13 +107,37 @@ func TestShowFirstRunNotice(t *testing.T) {
 		os.Stderr = oldStderr
 
 		output := string(out[:n])
-		assert.Contains(t, output, "anonymous usage data")
+		assert.Contains(t, output, "usage data")
+		assert.Contains(t, output, "linked to your Astro organization")
 		assert.Contains(t, output, "astro telemetry disable")
 
-		assert.Equal(t, "true", config.CFG.TelemetryNoticeShown.GetHomeString())
+		assert.Equal(t, noticeVersion, config.CFG.TelemetryNoticeShown.GetHomeString())
 	})
 
 	t.Run("does not print on subsequent calls", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		configRaw := []byte("telemetry:\n  enabled: true\n  notice_shown: \"" + noticeVersion + "\"\n")
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		config.InitConfig(fs)
+
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		showFirstRunNotice()
+
+		w.Close()
+		out := make([]byte, 1024)
+		n, _ := r.Read(out)
+		os.Stderr = oldStderr
+
+		assert.Equal(t, 0, n, "Should not print anything on subsequent calls")
+	})
+
+	// Users who accepted the v1 notice agreed to fully anonymous collection. The
+	// v2 notice adds organization attribution, so they must be told once rather
+	// than inheriting the change silently.
+	t.Run("reprints when the accepted notice predates the current version", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		configRaw := []byte("telemetry:\n  enabled: true\n  notice_shown: \"true\"\n")
 		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
@@ -130,7 +154,42 @@ func TestShowFirstRunNotice(t *testing.T) {
 		n, _ := r.Read(out)
 		os.Stderr = oldStderr
 
-		assert.Equal(t, 0, n, "Should not print anything on subsequent calls")
+		assert.Contains(t, string(out[:n]), "linked to your Astro organization")
+		assert.Equal(t, noticeVersion, config.CFG.TelemetryNoticeShown.GetHomeString())
+	})
+}
+
+func TestCurrentToken(t *testing.T) {
+	origEnv := os.Getenv("ASTRO_API_TOKEN")
+	defer os.Setenv("ASTRO_API_TOKEN", origEnv)
+
+	// A context with a stored token, as `astro login` would leave it.
+	withContext := func(t *testing.T) {
+		t.Helper()
+		fs := afero.NewMemMapFs()
+		configRaw := []byte("context: test_com\ncontexts:\n  test_com:\n    domain: test.com\n    token: ctx-token\n    organization: org-1\ntelemetry:\n  enabled: true\n")
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		config.InitConfig(fs)
+	}
+
+	t.Run("returns the context token when logged in", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		withContext(t)
+		assert.Equal(t, "ctx-token", currentToken())
+	})
+
+	t.Run("prefers ASTRO_API_TOKEN over the context token", func(t *testing.T) {
+		withContext(t)
+		os.Setenv("ASTRO_API_TOKEN", "env-token")
+		assert.Equal(t, "env-token", currentToken())
+	})
+
+	// Logged-out users must not error or block the event — they just send
+	// unattributed, which is the whole point of measuring them.
+	t.Run("returns empty when there is no context and no env token", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		initTestConfig(t)
+		assert.Empty(t, currentToken())
 	})
 }
 

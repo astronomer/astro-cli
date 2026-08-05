@@ -31,10 +31,20 @@ type TelemetryPayload struct {
 	Properties  map[string]interface{} `json:"properties,omitempty"`
 }
 
-// senderPayload wraps TelemetryPayload with the API URL for the subprocess
+// senderPayload wraps TelemetryPayload with the API URL for the subprocess.
+//
+// The CLI builds the equivalent struct in internal/telemetry before spawning the
+// sender, so the JSON tags here and there must stay identical — a mismatch is
+// silent, and the field simply arrives empty. TestSenderPayloadWireFormat guards
+// the shape.
+//
+// Token is the caller's Astro bearer token. It rides on stdin to the sender
+// subprocess (never argv, so it stays out of `ps`) and is set as a header, not
+// serialized into the event body.
 type senderPayload struct {
 	TelemetryPayload
 	APIURL string `json:"api_url"`
+	Token  string `json:"token,omitempty"`
 }
 
 // envMapping pairs an environment variable with a context name
