@@ -1,6 +1,7 @@
 !airflow/include/*/requirements.txt
 *.ndjson.gz
 *.test
+*.yaml.lock
 .astro/
 .DS_Store
 .env

@@ -63,6 +63,7 @@ type cfgs struct {
 	TelemetryNoticeShown    cfg
 	ProxyPort               cfg
 	OttoAutoUpdate          cfg
+	CosmosBoostPreDeploy    cfg
 }
 
 // Creates a new cfg struct
