@@ -146,12 +146,15 @@ func TrackCommand(cmd *cobra.Command) {
 		return
 	}
 
-	showFirstRunNotice()
-
 	commandPath := GetCommandPath(cmd)
 	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
 		return
 	}
+
+	// After the filter above, so that commands which send nothing say nothing —
+	// notably `astro telemetry disable`, which otherwise announces collection to
+	// someone in the act of opting out.
+	showFirstRunNotice()
 
 	properties := buildCommandProperties(cmd)
 
