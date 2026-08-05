@@ -13,6 +13,7 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 )
 
 var (
@@ -38,8 +39,25 @@ func newDbtCmd() *cobra.Command {
 	cmd.AddCommand(
 		newDbtDeployCmd(),
 		newDbtDeleteCmd(),
+		newDbtCleanupCmd(),
 	)
 	return cmd
+}
+
+func newDbtCleanupCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cleanup [path ...]",
+		Args:  cobra.ArbitraryArgs,
+		Short: "Remove the Cosmos Boost artifacts under each path",
+		Long:  "Remove the artifacts the Cosmos Boost pre-deploy step wrote under each path (default: the current directory). Run it after disabling cosmos_boost.pre_deploy, because a disabled deploy leaves earlier deploys' artifacts in place.",
+		RunE:  cleanupDbt,
+	}
+	return cmd
+}
+
+func cleanupDbt(cmd *cobra.Command, args []string) error {
+	cmd.SilenceUsage = true
+	return cosmosboost.Cleanup(args...)
 }
 
 //nolint:dupl
