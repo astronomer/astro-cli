@@ -1,8 +1,11 @@
 package telemetry
 
 import (
+	"encoding/base64"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -159,31 +162,84 @@ func TestShowFirstRunNotice(t *testing.T) {
 	})
 }
 
+// testJWT builds an unsigned JWT with the given expiry. currentToken only reads
+// the exp claim, so the signature is irrelevant here.
+func testJWT(exp time.Time) string {
+	enc := func(v string) string {
+		return base64.RawURLEncoding.EncodeToString([]byte(v))
+	}
+	return enc(`{"alg":"RS256","typ":"JWT"}`) + "." +
+		enc(fmt.Sprintf(`{"exp":%d,"sub":"test"}`, exp.Unix())) + ".sig"
+}
+
+func TestJWTExpiry(t *testing.T) {
+	want := time.Now().Add(time.Hour).Truncate(time.Second)
+	got, ok := jwtExpiry(testJWT(want))
+	assert.True(t, ok)
+	assert.Equal(t, want.Unix(), got.Unix())
+
+	for _, bad := range []string{"", "not-a-jwt", "a.b", "a.b.c", "a.!!!.c"} {
+		_, ok := jwtExpiry(bad)
+		assert.False(t, ok, "expected %q to be unreadable", bad)
+	}
+}
+
 func TestCurrentToken(t *testing.T) {
 	origEnv := os.Getenv("ASTRO_API_TOKEN")
 	defer os.Setenv("ASTRO_API_TOKEN", origEnv)
 
-	// A context as `astro login` leaves it: the token is stored WITH its
-	// "Bearer " prefix, which currentToken must strip.
-	withContext := func(t *testing.T) {
+	// A context as `astro login` leaves it on the production domain: the token is
+	// stored WITH its "Bearer " prefix, which currentToken must strip.
+	withContext := func(t *testing.T, domain, token string) {
 		t.Helper()
 		fs := afero.NewMemMapFs()
-		configRaw := []byte("context: test_com\ncontexts:\n  test_com:\n    domain: test.com\n    token: Bearer ctx-token\n    organization: org-1\ntelemetry:\n  enabled: true\n")
+		configRaw := []byte("context: prod\ncontexts:\n  prod:\n    domain: " + domain +
+			"\n    token: \"Bearer " + token + "\"\n    organization: org-1\ntelemetry:\n  enabled: true\n")
 		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
 		config.InitConfig(fs)
 	}
 
 	t.Run("strips the stored Bearer prefix from the context token", func(t *testing.T) {
 		os.Setenv("ASTRO_API_TOKEN", "")
-		withContext(t)
-		assert.Equal(t, "ctx-token", currentToken())
+		live := testJWT(time.Now().Add(time.Hour))
+		withContext(t, "astronomer.io", live)
+		assert.Equal(t, live, currentToken())
+	})
+
+	// The gateway rejects the whole request on a bad token, so an event that
+	// would have been recorded anonymously is lost instead. Never send one.
+	t.Run("drops an expired token so the event still sends anonymously", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		withContext(t, "astronomer.io", testJWT(time.Now().Add(-time.Hour)))
+		assert.Empty(t, currentToken())
+	})
+
+	// Expiring within the margin counts as expired: the sender is asynchronous.
+	t.Run("drops a token expiring inside the freshness margin", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		withContext(t, "astronomer.io", testJWT(time.Now().Add(tokenFreshnessMargin/2)))
+		assert.Empty(t, currentToken())
+	})
+
+	// Telemetry always posts to the production endpoint, which does not know
+	// issuers from other environments.
+	t.Run("drops a token from a non-production domain", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		withContext(t, "astronomer-dev.io", testJWT(time.Now().Add(time.Hour)))
+		assert.Empty(t, currentToken())
+	})
+
+	t.Run("drops a token that is not a readable JWT", func(t *testing.T) {
+		os.Setenv("ASTRO_API_TOKEN", "")
+		withContext(t, "astronomer.io", "not-a-jwt")
+		assert.Empty(t, currentToken())
 	})
 
 	// A context that was never populated stores the bare prefix.
 	t.Run("returns empty for a context holding only the Bearer prefix", func(t *testing.T) {
 		os.Setenv("ASTRO_API_TOKEN", "")
 		fs := afero.NewMemMapFs()
-		configRaw := []byte("context: test_com\ncontexts:\n  test_com:\n    domain: test.com\n    token: \"Bearer \"\ntelemetry:\n  enabled: true\n")
+		configRaw := []byte("context: prod\ncontexts:\n  prod:\n    domain: astronomer.io\n    token: \"Bearer \"\ntelemetry:\n  enabled: true\n")
 		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
 		config.InitConfig(fs)
 		assert.Empty(t, currentToken())
@@ -191,9 +247,16 @@ func TestCurrentToken(t *testing.T) {
 
 	// ASTRO_API_TOKEN holds a raw token; the prefix is only added when persisted.
 	t.Run("prefers ASTRO_API_TOKEN over the context token", func(t *testing.T) {
-		withContext(t)
-		os.Setenv("ASTRO_API_TOKEN", "env-token")
-		assert.Equal(t, "env-token", currentToken())
+		withContext(t, "astronomer.io", testJWT(time.Now().Add(time.Hour)))
+		envToken := testJWT(time.Now().Add(time.Hour))
+		os.Setenv("ASTRO_API_TOKEN", envToken)
+		assert.Equal(t, envToken, currentToken())
+	})
+
+	t.Run("drops an expired ASTRO_API_TOKEN", func(t *testing.T) {
+		withContext(t, "astronomer.io", testJWT(time.Now().Add(time.Hour)))
+		os.Setenv("ASTRO_API_TOKEN", testJWT(time.Now().Add(-time.Hour)))
+		assert.Empty(t, currentToken())
 	})
 
 	// Logged-out users must not error or block the event — they just send

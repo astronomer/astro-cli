@@ -1,17 +1,20 @@
 package telemetry
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	sharedtel "github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/astronomer/astro-cli/version"
 )
@@ -55,24 +58,68 @@ func IsInteractive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
-// currentToken returns the bearer token for the active context, or "" when the
-// user is logged out — in which case the event still sends, unattributed.
-//
-// Deliberately does not refresh an expired token: the sender runs in a detached
-// subprocess, so refreshing would race the main process for ~/.astro/config.yaml.
-// A stale token costs one unattributed event.
-// Returns the raw token: contexts persist it with a "Bearer " prefix already
-// (see cmd/cloud/setup.go), while ASTRO_API_TOKEN holds it without one.
-// SendWithToken supplies the scheme.
-func currentToken() string {
-	if t := os.Getenv("ASTRO_API_TOKEN"); t != "" {
-		return strings.TrimPrefix(t, "Bearer ")
+// jwtSections is the header.payload.signature shape a JWT must have.
+const jwtSections = 3
+
+// jwtExpiry reads the exp claim without verifying the signature. The second
+// return is false when the token is not a readable JWT.
+func jwtExpiry(token string) (expiry time.Time, ok bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != jwtSections {
+		return time.Time{}, false
 	}
-	ctx, err := config.GetCurrentContext()
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
+		return time.Time{}, false
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(claims.Exp, 0), true
+}
+
+// tokenFreshnessMargin is how much life a token must have left to be worth
+// attaching. The sender runs asynchronously, so a token expiring in the next
+// moment would likely be rejected by the time the request lands.
+const tokenFreshnessMargin = 30 * time.Second
+
+// currentToken returns a bearer token to attach, or "" to send anonymously.
+//
+// It only returns a token that can plausibly be accepted: the gateway validates
+// the JWT and rejects the whole request when it fails, so attaching a token we
+// already know is bad loses the event outright, where attaching none still
+// records it anonymously. Expired tokens are dropped rather than refreshed —
+// the sender is a detached subprocess and refreshing would race the main process
+// for ~/.astro/config.yaml.
+//
+// Returns the raw token. Contexts persist it with a "Bearer " prefix (see
+// cmd/cloud/setup.go) while ASTRO_API_TOKEN holds it without one; SendWithToken
+// supplies the scheme.
+func currentToken() string {
+	token := strings.TrimPrefix(os.Getenv("ASTRO_API_TOKEN"), "Bearer ")
+	if token == "" {
+		ctx, err := config.GetCurrentContext()
+		if err != nil {
+			return ""
+		}
+		// Telemetry always posts to the production endpoint, which does not
+		// recognize tokens issued by a dev or stage domain. An explicit endpoint
+		// override means someone is pointing at their own listener, so trust it.
+		defaultEndpoint := sharedtel.GetTelemetryAPIURL() == sharedtel.TelemetryAPIURL
+		if defaultEndpoint && domainutil.FormatDomain(ctx.Domain) != domainutil.DefaultDomain {
+			return ""
+		}
+		token = strings.TrimPrefix(ctx.Token, "Bearer ")
+	}
+
+	expiry, ok := jwtExpiry(token)
+	if !ok || time.Now().Add(tokenFreshnessMargin).After(expiry) {
 		return ""
 	}
-	return strings.TrimPrefix(ctx.Token, "Bearer ")
+	return token
 }
 
 // GetCommandPath extracts the command path from a cobra.Command
