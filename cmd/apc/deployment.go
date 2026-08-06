@@ -87,7 +87,7 @@ $ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airfl
 # Create new deployment with Astronomer Runtime.
 $ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1
 `
-	deploymentCreateExampleSoftwareV1 = `
+	deploymentCreateExampleAPCV1 = `
 # Create new deployment with Celery executor (default: celery without params).
 $ astro deployment create --label=new-deployment-name --executor=celery --cluster-id=123
 
@@ -108,7 +108,7 @@ $ astro deployment create --label=my-operator-deployment --executor=k8s --cluste
 # Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
 $ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test
 `
-	createExampleDagDeploymentSoftwareV1 = `
+	createExampleDagDeploymentAPCV1 = `
 # Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
 $ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test --cluster-id=123
 `
@@ -171,7 +171,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	example := deploymentCreateExample
 	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
-		example = deploymentCreateExampleSoftwareV1
+		example = deploymentCreateExampleAPCV1
 	}
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -202,7 +202,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	if nfsMountDAGDeploymentEnabled {
 		if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
-			cmd.Example += createExampleDagDeploymentSoftwareV1
+			cmd.Example += createExampleDagDeploymentAPCV1
 		} else {
 			cmd.Example += createExampleDagDeployment
 		}

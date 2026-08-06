@@ -866,7 +866,7 @@ func (s *Suite) TestDeploymentUpdateCommandDagOnlyDeployEnabled() {
 }
 
 func (s *Suite) TestDeploymentAirflowUpgradeCommand() {
-	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
+	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "1.10.5"
@@ -1197,7 +1197,7 @@ func (s *Suite) TestDeploymentRuntimeUpgradeCommand() {
 		},
 	}
 
-	expectedOut := `The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.`
+	expectedOut := `The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = ""
@@ -1272,7 +1272,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommand() {
 		},
 	}
 
-	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.`
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "2.2.4"
@@ -1311,7 +1311,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommandFor1_0_0() {
 		},
 	}
 
-	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.`
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "2.2.4"
