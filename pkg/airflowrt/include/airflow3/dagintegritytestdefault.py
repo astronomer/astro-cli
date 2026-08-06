@@ -1,6 +1,7 @@
 """Test the validity of all DAGs. **USED BY DEV PARSE COMMAND DO NOT EDIT**"""
 
 from contextlib import contextmanager
+import inspect
 import logging
 import os
 
@@ -112,12 +113,21 @@ def suppress_logging(namespace):
         logger.disabled = old_value
 
 
+def new_dag_bag():
+    # Airflow 3.3 removed DagBag's `include_examples`; only pass it where supported.
+    try:
+        supports_examples = "include_examples" in inspect.signature(DagBag.__init__).parameters
+    except (ValueError, TypeError):
+        supports_examples = False
+    return DagBag(include_examples=False) if supports_examples else DagBag()
+
+
 def get_import_errors():
     """
     Generate a tuple for import errors in the dag bag, and include DAGs without errors.
     """
     with suppress_logging("airflow"):
-        dag_bag = DagBag(include_examples=False)
+        dag_bag = new_dag_bag()
 
         def strip_path_prefix(path):
             return os.path.relpath(path, os.environ.get("AIRFLOW_HOME"))

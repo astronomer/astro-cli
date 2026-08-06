@@ -1,6 +1,7 @@
 """Example DAGs test. This test ensures that all Dags have tags, retries set to two, and no import errors. This is an example pytest and may not be fit the context of your DAGs. Feel free to add and remove tests."""
 
 import os
+import inspect
 import logging
 from contextlib import contextmanager
 import pytest
@@ -18,12 +19,21 @@ def suppress_logging(namespace):
         logger.disabled = old_value
 
 
+def new_dag_bag():
+    # Airflow 3.3 removed DagBag's `include_examples`; only pass it where supported.
+    try:
+        supports_examples = "include_examples" in inspect.signature(DagBag.__init__).parameters
+    except (ValueError, TypeError):
+        supports_examples = False
+    return DagBag(include_examples=False) if supports_examples else DagBag()
+
+
 def get_import_errors():
     """
     Generate a tuple for import errors in the dag bag
     """
     with suppress_logging("airflow"):
-        dag_bag = DagBag(include_examples=False)
+        dag_bag = new_dag_bag()
 
         def strip_path_prefix(path):
             return os.path.relpath(path, os.environ.get("AIRFLOW_HOME"))
@@ -39,7 +49,7 @@ def get_dags():
     Generate a tuple of dag_id, <DAG objects> in the DagBag
     """
     with suppress_logging("airflow"):
-        dag_bag = DagBag(include_examples=False)
+        dag_bag = new_dag_bag()
 
     def strip_path_prefix(path):
         return os.path.relpath(path, os.environ.get("AIRFLOW_HOME"))
