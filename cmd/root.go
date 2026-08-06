@@ -28,8 +28,8 @@ var (
 )
 
 const (
-	softwarePlatform = "Astro Private Cloud"
-	cloudPlatform    = "Astro"
+	apcPlatform   = "APC"
+	cloudPlatform = "Astro"
 )
 
 // NewRootCmd adds all of the primary commands for the cli
@@ -45,7 +45,7 @@ func NewRootCmd() *cobra.Command {
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
 	if !isCloudCtx {
-		ctx = softwarePlatform
+		ctx = apcPlatform
 		houstonVersion, err = houstonClient.GetPlatformVersion(nil)
 		if err != nil {
 			apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
@@ -64,7 +64,7 @@ func NewRootCmd() *cobra.Command {
    \:.\ \  \ \ /____\:\  \::\ \   \ \ '\ \ \\:\_\ \ \          \:\_\ \ \\:\/___/\/__\::\__/\
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
-Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astro Private Cloud, or Local Development.`,
+Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, APC, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip heavy pre-run logic for commands that opt out via annotation
 			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
@@ -97,7 +97,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		rootCmd.AddCommand(
 			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, os.Stdout)...,
 		)
-	} else { // Include all the commands to be exposed for software users
+	} else { // Include all the commands to be exposed for APC users
 		rootCmd.AddCommand(
 			apcCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
@@ -113,7 +113,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 func getResourcesHelpTemplate(houstonVersion, ctx string) string {
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
-Current Context: %s{{if and (eq "%s" "Astro Private Cloud") (ne "%s" "")}}
+Current Context: %s{{if and (eq "%s" "APC") (ne "%s" "")}}
 Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}

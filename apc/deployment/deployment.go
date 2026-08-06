@@ -400,7 +400,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, fmt.Sprintf("%s-%s", certifiedImageType, d.DesiredAirflowVersion)}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started. ", d.AirflowVersion, d.DesiredAirflowVersion) +
-		fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to Astronomer.\n", d.DesiredAirflowVersion) +
+		fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to APC.\n", d.DesiredAirflowVersion) +
 		"To cancel, run: \n $ astro deployment airflow upgrade --cancel\n"
 
 	tab.Print(out)
@@ -474,7 +474,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, runtimeVersion}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Runtime %s to %s has been started. ", d.RuntimeVersion, desiredRuntimeVersion) +
-		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to Astronomer.\n", desiredRuntimeVersion) +
+		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to APC.\n", desiredRuntimeVersion) +
 		"To cancel, run: \n $ astro deployment runtime upgrade --cancel\n"
 
 	tab.Print(out)
@@ -557,7 +557,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 	tab.AddRow([]string{resp.Label, resp.ReleaseName, "v" + resp.Version, resp.ID, fmt.Sprintf("%s-%s", runtimeImageType, desiredRuntimeVersion)}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe migration from Airflow %s image to Runtime %s has been started. ", deployment.AirflowVersion, desiredRuntimeVersion) +
-		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to Astronomer.\n", desiredRuntimeVersion) +
+		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to APC.\n", desiredRuntimeVersion) +
 		"To cancel, run: \n $ astro deployment runtime migrate --cancel\n"
 
 	tab.Print(out)

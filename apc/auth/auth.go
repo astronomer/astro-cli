@@ -34,7 +34,7 @@ const (
 
 	localhostDomain      = "localhost"
 	houstonDomain        = "houston"
-	localSoftwareDomain  = "localhost.me"
+	localAPCDomain       = "localhost.me"
 	registryDomainPrefix = "registry."
 	defaultPageSize      = 100
 )
@@ -91,7 +91,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 		return err
 	}
 
-	if c.Domain == localhostDomain || c.Domain == houstonDomain || c.Domain == localSoftwareDomain {
+	if c.Domain == localhostDomain || c.Domain == houstonDomain || c.Domain == localAPCDomain {
 		return nil
 	}
 

@@ -774,7 +774,7 @@ func (s *Suite) TestAirflowUpgrade() {
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Astronomer-Certified-1.10.10     
 
-The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
+The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment airflow upgrade --cancel
 
@@ -913,7 +913,7 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
  NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
  test     burning-terrestrial-5940     v0.0.0     ckggzqj5f4157qtc9lescmehm     Astronomer-Certified-1.10.10     
 
-The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
+The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment airflow upgrade --cancel
 
@@ -1205,7 +1205,7 @@ func (s *Suite) TestRuntimeUpgrade() {
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
 
-The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.
+The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment runtime upgrade --cancel
 
@@ -1229,7 +1229,7 @@ To cancel, run:
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
 
-The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.
+The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment runtime upgrade --cancel
 
@@ -1311,7 +1311,7 @@ To cancel, run:
  NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
 
-The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.
+The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment runtime upgrade --cancel
 
@@ -1407,7 +1407,7 @@ func (s *Suite) TestRuntimeMigrate() {
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
 
-The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.
+The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment runtime migrate --cancel
 
@@ -1437,7 +1437,7 @@ To cancel, run:
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
 
-The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.
+The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.
 To cancel, run: 
  $ astro deployment runtime migrate --cancel
 

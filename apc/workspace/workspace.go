@@ -297,7 +297,7 @@ func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writ
 	return err
 }
 
-// Update an astronomer workspace
+// Update an APC workspace
 func Update(id string, client houston.ClientInterface, out io.Writer, args map[string]string) error {
 	// validate workspace
 	w, err := houston.Call(client.UpdateWorkspace)(houston.UpdateWorkspaceRequest{WorkspaceID: id, Args: args})

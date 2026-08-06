@@ -17,7 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/version"
 )
 
-// SetupLogging is a pre-run hook shared between software & cloud
+// SetupLogging is a pre-run hook shared between APC & cloud
 // setting up log verbosity.
 func SetupLogging(_ *cobra.Command, _ []string) error {
 	return apcCmd.SetUpLogs(os.Stdout, verboseLevel)

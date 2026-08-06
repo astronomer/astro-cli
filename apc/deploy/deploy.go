@@ -45,9 +45,9 @@ var (
 	errDeploymentNotFound        = errors.New("no airflow deployments found")
 	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
 	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
-	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your Astronomer cluster")
+	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your APC cluster")
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
-	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your Astronomer cluster")
+	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
@@ -137,7 +137,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	}
 
 	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
-	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
+	fmt.Printf("Successfully pushed Docker image to the APC registry, it can take a few minutes to update the deployment with the new image. Navigate to the APC UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return deploymentID, nil
 }
