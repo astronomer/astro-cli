@@ -52,7 +52,7 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 			if context.IsCloudDomain(ctx.Domain) {
 				fmt.Fprintf(out, "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
-			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
+			return softwareLogin(args[0], oAuth, "", "", token, houstonVersion, houstonClient, out)
 		}
 		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink)
 	}
@@ -64,7 +64,7 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink)
 	}
-	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
+	return softwareLogin(ctx.Domain, oAuth, "", "", token, houstonVersion, houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {

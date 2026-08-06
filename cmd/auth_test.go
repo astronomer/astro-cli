@@ -30,7 +30,7 @@ func (s *CmdSuite) TestLogin() {
 		return nil
 	}
 
-	softwareLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+	softwareLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 		s.Equal(softwareDomain, domain)
 		return nil
 	}
