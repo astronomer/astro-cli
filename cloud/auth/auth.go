@@ -424,26 +424,36 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Astro next.
-func Logout(domain string, out io.Writer) {
+// It clears every credential held in the context (access token, refresh token,
+// and email) so no live token is left behind in the config file.
+func Logout(domain string, out io.Writer) error {
 	c, _ := context.GetContext(domain)
 
 	err = c.SetContextKey("token", "")
 	if err != nil {
-		return
+		fmt.Fprintln(out, "Failed to clear access token: ", err.Error())
+		return err
+	}
+	err = c.SetContextKey("refreshtoken", "")
+	if err != nil {
+		fmt.Fprintln(out, "Failed to clear refresh token: ", err.Error())
+		return err
 	}
 	err = c.SetContextKey("user_email", "")
 	if err != nil {
-		return
+		fmt.Fprintln(out, "Failed to clear user email: ", err.Error())
+		return err
 	}
 
 	// remove the current context
 	err = config.ResetCurrentContext()
 	if err != nil {
 		fmt.Fprintln(out, "Failed to reset current context: ", err.Error())
-		return
+		return err
 	}
 
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
+	return nil
 }
 
 func FetchDomainAuthConfig(domain string) (Config, error) {
