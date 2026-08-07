@@ -1,5 +1,5 @@
 *  @astronomer/astro-cli-maintainers
 
 /houston/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
-/software/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
-/cmd/software/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
+/apc/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
+/cmd/apc/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers

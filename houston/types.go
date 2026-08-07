@@ -233,7 +233,7 @@ type TokenPayload struct {
 	Exp int    `json:"exp"`
 }
 
-// User contains all components of an Astronomer user
+// User contains all components of an APC user
 type User struct {
 	ID       string  `json:"id"`
 	Emails   []Email `json:"emails"`
@@ -245,7 +245,7 @@ type User struct {
 	// profile
 }
 
-// Team contains all components of an Astronomer Team
+// Team contains all components of an APC Team
 type Team struct {
 	ID           string        `json:"id"`
 	Name         string        `json:"name"`
@@ -282,7 +282,7 @@ type RoleBindingUser struct {
 	Username string `json:"username"`
 }
 
-// Workspace contains all components of an Astronomer Workspace
+// Workspace contains all components of an APC Workspace
 type Workspace struct {
 	ID          string `json:"id"`
 	Label       string `json:"label"`
