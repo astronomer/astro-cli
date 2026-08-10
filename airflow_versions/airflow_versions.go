@@ -82,12 +82,12 @@ func isBetterImage(candidate, current *ImageTagInfo) bool {
 		CompareRuntimeVersions(candidate.RuntimeVersion, current.RuntimeVersion),
 		semver.Compare("v"+candidate.PythonVersion, "v"+current.PythonVersion),
 		semver.Compare("v"+candidate.AgentVersion, "v"+current.AgentVersion),
-		// Prefer Debian as the default, but keep UBI as a fallback when it's all that exists.
-		distroRank(candidate.Distro)-distroRank(current.Distro),
+		cmp.Compare(distroRank(candidate.Distro), distroRank(current.Distro)),
 	) > 0
 }
 
-// distroRank ranks distros so Debian (empty distro) outranks any UBI variant.
+// distroRank ranks distros for default image selection: Debian (empty distro) is
+// preferred, with UBI kept only as a fallback when no Debian variant exists.
 func distroRank(distro string) int {
 	if distro == "" {
 		return 1
