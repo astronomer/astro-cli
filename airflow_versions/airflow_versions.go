@@ -20,8 +20,9 @@ const (
 
 var tagPrefixOrder = []string{"buster-onbuild", "onbuild", "buster"}
 
-// imageTagRegex matches image tags like "3.1-1-python-3.12-astro-agent-1.1.0"
-var imageTagRegex = regexp.MustCompile(`^(?P<runtime>\d+\.\d+(?:-\d+)?)-python-(?P<python>\d+\.\d+)-astro-agent-(?P<agent>.+?)(?:-base)?$`)
+// imageTagRegex matches "3.1-1-python-3.12-astro-agent-1.1.0" and "3.1-1-ubi9-python-...".
+// distro is optional (empty = Debian).
+var imageTagRegex = regexp.MustCompile(`^(?P<runtime>\d+\.\d+(?:-\d+)?)(?:-(?P<distro>ubi\d*))?-python-(?P<python>\d+\.\d+)-astro-agent-(?P<agent>.+?)(?:-base)?$`)
 
 type ErrNoTagAvailable struct {
 	airflowVersion string
@@ -36,6 +37,7 @@ type ImageTagInfo struct {
 	RuntimeVersion string
 	PythonVersion  string
 	AgentVersion   string
+	Distro         string // "" for Debian, else the ubi variant (ubi, ubi9, ...)
 	IsBase         bool
 }
 
@@ -62,12 +64,13 @@ func ParseImageTag(imageTag string) (*ImageTagInfo, error) {
 		RuntimeVersion: result["runtime"],
 		PythonVersion:  result["python"],
 		AgentVersion:   result["agent"],
+		Distro:         result["distro"],
 		IsBase:         isBase,
 	}, nil
 }
 
 // isBetterImage reports whether candidate should replace current for default astro-agent image selection.
-// Priority: Astro runtime (CompareRuntimeVersions), then Python semver, then astro-agent semver.
+// Priority: Astro runtime (CompareRuntimeVersions), then Python semver, then astro-agent semver, then Debian over UBI.
 func isBetterImage(candidate, current *ImageTagInfo) bool {
 	if candidate == nil {
 		return false
@@ -79,7 +82,17 @@ func isBetterImage(candidate, current *ImageTagInfo) bool {
 		CompareRuntimeVersions(candidate.RuntimeVersion, current.RuntimeVersion),
 		semver.Compare("v"+candidate.PythonVersion, "v"+current.PythonVersion),
 		semver.Compare("v"+candidate.AgentVersion, "v"+current.AgentVersion),
+		// Prefer Debian as the default, but keep UBI as a fallback when it's all that exists.
+		distroRank(candidate.Distro)-distroRank(current.Distro),
 	) > 0
+}
+
+// distroRank ranks distros so Debian (empty distro) outranks any UBI variant.
+func distroRank(distro string) int {
+	if distro == "" {
+		return 1
+	}
+	return 0
 }
 
 // GetDefaultImageTag returns default airflow image tag
