@@ -22,7 +22,15 @@ var tagPrefixOrder = []string{"buster-onbuild", "onbuild", "buster"}
 
 // imageTagRegex matches "3.1-1-python-3.12-astro-agent-1.1.0" and "3.1-1-ubi9-python-...".
 // distro is optional (empty = Debian).
-var imageTagRegex = regexp.MustCompile(`^(?P<runtime>\d+\.\d+(?:-\d+)?)(?:-(?P<distro>ubi\d*))?-python-(?P<python>\d+\.\d+)-astro-agent-(?P<agent>.+?)(?:-base)?$`)
+var imageTagRegex = regexp.MustCompile(`(?x)
+	\A
+	(?P<runtime>\d+\.\d+(?:-\d+)?)      # runtime version (e.g. 3.1-1)
+	(?:-(?P<distro>ubi\d*))?            # distro (optional)
+	-python-(?P<python>\d+\.\d+)        # python version
+	-astro-agent-(?P<agent>.+?)         # agent version
+	(?:-base)?
+	\z
+`)
 
 type ErrNoTagAvailable struct {
 	airflowVersion string
