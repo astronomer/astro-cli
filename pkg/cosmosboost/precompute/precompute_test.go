@@ -24,7 +24,7 @@ func TestRunDiscoversProjectsAndWritesSidecars(t *testing.T) {
 		"dags/plain_dag.py":               "print('hi')",
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestRunManifestOnly(t *testing.T) {
 		"shipped/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","generated_at":"t"},"nodes":{"model.x":{"name":"x"}}}`,
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestRunProjectWithTargetManifest(t *testing.T) {
 		"proj/target/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","generated_at":"t"},"nodes":{}}`,
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestRunSkipsNonDBTManifest(t *testing.T) {
 		"webapp/manifest.json": `{"name":"My App","icons":[]}`,
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestRunWarnsOnTemplatedPackagesPath(t *testing.T) {
 		"proj/models/a.sql":    "select 1",
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestSummaryWrite(t *testing.T) {
 
 func hashesByPath(t *testing.T, root string) map[string]string {
 	t.Helper()
-	s, err := Run([]string{root}, "test")
+	s, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestRunProjectHashStableWithNestedManifestSidecar(t *testing.T) {
 	})
 
 	projectHash := func() string {
-		s, err := Run([]string{root}, "test")
+		s, err := Run([]string{root}, "test", Options{SlimManifest: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestRunSkipsGitInternals(t *testing.T) {
 		".git/deep/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
 
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -333,7 +333,7 @@ func TestRunWarnsOnAllTemplatedDirSettings(t *testing.T) {
 		"proj/models/a.sql": "select 1",
 	})
 
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -382,7 +382,7 @@ func TestRunErrorsOnUnreadableDir(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 
-	if _, err := Run([]string{dir}, "test"); err == nil {
+	if _, err := Run([]string{dir}, "test", Options{SlimManifest: true}); err == nil {
 		t.Fatal("Run over a tree with an unreadable directory: error = nil, want non-nil")
 	}
 }
@@ -405,7 +405,7 @@ func TestRunErrorsOnUnreadableTargetDir(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(target, 0o755) })
 
-	if _, err := Run([]string{dir}, "test"); err == nil {
+	if _, err := Run([]string{dir}, "test", Options{SlimManifest: true}); err == nil {
 		t.Fatal("Run: error = nil, want manifest-scan error")
 	}
 }
@@ -420,7 +420,7 @@ func TestRunSkipsManifestInProjectRoot(t *testing.T) {
 		"proj/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
 
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestRunReportsFailedUnits(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "standalone", "manifest.json"), 0o644) })
 
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -474,16 +474,16 @@ func TestRunReportsFailedUnits(t *testing.T) {
 	}
 }
 
-// TestRunWritesSlimManifestAlongsideSidecar: every discovered manifest.json
-// gets a slim, field-filtered copy next to its hash sidecar, unconditionally
-// (there is no separate opt-in for this — see buildSlimManifest).
+// TestRunWritesSlimManifestAlongsideSidecar: with the option set, every
+// discovered manifest.json gets a slim, field-filtered copy next to its hash
+// sidecar (see buildSlimManifest).
 func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
 		"shipped/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"]}}}`,
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,6 +499,30 @@ func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 	nodes := slim["nodes"].(map[string]any)
 	if _, ok := nodes["model.shop.orders"]; !ok {
 		t.Fatalf("slim manifest missing expected node: %+v", slim)
+	}
+}
+
+// TestRunSkipsSlimManifestWhenNotRequested is the other side of the switch:
+// the hash sidecar is still written, because the two optimizations are
+// independent, and no slim manifest is left for a plugin that cannot read one.
+func TestRunSkipsSlimManifestWhenNotRequested(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"shipped/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 successful manifest result, got %+v", summary.Results)
+	}
+
+	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
+	slimPath := filepath.Join(root, "shipped", sidecarDir, slimManifestName)
+	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
+		t.Fatalf("slim manifest written without being requested: %v", err)
 	}
 }
 
@@ -521,7 +545,7 @@ func TestRunSlimManifestUnaffectedByHashDocumentMutation(t *testing.T) {
 		}`,
 	})
 
-	summary, err := Run([]string{root}, "test")
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
 	if err != nil || len(summary.Results) != 1 || summary.Results[0].Err != nil {
 		t.Fatalf("Run failed: err=%v results=%+v", err, summary.Results)
 	}

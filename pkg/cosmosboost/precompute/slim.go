@@ -11,9 +11,25 @@ const slimSchemaVersion = 1
 // (macros, disabled, docs, parent_map, child_map, ...) is unused.
 var slimSections = []string{"nodes", "sources", "exposures"}
 
-// slimResourceFields are the per-resource fields Cosmos reads to build a
-// DbtNode from a manifest resource.
-var slimResourceFields = []string{"original_file_path", "package_name", "resource_type", "tags", "config", "fqn"}
+// slimResourceFields are the per-resource fields Cosmos reads from a manifest
+// resource. The first six build the DbtNode itself
+// (cosmos/dbt/graph.py::_build_dbt_node_from_manifest_resource): dropping
+// original_file_path silently drops the node, resource_type is the one
+// bracket-accessed key (a KeyError if absent), and fqn is load-bearing at
+// runtime, not just for selectors - it becomes each task's literal
+// `--select fqn:...`. config is kept whole because selectors reach arbitrary
+// depth into config.meta.*, so its sub-keys cannot be enumerated ahead of time.
+//
+// database/schema/alias/name are read by a different module
+// (cosmos/dataset.py::compute_model_outlet_uris) to build per-model
+// dataset/Asset outlet URIs as "database.schema.alias", with name as the alias
+// fallback. Under ExecutionMode.WATCHER on Kubernetes/GKE that read is against
+// this very file, and a missing value there is a silent skip - no outlet, no
+// warning - so they stay in.
+var slimResourceFields = []string{
+	"original_file_path", "package_name", "resource_type", "tags", "config", "fqn",
+	"database", "schema", "alias", "name",
+}
 
 // buildSlimManifest returns a manifest document containing only the fields
 // Cosmos reads when building DAGs from a dbt manifest.json. doc is not

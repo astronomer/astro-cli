@@ -723,7 +723,7 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 			if err := cosmosboost.EnsureClean(path); err != nil {
 				return "", err
 			}
-			cosmosboost.BestEffortPreDeploy(path)
+			cosmosboost.BestEffortPreDeploy(path, config.CFG.CosmosBoostSlimManifest.GetBool())
 		}
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {

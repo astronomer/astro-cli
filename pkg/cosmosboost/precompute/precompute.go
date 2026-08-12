@@ -39,6 +39,17 @@ type Summary struct {
 	Results  []Result
 }
 
+// Options selects which artifacts a run writes. The hash sidecar is not
+// optional - it is the whole point of the run - so the zero value is the
+// sidecar-only behavior this package shipped before the slim manifest existed.
+type Options struct {
+	// SlimManifest also writes a slim, field-filtered copy of each discovered
+	// manifest.json (see buildSlimManifest) next to its sidecar. Independently
+	// switchable because its consumer is a specific plugin version: a
+	// deployment whose plugin cannot read it gains nothing from the bytes.
+	SlimManifest bool
+}
+
 // Run finds every dbt project (a directory with dbt_project.yml) and standalone
 // dbt manifest.json under the given roots, and writes a .astro/dbt_metadata.json
 // hash sidecar next to each. Units are processed concurrently — one worker each,
@@ -50,12 +61,12 @@ type Summary struct {
 // problem, such as a root that cannot be walked. version is recorded in each
 // sidecar's generated_by.
 //
-// Every discovered manifest.json also gets a slim, field-filtered copy (see
-// buildSlimManifest) written next to its sidecar, for the Cosmos Boost plugin
-// to load in place of the full manifest at DAG-parse time. A manifest.json
-// sitting directly in a project's root is excluded from discovery (see
-// findManifests) and so gets no slim copy either.
-func Run(roots []string, version string) (Summary, error) {
+// With opts.SlimManifest set, every discovered manifest.json also gets a slim,
+// field-filtered copy (see buildSlimManifest) written next to its sidecar, for
+// the Cosmos Boost plugin to load in place of the full manifest at DAG-parse
+// time. A manifest.json sitting directly in a project's root is excluded from
+// discovery (see findManifests) and so gets no slim copy either.
+func Run(roots []string, version string, opts Options) (Summary, error) {
 	start := time.Now()
 
 	projectDirs := map[string]bool{}
@@ -106,7 +117,7 @@ func Run(roots []string, version string) (Summary, error) {
 			if u.kind == kindProject {
 				results[i] = processProject(u.path, version)
 			} else {
-				results[i] = processManifest(u.path, version)
+				results[i] = processManifest(u.path, version, opts)
 			}
 		}(i, u)
 	}
@@ -137,27 +148,29 @@ func processProject(dir, version string) Result {
 }
 
 // processManifest hashes one manifest.json and writes a sidecar next to it,
-// along with a slim, field-filtered copy of the manifest (see
-// buildSlimManifest). A file that isn't a dbt manifest is skipped (neither is
+// plus a slim, field-filtered copy of the manifest when opts asks for one (see
+// buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
 // written) so unrelated manifest.json files in the project aren't stamped.
-func processManifest(path, version string) Result {
+func processManifest(path, version string, opts Options) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
 	var hash string
 	var slimData []byte
 	if err == nil && isDbt {
-		// Marshal now, before hashDocument mutates doc: buildSlimManifest's
-		// result shares nested values with doc (selectors, and each
-		// resource's config/tags/fqn/depends_on.nodes), so only marshaling
-		// it to bytes - not just calling buildSlimManifest first - actually
-		// decouples the slim manifest from hashDocument's mutation.
-		//
-		// slim holds only JSON-native types and the GeneratedBy struct, all
-		// of which always marshal successfully.
-		slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+		if opts.SlimManifest {
+			// Marshal now, before hashDocument mutates doc: buildSlimManifest's
+			// result shares nested values with doc (selectors, and each
+			// resource's config/tags/fqn/depends_on.nodes), so only marshaling
+			// it to bytes - not just calling buildSlimManifest first - actually
+			// decouples the slim manifest from hashDocument's mutation.
+			//
+			// slim holds only JSON-native types and the GeneratedBy struct, all
+			// of which always marshal successfully.
+			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+		}
 		hash = hashDocument(doc)
 	}
-	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes}
+	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
 	switch {
 	case err != nil:
 		r.Err = err
@@ -171,15 +184,13 @@ func processManifest(path, version string) Result {
 		// the plugin just falls back to hashing at parse time. Writing it
 		// first would instead ship a fresh sidecar next to a slim manifest
 		// that was never written.
-		if slimErr := writeSlimManifest(dir, slimData); slimErr != nil {
-			r.Err = slimErr
-		} else {
+		if slimData != nil {
+			r.Err = writeSlimManifest(dir, slimData)
+		}
+		if r.Err == nil {
 			r.Err = writeSidecar(dir, algoManifestJSON, hash, version)
 		}
 	}
-	// Measured after the writes, like processProject: both artifacts are part
-	// of this unit's cost, and the slim manifest is the larger of the two.
-	r.Duration = time.Since(start)
 	return r
 }
 

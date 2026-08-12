@@ -15,10 +15,14 @@ import (
 // (dbt_project.yml) gets a .astro/dbt_metadata.json sidecar carrying its
 // content hash, which the Cosmos Boost plugin uses as a cache version key at
 // parse time instead of hashing the project tree itself. Every standalone dbt
-// manifest.json also gets a hash sidecar plus a slim, field-filtered copy for
-// the plugin to load in place of the full manifest at DAG-parse time.
-func PreDeploy(path string) error {
-	summary, err := precompute.Run([]string{path}, version.CurrVersion)
+// manifest.json gets a hash sidecar too.
+//
+// slimManifest additionally writes a slim, field-filtered copy of each
+// manifest for the plugin to load in place of the full one at DAG-parse time.
+// It is a separate switch from the step as a whole because only a plugin
+// version that knows to read it benefits (see config's cosmos_boost.*).
+func PreDeploy(path string, slimManifest bool) error {
+	summary, err := precompute.Run([]string{path}, version.CurrVersion, precompute.Options{SlimManifest: slimManifest})
 	if err != nil {
 		return fmt.Errorf("running the Cosmos Boost pre-deploy step: %w", err)
 	}
@@ -82,8 +86,8 @@ func EnsureClean(path string) error {
 // because without a sidecar the plugin simply falls back to hashing at parse
 // time. Callers must run EnsureClean first: writing nothing is safe, leaving
 // something stale is not.
-func BestEffortPreDeploy(path string) {
-	if err := PreDeploy(path); err != nil {
+func BestEffortPreDeploy(path string, slimManifest bool) {
+	if err := PreDeploy(path, slimManifest); err != nil {
 		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", err)
 		return
 	}

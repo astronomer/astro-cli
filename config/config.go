@@ -102,6 +102,12 @@ var (
 		ProxyPort:               newCfg("proxy.port", "6563"),
 		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
 		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
+		// Gates the slim, field-filtered manifest copy only; the hash sidecar
+		// is written either way. Off by default because no released Cosmos
+		// Boost plugin reads manifest.slim.json yet - until one does, writing
+		// it only costs deploy time and payload size. Flip to "true" once the
+		// plugin ships the read-with-fallback path.
+		CosmosBoostSlimManifest: newCfg("cosmos_boost.slim_manifest", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory

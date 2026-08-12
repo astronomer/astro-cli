@@ -18,7 +18,7 @@ func stampProject(t *testing.T, dir string) {
 		"dbt_project.yml": "name: shop\n",
 		"models/a.sql":    "select 1",
 	})
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil || summary.CountFailed() > 0 {
 		t.Fatalf("stamping fixture project failed: err=%v failed=%d", err, summary.CountFailed())
 	}
@@ -57,7 +57,7 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	writeFiles(t, dir, map[string]string{
 		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil || summary.CountFailed() > 0 {
 		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
 	}
@@ -95,7 +95,7 @@ func TestCleanupKeepsForeignSlimManifestBesideOurSidecar(t *testing.T) {
 	writeFiles(t, dir, map[string]string{
 		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil || summary.CountFailed() > 0 {
 		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
 	}
@@ -130,7 +130,7 @@ func TestCleanupRemovesSlimManifestBesideForeignSidecar(t *testing.T) {
 	writeFiles(t, dir, map[string]string{
 		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil || summary.CountFailed() > 0 {
 		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
 	}
@@ -167,7 +167,7 @@ func TestCleanupRemovesOrphanedSlimManifest(t *testing.T) {
 	writeFiles(t, dir, map[string]string{
 		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil || summary.CountFailed() > 0 {
 		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
 	}
@@ -233,7 +233,7 @@ func TestCleanupAttributesRemovalFailuresPerArtifact(t *testing.T) {
 	writeFiles(t, dir, map[string]string{
 		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
-	summary, err := Run([]string{dir}, "test")
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
 	if err != nil || summary.CountFailed() > 0 {
 		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
 	}

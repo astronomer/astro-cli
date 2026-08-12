@@ -29,7 +29,7 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 
-	require.NoError(t, PreDeploy(dir))
+	require.NoError(t, PreDeploy(dir, true))
 
 	data, err := os.ReadFile(filepath.Join(dir, artifactRelPath))
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestPreDeployWritesSlimManifest(t *testing.T) {
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
 
-	require.NoError(t, PreDeploy(dir))
+	require.NoError(t, PreDeploy(dir, true))
 
 	require.FileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
 }
@@ -69,14 +69,14 @@ func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('hi')"), 0o644))
 
-	require.NoError(t, PreDeploy(dir))
+	require.NoError(t, PreDeploy(dir, true))
 
 	_, err := os.Stat(filepath.Join(dir, ".astro"))
 	require.True(t, os.IsNotExist(err), "nothing dbt-shaped means nothing written")
 }
 
 func TestPreDeployNonexistentPath(t *testing.T) {
-	require.Error(t, PreDeploy(filepath.Join(t.TempDir(), "does-not-exist")))
+	require.Error(t, PreDeploy(filepath.Join(t.TempDir(), "does-not-exist"), true))
 }
 
 // TestEnsureCleanRemovesStaleArtifacts covers the sequence the deploy hooks
@@ -94,7 +94,7 @@ func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
 	require.NoError(t, os.WriteFile(stale, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
 
 	require.NoError(t, EnsureClean(dir))
-	BestEffortPreDeploy(dir)
+	BestEffortPreDeploy(dir, true)
 
 	_, err := os.Stat(stale)
 	require.True(t, os.IsNotExist(err), "stale artifacts must not survive a pre-deploy run")
@@ -108,7 +108,7 @@ func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
 func TestEnsureCleanFailsOnForeignSidecar(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
-	require.NoError(t, PreDeploy(dir))
+	require.NoError(t, PreDeploy(dir, true))
 
 	foreign := filepath.Join(dir, "other", ".astro", "dbt_metadata.json")
 	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
@@ -170,7 +170,7 @@ func TestPreDeployReportsFailedUnits(t *testing.T) {
 	require.NoError(t, os.Chmod(model, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(model, 0o644) })
 
-	err := PreDeploy(dir)
+	err := PreDeploy(dir, true)
 
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed for 1 unit(s)")
@@ -178,5 +178,5 @@ func TestPreDeployReportsFailedUnits(t *testing.T) {
 
 // TestBestEffortPreDeployWarnsAndContinues: stamping failures never propagate.
 func TestBestEffortPreDeployWarnsAndContinues(t *testing.T) {
-	BestEffortPreDeploy(filepath.Join(t.TempDir(), "does-not-exist"))
+	BestEffortPreDeploy(filepath.Join(t.TempDir(), "does-not-exist"), true)
 }

@@ -58,9 +58,32 @@ func TestUploadBundleRunsPreDeployWhenEnabled(t *testing.T) {
 
 // TestUploadBundleWritesSlimManifestWhenEnabled pins that a discovered
 // manifest.json gets a slim, field-filtered copy alongside its hash sidecar
-// whenever cosmos_boost.pre_deploy is enabled - there is no separate opt-in
-// for this.
+// once cosmos_boost.slim_manifest is enabled on top of the step itself.
 func TestUploadBundleWritesSlimManifestWhenEnabled(t *testing.T) {
+	setupCosmosBoostEnv(t)
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
+	require.NoError(t, config.CFG.CosmosBoostSlimManifest.SetHomeString("true"))
+
+	bundleDir := writeDbtBundle(t)
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.MkdirAll(filepath.Join(bundleDir, "target"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "target", "manifest.json"), []byte(manifest), 0o644))
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(bundleDir, "target", ".astro", "dbt_metadata.json"), "the manifest must still be stamped")
+	assert.FileExists(t, filepath.Join(bundleDir, "target", ".astro", "manifest.slim.json"))
+}
+
+// TestUploadBundleSkipsSlimManifestByDefault: cosmos_boost.slim_manifest is a
+// switch of its own, defaulting off while no released plugin reads the file.
+// Enabling the step alone must still stamp the hash sidecar and nothing more.
+func TestUploadBundleSkipsSlimManifestByDefault(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
 
@@ -77,7 +100,7 @@ func TestUploadBundleWritesSlimManifestWhenEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.FileExists(t, filepath.Join(bundleDir, "target", ".astro", "dbt_metadata.json"), "the manifest must still be stamped")
-	assert.FileExists(t, filepath.Join(bundleDir, "target", ".astro", "manifest.slim.json"))
+	assert.NoFileExists(t, filepath.Join(bundleDir, "target", ".astro", "manifest.slim.json"))
 }
 
 func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
