@@ -52,6 +52,19 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 	require.Equal(t, "1.2.3", meta.GeneratedBy.Version, "provenance records the CLI version now that the step runs in-process")
 }
 
+// TestPreDeployWritesSlimManifest pins that PreDeploy writes a slim manifest
+// next to a discovered manifest.json's hash sidecar - there is no separate
+// opt-in for this, it follows cosmos_boost.pre_deploy.
+func TestPreDeployWritesSlimManifest(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
+
+	require.NoError(t, PreDeploy(dir))
+
+	require.FileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
+}
+
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('hi')"), 0o644))

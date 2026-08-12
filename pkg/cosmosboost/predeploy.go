@@ -12,10 +12,11 @@ import (
 )
 
 // PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
-// (dbt_project.yml) and standalone dbt manifest.json under it gets a
-// .astro/dbt_metadata.json sidecar carrying its content hash, which the Cosmos
-// Boost plugin uses as a cache version key at parse time instead of hashing
-// the project tree itself.
+// (dbt_project.yml) gets a .astro/dbt_metadata.json sidecar carrying its
+// content hash, which the Cosmos Boost plugin uses as a cache version key at
+// parse time instead of hashing the project tree itself. Every standalone dbt
+// manifest.json also gets a hash sidecar plus a slim, field-filtered copy for
+// the plugin to load in place of the full manifest at DAG-parse time.
 func PreDeploy(path string) error {
 	summary, err := precompute.Run([]string{path}, version.CurrVersion)
 	if err != nil {

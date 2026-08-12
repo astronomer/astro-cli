@@ -39,10 +39,11 @@ type CleanupSummary struct {
 }
 
 // Cleanup removes every .astro/dbt_metadata.json sidecar under the given
-// roots that this tool wrote, pruning each containing .astro directory when
-// removal leaves it empty. A dbt_metadata.json whose generated_by.application
-// is not ours — or that isn't valid JSON — is left in place and reported as
-// kept, so cleanup never deletes a file some other tool owns.
+// roots that this tool wrote, along with any slim manifest (manifest.slim.json)
+// written next to it, pruning each containing .astro directory when removal
+// leaves it empty. A dbt_metadata.json whose generated_by.application is not
+// ours — or that isn't valid JSON — is left in place and reported as kept, so
+// cleanup never deletes a file some other tool owns.
 //
 // Per-file removal failures are recorded in their Result and do not stop the
 // others; like Run, a non-nil error is returned only for a top-level problem
@@ -103,9 +104,10 @@ func canonicalPath(path string) string {
 	return filepath.Clean(path)
 }
 
-// removeSidecar deletes one sidecar after checking this tool wrote it, then
-// prunes the containing .astro directory if removal left it empty. Only the
-// sidecar file is ever removed — anything else under .astro (e.g. an Astro
+// removeSidecar deletes one sidecar after checking this tool wrote it, along
+// with any slim manifest sitting next to it, then prunes the containing
+// .astro directory if removal left it empty. Only files this tool could have
+// written are ever removed — anything else under .astro (e.g. an Astro
 // project's config.yaml) is never touched.
 func removeSidecar(path string) CleanupResult {
 	data, err := os.ReadFile(path)
@@ -119,6 +121,8 @@ func removeSidecar(path string) CleanupResult {
 	if err := os.Remove(path); err != nil {
 		return CleanupResult{Path: path, Err: err}
 	}
+	// Best-effort: a slim manifest is optional, so its absence is not an error.
+	_ = os.Remove(filepath.Join(filepath.Dir(path), slimManifestName))
 	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
 	return CleanupResult{Path: path}
 }

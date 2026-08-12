@@ -473,3 +473,31 @@ func TestRunReportsFailedUnits(t *testing.T) {
 		t.Fatalf("failed = %d, want 3 (broken project, locked project, unreadable manifest)", got)
 	}
 }
+
+// TestRunWritesSlimManifestAlongsideSidecar: every discovered manifest.json
+// gets a slim, field-filtered copy next to its hash sidecar, unconditionally
+// (there is no separate opt-in for this — see buildSlimManifest).
+func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"shipped/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"]}}}`,
+	})
+
+	summary, err := Run([]string{root}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 successful manifest result, got %+v", summary.Results)
+	}
+
+	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
+	slimPath := filepath.Join(root, "shipped", sidecarDir, slimManifestName)
+	mustExist(t, slimPath)
+	var slim map[string]any
+	readJSON(t, slimPath, &slim)
+	nodes := slim["nodes"].(map[string]any)
+	if _, ok := nodes["model.shop.orders"]; !ok {
+		t.Fatalf("slim manifest missing expected node: %+v", slim)
+	}
+}

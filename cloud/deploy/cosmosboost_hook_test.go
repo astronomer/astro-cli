@@ -56,6 +56,30 @@ func TestUploadBundleRunsPreDeployWhenEnabled(t *testing.T) {
 		"the pre-deploy step must stamp the bundle before it is tarred")
 }
 
+// TestUploadBundleWritesSlimManifestWhenEnabled pins that a discovered
+// manifest.json gets a slim, field-filtered copy alongside its hash sidecar
+// whenever cosmos_boost.pre_deploy is enabled - there is no separate opt-in
+// for this.
+func TestUploadBundleWritesSlimManifestWhenEnabled(t *testing.T) {
+	setupCosmosBoostEnv(t)
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
+
+	bundleDir := writeDbtBundle(t)
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.MkdirAll(filepath.Join(bundleDir, "target"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bundleDir, "target", "manifest.json"), []byte(manifest), 0o644))
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(bundleDir, "target", ".astro", "dbt_metadata.json"), "the manifest must still be stamped")
+	assert.FileExists(t, filepath.Join(bundleDir, "target", ".astro", "manifest.slim.json"))
+}
+
 func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	// cosmos_boost.pre_deploy defaults to false, so nothing may be produced.

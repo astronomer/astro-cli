@@ -189,29 +189,33 @@ func isDbtManifest(doc map[string]any) bool {
 	return ok && v != ""
 }
 
-// hashManifest computes the "sha256-manifest-v2" hash of a dbt manifest.json: the
-// sha256 of its JSON content with the volatile metadata fields removed, so the
-// value is stable across recompiles of unchanged source.
-//
-// isDbt reports whether the file is actually a dbt manifest. A file that is not
-// valid JSON, or that lacks the dbt manifest shape, returns isDbt=false and is
-// not stamped (callers skip it) — so unrelated manifest.json files in the project
-// don't get a sidecar.
-func hashManifest(path string) (hash string, bytes int64, isDbt bool, err error) {
+// readManifestDoc reads path and parses it as JSON. isDbt reports whether the
+// file is actually a dbt manifest (see isDbtManifest). A file that is not
+// valid JSON, or that lacks the dbt manifest shape, returns isDbt=false and
+// doc=nil — not every manifest.json found in a project is one dbt produced
+// (e.g. a web app's PWA manifest).
+func readManifestDoc(path string) (doc map[string]any, bytes int64, isDbt bool, err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", 0, false, err
+		return nil, 0, false, err
 	}
 	bytes = int64(len(data))
 
-	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
 		//nolint:nilerr // invalid JSON → not a dbt manifest: a skip, not an error (callers don't stamp it)
-		return "", bytes, false, nil
+		return nil, bytes, false, nil
 	}
 	if !isDbtManifest(doc) {
-		return "", bytes, false, nil
+		return nil, bytes, false, nil
 	}
+	return doc, bytes, true, nil
+}
+
+// hashDocument computes the "sha256-manifest-v2" hash of an already-parsed
+// dbt manifest document, after removing the volatile fields dbt regenerates on
+// every full parse, so the value is stable across recompiles of unchanged
+// source. doc is mutated in place.
+func hashDocument(doc map[string]any) string {
 	if meta, ok := doc["metadata"].(map[string]any); ok {
 		for _, k := range volatileManifestKeys {
 			delete(meta, k)
@@ -222,7 +226,19 @@ func hashManifest(path string) (hash string, bytes int64, isDbt bool, err error)
 	// doc came from json.Unmarshal, so it holds only JSON-native types and
 	// re-marshaling cannot fail.
 	canonical, _ := json.Marshal(doc)
-	return sha256Hex(canonical), bytes, true, nil
+	return sha256Hex(canonical)
+}
+
+// hashManifest computes the "sha256-manifest-v2" hash of a dbt manifest.json.
+// isDbt reports whether the file is actually a dbt manifest; a file that
+// isn't is not stamped (callers skip it) — so unrelated manifest.json files
+// in the project don't get a sidecar.
+func hashManifest(path string) (hash string, isDbt bool, err error) {
+	doc, _, isDbt, err := readManifestDoc(path)
+	if err != nil || !isDbt {
+		return "", isDbt, err
+	}
+	return hashDocument(doc), true, nil
 }
 
 // hashFile returns the hex sha256 of a file's contents and its size in bytes.

@@ -47,6 +47,37 @@ func TestCleanupRemovesSidecarAndPrunesDir(t *testing.T) {
 	}
 }
 
+// TestCleanupRemovesSlimManifestAlongsideSidecar: a slim manifest is only
+// meaningful alongside a fresh hash sidecar, so cleanup must remove a stale
+// one too - otherwise a later deploy (with a changed manifest, or with
+// cosmos_boost.pre_deploy disabled) could still ship an outdated
+// manifest.slim.json.
+func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test")
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+	slimPath := filepath.Join(dir, sidecarDir, slimManifestName)
+	if _, err := os.Stat(slimPath); err != nil {
+		t.Fatalf("fixture setup: slim manifest not written: %v", err)
+	}
+
+	if _, err := Cleanup([]string{dir}); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+
+	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
+		t.Fatalf("slim manifest still present after cleanup: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, sidecarDir)); !os.IsNotExist(err) {
+		t.Fatalf(".astro dir not pruned after removing both files: %v", err)
+	}
+}
+
 func TestCleanupLeavesNonEmptyAstroDir(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)

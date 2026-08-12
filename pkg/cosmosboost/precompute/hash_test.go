@@ -185,7 +185,7 @@ func TestHashManifestIgnoresVolatileMetadata(t *testing.T) {
 		return p
 	}
 	hash := func(path string) string {
-		h, _, isDbt, err := hashManifest(path)
+		h, isDbt, err := hashManifest(path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -223,7 +223,7 @@ func TestHashManifestSkipsNonDBT(t *testing.T) {
 		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		_, _, isDbt, err := hashManifest(p)
+		_, isDbt, err := hashManifest(p)
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", name, err)
 		}
@@ -385,7 +385,7 @@ func TestHashFileError(t *testing.T) {
 }
 
 func TestHashManifestReadError(t *testing.T) {
-	_, _, isDbt, err := hashManifest(filepath.Join(t.TempDir(), "does-not-exist.json"))
+	_, isDbt, err := hashManifest(filepath.Join(t.TempDir(), "does-not-exist.json"))
 	if err == nil {
 		t.Fatal("hashManifest on a missing file should return an error")
 	}
@@ -447,18 +447,18 @@ func TestHashManifestStableAcrossFullParses(t *testing.T) {
 		"changed/manifest.json": manifest("1754300000.1", "2026-08-04T09:00:00Z", "select 2"),
 	})
 
-	h1, _, isDbt1, err := hashManifest(filepath.Join(dir, "first", "manifest.json"))
+	h1, isDbt1, err := hashManifest(filepath.Join(dir, "first", "manifest.json"))
 	if err != nil || !isDbt1 {
 		t.Fatalf("first manifest: err=%v isDbt=%v", err, isDbt1)
 	}
-	h2, _, _, err := hashManifest(filepath.Join(dir, "second", "manifest.json"))
+	h2, _, err := hashManifest(filepath.Join(dir, "second", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if h1 != h2 {
 		t.Fatalf("full-parse timestamp churn changed the hash:\n want %s\n got  %s", h1, h2)
 	}
-	h3, _, _, err := hashManifest(filepath.Join(dir, "changed", "manifest.json"))
+	h3, _, err := hashManifest(filepath.Join(dir, "changed", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -479,11 +479,11 @@ func TestHashManifestKeepsUserMetaCreatedAt(t *testing.T) {
 		"one/manifest.json": fmt.Sprintf(base, "2001-01-01"),
 		"two/manifest.json": fmt.Sprintf(base, "2002-02-02"),
 	})
-	h1, _, _, err := hashManifest(filepath.Join(dir, "one", "manifest.json"))
+	h1, _, err := hashManifest(filepath.Join(dir, "one", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	h2, _, _, err := hashManifest(filepath.Join(dir, "two", "manifest.json"))
+	h2, _, err := hashManifest(filepath.Join(dir, "two", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

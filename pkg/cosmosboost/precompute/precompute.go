@@ -28,7 +28,7 @@ type Result struct {
 	Duration time.Duration // time spent on this unit
 	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar written)
 	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
-	Err      error         // non-nil if hashing or writing the sidecar failed
+	Err      error         // non-nil if hashing, writing the sidecar, or writing the slim manifest failed
 }
 
 // Summary is the structured outcome of a precompute run. It backs both the
@@ -48,6 +48,10 @@ type Summary struct {
 // and does not stop the others. Run only returns a non-nil error for a top-level
 // problem, such as a root that cannot be walked. version is recorded in each
 // sidecar's generated_by.
+//
+// Every discovered manifest.json also gets a slim, field-filtered copy (see
+// buildSlimManifest) written next to its sidecar, for the Cosmos Boost plugin
+// to load in place of the full manifest at DAG-parse time.
 func Run(roots []string, version string) (Summary, error) {
 	start := time.Now()
 
@@ -129,12 +133,17 @@ func processProject(dir, version string) Result {
 	return r
 }
 
-// processManifest hashes one manifest.json and writes a sidecar next to it. A
-// file that isn't a dbt manifest is skipped (no sidecar) so unrelated
-// manifest.json files in the project aren't stamped.
+// processManifest hashes one manifest.json and writes a sidecar next to it,
+// along with a slim, field-filtered copy of the manifest (see
+// buildSlimManifest). A file that isn't a dbt manifest is skipped (neither is
+// written) so unrelated manifest.json files in the project aren't stamped.
 func processManifest(path, version string) Result {
 	start := time.Now()
-	hash, bytes, isDbt, err := hashManifest(path)
+	doc, bytes, isDbt, err := readManifestDoc(path)
+	var hash string
+	if err == nil && isDbt {
+		hash = hashDocument(doc)
+	}
 	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
 	switch {
 	case err != nil:
@@ -142,7 +151,12 @@ func processManifest(path, version string) Result {
 	case !isDbt:
 		r.Skipped = true
 	default:
-		r.Err = writeSidecar(filepath.Dir(path), algoManifestJSON, hash, version)
+		dir := filepath.Dir(path)
+		if sidecarErr := writeSidecar(dir, algoManifestJSON, hash, version); sidecarErr != nil {
+			r.Err = sidecarErr
+		} else {
+			r.Err = writeSlimManifest(dir, buildSlimManifest(doc))
+		}
 	}
 	return r
 }
