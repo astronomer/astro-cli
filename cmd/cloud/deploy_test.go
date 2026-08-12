@@ -153,6 +153,43 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 	assert.ErrorIs(t, err, assert.AnError)
 }
 
+func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return assert.AnError
+	}
+	defer func() {
+		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	}()
+
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+		return nil
+	}
+
+	// With --dags and --dags-path, the DAGs are read entirely from --dags-path, so the
+	// project-dir check should be skipped.
+	err := execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags")
+	assert.NoError(t, err)
+
+	// --dags alone (DAGs read from the working directory) still needs the project-dir check.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// --dags-path alone (without --dags, i.e. a full image+dags deploy) still needs the project
+	// root as the Docker build context.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags-path", "./external-dags")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// --pytest/--parse build and run a local image to test-parse the DAGs, so the project-dir
+	// check should still run even with --dags-path set.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags", "--pytest")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags", "--parse")
+	assert.ErrorIs(t, err, assert.AnError)
+}
+
 func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
