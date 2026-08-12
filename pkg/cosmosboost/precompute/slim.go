@@ -1,10 +1,5 @@
 package precompute
 
-import (
-	"os"
-	"path/filepath"
-)
-
 const slimManifestName = "manifest.slim.json"
 
 // slimSchemaVersion lets a future reader tell which allowlist produced a slim
@@ -35,8 +30,8 @@ func buildSlimManifest(doc map[string]any, version string) map[string]any {
 	slim := map[string]any{
 		"_schema":       slimSchemaVersion,
 		"_generated_by": GeneratedBy{Application: application, Version: version},
-		"metadata":      map[string]any{"project_name": projectName(doc)},
-		"selectors":     doc["selectors"],
+		"metadata":      slimMetadata(doc),
+		"selectors":     objectOrEmpty(doc["selectors"]),
 	}
 	for _, section := range slimSections {
 		entries, _ := doc[section].(map[string]any)
@@ -51,15 +46,34 @@ func buildSlimManifest(doc map[string]any, version string) map[string]any {
 	return slim
 }
 
-// projectName returns manifest.metadata.project_name, or nil if either is
-// absent. is_root_project_node (Cosmos) compares each resource's
-// package_name against this value, so it's the only metadata field kept.
-func projectName(doc map[string]any) any {
+// slimMetadata returns the kept subset of manifest.metadata: project_name and
+// nothing else, since is_root_project_node (Cosmos) comparing each resource's
+// package_name against it is the only use of this section. An absent
+// project_name leaves the key out rather than setting it to null, so the read
+// side sees the same absence the full manifest had.
+func slimMetadata(doc map[string]any) map[string]any {
 	meta, ok := doc["metadata"].(map[string]any)
 	if !ok {
-		return nil
+		return map[string]any{}
 	}
-	return meta["project_name"]
+	slim := map[string]any{}
+	if name, ok := meta["project_name"]; ok {
+		slim["project_name"] = name
+	}
+	return slim
+}
+
+// objectOrEmpty returns v when it is a JSON object, else an empty one. Every
+// section this is applied to is an object in a real manifest, so substituting
+// {} for a missing or wrong-typed one keeps the slim manifest's shape a subset
+// of the full manifest's: a null would survive marshaling and break a reader
+// that iterates what manifest.get("selectors", {}) hands back.
+func objectOrEmpty(v any) map[string]any {
+	object, ok := v.(map[string]any)
+	if !ok {
+		return map[string]any{}
+	}
+	return object
 }
 
 // slimResource returns a copy of resource containing only the fields Cosmos
@@ -91,9 +105,5 @@ func slimResource(resource map[string]any) map[string]any {
 // callers marshal it themselves, before hashDocument gets a chance to mutate
 // any doc value the slim manifest shares (see buildSlimManifest).
 func writeSlimManifest(dir string, data []byte) error {
-	out := filepath.Join(dir, sidecarDir)
-	if err := os.MkdirAll(out, sidecarDirPerm); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(out, slimManifestName), data, sidecarPerm) //nolint:gosec // see sidecarPerm
+	return writeArtifact(dir, slimManifestName, data)
 }

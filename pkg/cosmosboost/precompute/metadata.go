@@ -69,9 +69,44 @@ func writeSidecar(dir, algo, hash, version string) error {
 	data, _ := json.MarshalIndent(meta, "", "  ")
 	data = append(data, '\n')
 
+	return writeArtifact(dir, sidecarName, data)
+}
+
+// writeArtifact writes data to dir/.astro/name, creating the directory if
+// needed. The write is atomic — a temp file in the same directory, renamed
+// over the destination — so a failed or interrupted write leaves the previous
+// contents (or nothing) rather than a truncated file. That matters most for
+// the slim manifest, which is large enough for a partial write to be real:
+// truncated JSON is unusable to the plugin AND indistinguishable from another
+// producer's file to Cleanup, which would then report it as an unrecognized
+// artifact and have EnsureClean block every later deploy over a file we wrote
+// ourselves. A hard kill between create and rename can still strand a temp
+// file in .astro, which only keeps the directory from being pruned.
+func writeArtifact(dir, name string, data []byte) error {
 	out := filepath.Join(dir, sidecarDir)
 	if err := os.MkdirAll(out, sidecarDirPerm); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(out, sidecarName), data, sidecarPerm) //nolint:gosec // see sidecarPerm
+	tmp, err := os.CreateTemp(out, name+".tmp-*")
+	if err != nil {
+		return err
+	}
+	// Both are no-ops on the success path: Close is already done and the
+	// rename has taken the temp name out of the directory.
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	// CreateTemp opens at 0o600; artifacts need sidecarPerm to be readable by
+	// the Airflow runtime user once shipped.
+	if err := os.Chmod(tmp.Name(), sidecarPerm); err != nil { //nolint:gosec // see sidecarPerm
+		return err
+	}
+	return os.Rename(tmp.Name(), filepath.Join(out, name))
 }

@@ -144,6 +144,34 @@ func TestBuildSlimManifestHandlesMissingSections(t *testing.T) {
 	}
 }
 
+// TestBuildSlimManifestNeverEmitsNulls: an absent key must not turn into an
+// explicit null. A reader doing manifest.get("selectors", {}) - the idiom that
+// works against a full manifest - would get None back and fail on the whole
+// file, so the slim manifest's shape stays a subset of the full one's.
+func TestBuildSlimManifestNeverEmitsNulls(t *testing.T) {
+	// No top-level selectors, and metadata without project_name.
+	doc := parseDoc(t, `{"metadata": {"dbt_schema_version": "v12"}, "nodes": {}}`)
+
+	slim := buildSlimManifest(doc, "test")
+
+	if selectors, ok := slim["selectors"].(map[string]any); !ok || len(selectors) != 0 {
+		t.Fatalf("absent selectors must slim to an empty object, got %#v", slim["selectors"])
+	}
+	meta, ok := slim["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata has the wrong type: %#v", slim["metadata"])
+	}
+	if _, present := meta["project_name"]; present {
+		t.Fatalf("absent project_name must be left out, not set to null: %#v", meta)
+	}
+
+	// A wrong-typed metadata (not an object) must not panic or leak through.
+	if slim := buildSlimManifest(parseDoc(t, `{"metadata": 7, "selectors": 7}`), "test"); len(slim["metadata"].(map[string]any)) != 0 ||
+		len(slim["selectors"].(map[string]any)) != 0 {
+		t.Fatalf("wrong-typed sections must slim to empty objects, got %#v", slim)
+	}
+}
+
 // TestBuildSlimManifestIncludesVersionMarker: a future reader needs a way to
 // tell which allowlist produced a slim manifest, so it carries its own
 // schema/generated_by, independent of the sidecar sitting next to it.

@@ -157,7 +157,7 @@ func processManifest(path, version string) Result {
 		slimData, _ = json.Marshal(buildSlimManifest(doc, version))
 		hash = hashDocument(doc)
 	}
-	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
+	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes}
 	switch {
 	case err != nil:
 		r.Err = err
@@ -165,12 +165,21 @@ func processManifest(path, version string) Result {
 		r.Skipped = true
 	default:
 		dir := filepath.Dir(path)
-		if sidecarErr := writeSidecar(dir, algoManifestJSON, hash, version); sidecarErr != nil {
-			r.Err = sidecarErr
+		// The sidecar goes last. It is what the plugin keys off, so stopping
+		// short of it leaves a state indistinguishable from "nothing was
+		// stamped" - which BestEffortPreDeploy already treats as safe, since
+		// the plugin just falls back to hashing at parse time. Writing it
+		// first would instead ship a fresh sidecar next to a slim manifest
+		// that was never written.
+		if slimErr := writeSlimManifest(dir, slimData); slimErr != nil {
+			r.Err = slimErr
 		} else {
-			r.Err = writeSlimManifest(dir, slimData)
+			r.Err = writeSidecar(dir, algoManifestJSON, hash, version)
 		}
 	}
+	// Measured after the writes, like processProject: both artifacts are part
+	// of this unit's cost, and the slim manifest is the larger of the two.
+	r.Duration = time.Since(start)
 	return r
 }
 

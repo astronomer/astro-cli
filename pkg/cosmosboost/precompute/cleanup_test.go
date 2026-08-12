@@ -70,12 +70,12 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cleanup: %v", err)
 	}
-	// The sidecar's own removal (removeSidecar) takes the slim manifest with
-	// it; the slim manifest must not also be reported as its own entry once
-	// Cleanup's walk reaches it (see TestCleanupRemovesOrphanedSlimManifest
-	// for when it must be).
-	if got := len(cleanupSummary.Results); got != 1 {
-		t.Fatalf("results = %d, want 1 (slim manifest removal must not be double-counted)", got)
+	// Each artifact is removed on its own terms, so each gets its own entry.
+	if got := len(cleanupSummary.Results); got != 2 {
+		t.Fatalf("results = %d, want 2 (one per artifact removed)", got)
+	}
+	if cleanupSummary.CountFailed() != 0 || cleanupSummary.CountKept() != 0 {
+		t.Fatalf("failed=%d kept=%d, want 0/0", cleanupSummary.CountFailed(), cleanupSummary.CountKept())
 	}
 
 	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
@@ -83,6 +83,76 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, sidecarDir)); !os.IsNotExist(err) {
 		t.Fatalf(".astro dir not pruned after removing both files: %v", err)
+	}
+}
+
+// TestCleanupKeepsForeignSlimManifestBesideOurSidecar: provenance is read per
+// file, so a manifest.slim.json another producer owns survives even when the
+// sidecar next to it is ours and gets removed. Deleting it on the sidecar's
+// provenance would destroy a file from the user's working tree.
+func TestCleanupKeepsForeignSlimManifestBesideOurSidecar(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test")
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+	astroDir := filepath.Join(dir, sidecarDir)
+	slimPath := filepath.Join(astroDir, slimManifestName)
+	// Replace our slim manifest with one another tool owns.
+	if err := os.WriteFile(slimPath, []byte(`{"_generated_by": {"application": "someone-else"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cleanupSummary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if cleanupSummary.CountKept() != 1 || cleanupSummary.CountFailed() != 0 {
+		t.Fatalf("kept=%d failed=%d, want 1/0", cleanupSummary.CountKept(), cleanupSummary.CountFailed())
+	}
+	if _, err := os.Stat(slimPath); err != nil {
+		t.Fatalf("foreign slim manifest was removed on its sidecar's provenance: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(astroDir, sidecarName)); !os.IsNotExist(err) {
+		t.Fatalf("our own sidecar must still be removed: %v", err)
+	}
+}
+
+// TestCleanupRemovesSlimManifestBesideForeignSidecar is the mirror case: a
+// foreign sidecar must not strand our own slim manifest. Skipping it would
+// leave a stale manifest.slim.json in the tree, unreported by `astro dbt
+// cleanup` and unnamed by EnsureClean's error, to ship in the next deploy.
+func TestCleanupRemovesSlimManifestBesideForeignSidecar(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test")
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+	astroDir := filepath.Join(dir, sidecarDir)
+	slimPath := filepath.Join(astroDir, slimManifestName)
+	sidecarPath := filepath.Join(astroDir, sidecarName)
+	if err := os.WriteFile(sidecarPath, []byte(`{"generated_by": {"application": "someone-else"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cleanupSummary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if cleanupSummary.CountKept() != 1 || cleanupSummary.CountFailed() != 0 {
+		t.Fatalf("kept=%d failed=%d, want 1/0 (the foreign sidecar only)", cleanupSummary.CountKept(), cleanupSummary.CountFailed())
+	}
+	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
+		t.Fatalf("our slim manifest was stranded by the foreign sidecar beside it: %v", err)
+	}
+	if _, err := os.Stat(sidecarPath); err != nil {
+		t.Fatalf("foreign sidecar was removed: %v", err)
 	}
 }
 
@@ -151,12 +221,11 @@ func TestCleanupKeepsForeignOrphanedSlimManifest(t *testing.T) {
 	}
 }
 
-// TestCleanupKeepsSidecarWhenSlimManifestUnremovable: the slim manifest is
-// removed before the sidecar specifically so a failure there leaves the
-// sidecar in place - Cleanup can only find this directory again by matching
-// the sidecar's name, so removing the sidecar first would make an
-// unremovable slim manifest permanently invisible to future runs.
-func TestCleanupKeepsSidecarWhenSlimManifestUnremovable(t *testing.T) {
+// TestCleanupAttributesRemovalFailuresPerArtifact: a failure must name the
+// file that actually could not be removed. Reporting one artifact's error
+// against its neighbour's path sends the user to fix the wrong file, and the
+// next deploy fails on the same unnamed one.
+func TestCleanupAttributesRemovalFailuresPerArtifact(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("directory write-permission semantics differ on windows")
 	}
@@ -170,10 +239,12 @@ func TestCleanupKeepsSidecarWhenSlimManifestUnremovable(t *testing.T) {
 	}
 	astroDir := filepath.Join(dir, sidecarDir)
 	sidecarPath := filepath.Join(astroDir, sidecarName)
+	slimPath := filepath.Join(astroDir, slimManifestName)
 	if _, err := os.Stat(sidecarPath); err != nil {
 		t.Fatalf("fixture setup: sidecar not written: %v", err)
 	}
 
+	// A read-only .astro makes both removals fail.
 	if err := os.Chmod(astroDir, 0o555); err != nil {
 		t.Fatal(err)
 	}
@@ -183,14 +254,27 @@ func TestCleanupKeepsSidecarWhenSlimManifestUnremovable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cleanup: %v", err)
 	}
-	if cleanupSummary.CountFailed() != 1 {
-		t.Fatalf("failed = %d, want 1 (slim manifest unremovable)", cleanupSummary.CountFailed())
+	if cleanupSummary.CountFailed() != 2 {
+		t.Fatalf("failed = %d, want 2 (neither artifact removable)", cleanupSummary.CountFailed())
 	}
-	if err := os.Chmod(astroDir, 0o755); err != nil { // restore before the stat below
+	failed := map[string]bool{}
+	for _, r := range cleanupSummary.Results {
+		if r.Err != nil {
+			failed[r.Path] = true
+		}
+	}
+	for _, want := range []string{sidecarPath, slimPath} {
+		if !failed[want] {
+			t.Fatalf("no failure reported against %s; got %+v", want, cleanupSummary.Results)
+		}
+	}
+	if err := os.Chmod(astroDir, 0o755); err != nil { // restore before the stats below
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(sidecarPath); err != nil {
-		t.Fatalf("sidecar must survive a failed slim-manifest removal so Cleanup can find it again: %v", err)
+	for _, path := range []string{sidecarPath, slimPath} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("%s must survive a failed removal so Cleanup can retry it: %v", path, err)
+		}
 	}
 }
 

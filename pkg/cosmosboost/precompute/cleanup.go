@@ -25,9 +25,11 @@ var cleanupSkipDirs = map[string]bool{
 	defaultPackagesDir: true,
 }
 
-// CleanupResult records what happened to one sidecar found during Cleanup.
+// CleanupResult records what happened to one artifact found during Cleanup.
+// Err always describes Path: each artifact is removed on its own terms, so a
+// failure is never reported against a neighboring file's name.
 type CleanupResult struct {
-	Path string // sidecar file path
+	Path string // artifact file path
 	Kept bool   // left in place: the file was not written by this tool
 	Err  error  // non-nil if removal failed
 }
@@ -38,20 +40,20 @@ type CleanupSummary struct {
 	Results  []CleanupResult
 }
 
-// Cleanup removes every .astro/dbt_metadata.json sidecar under the given
-// roots that this tool wrote, along with any slim manifest (manifest.slim.json)
-// written next to it, pruning each containing .astro directory when removal
-// leaves it empty. A dbt_metadata.json whose generated_by.application is not
-// ours — or that isn't valid JSON — is left in place and reported as kept, so
-// cleanup never deletes a file some other tool owns.
+// Cleanup removes every .astro/dbt_metadata.json sidecar and every
+// .astro/manifest.slim.json under the given roots that this tool wrote,
+// pruning each containing .astro directory when removal leaves it empty. Each
+// file is judged by its own producer marker: one whose marker is not ours — or
+// that isn't valid JSON — is left in place and reported as kept, so cleanup
+// never deletes a file some other tool owns.
 //
-// A manifest.slim.json found WITHOUT a sidecar beside it — left behind by an
-// older astro-cli that deleted only the sidecar, or by EnsureClean leaving a
-// foreign sidecar in place — is not otherwise reachable by anything walking
-// for dbt_metadata.json, so it is checked and removed on its own terms
-// instead, via its own _generated_by marker (see removeOrphanSlimManifest).
-// When a sidecar IS present, that sidecar's own removal owns the slim file
-// next to it (removeSidecar), so it isn't visited twice here.
+// Checking the two independently is what makes the mixed states come out
+// right, and neither is rare. A slim manifest outlives its sidecar whenever an
+// older astro-cli's cleanup deleted only the sidecar it knew about, or
+// EnsureClean left a foreign one in place; a sidecar we wrote can equally sit
+// next to a manifest.slim.json we did not. Inferring either file's provenance
+// from the other would delete a file we do not own in one direction and strand
+// a stale artifact of ours — unremoved and unreported — in the other.
 //
 // Per-file removal failures are recorded in their Result and do not stop the
 // others; like Run, a non-nil error is returned only for a top-level problem
@@ -75,24 +77,19 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 			if filepath.Base(filepath.Dir(path)) != sidecarDir {
 				return nil
 			}
+			// WalkDir reads a directory's entries in lexical order, so
+			// dbt_metadata.json is handled before manifest.slim.json and the
+			// .astro prune that finally succeeds is the slim manifest's.
 			switch d.Name() {
 			case sidecarName:
-				recordOnce(seen, &results, path, func(p string) (CleanupResult, bool) {
-					return removeSidecar(p), true
-				})
+				recordOnce(seen, &results, path, removeSidecar)
 			case slimManifestName:
-				// The sidecar, if present, owns removing this file (see
-				// removeSidecar); only handle it here when there is none.
-				sidecarPath := filepath.Join(filepath.Dir(path), sidecarName)
-				if _, statErr := os.Lstat(sidecarPath); statErr == nil {
-					return nil
-				}
-				recordOnce(seen, &results, path, removeOrphanSlimManifest)
+				recordOnce(seen, &results, path, removeSlimManifest)
 			}
 			return nil
 		})
 		if err != nil {
-			return CleanupSummary{}, fmt.Errorf("scanning %q for sidecars: %w", root, err)
+			return CleanupSummary{}, fmt.Errorf("scanning %q for artifacts: %w", root, err)
 		}
 	}
 
@@ -102,18 +99,14 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 // recordOnce runs remove(path) and appends its result, deduplicated by
 // canonical path so overlapping roots naming the same tree differently — a
 // relative name and an absolute one, or a symlink and its target — report
-// each file once rather than once per spelling. remove's ok return lets a
-// caller signal "nothing to report" (see removeOrphanSlimManifest) without
-// that turning into a phantom entry in results.
-func recordOnce(seen map[string]bool, results *[]CleanupResult, path string, remove func(string) (CleanupResult, bool)) {
+// each file once rather than once per spelling.
+func recordOnce(seen map[string]bool, results *[]CleanupResult, path string, remove func(string) CleanupResult) {
 	key := canonicalPath(path)
 	if seen[key] { // overlapping roots: report each file once
 		return
 	}
 	seen[key] = true
-	if result, ok := remove(path); ok {
-		*results = append(*results, result)
-	}
+	*results = append(*results, remove(path))
 }
 
 // canonicalPath returns a path suitable for identifying one file across roots
@@ -132,24 +125,19 @@ func canonicalPath(path string) string {
 	return filepath.Clean(path)
 }
 
-// removeSidecar deletes one sidecar after checking this tool wrote it, along
-// with any slim manifest sitting next to it, then prunes the containing
-// .astro directory if removal left it empty. Only files this tool could have
-// written are ever removed — anything else under .astro (e.g. an Astro
-// project's config.yaml) is never touched.
-func removeSidecar(path string) CleanupResult {
+// removeArtifact deletes one artifact after producedByUs confirms this tool
+// wrote it, then prunes the containing .astro directory if removal left it
+// empty. Only files this tool could have written are ever removed — anything
+// else under .astro (e.g. an Astro project's config.yaml) is never touched.
+// Both artifacts carry a producer marker and differ only in which field holds
+// it, which is all producedByUs reads.
+func removeArtifact(path string, producedByUs func(data []byte) bool) CleanupResult {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return CleanupResult{Path: path, Err: err}
 	}
-	var meta Metadata
-	if json.Unmarshal(data, &meta) != nil || meta.GeneratedBy.Application != application {
+	if !producedByUs(data) {
 		return CleanupResult{Path: path, Kept: true}
-	}
-	// Removed before the sidecar: on any failure but ENOENT, return here so
-	// the sidecar survives and Cleanup can still find (and retry) it later.
-	if slimErr := os.Remove(filepath.Join(filepath.Dir(path), slimManifestName)); slimErr != nil && !os.IsNotExist(slimErr) {
-		return CleanupResult{Path: path, Err: slimErr}
 	}
 	if err := os.Remove(path); err != nil {
 		return CleanupResult{Path: path, Err: err}
@@ -158,35 +146,30 @@ func removeSidecar(path string) CleanupResult {
 	return CleanupResult{Path: path}
 }
 
-// removeOrphanSlimManifest removes a manifest.slim.json found with no sidecar
-// beside it (see Cleanup), after checking its own _generated_by marker names
-// this tool — the same provenance check removeSidecar applies to a sidecar,
-// since there is no sidecar here to anchor the check to. ok is false when the
-// file is already gone by the time this runs (e.g. its sidecar was found and
-// removed, taking this file with it, after WalkDir had already queued this
-// entry) — in that case there is nothing to report.
-func removeOrphanSlimManifest(path string) (result CleanupResult, ok bool) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return CleanupResult{}, false
-		}
-		return CleanupResult{Path: path, Err: err}, true
-	}
-	var marker struct {
-		GeneratedBy GeneratedBy `json:"_generated_by"`
-	}
-	if json.Unmarshal(data, &marker) != nil || marker.GeneratedBy.Application != application {
-		return CleanupResult{Path: path, Kept: true}, true
-	}
-	if err := os.Remove(path); err != nil {
-		return CleanupResult{Path: path, Err: err}, true
-	}
-	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
-	return CleanupResult{Path: path}, true
+// removeSidecar removes one .astro/dbt_metadata.json, keeping it unless its
+// generated_by names this tool.
+func removeSidecar(path string) CleanupResult {
+	return removeArtifact(path, func(data []byte) bool {
+		var meta Metadata
+		return json.Unmarshal(data, &meta) == nil && meta.GeneratedBy.Application == application
+	})
 }
 
-// CountKept returns the number of sidecars left in place because this tool
+// removeSlimManifest removes one .astro/manifest.slim.json, keeping it unless
+// its own _generated_by marker names this tool. The marker read is the slim
+// manifest's own and never the neighboring sidecar's: the plugin consumes a
+// slim manifest just as directly as a sidecar, so a file another producer owns
+// has to survive here even when the sidecar beside it is ours.
+func removeSlimManifest(path string) CleanupResult {
+	return removeArtifact(path, func(data []byte) bool {
+		var marker struct {
+			GeneratedBy GeneratedBy `json:"_generated_by"`
+		}
+		return json.Unmarshal(data, &marker) == nil && marker.GeneratedBy.Application == application
+	})
+}
+
+// CountKept returns the number of artifacts left in place because this tool
 // did not write them.
 func (s CleanupSummary) CountKept() int {
 	n := 0
@@ -198,7 +181,7 @@ func (s CleanupSummary) CountKept() int {
 	return n
 }
 
-// CountFailed returns the number of sidecars that could not be removed.
+// CountFailed returns the number of artifacts that could not be removed.
 func (s CleanupSummary) CountFailed() int {
 	n := 0
 	for _, r := range s.Results {
