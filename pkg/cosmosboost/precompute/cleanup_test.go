@@ -78,6 +78,49 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	}
 }
 
+// TestCleanupKeepsSidecarWhenSlimManifestUnremovable: the slim manifest is
+// removed before the sidecar specifically so a failure there leaves the
+// sidecar in place - Cleanup can only find this directory again by matching
+// the sidecar's name, so removing the sidecar first would make an
+// unremovable slim manifest permanently invisible to future runs.
+func TestCleanupKeepsSidecarWhenSlimManifestUnremovable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory write-permission semantics differ on windows")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test")
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+	astroDir := filepath.Join(dir, sidecarDir)
+	sidecarPath := filepath.Join(astroDir, sidecarName)
+	if _, err := os.Stat(sidecarPath); err != nil {
+		t.Fatalf("fixture setup: sidecar not written: %v", err)
+	}
+
+	if err := os.Chmod(astroDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(astroDir, 0o755) })
+
+	cleanupSummary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if cleanupSummary.CountFailed() != 1 {
+		t.Fatalf("failed = %d, want 1 (slim manifest unremovable)", cleanupSummary.CountFailed())
+	}
+	if err := os.Chmod(astroDir, 0o755); err != nil { // restore before the stat below
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(sidecarPath); err != nil {
+		t.Fatalf("sidecar must survive a failed slim-manifest removal so Cleanup can find it again: %v", err)
+	}
+}
+
 func TestCleanupLeavesNonEmptyAstroDir(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)

@@ -51,7 +51,9 @@ type Summary struct {
 //
 // Every discovered manifest.json also gets a slim, field-filtered copy (see
 // buildSlimManifest) written next to its sidecar, for the Cosmos Boost plugin
-// to load in place of the full manifest at DAG-parse time.
+// to load in place of the full manifest at DAG-parse time. A manifest.json
+// sitting directly in a project's root is excluded from discovery (see
+// findManifests) and so gets no slim copy either.
 func Run(roots []string, version string) (Summary, error) {
 	start := time.Now()
 
@@ -141,7 +143,9 @@ func processManifest(path, version string) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
 	var hash string
+	var slim map[string]any
 	if err == nil && isDbt {
+		slim = buildSlimManifest(doc, version) // before hashDocument mutates doc
 		hash = hashDocument(doc)
 	}
 	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
@@ -155,7 +159,7 @@ func processManifest(path, version string) Result {
 		if sidecarErr := writeSidecar(dir, algoManifestJSON, hash, version); sidecarErr != nil {
 			r.Err = sidecarErr
 		} else {
-			r.Err = writeSlimManifest(dir, buildSlimManifest(doc))
+			r.Err = writeSlimManifest(dir, slim)
 		}
 	}
 	return r

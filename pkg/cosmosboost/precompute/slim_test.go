@@ -42,7 +42,7 @@ func TestBuildSlimManifestKeepsOnlyAllowedResourceFields(t *testing.T) {
 		}
 	}`)
 
-	slim := buildSlimManifest(doc)
+	slim := buildSlimManifest(doc, "test")
 
 	node := slim["nodes"].(map[string]any)["model.shop.orders"].(map[string]any)
 	want := map[string]any{
@@ -84,7 +84,7 @@ func TestBuildSlimManifestKeepsFreshnessForSourcesOnly(t *testing.T) {
 		}
 	}`)
 
-	slim := buildSlimManifest(doc)
+	slim := buildSlimManifest(doc, "test")
 
 	source := slim["sources"].(map[string]any)["source.shop.raw.orders"].(map[string]any)
 	if _, ok := source["freshness"]; !ok {
@@ -114,7 +114,7 @@ func TestBuildSlimManifestDropsUnusedSections(t *testing.T) {
 		"selectors": {"my_selector": {"definition": {}}}
 	}`)
 
-	slim := buildSlimManifest(doc)
+	slim := buildSlimManifest(doc, "test")
 
 	for _, dropped := range []string{"macros", "disabled", "docs", "parent_map", "child_map"} {
 		if _, ok := slim[dropped]; ok {
@@ -134,12 +134,32 @@ func TestBuildSlimManifestDropsUnusedSections(t *testing.T) {
 func TestBuildSlimManifestHandlesMissingSections(t *testing.T) {
 	doc := parseDoc(t, `{"metadata": {"project_name": "shop"}, "nodes": {}}`)
 
-	slim := buildSlimManifest(doc)
+	slim := buildSlimManifest(doc, "test")
 
 	for _, section := range slimSections {
 		entries, ok := slim[section].(map[string]any)
 		if !ok || len(entries) != 0 {
 			t.Fatalf("missing section %q must slim to an empty map, got %+v", section, slim[section])
 		}
+	}
+}
+
+// TestBuildSlimManifestIncludesVersionMarker: a future reader needs a way to
+// tell which allowlist produced a slim manifest, so it carries its own
+// schema/generated_by, independent of the sidecar sitting next to it.
+func TestBuildSlimManifestIncludesVersionMarker(t *testing.T) {
+	doc := parseDoc(t, `{"metadata": {"project_name": "shop"}, "nodes": {}}`)
+
+	slim := buildSlimManifest(doc, "1.2.3")
+
+	if slim["_schema"] != slimSchemaVersion {
+		t.Fatalf("_schema = %v, want %v", slim["_schema"], slimSchemaVersion)
+	}
+	gb, ok := slim["_generated_by"].(GeneratedBy)
+	if !ok {
+		t.Fatalf("_generated_by has the wrong type: %T", slim["_generated_by"])
+	}
+	if gb.Application != application || gb.Version != "1.2.3" {
+		t.Fatalf("_generated_by = %+v, want application=%q version=%q", gb, application, "1.2.3")
 	}
 }

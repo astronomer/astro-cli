@@ -118,11 +118,14 @@ func removeSidecar(path string) CleanupResult {
 	if json.Unmarshal(data, &meta) != nil || meta.GeneratedBy.Application != application {
 		return CleanupResult{Path: path, Kept: true}
 	}
+	// Removed before the sidecar: on any failure but ENOENT, return here so
+	// the sidecar survives and Cleanup can still find (and retry) it later.
+	if slimErr := os.Remove(filepath.Join(filepath.Dir(path), slimManifestName)); slimErr != nil && !os.IsNotExist(slimErr) {
+		return CleanupResult{Path: path, Err: slimErr}
+	}
 	if err := os.Remove(path); err != nil {
 		return CleanupResult{Path: path, Err: err}
 	}
-	// Best-effort: a slim manifest is optional, so its absence is not an error.
-	_ = os.Remove(filepath.Join(filepath.Dir(path), slimManifestName))
 	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
 	return CleanupResult{Path: path}
 }

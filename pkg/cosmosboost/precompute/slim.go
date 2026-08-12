@@ -8,6 +8,10 @@ import (
 
 const slimManifestName = "manifest.slim.json"
 
+// slimSchemaVersion lets a future reader tell which allowlist produced a slim
+// manifest, independent of the sidecar's own schemaVersion (metadata.go).
+const slimSchemaVersion = 1
+
 // slimSections are the only top-level manifest collections Cosmos loads nodes
 // from when parsing a dbt manifest (LoadMode.DBT_MANIFEST); everything else
 // (macros, disabled, docs, parent_map, child_map, ...) is unused.
@@ -18,13 +22,18 @@ var slimSections = []string{"nodes", "sources", "exposures"}
 var slimResourceFields = []string{"original_file_path", "package_name", "resource_type", "tags", "config", "fqn"}
 
 // buildSlimManifest returns a manifest document containing only the fields
-// Cosmos reads when building DAGs from a dbt manifest.json, so the file the
-// plugin loads at parse time is a fraction of the size of the original. doc
-// is not mutated.
-func buildSlimManifest(doc map[string]any) map[string]any {
+// Cosmos reads when building DAGs from a dbt manifest.json. doc is not
+// mutated.
+//
+// Only a substitute for the graph-loading read - Cosmos also reads
+// manifest_path directly for dbt's own subprocess copy and per-model
+// dataset/Asset outlet URIs (database/schema/alias), which this drops.
+func buildSlimManifest(doc map[string]any, version string) map[string]any {
 	slim := map[string]any{
-		"metadata":  map[string]any{"project_name": projectName(doc)},
-		"selectors": doc["selectors"],
+		"_schema":       slimSchemaVersion,
+		"_generated_by": GeneratedBy{Application: application, Version: version},
+		"metadata":      map[string]any{"project_name": projectName(doc)},
+		"selectors":     doc["selectors"],
 	}
 	for _, section := range slimSections {
 		entries, _ := doc[section].(map[string]any)
@@ -76,8 +85,8 @@ func slimResource(resource map[string]any) map[string]any {
 // writeSlimManifest writes the slim manifest JSON into dir/.astro/manifest.slim.json,
 // compactly (no indentation) to keep the size reduction from field-filtering.
 func writeSlimManifest(dir string, slim map[string]any) error {
-	// slim holds only JSON-native types built by buildSlimManifest, so
-	// marshaling cannot fail.
+	// slim holds only JSON-native types and the GeneratedBy struct, all of
+	// which always marshal successfully.
 	data, _ := json.Marshal(slim)
 
 	out := filepath.Join(dir, sidecarDir)
