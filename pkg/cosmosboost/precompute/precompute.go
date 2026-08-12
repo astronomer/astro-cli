@@ -1,6 +1,7 @@
 package precompute
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -143,9 +144,17 @@ func processManifest(path, version string) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
 	var hash string
-	var slim map[string]any
+	var slimData []byte
 	if err == nil && isDbt {
-		slim = buildSlimManifest(doc, version) // before hashDocument mutates doc
+		// Marshal now, before hashDocument mutates doc: buildSlimManifest's
+		// result shares nested values with doc (selectors, and each
+		// resource's config/tags/fqn/depends_on.nodes), so only marshaling
+		// it to bytes - not just calling buildSlimManifest first - actually
+		// decouples the slim manifest from hashDocument's mutation.
+		//
+		// slim holds only JSON-native types and the GeneratedBy struct, all
+		// of which always marshal successfully.
+		slimData, _ = json.Marshal(buildSlimManifest(doc, version))
 		hash = hashDocument(doc)
 	}
 	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
@@ -159,7 +168,7 @@ func processManifest(path, version string) Result {
 		if sidecarErr := writeSidecar(dir, algoManifestJSON, hash, version); sidecarErr != nil {
 			r.Err = sidecarErr
 		} else {
-			r.Err = writeSlimManifest(dir, slim)
+			r.Err = writeSlimManifest(dir, slimData)
 		}
 	}
 	return r

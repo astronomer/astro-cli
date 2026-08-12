@@ -45,6 +45,14 @@ type CleanupSummary struct {
 // ours — or that isn't valid JSON — is left in place and reported as kept, so
 // cleanup never deletes a file some other tool owns.
 //
+// A manifest.slim.json found WITHOUT a sidecar beside it — left behind by an
+// older astro-cli that deleted only the sidecar, or by EnsureClean leaving a
+// foreign sidecar in place — is not otherwise reachable by anything walking
+// for dbt_metadata.json, so it is checked and removed on its own terms
+// instead, via its own _generated_by marker (see removeOrphanSlimManifest).
+// When a sidecar IS present, that sidecar's own removal owns the slim file
+// next to it (removeSidecar), so it isn't visited twice here.
+//
 // Per-file removal failures are recorded in their Result and do not stop the
 // others; like Run, a non-nil error is returned only for a top-level problem
 // such as a root that cannot be walked.
@@ -64,20 +72,23 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 				}
 				return nil
 			}
-			if d.Name() != sidecarName || filepath.Base(filepath.Dir(path)) != sidecarDir {
+			if filepath.Base(filepath.Dir(path)) != sidecarDir {
 				return nil
 			}
-			// Key on the canonical path, not the walked one. Roots that name the
-			// same tree differently — a relative name and an absolute one, or a
-			// symlink and its target — yield different strings for one file, and
-			// a sidecar left in place (foreign, so not removed) would then be
-			// found and reported once per spelling.
-			key := canonicalPath(path)
-			if seen[key] { // overlapping roots: report each sidecar once
-				return nil
+			switch d.Name() {
+			case sidecarName:
+				recordOnce(seen, &results, path, func(p string) (CleanupResult, bool) {
+					return removeSidecar(p), true
+				})
+			case slimManifestName:
+				// The sidecar, if present, owns removing this file (see
+				// removeSidecar); only handle it here when there is none.
+				sidecarPath := filepath.Join(filepath.Dir(path), sidecarName)
+				if _, statErr := os.Lstat(sidecarPath); statErr == nil {
+					return nil
+				}
+				recordOnce(seen, &results, path, removeOrphanSlimManifest)
 			}
-			seen[key] = true
-			results = append(results, removeSidecar(path))
 			return nil
 		})
 		if err != nil {
@@ -86,6 +97,23 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 	}
 
 	return CleanupSummary{Duration: time.Since(start), Results: results}, nil
+}
+
+// recordOnce runs remove(path) and appends its result, deduplicated by
+// canonical path so overlapping roots naming the same tree differently — a
+// relative name and an absolute one, or a symlink and its target — report
+// each file once rather than once per spelling. remove's ok return lets a
+// caller signal "nothing to report" (see removeOrphanSlimManifest) without
+// that turning into a phantom entry in results.
+func recordOnce(seen map[string]bool, results *[]CleanupResult, path string, remove func(string) (CleanupResult, bool)) {
+	key := canonicalPath(path)
+	if seen[key] { // overlapping roots: report each file once
+		return
+	}
+	seen[key] = true
+	if result, ok := remove(path); ok {
+		*results = append(*results, result)
+	}
 }
 
 // canonicalPath returns a path suitable for identifying one file across roots
@@ -128,6 +156,34 @@ func removeSidecar(path string) CleanupResult {
 	}
 	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
 	return CleanupResult{Path: path}
+}
+
+// removeOrphanSlimManifest removes a manifest.slim.json found with no sidecar
+// beside it (see Cleanup), after checking its own _generated_by marker names
+// this tool — the same provenance check removeSidecar applies to a sidecar,
+// since there is no sidecar here to anchor the check to. ok is false when the
+// file is already gone by the time this runs (e.g. its sidecar was found and
+// removed, taking this file with it, after WalkDir had already queued this
+// entry) — in that case there is nothing to report.
+func removeOrphanSlimManifest(path string) (result CleanupResult, ok bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return CleanupResult{}, false
+		}
+		return CleanupResult{Path: path, Err: err}, true
+	}
+	var marker struct {
+		GeneratedBy GeneratedBy `json:"_generated_by"`
+	}
+	if json.Unmarshal(data, &marker) != nil || marker.GeneratedBy.Application != application {
+		return CleanupResult{Path: path, Kept: true}, true
+	}
+	if err := os.Remove(path); err != nil {
+		return CleanupResult{Path: path, Err: err}, true
+	}
+	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
+	return CleanupResult{Path: path}, true
 }
 
 // CountKept returns the number of sidecars left in place because this tool

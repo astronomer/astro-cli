@@ -72,7 +72,7 @@ func EnsureClean(path string) error {
 		}
 	}
 	if len(kept) > 0 {
-		return fmt.Errorf("found dbt_metadata.json files from an unrecognized producer: %s; the deploy cannot prove they are fresh, and cleanup will not delete files it does not own - remove them manually and retry", strings.Join(kept, ", "))
+		return fmt.Errorf("found Cosmos Boost artifact(s) from an unrecognized producer: %s; the deploy cannot prove they are fresh, and cleanup will not delete files it does not own - remove them manually and retry", strings.Join(kept, ", "))
 	}
 	return nil
 }

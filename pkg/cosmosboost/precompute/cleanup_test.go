@@ -66,8 +66,16 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 		t.Fatalf("fixture setup: slim manifest not written: %v", err)
 	}
 
-	if _, err := Cleanup([]string{dir}); err != nil {
+	cleanupSummary, err := Cleanup([]string{dir})
+	if err != nil {
 		t.Fatalf("Cleanup: %v", err)
+	}
+	// The sidecar's own removal (removeSidecar) takes the slim manifest with
+	// it; the slim manifest must not also be reported as its own entry once
+	// Cleanup's walk reaches it (see TestCleanupRemovesOrphanedSlimManifest
+	// for when it must be).
+	if got := len(cleanupSummary.Results); got != 1 {
+		t.Fatalf("results = %d, want 1 (slim manifest removal must not be double-counted)", got)
 	}
 
 	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
@@ -75,6 +83,71 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, sidecarDir)); !os.IsNotExist(err) {
 		t.Fatalf(".astro dir not pruned after removing both files: %v", err)
+	}
+}
+
+// TestCleanupRemovesOrphanedSlimManifest: a slim manifest can end up without
+// its sidecar - an older astro-cli's `cleanup`/EnsureClean deletes only the
+// sidecar it knows about, or EnsureClean leaves a foreign sidecar in place -
+// and nothing walking for dbt_metadata.json would ever find it again. Cleanup
+// must check and remove it on its own terms, via its own _generated_by
+// marker.
+func TestCleanupRemovesOrphanedSlimManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test")
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+	astroDir := filepath.Join(dir, sidecarDir)
+	slimPath := filepath.Join(astroDir, slimManifestName)
+	if _, err := os.Stat(slimPath); err != nil {
+		t.Fatalf("fixture setup: slim manifest not written: %v", err)
+	}
+	// Simulate the sidecar being gone without this file's knowledge: an older
+	// astro-cli's cleanup, or a hand removal.
+	if err := os.Remove(filepath.Join(astroDir, sidecarName)); err != nil {
+		t.Fatal(err)
+	}
+
+	cleanupSummary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if cleanupSummary.CountFailed() != 0 || cleanupSummary.CountKept() != 0 {
+		t.Fatalf("failed=%d kept=%d, want 0/0", cleanupSummary.CountFailed(), cleanupSummary.CountKept())
+	}
+	if got := len(cleanupSummary.Results); got != 1 {
+		t.Fatalf("results = %d, want 1 (the orphaned slim manifest)", got)
+	}
+	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
+		t.Fatalf("orphaned slim manifest still present after cleanup: %v", err)
+	}
+	if _, err := os.Stat(astroDir); !os.IsNotExist(err) {
+		t.Fatalf(".astro dir not pruned after removing the orphaned slim manifest: %v", err)
+	}
+}
+
+// TestCleanupKeepsForeignOrphanedSlimManifest: an orphaned slim manifest
+// checks its own provenance the same way a sidecar does - one this tool did
+// not write (or that isn't valid JSON) must never be deleted.
+func TestCleanupKeepsForeignOrphanedSlimManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		".astro/manifest.slim.json": `{"_generated_by": {"application": "someone-else"}}`,
+	})
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if got := summary.CountKept(); got != 1 {
+		t.Fatalf("kept = %d, want 1", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, sidecarDir, slimManifestName)); err != nil {
+		t.Fatalf("foreign orphaned slim manifest was removed: %v", err)
 	}
 }
 

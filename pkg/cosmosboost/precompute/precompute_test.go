@@ -501,3 +501,38 @@ func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 		t.Fatalf("slim manifest missing expected node: %+v", slim)
 	}
 }
+
+// TestRunSlimManifestUnaffectedByHashDocumentMutation pins a review-flagged
+// risk: buildSlimManifest's result shares doc's "selectors" map by reference
+// rather than copying it, so if the slim manifest were marshaled to disk
+// after hashDocument runs — which strips created_at from every top-level
+// collection's entries, selectors included — the written file would lose
+// data outside the allowlist that was never supposed to be touched.
+// processManifest now marshals the slim manifest before calling
+// hashDocument, so a selector's created_at must still reach the file that
+// ships.
+func TestRunSlimManifestUnaffectedByHashDocumentMutation(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"shipped/manifest.json": `{
+			"metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json"},
+			"nodes": {},
+			"selectors": {"my_selector": {"created_at": 123, "definition": {"method": "tag", "value": "daily"}}}
+		}`,
+	})
+
+	summary, err := Run([]string{root}, "test")
+	if err != nil || len(summary.Results) != 1 || summary.Results[0].Err != nil {
+		t.Fatalf("Run failed: err=%v results=%+v", err, summary.Results)
+	}
+
+	var slim map[string]any
+	readJSON(t, filepath.Join(root, "shipped", sidecarDir, slimManifestName), &slim)
+	selector, ok := slim["selectors"].(map[string]any)["my_selector"].(map[string]any)
+	if !ok {
+		t.Fatalf("slim manifest missing expected selector: %+v", slim)
+	}
+	if _, ok := selector["created_at"]; !ok {
+		t.Fatalf("selector lost created_at: hashDocument's mutation of doc leaked into the already-written slim manifest, got %+v", selector)
+	}
+}

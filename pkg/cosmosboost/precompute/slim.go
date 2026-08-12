@@ -1,7 +1,6 @@
 package precompute
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 )
@@ -23,7 +22,11 @@ var slimResourceFields = []string{"original_file_path", "package_name", "resourc
 
 // buildSlimManifest returns a manifest document containing only the fields
 // Cosmos reads when building DAGs from a dbt manifest.json. doc is not
-// mutated.
+// mutated, but the result is a shallow copy: selectors and each resource's
+// config/tags/fqn/depends_on.nodes are the same nested map/slice values as
+// doc's, not copies. A caller that mutates doc afterward (e.g. hashDocument)
+// must marshal this result to bytes first if the two need to stay
+// independent - see processManifest.
 //
 // Only a substitute for the graph-loading read - Cosmos also reads
 // manifest_path directly for dbt's own subprocess copy and per-model
@@ -82,13 +85,12 @@ func slimResource(resource map[string]any) map[string]any {
 	return slim
 }
 
-// writeSlimManifest writes the slim manifest JSON into dir/.astro/manifest.slim.json,
-// compactly (no indentation) to keep the size reduction from field-filtering.
-func writeSlimManifest(dir string, slim map[string]any) error {
-	// slim holds only JSON-native types and the GeneratedBy struct, all of
-	// which always marshal successfully.
-	data, _ := json.Marshal(slim)
-
+// writeSlimManifest writes data into dir/.astro/manifest.slim.json. data must
+// already be the marshaled, compact (no indentation, to keep the size
+// reduction from field-filtering) JSON for a buildSlimManifest result -
+// callers marshal it themselves, before hashDocument gets a chance to mutate
+// any doc value the slim manifest shares (see buildSlimManifest).
+func writeSlimManifest(dir string, data []byte) error {
 	out := filepath.Join(dir, sidecarDir)
 	if err := os.MkdirAll(out, sidecarDirPerm); err != nil {
 		return err
