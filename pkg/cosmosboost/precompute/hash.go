@@ -229,18 +229,6 @@ func hashDocument(doc map[string]any) string {
 	return sha256Hex(canonical)
 }
 
-// hashManifest computes the "sha256-manifest-v2" hash of a dbt manifest.json.
-// isDbt reports whether the file is actually a dbt manifest; a file that
-// isn't is not stamped (callers skip it) — so unrelated manifest.json files
-// in the project don't get a sidecar.
-func hashManifest(path string) (hash string, isDbt bool, err error) {
-	doc, _, isDbt, err := readManifestDoc(path)
-	if err != nil || !isDbt {
-		return "", isDbt, err
-	}
-	return hashDocument(doc), true, nil
-}
-
 // hashFile returns the hex sha256 of a file's contents and its size in bytes.
 func hashFile(path string) (digest string, size int64, err error) {
 	f, err := os.Open(path)
