@@ -24,6 +24,9 @@ const (
 	// metadata.run_started_at, which dbt regenerates on every full parse, so
 	// CI-built manifests hash-match locally built ones.
 	algoManifestJSON = "sha256-manifest-v2"
+	// algoFilteredManifest hashes the slim manifest's own bytes, not the
+	// manifest it came from (that is version.hash's job).
+	algoFilteredManifest = "sha256-filtered-manifest-v1"
 
 	sidecarDir  = ".astro"
 	sidecarName = "dbt_metadata.json"
@@ -41,6 +44,21 @@ type Metadata struct {
 	Schema      int            `json:"schema"`
 	Version     ProjectVersion `json:"version"`
 	GeneratedBy GeneratedBy    `json:"generated_by"`
+	// FilteredManifest points at the slim manifest beside this sidecar, absent
+	// when none was written. The sidecar is the consumer's entry point: it
+	// already reads and schema-gates this file, so it discovers the slim
+	// manifest here and falls back to the full one when the section is missing.
+	FilteredManifest *FilteredManifest `json:"filtered_manifest,omitempty"`
+}
+
+// FilteredManifest describes a slim manifest sitting next to the sidecar. Path
+// is relative to the sidecar's directory, and Version hashes the slim file's
+// own bytes, so a consumer can confirm the two are a matched pair without
+// re-hashing the full manifest.
+type FilteredManifest struct {
+	Schema  int            `json:"schema"`
+	Path    string         `json:"path"`
+	Version ProjectVersion `json:"version"`
 }
 
 // ProjectVersion identifies a dbt project's content. Hash is the version key;
@@ -57,12 +75,14 @@ type GeneratedBy struct {
 }
 
 // writeSidecar writes .astro/dbt_metadata.json inside dir. version is the
-// producer's version, recorded in generated_by.
-func writeSidecar(dir, algo, hash, version string) error {
+// producer's version, recorded in generated_by. filtered describes a slim
+// manifest written beside it, or is nil when none was.
+func writeSidecar(dir, algo, hash, version string, filtered *FilteredManifest) error {
 	meta := Metadata{
-		Schema:      schemaVersion,
-		Version:     ProjectVersion{Algo: algo, Hash: hash},
-		GeneratedBy: GeneratedBy{Application: application, Version: version},
+		Schema:           schemaVersion,
+		Version:          ProjectVersion{Algo: algo, Hash: hash},
+		GeneratedBy:      GeneratedBy{Application: application, Version: version},
+		FilteredManifest: filtered,
 	}
 
 	// Metadata holds only strings and ints, so marshaling cannot fail.
@@ -73,8 +93,7 @@ func writeSidecar(dir, algo, hash, version string) error {
 }
 
 // writeArtifact writes data to dir/.astro/name, creating the directory if
-// needed. Shared by the two artifacts a run produces - the hash sidecar and
-// the slim manifest - which differ only in filename and payload.
+// needed.
 func writeArtifact(dir, name string, data []byte) error {
 	out := filepath.Join(dir, sidecarDir)
 	if err := os.MkdirAll(out, sidecarDirPerm); err != nil {

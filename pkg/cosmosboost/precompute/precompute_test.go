@@ -475,8 +475,11 @@ func TestRunReportsFailedUnits(t *testing.T) {
 }
 
 // TestRunWritesSlimManifestAlongsideSidecar: with the option set, every
-// discovered manifest.json gets a slim, field-filtered copy next to its hash
-// sidecar (see buildSlimManifest).
+// discovered manifest.json gets a slim copy next to its hash sidecar, and the
+// sidecar carries the filtered_manifest pointer at it. The pointer hashes the
+// slim file's own bytes, so a consumer can confirm the two are a matched pair -
+// which adjacency alone no longer implies, now that cleanup judges each
+// artifact independently.
 func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -491,38 +494,84 @@ func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 		t.Fatalf("want 1 successful manifest result, got %+v", summary.Results)
 	}
 
-	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
-	slimPath := filepath.Join(root, "shipped", sidecarDir, slimManifestName)
-	mustExist(t, slimPath)
+	astroDir := filepath.Join(root, "shipped", sidecarDir)
 	var slim map[string]any
-	readJSON(t, slimPath, &slim)
-	nodes := slim["nodes"].(map[string]any)
-	if _, ok := nodes["model.shop.orders"]; !ok {
+	readJSON(t, filepath.Join(astroDir, slimManifestName), &slim)
+	if _, ok := slim["nodes"].(map[string]any)["model.shop.orders"]; !ok {
 		t.Fatalf("slim manifest missing expected node: %+v", slim)
+	}
+
+	var meta Metadata
+	readJSON(t, filepath.Join(astroDir, sidecarName), &meta)
+	fm := meta.FilteredManifest
+	if fm == nil {
+		t.Fatalf("sidecar has no filtered_manifest section: %+v", meta)
+	}
+	if fm.Path != slimManifestName || fm.Schema != slimSchemaVersion || fm.Version.Algo != algoFilteredManifest {
+		t.Fatalf("filtered_manifest = %+v", fm)
+	}
+	slimData, err := os.ReadFile(filepath.Join(astroDir, slimManifestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := sha256Hex(slimData); fm.Version.Hash != want {
+		t.Fatalf("filtered_manifest hash = %q, want the slim file's own hash %q", fm.Version.Hash, want)
+	}
+	if fm.Version.Hash == meta.Version.Hash {
+		t.Fatal("filtered_manifest hash must not be the full manifest's hash")
 	}
 }
 
-// TestRunSkipsSlimManifestWhenNotRequested is the other side of the switch:
-// the hash sidecar is still written, because the two optimizations are
-// independent, and no slim manifest is left for a plugin that cannot read one.
+// TestRunSkipsSlimManifestWhenNotRequested is the other side of the switch: the
+// hash sidecar is still written, with no slim manifest and no pointer key - so
+// a consumer's presence check is enough to fall back to the full manifest.
 func TestRunSkipsSlimManifestWhenNotRequested(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
 		"shipped/manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{}}`,
 	})
 
-	summary, err := Run([]string{root}, "test", Options{})
+	if _, err := Run([]string{root}, "test", Options{}); err != nil {
+		t.Fatal(err)
+	}
+
+	astroDir := filepath.Join(root, "shipped", sidecarDir)
+	if _, err := os.Stat(filepath.Join(astroDir, slimManifestName)); !os.IsNotExist(err) {
+		t.Fatalf("slim manifest written without being requested: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(astroDir, sidecarName))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(summary.Results) != 1 || summary.Results[0].Err != nil {
-		t.Fatalf("want 1 successful manifest result, got %+v", summary.Results)
+	if strings.Contains(string(raw), "filtered_manifest") {
+		t.Fatalf("filtered_manifest emitted with the slim manifest disabled: %s", raw)
 	}
+}
 
+// TestRunLeavesManifestUnchanged: the slim manifest is a copy written into
+// .astro/, never an edit of what dbt produced. Worth pinning by bytes, since
+// processManifest parses the manifest and hashDocument then mutates that doc.
+func TestRunLeavesManifestUnchanged(t *testing.T) {
+	root := t.TempDir()
+	const manifest = `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop","generated_at":"2026-08-13T00:00:00Z"},` +
+		`"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"],"created_at":1754300000.1}},` +
+		`"selectors":{"my_selector":{"definition":{},"created_at":1754300000.1}}}`
+	writeFiles(t, root, map[string]string{"shipped/manifest.json": manifest})
+	manifestPath := filepath.Join(root, "shipped", "manifest.json")
+
+	if _, err := Run([]string{root}, "test", Options{SlimManifest: true}); err != nil {
+		t.Fatal(err)
+	}
+	// Both artifacts must exist, or this would pass trivially.
 	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
-	slimPath := filepath.Join(root, "shipped", sidecarDir, slimManifestName)
-	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
-		t.Fatalf("slim manifest written without being requested: %v", err)
+	mustExist(t, filepath.Join(root, "shipped", sidecarDir, slimManifestName))
+
+	after, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != manifest {
+		t.Fatalf("manifest.json was modified:\n before %s\n after  %s", manifest, after)
 	}
 }
 

@@ -39,14 +39,11 @@ type Summary struct {
 	Results  []Result
 }
 
-// Options selects which artifacts a run writes. The hash sidecar is not
-// optional - it is the whole point of the run - so the zero value is the
-// sidecar-only behavior this package shipped before the slim manifest existed.
+// Options selects which artifacts a run writes; the zero value writes only the
+// hash sidecars.
 type Options struct {
 	// SlimManifest also writes a slim, field-filtered copy of each discovered
-	// manifest.json (see buildSlimManifest) next to its sidecar. Independently
-	// switchable because its consumer is a specific plugin version: a
-	// deployment whose plugin cannot read it gains nothing from the bytes.
+	// manifest.json (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
 }
 
@@ -142,7 +139,7 @@ func processProject(dir, version string) Result {
 		r.Warning = strings.Join(cfg.templatedSettings, ", ") +
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
-	r.Err = writeSidecar(dir, algoProjectTree, hash, version)
+	r.Err = writeSidecar(dir, algoProjectTree, hash, version, nil)
 	r.Duration = time.Since(start)
 	return r
 }
@@ -158,14 +155,9 @@ func processManifest(path, version string, opts Options) Result {
 	var slimData []byte
 	if err == nil && isDbt {
 		if opts.SlimManifest {
-			// Marshal now, before hashDocument mutates doc: buildSlimManifest's
-			// result shares nested values with doc (selectors, and each
-			// resource's config/tags/fqn/depends_on.nodes), so only marshaling
-			// it to bytes - not just calling buildSlimManifest first - actually
-			// decouples the slim manifest from hashDocument's mutation.
-			//
-			// slim holds only JSON-native types and the GeneratedBy struct, all
-			// of which always marshal successfully.
+			// Marshal before hashDocument mutates doc: the slim manifest shares
+			// doc's nested values, so only turning it into bytes here decouples
+			// the two. It holds JSON-native types only, so this cannot fail.
 			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
 		}
 		hash = hashDocument(doc)
@@ -178,17 +170,22 @@ func processManifest(path, version string, opts Options) Result {
 		r.Skipped = true
 	default:
 		dir := filepath.Dir(path)
-		// The sidecar goes last. It is what the plugin keys off, so stopping
-		// short of it leaves a state indistinguishable from "nothing was
-		// stamped" - which BestEffortPreDeploy already treats as safe, since
-		// the plugin just falls back to hashing at parse time. Writing it
-		// first would instead ship a fresh sidecar next to a slim manifest
-		// that was never written.
+		// The sidecar goes last: it carries the filtered_manifest pointer, so it
+		// must never exist before the file it points at. Stopping short of it
+		// looks like "nothing was stamped", which BestEffortPreDeploy treats as
+		// safe.
+		var filtered *FilteredManifest
 		if slimData != nil {
-			r.Err = writeSlimManifest(dir, slimData)
+			if r.Err = writeArtifact(dir, slimManifestName, slimData); r.Err == nil {
+				filtered = &FilteredManifest{
+					Schema:  slimSchemaVersion,
+					Path:    slimManifestName,
+					Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(slimData)},
+				}
+			}
 		}
 		if r.Err == nil {
-			r.Err = writeSidecar(dir, algoManifestJSON, hash, version)
+			r.Err = writeSidecar(dir, algoManifestJSON, hash, version, filtered)
 		}
 	}
 	return r

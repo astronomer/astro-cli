@@ -15,7 +15,7 @@ func TestWriteSidecarError(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, sidecarDir), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSidecar(dir, algoProjectTree, "deadbeef", "test"); err == nil {
+	if err := writeSidecar(dir, algoProjectTree, "deadbeef", "test", nil); err == nil {
 		t.Fatal("writeSidecar should fail when .astro is a file, not a directory")
 	}
 }
