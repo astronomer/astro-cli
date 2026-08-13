@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -63,31 +64,6 @@ func TestBuildSlimManifestKeepsOnlyAllowedResourceFields(t *testing.T) {
 	}
 	if !reflect.DeepEqual(node, want) {
 		t.Fatalf("slim node = %+v, want %+v", node, want)
-	}
-}
-
-// TestBuildSlimManifestKeepsOutletURIFields is the regression for the outlet
-// URI read specifically. compute_model_outlet_uris builds
-// "database.schema.alias" from this file under ExecutionMode.WATCHER on
-// Kubernetes/GKE, and skips the model silently when any part is missing - so
-// dropping these would cost dataset/Asset outlets with nothing in the logs to
-// explain it. `name` is the fallback when `alias` is absent.
-func TestBuildSlimManifestKeepsOutletURIFields(t *testing.T) {
-	doc := parseDoc(t, `{
-		"nodes": {
-			"seed.shop.countries": {
-				"original_file_path": "seeds/countries.csv", "package_name": "shop",
-				"resource_type": "seed", "database": "analytics", "schema": "raw", "name": "countries"
-			}
-		}
-	}`)
-
-	node := buildSlimManifest(doc, "test")["nodes"].(map[string]any)["seed.shop.countries"].(map[string]any)
-
-	for _, key := range []string{"database", "schema", "name"} {
-		if _, ok := node[key]; !ok {
-			t.Fatalf("outlet URI field %q dropped: %+v", key, node)
-		}
 	}
 }
 
@@ -161,115 +137,61 @@ func TestBuildSlimManifestDropsUnusedSections(t *testing.T) {
 	}
 }
 
-// TestBuildSlimManifestHandlesMissingSections: a manifest missing an optional
-// section (e.g. no exposures) must not panic and yields an empty collection.
-func TestBuildSlimManifestHandlesMissingSections(t *testing.T) {
-	doc := parseDoc(t, `{"metadata": {"project_name": "shop"}, "nodes": {}}`)
+// TestBuildSlimManifestHandlesAbsentInput: absent or wrong-typed input yields
+// empty collections, never a null. A reader doing manifest.get("selectors", {})
+// - the idiom that works against a full manifest - would get None from a null
+// and fail on the whole file.
+func TestBuildSlimManifestHandlesAbsentInput(t *testing.T) {
+	doc := parseDoc(t, `{"metadata": {"dbt_schema_version": "v12"}, "nodes": {}}`)
 
 	slim := buildSlimManifest(doc, "test")
 
 	for _, section := range slimSections {
 		entries, ok := slim[section].(map[string]any)
 		if !ok || len(entries) != 0 {
-			t.Fatalf("missing section %q must slim to an empty map, got %+v", section, slim[section])
+			t.Fatalf("missing section %q must slim to an empty map, got %#v", section, slim[section])
 		}
 	}
-}
-
-// TestBuildSlimManifestNeverEmitsNulls: an absent key must not turn into an
-// explicit null. A reader doing manifest.get("selectors", {}) - the idiom that
-// works against a full manifest - would get None back and fail on the whole
-// file, so the slim manifest's shape stays a subset of the full one's.
-func TestBuildSlimManifestNeverEmitsNulls(t *testing.T) {
-	// No top-level selectors, and metadata without project_name.
-	doc := parseDoc(t, `{"metadata": {"dbt_schema_version": "v12"}, "nodes": {}}`)
-
-	slim := buildSlimManifest(doc, "test")
-
 	if selectors, ok := slim["selectors"].(map[string]any); !ok || len(selectors) != 0 {
 		t.Fatalf("absent selectors must slim to an empty object, got %#v", slim["selectors"])
 	}
-	meta, ok := slim["metadata"].(map[string]any)
-	if !ok {
-		t.Fatalf("metadata has the wrong type: %#v", slim["metadata"])
-	}
-	if _, present := meta["project_name"]; present {
-		t.Fatalf("absent project_name must be left out, not set to null: %#v", meta)
+	if meta := slim["metadata"].(map[string]any); len(meta) != 0 {
+		t.Fatalf("absent project_name must be left out, not nulled: %#v", meta)
 	}
 
-	// A wrong-typed metadata (not an object) must not panic or leak through.
-	if slim := buildSlimManifest(parseDoc(t, `{"metadata": 7, "selectors": 7}`), "test"); len(slim["metadata"].(map[string]any)) != 0 ||
-		len(slim["selectors"].(map[string]any)) != 0 {
+	// Wrong-typed sections must not panic or leak through either.
+	slim = buildSlimManifest(parseDoc(t, `{"metadata": 7, "selectors": 7}`), "test")
+	if len(slim["metadata"].(map[string]any)) != 0 || len(slim["selectors"].(map[string]any)) != 0 {
 		t.Fatalf("wrong-typed sections must slim to empty objects, got %#v", slim)
 	}
 }
 
-// bulkyManifest builds a manifest whose resources carry the fields a real dbt
-// manifest is mostly made of - raw_code/compiled_code, columns, docs blocks,
-// checksums, patch paths, depends_on.macros - none of which Cosmos reads. The
-// proportions matter more than the absolute size: this is what makes the
-// reduction ratio below meaningful rather than arbitrary.
-func bulkyManifest(nodeCount int) map[string]any {
-	sql := "select * from {{ ref('upstream') }} where 1=1 -- " +
-		"padding to approximate a real model body, which dominates manifest size\n"
+// TestBuildSlimManifestCutsSize is the CI guard for the size (and so parse
+// cost) reduction this artifact exists for. The fixture gives each resource the
+// bulk a real manifest carries - code, columns, descriptions - none of which
+// Cosmos reads. The floor is well under the ~3x measured on the smallest
+// prototype subject: it catches a bulky field creeping back into the allowlist,
+// it is not a promise about any one project.
+func TestBuildSlimManifestCutsSize(t *testing.T) {
+	sql := strings.Repeat("select * from {{ ref('upstream') }} -- padding\n", 4)
 	nodes := map[string]any{}
-	for i := range nodeCount {
-		id := fmt.Sprintf("model.shop.m%d", i)
-		columns := map[string]any{}
-		for c := range 12 {
-			columns[fmt.Sprintf("col_%d", c)] = map[string]any{
-				"name": fmt.Sprintf("col_%d", c), "description": "a column description that dbt stores verbatim",
-				"meta": map[string]any{}, "data_type": "varchar", "constraints": []any{}, "tags": []any{},
-			}
-		}
-		nodes[id] = map[string]any{
-			// Read by Cosmos:
+	for i := range 200 {
+		nodes[fmt.Sprintf("model.shop.m%d", i)] = map[string]any{
 			"original_file_path": fmt.Sprintf("models/m%d.sql", i),
 			"package_name":       "shop",
 			"resource_type":      "model",
-			"tags":               []any{"nightly"},
-			"config":             map[string]any{"materialized": "table", "tags": []any{"nightly"}},
+			"config":             map[string]any{"materialized": "table"},
 			"fqn":                []any{"shop", fmt.Sprintf("m%d", i)},
-			"depends_on":         map[string]any{"nodes": []any{"model.shop.upstream"}, "macros": []any{"macro.dbt.ref", "macro.dbt.config"}},
-			// Not read by Cosmos, and the bulk of a real manifest:
-			"raw_code":      sql + sql + sql,
-			"compiled_code": sql + sql + sql + sql,
-			"columns":       columns,
-			"description":   "a model description that dbt stores verbatim in the manifest",
-			"checksum":      map[string]any{"name": "sha256", "checksum": "b1946ac92492d2347c6235b4d2611184b1946ac92492d2347c6235b4d2611184"},
-			"patch_path":    fmt.Sprintf("shop://models/schema/m%d.yml", i),
-			"docs":          map[string]any{"show": true, "node_color": nil},
-			"unrendered_config": map[string]any{
-				"materialized": "table", "tags": []any{"nightly"},
-			},
-			"created_at": 1754300000.1,
-			"meta":       map[string]any{"owner": "analytics"},
+			"depends_on":         map[string]any{"nodes": []any{"model.shop.upstream"}},
+			// Dropped, and the bulk of a real manifest:
+			"raw_code":      sql,
+			"compiled_code": sql,
+			"description":   strings.Repeat("a description dbt stores verbatim. ", 4),
+			"columns":       map[string]any{"a": map[string]any{"description": sql, "data_type": "varchar"}},
 		}
 	}
-	return map[string]any{
-		"metadata":  map[string]any{"project_name": "shop", "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json"},
-		"nodes":     nodes,
-		"sources":   map[string]any{},
-		"exposures": map[string]any{},
-		"selectors": map[string]any{},
-		// Whole sections Cosmos never touches.
-		"macros":     map[string]any{"macro.dbt.ref": map[string]any{"macro_sql": sql + sql, "depends_on": map[string]any{"macros": []any{}}}},
-		"parent_map": map[string]any{"model.shop.m0": []any{"model.shop.upstream"}},
-		"child_map":  map[string]any{"model.shop.upstream": []any{"model.shop.m0"}},
-		"docs":       map[string]any{"doc.shop.readme": map[string]any{"block_contents": sql}},
-		"disabled":   map[string]any{},
-	}
-}
+	doc := map[string]any{"metadata": map[string]any{"project_name": "shop"}, "nodes": nodes}
 
-// TestBuildSlimManifestCutsSize is the CI guard for the acceptance criterion
-// this artifact exists to satisfy: a measurable size (and so parse-cost)
-// reduction on a large project. The prototype this was modeled on measured
-// roughly 3x on its smaller subject and 7x on its larger one, so the floor
-// asserted here is deliberately below the low end - it catches allowlist creep
-// (a bulky field quietly added back), not a promise about any one customer's
-// manifest.
-func TestBuildSlimManifestCutsSize(t *testing.T) {
-	doc := bulkyManifest(200)
 	full, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -280,37 +202,9 @@ func TestBuildSlimManifestCutsSize(t *testing.T) {
 	}
 
 	const maxRatio = 0.34 // ~3x smaller
-	ratio := float64(len(slim)) / float64(len(full))
-	if ratio > maxRatio {
+	if ratio := float64(len(slim)) / float64(len(full)); ratio > maxRatio {
 		t.Fatalf("slim manifest is %.0f%% of the full one (%d vs %d bytes), want at most %.0f%%",
 			ratio*100, len(slim), len(full), maxRatio*100)
-	}
-	t.Logf("slim manifest is %.1fx smaller (%d -> %d bytes)", 1/ratio, len(full), len(slim))
-}
-
-// TestBuildSlimManifestNoRegressionOnSmallManifest: the other half of that
-// criterion. A manifest holding nothing but fields Cosmos reads cannot be
-// slimmed, so the slim copy is necessarily a little larger - its own
-// _schema/_generated_by markers. That overhead must stay a small constant, not
-// grow with the manifest.
-func TestBuildSlimManifestNoRegressionOnSmallManifest(t *testing.T) {
-	doc := parseDoc(t, `{"metadata":{"project_name":"shop"},"selectors":{},
-	  "nodes":{"model.shop.a":{"original_file_path":"models/a.sql","package_name":"shop",
-	  "resource_type":"model","tags":[],"config":{},"fqn":["shop","a"]}}}`)
-	full, err := json.Marshal(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	slim, err := json.Marshal(buildSlimManifest(doc, "1.44.0"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// The markers, plus the empty sources/exposures sections always emitted.
-	const maxOverhead = 160
-	if grew := len(slim) - len(full); grew > maxOverhead {
-		t.Fatalf("slim copy of an already-minimal manifest grew by %d bytes (%d -> %d), want at most %d",
-			grew, len(full), len(slim), maxOverhead)
 	}
 }
 

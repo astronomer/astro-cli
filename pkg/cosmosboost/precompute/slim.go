@@ -2,46 +2,29 @@ package precompute
 
 const slimManifestName = "manifest.slim.json"
 
-// slimSchemaVersion lets a future reader tell which allowlist produced a slim
-// manifest, independent of the sidecar's own schemaVersion (metadata.go).
+// slimSchemaVersion identifies the allowlist that produced a slim manifest, so
+// a reader that doesn't recognize it can fall back to the full manifest.
 const slimSchemaVersion = 1
 
-// slimSections are the only top-level manifest collections Cosmos loads nodes
-// from when parsing a dbt manifest (LoadMode.DBT_MANIFEST); everything else
-// (macros, disabled, docs, parent_map, child_map, ...) is unused.
+// slimSections are the only top-level collections Cosmos loads nodes from
+// (cosmos/dbt/graph.py::_load_nodes_from_manifest_data).
 var slimSections = []string{"nodes", "sources", "exposures"}
 
-// slimResourceFields are the per-resource fields Cosmos reads from a manifest
-// resource. The first six build the DbtNode itself
-// (cosmos/dbt/graph.py::_build_dbt_node_from_manifest_resource): dropping
-// original_file_path silently drops the node, resource_type is the one
-// bracket-accessed key (a KeyError if absent), and fqn is load-bearing at
-// runtime, not just for selectors - it becomes each task's literal
-// `--select fqn:...`. config is kept whole because selectors reach arbitrary
-// depth into config.meta.*, so its sub-keys cannot be enumerated ahead of time.
-//
-// database/schema/alias/name are read by a different module
-// (cosmos/dataset.py::compute_model_outlet_uris) to build per-model
-// dataset/Asset outlet URIs as "database.schema.alias", with name as the alias
-// fallback. Under ExecutionMode.WATCHER on Kubernetes/GKE that read is against
-// this very file, and a missing value there is a silent skip - no outlet, no
-// warning - so they stay in.
+// slimResourceFields are the per-resource fields Cosmos reads. The first six
+// build the DbtNode (graph.py::_build_dbt_node_from_manifest_resource); config
+// is kept whole because selectors reach arbitrary depth into config.meta.*. The
+// last four build per-model dataset outlet URIs as "database.schema.alias",
+// name being the alias fallback (dataset.py::compute_model_outlet_uris), which
+// under ExecutionMode.WATCHER on Kubernetes reads this file directly.
 var slimResourceFields = []string{
 	"original_file_path", "package_name", "resource_type", "tags", "config", "fqn",
 	"database", "schema", "alias", "name",
 }
 
-// buildSlimManifest returns a manifest document containing only the fields
-// Cosmos reads when building DAGs from a dbt manifest.json. doc is not
-// mutated, but the result is a shallow copy: selectors and each resource's
-// config/tags/fqn/depends_on.nodes are the same nested map/slice values as
-// doc's, not copies. A caller that mutates doc afterward (e.g. hashDocument)
-// must marshal this result to bytes first if the two need to stay
-// independent - see processManifest.
-//
-// Only a substitute for the graph-loading read - Cosmos also reads
-// manifest_path directly for dbt's own subprocess copy and per-model
-// dataset/Asset outlet URIs (database/schema/alias), which this drops.
+// buildSlimManifest returns a manifest document holding only the fields Cosmos
+// reads. doc is not mutated, but the result shares doc's nested values, so a
+// caller that later mutates doc (hashDocument does) must marshal this to bytes
+// first - see processManifest.
 func buildSlimManifest(doc map[string]any, version string) map[string]any {
 	slim := map[string]any{
 		"_schema":       slimSchemaVersion,
@@ -62,11 +45,9 @@ func buildSlimManifest(doc map[string]any, version string) map[string]any {
 	return slim
 }
 
-// slimMetadata returns the kept subset of manifest.metadata: project_name and
-// nothing else, since is_root_project_node (Cosmos) comparing each resource's
-// package_name against it is the only use of this section. An absent
-// project_name leaves the key out rather than setting it to null, so the read
-// side sees the same absence the full manifest had.
+// slimMetadata keeps project_name and nothing else - is_root_project_node
+// compares each resource's package_name against it. An absent project_name is
+// left out rather than nulled, matching the full manifest's shape.
 func slimMetadata(doc map[string]any) map[string]any {
 	meta, ok := doc["metadata"].(map[string]any)
 	if !ok {
@@ -79,11 +60,8 @@ func slimMetadata(doc map[string]any) map[string]any {
 	return slim
 }
 
-// objectOrEmpty returns v when it is a JSON object, else an empty one. Every
-// section this is applied to is an object in a real manifest, so substituting
-// {} for a missing or wrong-typed one keeps the slim manifest's shape a subset
-// of the full manifest's: a null would survive marshaling and break a reader
-// that iterates what manifest.get("selectors", {}) hands back.
+// objectOrEmpty returns v when it is a JSON object, else an empty one: never
+// null, which would break a reader doing manifest.get("selectors", {}).
 func objectOrEmpty(v any) map[string]any {
 	object, ok := v.(map[string]any)
 	if !ok {
@@ -92,9 +70,8 @@ func objectOrEmpty(v any) map[string]any {
 	return object
 }
 
-// slimResource returns a copy of resource containing only the fields Cosmos
-// reads: the shared fields, depends_on.nodes (never depends_on.macros, which
-// Cosmos does not consume), and freshness for sources only.
+// slimResource keeps the allowlisted fields plus depends_on.nodes (never
+// .macros, which Cosmos ignores) and freshness for sources only.
 func slimResource(resource map[string]any) map[string]any {
 	slim := make(map[string]any, len(slimResourceFields)+2)
 	for _, key := range slimResourceFields {
@@ -113,13 +90,4 @@ func slimResource(resource map[string]any) map[string]any {
 		}
 	}
 	return slim
-}
-
-// writeSlimManifest writes data into dir/.astro/manifest.slim.json. data must
-// already be the marshaled, compact (no indentation, to keep the size
-// reduction from field-filtering) JSON for a buildSlimManifest result -
-// callers marshal it themselves, before hashDocument gets a chance to mutate
-// any doc value the slim manifest shares (see buildSlimManifest).
-func writeSlimManifest(dir string, data []byte) error {
-	return writeArtifact(dir, slimManifestName, data)
 }

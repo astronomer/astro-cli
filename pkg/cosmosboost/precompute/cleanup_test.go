@@ -24,6 +24,22 @@ func stampProject(t *testing.T, dir string) {
 	}
 }
 
+// stampManifest is stampProject's sibling for the other unit kind: it drops a
+// minimal dbt manifest.json under dir and runs the real pre-deploy over it, so
+// the tests below exercise a sidecar *and* a slim manifest exactly as the
+// producer writes them. (stampProject writes dbt_project.yml, which produces a
+// project sidecar and no manifest, so it can't stand in here.)
+func stampManifest(t *testing.T, dir string) {
+	t.Helper()
+	writeFiles(t, dir, map[string]string{
+		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+}
+
 func TestCleanupRemovesSidecarAndPrunesDir(t *testing.T) {
 	dir := t.TempDir()
 	stampProject(t, dir)
@@ -54,13 +70,7 @@ func TestCleanupRemovesSidecarAndPrunesDir(t *testing.T) {
 // manifest.slim.json.
 func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
-	})
-	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
-	if err != nil || summary.CountFailed() > 0 {
-		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
-	}
+	stampManifest(t, dir)
 	slimPath := filepath.Join(dir, sidecarDir, slimManifestName)
 	if _, err := os.Stat(slimPath); err != nil {
 		t.Fatalf("fixture setup: slim manifest not written: %v", err)
@@ -86,73 +96,51 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	}
 }
 
-// TestCleanupKeepsForeignSlimManifestBesideOurSidecar: provenance is read per
-// file, so a manifest.slim.json another producer owns survives even when the
-// sidecar next to it is ours and gets removed. Deleting it on the sidecar's
-// provenance would destroy a file from the user's working tree.
-func TestCleanupKeepsForeignSlimManifestBesideOurSidecar(t *testing.T) {
-	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
-	})
-	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
-	if err != nil || summary.CountFailed() > 0 {
-		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
-	}
-	astroDir := filepath.Join(dir, sidecarDir)
-	slimPath := filepath.Join(astroDir, slimManifestName)
-	// Replace our slim manifest with one another tool owns.
-	if err := os.WriteFile(slimPath, []byte(`{"_generated_by": {"application": "someone-else"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+// TestCleanupJudgesEachArtifactSeparately: provenance is read per file, never
+// inferred from the neighbor. Deleting on the neighbor's marker would destroy
+// a file we do not own in one direction, and strand a stale artifact of ours -
+// unremoved and unreported - in the other.
+func TestCleanupJudgesEachArtifactSeparately(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		foreign  string // artifact to overwrite with another producer's marker
+		marker   string
+		wantKept string // artifact that must survive
+		wantGone string
+	}{
+		{
+			name:    "foreign slim manifest beside our sidecar",
+			foreign: slimManifestName, marker: `{"_generated_by": {"application": "someone-else"}}`,
+			wantKept: slimManifestName, wantGone: sidecarName,
+		},
+		{
+			name:    "our slim manifest beside a foreign sidecar",
+			foreign: sidecarName, marker: `{"generated_by": {"application": "someone-else"}}`,
+			wantKept: sidecarName, wantGone: slimManifestName,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			stampManifest(t, dir)
+			astroDir := filepath.Join(dir, sidecarDir)
+			if err := os.WriteFile(filepath.Join(astroDir, tc.foreign), []byte(tc.marker), 0o644); err != nil {
+				t.Fatal(err)
+			}
 
-	cleanupSummary, err := Cleanup([]string{dir})
-	if err != nil {
-		t.Fatalf("Cleanup: %v", err)
-	}
-	if cleanupSummary.CountKept() != 1 || cleanupSummary.CountFailed() != 0 {
-		t.Fatalf("kept=%d failed=%d, want 1/0", cleanupSummary.CountKept(), cleanupSummary.CountFailed())
-	}
-	if _, err := os.Stat(slimPath); err != nil {
-		t.Fatalf("foreign slim manifest was removed on its sidecar's provenance: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(astroDir, sidecarName)); !os.IsNotExist(err) {
-		t.Fatalf("our own sidecar must still be removed: %v", err)
-	}
-}
-
-// TestCleanupRemovesSlimManifestBesideForeignSidecar is the mirror case: a
-// foreign sidecar must not strand our own slim manifest. Skipping it would
-// leave a stale manifest.slim.json in the tree, unreported by `astro dbt
-// cleanup` and unnamed by EnsureClean's error, to ship in the next deploy.
-func TestCleanupRemovesSlimManifestBesideForeignSidecar(t *testing.T) {
-	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
-	})
-	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
-	if err != nil || summary.CountFailed() > 0 {
-		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
-	}
-	astroDir := filepath.Join(dir, sidecarDir)
-	slimPath := filepath.Join(astroDir, slimManifestName)
-	sidecarPath := filepath.Join(astroDir, sidecarName)
-	if err := os.WriteFile(sidecarPath, []byte(`{"generated_by": {"application": "someone-else"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cleanupSummary, err := Cleanup([]string{dir})
-	if err != nil {
-		t.Fatalf("Cleanup: %v", err)
-	}
-	if cleanupSummary.CountKept() != 1 || cleanupSummary.CountFailed() != 0 {
-		t.Fatalf("kept=%d failed=%d, want 1/0 (the foreign sidecar only)", cleanupSummary.CountKept(), cleanupSummary.CountFailed())
-	}
-	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
-		t.Fatalf("our slim manifest was stranded by the foreign sidecar beside it: %v", err)
-	}
-	if _, err := os.Stat(sidecarPath); err != nil {
-		t.Fatalf("foreign sidecar was removed: %v", err)
+			summary, err := Cleanup([]string{dir})
+			if err != nil {
+				t.Fatalf("Cleanup: %v", err)
+			}
+			if summary.CountKept() != 1 || summary.CountFailed() != 0 {
+				t.Fatalf("kept=%d failed=%d, want 1/0", summary.CountKept(), summary.CountFailed())
+			}
+			if _, err := os.Stat(filepath.Join(astroDir, tc.wantKept)); err != nil {
+				t.Fatalf("%s must survive: %v", tc.wantKept, err)
+			}
+			if _, err := os.Stat(filepath.Join(astroDir, tc.wantGone)); !os.IsNotExist(err) {
+				t.Fatalf("%s must be removed: %v", tc.wantGone, err)
+			}
+		})
 	}
 }
 
@@ -164,13 +152,7 @@ func TestCleanupRemovesSlimManifestBesideForeignSidecar(t *testing.T) {
 // marker.
 func TestCleanupRemovesOrphanedSlimManifest(t *testing.T) {
 	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
-	})
-	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
-	if err != nil || summary.CountFailed() > 0 {
-		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
-	}
+	stampManifest(t, dir)
 	astroDir := filepath.Join(dir, sidecarDir)
 	slimPath := filepath.Join(astroDir, slimManifestName)
 	if _, err := os.Stat(slimPath); err != nil {
@@ -223,20 +205,14 @@ func TestCleanupKeepsForeignOrphanedSlimManifest(t *testing.T) {
 
 // TestCleanupAttributesRemovalFailuresPerArtifact: a failure must name the
 // file that actually could not be removed. Reporting one artifact's error
-// against its neighbour's path sends the user to fix the wrong file, and the
+// against its neighbor's path sends the user to fix the wrong file, and the
 // next deploy fails on the same unnamed one.
 func TestCleanupAttributesRemovalFailuresPerArtifact(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("directory write-permission semantics differ on windows")
 	}
 	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
-	})
-	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
-	if err != nil || summary.CountFailed() > 0 {
-		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
-	}
+	stampManifest(t, dir)
 	astroDir := filepath.Join(dir, sidecarDir)
 	sidecarPath := filepath.Join(astroDir, sidecarName)
 	slimPath := filepath.Join(astroDir, slimManifestName)

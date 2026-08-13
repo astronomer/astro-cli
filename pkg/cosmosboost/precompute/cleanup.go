@@ -26,8 +26,6 @@ var cleanupSkipDirs = map[string]bool{
 }
 
 // CleanupResult records what happened to one artifact found during Cleanup.
-// Err always describes Path: each artifact is removed on its own terms, so a
-// failure is never reported against a neighboring file's name.
 type CleanupResult struct {
 	Path string // artifact file path
 	Kept bool   // left in place: the file was not written by this tool
@@ -42,18 +40,13 @@ type CleanupSummary struct {
 
 // Cleanup removes every .astro/dbt_metadata.json sidecar and every
 // .astro/manifest.slim.json under the given roots that this tool wrote,
-// pruning each containing .astro directory when removal leaves it empty. Each
-// file is judged by its own producer marker: one whose marker is not ours — or
-// that isn't valid JSON — is left in place and reported as kept, so cleanup
-// never deletes a file some other tool owns.
+// pruning each containing .astro directory when removal leaves it empty.
 //
-// Checking the two independently is what makes the mixed states come out
-// right, and neither is rare. A slim manifest outlives its sidecar whenever an
-// older astro-cli's cleanup deleted only the sidecar it knew about, or
-// EnsureClean left a foreign one in place; a sidecar we wrote can equally sit
-// next to a manifest.slim.json we did not. Inferring either file's provenance
-// from the other would delete a file we do not own in one direction and strand
-// a stale artifact of ours — unremoved and unreported — in the other.
+// Each file is judged by its own producer marker, never by its neighbor's,
+// because the mixed states are real: a slim manifest outlives its sidecar when
+// an older astro-cli removed only the sidecar, and a sidecar we wrote can sit
+// beside a slim manifest we did not. One whose marker isn't ours is reported
+// kept and left alone.
 //
 // Per-file removal failures are recorded in their Result and do not stop the
 // others; like Run, a non-nil error is returned only for a top-level problem
@@ -77,9 +70,6 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 			if filepath.Base(filepath.Dir(path)) != sidecarDir {
 				return nil
 			}
-			// WalkDir reads a directory's entries in lexical order, so
-			// dbt_metadata.json is handled before manifest.slim.json and the
-			// .astro prune that finally succeeds is the slim manifest's.
 			switch d.Name() {
 			case sidecarName:
 				recordOnce(seen, &results, path, removeSidecar)
@@ -127,10 +117,8 @@ func canonicalPath(path string) string {
 
 // removeArtifact deletes one artifact after producedByUs confirms this tool
 // wrote it, then prunes the containing .astro directory if removal left it
-// empty. Only files this tool could have written are ever removed — anything
-// else under .astro (e.g. an Astro project's config.yaml) is never touched.
-// Both artifacts carry a producer marker and differ only in which field holds
-// it, which is all producedByUs reads.
+// empty. Anything else under .astro (e.g. an Astro project's config.yaml) is
+// never touched.
 func removeArtifact(path string, producedByUs func(data []byte) bool) CleanupResult {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -156,10 +144,7 @@ func removeSidecar(path string) CleanupResult {
 }
 
 // removeSlimManifest removes one .astro/manifest.slim.json, keeping it unless
-// its own _generated_by marker names this tool. The marker read is the slim
-// manifest's own and never the neighboring sidecar's: the plugin consumes a
-// slim manifest just as directly as a sidecar, so a file another producer owns
-// has to survive here even when the sidecar beside it is ours.
+// its own _generated_by marker names this tool.
 func removeSlimManifest(path string) CleanupResult {
 	return removeArtifact(path, func(data []byte) bool {
 		var marker struct {
