@@ -59,6 +59,7 @@ const (
 
 	imageNameFlag = "image-name"
 	nonDagsFlag   = "non-dags"
+	dagsPathFlag  = "dags-path"
 )
 
 func NewDeployCmd() *cobra.Command {
@@ -69,6 +70,14 @@ func NewDeployCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
+				return nil
+			}
+			// A DAG-only deploy sourcing its DAGs from --dags-path doesn't read anything else
+			// from the working directory, unless --pytest/--parse is also used, which builds
+			// and runs a local image to test-parse the DAGs and so still needs the project root.
+			// Check the bound values (not cmd.Flags().Changed) so --dags=false or an explicit
+			// empty --dags-path can't be misread as enabling the bypass.
+			if dags && dagsPath != "" && !pytest && !parse {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
@@ -89,12 +98,11 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy DAGs to a named DAG bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
 	cmd.Flags().MarkHidden("dag-bundle-name") //nolint:errcheck
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
-	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
+	cmd.Flags().StringVar(&dagsPath, dagsPathFlag, "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
@@ -114,7 +122,7 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "dags", "dag")
 	annotateDeployFlag(cmd, "no-dags-base-dir", "dag")
 	annotateDeployFlag(cmd, "dag-bundle-name", "dag")
-	annotateDeployFlag(cmd, "dags-path", "dag")
+	annotateDeployFlag(cmd, dagsPathFlag, "dag")
 	annotateDeployFlag(cmd, "pytest", "test")
 	annotateDeployFlag(cmd, "test", "test")
 	annotateDeployFlag(cmd, "env", "test")
