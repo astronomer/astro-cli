@@ -11,7 +11,7 @@ import (
 func TestCleanupDefaultRootRemovesArtifact(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
-	require.NoError(t, PreDeploy(dir, true))
+	require.NoError(t, PreDeploy(dir))
 	t.Chdir(dir)
 
 	require.NoError(t, Cleanup())
@@ -33,11 +33,11 @@ func TestCleanupNonexistentRoot(t *testing.T) {
 func TestCleanupTouchesOnlyTheRequestedPaths(t *testing.T) {
 	requested := t.TempDir()
 	writeDbtProject(t, requested)
-	require.NoError(t, PreDeploy(requested, true))
+	require.NoError(t, PreDeploy(requested))
 
 	elsewhere := t.TempDir()
 	writeDbtProject(t, elsewhere)
-	require.NoError(t, PreDeploy(elsewhere, true))
+	require.NoError(t, PreDeploy(elsewhere))
 
 	require.NoError(t, Cleanup(requested))
 

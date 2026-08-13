@@ -4,25 +4,35 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/version"
 )
+
+// slimManifestDisabledEnvVar opts out of the slim manifest without disabling
+// the step. cosmos_boost.pre_deploy is the master switch; optimizations under
+// it are on by default and disabled per-feature by env var, as the plugin does.
+// Named for the disable so CheckEnvBool's "only an explicit truthy value
+// counts" leaves the optimization on for an unset or misspelled value.
+const slimManifestDisabledEnvVar = "ASTRO_COSMOS_BOOST_SLIM_MANIFEST_DISABLED"
+
+func slimManifestEnabled() bool {
+	return !util.CheckEnvBool(os.Getenv(slimManifestDisabledEnvVar))
+}
 
 // PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
 // (dbt_project.yml) gets a .astro/dbt_metadata.json sidecar carrying its
 // content hash, which the Cosmos Boost plugin uses as a cache version key at
 // parse time instead of hashing the project tree itself. Every standalone dbt
-// manifest.json gets a hash sidecar too.
-//
-// slimManifest additionally writes a slim, field-filtered copy of each
-// manifest for the plugin to load in place of the full one at DAG-parse time.
-// It is a separate switch from the step as a whole because only a plugin
-// version that knows to read it benefits (see config's cosmos_boost.*).
-func PreDeploy(path string, slimManifest bool) error {
-	summary, err := precompute.Run([]string{path}, version.CurrVersion, precompute.Options{SlimManifest: slimManifest})
+// manifest.json gets a hash sidecar too, plus a slim, field-filtered copy for
+// the plugin to load in place of the full manifest at DAG-parse time.
+func PreDeploy(path string) error {
+	opts := precompute.Options{SlimManifest: slimManifestEnabled()}
+	summary, err := precompute.Run([]string{path}, version.CurrVersion, opts)
 	if err != nil {
 		return fmt.Errorf("running the Cosmos Boost pre-deploy step: %w", err)
 	}
@@ -86,8 +96,8 @@ func EnsureClean(path string) error {
 // because without a sidecar the plugin simply falls back to hashing at parse
 // time. Callers must run EnsureClean first: writing nothing is safe, leaving
 // something stale is not.
-func BestEffortPreDeploy(path string, slimManifest bool) {
-	if err := PreDeploy(path, slimManifest); err != nil {
+func BestEffortPreDeploy(path string) {
+	if err := PreDeploy(path); err != nil {
 		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", err)
 		return
 	}

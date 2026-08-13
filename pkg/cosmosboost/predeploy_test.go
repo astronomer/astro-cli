@@ -29,7 +29,7 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 
-	require.NoError(t, PreDeploy(dir, true))
+	require.NoError(t, PreDeploy(dir))
 
 	data, err := os.ReadFile(filepath.Join(dir, artifactRelPath))
 	require.NoError(t, err)
@@ -53,30 +53,64 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 }
 
 // TestPreDeployWritesSlimManifest pins that PreDeploy writes a slim manifest
-// next to a discovered manifest.json's hash sidecar - there is no separate
-// opt-in for this, it follows cosmos_boost.pre_deploy.
+// next to a discovered manifest.json's hash sidecar. It is on by default: the
+// only switch is the step itself (cosmos_boost.pre_deploy), with a per-feature
+// opt-out below.
 func TestPreDeployWritesSlimManifest(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
 
-	require.NoError(t, PreDeploy(dir, true))
+	require.NoError(t, PreDeploy(dir))
 
 	require.FileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
+}
+
+// TestPreDeployRespectsSlimManifestOptOut: the env var disables this one
+// optimization without disabling the step, so the hash sidecar still lands.
+func TestPreDeployRespectsSlimManifestOptOut(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
+	t.Setenv(slimManifestDisabledEnvVar, "true")
+
+	require.NoError(t, PreDeploy(dir))
+
+	require.FileExists(t, filepath.Join(dir, ".astro", "dbt_metadata.json"))
+	require.NoFileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
+}
+
+// TestSlimManifestEnabled: only an explicit truthy value in the disable var
+// turns the optimization off, so unset - and a misspelled value - leaves it on.
+func TestSlimManifestEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{
+		{value: "", want: true},
+		{value: "flase", want: true}, // a typo must not silently disable
+		{value: "true"},
+		{value: "TRUE"},
+		{value: "1"},
+		{value: "yes"},
+	} {
+		t.Setenv(slimManifestDisabledEnvVar, tc.value)
+		require.Equal(t, tc.want, slimManifestEnabled(), "value %q", tc.value)
+	}
 }
 
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('hi')"), 0o644))
 
-	require.NoError(t, PreDeploy(dir, true))
+	require.NoError(t, PreDeploy(dir))
 
 	_, err := os.Stat(filepath.Join(dir, ".astro"))
 	require.True(t, os.IsNotExist(err), "nothing dbt-shaped means nothing written")
 }
 
 func TestPreDeployNonexistentPath(t *testing.T) {
-	require.Error(t, PreDeploy(filepath.Join(t.TempDir(), "does-not-exist"), true))
+	require.Error(t, PreDeploy(filepath.Join(t.TempDir(), "does-not-exist")))
 }
 
 // TestEnsureCleanRemovesStaleArtifacts covers the sequence the deploy hooks
@@ -94,7 +128,7 @@ func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
 	require.NoError(t, os.WriteFile(stale, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
 
 	require.NoError(t, EnsureClean(dir))
-	BestEffortPreDeploy(dir, true)
+	BestEffortPreDeploy(dir)
 
 	_, err := os.Stat(stale)
 	require.True(t, os.IsNotExist(err), "stale artifacts must not survive a pre-deploy run")
@@ -108,7 +142,7 @@ func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
 func TestEnsureCleanFailsOnForeignSidecar(t *testing.T) {
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
-	require.NoError(t, PreDeploy(dir, true))
+	require.NoError(t, PreDeploy(dir))
 
 	foreign := filepath.Join(dir, "other", ".astro", "dbt_metadata.json")
 	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
@@ -170,7 +204,7 @@ func TestPreDeployReportsFailedUnits(t *testing.T) {
 	require.NoError(t, os.Chmod(model, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(model, 0o644) })
 
-	err := PreDeploy(dir, true)
+	err := PreDeploy(dir)
 
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed for 1 unit(s)")
@@ -178,5 +212,5 @@ func TestPreDeployReportsFailedUnits(t *testing.T) {
 
 // TestBestEffortPreDeployWarnsAndContinues: stamping failures never propagate.
 func TestBestEffortPreDeployWarnsAndContinues(t *testing.T) {
-	BestEffortPreDeploy(filepath.Join(t.TempDir(), "does-not-exist"), true)
+	BestEffortPreDeploy(filepath.Join(t.TempDir(), "does-not-exist"))
 }

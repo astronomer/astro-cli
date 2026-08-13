@@ -227,7 +227,7 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		if err := cosmosboost.EnsureClean(bundlePath); err != nil {
 			return "", err
 		}
-		cosmosboost.BestEffortPreDeploy(bundlePath, config.CFG.CosmosBoostSlimManifest.GetBool())
+		cosmosboost.BestEffortPreDeploy(bundlePath)
 	}
 
 	// Generate the bundle tar
