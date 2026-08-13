@@ -55,7 +55,7 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 // TestPreDeployWritesSlimManifest pins that PreDeploy writes a slim manifest
 // next to a discovered manifest.json's hash sidecar. It is on by default: the
 // only switch is the step itself (cosmos_boost.pre_deploy), with a per-feature
-// opt-out below.
+// env var below.
 func TestPreDeployWritesSlimManifest(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
@@ -66,13 +66,13 @@ func TestPreDeployWritesSlimManifest(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
 }
 
-// TestPreDeployRespectsSlimManifestOptOut: the env var disables this one
+// TestPreDeployRespectsSlimManifestEnvVar: the env var disables this one
 // optimization without disabling the step, so the hash sidecar still lands.
-func TestPreDeployRespectsSlimManifestOptOut(t *testing.T) {
+func TestPreDeployRespectsSlimManifestEnvVar(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
-	t.Setenv(slimManifestDisabledEnvVar, "true")
+	t.Setenv(slimManifestEnvVar, "false")
 
 	require.NoError(t, PreDeploy(dir))
 
@@ -80,21 +80,23 @@ func TestPreDeployRespectsSlimManifestOptOut(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
 }
 
-// TestSlimManifestEnabled: only an explicit truthy value in the disable var
-// turns the optimization off, so unset - and a misspelled value - leaves it on.
+// TestSlimManifestEnabled: unset leaves the optimization on; otherwise only a
+// value util.CheckEnvBool reads as true keeps it on.
 func TestSlimManifestEnabled(t *testing.T) {
 	for _, tc := range []struct {
 		value string
 		want  bool
 	}{
-		{value: "", want: true},
-		{value: "flase", want: true}, // a typo must not silently disable
-		{value: "true"},
-		{value: "TRUE"},
-		{value: "1"},
-		{value: "yes"},
+		{value: "", want: true}, // unset: on by default under the master switch
+		{value: "true", want: true},
+		{value: "TRUE", want: true}, // case-insensitive
+		{value: "1", want: true},
+		{value: "yes", want: true},
+		{value: "false"},
+		{value: "0"},
+		{value: "off"},
 	} {
-		t.Setenv(slimManifestDisabledEnvVar, tc.value)
+		t.Setenv(slimManifestEnvVar, tc.value)
 		require.Equal(t, tc.want, slimManifestEnabled(), "value %q", tc.value)
 	}
 }
