@@ -410,25 +410,6 @@ func TestRunErrorsOnUnreadableTargetDir(t *testing.T) {
 	}
 }
 
-// TestRunSkipsManifestInProjectRoot: a manifest sitting in a discovered
-// project's root is covered by the project's tree hash and gets no unit of
-// its own.
-func TestRunSkipsManifestInProjectRoot(t *testing.T) {
-	dir := t.TempDir()
-	writeFiles(t, dir, map[string]string{
-		"proj/dbt_project.yml": "name: shop\n",
-		"proj/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
-	})
-
-	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject {
-		t.Fatalf("results = %+v, want exactly one project unit", summary.Results)
-	}
-}
-
 // TestRunReportsFailedUnits: per-unit failures land in the unit's Result and
 // do not abort the run.
 func TestRunReportsFailedUnits(t *testing.T) {
@@ -545,6 +526,94 @@ func TestRunSkipsSlimManifestWhenNotRequested(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "filtered_manifest") {
 		t.Fatalf("filtered_manifest emitted with the slim manifest disabled: %s", raw)
+	}
+}
+
+// TestRunSlimsManifestInProjectRoot: a manifest.json beside dbt_project.yml is
+// not a discovery unit (its .astro/ is the project's own), so it used to get no
+// slim copy at all - the projects most likely to have one got nothing from this
+// feature. It is slimmed into the project's .astro/, with the project sidecar
+// carrying the pointer and keeping its own tree hash.
+func TestRunSlimsManifestInProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml": "name: shop\n",
+		"proj/models/a.sql":    "select 1",
+		"proj/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"],"raw_code":"select 1"}}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One unit only: the manifest must not also be discovered on its own.
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 successful project result, got %+v", summary.Results)
+	}
+
+	astroDir := filepath.Join(root, "proj", sidecarDir)
+	var slim map[string]any
+	readJSON(t, filepath.Join(astroDir, slimManifestName), &slim)
+	if _, ok := slim["nodes"].(map[string]any)["model.shop.orders"]; !ok {
+		t.Fatalf("slim manifest missing expected node: %+v", slim)
+	}
+
+	var meta Metadata
+	readJSON(t, filepath.Join(astroDir, sidecarName), &meta)
+	if meta.Version.Algo != algoProjectTree {
+		t.Fatalf("project sidecar algo = %q, want %q", meta.Version.Algo, algoProjectTree)
+	}
+	if meta.FilteredManifest == nil || meta.FilteredManifest.Path != slimManifestName {
+		t.Fatalf("project sidecar does not point at the slim manifest: %+v", meta.FilteredManifest)
+	}
+}
+
+// TestRunProjectHashIgnoresRootSlimManifest: the slim manifest lands inside the
+// hashed tree, so the project hash must not move because of it - otherwise
+// enabling the optimization would invalidate every cache key once.
+func TestRunProjectHashIgnoresRootSlimManifest(t *testing.T) {
+	hashWith := func(t *testing.T, opts Options) string {
+		t.Helper()
+		root := t.TempDir()
+		writeFiles(t, root, map[string]string{
+			"proj/dbt_project.yml": "name: shop\n",
+			"proj/models/a.sql":    "select 1",
+			"proj/manifest.json":   `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		})
+		summary, err := Run([]string{root}, "test", opts)
+		if err != nil || len(summary.Results) != 1 {
+			t.Fatalf("Run: err=%v results=%+v", err, summary.Results)
+		}
+		return summary.Results[0].Hash
+	}
+
+	if with, without := hashWith(t, Options{SlimManifest: true}), hashWith(t, Options{}); with != without {
+		t.Fatalf("writing the slim manifest changed the project hash:\n with    %s\n without %s", with, without)
+	}
+}
+
+// TestRunSkipsNonDbtManifestInProjectRoot: a project root can hold an unrelated
+// manifest.json (a web app's PWA manifest), which must not be slimmed or
+// pointed at.
+func TestRunSkipsNonDbtManifestInProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml": "name: shop\n",
+		"proj/manifest.json":   `{"name":"My App","short_name":"App","icons":[]}`,
+	})
+
+	if _, err := Run([]string{root}, "test", Options{SlimManifest: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	astroDir := filepath.Join(root, "proj", sidecarDir)
+	if _, err := os.Stat(filepath.Join(astroDir, slimManifestName)); !os.IsNotExist(err) {
+		t.Fatalf("a non-dbt manifest.json must not be slimmed: %v", err)
+	}
+	var meta Metadata
+	readJSON(t, filepath.Join(astroDir, sidecarName), &meta)
+	if meta.FilteredManifest != nil {
+		t.Fatalf("project sidecar points at a slim manifest that was never written: %+v", meta.FilteredManifest)
 	}
 }
 
