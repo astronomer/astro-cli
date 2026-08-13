@@ -188,6 +188,16 @@ func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {
 
 	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags", "--parse")
 	assert.ErrorIs(t, err, assert.AnError)
+
+	// Explicitly passing --dags=false must not be misread as enabling the bypass just because
+	// the flag was mentioned on the command line - this is really a full image+dags deploy.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags=false", "--dags-path", "./external-dags")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// An explicit empty --dags-path falls back to the working directory's dags/ folder
+	// (cloud/deploy/deploy.go), so it must not be misread as enabling the bypass either.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "")
+	assert.ErrorIs(t, err, assert.AnError)
 }
 
 func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {

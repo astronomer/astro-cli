@@ -75,7 +75,9 @@ func NewDeployCmd() *cobra.Command {
 			// A DAG-only deploy sourcing its DAGs from --dags-path doesn't read anything else
 			// from the working directory, unless --pytest/--parse is also used, which builds
 			// and runs a local image to test-parse the DAGs and so still needs the project root.
-			if cmd.Flags().Changed("dags") && cmd.Flags().Changed(dagsPathFlag) && !cmd.Flags().Changed("pytest") && !cmd.Flags().Changed("parse") {
+			// Check the bound values (not cmd.Flags().Changed) so --dags=false or an explicit
+			// empty --dags-path can't be misread as enabling the bypass.
+			if dags && dagsPath != "" && !pytest && !parse {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
