@@ -58,11 +58,11 @@ type Options struct {
 // problem, such as a root that cannot be walked. version is recorded in each
 // sidecar's generated_by.
 //
-// With opts.SlimManifest set, every discovered manifest.json also gets a slim,
-// field-filtered copy (see buildSlimManifest) written next to its sidecar, for
-// the Cosmos Boost plugin to load in place of the full manifest at DAG-parse
-// time. A manifest.json sitting directly in a project's root is excluded from
-// discovery (see findManifests) and so gets no slim copy either.
+// With opts.SlimManifest set, every dbt manifest.json also gets a slim,
+// field-filtered copy (see buildSlimManifest) written into the .astro/ beside
+// it, for the Cosmos Boost plugin to load in place of the full manifest at
+// DAG-parse time. That includes one in a project's own root, which is not a
+// discovery unit of its own and is handled by processProject.
 func Run(roots []string, version string, opts Options) (Summary, error) {
 	start := time.Now()
 
@@ -112,7 +112,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 			defer wg.Done()
 			defer func() { <-sem }() // release the slot
 			if u.kind == kindProject {
-				results[i] = processProject(u.path, version)
+				results[i] = processProject(u.path, version, opts)
 			} else {
 				results[i] = processManifest(u.path, version, opts)
 			}
@@ -126,7 +126,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 // processProject hashes one dbt project directory and writes its sidecar. It reads
 // dbt_project.yml once (readDbtConfig) and threads the result through hashing and the
 // templated-packages warning, so the file isn't parsed more than once per project.
-func processProject(dir, version string) Result {
+func processProject(dir, version string, opts Options) Result {
 	start := time.Now()
 	cfg := readDbtConfig(dir)
 	hash, files, totalBytes, err := hashProject(dir, cfg)
@@ -139,7 +139,24 @@ func processProject(dir, version string) Result {
 		r.Warning = strings.Join(cfg.templatedSettings, ", ") +
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
-	r.Err = writeSidecar(dir, algoProjectTree, hash, version, nil)
+
+	// A manifest.json in the project root is not a unit of its own - its .astro/
+	// is this project's, so it would collide with the sidecar written below - and
+	// findManifests skips it for that reason. Slim it here instead, leaving the
+	// project's own hash as the anchor the pointer hangs off.
+	var filtered *FilteredManifest
+	if opts.SlimManifest {
+		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, manifestFile)); readErr == nil && isDbt {
+			// Nothing mutates doc afterward here, unlike processManifest.
+			data, _ := json.Marshal(buildSlimManifest(doc, version))
+			if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
+				r.Duration = time.Since(start)
+				return r
+			}
+		}
+	}
+
+	r.Err = writeSidecar(dir, algoProjectTree, hash, version, filtered)
 	r.Duration = time.Since(start)
 	return r
 }
@@ -176,19 +193,27 @@ func processManifest(path, version string, opts Options) Result {
 		// safe.
 		var filtered *FilteredManifest
 		if slimData != nil {
-			if r.Err = writeArtifact(dir, slimManifestName, slimData); r.Err == nil {
-				filtered = &FilteredManifest{
-					Schema:  slimSchemaVersion,
-					Path:    slimManifestName,
-					Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(slimData)},
-				}
-			}
+			filtered, r.Err = writeSlimManifest(dir, slimData)
 		}
 		if r.Err == nil {
 			r.Err = writeSidecar(dir, algoManifestJSON, hash, version, filtered)
 		}
 	}
 	return r
+}
+
+// writeSlimManifest writes data as dir's slim manifest and returns the sidecar
+// pointer describing it. data must already be marshaled, so a caller that later
+// mutates the source doc cannot leak into it (see processManifest).
+func writeSlimManifest(dir string, data []byte) (*FilteredManifest, error) {
+	if err := writeArtifact(dir, slimManifestName, data); err != nil {
+		return nil, err
+	}
+	return &FilteredManifest{
+		Schema:  slimSchemaVersion,
+		Path:    slimManifestName,
+		Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(data)},
+	}, nil
 }
 
 // CountFailed returns the number of units that errored.

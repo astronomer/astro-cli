@@ -57,23 +57,23 @@ func TestUploadBundleRunsPreDeployWhenEnabled(t *testing.T) {
 }
 
 // TestUploadBundleSlimManifest pins the slim manifest's gating end to end: on
-// by default once the step is enabled, and off only when the per-feature env
-// var disables it. Either way the hash sidecar still lands - the two
-// optimizations are independent.
+// by default once the step is enabled, and off when the per-feature env var
+// says so. Either way the hash sidecar still lands - the two optimizations are
+// independent.
 func TestUploadBundleSlimManifest(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
-		disable  string // value for the disable env var; "" leaves it unset
+		envVar   string // value for the per-feature env var; "" leaves it unset
 		wantSlim bool
 	}{
 		{name: "on by default", wantSlim: true},
-		{name: "env var disables it", disable: "true", wantSlim: false},
+		{name: "env var switches it off", envVar: "false", wantSlim: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupCosmosBoostEnv(t)
 			require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
-			if tc.disable != "" {
-				t.Setenv("ASTRO_COSMOS_BOOST_SLIM_MANIFEST_DISABLED", tc.disable)
+			if tc.envVar != "" {
+				t.Setenv("ASTRO_COSMOS_BOOST_SLIM_MANIFEST_ENABLED", tc.envVar)
 			}
 
 			bundleDir := writeDbtBundle(t)

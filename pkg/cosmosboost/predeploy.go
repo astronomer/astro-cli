@@ -13,15 +13,19 @@ import (
 	"github.com/astronomer/astro-cli/version"
 )
 
-// slimManifestDisabledEnvVar opts out of the slim manifest without disabling
-// the step. cosmos_boost.pre_deploy is the master switch; optimizations under
-// it are on by default and disabled per-feature by env var, as the plugin does.
-// Named for the disable so CheckEnvBool's "only an explicit truthy value
-// counts" leaves the optimization on for an unset or misspelled value.
-const slimManifestDisabledEnvVar = "ASTRO_COSMOS_BOOST_SLIM_MANIFEST_DISABLED"
+// slimManifestEnvVar switches the slim manifest without disabling the step.
+// cosmos_boost.pre_deploy is the master switch; optimizations under it are on by
+// default and switched per-feature by env var. The name matches the plugin's
+// convention for its own optimizations.
+const slimManifestEnvVar = "ASTRO_COSMOS_BOOST_SLIM_MANIFEST_ENABLED"
 
+// slimManifestEnabled reports whether to write the slim manifest: on when unset,
+// otherwise only for a value util.CheckEnvBool reads as true. The plugin keeps
+// an unrecognized value on; here it turns the optimization off, because reusing
+// this repo's only bool-env helper beats hand-rolling a second parser.
 func slimManifestEnabled() bool {
-	return !util.CheckEnvBool(os.Getenv(slimManifestDisabledEnvVar))
+	value := os.Getenv(slimManifestEnvVar)
+	return value == "" || util.CheckEnvBool(value)
 }
 
 // PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
