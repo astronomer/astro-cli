@@ -52,6 +52,53 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 	require.Equal(t, "1.2.3", meta.GeneratedBy.Version, "provenance records the CLI version now that the step runs in-process")
 }
 
+// TestPreDeployWritesSlimManifest pins that PreDeploy writes a slim manifest
+// next to a discovered manifest.json's hash sidecar. It is on by default: the
+// only switch is the step itself (cosmos_boost.pre_deploy), with a per-feature
+// opt-out below.
+func TestPreDeployWritesSlimManifest(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
+
+	require.NoError(t, PreDeploy(dir))
+
+	require.FileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
+}
+
+// TestPreDeployRespectsSlimManifestOptOut: the env var disables this one
+// optimization without disabling the step, so the hash sidecar still lands.
+func TestPreDeployRespectsSlimManifestOptOut(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(manifest), 0o644))
+	t.Setenv(slimManifestDisabledEnvVar, "true")
+
+	require.NoError(t, PreDeploy(dir))
+
+	require.FileExists(t, filepath.Join(dir, ".astro", "dbt_metadata.json"))
+	require.NoFileExists(t, filepath.Join(dir, ".astro", "manifest.slim.json"))
+}
+
+// TestSlimManifestEnabled: only an explicit truthy value in the disable var
+// turns the optimization off, so unset - and a misspelled value - leaves it on.
+func TestSlimManifestEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{
+		{value: "", want: true},
+		{value: "flase", want: true}, // a typo must not silently disable
+		{value: "true"},
+		{value: "TRUE"},
+		{value: "1"},
+		{value: "yes"},
+	} {
+		t.Setenv(slimManifestDisabledEnvVar, tc.value)
+		require.Equal(t, tc.want, slimManifestEnabled(), "value %q", tc.value)
+	}
+}
+
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('hi')"), 0o644))

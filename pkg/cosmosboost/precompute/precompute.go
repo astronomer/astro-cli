@@ -1,6 +1,7 @@
 package precompute
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -28,7 +29,7 @@ type Result struct {
 	Duration time.Duration // time spent on this unit
 	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar written)
 	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
-	Err      error         // non-nil if hashing or writing the sidecar failed
+	Err      error         // non-nil if hashing, writing the sidecar, or writing the slim manifest failed
 }
 
 // Summary is the structured outcome of a precompute run. It backs both the
@@ -36,6 +37,14 @@ type Result struct {
 type Summary struct {
 	Duration time.Duration
 	Results  []Result
+}
+
+// Options selects which artifacts a run writes; the zero value writes only the
+// hash sidecars.
+type Options struct {
+	// SlimManifest also writes a slim, field-filtered copy of each discovered
+	// manifest.json (see buildSlimManifest) next to its sidecar.
+	SlimManifest bool
 }
 
 // Run finds every dbt project (a directory with dbt_project.yml) and standalone
@@ -48,7 +57,13 @@ type Summary struct {
 // and does not stop the others. Run only returns a non-nil error for a top-level
 // problem, such as a root that cannot be walked. version is recorded in each
 // sidecar's generated_by.
-func Run(roots []string, version string) (Summary, error) {
+//
+// With opts.SlimManifest set, every discovered manifest.json also gets a slim,
+// field-filtered copy (see buildSlimManifest) written next to its sidecar, for
+// the Cosmos Boost plugin to load in place of the full manifest at DAG-parse
+// time. A manifest.json sitting directly in a project's root is excluded from
+// discovery (see findManifests) and so gets no slim copy either.
+func Run(roots []string, version string, opts Options) (Summary, error) {
 	start := time.Now()
 
 	projectDirs := map[string]bool{}
@@ -99,7 +114,7 @@ func Run(roots []string, version string) (Summary, error) {
 			if u.kind == kindProject {
 				results[i] = processProject(u.path, version)
 			} else {
-				results[i] = processManifest(u.path, version)
+				results[i] = processManifest(u.path, version, opts)
 			}
 		}(i, u)
 	}
@@ -124,17 +139,29 @@ func processProject(dir, version string) Result {
 		r.Warning = strings.Join(cfg.templatedSettings, ", ") +
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
-	r.Err = writeSidecar(dir, algoProjectTree, hash, version)
+	r.Err = writeSidecar(dir, algoProjectTree, hash, version, nil)
 	r.Duration = time.Since(start)
 	return r
 }
 
-// processManifest hashes one manifest.json and writes a sidecar next to it. A
-// file that isn't a dbt manifest is skipped (no sidecar) so unrelated
-// manifest.json files in the project aren't stamped.
-func processManifest(path, version string) Result {
+// processManifest hashes one manifest.json and writes a sidecar next to it,
+// plus a slim, field-filtered copy of the manifest when opts asks for one (see
+// buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
+// written) so unrelated manifest.json files in the project aren't stamped.
+func processManifest(path, version string, opts Options) Result {
 	start := time.Now()
-	hash, bytes, isDbt, err := hashManifest(path)
+	doc, bytes, isDbt, err := readManifestDoc(path)
+	var hash string
+	var slimData []byte
+	if err == nil && isDbt {
+		if opts.SlimManifest {
+			// Marshal before hashDocument mutates doc: the slim manifest shares
+			// doc's nested values, so only turning it into bytes here decouples
+			// the two. It holds JSON-native types only, so this cannot fail.
+			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+		}
+		hash = hashDocument(doc)
+	}
 	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
 	switch {
 	case err != nil:
@@ -142,7 +169,24 @@ func processManifest(path, version string) Result {
 	case !isDbt:
 		r.Skipped = true
 	default:
-		r.Err = writeSidecar(filepath.Dir(path), algoManifestJSON, hash, version)
+		dir := filepath.Dir(path)
+		// The sidecar goes last: it carries the filtered_manifest pointer, so it
+		// must never exist before the file it points at. Stopping short of it
+		// looks like "nothing was stamped", which BestEffortPreDeploy treats as
+		// safe.
+		var filtered *FilteredManifest
+		if slimData != nil {
+			if r.Err = writeArtifact(dir, slimManifestName, slimData); r.Err == nil {
+				filtered = &FilteredManifest{
+					Schema:  slimSchemaVersion,
+					Path:    slimManifestName,
+					Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(slimData)},
+				}
+			}
+		}
+		if r.Err == nil {
+			r.Err = writeSidecar(dir, algoManifestJSON, hash, version, filtered)
+		}
 	}
 	return r
 }
