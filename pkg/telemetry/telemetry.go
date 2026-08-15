@@ -31,10 +31,13 @@ type TelemetryPayload struct {
 	Properties  map[string]interface{} `json:"properties,omitempty"`
 }
 
-// senderPayload wraps TelemetryPayload with the API URL for the subprocess
-type senderPayload struct {
+// SenderPayload is what the sender subprocess reads from stdin: an event plus
+// the two things it needs to deliver it. Token is sent as a bearer header, not
+// serialized into the event body, and is empty for logged-out users.
+type SenderPayload struct {
 	TelemetryPayload
 	APIURL string `json:"api_url"`
+	Token  string `json:"token,omitempty"`
 }
 
 // envMapping pairs an environment variable with a context name
