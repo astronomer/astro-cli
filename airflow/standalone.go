@@ -773,6 +773,11 @@ func (s *Standalone) buildEnv() []string {
 		overrides["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"] = "True"
 	}
 
+	// Bind the api-server (AF3) / webserver (AF2) to loopback so the
+	// all-admins instance isn't reachable from the LAN. Unlike the settings
+	// above these are defaults: a user's .env or inherited env wins.
+	airflowrt.ApplyLoopbackDefaults(overrides)
+
 	// Layer 3: macOS fork-safety workarounds.
 	// a) Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
 	//    When Airflow forks, this can spin at 100% CPU indefinitely.
@@ -888,17 +893,20 @@ func (s *Standalone) Stop(_ bool) error {
 	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
 	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
 
-	// Poll for process exit
+	// Poll the process group — not just the master PID. airflow standalone
+	// spawns scheduler/api-server/triggerer into the same group (Setpgid at
+	// start), and the master often exits on SIGTERM before its children
+	// finish; returning then would leave them running.
 	deadline := time.Now().Add(stopTimeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(stopPollInterval)
-		if _, stillAlive := s.readPID(); !stillAlive {
+		if !airflowrt.ProcessGroupAlive(pid) {
 			break
 		}
 	}
 
-	// If still alive, send SIGKILL
-	if _, stillAlive := s.readPID(); stillAlive {
+	// If any group member is still alive, send SIGKILL
+	if airflowrt.ProcessGroupAlive(pid) {
 		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
 		time.Sleep(stopPollInterval)
 	}
