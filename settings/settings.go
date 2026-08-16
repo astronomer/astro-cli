@@ -47,11 +47,12 @@ var (
 const (
 	airflowConnectionList = "airflow connections list -o yaml"
 	ariflowPoolsList      = "airflow pools list -o yaml"
-	airflowConnExport     = "airflow connections export tmp.connections --file-format env"
+	airflowConnExport     = "airflow connections export /tmp/connections.env --file-format env"
 	airflowVarExport      = "airflow variables export tmp.var"
 	catVarFile            = "cat tmp.var"
 	rmVarFile             = "rm tmp.var"
-	catConnFile           = "cat tmp.connections"
+	catConnFile           = "cat /tmp/connections.env"
+	rmConnFile            = "rm /tmp/connections.env"
 	configReadErrorMsg    = "Error reading Airflow Settings file. Connections, Variables, and Pools were not loaded please check your Settings file syntax: %s\n"
 	noColorString         = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
 )
@@ -481,7 +482,7 @@ func EnvExportVariables(id, envFile string) error {
 	return errors.New("variable export unsuccessful")
 }
 
-func EnvExportConnections(id, envFile string) error {
+func EnvExportConnections(id, envFile string) (err error) {
 	// Airflow command to export connections to env uris
 	out, err := execAirflowCommand(id, airflowConnExport)
 	if err != nil {
@@ -489,41 +490,51 @@ func EnvExportConnections(id, envFile string) error {
 	}
 	logger.Debugf("Env Export Connections logs:\n%s", out)
 
-	if strings.Contains(out, "successfully") {
-		// get connections from file craeted by airflow command
-		out, err = execAirflowCommand(id, catConnFile)
-		if err != nil {
-			return fmt.Errorf("error reading connections file: %w", err)
-		}
+	if !strings.Contains(out, "successfully") {
+		return errors.New("connection export unsuccessful")
+	}
 
-		vars := strings.Split(out, "\n")
-		// add connections to the env file; connection URIs contain passwords, so keep it owner-only
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
-		if err != nil {
-			return errors.Wrap(err, "Writing connections to file unsuccessful")
-		}
-
-		defer f.Close()
-
-		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:mnd
-			if len(varSplit) > 1 {
-				fmt.Println("Exporting Connection: " + varSplit[0])
-				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
-				if err != nil {
-					fmt.Printf("error adding connection %s to file: %s\n", varSplit[0], err.Error())
-				}
+	// The command above wrote connection URIs, including plaintext passwords, to a
+	// temp file inside the container. Remove it once we're done reading it, even if
+	// something below fails, so secrets don't linger in the container.
+	defer func() {
+		if _, rmErr := execAirflowCommand(id, rmConnFile); rmErr != nil {
+			rmErr = fmt.Errorf("error removing connections file: %w", rmErr)
+			if err == nil {
+				err = rmErr
+			} else {
+				fmt.Println(rmErr)
 			}
 		}
-		fmt.Println("Aiflow connections successfully export to the file " + envFile + "\n")
-		rmCmd := "rm tmp.connection"
-		_, err = execAirflowCommand(id, rmCmd)
-		if err != nil {
-			return fmt.Errorf("error removing connections file: %w", err)
-		}
-		return nil
+	}()
+
+	// get connections from file created by airflow command
+	out, err = execAirflowCommand(id, catConnFile)
+	if err != nil {
+		return fmt.Errorf("error reading connections file: %w", err)
 	}
-	return errors.New("connection export unsuccessful")
+
+	vars := strings.Split(out, "\n")
+	// add connections to the env file; connection URIs contain passwords, so keep it owner-only
+	f, ferr := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
+	if ferr != nil {
+		return errors.Wrap(ferr, "Writing connections to file unsuccessful")
+	}
+
+	defer f.Close()
+
+	for i := range vars {
+		varSplit := strings.SplitN(vars[i], "=", 2) //nolint:mnd
+		if len(varSplit) > 1 {
+			fmt.Println("Exporting Connection: " + varSplit[0])
+			_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
+			if err != nil {
+				fmt.Printf("error adding connection %s to file: %s\n", varSplit[0], err.Error())
+			}
+		}
+	}
+	fmt.Println("Airflow connections successfully exported to the file " + envFile + "\n")
+	return nil
 }
 
 func Export(id, settingsFile string, version uint64, connections, variables, pools bool) error {
