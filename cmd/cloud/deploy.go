@@ -200,8 +200,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 
 	if git.HasUncommittedChanges("") && !forceDeploy {
-		fmt.Println(registryUncommitedChangesMsg)
-		return nil
+		return errors.New(registryUncommitedChangesMsg)
 	}
 
 	// case for astro deploy --dags whose default operation should be not running any tests
