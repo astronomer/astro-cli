@@ -217,12 +217,12 @@ func (c *Context) DeleteContext() error {
 	return nil
 }
 
-func (c *Context) SetExpiresIn(value int64) error {
+func (c *Context) SetExpiresIn(d time.Duration) error {
 	cKey, err := c.GetContextKey()
 	if err != nil {
 		return err
 	}
-	expiretime := time.Now().Add(time.Duration(value) * time.Second)
+	expiretime := time.Now().Add(d)
 	return setContextField(cKey, "ExpiresIn", expiretime)
 }
 
