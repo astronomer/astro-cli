@@ -130,7 +130,7 @@ func removeArtifact(path string, producedByUs func(data []byte) bool) CleanupRes
 	if err := os.Remove(path); err != nil {
 		return CleanupResult{Path: path, Err: err}
 	}
-	_ = os.Remove(filepath.Dir(path)) // rmdir; succeeds only when empty
+	_ = os.Remove(filepath.Dir(path)) //nolint:errcheck // best-effort rmdir; succeeds only when the dir is empty
 	return CleanupResult{Path: path}
 }
 

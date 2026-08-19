@@ -86,7 +86,7 @@ func writeSidecar(dir, algo, hash, version string, filtered *FilteredManifest) e
 	}
 
 	// Metadata holds only strings and ints, so marshaling cannot fail.
-	data, _ := json.MarshalIndent(meta, "", "  ")
+	data, _ := json.MarshalIndent(meta, "", "  ") //nolint:errcheck // see above: Metadata holds only strings and ints, so this cannot fail
 	data = append(data, '\n')
 
 	return writeArtifact(dir, sidecarName, data)
@@ -99,5 +99,5 @@ func writeArtifact(dir, name string, data []byte) error {
 	if err := os.MkdirAll(out, sidecarDirPerm); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(out, name), data, sidecarPerm) //nolint:gosec // see sidecarPerm
+	return os.WriteFile(filepath.Join(out, name), data, sidecarPerm)
 }

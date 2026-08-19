@@ -148,7 +148,7 @@ func processProject(dir, version string, opts Options) Result {
 	if opts.SlimManifest {
 		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, manifestFile)); readErr == nil && isDbt {
 			// Nothing mutates doc afterward here, unlike processManifest.
-			data, _ := json.Marshal(buildSlimManifest(doc, version))
+			data, _ := json.Marshal(buildSlimManifest(doc, version)) //nolint:errcheck // JSON-native types only, so this cannot fail
 			if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
 				r.Duration = time.Since(start)
 				return r
@@ -175,7 +175,7 @@ func processManifest(path, version string, opts Options) Result {
 			// Marshal before hashDocument mutates doc: the slim manifest shares
 			// doc's nested values, so only turning it into bytes here decouples
 			// the two. It holds JSON-native types only, so this cannot fail.
-			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+			slimData, _ = json.Marshal(buildSlimManifest(doc, version)) //nolint:errcheck // see above: JSON-native types only, so this cannot fail
 		}
 		hash = hashDocument(doc)
 	}

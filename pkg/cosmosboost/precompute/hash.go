@@ -225,7 +225,7 @@ func hashDocument(doc map[string]any) string {
 	// json.Marshal emits object keys in sorted order, so this is deterministic;
 	// doc came from json.Unmarshal, so it holds only JSON-native types and
 	// re-marshaling cannot fail.
-	canonical, _ := json.Marshal(doc)
+	canonical, _ := json.Marshal(doc) //nolint:errcheck // see above: doc holds only JSON-native types, so this cannot fail
 	return sha256Hex(canonical)
 }
 
