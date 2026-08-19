@@ -119,51 +119,111 @@ var (
 )
 
 func Test_FetchDomainAuthConfig(t *testing.T) {
-	// non-cloud domains are rejected before any network call is made
-	for _, domain := range []string{
-		"gcp0001.us-east4.astronomer.io", // Gen1 CLI domain
-		"fail.astronomer.io",
-		"fail.astronomer-dev.io",
-		"fail.astronomer-stage.io",
-		"fail.astronomer-perf.io",
-	} {
-		_, err := FetchDomainAuthConfig(domain)
-		assert.Errorf(t, err, "expected %s to be rejected as a non-cloud domain", domain)
+	// Stub the package http client so the test builds the right URL per
+	// domain and parses the response without hitting live environments.
+	originalHTTPClient := httpClient
+	t.Cleanup(func() { httpClient = originalHTTPClient })
+
+	responses := map[string]Config{
+		"https://api.astronomer.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer.io/",
+		},
+		"https://api.astronomer-dev.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer-dev.io/",
+		},
+		"https://api.astronomer-stage.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "jsarDat3BeDXZ1monEAeqJPOvRvterpm",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer-stage.io/",
+		},
+		"https://pr1234.api.astronomer-dev.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		},
 	}
 
-	// cloud domains reach out over httpClient; serve a canned config so the test
-	// asserts the request/parse plumbing instead of hitting the live API
-	origHTTPClient := httpClient
-	defer func() { httpClient = origHTTPClient }()
-
-	mockResponse := Config{
-		ClientID:  "client-id",
-		Audience:  "audience",
-		DomainURL: "https://myURL.com/",
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
 	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		assert.Equal(t, "cli", req.Header.Get("X-Astro-Client-Identifier"))
+		cfg, ok := responses[req.URL.String()]
+		if !ok {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(bytes.NewBufferString("unexpected URL: " + req.URL.String())),
+				Header:     make(http.Header),
+			}
+		}
+		body, _ := json.Marshal(cfg)
 		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBuffer(body)),
 			Header:     make(http.Header),
 		}
 	})
 
-	for _, domain := range []string{
-		"astronomer.io",
-		"astronomer-dev.io",
-		"astronomer-stage.io",
-		"pr1234.astronomer-dev.io", // pr preview
-	} {
-		actual, err := FetchDomainAuthConfig(domain)
+	domain := "astronomer.io"
+	actual, err := FetchDomainAuthConfig(domain)
+	assert.NoError(t, err)
+	assert.Equal(t, actual.ClientID, "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9")
+	assert.Equal(t, actual.Audience, "astronomer-ee")
+	assert.Equal(t, actual.DomainURL, "https://auth.astronomer.io/")
+
+	domain = "gcp0001.us-east4.astronomer.io" // Gen1 CLI domain
+	_, err = FetchDomainAuthConfig(domain)
+	assert.Error(t, err)
+	assert.Errorf(t, err, "Error! Invalid domain. "+
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
+
+	domain = "fail.astronomer.io"
+	_, err = FetchDomainAuthConfig(domain)
+	assert.Error(t, err)
+	assert.Errorf(t, err, "Error! Invalid domain. "+
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
+
+	domain = "astronomer-dev.io"
+	actual, err = FetchDomainAuthConfig(domain)
+	assert.NoError(t, err)
+	assert.Equal(t, actual.ClientID, "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG")
+	assert.Equal(t, actual.Audience, "astronomer-ee")
+	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-dev.io/")
+
+	domain = "fail.astronomer-dev.io"
+	_, err = FetchDomainAuthConfig(domain)
+	assert.Error(t, err)
+	assert.Errorf(t, err, "Error! Invalid domain. "+
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
+
+	domain = "astronomer-stage.io"
+	actual, err = FetchDomainAuthConfig(domain)
+	assert.NoError(t, err)
+	assert.Equal(t, actual.ClientID, "jsarDat3BeDXZ1monEAeqJPOvRvterpm")
+	assert.Equal(t, actual.Audience, "astronomer-ee")
+	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-stage.io/")
+
+	domain = "fail.astronomer-stage.io"
+	_, err = FetchDomainAuthConfig(domain)
+	assert.Error(t, err)
+	assert.Errorf(t, err, "Error! Invalid domain. "+
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
+
+	domain = "fail.astronomer-perf.io"
+	_, err = FetchDomainAuthConfig(domain)
+	assert.Error(t, err)
+	assert.Errorf(t, err, "Error! Invalid domain. "+
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
+
+	t.Run("pr preview is a valid domain", func(t *testing.T) {
+		domain = "pr1234.astronomer-dev.io"
+		actual, err = FetchDomainAuthConfig(domain)
 		assert.NoError(t, err)
-		assert.Equal(t, mockResponse.ClientID, actual.ClientID)
-		assert.Equal(t, mockResponse.Audience, actual.Audience)
-		assert.Equal(t, mockResponse.DomainURL, actual.DomainURL)
-	}
+		assert.Equal(t, actual.ClientID, "client-id")
+		assert.Equal(t, actual.Audience, "audience")
+		assert.Equal(t, actual.DomainURL, "https://myURL.com/")
+	})
 }
 
 func TestRequestUserInfo(t *testing.T) {

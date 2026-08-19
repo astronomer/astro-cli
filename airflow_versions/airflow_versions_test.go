@@ -512,6 +512,28 @@ func (s *Suite) TestParseImageTag() {
 			},
 		},
 		{
+			name:     "ubi variant",
+			imageTag: "3.1-1-ubi-python-3.12-astro-agent-1.1.0",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "3.1-1",
+				PythonVersion:  "3.12",
+				AgentVersion:   "1.1.0",
+				Distro:         "ubi",
+				IsBase:         false,
+			},
+		},
+		{
+			name:     "ubi9 base variant",
+			imageTag: "3.0-12-ubi9-python-3.11-astro-agent-1.1.0-base",
+			expected: &ImageTagInfo{
+				RuntimeVersion: "3.0-12",
+				PythonVersion:  "3.11",
+				AgentVersion:   "1.1.0",
+				Distro:         "ubi9",
+				IsBase:         true,
+			},
+		},
+		{
 			name:        "invalid tag format",
 			imageTag:    "invalid-tag-format",
 			shouldError: true,
@@ -531,6 +553,7 @@ func (s *Suite) TestParseImageTag() {
 				s.Equal(tc.expected.RuntimeVersion, result.RuntimeVersion)
 				s.Equal(tc.expected.PythonVersion, result.PythonVersion)
 				s.Equal(tc.expected.AgentVersion, result.AgentVersion)
+				s.Equal(tc.expected.Distro, result.Distro)
 				s.Equal(tc.expected.IsBase, result.IsBase)
 			}
 		})
@@ -681,6 +704,38 @@ func (s *Suite) TestIsBetterImage() {
 				AgentVersion:   "1.3.9",
 			},
 			expected: true,
+		},
+		{
+			name: "same runtime/python/agent, Debian beats UBI",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.7",
+				Distro:         "",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.7",
+				Distro:         "ubi9",
+			},
+			expected: true,
+		},
+		{
+			name: "same runtime/python/agent, UBI does not beat Debian",
+			candidate: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.7",
+				Distro:         "ubi9",
+			},
+			current: &ImageTagInfo{
+				PythonVersion:  "3.12",
+				RuntimeVersion: "3.1-13",
+				AgentVersion:   "1.3.7",
+				Distro:         "",
+			},
+			expected: false,
 		},
 	}
 
@@ -856,6 +911,41 @@ func (s *Suite) TestGetAstroAgentTag() {
 			},
 			runtimeVersion: "3.0-10",
 			expected:       "3.0-8-python-3.11-astro-agent-1.0.0",
+			shouldError:    false,
+		},
+		{
+			name: "prefers Debian over UBI when both are published",
+			clientVersions: map[string]ClientVersion{
+				"1.1.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2025-09-29",
+					},
+					ImageTags: []string{
+						"3.1-1-ubi9-python-3.12-astro-agent-1.1.0",
+						"3.1-1-python-3.12-astro-agent-1.1.0",
+					},
+				},
+			},
+			runtimeVersion: "",
+			expected:       "3.1-1-python-3.12-astro-agent-1.1.0",
+			shouldError:    false,
+		},
+		{
+			name: "falls back to UBI when no Debian variant exists",
+			clientVersions: map[string]ClientVersion{
+				"1.1.0": {
+					Metadata: ClientVersionMetadata{
+						Channel:     VersionChannelStable,
+						ReleaseDate: "2025-09-29",
+					},
+					ImageTags: []string{
+						"3.1-1-ubi9-python-3.12-astro-agent-1.1.0",
+					},
+				},
+			},
+			runtimeVersion: "",
+			expected:       "3.1-1-ubi9-python-3.12-astro-agent-1.1.0",
 			shouldError:    false,
 		},
 	}

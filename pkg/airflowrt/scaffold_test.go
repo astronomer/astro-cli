@@ -45,9 +45,12 @@ func TestScaffold_Airflow3_Minimal(t *testing.T) {
 	assert.Equal(t, "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n", fileMap["Dockerfile"])
 
 	// Gitignore includes standalone + worktrees dirs (the .astro/ paths
-	// astro-desktop and the otto CLI write into per-project state).
+	// Astro Desktop and the otto CLI write into per-project state).
 	assert.Contains(t, fileMap[".gitignore"], ".astro/standalone/")
 	assert.Contains(t, fileMap[".gitignore"], ".astro/worktrees/")
+	// The Cosmos Boost pre-deploy artifact is generated at deploy time and
+	// must not be committed; **/ because dbt projects can be nested.
+	assert.Contains(t, fileMap[".gitignore"], "**/.astro/dbt_metadata.json")
 }
 
 func TestScaffold_Airflow3_Full(t *testing.T) {

@@ -1,6 +1,7 @@
 !airflow/include/*/requirements.txt
 *.ndjson.gz
 *.test
+*.yaml.lock
 .astro/
 .DS_Store
 .env
@@ -29,3 +30,6 @@ vendor/github.com/theupdateframework/notary/Dockerfile
 config/test.yaml
 config/test.yaml.lock
 .claude/
+
+# config flock sidecars (transient, created by saveConfig during tests/runs)
+# - covered by the *.yaml.lock entry above

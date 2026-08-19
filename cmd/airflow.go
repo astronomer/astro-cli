@@ -86,7 +86,7 @@ var (
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
-	initSoftwareExample = `
+	initAPCExample = `
 # Initialize a new Astro project with the latest version of Astro Runtime
 astro dev init
 
@@ -96,7 +96,7 @@ astro dev init --runtime-version 4.1.0
 # Initialize a new Astro project with the latest Astro Runtime version based on Airflow 2.2.3
 astro dev init --airflow-version 2.2.3
 
-# Initialize a new Astro project with the latest version of Astronomer Certified. Use this only if you run on Astro Private Cloud
+# Initialize a new Astro project with the latest version of Astronomer Certified. Use this only if you run on APC
 astro dev init --use-astronomer-certified
 
 # Initialize a new Astro project with the latest version of Astronomer Certified based on Airflow 2.2.3
@@ -227,7 +227,7 @@ func newAirflowInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Create a new Astro project in your working directory",
-		Long:    "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or Astro Private Cloud.",
+		Long:    "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or APC.",
 		Example: initCloudExample,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    airflowInit,
@@ -256,7 +256,7 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 
 	if !context.IsCloudContext() && !avoidACFlag {
-		cmd.Example = initSoftwareExample
+		cmd.Example = initAPCExample
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 	}
 

@@ -283,6 +283,52 @@ var (
 			      }
 			    }`,
 		},
+		{
+			version: "2.1.0",
+			query: `
+			mutation upsertDeployment(
+				$label: String,
+			    $workspaceId: Uuid,
+			    $clusterId: Uuid,
+			    $releaseName: String,
+				$executor: ExecutorType,
+				$runtimeVersion: String,
+			    $namespace: String,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int,
+				$mode: AllowedDeploymentModeValues,
+			  ) {
+			    upsertDeployment(
+			      workspaceUuid: $workspaceId,
+			      clusterId: $clusterId,
+			      label: $label,
+			      releaseName: $releaseName,
+			      namespace: $namespace,
+			      runtimeVersion: $runtimeVersion,
+			      executor: $executor,
+			      triggerer: {
+						replicas: $triggererReplicas
+					}
+			      dagDeployment: $dagDeployment,
+			      cloudRole: $cloudRole,
+			      mode: $mode,
+			    ) {
+			        id
+					type
+					label
+					releaseName
+					version
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+			      }
+			    }`,
+		},
 	}
 
 	DeploymentsGetRequest = queryList{
