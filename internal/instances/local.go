@@ -20,10 +20,13 @@ import (
 //     the compose environment in pkg/localrt's docker engine). Everyone is an admin
 //     and /auth/token mints for whoever asks, with no credentials to send —
 //     which is what the minter's credential-less mint is for.
-//   - Airflow 2 runs in standalone mode only, with the basic_auth backend on
-//     (pkg/localrt's standalone engine). The macOS launch shim creates
-//     admin/admin; everywhere else `airflow standalone` generates a password
-//     into standalone_admin_password.txt under its AIRFLOW_HOME.
+//   - Airflow 2, both engines, runs the basic_auth backend on (pkg/localrt's
+//     standalone engine, the compose environment in its docker engine).
+//     Flask-AppBuilder has no all-admins mode, so there is a real account:
+//     docker mode creates admin/admin with the database migration, and so does
+//     standalone's macOS launch shim; everywhere else `airflow standalone`
+//     generates a password into standalone_admin_password.txt under its
+//     AIRFLOW_HOME.
 //
 // Which of the two a project runs comes from the Airflow it pins — the same
 // fact the standalone engine branches on when it launches.
@@ -39,7 +42,7 @@ const (
 // provisioned. The token lives in memory for the run, and the refresh hook
 // re-mints when a short-lived one expires mid-command.
 func localCredentials(i Instance, baseURL string, d Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
-	username, password := localAccount(i.AirflowMajor, i.Project)
+	username, password := localAccount(i.AirflowMajor, i.Mode, i.Project)
 	minter, err := airflowapi.NewTokenMinter(baseURL, username, password, d.httpOptions()...)
 	if err != nil {
 		return nil, nil, err
@@ -47,27 +50,35 @@ func localCredentials(i Instance, baseURL string, d Deps) (airflowapi.Credential
 	return minter.Credentials, minter.Refresh, nil
 }
 
-// airflow2 is the generation that needs an account, spelled as the record and
-// the engines spell it.
-const airflow2 = "2"
+// airflow2 is the generation that needs an account, and modeDocker the engine
+// that provisions one itself — both spelled as the record and the engines
+// spell them.
+const (
+	airflow2   = "2"
+	modeDocker = "docker"
+)
 
 // localAccount reports the credentials to mint a local Airflow's token with:
 // none on Airflow 3, where all-admins mode mints for whoever asks, and the
-// admin account on Airflow 2, whose password the standalone engine may have
-// generated.
+// admin account on Airflow 2. Docker mode creates that account with a known
+// password; standalone may have generated one instead, so only standalone reads
+// the generated file — a project that ran standalone before it ran docker still
+// has that file, and it names a different password.
 //
 // major comes from the runtime record — a fact about the process that is
 // running, which the manifest is not: the pin can be edited, or the project
 // deleted, while Airflow keeps serving. Only a record written before that field
 // existed falls back to reading the manifest, and a manifest that cannot be
-// read at all reads as Airflow 3, which is what the v2 scaffold writes and the
-// only thing docker mode runs.
-func localAccount(major, projectPath string) (username, password string) {
+// read at all reads as Airflow 3, which is what the v2 scaffold writes.
+func localAccount(major, mode, projectPath string) (username, password string) {
 	if major == "" {
 		major = pinnedAirflowMajor(projectPath)
 	}
 	if major != airflow2 {
 		return "", ""
+	}
+	if mode == modeDocker {
+		return localUsername, localPassword
 	}
 	return localUsername, localPasswordFor(projectPath)
 }

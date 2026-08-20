@@ -14,8 +14,12 @@ import "context"
 // The CLI passes an adapter over *imagebuild.Builder. Astro Desktop passes the
 // same, which is why imagebuild is a pkg/ sub-module rather than CLI-private.
 type ImageBuilder interface {
-	// RuntimeImage resolves the base image for an Airflow version.
-	RuntimeImage(airflowVersion string) (string, error)
+	// RuntimeImage resolves the base image for an Airflow version. It takes a
+	// context because the answer is not always local: Airflow 3 tags its
+	// runtime images by the Airflow version, but an Airflow 2 image is tagged
+	// by runtime version, so which runtime carries a given Airflow is a lookup
+	// against Astronomer's version service.
+	RuntimeImage(ctx context.Context, airflowVersion string) (string, error)
 	// Build layers the project's dependencies and OS packages over BaseImage and
 	// returns the image to run. With nothing to install it returns BaseImage
 	// unchanged rather than building an empty layer.

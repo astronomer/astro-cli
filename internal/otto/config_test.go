@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/localrttest"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -168,9 +169,10 @@ func (s *ConfigSuite) TestDetectAirflow_V2StaleRecord() {
 	s.Empty(DetectAirflow())
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2Airflow2Refused() {
-	// An Airflow 2 record means a generated admin password otto can't read —
-	// detection must yield nothing rather than a URL with wrong credentials.
+func (s *ConfigSuite) TestDetectAirflow_V2Airflow2StandaloneRefused() {
+	// A standalone Airflow 2 record means a generated admin password otto can't
+	// read — detection must yield nothing rather than a URL with wrong
+	// credentials.
 	srv := s.startFakeAirflow()
 	defer srv.Close()
 
@@ -178,10 +180,28 @@ func (s *ConfigSuite) TestDetectAirflow_V2Airflow2Refused() {
 	s.Require().NoError(localrttest.Seed(localrttest.Record{
 		ProjectPath:  cwd,
 		Port:         serverPort(srv),
+		Mode:         localrt.ModeStandalone,
 		AirflowMajor: "2",
 	}))
 
 	s.Empty(DetectAirflow())
+}
+
+func (s *ConfigSuite) TestDetectAirflow_V2Airflow2DockerDetected() {
+	// Docker mode creates admin/admin itself, which is the pair BuildEnv sends,
+	// so an Airflow 2 project running in containers is reachable.
+	srv := s.startFakeAirflow()
+	defer srv.Close()
+
+	cwd := s.chdirV2Project("v2-airflow2-docker")
+	s.Require().NoError(localrttest.Seed(localrttest.Record{
+		ProjectPath:  cwd,
+		Port:         serverPort(srv),
+		Mode:         localrt.ModeDocker,
+		AirflowMajor: "2",
+	}))
+
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), DetectAirflow())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_V2ProjectNoRecord() {

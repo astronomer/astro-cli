@@ -314,15 +314,22 @@ func TestLocalMintsWithTheAdminAccountOnAirflow2(t *testing.T) {
 func TestLocalUsesTheGeneratedStandalonePassword(t *testing.T) {
 	project := localProject(t, "2.10.5")
 	writePasswordFile(t, project, "generated\n")
-	username, password := localAccount(airflow2, project)
+	username, password := localAccount(airflow2, "standalone", project)
 	if username != localUsername || password != "generated" {
 		t.Fatalf("account = %s/%s, want %s with the generated password", username, password, localUsername)
 	}
 
 	// No file: the password the macOS launch shim seeds.
-	username, password = localAccount(airflow2, localProject(t, "2.10.5"))
+	username, password = localAccount(airflow2, "standalone", localProject(t, "2.10.5"))
 	if username != localUsername || password != localPassword {
 		t.Fatalf("account = %s/%s, want the shim's %s/%s", username, password, localUsername, localPassword)
+	}
+
+	// Docker mode creates the account itself, so the file a previous
+	// standalone run left behind names the wrong password and is ignored.
+	username, password = localAccount(airflow2, modeDocker, project)
+	if username != localUsername || password != localPassword {
+		t.Fatalf("account = %s/%s, want docker mode's %s/%s", username, password, localUsername, localPassword)
 	}
 }
 
@@ -335,13 +342,13 @@ func TestLocalAccountFollowsTheRunningProcess(t *testing.T) {
 	writePasswordFile(t, project, "generated\n")
 	// The record says the process was started for Airflow 2, and it is the
 	// process that has to be talked to.
-	username, password := localAccount(airflow2, project)
+	username, password := localAccount(airflow2, "standalone", project)
 	if username != localUsername || password != "generated" {
 		t.Fatalf("account = %s/%s, want the Airflow 2 account the record calls for", username, password)
 	}
 
 	// The reverse: a manifest edited down to 2 while an Airflow 3 runs.
-	if username, password = localAccount("3", localProject(t, "2.10.5")); username != "" || password != "" {
+	if username, password = localAccount("3", "standalone", localProject(t, "2.10.5")); username != "" || password != "" {
 		t.Fatalf("account = %s/%s, want no credentials for a running Airflow 3", username, password)
 	}
 
@@ -351,7 +358,7 @@ func TestLocalAccountFollowsTheRunningProcess(t *testing.T) {
 	if err := os.RemoveAll(gone); err != nil {
 		t.Fatal(err)
 	}
-	if username, password = localAccount(airflow2, gone); username != localUsername || password != localPassword {
+	if username, password = localAccount(airflow2, "standalone", gone); username != localUsername || password != localPassword {
 		t.Fatalf("account = %s/%s for a deleted project, want the shim's default", username, password)
 	}
 }
@@ -359,16 +366,28 @@ func TestLocalAccountFollowsTheRunningProcess(t *testing.T) {
 // TestLocalAccountFallsBackToTheManifest covers a record written before the
 // generation was stored: the manifest is the only thing left to ask.
 func TestLocalAccountFallsBackToTheManifest(t *testing.T) {
-	if username, _ := localAccount("", localProject(t, "2.10.5")); username != localUsername {
+	if username, _ := localAccount("", "standalone", localProject(t, "2.10.5")); username != localUsername {
 		t.Errorf("an old record for an Airflow 2 project got %q", username)
 	}
-	if username, _ := localAccount("", localProject(t, "3.1")); username != "" {
+	if username, _ := localAccount("", "standalone", localProject(t, "3.1")); username != "" {
 		t.Errorf("an old record for an Airflow 3 project got %q", username)
 	}
 	// No manifest to fall back to reads as Airflow 3: what the v2 scaffold
-	// writes, and all docker mode runs.
-	if username, password := localAccount("", t.TempDir()); username != "" || password != "" {
+	// writes.
+	if username, password := localAccount("", "standalone", t.TempDir()); username != "" || password != "" {
 		t.Fatalf("account = %s/%s, want no credentials", username, password)
+	}
+}
+
+// TestDockerModeAccountLiterals pins the Airflow 2 account docker mode creates.
+// pkg/localrt's docker engine writes these two words into the compose file's
+// `airflow users create` line, and its own test pins them there; the pair has to
+// agree or every authenticated call to a docker-mode Airflow 2 gets a 401. The
+// two live in different modules and share no constant, so each side pins the
+// literal and names the other.
+func TestDockerModeAccountLiterals(t *testing.T) {
+	if localUsername != "admin" || localPassword != "admin" {
+		t.Fatalf("account = %s/%s, want admin/admin, which the docker engine's dbCommand creates", localUsername, localPassword)
 	}
 }
 

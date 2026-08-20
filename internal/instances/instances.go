@@ -94,6 +94,11 @@ type Instance struct {
 	// AirflowMajor is the generation a local Airflow was started for, from its
 	// runtime record.
 	AirflowMajor string
+	// Mode is the engine running a local Airflow ("standalone" or "docker", as
+	// pkg/localrt spells it), from its runtime record. The two engines
+	// provision the Airflow 2 admin account differently, so which password to
+	// send depends on it.
+	Mode string
 }
 
 // Local is one running local Airflow, as the caller discovered it. It mirrors
@@ -108,6 +113,8 @@ type Local struct {
 	// AirflowMajor is the generation this runtime was started for, from its
 	// record. Empty on a record written before the field existed.
 	AirflowMajor string
+	// Mode is the engine running it, from its record.
+	Mode string
 }
 
 // LocalInstance is a running local Airflow as an instance: what every
@@ -129,6 +136,7 @@ func LocalInstance(l Local, name string) Instance {
 		URL:          url,
 		Project:      l.ProjectPath,
 		AirflowMajor: l.AirflowMajor,
+		Mode:         l.Mode,
 	}
 }
 

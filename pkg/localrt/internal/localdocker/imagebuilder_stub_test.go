@@ -12,25 +12,36 @@ import (
 // compose and lifecycle behavior, not about building images, and the real builder
 // cannot be imported anyway — see rt.ImageBuilder.
 type stubImages struct {
-	base     string
-	built    string
-	err      error
-	requests []rt.BuildRequest
+	base         string
+	airflow2Base string
+	built        string
+	err          error
+	requests     []rt.BuildRequest
 }
 
 func newStubImages() *stubImages {
-	return &stubImages{base: "astrocrpublic.azurecr.io/runtime:3.0-1"}
+	return &stubImages{
+		base:         "astrocrpublic.azurecr.io/runtime:3.0-1",
+		airflow2Base: "quay.io/astronomer/astro-runtime:13.9.0",
+	}
 }
 
-// RuntimeImage mirrors the real builder's one rule: Astro Runtime images are
-// Airflow 3 only. The engine's contribution is surfacing that refusal before
-// anything starts, which is what TestStartRejectsNonDockerPlanAndBadVersions
-// checks; the rule itself belongs to pkg/imagebuild and is tested there.
-func (s *stubImages) RuntimeImage(airflowVersion string) (string, error) {
-	if strings.HasPrefix(airflowVersion, "2.") {
-		return "", errors.New("local Docker mode needs Airflow 3")
+// RuntimeImage mirrors the real builder's rules closely enough for the engine's
+// tests: both generations resolve, an Airflow 2 image comes from the other
+// repository, and anything else is refused. The engine's contribution is
+// surfacing a refusal before anything starts, which is what
+// TestStartRejectsNonDockerPlanAndBadVersions checks; the rules themselves —
+// the 2.7 floor, and the version-service lookup an Airflow 2 pin needs — belong
+// to pkg/imagebuild and are tested there.
+func (s *stubImages) RuntimeImage(_ context.Context, airflowVersion string) (string, error) {
+	switch {
+	case strings.HasPrefix(airflowVersion, "3"):
+		return s.base, nil
+	case strings.HasPrefix(airflowVersion, "2"):
+		return s.airflow2Base, nil
+	default:
+		return "", errors.New("Docker mode runs Airflow 2 or Airflow 3, not " + airflowVersion)
 	}
-	return s.base, nil
 }
 
 func (s *stubImages) Build(_ context.Context, req rt.BuildRequest, _ rt.Callbacks) (string, error) {

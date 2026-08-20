@@ -14,13 +14,17 @@ import (
 var updateGolden = flag.Bool("update", false, "rewrite golden files")
 
 func goldenInput() composeInput {
+	return goldenInputFor(airflow3, "astrocrpublic.azurecr.io/runtime:3.1-2")
+}
+
+func goldenInputFor(major, image string) composeInput {
 	return composeInput{
 		ProjectName:   "astro-demo-abc123",
-		Image:         "astrocrpublic.azurecr.io/runtime:3.1-2",
+		Image:         image,
 		PostgresImage: postgresImage,
-		APIServerPort: 8081,
+		WebPort:       8081,
 		PostgresPort:  15432,
-		Env: airflowEnv("astro-demo-abc123", 8081, map[string]string{
+		Env: airflowEnv("astro-demo-abc123", 8081, major, map[string]string{
 			"AIRFLOW__CORE__LOAD_EXAMPLES": "True", // user override wins
 			"MY_SECRET":                    "it's quoted",
 		}),
@@ -29,20 +33,94 @@ func goldenInput() composeInput {
 			{Host: "/home/me/demo/dags", Container: "/usr/local/airflow/dags"},
 			{Host: "/home/me/demo/include", Container: "/usr/local/airflow/include"},
 		},
+		DBCommand: dbCommand(major),
+		Services:  airflowServices(major),
 	}
 }
 
 func TestGenerateComposeGolden(t *testing.T) {
-	got, err := generateCompose(goldenInput())
+	for _, tc := range []struct {
+		name   string
+		input  composeInput
+		golden string
+	}{
+		{"airflow3", goldenInput(), "compose_golden.yaml"},
+		{"airflow2", goldenInputFor(airflow2, "quay.io/astronomer/astro-runtime:12.9.0"), "compose_golden_af2.yaml"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := generateCompose(tc.input)
+			require.NoError(t, err)
+
+			golden := filepath.Join("testdata", tc.golden)
+			if *updateGolden {
+				require.NoError(t, os.WriteFile(golden, []byte(got), 0o644))
+			}
+			want, err := os.ReadFile(golden)
+			require.NoError(t, err)
+			assert.Equal(t, string(want), got, "run `go test ./pkg/localrt/internal/localdocker -update` after intentional template changes")
+		})
+	}
+}
+
+// Airflow 2 runs the components that release has, authenticates through
+// Flask-AppBuilder, and gets none of Airflow 3's api-server settings.
+func TestGenerateComposeAirflow2(t *testing.T) {
+	got, err := generateCompose(goldenInputFor(airflow2, "quay.io/astronomer/astro-runtime:12.9.0"))
 	require.NoError(t, err)
 
-	golden := filepath.Join("testdata", "compose_golden.yaml")
-	if *updateGolden {
-		require.NoError(t, os.WriteFile(golden, []byte(got), 0o644))
+	var doc struct {
+		Services map[string]struct {
+			Command     []string          `yaml:"command"`
+			Ports       []string          `yaml:"ports"`
+			Environment map[string]string `yaml:"environment"`
+			Volumes     []string          `yaml:"volumes"`
+		} `yaml:"services"`
 	}
-	want, err := os.ReadFile(golden)
-	require.NoError(t, err)
-	assert.Equal(t, string(want), got, "run `go test ./internal/localdocker -update` after intentional template changes")
+	require.NoError(t, yaml.Unmarshal([]byte(got), &doc))
+
+	assert.NotContains(t, doc.Services, "api-server")
+	assert.NotContains(t, doc.Services, "dag-processor")
+	web, ok := doc.Services["webserver"]
+	require.True(t, ok)
+	assert.Equal(t, []string{"airflow", "webserver"}, web.Command)
+	assert.Equal(t, []string{"127.0.0.1:8081:8080"}, web.Ports)
+	assert.Contains(t, web.Volumes, "/home/me/demo/dags:/usr/local/airflow/dags:z")
+
+	assert.Equal(t, "http://localhost:8081", web.Environment["AIRFLOW__WEBSERVER__BASE_URL"])
+	assert.Contains(t, web.Environment["AIRFLOW__API__AUTH_BACKENDS"], "basic_auth")
+	for _, af3Only := range []string{
+		"AIRFLOW__API__BASE_URL",
+		"AIRFLOW__CORE__AUTH_MANAGER",
+		"AIRFLOW__CORE__EXECUTION_API_SERVER_URL",
+		"AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR",
+	} {
+		assert.NotContains(t, web.Environment, af3Only, "an Airflow 3 setting must not reach an Airflow 2 container")
+	}
+
+	// The migration also seeds the admin account the CLI mints with. Those two
+	// words are pinned in internal/instances too (localUsername,
+	// localPassword): the two modules share no constant, and a pair that
+	// disagrees turns every authenticated call into a 401.
+	db := doc.Services["db-migration"].Command
+	require.Len(t, db, 3)
+	assert.Equal(t, []string{"bash", "-c"}, db[:2])
+	assert.Contains(t, db[2], "airflow db migrate")
+	assert.Contains(t, db[2], "--username admin --password admin")
+}
+
+func TestHealthURLs(t *testing.T) {
+	assert.Equal(t, []string{"http://localhost:8081/api/v2/monitor/health"}, healthURLs(8081, airflow3))
+	// Older Astronomer Airflow 2 runtimes serve /health at the root instead.
+	assert.Equal(t, []string{
+		"http://localhost:8081/api/v2/monitor/health",
+		"http://localhost:8081/health",
+	}, healthURLs(8081, airflow2))
+}
+
+func TestAirflowMajor(t *testing.T) {
+	assert.Equal(t, "2", airflowMajor("2.11.2"))
+	assert.Equal(t, "3", airflowMajor("3.1-2"))
+	assert.Equal(t, "", airflowMajor(""))
 }
 
 // The generated file must be valid YAML whose values land where compose

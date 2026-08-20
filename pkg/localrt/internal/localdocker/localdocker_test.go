@@ -60,7 +60,7 @@ func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	e.connFor = func(bin string) engineConn { return engineConn{bin: bin} }
 	e.portFree = func(string) bool { return true }
 	e.allocPort = func() (string, error) { return "", errors.New("allocation not expected") }
-	e.health = func(context.Context, string, time.Duration) error { return nil }
+	e.health = func(context.Context, []string, time.Duration) error { return nil }
 	e.now = func() time.Time { return time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC) }
 	e.ensureEngine = func(rt.Callbacks) error { return nil }
 	e.composeAvail = func(context.Context, engineConn) error { return nil }
@@ -135,6 +135,33 @@ func TestStartBringsProjectUp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, rt.StateRunning, st.State)
 	assert.Equal(t, 8081, st.Port)
+}
+
+// An Airflow 2 project runs the components that release has, off the image the
+// builder resolves for it. Which image that is belongs to pkg/imagebuild; what
+// the engine does with the generation is here.
+func TestStartAirflow2(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.AirflowVersion = "2.11.2"
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	// The record says Airflow 2, which is how every other tool knows the
+	// credentials this Airflow wants.
+	rec, err := localstate.Load(p.ProjectPath)
+	require.NoError(t, err)
+	assert.Equal(t, "2", rec.AirflowMajor)
+
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(compose), "image: "+e.images.(*stubImages).airflow2Base)
+	assert.Contains(t, string(compose), "webserver:")
+	assert.NotContains(t, string(compose), "api-server:")
 }
 
 func TestStartSessionTiedRecordsOwnerPID(t *testing.T) {
@@ -315,7 +342,7 @@ func TestStartSessionTiedSpawnsWatcher(t *testing.T) {
 
 func TestStartHealthFailureKeepsRecordAndRoute(t *testing.T) {
 	e := testEngine(t, &fakeCmd{output: noProjects})
-	e.health = func(context.Context, string, time.Duration) error { return ErrHealthTimeout }
+	e.health = func(context.Context, []string, time.Duration) error { return ErrHealthTimeout }
 	p := testPlan(t)
 
 	var errState error
@@ -344,10 +371,12 @@ func TestStartRejectsNonDockerPlanAndBadVersions(t *testing.T) {
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
 	assert.ErrorContains(t, err, "standalone")
 
+	// A generation neither template covers is refused before any container
+	// starts.
 	p = testPlan(t)
-	p.AirflowVersion = "2.9.3"
+	p.AirflowVersion = "1.10.15"
 	_, err = e.Start(context.Background(), p, rt.Callbacks{})
-	assert.ErrorContains(t, err, "Airflow 3")
+	assert.ErrorContains(t, err, "Airflow 2 or Airflow 3")
 	assert.Empty(t, e.cmd.(*fakeCmd).calls, "no containers may start for a rejected plan")
 }
 
@@ -355,28 +384,28 @@ func TestChoosePort(t *testing.T) {
 	e := testEngine(t, &fakeCmd{})
 
 	// Requested and free: taken as-is.
-	got, err := e.choosePort(8081, defaultAPIServerPort)
+	got, err := e.choosePort(8081, defaultWebPort)
 	require.NoError(t, err)
 	assert.Equal(t, 8081, got)
 
 	// No request, default free: the default.
-	got, err = e.choosePort(0, defaultAPIServerPort)
+	got, err = e.choosePort(0, defaultWebPort)
 	require.NoError(t, err)
-	assert.Equal(t, defaultAPIServerPort, got)
+	assert.Equal(t, defaultWebPort, got)
 
 	// Busy ports fall back to pool allocation.
 	e.portFree = func(string) bool { return false }
 	e.allocPort = func() (string, error) { return "15001", nil }
-	got, err = e.choosePort(8081, defaultAPIServerPort)
+	got, err = e.choosePort(8081, defaultWebPort)
 	require.NoError(t, err)
 	assert.Equal(t, 15001, got)
-	got, err = e.choosePort(0, defaultAPIServerPort)
+	got, err = e.choosePort(0, defaultWebPort)
 	require.NoError(t, err)
 	assert.Equal(t, 15001, got)
 
 	// A busy requested port never silently lands on the default.
 	e.portFree = func(p string) bool { return p == "8080" }
-	got, err = e.choosePort(8081, defaultAPIServerPort)
+	got, err = e.choosePort(8081, defaultWebPort)
 	require.NoError(t, err)
 	assert.Equal(t, 15001, got)
 }

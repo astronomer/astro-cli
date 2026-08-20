@@ -1,17 +1,13 @@
 x-common-env: &common-env
-  AIRFLOW__API_AUTH__JWT_SECRET: 'astro-demo-abc123'
-  AIRFLOW__API__BASE_URL: 'http://localhost:8081'
-  AIRFLOW__API__PORT: '8080'
-  AIRFLOW__API__SECRET_KEY: 'astro-demo-abc123'
-  AIRFLOW__CORE__AUTH_MANAGER: 'airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager'
-  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://api-server:8080/execution/'
+  AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth'
   AIRFLOW__CORE__EXECUTOR: 'LocalExecutor'
   AIRFLOW__CORE__FERNET_KEY: 'd6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw='
   AIRFLOW__CORE__LOAD_EXAMPLES: 'True'
-  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'True'
   AIRFLOW__CORE__SQL_ALCHEMY_CONN: 'postgresql://postgres:postgres@postgres:5432'
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: 'postgresql://postgres:postgres@postgres:5432'
-  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: 'True'
+  AIRFLOW__WEBSERVER__BASE_URL: 'http://localhost:8081'
+  AIRFLOW__WEBSERVER__RBAC: 'True'
+  AIRFLOW__WEBSERVER__SECRET_KEY: 'astro-demo-abc123'
   ASTRONOMER_ENVIRONMENT: 'local'
   MY_SECRET: 'it''s quoted'
   'SHELL_ONLY_TOKEN':
@@ -44,11 +40,11 @@ services:
   db-migration:
     depends_on:
       - postgres
-    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    image: quay.io/astronomer/astro-runtime:12.9.0
     command:
-      - 'airflow'
-      - 'db'
-      - 'migrate'
+      - 'bash'
+      - '-c'
+      - 'airflow db migrate && airflow sync-perm && airflow users create --role Admin --username admin --password admin --email admin@example.com --firstname admin --lastname user'
     networks:
       - airflow
     labels:
@@ -65,7 +61,7 @@ services:
     depends_on:
       db-migration:
         condition: service_completed_successfully
-    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    image: quay.io/astronomer/astro-runtime:12.9.0
     command:
       - 'airflow'
       - 'scheduler'
@@ -82,7 +78,7 @@ services:
       - /home/me/demo/dags:/usr/local/airflow/dags:z
       - /home/me/demo/include:/usr/local/airflow/include:z
 
-  dag-processor:
+  webserver:
     # Wait for the migration to finish, not just to start: a component that
     # opens the metadata database before the tables exist crash-loops, and
     # Astro Runtime's version-check plugin creates its own table on every
@@ -90,10 +86,10 @@ services:
     depends_on:
       db-migration:
         condition: service_completed_successfully
-    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    image: quay.io/astronomer/astro-runtime:12.9.0
     command:
       - 'airflow'
-      - 'dag-processor'
+      - 'webserver'
     restart: unless-stopped
     networks:
       - airflow
@@ -101,32 +97,7 @@ services:
     labels:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-dag-processor"
-    environment: *common-env
-    volumes:
-      - /home/me/demo/dags:/usr/local/airflow/dags:z
-      - /home/me/demo/include:/usr/local/airflow/include:z
-
-  api-server:
-    # Wait for the migration to finish, not just to start: a component that
-    # opens the metadata database before the tables exist crash-loops, and
-    # Astro Runtime's version-check plugin creates its own table on every
-    # start, which collides when several components do it at once.
-    depends_on:
-      db-migration:
-        condition: service_completed_successfully
-    image: astrocrpublic.azurecr.io/runtime:3.1-2
-    command:
-      - 'airflow'
-      - 'api-server'
-    restart: unless-stopped
-    networks:
-      - airflow
-    user: astro
-    labels:
-      io.astronomer.docker: "true"
-      io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-api-server"
+      io.astronomer.docker.component: "airflow-webserver"
     environment: *common-env
     ports:
       - 127.0.0.1:8081:8080
@@ -142,7 +113,7 @@ services:
     depends_on:
       db-migration:
         condition: service_completed_successfully
-    image: astrocrpublic.azurecr.io/runtime:3.1-2
+    image: quay.io/astronomer/astro-runtime:12.9.0
     command:
       - 'airflow'
       - 'triggerer'

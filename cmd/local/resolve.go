@@ -66,6 +66,7 @@ func (c *cli) runningLocals() ([]instances.Local, error) {
 			ProjectPath:  canonical(statuses[i].ProjectPath),
 			Port:         statuses[i].Port,
 			AirflowMajor: statuses[i].AirflowMajor,
+			Mode:         string(statuses[i].Mode),
 		})
 	}
 	return running, nil
@@ -185,6 +186,7 @@ func (c *cli) machineInstance() (instances.Instance, error) {
 		ProjectPath:  status.ProjectPath,
 		Port:         status.Port,
 		AirflowMajor: status.AirflowMajor,
+		Mode:         string(status.Mode),
 	}, instances.LocalName), nil
 }
 

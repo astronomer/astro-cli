@@ -191,17 +191,37 @@ func newRuntime() *localrt.Runtime {
 	return localrt.New(localrt.Config{
 		RoutesDir:   routesDir(),
 		ProxyDaemon: newProxyDaemon(),
-		Images:      imageBuilder{},
+		Images:      newImageBuilder(),
 	})
 }
 
 // imageBuilder adapts pkg/imagebuild to localrt.ImageBuilder. The seam exists
 // because imagebuild imports the localrt contract, so localrt cannot import it
 // back; this is the field-for-field copy that costs.
-type imageBuilder struct{}
+type imageBuilder struct {
+	// versionCacheDir is where the Astro Runtime version lookup keeps the
+	// service's answer. The CLI names it, because the CLI is what knows where
+	// its cache lives.
+	versionCacheDir string
+}
 
-func (imageBuilder) RuntimeImage(airflowVersion string) (string, error) {
-	return imagebuild.RuntimeImage(airflowVersion)
+// newImageBuilder resolves the cache directory for the version lookup. A cache
+// root that cannot be resolved is not a failure: an empty directory means the
+// lookup asks the service every time, which still works.
+func newImageBuilder() imageBuilder {
+	dir, err := localrt.CacheRoot()
+	if err != nil {
+		dir = ""
+	}
+	return imageBuilder{versionCacheDir: dir}
+}
+
+// RuntimeImage resolves through LocalRuntimeImage, not RuntimeImage: a local run
+// takes either generation, and an Airflow 2 pin needs the version service to say
+// which runtime carries it. The deploy path keeps the pure RuntimeImage, which
+// is Airflow 3 alone.
+func (b imageBuilder) RuntimeImage(ctx context.Context, airflowVersion string) (string, error) {
+	return imagebuild.LocalRuntimeImage(ctx, airflowVersion, b.versionCacheDir)
 }
 
 func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb localrt.Callbacks) (string, error) {

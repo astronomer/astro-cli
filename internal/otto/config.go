@@ -80,8 +80,9 @@ func detectV2Airflow(cwd string) string {
 	}
 	// Airflow 2's standalone generates its own admin password, which otto
 	// doesn't read — BuildEnv would pair the URL with admin/admin and the
-	// token exchange would fail. Better no URL than a half-wired one.
-	if rec.AirflowMajor == "2" || rec.Port == 0 {
+	// token exchange would fail. Better no URL than a half-wired one. Docker
+	// mode creates admin/admin itself, so that pairing is the right one.
+	if (rec.AirflowMajor == "2" && rec.Mode != localrt.ModeDocker) || rec.Port == 0 {
 		return ""
 	}
 	url := fmt.Sprintf("http://localhost:%d", rec.Port)

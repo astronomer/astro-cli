@@ -13,12 +13,18 @@ import (
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
-// The compose file is a port of v1's airflow/include/airflow3 template,
-// thinned for v2: ports are always parametrized (v1 hardcoded 8080 in
-// places — an earlier fix), everything binds loopback-only, Airflow env comes
-// fully layered from the Plan instead of env_file/settings plumbing, and
-// postgres always persists to a named volume so a plain stop keeps the
-// database and only --clean drops it.
+// The compose file is a port of v1's airflow/include templates, thinned for
+// v2: ports are always parametrized (v1 hardcoded 8080 in places — an earlier fix),
+// everything binds loopback-only, Airflow env comes fully layered from the
+// Plan instead of env_file/settings plumbing, and postgres always persists to
+// a named volume so a plain stop keeps the database and only --clean drops it.
+//
+// One template serves both Airflow generations. Everything they share —
+// postgres, the one-shot database service, the shape of a component — is
+// literal in the template; everything they differ on is resolved here, in Go,
+// where it is testable: which components run (airflowServices), what the
+// database service does (dbCommand), and the baseline environment
+// (generationEnv).
 //
 //go:embed compose.yaml.tmpl
 var composeTemplate string
@@ -35,6 +41,22 @@ const (
 	postgresConn = "postgresql://postgres:postgres@postgres:5432" //nolint:gosec // fixed local-dev credentials for the loopback-only metadata DB
 
 	composeFileName = "docker-compose.yaml"
+
+	// airflow2 and airflow3 are the generations this engine runs, spelled the
+	// way the state record spells them.
+	airflow2 = "2"
+	airflow3 = "3"
+)
+
+// The Airflow 2 admin account. Flask-AppBuilder has no all-admins mode, so
+// Airflow 2 needs a real user before anything can log in or mint a token; the
+// database service creates this one. The CLI's internal/instances names the
+// same pair as the local Airflow 2 account — that is how `astro api airflow`
+// and Otto reach a docker-mode Airflow 2 — and pins it in a test of its own,
+// since the two live in different modules and cannot share a constant.
+const (
+	adminUser     = "admin"
+	adminPassword = "admin"
 )
 
 // mountDirs are the project subdirectories mounted into the Airflow
@@ -49,6 +71,21 @@ type mount struct {
 	Host, Container string
 }
 
+// service is one long-running Airflow component. The generations disagree
+// about which ones exist: Airflow 3 splits the API and the dag processor into
+// their own components, Airflow 2 serves the API from the webserver and
+// processes dags inside the scheduler.
+type service struct {
+	// Name is both the compose service name and the log component, so
+	// `astro local logs --component scheduler` reads the same either way.
+	Name string
+	// Command is the container's argv.
+	Command []string
+	// Publish gives this component the published web port. Exactly one
+	// service sets it: the one that serves the UI.
+	Publish bool
+}
+
 // composeInput is the fully resolved data the template renders. Everything
 // here derives from the Plan; no config or manifest reads happen at
 // generation time.
@@ -56,15 +93,65 @@ type composeInput struct {
 	ProjectName   string
 	Image         string
 	PostgresImage string
-	APIServerPort int
-	PostgresPort  int
-	Env           []envVar
+	// WebPort is the host port the UI and the API are published on — the
+	// api-server on Airflow 3, the webserver on Airflow 2. In the container
+	// both listen on 8080.
+	WebPort      int
+	PostgresPort int
+	Env          []envVar
 	// PassEnv is env-var names rendered with no value, which compose
 	// resolves from the CLI's own environment at invocation time. This is
 	// how a value satisfied only by the caller's shell reaches the
 	// containers without ever being written into the compose file.
 	PassEnv []string
 	Mounts  []mount
+	// DBCommand is the one-shot database service's argv, and Services the
+	// components that wait on it.
+	DBCommand []string
+	Services  []service
+}
+
+// airflowServices lists the components to run for an Airflow generation.
+func airflowServices(major string) []service {
+	if major == airflow2 {
+		return []service{
+			{Name: "scheduler", Command: []string{"airflow", "scheduler"}},
+			{Name: "webserver", Command: []string{"airflow", "webserver"}, Publish: true},
+			{Name: "triggerer", Command: []string{"airflow", "triggerer"}},
+		}
+	}
+	return []service{
+		{Name: "scheduler", Command: []string{"airflow", "scheduler"}},
+		{Name: "dag-processor", Command: []string{"airflow", "dag-processor"}},
+		{Name: "api-server", Command: []string{"airflow", "api-server"}, Publish: true},
+		{Name: "triggerer", Command: []string{"airflow", "triggerer"}},
+	}
+}
+
+// dbCommand is what the one-shot database service runs before the components
+// start. Airflow 3 only migrates. Airflow 2 also seeds the admin account,
+// which has to happen here: the Flask-AppBuilder tables it writes to are
+// created by the migration, and the webserver needs the account to exist
+// before anyone logs in. The roles come in between — the migration creates the
+// tables but leaves them empty, so `users create --role Admin` without
+// sync-perm fails with "Admin is not a valid role". Both commands are safe to
+// repeat: creating a user that already exists prints so and exits 0.
+func dbCommand(major string) []string {
+	if major == airflow2 {
+		createAdmin := fmt.Sprintf(
+			"airflow users create --role Admin --username %s --password %s --email admin@example.com --firstname admin --lastname user",
+			adminUser, adminPassword)
+		return []string{"bash", "-c", "airflow db migrate && airflow sync-perm && " + createAdmin}
+	}
+	return []string{"airflow", "db", "migrate"}
+}
+
+// airflowMajor is the generation a plan's Airflow version names. The version
+// arrives validated — imagebuild.LocalRuntimeImage refuses anything but the
+// two generations before this is asked — so a leading segment is all it takes.
+func airflowMajor(version string) string {
+	major, _, _ := strings.Cut(strings.TrimSpace(version), ".")
+	return major
 }
 
 // composeProjectName derives the compose project name for a project
@@ -84,25 +171,20 @@ func composeProjectName(projectPath string) (string, error) {
 }
 
 // airflowEnv layers the template's baseline Airflow settings under the
-// Plan's fully layered environment, so anything the user sets wins.
-func airflowEnv(projectName string, apiServerPort int, planEnv map[string]string) []envVar {
+// Plan's fully layered environment, so anything the user sets wins. The
+// settings both generations share are here; the rest come from
+// generationEnv.
+func airflowEnv(projectName string, webPort int, major string, planEnv map[string]string) []envVar {
 	m := map[string]string{
-		// The UI builds links from BASE_URL, so it carries the host port;
-		// in-container Airflow always listens on 8080.
-		"AIRFLOW__API__BASE_URL":                        fmt.Sprintf("http://localhost:%d", apiServerPort),
-		"AIRFLOW__API__PORT":                            "8080",
-		"AIRFLOW__API_AUTH__JWT_SECRET":                 projectName,
-		"AIRFLOW__API__SECRET_KEY":                      projectName,
-		"AIRFLOW__CORE__AUTH_MANAGER":                   "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager",
-		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS": "True",
-		"AIRFLOW__CORE__EXECUTION_API_SERVER_URL":       "http://api-server:8080/execution/",
-		"AIRFLOW__CORE__EXECUTOR":                       "LocalExecutor",
-		"AIRFLOW__CORE__FERNET_KEY":                     devFernetKey,
-		"AIRFLOW__CORE__LOAD_EXAMPLES":                  "False",
-		"AIRFLOW__CORE__SQL_ALCHEMY_CONN":               postgresConn,
-		"AIRFLOW__DATABASE__SQL_ALCHEMY_CONN":           postgresConn,
-		"AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR":  "True",
-		"ASTRONOMER_ENVIRONMENT":                        "local",
+		"AIRFLOW__CORE__EXECUTOR":             "LocalExecutor",
+		"AIRFLOW__CORE__FERNET_KEY":           devFernetKey,
+		"AIRFLOW__CORE__LOAD_EXAMPLES":        "False",
+		"AIRFLOW__CORE__SQL_ALCHEMY_CONN":     postgresConn,
+		"AIRFLOW__DATABASE__SQL_ALCHEMY_CONN": postgresConn,
+		"ASTRONOMER_ENVIRONMENT":              "local",
+	}
+	for k, v := range generationEnv(projectName, webPort, major) {
+		m[k] = v
 	}
 	for k, v := range planEnv {
 		m[k] = v
@@ -113,6 +195,38 @@ func airflowEnv(projectName string, apiServerPort int, planEnv map[string]string
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// generationEnv is the baseline that belongs to one Airflow generation
+// alone. Airflow 3 runs the simple auth manager with everyone an admin, and
+// its components find each other over the execution API. Airflow 2 has
+// neither: it authenticates through Flask-AppBuilder against the account the
+// database service creates, and its REST API needs the basic-auth backend
+// turned on for a token to be mintable at all —
+// internal/localstandalone.af2Env sets the same backends for the same reason.
+//
+// Both generations build UI links from a base URL, which is why that setting
+// carries the host port; in the container Airflow always listens on 8080.
+func generationEnv(projectName string, webPort int, major string) map[string]string {
+	baseURL := fmt.Sprintf("http://localhost:%d", webPort)
+	if major == airflow2 {
+		return map[string]string{
+			"AIRFLOW__API__AUTH_BACKENDS":    "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth",
+			"AIRFLOW__WEBSERVER__BASE_URL":   baseURL,
+			"AIRFLOW__WEBSERVER__RBAC":       "True",
+			"AIRFLOW__WEBSERVER__SECRET_KEY": projectName,
+		}
+	}
+	return map[string]string{
+		"AIRFLOW__API__BASE_URL":                        baseURL,
+		"AIRFLOW__API__PORT":                            "8080",
+		"AIRFLOW__API__SECRET_KEY":                      projectName,
+		"AIRFLOW__API_AUTH__JWT_SECRET":                 projectName,
+		"AIRFLOW__CORE__AUTH_MANAGER":                   "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager",
+		"AIRFLOW__CORE__EXECUTION_API_SERVER_URL":       "http://api-server:8080/execution/",
+		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS": "True",
+		"AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR":  "True",
+	}
 }
 
 // quoteYAML single-quotes a scalar so arbitrary env values cannot change

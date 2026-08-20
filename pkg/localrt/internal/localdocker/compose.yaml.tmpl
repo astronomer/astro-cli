@@ -36,9 +36,9 @@ services:
       - postgres
     image: {{.Image}}
     command:
-      - airflow
-      - db
-      - migrate
+{{- range .DBCommand}}
+      - {{quote .}}
+{{- end}}
     networks:
       - airflow
     labels:
@@ -46,14 +46,21 @@ services:
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-db-migration"
     environment: *common-env
+{{- range .Services}}
 
-  scheduler:
+  {{.Name}}:
+    # Wait for the migration to finish, not just to start: a component that
+    # opens the metadata database before the tables exist crash-loops, and
+    # Astro Runtime's version-check plugin creates its own table on every
+    # start, which collides when several components do it at once.
     depends_on:
-      - db-migration
-    image: {{.Image}}
+      db-migration:
+        condition: service_completed_successfully
+    image: {{$.Image}}
     command:
-      - airflow
-      - scheduler
+{{- range .Command}}
+      - {{quote .}}
+{{- end}}
     restart: unless-stopped
     networks:
       - airflow
@@ -61,65 +68,14 @@ services:
     labels:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-scheduler"
+      io.astronomer.docker.component: "airflow-{{.Name}}"
     environment: *common-env
-{{- template "mounts" .}}
-
-  dag-processor:
-    depends_on:
-      - db-migration
-    image: {{.Image}}
-    command:
-      - airflow
-      - dag-processor
-    restart: unless-stopped
-    networks:
-      - airflow
-    user: astro
-    labels:
-      io.astronomer.docker: "true"
-      io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-dag-processor"
-    environment: *common-env
-{{- template "mounts" .}}
-
-  api-server:
-    depends_on:
-      - db-migration
-    image: {{.Image}}
-    command:
-      - airflow
-      - api-server
-    restart: unless-stopped
-    networks:
-      - airflow
-    user: astro
-    labels:
-      io.astronomer.docker: "true"
-      io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-api-server"
-    environment: *common-env
+{{- if .Publish}}
     ports:
-      - 127.0.0.1:{{.APIServerPort}}:8080
-{{- template "mounts" .}}
-
-  triggerer:
-    depends_on:
-      - db-migration
-    image: {{.Image}}
-    command:
-      - airflow
-      - triggerer
-    restart: unless-stopped
-    networks:
-      - airflow
-    user: astro
-    labels:
-      io.astronomer.docker: "true"
-      io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-triggerer"
-    environment: *common-env
-{{- template "mounts" .}}
+      - 127.0.0.1:{{$.WebPort}}:8080
+{{- end}}
+{{- template "mounts" $}}
+{{- end}}
 
 {{- define "mounts"}}
 {{- if .Mounts}}

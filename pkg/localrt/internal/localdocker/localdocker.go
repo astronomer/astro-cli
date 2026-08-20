@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	defaultAPIServerPort = 8080
-	defaultPostgresPort  = 5432
+	defaultWebPort      = 8080
+	defaultPostgresPort = 5432
 	// execService is the container Run and Shell exec into: the scheduler
 	// has the full Airflow env and reaches the metadata DB (same choice as
 	// desktop's DockerExecCommand).
@@ -42,10 +42,6 @@ const (
 	// gracefulStopTimeout is how long compose waits on SIGTERM before
 	// killing; Stop with Force uses 0.
 	gracefulStopTimeout = 10
-	// dockerAirflowMajor is the Airflow generation this engine runs. The
-	// compose template is Airflow 3 throughout — an api-server, the simple
-	// auth manager — so there is nothing to derive it from.
-	dockerAirflowMajor = "3"
 )
 
 // ErrNotDockerMode reports a record this engine does not own.
@@ -70,7 +66,7 @@ type Engine struct {
 	connFor   func(bin string) engineConn
 	portFree  func(port string) bool
 	allocPort func() (string, error)
-	health    func(ctx context.Context, url string, timeout time.Duration) error
+	health    func(ctx context.Context, urls []string, timeout time.Duration) error
 	now       func() time.Time
 
 	// ensureEngine brings a stopped engine daemon/machine up before the start
@@ -131,10 +127,14 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if e.images == nil {
 		return nil, errors.New("docker mode needs an image builder: set Images on localrt.Config")
 	}
-	image, err := e.images.RuntimeImage(p.AirflowVersion)
+	// The resolution takes a context because an Airflow 2 base image is a
+	// lookup against the version service, not a tag built from the pin. It also
+	// validates the generation, which everything below reads off the plan.
+	image, err := e.images.RuntimeImage(ctx, p.AirflowVersion)
 	if err != nil {
 		return nil, err
 	}
+	major := airflowMajor(p.AirflowVersion)
 	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
 		return nil, err
@@ -143,11 +143,11 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if err != nil {
 		return nil, err
 	}
-	apiPort, err := e.choosePort(p.RequestedPort, defaultAPIServerPort)
+	webPort, err := e.choosePort(p.RequestedPort, defaultWebPort)
 	if err != nil {
 		return nil, err
 	}
-	pgPort, err := e.choosePort(0, defaultPostgresPort, apiPort)
+	pgPort, err := e.choosePort(0, defaultPostgresPort, webPort)
 	if err != nil {
 		return nil, err
 	}
@@ -183,16 +183,18 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, err
 	}
 
-	env := airflowEnv(name, apiPort, p.Env)
+	env := airflowEnv(name, webPort, major, p.Env)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName:   name,
 		Image:         image,
 		PostgresImage: postgresImage,
-		APIServerPort: apiPort,
+		WebPort:       webPort,
 		PostgresPort:  pgPort,
 		Env:           env,
 		PassEnv:       passEnv(p.PassthroughEnv, env),
 		Mounts:        projectMounts(projectPath),
+		DBCommand:     dbCommand(major),
+		Services:      airflowServices(major),
 	})
 	if err != nil {
 		return nil, err
@@ -204,14 +206,12 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	}
 
 	rec := localstate.Record{
-		ProjectPath:    projectPath,
-		Mode:           rt.ModeDocker,
-		ComposeProject: name,
-		Port:           apiPort,
-		Hostname:       hostname,
-		// The compose template runs Airflow 3 and nothing else, so the
-		// generation is not derived from the plan — it is what this engine is.
-		AirflowMajor:    dockerAirflowMajor,
+		ProjectPath:     projectPath,
+		Mode:            rt.ModeDocker,
+		ComposeProject:  name,
+		Port:            webPort,
+		Hostname:        hostname,
+		AirflowMajor:    major,
 		StartedAt:       e.now().UTC(),
 		StopWithSession: p.StopWithSession,
 	}
@@ -240,8 +240,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		}
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/api/v2/monitor/health", apiPort)
-	if err := e.health(ctx, url, e.healthTimeout); err != nil {
+	if err := e.health(ctx, healthURLs(webPort, major), e.healthTimeout); err != nil {
 		rt.OnState(cb, rt.StateError, err)
 		return nil, err
 	}

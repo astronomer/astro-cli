@@ -21,9 +21,23 @@ const (
 // registered, and stoppable.
 var ErrHealthTimeout = errors.New("timed out waiting for Airflow to become healthy")
 
-// waitHealthy polls url until it returns 200, the timeout passes, or ctx
-// is canceled. Ported from v1's checkWebserverHealth, minus the printing.
-func waitHealthy(ctx context.Context, url string, timeout time.Duration) error {
+// healthURLs is where an Airflow generation answers that it is up. Airflow 3
+// serves the monitor endpoint under the v2 API. Astronomer's newer Airflow 2
+// runtimes serve that same path; older ones serve /health at the root, so
+// Airflow 2 is polled on both and the first 200 wins (pkg/airflowrt does the
+// same for standalone).
+func healthURLs(port int, major string) []string {
+	base := fmt.Sprintf("http://localhost:%d", port)
+	urls := []string{base + "/api/v2/monitor/health"}
+	if major == airflow2 {
+		urls = append(urls, base+"/health")
+	}
+	return urls
+}
+
+// waitHealthy polls the urls until one returns 200, the timeout passes, or
+// ctx is canceled. Ported from v1's checkWebserverHealth, minus the printing.
+func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	client := &http.Client{Timeout: healthRequestTimeout}
@@ -37,8 +51,10 @@ func waitHealthy(ctx context.Context, url string, timeout time.Duration) error {
 			}
 			return ctx.Err()
 		case <-ticker.C:
-			if healthOK(ctx, client, url) {
-				return nil
+			for _, url := range urls {
+				if healthOK(ctx, client, url) {
+					return nil
+				}
 			}
 		}
 	}
