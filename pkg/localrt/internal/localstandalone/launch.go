@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // Commander runs foreground commands in the project environment (Run and

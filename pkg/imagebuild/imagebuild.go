@@ -14,7 +14,7 @@
 // engine and deploy resolve it the same way.
 //
 // Per the layer rules (docs/v2-architecture.md) it prints nothing and never
-// exits: build output flows through localrt.Callbacks and a failed install
+// exits: build output flows through rt.Callbacks and a failed install
 // returns a named error.
 package imagebuild
 
@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // RuntimeImageRepo hosts Astro Runtime 3 images (Airflow 3). The tag is the
@@ -80,7 +80,7 @@ const airflowDist = "apache-airflow"
 type Commander interface {
 	// Run runs the command wired to the given stdio. Nil readers/writers are
 	// allowed and mean "none"/discard.
-	Run(ctx context.Context, env []string, s localrt.Stdio, name string, args ...string) error
+	Run(ctx context.Context, env []string, s rt.Stdio, name string, args ...string) error
 }
 
 // Request describes an image to build from a manifest's fields. It carries no
@@ -132,7 +132,7 @@ func NewExecCommander() Commander { return execCommander{} }
 
 type execCommander struct{}
 
-func (execCommander) Run(ctx context.Context, extraEnv []string, s localrt.Stdio, name string, args ...string) error {
+func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(), extraEnv...)
 	// A nil reader/writer means "none": os/exec routes a nil Stdout/Stderr to the
@@ -147,7 +147,7 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s localrt.Stdio
 // image unchanged (the fast path). Build output streams to cb.OnLine
 // (component "build"); a failed install returns a named error, never a hang.
 
-func (b *Builder) Build(ctx context.Context, req Request, cb localrt.Callbacks) (string, error) {
+func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (string, error) {
 	deps := runtimeDeps(req.Dependencies)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is.
@@ -180,9 +180,9 @@ func (b *Builder) Build(ctx context.Context, req Request, cb localrt.Callbacks) 
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
-	w := &localrt.LineWriter{Emit: func(line string) {
+	w := &rt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
-			cb.OnLine(localrt.LogLine{Component: "build", Time: b.now(), Text: line})
+			cb.OnLine(rt.LogLine{Component: "build", Time: b.now(), Text: line})
 		}
 	}}
 	// --pull keeps the base fresh for a floating tag; the daemon still caches
@@ -194,7 +194,7 @@ func (b *Builder) Build(ctx context.Context, req Request, cb localrt.Callbacks) 
 		args = append(args, "--platform", req.Platform)
 	}
 	args = append(args, contextDir)
-	err := b.cmd.Run(ctx, req.Env, localrt.Stdio{Out: w, Err: w}, req.Bin, args...)
+	err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: w, Err: w}, req.Bin, args...)
 	w.Flush()
 	if err != nil {
 		return "", fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)

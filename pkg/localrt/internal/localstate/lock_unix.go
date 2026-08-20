@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // lockFile is the per-project start lock, next to the runtime record in the

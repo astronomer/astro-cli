@@ -8,14 +8,17 @@
 // makes them unreachable from outside — deliberately. Both consumers enter through
 // New and the methods on Runtime, and nothing else is API.
 //
-// The contract types are declared in internal/rt and aliased below. That is an
-// import-cycle workaround, not a second layer: Start has to import the engines,
-// and the engines need these types, so they cannot live in this package. The
+// The contract types are declared in the rt leaf below and aliased here. The
 // aliases mean callers never see the difference — localrt.Plan IS rt.Plan, not a
 // copy of it, so a value built by one is the value the other consumes.
+//
+// Importing this package links the engines, which is right if you want to RUN
+// Airflow and wasteful if you only need to speak the contract. Two leaves exist
+// for that: pkg/localrt/rt for the types, and pkg/localrt/supervise for the
+// supervisor and its argv markers. Neither links an engine.
 package localrt
 
-import "github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+import "github.com/astronomer/astro-cli/pkg/localrt/rt"
 
 // The contract, re-exported. See internal/rt for the documentation on each.
 type (

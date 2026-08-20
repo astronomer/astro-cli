@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // Standalone log parsing, lifted from Astro Desktop's standalone_logs.go.

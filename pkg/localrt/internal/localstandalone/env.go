@@ -13,7 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // buildEnv constructs the environment for the standalone Airflow process:

@@ -3,7 +3,7 @@ package localdocker
 import (
 	"context"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // The build itself — assembling the requirements.txt/packages.txt context over

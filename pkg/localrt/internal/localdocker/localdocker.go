@@ -26,7 +26,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 

@@ -11,7 +11,7 @@ import (
 	"errors"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // ErrWindowsUnsupported reports that standalone mode does not run on

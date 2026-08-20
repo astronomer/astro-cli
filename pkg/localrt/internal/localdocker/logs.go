@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // Compose log parsing, ported from Astro Desktop's runtime/docker_logs.go.

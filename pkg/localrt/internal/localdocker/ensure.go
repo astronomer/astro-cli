@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/container"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // ErrComposeMissing reports that the engine has no Compose v2 plugin, which

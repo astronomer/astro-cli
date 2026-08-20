@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localdocker"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstandalone/supervise"
+	"github.com/astronomer/astro-cli/pkg/localrt/supervise"
 )
 
 // The engines re-invoke their own binary for two helper processes, so every
@@ -14,6 +14,12 @@ import (
 //
 // This is the part of the contract that is easy to miss, because nothing fails at
 // build time when a consumer forgets: the feature simply does not work.
+//
+// A consumer that needs ONLY the supervisor — the common case for an app that
+// runs its own Airflow and just wants the watchdog — should import
+// pkg/localrt/supervise directly rather than these re-exports. That leaf carries
+// Subcommand, the flag tokens, and Run, and links no engine; reaching them through
+// this package pulls in the entire local runtime for three strings and a function.
 const (
 	// SessionWatchSubcommand watches the process that started a session-tied
 	// docker Airflow and stops the compose stack when it exits.

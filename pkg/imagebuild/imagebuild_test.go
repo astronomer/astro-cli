@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // fakeCmd is a Commander that never touches a real daemon. Each call is
@@ -20,10 +20,10 @@ import (
 // wired stdio.
 type fakeCmd struct {
 	calls []string
-	run   func(call string, s localrt.Stdio) error
+	run   func(call string, s rt.Stdio) error
 }
 
-func (f *fakeCmd) Run(_ context.Context, _ []string, s localrt.Stdio, name string, args ...string) error {
+func (f *fakeCmd) Run(_ context.Context, _ []string, s rt.Stdio, name string, args ...string) error {
 	call := name + " " + strings.Join(args, " ")
 	f.calls = append(f.calls, call)
 	if f.run == nil {
@@ -66,7 +66,7 @@ func TestBuildWritesRequirements(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"pandas==2.2.0", "requests"}
 
-	image, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	// A build ran, tagged with the requested tag, and that tag is the image
 	// returned to run.
@@ -89,7 +89,7 @@ func TestBuildWritesOSPackages(t *testing.T) {
 	req := testRequest(t)
 	req.Packages = []string{"libpq-dev", "build-essential"}
 
-	image, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	// OS packages alone trigger the build layer, even with no extra deps.
 	assert.True(t, hasCall(cmd.calls, "docker build --tag "+req.Tag), "expected a build, got %v", cmd.calls)
@@ -108,7 +108,7 @@ func TestBuildEmptyPackagesWritesEmptyFile(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"pandas"} // a build runs, but no OS packages
 
-	_, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 
 	// packages.txt must exist but stay empty when none are listed, so the
@@ -122,7 +122,7 @@ func TestBuildSkipsWhenNothingToInstall(t *testing.T) {
 	cmd := &fakeCmd{}
 	req := testRequest(t) // no deps, no packages
 
-	image, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	// Nothing to install: no build runs and the base image is returned as-is.
 	assert.Empty(t, cmd.calls, "no build may run with nothing to install, got %v", cmd.calls)
@@ -138,14 +138,14 @@ func TestBuildAirflowOnlyDepsSkip(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"apache-airflow==3.1.*", "apache-airflow[celery]"}
 
-	image, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.Empty(t, cmd.calls, "airflow-only deps must not trigger a build, got %v", cmd.calls)
 	assert.Equal(t, req.BaseImage, image)
 }
 
 func TestBuildFailedInstallReturnsNamedError(t *testing.T) {
-	cmd := &fakeCmd{run: func(call string, _ localrt.Stdio) error {
+	cmd := &fakeCmd{run: func(call string, _ rt.Stdio) error {
 		if strings.Contains(call, "build") {
 			return errors.New("exit status 1")
 		}
@@ -154,22 +154,22 @@ func TestBuildFailedInstallReturnsNamedError(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"nonexistent-package-xyz"}
 
-	image, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dependencies")
 	assert.Empty(t, image)
 }
 
 func TestBuildStreamsOutput(t *testing.T) {
-	cmd := &fakeCmd{run: func(_ string, s localrt.Stdio) error {
+	cmd := &fakeCmd{run: func(_ string, s rt.Stdio) error {
 		_, _ = s.Out.Write([]byte("Step 1/1\n"))
 		return nil
 	}}
 	req := testRequest(t)
 	req.Dependencies = []string{"pandas"}
 
-	var lines []localrt.LogLine
-	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l) }}
+	var lines []rt.LogLine
+	cb := rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l) }}
 	_, err := testBuilder(cmd).Build(context.Background(), req, cb)
 	require.NoError(t, err)
 
@@ -202,7 +202,7 @@ func TestBuildPassesPlatform(t *testing.T) {
 	req.Dependencies = []string{"pandas"}
 	req.Platform = "linux/amd64"
 
-	_, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.True(t, hasCall(cmd.calls, "--platform linux/amd64"), "expected --platform in the build, got %v", cmd.calls)
 }
@@ -212,7 +212,7 @@ func TestBuildOmitsPlatformWhenUnset(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"pandas"} // no platform: host build, exact command
 
-	_, err := testBuilder(cmd).Build(context.Background(), req, localrt.Callbacks{})
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.False(t, hasCall(cmd.calls, "--platform"), "host build must not pin a platform, got %v", cmd.calls)
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // stubImages stands in for pkg/imagebuild. The tests here are about the engine's

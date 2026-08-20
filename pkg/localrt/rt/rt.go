@@ -1,10 +1,22 @@
-// Package rt holds the local-runtime contract types.
+// Package rt is the local-runtime contract: the types both consumers and engines
+// speak, and nothing else. Its dependency list is empty and must stay that way.
 //
-// They live below pkg/localrt rather than in it for one reason: localrt's Start
-// and Attach have to import the engines, and the engines need Plan, Callbacks,
-// and the rest. Types in the parent would make that an import cycle. Everything
-// here is re-exported from pkg/localrt as an alias, so the public names callers
-// write are unchanged and this package stays invisible to them.
+// It sits below pkg/localrt rather than in it for two reasons.
+//
+// The first is mechanical: localrt's Start and Attach import the engines, and the
+// engines need Plan, Callbacks, and the rest, so types in the parent would be an
+// import cycle.
+//
+// The second is why this package is public rather than internal. Importing
+// pkg/localrt links the whole local runtime — both engines, the record store, the
+// prune predicate, and through them pkg/proxy, pkg/container, pkg/uv, and
+// pkg/fsatomic. Code that only needs to SPEAK the contract should not pay for the
+// machinery that implements it: pkg/imagebuild wants four progress types, and
+// Astro Desktop's supervisor shim wants a few markers. Both import a leaf instead
+// and link no engine.
+//
+// pkg/localrt re-exports everything here as aliases, so callers that do want the
+// runtime keep writing localrt.Plan and get the identical type.
 package rt
 
 import (

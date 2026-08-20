@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // Commander runs external commands. It is the engine's only path to a

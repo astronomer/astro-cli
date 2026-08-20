@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 const (
