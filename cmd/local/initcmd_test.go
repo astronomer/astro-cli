@@ -1,46 +1,12 @@
 package local
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/astronomer/astro-cli/internal/scaffold"
-	"github.com/astronomer/astro-cli/pkg/uv"
 )
-
-// stubLocker stands in for a uv-backed Locker in cmd tests, so the import path
-// runs without a real uv binary.
-type stubLocker struct{ err error }
-
-func (l stubLocker) Lock(context.Context, string, uv.Stdio) error { return l.err }
-
-// useLocker points newImportLocker at a stub for the duration of a test.
-func useLocker(t *testing.T, locker scaffold.Locker, err error) {
-	t.Helper()
-	prev := newImportLocker
-	newImportLocker = func(context.Context) (scaffold.Locker, error) { return locker, err }
-	t.Cleanup(func() { newImportLocker = prev })
-}
-
-// plainRepo writes a minimal plain-Airflow repo and returns its path.
-func plainRepo(t *testing.T) string {
-	t.Helper()
-	src := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(src, "dags"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(src, "dags", "d.py"), []byte("# dag\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(src, "requirements.txt"), []byte("flask==2.0\nrequests\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return src
-}
 
 // initDeps pins WorkingDir to one directory (testDeps mints a fresh temp dir
 // per call, which init tests cannot use).
@@ -65,7 +31,7 @@ func TestInitScaffoldsTheWorkingDir(t *testing.T) {
 		}
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Created astro project") || !strings.Contains(out, replaceStart) {
+	if !strings.Contains(out, "Created Astro project") || !strings.Contains(out, replaceStart) {
 		t.Errorf("text output incomplete:\n%s", out)
 	}
 }
@@ -110,92 +76,82 @@ func TestInitJSONOutput(t *testing.T) {
 	}
 }
 
-func TestInitRefusesAnExistingProject(t *testing.T) {
+func TestInitAdoptsAnExistingManifest(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	existing := "[project]\nname = 'orders'\ndependencies = ['requests']\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init over an existing manifest: %v", err)
+	}
+	m, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(m), "[tool.astro]") {
+		t.Errorf("manifest gained no astro section:\n%s", m)
+	}
+	if !strings.Contains(string(m), "requests") {
+		t.Errorf("existing dependency was lost:\n%s", m)
+	}
+	if out := stdout.String(); !strings.Contains(out, "Adopted Astro project orders") {
+		t.Errorf("adoption not reported:\n%s", out)
+	}
+}
+
+func TestInitRefusesAnAstroProject(t *testing.T) {
 	d, dir, _ := initDeps(t)
-	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\n"), 0o600); err != nil {
+	existing := "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	err := execute(t, d, "init")
-	if err == nil || !strings.Contains(err.Error(), "already has a pyproject.toml") {
+	if err == nil || !strings.Contains(err.Error(), "already an Astro project") {
 		t.Errorf("want a clear refusal, got: %v", err)
 	}
 }
 
-func TestInitFromImportsRepo(t *testing.T) {
+func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	d, dir, stdout := initDeps(t)
-	useLocker(t, stubLocker{}, nil)
-	src := plainRepo(t)
-
-	if err := execute(t, d, "init", "--from", src); err != nil {
-		t.Fatalf("astro init --from: %v", err)
+	for name, body := range map[string]string{
+		"requirements.txt": "flask==2.0\n",
+		"Dockerfile":       "FROM quay.io/astronomer/astro-runtime:9\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
-		t.Errorf("target missing pyproject.toml: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "dags", "d.py")); err != nil {
-		t.Errorf("dag was not copied: %v", err)
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Imported") || !strings.Contains(out, "lock: resolved") {
-		t.Errorf("import output incomplete:\n%s", out)
+	if !strings.Contains(out, "Left to do:") {
+		t.Fatalf("no hand-off list:\n%s", out)
+	}
+	for _, want := range []string{"requirements.txt", "Dockerfile"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("%s not listed:\n%s", want, out)
+		}
 	}
 }
 
-func TestInitFromJSONOutput(t *testing.T) {
+// A greenfield init in a repo that already has a .gitignore updates that file,
+// which must not make the command claim it adopted a manifest it wrote itself.
+func TestInitSaysCreatedWhenItWroteTheManifest(t *testing.T) {
 	d, dir, stdout := initDeps(t)
-	useLocker(t, stubLocker{}, nil)
-	src := plainRepo(t)
-
-	if err := execute(t, d, "init", "--from", src, "--output", "json"); err != nil {
-		t.Fatalf("astro init --from --output json: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("*.pyc\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	var payload struct {
-		Source       string `json:"source"`
-		Dir          string `json:"dir"`
-		Dependencies int    `json:"dependencies"`
-		Dags         int    `json:"dags"`
-		Lock         struct {
-			Attempted bool `json:"attempted"`
-			Locked    bool `json:"locked"`
-		} `json:"lock"`
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
 	}
-	if err := json.Unmarshal([]byte(stdout.String()), &payload); err != nil {
-		t.Fatalf("stdout is not one JSON object: %v\n%s", err, stdout.String())
+	out := stdout.String()
+	if !strings.Contains(out, "Created Astro project") {
+		t.Errorf("want Created, got:\n%s", out)
 	}
-	// flask and requests carried, plus the apache-airflow line the import adds
-	// because the source named no Airflow.
-	if payload.Dir != dir || payload.Dependencies != 3 || payload.Dags != 1 {
-		t.Errorf("unexpected payload: %+v", payload)
-	}
-	if !payload.Lock.Attempted || !payload.Lock.Locked {
-		t.Errorf("lock not reported as done: %+v", payload.Lock)
-	}
-}
-
-func TestInitFromReportsLockFailure(t *testing.T) {
-	d, _, stdout := initDeps(t)
-	useLocker(t, stubLocker{err: &uv.ResolutionError{Op: "lock", Summary: "no way to satisfy flask and werkzeug"}}, nil)
-	src := plainRepo(t)
-
-	// A lock failure leaves the command succeeding: the project is scaffolded.
-	if err := execute(t, d, "init", "--from", src); err != nil {
-		t.Fatalf("import should not fail on lock error: %v", err)
-	}
-	if out := stdout.String(); !strings.Contains(out, "did not resolve") {
-		t.Errorf("lock failure not reported:\n%s", out)
-	}
-}
-
-func TestInitFromSkipsLockWithoutUV(t *testing.T) {
-	d, _, stdout := initDeps(t)
-	useLocker(t, nil, uv.ErrNotFound)
-	src := plainRepo(t)
-
-	if err := execute(t, d, "init", "--from", src); err != nil {
-		t.Fatalf("import should run without uv: %v", err)
-	}
-	if out := stdout.String(); !strings.Contains(out, "skipped uv lock") {
-		t.Errorf("missing-uv note absent:\n%s", out)
+	if !strings.Contains(out, ".gitignore (added the .env rule)") {
+		t.Errorf("gitignore edit not reported:\n%s", out)
 	}
 }
 

@@ -1,8 +1,9 @@
-// Package scaffold builds the greenfield `astro init` project: the
-// pyproject.toml manifest, the standard directories, .gitignore, and
-// AGENTS.md (with CLAUDE.md as a symlink to it outside Windows). It follows
-// the layer rules in docs/v2-architecture.md: it returns data and errors,
-// never prints, never exits.
+// Package scaffold makes a directory an `astro init` project: the
+// pyproject.toml manifest — written fresh, or adopted where one is already
+// there — the standard directories, .gitignore, and AGENTS.md (with CLAUDE.md
+// as a symlink to it outside Windows). It follows the layer rules in
+// docs/v2-architecture.md: it returns data and errors, never prints, never
+// exits.
 package scaffold
 
 import (
@@ -45,18 +46,21 @@ type Result struct {
 	Created        []string `json:"created"`
 	// Skipped lists entries that already existed and were left untouched.
 	Skipped []string `json:"skipped,omitempty"`
+	// Updated lists files this run changed rather than created.
+	Updated []string `json:"updated,omitempty"`
+	// Adopted reports that the manifest was already there and gained a
+	// [tool.astro] section, rather than being written by this run. A status
+	// bool a json consumer reads, so it stays present when false.
+	Adopted bool `json:"adopted"`
+	// Notes lists the files init found but did not read, and where their
+	// contents belong. It is the work left to do by hand.
+	Notes []string `json:"notes,omitempty"`
 }
 
-// Refusal sentinels, wrapped with directory context by Run. Callers branch
-// with errors.Is.
-var (
-	// ErrManifestExists reports a directory that already has a
-	// pyproject.toml: an existing project, not a scaffolding target.
-	ErrManifestExists = errors.New("already has a pyproject.toml")
-	// ErrV1Project reports a directory holding an astro v1 project
-	// (Dockerfile plus .astro/), which v2 cannot scaffold over.
-	ErrV1Project = errors.New("holds an astro v1 project")
-)
+// ErrAlreadyAstroProject reports a directory whose pyproject.toml already
+// carries [tool.astro]. It is the one shape Run refuses: every other
+// directory is either scaffolded or adopted. Callers branch with errors.Is.
+var ErrAlreadyAstroProject = errors.New("is already an Astro project")
 
 // Project files are the user's own; world-readable is right (never the v1
 // helpers' 0o777 — an earlier fix).
@@ -65,156 +69,191 @@ const (
 	filePerm = 0o644
 )
 
-// Names reused across the greenfield and import paths (and their tests), kept
-// as constants so goconst stays quiet and the spellings never drift.
+// Names written in more than one place, kept as constants so the spellings
+// never drift.
 const (
-	dirDags       = "dags"
-	dirPlugins    = "plugins"
 	fileGitignore = ".gitignore"
 	fileAgents    = "AGENTS.md"
 )
 
 // projectDirs are the standard project directories, in creation order.
-var projectDirs = []string{dirDags, "include", dirPlugins, "tests"}
+var projectDirs = []string{"dags", "include", "plugins", "tests"}
 
-// Run scaffolds a project in dir, creating it if needed. It refuses a
-// directory that already has a pyproject.toml or looks like a v1 astro
-// project; anything else it fills in, keeping files that already exist.
+// windowsOS is the GOOS whose layout skips the CLAUDE.md symlink.
+const windowsOS = "windows"
+
+// manifestFacts is what the hand-off list needs to know about the manifest,
+// beyond the files sitting beside it.
+type manifestFacts struct {
+	// defaultedPin reports that nothing named an Airflow version, so the pin
+	// is the CLI's default.
+	defaultedPin bool
+	// namesAirflow reports that the manifest names apache-airflow in a shape
+	// no version could be read out of — a range, a wildcard. With a defaulted
+	// pin that means the project may have just moved an Airflow generation.
+	namesAirflow bool
+	// dynamicDeps reports that dependencies are declared dynamic, so the
+	// Airflow requirement could not be added beside them.
+	dynamicDeps bool
+}
+
+// Run makes dir an Astro project, creating dir if needed. A directory with no
+// pyproject.toml is scaffolded; one that has a pyproject.toml without
+// [tool.astro] is adopted, so `astro init` runs in an Airflow repo as it
+// stands. Either way, files already there are kept, and what Run could not
+// carry over is reported in Notes.
 func Run(dir string, opts Options) (*Result, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
-	}
-	if err := refuse(abs); err != nil {
-		return nil, err
-	}
-
-	name := opts.Name
-	if name == "" {
-		name = deriveName(abs)
-	}
-	version := opts.AirflowVersion
-	if version == "" {
-		version = DefaultAirflowVersion
-	}
-	pyproject, err := renderPyproject(name, version)
-	if err != nil {
-		return nil, err
 	}
 
 	goos := opts.GOOS
 	if goos == "" {
 		goos = runtime.GOOS
 	}
-	res := &Result{Dir: abs, Name: name, AirflowVersion: version}
-	if err := write(abs, pyproject, goos != "windows", &res.Created, &res.Skipped); err != nil {
+	marker := filepath.Join(abs, project.Marker)
+
+	// A manifest already there is adopted; its absence is the greenfield path.
+	// Both arms settle the manifest and write nothing.
+	res := &Result{Dir: abs}
+	var out []byte
+	var pin manifestFacts
+	data, readErr := os.ReadFile(marker)
+	switch {
+	case readErr == nil:
+		out, pin, err = adopt(abs, data, opts, res)
+	case errors.Is(readErr, os.ErrNotExist):
+		out, pin, err = scaffoldManifest(abs, opts, res)
+	default:
+		err = fmt.Errorf("reading %s: %w", marker, readErr)
+	}
+	if err != nil {
 		return nil, err
 	}
+
+	// The scaffold lands before the manifest. A manifest carrying [tool.astro]
+	// is the one thing that makes a rerun refuse, so writing it last leaves a
+	// run that failed part-way through safe to repeat.
+	if err := write(abs, goos != windowsOS, res); err != nil {
+		return nil, err
+	}
+	// Written in place, not through a temp file and a rename. This manifest is
+	// often one this package did not create, and a rename replaces it: it
+	// drops the file's mode, writes through a read-only bit that says don't,
+	// and turns a symlinked manifest into a regular file. Every byte here has
+	// already been through manifest.Parse, so what lands is a manifest that
+	// loads.
+	//nolint:gosec // G703: marker is the directory the user named for their own project, joined with a fixed filename — writing there is what init does
+	if err := os.WriteFile(marker, out, filePerm); err != nil {
+		return nil, fmt.Errorf("writing %s: %w", marker, err)
+	}
+	if !res.Adopted {
+		res.Created = append(res.Created, project.Marker)
+	}
+	res.Notes = leftovers(abs, pin)
 	return res, nil
 }
 
-// refuse rejects directories `astro init` must not touch.
-func refuse(dir string) error {
-	if _, err := os.Stat(filepath.Join(dir, project.Marker)); err == nil {
-		return fmt.Errorf("%s %w; edit that manifest instead of re-initializing", dir, ErrManifestExists)
+// scaffoldManifest renders the manifest for a directory that has none, and
+// records on the Result what it chose. It returns the manifest rather than
+// writing it, so write puts every file on disk in one place.
+func scaffoldManifest(dir string, opts Options, res *Result) ([]byte, manifestFacts, error) {
+	name := opts.Name
+	if name == "" {
+		name = deriveName(dir)
 	}
-	if project.IsV1(dir) {
-		return fmt.Errorf("%s %w (Dockerfile and .astro/); migration ships in a later release — use astro CLI 1.x with this project for now", dir, ErrV1Project)
+	version, defaulted := resolveAirflowVersion(opts.AirflowVersion, nil)
+	pyproject, err := renderPyproject(name, version)
+	if err != nil {
+		return nil, manifestFacts{}, err
 	}
-	return nil
+	res.Name, res.AirflowVersion = name, version
+	return pyproject, manifestFacts{defaultedPin: defaulted}, nil
 }
 
-// renderPyproject builds the greenfield manifest. [project.dependencies]
-// carries the Airflow the project pins, derived from the same version that
-// fills [tool.astro].airflow, so init → start needs no hand-edit.
-func renderPyproject(name, version string) (string, error) {
-	deps, _ := renderDependencies([]reqLine{{kind: reqDependency, text: airflowRequirement(version)}})
-	// Greenfield projects carry no OS packages, so the packages key is omitted.
-	return renderManifest(name, version, deps, "")
-}
-
-// renderManifest fills the shared pyproject template with the given
-// dependencies array literal and, when non-empty, an OS-packages literal, then
-// sets the project name and Airflow pin through the surgical editor (so both
-// are quoted the way the manifest expects) and round-trips through
-// manifest.Parse, so every scaffolded project — greenfield or imported — is
-// guaranteed to load. An invalid --name or --airflow-version surfaces here as
-// the manifest's own validation error.
-func renderManifest(name, version, depsLiteral, packagesLiteral string) (string, error) {
-	astro := "[tool.astro]\n" +
-		"airflow = '" + DefaultAirflowVersion + "'\n"
-	if packagesLiteral != "" {
-		astro += "packages = " + packagesLiteral + "\n"
-	}
+// renderPyproject builds the greenfield manifest. It fills the template
+// through the surgical editor, so the name, the pin, and the dependency are
+// quoted the way the manifest expects, then round-trips through
+// manifest.Parse, so every scaffolded project is guaranteed to load. An
+// invalid --name or --airflow-version surfaces here as the manifest's own
+// validation error. [project.dependencies] carries the Airflow the project
+// pins, derived from the same version that fills [tool.astro].airflow, so
+// init → start needs no hand-edit.
+func renderPyproject(name, version string) ([]byte, error) {
 	tmpl := "[project]\n" +
 		"name = 'astro-project'\n" +
-		"version = '0.1.0'\n" +
+		"version = '" + defaultProjectVersion + "'\n" +
 		"requires-python = '>=3.10'\n" +
-		"dependencies = " + depsLiteral + "\n\n" +
-		astro
+		"dependencies = []\n\n" +
+		"[tool.astro]\n" +
+		"airflow = '" + DefaultAirflowVersion + "'\n"
 	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if err := ed.Set([]string{"project", "name"}, name); err != nil {
-		return "", err
+		return nil, err
 	}
 	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
-		return "", err
+		return nil, err
+	}
+	if err := ed.Set([]string{"project", "dependencies", "0"}, airflowRequirement(version)); err != nil {
+		return nil, err
 	}
 	data, err := ed.Bytes()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if _, err := manifest.Parse(data); err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(data), nil
+	return data, nil
 }
 
-// write puts the scaffold on disk. Existing entries are kept and reported
-// as skipped, so a rerun over a partial scaffold is safe. Greenfield and
-// import share it, so it appends to plain slices rather than a Result.
-func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) error {
+// write puts the scaffold on disk — the directories, .gitignore, AGENTS.md and
+// the symlink. Existing entries are kept and reported as skipped, so a rerun
+// over a partial scaffold is safe. The manifest is Run's to write, on both
+// paths, so it is not here.
+func write(dir string, withSymlink bool, res *Result) error {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return err
 	}
 	for _, d := range projectDirs {
 		path := filepath.Join(dir, d)
 		if _, err := os.Lstat(path); err == nil {
-			*skipped = append(*skipped, d+"/")
+			res.Skipped = append(res.Skipped, d+"/")
 			continue
 		}
 		if err := os.Mkdir(path, dirPerm); err != nil {
 			return fmt.Errorf("creating %s: %w", d, err)
 		}
-		*created = append(*created, d+"/")
+		res.Created = append(res.Created, d+"/")
 	}
 
 	files := []struct{ name, content string }{
-		{project.Marker, pyproject},
 		{fileGitignore, gitignoreTemplate},
 		{fileAgents, agentsContent()},
 	}
 	for _, f := range files {
 		path := filepath.Join(dir, f.name)
 		if _, err := os.Lstat(path); err == nil {
-			*skipped = append(*skipped, f.name)
+			res.Skipped = append(res.Skipped, f.name)
 			continue
 		}
 		if err := os.WriteFile(path, []byte(f.content), filePerm); err != nil {
 			return fmt.Errorf("creating %s: %w", f.name, err)
 		}
-		*created = append(*created, f.name)
+		res.Created = append(res.Created, f.name)
 	}
 
 	// Ensure .gitignore covers .env even when it already existed and was kept
-	// above (a fresh template already lists it, so this only heals a pre-made
-	// or imported .gitignore). Local env values must never be committed.
+	// above (a fresh template already lists it, so this only heals a .gitignore
+	// the repo already had). Local env values must never be committed.
 	if added, err := localenv.EnsureEnvIgnored(dir); err != nil {
 		return err
 	} else if added {
-		*created = append(*created, fileGitignore+" (.env rule)")
+		res.Updated = append(res.Updated, fileGitignore+" (added the .env rule)")
 	}
 
 	if !withSymlink {
@@ -222,13 +261,13 @@ func write(dir, pyproject string, withSymlink bool, created, skipped *[]string) 
 	}
 	link := filepath.Join(dir, "CLAUDE.md")
 	if _, err := os.Lstat(link); err == nil {
-		*skipped = append(*skipped, "CLAUDE.md")
+		res.Skipped = append(res.Skipped, "CLAUDE.md")
 		return nil
 	}
 	if err := os.Symlink("AGENTS.md", link); err != nil {
 		return fmt.Errorf("linking CLAUDE.md: %w", err)
 	}
-	*created = append(*created, "CLAUDE.md -> AGENTS.md")
+	res.Created = append(res.Created, "CLAUDE.md -> AGENTS.md")
 	return nil
 }
 
@@ -260,4 +299,49 @@ func deriveName(dir string) string {
 		return "astro-project"
 	}
 	return name
+}
+
+// leftovers reports the files init found, did not read, and cannot carry over
+// on its own, with where each one belongs. Reading a Dockerfile means guessing
+// what its RUN lines were for, so init names it and stops there. The list is
+// the hand-off: what a person, or the agent working with them, does next.
+func leftovers(dir string, facts manifestFacts) []string {
+	checks := []struct{ file, note string }{
+		{"requirements.txt", "move its pins into [project.dependencies]"},
+		{"packages.txt", "move its entries into packages under [tool.astro]"},
+		{"airflow_settings.yaml", "move its connections, variables, and pools into [tool.astro]"},
+		{filepath.Join(".astro", "config.yaml"), "move the Deployments it names into deployments under [tool.astro]"},
+		{"Dockerfile", "not read — move what it installs into pyproject.toml"},
+		{"docker-compose.yml", "not read — `astro local start` replaces it"},
+		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
+		{"docker-compose.override.yml", "not read — move any service your dags need into your own setup"},
+		{"docker-compose.override.yaml", "not read — move any service your dags need into your own setup"},
+	}
+	var out []string
+	namesVersion := false
+	for _, c := range checks {
+		if _, err := os.Stat(filepath.Join(dir, c.file)); err != nil {
+			continue
+		}
+		out = append(out, c.file+": "+c.note)
+		// A Dockerfile image tag, or an apache-airflow pin in requirements.txt,
+		// states the Airflow this project runs today.
+		if c.file == "Dockerfile" || c.file == "requirements.txt" {
+			namesVersion = true
+		}
+	}
+	// A pin nobody chose leads the list. Most repos state the Airflow they run
+	// in a Dockerfile image tag, and most of those are on 2.x, so the default
+	// is the likeliest way this ends up a project that cannot start.
+	if facts.defaultedPin && (namesVersion || facts.namesAirflow) {
+		out = append([]string{"airflow = '" + DefaultAirflowVersion + "' is the default, not this project's version: " +
+			"set it from the Airflow this project already names"}, out...)
+	}
+	// Dependencies declared dynamic are supplied from somewhere this cannot
+	// reach, so the requirement that installs Airflow has to be put there.
+	if facts.dynamicDeps {
+		out = append(out, "dependencies are dynamic, so the Airflow pin was not added: put "+
+			airflowRequirement(DefaultAirflowVersion)+" wherever this project lists its dependencies")
+	}
+	return out
 }

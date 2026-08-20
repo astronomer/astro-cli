@@ -15,8 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
-const windowsOS = "windows"
-
 func TestRunFreshScaffold(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "flight-data")
 	res, err := Run(dir, Options{})
@@ -125,27 +123,211 @@ func TestDeriveName(t *testing.T) {
 	}
 }
 
-func TestRunRefusesExistingManifest(t *testing.T) {
+func TestRunRefusesAnAstroProject(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\n"), 0o600))
+	m := "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600))
 	_, err := Run(dir, Options{})
-	require.ErrorIs(t, err, ErrManifestExists)
+	require.ErrorIs(t, err, ErrAlreadyAstroProject)
 	assert.Contains(t, err.Error(), dir)
 }
 
-func TestRunRefusesV1Project(t *testing.T) {
+func TestRunAdoptsExistingManifest(t *testing.T) {
+	dir := t.TempDir()
+	// Comments and key order must survive: this is the user's own file, and
+	// the port that follows is reviewed as a diff.
+	existing := "# our project\n[project]\nname = 'orders'\nrequires-python = '>=3.11'\ndependencies = [\n    'requests==2.31.0',  # http\n]\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	assert.Equal(t, "orders", res.Name)
+	assert.Equal(t, DefaultAirflowVersion, res.AirflowVersion)
+	assert.NotEmpty(t, res.Updated)
+
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	got := string(out)
+	assert.Contains(t, got, "# our project")
+	assert.Contains(t, got, "# http")
+	assert.Contains(t, got, "requests==2.31.0")
+	assert.Contains(t, got, "requires-python = '>=3.11'")
+	assert.Contains(t, got, airflowRequirement(DefaultAirflowVersion))
+	m, err := manifest.Parse(out)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultAirflowVersion, m.Astro.AirflowVersion)
+
+	// The rest of the scaffold lands beside it.
+	for _, f := range []string{"dags", "include", "plugins", "tests", ".gitignore", "AGENTS.md"} {
+		_, statErr := os.Lstat(filepath.Join(dir, f))
+		assert.NoError(t, statErr, f)
+	}
+}
+
+func TestRunAdoptsThePinAlreadyInDependencies(t *testing.T) {
+	dir := t.TempDir()
+	existing := "[project]\nname = 'orders'\ndependencies = ['apache-airflow==2.9.3', 'requests']\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	// A project running 2.9 stays on 2.9: init reads the pin, never moves it.
+	assert.Equal(t, "2.9.3", res.AirflowVersion)
+
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(string(out), "apache-airflow"), "the pin was duplicated:\n%s", out)
+}
+
+// PEP 621 requires a version beside the name, and uv refuses to build the
+// environment without one. This package's validation does not ask for it, so a
+// manifest missing it would parse here and fail at the first `local start`.
+func TestRunWritesAProjectVersionWhenAdopting(t *testing.T) {
+	version := func(t *testing.T, manifest string) string {
+		t.Helper()
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifest), 0o600))
+		_, err := Run(dir, Options{})
+		require.NoError(t, err)
+		out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+		require.NoError(t, err)
+		return string(out)
+	}
+
+	// No [project] table at all: the one this run creates carries a version.
+	assert.Contains(t, version(t, "[tool.ruff]\nline-length = 100\n"), "version = '0.1.0'")
+
+	// A [project] table without one gains it.
+	assert.Contains(t, version(t, "[project]\nname = 'a'\n"), "version = '0.1.0'")
+
+	// A version already there is never rewritten.
+	got := version(t, "[project]\nname = 'a'\nversion = '2.4.0'\n")
+	assert.Contains(t, got, "version = '2.4.0'")
+	assert.NotContains(t, got, "0.1.0")
+
+	// A version a build backend supplies satisfies PEP 621, so leave it alone.
+	got = version(t, "[project]\nname = 'a'\ndynamic = ['version']\n")
+	assert.NotContains(t, got, "version = '0.1.0'")
+	assert.Contains(t, got, "dynamic = ['version']")
+}
+
+func TestRunAdoptsAManifestWithNoProjectTable(t *testing.T) {
+	dir := t.TempDir()
+	// Poetry-era files carry no [project] table at all, so there is no name
+	// for the manifest's own validation to accept.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[tool.ruff]\nline-length = 100\n"), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	assert.Equal(t, deriveName(dir), res.Name)
+
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "line-length = 100")
+	_, err = manifest.Parse(out)
+	require.NoError(t, err)
+}
+
+// Most repos state the Airflow they run in a Dockerfile image tag, and most of
+// those are on 2.x. init does not read the tag, so it must at least say that
+// the pin it wrote is a default nobody chose.
+func TestRunWarnsWhenThePinIsJustTheDefault(t *testing.T) {
+	withDockerfile := func(t *testing.T) string {
+		t.Helper()
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+			[]byte("FROM quay.io/astronomer/astro-runtime:9.1.0\n"), 0o600))
+		return dir
+	}
+	defaultPinNote := func(notes []string) bool {
+		return strings.Contains(strings.Join(notes, "\n"), "is the default, not this project's version")
+	}
+
+	res, err := Run(withDockerfile(t), Options{})
+	require.NoError(t, err)
+	assert.True(t, defaultPinNote(res.Notes), "no warning for a defaulted pin: %v", res.Notes)
+
+	// Naming the version settles it, so there is nothing to warn about.
+	res, err = Run(withDockerfile(t), Options{AirflowVersion: "2.9.3"})
+	require.NoError(t, err)
+	assert.False(t, defaultPinNote(res.Notes), "warned about a version the caller chose: %v", res.Notes)
+
+	// An empty directory has no better answer sitting in it, so no nagging.
+	res, err = Run(t.TempDir(), Options{})
+	require.NoError(t, err)
+	assert.False(t, defaultPinNote(res.Notes), "warned with nothing to read: %v", res.Notes)
+
+	// A manifest that already pins Airflow settles it too.
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
-	_, err := Run(dir, Options{})
-	require.ErrorIs(t, err, ErrV1Project)
-	assert.Contains(t, err.Error(), "astro CLI 1.x")
-
-	// A Dockerfile alone (no .astro/) is any container project, not v1.
-	dir2 := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir2, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	_, err = Run(dir2, Options{})
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
+		[]byte("[project]\nname='a'\ndependencies=['apache-airflow==2.9.3']\n"), 0o600))
+	res, err = Run(dir, Options{})
 	require.NoError(t, err)
+	assert.False(t, defaultPinNote(res.Notes), "warned about a pin read from the manifest: %v", res.Notes)
+}
+
+// PEP 621 forbids a static dependencies array beside a dynamic declaration,
+// and uv refuses the manifest outright — which is the shape of every repo that
+// keeps its dependencies in a requirements.txt.
+func TestRunLeavesDynamicDependenciesAlone(t *testing.T) {
+	dir := t.TempDir()
+	existing := "[project]\nname = 'a'\ndynamic = ['version', 'dependencies']\n\n" +
+		"[tool.setuptools.dynamic]\ndependencies = {file = ['requirements.txt']}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "apache-airflow", "a static dependency was added beside a dynamic one:\n%s", out)
+	assert.Contains(t, string(out), "dynamic = ['version', 'dependencies']")
+	// The pin still has to reach the project, so init says where to put it.
+	assert.Contains(t, strings.Join(res.Notes, "\n"), "dependencies are dynamic")
+}
+
+// A range or a wildcard names an Airflow this cannot read a version out of, so
+// the default lands instead — which for a 2.x project is a whole generation.
+// Nothing else in such a repo need mention a version, so the manifest itself
+// has to trigger the warning.
+func TestRunWarnsWhenAPinnedProjectFallsBackToTheDefault(t *testing.T) {
+	dir := t.TempDir()
+	existing := "[project]\nname = 'a'\nversion = '0.1.0'\ndependencies = ['apache-airflow[celery]>=2.9,<2.10']\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	assert.Equal(t, DefaultAirflowVersion, res.AirflowVersion)
+	assert.Contains(t, strings.Join(res.Notes, "\n"), "is the default, not this project's version")
+
+	// The project's own requirement is left as its author wrote it.
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "apache-airflow[celery]>=2.9,<2.10")
+	assert.Equal(t, 1, strings.Count(string(out), "apache-airflow"))
+}
+
+func TestRunAdoptsAV1ProjectAndListsTheLeftovers(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"Dockerfile":            "FROM quay.io/astronomer/astro-runtime:9\n",
+		"requirements.txt":      "flask==2.0\n",
+		"packages.txt":          "libpq-dev\n",
+		"airflow_settings.yaml": "airflow:\n",
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600))
+	}
+	require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
+
+	// init writes the manifest and names what it could not read, which is the
+	// work the port picks up.
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	joined := strings.Join(res.Notes, "\n")
+	for _, want := range []string{"Dockerfile", "requirements.txt", "packages.txt", "airflow_settings.yaml"} {
+		assert.Contains(t, joined, want)
+	}
 }
 
 func TestRunKeepsExistingFiles(t *testing.T) {
@@ -160,8 +342,10 @@ func TestRunKeepsExistingFiles(t *testing.T) {
 	assert.Contains(t, res.Skipped, "dags/")
 
 	// The hand-written .gitignore is kept, but init heals it to cover .env so
-	// local values are never committed.
-	assert.Contains(t, res.Created, ".gitignore (.env rule)")
+	// local values are never committed. That is an edit to a file that was
+	// already there, so it is reported as one — listing it as created too
+	// would contradict the "already existed, kept" line beside it.
+	assert.Contains(t, res.Updated, ".gitignore (added the .env rule)")
 	got, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(string(got), "# mine\n"), "original content kept: %q", string(got))
