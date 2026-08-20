@@ -45,7 +45,7 @@ func (c *cli) deploymentSet() (projectDir string, set instances.Set, err error) 
 
 // runningLocals is every local Airflow alive on this machine, for the inventory
 // that promises to list them all. Liveness is why the runtime does the listing
-// rather than internal/localstate directly — a leftover record is not a running
+// rather than the record store directly — a leftover record is not a running
 // Airflow.
 //
 // Every path is canonicalized here, at the boundary, because identity is a

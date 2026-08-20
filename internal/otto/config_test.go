@@ -15,8 +15,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/localrt/localrttest"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -175,7 +175,7 @@ func (s *ConfigSuite) TestDetectAirflow_V2Airflow2Refused() {
 	defer srv.Close()
 
 	cwd := s.chdirV2Project("v2-airflow2")
-	s.Require().NoError(localstate.Save(localstate.Record{
+	s.Require().NoError(localrttest.Seed(localrttest.Record{
 		ProjectPath:  cwd,
 		Port:         serverPort(srv),
 		AirflowMajor: "2",
@@ -303,7 +303,7 @@ func (s *ConfigSuite) chdirV2Project(name string) string {
 // writeV2Record writes the smallest record detection reads: path and port.
 func (s *ConfigSuite) writeV2Record(projectPath string, port int) {
 	s.T().Helper()
-	s.Require().NoError(localstate.Save(localstate.Record{
+	s.Require().NoError(localrttest.Seed(localrttest.Record{
 		ProjectPath: projectPath,
 		Port:        port,
 	}))

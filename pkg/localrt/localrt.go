@@ -4,188 +4,67 @@
 // except pkg/airflowrt, the primitives it orchestrates. Progress flows
 // through Callbacks; results flow through typed errors.
 //
-// The types here are the contract the an earlier fix/43 implementations fill in.
-// Signatures may still move while those land; nothing outside this repo and
-// Astro Desktop may depend on them yet.
+// The engines that implement this live in internal/ beneath this package, which
+// makes them unreachable from outside — deliberately. Both consumers enter through
+// New and the methods on Runtime, and nothing else is API.
+//
+// The contract types are declared in internal/rt and aliased below. That is an
+// import-cycle workaround, not a second layer: Start has to import the engines,
+// and the engines need these types, so they cannot live in this package. The
+// aliases mean callers never see the difference — localrt.Plan IS rt.Plan, not a
+// copy of it, so a value built by one is the value the other consumes.
 package localrt
 
-import (
-	"context"
-	"errors"
-	"io"
-	"time"
-)
+import "github.com/astronomer/astro-cli/pkg/localrt/internal/rt"
 
-// Mode selects how Airflow runs. The values are wire-coupled: they appear in
-// the state record and in routes.json (pkg/proxy Route.Mode — pkg/proxy's
-// RouteModeStandalone/RouteModeDocker carry the same wire values), so
-// changing a string breaks tools already in the field.
-type Mode string
+// The contract, re-exported. See internal/rt for the documentation on each.
+type (
+	Mode        = rt.Mode
+	Plan        = rt.Plan
+	State       = rt.State
+	Status      = rt.Status
+	LogLine     = rt.LogLine
+	Callbacks   = rt.Callbacks
+	StopOptions = rt.StopOptions
+	LogOptions  = rt.LogOptions
+	Stdio       = rt.Stdio
+	Airflow     = rt.Airflow
+	LineWriter  = rt.LineWriter
+
+	// ProxyDaemon and the image-builder seam are supplied by the consumer; see
+	// Config.
+	ProxyDaemon  = rt.ProxyDaemon
+	ImageBuilder = rt.ImageBuilder
+	BuildRequest = rt.BuildRequest
+)
 
 const (
-	// ModeStandalone runs Airflow from a uv-managed venv, no Docker daemon.
-	ModeStandalone Mode = "standalone"
-	// ModeDocker runs Airflow via compose. The only mode on Windows in the MVP.
-	ModeDocker Mode = "docker"
+	ModeStandalone = rt.ModeStandalone
+	ModeDocker     = rt.ModeDocker
+
+	StateStopped  = rt.StateStopped
+	StateStarting = rt.StateStarting
+	StateRunning  = rt.StateRunning
+	StateStopping = rt.StateStopping
+	StateError    = rt.StateError
 )
 
-// Plan is everything needed to start Airflow for a project, as plain values.
-// The code that builds a Plan (internal/plan in the CLI, the app layer in
-// desktop) resolves manifest, config, and env layering, and fills in
-// defaults, before this point. No manifest, config, cloud, or houston
-// (v1 Software API) types cross this boundary.
-type Plan struct {
-	ProjectPath    string
-	Mode           Mode
-	AirflowVersion string
-	PythonVersion  string
-	// Dependencies is the project's [project] dependencies (PEP 508 specs).
-	// Standalone mode ignores it — uv syncs the venv straight from the
-	// manifest — but docker mode installs these into the runtime image so
-	// both modes run Airflow against the same set of packages.
-	Dependencies []string
-	// Packages is the project's [tool.astro] packages, the OS (apt) packages
-	// it needs at the system level. Docker mode bakes them into the runtime
-	// image through the ONBUILD packages.txt step; standalone mode has no
-	// image and cannot honor them, so it is warned about them at start.
-	Packages []string
-	// StopWithSession ties Airflow's lifetime to the process that starts
-	// it: true means Airflow is killed when that process exits; false (the
-	// default) means Airflow keeps running and any tool can reconnect to
-	// it later. Persisted in the state record so other tools can see which
-	// way a running Airflow was started.
-	StopWithSession bool
-	// Env is the fully layered process environment for Airflow.
-	Env map[string]string
-	// PassthroughEnv names env vars satisfied only by the calling shell's
-	// environment. It never carries values, so engines that persist their
-	// configuration (docker mode's compose file) can hand the names to the
-	// runtime without writing the values to disk. Standalone mode ignores
-	// it: the Airflow process inherits the shell environment directly.
-	PassthroughEnv []string
-	// Hostname is the display hostname for this project, computed by the
-	// caller (e.g. from pkg/proxy's derivation). localrt persists it into
-	// the state record and reports it in Status; it is a label, never an
-	// identity.
-	Hostname string
-	// StateDir is the per-project runtime state home,
-	// ~/.cache/astro/projects/<path-hash>.
-	StateDir string
-	// AirflowHome is where AIRFLOW_HOME points; project-scoped.
-	AirflowHome string
-	// RequestedPort is a preference; the runtime may allocate another and
-	// reports the real one in Status.
-	RequestedPort int
-}
+// ErrNotImplemented marks a contract entry point with no engine behind it. Still
+// exported: `astro dev` reports it, and it is what a consumer checks while the
+// remaining modes land.
+var ErrNotImplemented = rt.ErrNotImplemented
 
-// State is the lifecycle state of a local Airflow.
-type State string
+// OnState reports a state transition if the caller asked for one.
+func OnState(cb Callbacks, s State, err error) { rt.OnState(cb, s, err) }
 
-const (
-	StateStopped  State = "stopped"
-	StateStarting State = "starting"
-	StateRunning  State = "running"
-	StateStopping State = "stopping"
-	StateError    State = "error"
-)
+// CanonicalPath resolves a project path to the spelling every tool agrees on.
+func CanonicalPath(path string) (string, error) { return rt.CanonicalPath(path) }
 
-// Status describes a local Airflow, recovered from the state record on disk
-// — it must not require in-memory state from the process that started it.
-// Proxy routes are derived from it (Route.ProjectDir = ProjectPath,
-// Route.Port = itoa(Port)); routes.json itself stays a compatibility view.
-// The json tags keep this in step with the rest of the v2 surface: lowercase
-// keys, and the fields a stopped Airflow zeroes (pid, port, startedAt) drop out
-// rather than reporting a false 0 or a zero-value timestamp.
-type Status struct {
-	ProjectPath     string `json:"projectPath"`
-	Mode            Mode   `json:"mode,omitempty"`
-	StopWithSession bool   `json:"stopWithSession,omitempty"`
-	State           State  `json:"state"`
-	PID             int    `json:"pid,omitempty"`
-	Port            int    `json:"port,omitempty"`
-	Hostname        string `json:"hostname,omitempty"`
-	// AirflowMajor is the Airflow generation this runtime was started for
-	// ("2" or "3"), carried from the record. It describes the running
-	// process, not the manifest, which may have been edited since. Empty on
-	// a record written before the field existed.
-	AirflowMajor string    `json:"airflowMajor,omitempty"`
-	StartedAt    time.Time `json:"startedAt,omitzero"`
-}
+// ProjectID is the stable per-project identifier derived from its path.
+func ProjectID(projectPath string) (string, error) { return rt.ProjectID(projectPath) }
 
-// LogLine is one parsed line of component output.
-type LogLine struct {
-	Component string
-	Time      time.Time
-	Text      string
-}
+// CacheRoot is ~/.cache/astro, the home for per-project runtime state.
+func CacheRoot() (string, error) { return rt.CacheRoot() }
 
-// Callbacks receives progress while the runtime works. Fields may be nil,
-// and implementations must check before calling. This is the only channel
-// for progress: the runtime never prints.
-type Callbacks struct {
-	OnState func(State, error)
-	OnLine  func(LogLine)
-}
-
-// StopOptions controls Stop.
-type StopOptions struct {
-	// Force skips the graceful SIGTERM window.
-	Force bool
-	// Clean also removes derived state (the old `astro dev kill`).
-	Clean bool
-}
-
-// LogOptions controls Logs. Exactly one of Writer or OnLine is set;
-// implementations error otherwise.
-type LogOptions struct {
-	Follow     bool
-	Components []string
-	// Tail limits output to the last N lines; 0 means all.
-	Tail int
-	// Since drops lines older than this; zero means all.
-	Since  time.Time
-	Writer io.Writer
-	OnLine func(LogLine)
-}
-
-// Stdio carries the stdin/stdout/stderr for Run and Shell.
-type Stdio struct {
-	In       io.Reader
-	Out, Err io.Writer
-}
-
-// Airflow is a handle to a running local Airflow, obtained from Start or
-// Attach — so every method on it is always valid.
-type Airflow interface {
-	Stop(ctx context.Context, opts StopOptions) error
-	Status() (Status, error)
-	Logs(ctx context.Context, opts LogOptions) error
-	Run(ctx context.Context, argv []string, s Stdio) error
-	Shell(ctx context.Context, s Stdio) error
-}
-
-// ErrNotImplemented marks the contract stubs below.
-var ErrNotImplemented = errors.New("not yet implemented")
-
-// Start launches Airflow per the plan and returns a handle to it.
-func Start(ctx context.Context, p Plan, cb Callbacks) (Airflow, error) {
-	return nil, ErrNotImplemented
-}
-
-// Attach returns a handle to an already-running Airflow using only its
-// state record on disk — no in-memory state from the process that started
-// it.
-func Attach(projectPath string) (Airflow, error) {
-	return nil, ErrNotImplemented
-}
-
-// ReadStatus reads one project's status straight from its state record,
-// without the reconnect work Attach does.
-func ReadStatus(projectPath string) (Status, error) {
-	return Status{}, ErrNotImplemented
-}
-
-// List returns every local Airflow known on this machine.
-func List() ([]Status, error) {
-	return nil, ErrNotImplemented
-}
+// StateDir is a project's runtime state home under CacheRoot.
+func StateDir(projectPath string) (string, error) { return rt.StateDir(projectPath) }

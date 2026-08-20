@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/internal/fsatomic"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 const gitignoreName = ".gitignore"

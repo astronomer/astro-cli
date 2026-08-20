@@ -10,8 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/imagebuild"
-	"github.com/astronomer/astro-cli/internal/localshared"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -240,7 +239,7 @@ func (t *AstroTarget) untag(ctx context.Context, ref string) {
 // save writes the image to a tarball with `docker save`, streaming its output
 // (progress lands on stderr) through cb under the "package" component.
 func (t *AstroTarget) save(ctx context.Context, image, path string, cb localrt.Callbacks) error {
-	w := &localshared.LineWriter{Emit: func(line string) {
+	w := &localrt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(localrt.LogLine{Component: "package", Time: time.Now(), Text: line})
 		}

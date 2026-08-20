@@ -17,11 +17,11 @@ import (
 //
 //   - Airflow 3, both engines, runs the simple auth manager with
 //     SIMPLE_AUTH_MANAGER_ALL_ADMINS on (pkg/airflowrt.BuildEnv for standalone,
-//     the compose environment in internal/localdocker). Everyone is an admin
+//     the compose environment in pkg/localrt's docker engine). Everyone is an admin
 //     and /auth/token mints for whoever asks, with no credentials to send —
 //     which is what the minter's credential-less mint is for.
 //   - Airflow 2 runs in standalone mode only, with the basic_auth backend on
-//     (internal/localstandalone.af2Env). The macOS launch shim creates
+//     (pkg/localrt's standalone engine). The macOS launch shim creates
 //     admin/admin; everywhere else `airflow standalone` generates a password
 //     into standalone_admin_password.txt under its AIRFLOW_HOME.
 //

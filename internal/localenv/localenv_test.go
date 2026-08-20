@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
-	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/localrt/localrttest"
 )
 
 func readFile(t *testing.T, path string) string {
@@ -276,7 +276,7 @@ func TestListAllDedupesCurrentProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range []string{projA, projB} {
-		if err := localstate.Save(localstate.Record{ProjectPath: p, Mode: localrt.ModeStandalone, Port: 1}); err != nil {
+		if err := localrttest.Seed(localrttest.Record{ProjectPath: p, Mode: localrt.ModeStandalone, Port: 1}); err != nil {
 			t.Fatal(err)
 		}
 	}

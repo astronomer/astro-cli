@@ -114,7 +114,7 @@ linters:
       # Keep this list in sync with v2BelowCmd and v2ConfigReaders in
       # internal/archlint/archlint_test.go when a new internal/ v2 package lands.
       - linters: [forbidigo]
-        path-except: ^internal/(astrosession|checks|emenv|envresolve|fsatomic|imagebuild|instancelocate|instances|localdocker|localprune|localshared|localstandalone|localstate|pack|plan|project|scaffold|userstate)/
+        path-except: ^internal/(astrosession|checks|emenv|envresolve|instancelocate|instances|pack|plan|project|scaffold|userstate)/
       - linters:
           - dupl
           - errcheck
@@ -131,10 +131,13 @@ linters:
       # v2 tree: Deps and the contract structs (localrt, envresolve Inputs,
       # airflowapi's per-call options, instances.Instance) are passed by value
       # on purpose (docs/v2-architecture.md), so hugeParam does not apply.
-      # `local` and `instance` are prefixes: they cover localdocker/localstate/…
-      # and instances/instancelocate respectively. Do not "fix" them to plurals.
+      # `instance` is a prefix: it covers instances and instancelocate. Do not
+      # "fix" it to a plural. `local` used to be one too, covering
+      # localdocker/localstate/…; those moved into pkg/localrt (its own module,
+      # which a root run does not descend into), leaving localenv as the only
+      # internal/local* package.
       - linters: [gocritic]
-        path: ^(cmd/(local|astro)|internal/(local|envresolve|deploy|imagebuild|instance|pack)|pkg/airflowapi)
+        path: ^(cmd/(local|astro)|internal/(localenv|envresolve|deploy|instance|pack)|pkg/airflowapi)
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

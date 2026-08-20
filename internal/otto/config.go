@@ -10,8 +10,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
@@ -71,9 +71,9 @@ func detectV2Airflow(cwd string) string {
 		}
 		return ""
 	}
-	rec, err := localstate.Load(proj.Dir)
+	rec, err := localrt.RecordedStatus(proj.Dir)
 	if err != nil {
-		if !errors.Is(err, localstate.ErrNotRunning) {
+		if !localrt.IsNotRunning(err) {
 			logger.Debugf("otto: reading local state for %s: %v", proj.Dir, err)
 		}
 		return ""

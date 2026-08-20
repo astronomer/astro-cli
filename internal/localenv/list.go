@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
-	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -152,7 +151,7 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 // project's file is already covered by orphans above, so it is skipped by
 // canonical path; a project whose file is missing simply contributes nothing.
 func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem {
-	recs, err := localstate.List()
+	recs, err := localrt.RecordedList()
 	if err != nil {
 		return nil // best-effort: --all still shows the current project and global
 	}

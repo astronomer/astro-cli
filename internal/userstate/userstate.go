@@ -13,7 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astronomer/astro-cli/internal/fsatomic"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 

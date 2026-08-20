@@ -21,6 +21,14 @@ GOLANGCI_VERSION=$(shell sed -n 's/.*golangci-lint@\(v[0-9.]*\).*/\1/p' prek.tom
 # not yet: never having been linted, they have collected unused nolint
 # directives and unchecked errors. Each joins this list when its backlog is
 # cleared, which is its own change rather than a rider on someone else's.
+#
+# pkg/localrt is a special case worth naming: its engines (localdocker,
+# localstandalone, localprune, localshared, localstate) WERE covered by the root
+# run until they moved into that module, and a root run does not descend into a
+# nested one. They are not newly dirty — a clean run needs the hugeParam
+# exclusion the root .golangci.yml grants them re-expressed against paths inside
+# the module, which is config work, not a fix. Until then ~4,000 lines of engine
+# code is unlinted; the root suite, GOOS=windows vet, and archlint still cover it.
 LINT_SUBMODULES=pkg/airflowapi pkg/connmodel pkg/envschema
 
 lint-submodules:

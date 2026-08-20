@@ -13,8 +13,8 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/container"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 

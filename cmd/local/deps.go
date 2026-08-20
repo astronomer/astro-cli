@@ -9,11 +9,11 @@ package local
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
@@ -25,12 +25,8 @@ import (
 	"github.com/astronomer/astro-cli/internal/checks"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/localdocker"
-	"github.com/astronomer/astro-cli/internal/localprune"
-	"github.com/astronomer/astro-cli/internal/localshared"
-	"github.com/astronomer/astro-cli/internal/localstandalone"
-	"github.com/astronomer/astro-cli/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
@@ -115,7 +111,7 @@ func NewDeps() Deps {
 		Stdin:         os.Stdin,
 		Stdout:        os.Stdout,
 		Stderr:        os.Stderr,
-		Runtime:       newModeRuntime(),
+		Runtime:       newRuntime(),
 		Checks:        runner,
 		CheckVenv:     runner,
 		Provisioner:   newUVProvisioner,
@@ -131,222 +127,6 @@ func NewDeps() Deps {
 // stdinIsTerminal is the production answer to "can this run ask a question".
 func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
-}
-
-// modeRuntime is the production Runtime: it dispatches on localrt.Mode
-// between the two engines, standalone (internal/localstandalone, an earlier fix)
-// and docker (internal/localdocker, an earlier fix). Read paths dispatch on the
-// mode the state record captured at start, so any tool stops what another
-// started.
-type modeRuntime struct {
-	docker     *localdocker.Engine
-	standalone *localstandalone.Engine
-	// routes is the CLI's own view of routes.json, for the list join and the
-	// --clean sweep. It carries the record-aware prune predicate so listing
-	// never evicts a route whose owner is still alive.
-	routes *proxy.Store
-}
-
-func newModeRuntime() modeRuntime {
-	dir := routesDir()
-	daemon := newProxyDaemon()
-	return modeRuntime{
-		docker:     localdocker.New(dir, daemon),
-		standalone: localstandalone.New(dir, daemon),
-		routes:     proxy.NewStore(dir, proxy.WithRouteLiveness(localprune.RouteAlive)),
-	}
-}
-
-// proxyDaemon adapts airflow/proxy's daemon lifecycle to the engines'
-// localshared.ProxyDaemon seam. It lives at the composition layer because
-// airflow/proxy pulls in config, which the v2 engines must not import; they
-// see only the interface.
-type proxyDaemon struct{}
-
-func (proxyDaemon) EnsureRunning() (string, error) {
-	return proxydaemon.EnsureRunning(proxy.DefaultPort)
-}
-
-func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
-
-// newProxyDaemon returns the daemon seam, or nil on Windows, where the proxy
-// is unsupported (decision 12): the engines skip the daemon and Airflow stays
-// reachable on its direct localhost port.
-func newProxyDaemon() localshared.ProxyDaemon {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	return proxyDaemon{}
-}
-
-// routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
-// same location v1 uses, honoring the same ASTRO_HOME override — v1 and v2
-// must see each other's routes.
-func routesDir() string {
-	home := os.Getenv("ASTRO_HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir() //nolint:errcheck // falls back to a relative path, matching v1's ASTRO_HOME handling
-	}
-	return filepath.Join(home, ".astro", "proxy")
-}
-
-func (r modeRuntime) Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error) {
-	if p.Mode == "" {
-		// The plan leaves Mode empty when the command asked for no specific
-		// runtime (no --docker); standalone is the default.
-		p.Mode = localrt.ModeStandalone
-	}
-	// One project starts at a time. The lock stops two concurrent starts from
-	// both writing the record, where the loser's dying pid would orphan the
-	// winner's live Airflow; it is held across the liveness check and the
-	// engine's record write so the check-and-write is atomic.
-	unlock, err := localstate.Lock(p.ProjectPath)
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-	if err := r.refuseLiveStart(p); err != nil {
-		return nil, err
-	}
-	if p.Mode == localrt.ModeDocker {
-		return r.docker.Start(ctx, p, cb)
-	}
-	return r.standalone.Start(ctx, p, cb)
-}
-
-// refuseLiveStart refuses to start over a runtime that is already live, so a
-// second start — same mode or a different one — never overwrites the record
-// and orphans the running Airflow. This is the only place a cross-mode
-// collision is caught, since an engine knows only its own mode. A record whose
-// runtime is gone falls through to the engine, which overwrites a stale
-// same-mode record and still refuses a foreign mode.
-func (r modeRuntime) refuseLiveStart(p localrt.Plan) error {
-	rec, err := localstate.Load(p.ProjectPath)
-	if errors.Is(err, localstate.ErrNotRunning) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if r.statusOf(rec).State != localrt.StateRunning {
-		return nil
-	}
-	if rec.Mode != p.Mode {
-		return fmt.Errorf("local Airflow is already running for this project in %s mode; stop it first with `astro local stop`", modeLabel(rec.Mode))
-	}
-	return fmt.Errorf("local Airflow is already running for this project; use `astro local restart` to restart it or `astro local stop` to stop it")
-}
-
-func (r modeRuntime) Attach(projectPath string) (localrt.Airflow, error) {
-	rec, err := localstate.Load(projectPath)
-	if err != nil {
-		return nil, err
-	}
-	if rec.Mode == localrt.ModeDocker {
-		return r.docker.Attach(projectPath)
-	}
-	return r.standalone.Attach(projectPath)
-}
-
-func (r modeRuntime) LogSource(projectPath string) (localrt.Airflow, error) {
-	rec, err := localstate.Load(projectPath)
-	if err == nil {
-		if rec.Mode == localrt.ModeDocker {
-			return r.docker.Attach(projectPath)
-		}
-		return r.standalone.Attach(projectPath)
-	}
-	if errors.Is(err, localstate.ErrNotRunning) {
-		// No record: only standalone leaves a log file behind, so read it
-		// through the standalone engine's detached log handle.
-		return r.standalone.LogHandle(projectPath)
-	}
-	return nil, err
-}
-
-func (r modeRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
-	rec, err := localstate.Load(projectPath)
-	if errors.Is(err, localstate.ErrNotRunning) {
-		return localrt.Status{ProjectPath: projectPath, State: localrt.StateStopped}, nil
-	}
-	if err != nil {
-		return localrt.Status{}, err
-	}
-	if rec.Mode == localrt.ModeDocker {
-		return r.docker.ReadStatus(projectPath)
-	}
-	return r.standalone.ReadStatus(projectPath)
-}
-
-func (r modeRuntime) List() ([]localrt.Status, error) {
-	recs, err := localstate.List()
-	if err != nil {
-		return nil, err
-	}
-	// Join with the live routes: it fills a hostname the record predates, and
-	// the read prunes routes.json through the record-aware predicate, so a
-	// list also heals the file. Best-effort — a missing or unreadable proxy
-	// dir must not hide the records.
-	hostByProject := map[string]string{}
-	if routes, rerr := r.routes.ListRoutes(); rerr == nil {
-		for _, rt := range routes {
-			hostByProject[rt.ProjectDir] = rt.Hostname
-		}
-	}
-	statuses := make([]localrt.Status, 0, len(recs))
-	for i := range recs {
-		st := r.statusOf(recs[i])
-		if st.Hostname == "" {
-			st.Hostname = hostByProject[st.ProjectPath]
-		}
-		statuses = append(statuses, st)
-	}
-	return statuses, nil
-}
-
-// statusOf reports one record's live status through the engine that owns its
-// mode, so liveness is checked the way that mode records it.
-func (r modeRuntime) statusOf(rec localstate.Record) localrt.Status {
-	if rec.Mode == localrt.ModeDocker {
-		return r.docker.StatusOf(rec)
-	}
-	return r.standalone.StatusOf(rec)
-}
-
-func (r modeRuntime) PruneStale() ([]localrt.Status, error) {
-	statuses, err := r.List()
-	if err != nil {
-		return nil, err
-	}
-	var removed []localrt.Status
-	for i := range statuses {
-		st := &statuses[i]
-		if st.State == localrt.StateRunning {
-			continue
-		}
-		// Docker liveness cannot tell "compose gone" from "engine down", so
-		// confirm the containers are really absent before deleting. A blip in
-		// the daemon must not wipe a running project's record. Standalone
-		// liveness is a syscall, so its stopped verdict is trusted as-is.
-		if st.Mode == localrt.ModeDocker {
-			gone, cerr := r.docker.ContainersGone(context.Background(), st.ProjectPath)
-			if cerr != nil || !gone {
-				continue
-			}
-		}
-		// Drop the route first, while the record still backs it, then the
-		// record. Removing an absent record is not an error.
-		if st.Hostname != "" {
-			if _, rerr := r.routes.RemoveRoute(st.Hostname); rerr != nil {
-				return removed, rerr
-			}
-		}
-		if rerr := localstate.Remove(st.ProjectPath); rerr != nil {
-			return removed, rerr
-		}
-		removed = append(removed, *st)
-	}
-	return removed, nil
 }
 
 // skipPreRunAnnotation mirrors internal/telemetry.SkipPreRunAnnotation. It
@@ -370,3 +150,68 @@ func markSkipPreRun(cmd *cobra.Command) {
 
 // errAborted reports a confirmation answered "no".
 var errAborted = errors.New("aborted")
+
+// proxyDaemon adapts airflow/proxy's daemon lifecycle to the engines'
+// localrt.ProxyDaemon seam. It lives at the composition layer because
+// airflow/proxy pulls in config, which the v2 engines must not import; they
+// see only the interface.
+type proxyDaemon struct{}
+
+func (proxyDaemon) EnsureRunning() (string, error) {
+	return proxydaemon.EnsureRunning(proxy.DefaultPort)
+}
+
+func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
+
+// newProxyDaemon returns the daemon seam, or nil on Windows, where the proxy
+// is unsupported (decision 12): the engines skip the daemon and Airflow stays
+// reachable on its direct localhost port.
+func newProxyDaemon() localrt.ProxyDaemon {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	return proxyDaemon{}
+}
+
+// routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
+// same location v1 uses, honoring the same ASTRO_HOME override — v1 and v2
+// must see each other's routes.
+func routesDir() string {
+	home := os.Getenv("ASTRO_HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir() //nolint:errcheck // falls back to a relative path, matching v1's ASTRO_HOME handling
+	}
+	return filepath.Join(home, ".astro", "proxy")
+}
+
+// newRuntime builds the shared local runtime with the CLI's composition: the
+// v1-compatible routes dir, the proxy daemon that shells out to `astro proxy`, and
+// the real image builder.
+func newRuntime() *localrt.Runtime {
+	return localrt.New(localrt.Config{
+		RoutesDir:   routesDir(),
+		ProxyDaemon: newProxyDaemon(),
+		Images:      imageBuilder{},
+	})
+}
+
+// imageBuilder adapts pkg/imagebuild to localrt.ImageBuilder. The seam exists
+// because imagebuild imports the localrt contract, so localrt cannot import it
+// back; this is the field-for-field copy that costs.
+type imageBuilder struct{}
+
+func (imageBuilder) RuntimeImage(airflowVersion string) (string, error) {
+	return imagebuild.RuntimeImage(airflowVersion)
+}
+
+func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb localrt.Callbacks) (string, error) {
+	return imagebuild.New(imagebuild.NewExecCommander(), time.Now).Build(ctx, imagebuild.Request{
+		WorkDir:      req.WorkDir,
+		BaseImage:    req.BaseImage,
+		Tag:          req.Tag,
+		Dependencies: req.Dependencies,
+		Packages:     req.Packages,
+		Bin:          req.Bin,
+		Env:          req.Env,
+	}, cb)
+}

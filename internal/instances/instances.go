@@ -97,7 +97,7 @@ type Instance struct {
 }
 
 // Local is one running local Airflow, as the caller discovered it. It mirrors
-// the fields of a localstate record (internal/localstate) that this package
+// the fields of a runtime state record (pkg/localrt) that this package
 // needs; the caller passes only the ones whose runtime is actually alive,
 // because a leftover record is not an Airflow to talk to. ProjectPath must
 // already be canonical — the caller resolves it, so this package touches no

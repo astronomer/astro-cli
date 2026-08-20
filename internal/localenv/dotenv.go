@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/internal/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 // ErrMultilineValue reports a value with a newline, which a dotenv line
