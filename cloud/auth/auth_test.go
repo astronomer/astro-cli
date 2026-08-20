@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -340,6 +341,29 @@ func TestRequestToken(t *testing.T) {
 	})
 }
 
+func TestAuthorizeError(t *testing.T) {
+	t.Run("a denial that names an unverified email address is a pending sign-up", func(t *testing.T) {
+		err := authorizeError(
+			[]string{"access_denied"},
+			[]string{"Thanks for signing up. Please check your inbox for a verification email to get started."},
+		)
+		assert.ErrorIs(t, err, ErrEmailVerificationPending)
+	})
+
+	t.Run("any other denial keeps the device message", func(t *testing.T) {
+		err := authorizeError([]string{"access_denied"}, []string{"user is blocked"})
+		assert.NotErrorIs(t, err, ErrEmailVerificationPending)
+		assert.Contains(t, err.Error(), "Could not authorize your device")
+		assert.Contains(t, err.Error(), "user is blocked")
+	})
+
+	t.Run("another error code keeps the device message", func(t *testing.T) {
+		err := authorizeError([]string{"invalid_request"}, []string{"please verify your email address"})
+		assert.NotErrorIs(t, err, ErrEmailVerificationPending)
+		assert.Contains(t, err.Error(), "Could not authorize your device")
+	})
+}
+
 func TestAuthorizeCallbackHandler(t *testing.T) {
 	client := httputil.NewHTTPClient()
 	httpClient = client
@@ -405,9 +429,34 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		resp, err := mockAuthenticator.authDeviceLogin(Config{}, false)
+		resp, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
+	})
+
+	t.Run("signup adds the sign-up parameters to the authorize URL", func(t *testing.T) {
+		var authorizeURL string
+		openURL = func(url string) error {
+			authorizeURL = url
+			return nil
+		}
+		callbackHandler := func() (string, error) {
+			return "test-code", nil
+		}
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
+			return Result{}, nil
+		}
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		assert.NoError(t, err)
+		assert.NotContains(t, authorizeURL, "screen_hint=signup")
+		assert.NotContains(t, authorizeURL, "ext-signup-source=cli")
+
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, false, true)
+		assert.NoError(t, err)
+		assert.Contains(t, authorizeURL, "screen_hint=signup")
+		assert.Contains(t, authorizeURL, "ext-signup-source=cli")
 	})
 
 	t.Run("openURL & callback failure", func(t *testing.T) {
@@ -418,7 +467,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -433,7 +482,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -446,7 +495,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return mockResponse, nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		resp, err := mockAuthenticator.authDeviceLogin(Config{}, true)
+		resp, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -456,7 +505,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, true)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -468,8 +517,69 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return Result{}, errMock
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, true)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
 		assert.ErrorIs(t, err, errMock)
+	})
+}
+
+// stubCreateOrganization answers the create-organization call with one status
+// and body, and puts the real client back when the test ends.
+func stubCreateOrganization(t *testing.T, status int, body string) *http.Request {
+	t.Helper()
+	previous := httpClient
+	t.Cleanup(func() { httpClient = previous })
+	seen := &http.Request{}
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		*seen = *req
+		return &http.Response{
+			StatusCode: status,
+			Body:       io.NopCloser(bytes.NewBufferString(body)),
+			Header:     make(http.Header),
+		}
+	})
+	return seen
+}
+
+func TestBootstrapOrganization(t *testing.T) {
+	// The account has nothing else to name the organization after, so the name
+	// comes from the email's local part.
+	for _, tc := range []struct {
+		name    string
+		email   string
+		orgName string
+	}{
+		{"the local part becomes the name", "af2-signup-test@astronomer.test", "af2-signup-test"},
+		{"anything but a letter, a digit or a dash becomes a dash", "user+astro.signup@example.com", "user-astro-signup"},
+		{"leading and trailing dashes come off", "_jane.doe_@astronomer.io", "jane-doe"},
+		{"a name under three characters gets a suffix", "ab@example.com", "ab-org"},
+		{"a name over fifty characters is cut", strings.Repeat("a", 60) + "@astronomer.io", strings.Repeat("a", 50)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			c, err := config.GetCurrentContext()
+			assert.NoError(t, err)
+			assert.NoError(t, c.SetContextKey("user_email", tc.email))
+
+			seen := stubCreateOrganization(t, http.StatusOK, "{}")
+
+			assert.NoError(t, bootstrapOrganization())
+			assert.Equal(t, "/private/v1alpha1/create-organization-and-workspace", seen.URL.Path)
+			sent, err := io.ReadAll(seen.Body)
+			assert.NoError(t, err)
+			assert.JSONEq(t, `{"organization":{"name":"`+tc.orgName+`"},"workspace":{"name":"Default"}}`, string(sent))
+		})
+	}
+
+	t.Run("a refused call reports the status and the body", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.NoError(t, c.SetContextKey("user_email", "jane@astronomer.io"))
+
+		stubCreateOrganization(t, http.StatusForbidden, "not allowed")
+		err = bootstrapOrganization()
+		assert.ErrorContains(t, err, "403")
+		assert.ErrorContains(t, err, "not allowed")
 	})
 }
 
@@ -734,6 +844,103 @@ func TestCheckUserSession(t *testing.T) {
 	}
 }
 
+func TestCheckUserSessionNoOrganization(t *testing.T) {
+	// A zero-organization login is either a brand-new account or someone
+	// waiting on an invite. --signup answers that question up front; without
+	// it the user is asked.
+	orgCreated := func() *astrov1.ListOrganizationsResponse {
+		return &astrov1.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.OrganizationsPaginated{
+				Limit:         1,
+				TotalCount:    1,
+				Organizations: []astrov1.Organization{{Id: "new-org-id", Name: "jane", Product: &mockOrganizationProduct}},
+			},
+		}
+	}
+	noOrgs := func() *astrov1.ListOrganizationsResponse {
+		return &astrov1.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrov1.OrganizationsPaginated{Limit: 1},
+		}
+	}
+	// answer feeds input.Confirm through a stand-in for stdin.
+	answer := func(t *testing.T, text string) {
+		t.Helper()
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.WriteString(text + "\n")
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		t.Cleanup(func() { os.Stdin = stdin })
+		os.Stdin = r
+	}
+	t.Run("signup creates the organization without asking", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		stubCreateOrganization(t, http.StatusOK, "{}")
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(noOrgs(), nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(orgCreated(), nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+
+		ctx := config.Context{Domain: "test-domain"}
+		buf := new(bytes.Buffer)
+		err := checkUserSession(&ctx, mockV1Client, buf, true)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Creating your organization")
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("without signup the user is asked, and yes creates the organization", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		stubCreateOrganization(t, http.StatusOK, "{}")
+		answer(t, "y")
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(noOrgs(), nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(orgCreated(), nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+
+		ctx := config.Context{Domain: "test-domain"}
+		buf := new(bytes.Buffer)
+		err := checkUserSession(&ctx, mockV1Client, buf, false)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Creating your organization")
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("without signup, no leaves the account alone", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		answer(t, "n")
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(noOrgs(), nil).Once()
+
+		ctx := config.Context{Domain: "test-domain"}
+		buf := new(bytes.Buffer)
+		err := checkUserSession(&ctx, mockV1Client, buf, false)
+		assert.ErrorIs(t, err, ErrorNoOrganization)
+		assert.NotContains(t, buf.String(), "Creating your organization")
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("a failed creation stops the login", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		stubCreateOrganization(t, http.StatusForbidden, "not allowed")
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(noOrgs(), nil).Once()
+
+		ctx := config.Context{Domain: "test-domain"}
+		buf := new(bytes.Buffer)
+		err := checkUserSession(&ctx, mockV1Client, buf, true)
+		assert.ErrorContains(t, err, "not allowed")
+		mockV1Client.AssertExpectations(t)
+	})
+}
+
 func TestLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
@@ -757,7 +964,7 @@ func TestLogin(t *testing.T) {
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Login("astronomer.io", "", mockV1Client, os.Stdout, false)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -798,7 +1005,7 @@ func TestLogin(t *testing.T) {
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 
-		err = Login("pr5723.cloud.astronomer-dev.io", "", mockV1Client, os.Stdout, false)
+		err = Login("pr5723.cloud.astronomer-dev.io", "", mockV1Client, os.Stdout, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -825,13 +1032,13 @@ func TestLogin(t *testing.T) {
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 
-		err := Login("astronomer.io", "OAuth Token", mockV1Client, os.Stdout, false)
+		err := Login("astronomer.io", "OAuth Token", mockV1Client, os.Stdout, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("invalid domain", func(t *testing.T) {
-		err := Login("fail.astronomer.io", "", nil, os.Stdout, false)
+		err := Login("fail.astronomer.io", "", nil, os.Stdout, false, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Invalid domain.")
 	})
@@ -841,7 +1048,7 @@ func TestLogin(t *testing.T) {
 			return "", errMock
 		}
 		authenticator = Authenticator{callbackHandler: callbackHandler}
-		err := Login("cloud.astronomer.io", "", nil, os.Stdout, false)
+		err := Login("cloud.astronomer.io", "", nil, os.Stdout, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -864,7 +1071,7 @@ func TestLogin(t *testing.T) {
 
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfErrorResponse, nil).Once()
-		err := Login("", "", mockV1Client, os.Stdout, false)
+		err := Login("", "", mockV1Client, os.Stdout, false, false)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
 		mockV1Client.AssertExpectations(t)
 	})
@@ -896,7 +1103,7 @@ func TestLogin(t *testing.T) {
 		// initialize stdin with user email input
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
 		// do the test
-		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -927,7 +1134,7 @@ func TestLogin(t *testing.T) {
 		}
 		// initialize user input with email
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
-		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true, false)
 		assert.NoError(t, err)
 		// assert that everything got set in the right spot
 		domainContext, err := context.GetContext("astronomer.io")

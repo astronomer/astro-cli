@@ -64,7 +64,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -85,7 +85,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -165,7 +165,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "deployment"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -185,7 +185,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -279,7 +279,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -315,7 +315,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -365,7 +365,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -411,7 +411,7 @@ func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("test check token", func(t *testing.T) {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 		// run checkToken
@@ -420,7 +420,7 @@ func TestCheckToken(t *testing.T) {
 	})
 	t.Run("trigger login when no token is found", func(t *testing.T) {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return errorLogin
 		}
 
@@ -433,7 +433,7 @@ func TestCheckToken(t *testing.T) {
 	})
 	t.Run("does not overwrite the token when refresh fails but relogin succeeds", func(t *testing.T) {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -493,7 +493,7 @@ func TestCheckAPIToken(t *testing.T) {
 	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
 	t.Run("test context switch", func(t *testing.T) {
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -516,7 +516,7 @@ func TestCheckAPIToken(t *testing.T) {
 	})
 
 	t.Run("failed to parse api token", func(t *testing.T) {
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -538,7 +538,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -572,7 +572,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -612,7 +612,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 
@@ -651,7 +651,7 @@ func TestCheckAPIToken(t *testing.T) {
 			},
 		}
 
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 			return nil
 		}
 

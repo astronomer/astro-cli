@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -19,6 +20,7 @@ var (
 	shouldDisplayLoginLink bool
 	token                  string
 	oAuth                  bool
+	signup                 bool
 
 	cloudLogin  = cloudAuth.Login
 	cloudLogout = cloudAuth.Logout
@@ -40,7 +42,22 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// signupVerificationMsg tells the user what an unverified address means. The
+// sign-up worked, so this is not a failure and the command exits zero: a caller
+// that reads a non-zero exit as "try again" would sign up twice.
+const signupVerificationMsg = `Thanks for signing up. Check your inbox for a verification email.
+After you verify your email address, run 'astro login' to finish signing in.`
+
 func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
+	err := runLogin(cmd, args, astroV1Client, out)
+	if errors.Is(err, cloudAuth.ErrEmailVerificationPending) {
+		fmt.Fprintf(out, "\n%s\n", signupVerificationMsg)
+		return nil
+	}
+	return err
+}
+
+func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -54,15 +71,15 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 			}
 			return apcLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
-		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink)
+		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink, signup)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(domainutil.DefaultDomain, token, astroV1Client, out, shouldDisplayLoginLink)
+		return cloudLogin(domainutil.DefaultDomain, token, astroV1Client, out, shouldDisplayLoginLink, signup)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink)
+		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink, signup)
 	}
 	return apcLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }
@@ -118,6 +135,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
 	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
+	cmd.Flags().BoolVar(&signup, "signup", false, "Create a new Astro account instead of signing in to an existing one")
 	return cmd
 }
 

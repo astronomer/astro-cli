@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -25,7 +26,7 @@ func (s *CmdSuite) TestLogin() {
 	cloudDomain := "astronomer.io"
 	apcDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 		s.Equal(cloudDomain, domain)
 		return nil
 	}
@@ -58,6 +59,41 @@ func (s *CmdSuite) TestLogin() {
 	apcDomain = "software.astronomer.io"
 	login(&cobra.Command{}, []string{apcDomain}, nil, buf)
 	s.Contains(buf.String(), "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+}
+
+func (s *CmdSuite) TestLoginSignup() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	s.T().Cleanup(func() { signup = false })
+
+	var got bool
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag bool) error {
+		got = signupFlag
+		return nil
+	}
+	buf := new(bytes.Buffer)
+
+	signup = true
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.True(got)
+
+	signup = false
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.False(got)
+}
+
+// A sign-up that still needs the email address verified worked. Say so and exit
+// zero: a caller that reads a non-zero exit as "try again" would sign up twice.
+func (s *CmdSuite) TestLoginEmailVerificationPending() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag bool) error {
+		return cloudAuth.ErrEmailVerificationPending
+	}
+
+	buf := new(bytes.Buffer)
+	err := login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf)
+	s.NoError(err)
+	s.Contains(buf.String(), "Check your inbox for a verification email")
+	s.Contains(buf.String(), "run 'astro login' to finish signing in")
 }
 
 func (s *CmdSuite) TestLogout() {

@@ -41,7 +41,7 @@ type Result struct {
 
 type CallbackMessage struct {
 	authorizationCode string
-	errorMessage      string
+	err               error
 }
 
 func (res Result) writeToContext(c *config.Context) error {

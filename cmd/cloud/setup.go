@@ -140,7 +140,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", astroV1Client, out, false)
+		err := authLogin(c.Domain, "", astroV1Client, out, false, false)
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", astroV1Client, out, false)
+			err := authLogin(c.Domain, "", astroV1Client, out, false, false)
 			if err != nil {
 				return err
 			}

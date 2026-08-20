@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -41,7 +44,29 @@ var (
 	openURL             = browser.OpenURL
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 	errEmailNotFound    = errors.New("cannot retrieve email")
+
+	// ErrEmailVerificationPending reports a sign-up that worked but left the
+	// email address unverified. The identity provider denies the authorization
+	// with access_denied and puts the real message in error_description, so the
+	// description is the only thing that tells this apart from a real refusal.
+	ErrEmailVerificationPending = errors.New("your account is created but your email address is not verified yet")
 )
+
+// The length the generated organization name is held to: a shorter one gets a
+// suffix, a longer one is cut.
+const (
+	minOrgNameLen = 3
+	maxOrgNameLen = 50
+)
+
+// orgNameForbidden matches every run of characters an organization name cannot
+// hold, so bootstrapOrganization can replace each run with a single dash.
+var orgNameForbidden = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
+
+// signupVerificationPattern matches the denial the identity provider returns
+// while an email address is unverified, for example "Thanks for signing up.
+// Please check your inbox for a verification email to get started."
+var signupVerificationPattern = regexp.MustCompile(`(?i)verif\w*\s+(your\s+)?email`)
 
 var (
 	callbackChannel = make(chan CallbackMessage, 1)
@@ -126,14 +151,23 @@ func requestToken(authConfig Config, verifier, code string) (Result, error) {
 	}, nil
 }
 
+// authorizeError turns the identity provider's error query parameters into an
+// error. A denial that names an unverified email address is a sign-up that
+// worked, so it gets its own error and the caller can say so.
+func authorizeError(errorCode, errorDescription []string) error {
+	if slices.Contains(errorCode, "access_denied") && signupVerificationPattern.MatchString(strings.Join(errorDescription, " ")) {
+		return ErrEmailVerificationPending
+	}
+	return fmt.Errorf("Could not authorize your device. %s: %s", errorCode, errorDescription)
+}
+
 func authorizeCallbackHandler() (string, error) {
 	m := http.NewServeMux()
 	s := http.Server{Addr: callbackServer, Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if errorCode, ok := req.URL.Query()["error"]; ok {
-			callbackChannel <- CallbackMessage{errorMessage: fmt.Sprintf("Could not authorize your device. %s: %s",
-				errorCode, req.URL.Query()["error_description"])}
+			callbackChannel <- CallbackMessage{err: authorizeError(errorCode, req.URL.Query()["error_description"])}
 			resp := &http.Request{}
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/denied", http.StatusFound)
 		} else {
@@ -153,8 +187,8 @@ func authorizeCallbackHandler() (string, error) {
 	for authorizationCode == "" {
 		select {
 		case callbackMessage := <-callbackChannel:
-			if callbackMessage.errorMessage != "" {
-				return "", errors.New(callbackMessage.errorMessage)
+			if callbackMessage.err != nil {
+				return "", callbackMessage.err
 			}
 			authorizationCode = callbackMessage.authorizationCode
 		case <-time.After(callbackTimeout):
@@ -174,7 +208,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink bool) (Result, error) {
+func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink, signup bool) (Result, error) {
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:mnd // the value is clear from context
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // reviewed; not a new risk in this v1 code
@@ -196,6 +230,13 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	)
 
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
+
+	if signup {
+		// screen_hint routes the universal login to its sign-up screen;
+		// ext-signup-source tags the account the way the web flow's
+		// ext-* params do, so the funnel can tell CLI signups apart.
+		authorizeURL += "&screen_hint=signup&ext-signup-source=cli"
+	}
 
 	// open browser
 	if !shouldDisplayLoginLink {
@@ -233,6 +274,60 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	}
 
 	return res, nil
+}
+
+// bootstrapOrganization creates a brand-new account's first organization and
+// workspace, the same call the web onboarding makes. The org name comes from
+// the email's local part; nothing else about the account exists yet to name
+// it after.
+func bootstrapOrganization() error {
+	// The caller's context is stale: writeToContext persists through
+	// SetContextKey, which writes the config file and never the struct. Read
+	// the context back so the token is the one this login just minted.
+	c, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	localPart, _, _ := strings.Cut(c.UserEmail, "@")
+	orgName := strings.Trim(orgNameForbidden.ReplaceAllString(localPart, "-"), "-")
+	if len(orgName) < minOrgNameLen {
+		orgName += "-org"
+	}
+	if len(orgName) > maxOrgNameLen {
+		orgName = orgName[:maxOrgNameLen]
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"organization": map[string]any{"name": orgName},
+		"workspace":    map[string]any{"name": "Default"},
+	})
+	if err != nil {
+		return err
+	}
+	addr := domainutil.GetURLToEndpoint("https", c.Domain, "private/v1alpha1/create-organization-and-workspace")
+	doOptions := &httputil.DoOptions{
+		Context: http_context.Background(),
+		Headers: map[string]string{
+			"Content-Type":              "application/json",
+			"Authorization":             c.Token,
+			"X-Astro-Client-Identifier": "cli",
+		},
+		Path:   addr,
+		Method: http.MethodPost,
+		Data:   body,
+	}
+	res, err := httpClient.Do(doOptions)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	// httputil.Do already turns 4xx and 5xx into an error. A create call may
+	// answer 201, so accept every 2xx and reject the rest.
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		out, _ := io.ReadAll(res.Body) //nolint:errcheck // the status line already names the failure; the body is best-effort detail
+		return fmt.Errorf("creating your organization failed (HTTP %d): %s", res.StatusCode, string(out))
+	}
+	return nil
 }
 
 // resolveActiveOrg returns the org the current context points at. When a context
@@ -293,8 +388,14 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astrov1.Workspace
 	return astrov1.Workspace{}, false, nil
 }
 
-// check client status after a successfully login
+// CheckUserSession checks the client status after a successful login. Callers
+// outside a fresh login reuse it, and none of them sign up, so it answers the
+// zero-organization question by asking the user.
 func CheckUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io.Writer) error {
+	return checkUserSession(c, astroV1Client, out, false)
+}
+
+func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io.Writer, signup bool) error {
 	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
@@ -309,6 +410,24 @@ func CheckUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		return err
 	}
 	activeOrg, err := resolveActiveOrg(c, astroV1Client)
+	if errors.Is(err, ErrorNoOrganization) {
+		// A zero-org login is either a brand-new account (create its first
+		// org) or someone waiting on an invite (creating would burn their
+		// one trial-org slot) — only they know which, so ask. --signup
+		// preselects yes; it already declared the intent.
+		create := signup
+		if !create {
+			create, _ = input.Confirm("No organization found. Create your own free organization now") //nolint:errcheck // a read error answers no, same as declining
+		}
+		if !create {
+			return err
+		}
+		fmt.Fprintln(out, "Creating your organization…")
+		if bootstrapErr := bootstrapOrganization(); bootstrapErr != nil {
+			return bootstrapErr
+		}
+		activeOrg, err = resolveActiveOrg(c, astroV1Client)
+	}
 	if err != nil {
 		return err
 	}
@@ -359,7 +478,7 @@ func CheckUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -373,7 +492,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 
 	if token == "" {
-		res, err = authenticator.authDeviceLogin(authConfig, shouldDisplayLoginLink)
+		res, err = authenticator.authDeviceLogin(authConfig, shouldDisplayLoginLink, signup)
 		if err != nil {
 			return err
 		}
@@ -413,7 +532,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 
 	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
 
-	err = CheckUserSession(&c, astroV1Client, out)
+	err = checkUserSession(&c, astroV1Client, out, signup)
 	if err != nil {
 		return err
 	}
