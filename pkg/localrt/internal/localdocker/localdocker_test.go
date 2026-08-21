@@ -636,3 +636,94 @@ func TestContainersGone(t *testing.T) {
 		assert.False(t, gone)
 	})
 }
+
+// dockerfilePlan is a project that declared its own Dockerfile: the manifest's
+// dependency fields are still populated, because a manifest carries them
+// whichever tier it chose, and the engine has to hand them over untouched
+// rather than act on them.
+func dockerfilePlan(t *testing.T) rt.Plan {
+	t.Helper()
+	p := testPlan(t)
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
+		[]byte("FROM my-own-base\nRUN echo hi\n"), 0o600))
+	p.Dockerfile = "Dockerfile"
+	p.Dependencies = []string{"pandas"}
+	p.Packages = []string{"libaio"}
+	return p
+}
+
+func TestStartWithProjectDockerfileBuildsThatFile(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+	p := dockerfilePlan(t)
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	require.Len(t, images.requests, 1)
+	req := images.requests[0]
+	assert.Equal(t, filepath.Join(p.ProjectPath, "Dockerfile"), req.Dockerfile,
+		"the engine must resolve the plan's project-relative path")
+	assert.Equal(t, p.ProjectPath, req.Context,
+		"a multi-stage build COPYs from the repo, so the project is the context")
+	assert.Empty(t, req.BaseImage, "the project's own FROM decides the base")
+}
+
+// Resolving a base image we would discard turns a working start into a
+// dependency on the version service, which is exactly what an air-gapped or
+// offline Dockerfile project should not need.
+func TestStartWithProjectDockerfileSkipsBaseImageResolution(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+
+	_, err := e.Start(context.Background(), dockerfilePlan(t), rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Zero(t, images.runtimeImageCalls, "Dockerfile mode must not resolve a runtime image")
+}
+
+// The generated path is unchanged: it still resolves a base and still gets the
+// manifest's dependencies.
+func TestStartWithoutProjectDockerfileStillResolvesBase(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+	p := testPlan(t)
+	p.Dependencies = []string{"pandas"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, images.runtimeImageCalls)
+	require.Len(t, images.requests, 1)
+	req := images.requests[0]
+	assert.Empty(t, req.Dockerfile)
+	assert.Empty(t, req.Context)
+	assert.Equal(t, images.base, req.BaseImage)
+	assert.Equal(t, []string{"pandas"}, req.Dependencies)
+}
+
+// AirflowVersion still has to be honored with a Dockerfile, because the compose
+// service set depends on the generation and a user's Dockerfile cannot be read
+// for it. An Airflow 2 project is the case that would break: it has no
+// dag-processor, and declaring one fails the whole compose merge.
+func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := dockerfilePlan(t)
+	p.AirflowVersion = "2.10.5"
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.NotContains(t, string(compose), "dag-processor",
+		"Airflow 2 has no dag-processor service")
+}

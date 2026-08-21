@@ -4,6 +4,13 @@
 // on the runtime image's ONBUILD triggers to install the project's
 // dependencies and OS packages — the same path `astro dev` builds through.
 //
+// A project may instead declare its own Dockerfile in the manifest, which the
+// project design calls tier 3: the escape hatch for multi-stage builds and
+// anything else a manifest cannot express, at the stated cost of portability.
+// Request.Dockerfile switches to that mode, where the file is the build and
+// nothing here is generated. Both modes are supported; neither is a ramp off
+// the other.
+//
 // It was lifted out of internal/localdocker so the v2 deploy path can build the
 // same image the local Docker engine builds (docs/v2-deploy.md, decision 7 and
 // section 1). Its inputs are manifest-shaped — Python dependencies, OS packages,
@@ -93,11 +100,31 @@ const filePermRW = 0o600
 
 type Request struct {
 	// WorkDir is the directory the build context and Dockerfile are written
-	// under; the caller owns its location and lifetime.
+	// under; the caller owns its location and lifetime. Unused in Dockerfile
+	// mode, which writes nothing.
 	WorkDir string
 	// BaseImage is the resolved runtime image the build starts FROM
-	// (astrocrpublic.azurecr.io/runtime:<version>).
+	// (astrocrpublic.azurecr.io/runtime:<version>). Empty in Dockerfile mode:
+	// the project's own file declares what it builds on.
 	BaseImage string
+	// Dockerfile and Context switch this into Dockerfile mode — the project
+	// supplied a real Dockerfile ("tier 3" in the project design) and it, not
+	// the manifest, is the build. Both are absolute, and set together.
+	//
+	// The two modes share little. This one writes no requirements.txt or
+	// packages.txt, because the file owns its own installs; it takes its FROM
+	// from the file rather than BaseImage; and it builds the PROJECT as its
+	// context, because a multi-stage build COPYs from the repo. That last part
+	// is also why the generated mode cannot just add the project to its
+	// context: that context is synthetic and deliberately tiny, and the runtime
+	// image's ONBUILD `COPY . .` would otherwise bake the whole repo into the
+	// dependency layer.
+	//
+	// Dependencies and Packages are ignored here rather than rejected. A caller
+	// reading a v2 manifest has them populated whichever tier the project
+	// chose, and a Dockerfile project installs its own.
+	Dockerfile string
+	Context    string
 	// Tag is the image reference the build produces.
 	Tag string
 	// Dependencies are the manifest's Python dependencies (PEP 508);
@@ -141,13 +168,25 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 	return cmd.Run()
 }
 
-// Build installs the request's dependencies and OS packages into a layer over
-// its base image through the runtime image's ONBUILD triggers, and returns the
-// image to run. With nothing to install it builds nothing and returns the base
-// image unchanged (the fast path). Build output streams to cb.OnLine
-// (component "build"); a failed install returns a named error, never a hang.
-
+// Build produces the image to run and returns its reference.
+//
+// Two modes. With req.Dockerfile set the project's own file is the build, and it
+// is run as-is against the project as context (see the field's doc for why they
+// share so little). Otherwise the request's dependencies and OS packages are
+// installed into a layer over its base image through the runtime image's ONBUILD
+// triggers, and with nothing to install it builds nothing and returns the base
+// image unchanged (the fast path).
+//
+// Build output streams to cb.OnLine (component "build"); a failed build returns
+// a named error, never a hang.
 func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (string, error) {
+	if req.Dockerfile != "" {
+		// No fast path here. An unchanged Dockerfile is the daemon's layer cache
+		// to short-circuit, not ours to skip: we cannot tell from the outside
+		// whether the file's own steps would produce something new.
+		return b.build(ctx, req, req.Dockerfile, req.Context, cb)
+	}
+
 	deps := runtimeDeps(req.Dependencies)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is.
@@ -180,6 +219,18 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
+	if _, err := b.build(ctx, req, dfPath, contextDir, cb); err != nil {
+		return "", err
+	}
+	return req.Tag, nil
+}
+
+// build runs the container build for a resolved Dockerfile and context, and is
+// the one place either mode shells out. Both want the same tag, the same
+// platform rule, the same streaming, and the same "--pull"; only the file and
+// the context differ, so keeping one call site is what stops the two modes
+// drifting on flags.
+func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir string, cb rt.Callbacks) (string, error) {
 	w := &rt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(rt.LogLine{Component: "build", Time: b.now(), Text: line})
@@ -189,7 +240,7 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 	// the install layer when the requirements file is unchanged. A pinned
 	// platform (deploy wants linux/amd64) is added only when set, so the
 	// host-platform local build keeps its exact command.
-	args := []string{"build", "--tag", req.Tag, "--file", dfPath, "--pull"}
+	args := []string{"build", "--tag", req.Tag, "--file", dockerfile, "--pull"}
 	if req.Platform != "" {
 		args = append(args, "--platform", req.Platform)
 	}
@@ -197,6 +248,11 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 	err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: w, Err: w}, req.Bin, args...)
 	w.Flush()
 	if err != nil {
+		// The two modes fail for different reasons and a user reading this has
+		// to know which file to open: ours, or theirs.
+		if req.Dockerfile != "" {
+			return "", fmt.Errorf("building the project's Dockerfile failed; see the build output above: %w", err)
+		}
 		return "", fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)
 	}
 	return req.Tag, nil

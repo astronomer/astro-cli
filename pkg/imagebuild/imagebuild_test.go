@@ -232,3 +232,96 @@ func TestRuntimeDepsDropsAirflowOnly(t *testing.T) {
 		"requests>=2",
 	}, got)
 }
+
+// dockerfileRequest is a tier-3 build: the project supplied its own Dockerfile,
+// so the file and the project context replace the generated pair. Dependencies
+// are set deliberately — a manifest carries them whichever tier it chose, and
+// this mode has to ignore them rather than act on them.
+func dockerfileRequest(t *testing.T) Request {
+	t.Helper()
+	project := t.TempDir()
+	df := filepath.Join(project, "Dockerfile")
+	require.NoError(t, os.WriteFile(df, []byte("FROM my-own-base\nRUN echo hi\n"), 0o600))
+	return Request{
+		WorkDir:      t.TempDir(),
+		Dockerfile:   df,
+		Context:      project,
+		Tag:          "astro-local/my-project",
+		Bin:          "docker",
+		Dependencies: []string{"pandas"},
+		Packages:     []string{"libaio"},
+	}
+}
+
+func TestBuildDockerfileModeUsesTheProjectFileAndContext(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := dockerfileRequest(t)
+
+	got, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, req.Tag, got)
+	assert.True(t, hasCall(cmd.calls, "--file "+req.Dockerfile),
+		"expected the project's Dockerfile, got %v", cmd.calls)
+	assert.True(t, hasCall(cmd.calls, req.Context),
+		"expected the project as build context, got %v", cmd.calls)
+}
+
+// The generated files are how the runtime image's ONBUILD triggers install, and
+// a Dockerfile project installs its own way. Writing them anyway would put a
+// requirements.txt into the user's build context that their own COPY could pick
+// up.
+func TestBuildDockerfileModeWritesNothing(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := dockerfileRequest(t)
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+
+	for _, name := range []string{requirementsName, packagesName, dockerfileName} {
+		_, err := os.Stat(filepath.Join(req.WorkDir, name))
+		assert.True(t, os.IsNotExist(err), "%s must not be generated in Dockerfile mode", name)
+		_, err = os.Stat(filepath.Join(req.WorkDir, buildContextDir, name))
+		assert.True(t, os.IsNotExist(err), "%s must not be generated in Dockerfile mode", name)
+	}
+	// And nothing was written into the project itself: a compiler does not
+	// mutate its source.
+	entries, err := os.ReadDir(req.Context)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "Dockerfile mode wrote into the project: %v", entries)
+}
+
+// The no-op fast path is keyed on having nothing to install, which is never true
+// of a file whose steps we cannot read.
+func TestBuildDockerfileModeBuildsEvenWithNoDependencies(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := dockerfileRequest(t)
+	req.Dependencies = nil
+	req.Packages = nil
+
+	got, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, req.Tag, got)
+	assert.True(t, hasCall(cmd.calls, "build"), "expected a build, got %v", cmd.calls)
+}
+
+// A failure has to name whose file broke, because the two modes send the reader
+// to different places.
+func TestBuildDockerfileModeFailureNamesTheProjectFile(t *testing.T) {
+	cmd := &fakeCmd{run: func(string, rt.Stdio) error { return errors.New("exit status 1") }}
+
+	_, err := testBuilder(cmd).Build(context.Background(), dockerfileRequest(t), rt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "building the project's Dockerfile failed")
+	assert.NotContains(t, err.Error(), "installing the project's dependencies")
+}
+
+func TestBuildDockerfileModeStillPinsPlatform(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := dockerfileRequest(t)
+	req.Platform = "linux/amd64"
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.True(t, hasCall(cmd.calls, "--platform linux/amd64"),
+		"a deploy build pins the platform in either mode, got %v", cmd.calls)
+}

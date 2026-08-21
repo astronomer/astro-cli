@@ -17,6 +17,10 @@ type stubImages struct {
 	built        string
 	err          error
 	requests     []rt.BuildRequest
+	// runtimeImageCalls counts base-image resolutions. A Dockerfile project must
+	// not cause one, and the count is the only way to see a lookup the engine
+	// should have skipped, since its result would be discarded either way.
+	runtimeImageCalls int
 }
 
 func newStubImages() *stubImages {
@@ -34,6 +38,7 @@ func newStubImages() *stubImages {
 // the 2.7 floor, and the version-service lookup an Airflow 2 pin needs — belong
 // to pkg/imagebuild and are tested there.
 func (s *stubImages) RuntimeImage(_ context.Context, airflowVersion string) (string, error) {
+	s.runtimeImageCalls++
 	switch {
 	case strings.HasPrefix(airflowVersion, "3"):
 		return s.base, nil
@@ -51,6 +56,11 @@ func (s *stubImages) Build(_ context.Context, req rt.BuildRequest, _ rt.Callback
 	}
 	if s.built != "" {
 		return s.built, nil
+	}
+	// Matches the real builder's Dockerfile mode: the file is the build, so
+	// there is no no-op case to take even with nothing declared to install.
+	if req.Dockerfile != "" {
+		return req.Tag, nil
 	}
 	// Matches the real builder's no-op case: nothing to install, so the base
 	// image is what runs.

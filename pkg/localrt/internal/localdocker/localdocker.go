@@ -127,12 +127,20 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if e.images == nil {
 		return nil, errors.New("docker mode needs an image builder: set Images on localrt.Config")
 	}
-	// The resolution takes a context because an Airflow 2 base image is a
-	// lookup against the version service, not a tag built from the pin. It also
-	// validates the generation, which everything below reads off the plan.
-	image, err := e.images.RuntimeImage(ctx, p.AirflowVersion)
-	if err != nil {
-		return nil, err
+	// Resolve the base image only for a generated build. A project that declared
+	// its own Dockerfile has already said what it builds on, and asking the
+	// version service for a base we would not use turns a working start into a
+	// network dependency.
+	var image string
+	if p.Dockerfile == "" {
+		// The resolution takes a context because an Airflow 2 base image is a
+		// lookup against the version service, not a tag built from the pin. It
+		// also validates the generation, which everything below reads off the
+		// plan.
+		var err error
+		if image, err = e.images.RuntimeImage(ctx, p.AirflowVersion); err != nil {
+			return nil, err
+		}
 	}
 	major := airflowMajor(p.AirflowVersion)
 	hostname, err := localshared.PlanHostname(p, projectPath)
@@ -166,11 +174,13 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if err != nil {
 		return nil, err
 	}
-	// Install the project's dependencies and OS packages into a layer over the
-	// runtime image so docker mode matches standalone. The builder drops
-	// apache-airflow (the base image already provides it) and, with nothing
-	// else to install, builds nothing and hands back the runtime image as-is.
-	image, err = e.images.Build(ctx, rt.BuildRequest{
+	// Build the image the services run. With a project Dockerfile that file is
+	// the build, run against the project as its context. Otherwise install the
+	// project's dependencies and OS packages into a layer over the runtime image
+	// so docker mode matches standalone: the builder drops apache-airflow (the
+	// base image already provides it) and, with nothing else to install, builds
+	// nothing and hands back the runtime image as-is.
+	build := rt.BuildRequest{
 		WorkDir:      stateDir,
 		BaseImage:    image,
 		Tag:          builtImageTag(name),
@@ -178,8 +188,12 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		Packages:     p.Packages,
 		Bin:          conn.bin,
 		Env:          conn.env,
-	}, cb)
-	if err != nil {
+	}
+	if p.Dockerfile != "" {
+		build.Dockerfile = filepath.Join(projectPath, p.Dockerfile)
+		build.Context = projectPath
+	}
+	if image, err = e.images.Build(ctx, build, cb); err != nil {
 		return nil, err
 	}
 

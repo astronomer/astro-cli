@@ -33,8 +33,15 @@ type ImageBuilder interface {
 type BuildRequest struct {
 	// WorkDir is where the build context and Dockerfile are written.
 	WorkDir string
-	// BaseImage is the resolved runtime image the build starts FROM.
+	// BaseImage is the resolved runtime image the build starts FROM. Empty when
+	// Dockerfile is set — that file declares its own FROM.
 	BaseImage string
+	// Dockerfile and Context ask the builder to run the project's own Dockerfile
+	// rather than generate one, for a project whose manifest declared it. Both
+	// absolute, set together, and both empty for a generated build. Dependencies
+	// and Packages are then that file's business rather than the runtime's.
+	Dockerfile string
+	Context    string
 	// Tag is the image reference the build produces.
 	Tag string
 	// Dependencies are the manifest's Python dependencies (PEP 508).

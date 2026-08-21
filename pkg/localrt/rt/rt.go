@@ -59,6 +59,23 @@ type Plan struct {
 	// image through the ONBUILD packages.txt step; standalone mode has no
 	// image and cannot honor them, so it is warned about them at start.
 	Packages []string
+	// Dockerfile is a project-relative path to the project's own Dockerfile,
+	// set when the manifest declared one ("tier 3" in the project design: the
+	// escape hatch for multi-stage builds and anything else a manifest cannot
+	// express). Docker mode then runs that file as the build, and
+	// AirflowVersion, Dependencies, and Packages stop describing the image —
+	// the file does. Empty means the image is generated from the manifest,
+	// which is the common case.
+	//
+	// Standalone mode ignores it: there is no image, so a project pinned to a
+	// Dockerfile has nothing standalone can honor.
+	//
+	// AirflowVersion is still required with this set. It does not pick the
+	// image any more, but the runtime needs the generation to decide the
+	// compose service set (Airflow 2 has no dag-processor) and the env it
+	// writes, and reading that back out of a user's Dockerfile would be a
+	// guess.
+	Dockerfile string
 	// StopWithSession ties Airflow's lifetime to the process that starts
 	// it: true means Airflow is killed when that process exits; false (the
 	// default) means Airflow keeps running and any tool can reconnect to
