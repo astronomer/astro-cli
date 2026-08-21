@@ -210,6 +210,13 @@ jobs:
           restore-keys: |
             release-go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}-
 
+      - name: Stamp the installer so the snapshot matches a real release
+        env:
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          set -e
+          sed "s/^LATEST_VERSION=.*/LATEST_VERSION=${TAG}/" godownloader.sh > install.sh
+
       - name: Build release artifacts without publishing
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
