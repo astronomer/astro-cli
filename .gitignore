@@ -19,6 +19,8 @@ coverage-2.txt
 coverage.txt
 dist/
 hello-astro/
+# generated at release time from godownloader.sh, uploaded as a release asset
+install.sh
 meta/
 packages.txt
 requirements.txt

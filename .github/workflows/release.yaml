@@ -92,6 +92,19 @@ jobs:
           scope: astronomer
           identity: astro-cli-homebrew
 
+      - name: Stamp the installer with this release's version
+        env:
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          set -e
+          sed "s/^LATEST_VERSION=.*/LATEST_VERSION=${TAG}/" godownloader.sh > install.sh
+          chmod +x install.sh
+          if ! grep -qx "LATEST_VERSION=${TAG}" install.sh; then
+            echo "::error::install.sh was not stamped with ${TAG}. Did the constant in godownloader.sh get renamed?"
+            exit 1
+          fi
+          echo "Stamped install.sh with ${TAG}"
+
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: v2.15.2
@@ -102,6 +115,9 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.prev-tag.outputs.tag }}
 
+  # install.astronomer.io fetches godownloader.sh from main, so this job keeps
+  # that path current. Pinned installs use the install.sh release asset instead,
+  # which carries its own version and does not depend on the PR this job opens.
   update-godownloader:
     needs: [detect, release]
     if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
