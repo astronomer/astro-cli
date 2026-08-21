@@ -24,6 +24,21 @@ type fakeCmd struct {
 	calls  []string
 	output func(call string) ([]byte, error)
 	run    func(call string, s rt.Stdio) error
+	// env records the environment each Run was given, keyed by the call string.
+	// Without it the environment argument was dropped on the floor, which left
+	// the one thing that makes SecretEnv work — the values reaching the up, and
+	// not reaching anything else — with no coverage at all.
+	env map[string][]string
+}
+
+// envFor returns the environment recorded for the first call containing substr.
+func (f *fakeCmd) envFor(substr string) ([]string, bool) {
+	for call, env := range f.env {
+		if strings.Contains(call, substr) {
+			return env, true
+		}
+	}
+	return nil, false
 }
 
 func (f *fakeCmd) Output(_ context.Context, _ []string, name string, args ...string) ([]byte, error) {
@@ -35,9 +50,13 @@ func (f *fakeCmd) Output(_ context.Context, _ []string, name string, args ...str
 	return f.output(call)
 }
 
-func (f *fakeCmd) Run(_ context.Context, _ []string, s rt.Stdio, name string, args ...string) error {
+func (f *fakeCmd) Run(_ context.Context, env []string, s rt.Stdio, name string, args ...string) error {
 	call := name + " " + strings.Join(args, " ")
 	f.calls = append(f.calls, call)
+	if f.env == nil {
+		f.env = map[string][]string{}
+	}
+	f.env[call] = env
 	if f.run == nil {
 		return nil
 	}
@@ -726,4 +745,74 @@ func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(compose), "dag-processor",
 		"Airflow 2 has no dag-processor service")
+}
+
+// --- SecretEnv reaches the containers, and nothing else ---
+
+// The helpers are unit-tested in compose_test.go; this is the wiring that makes
+// them matter. Delete the extraEnv line in Start and every one of those tests
+// still passes while no secret ever reaches a container, which is why this asserts
+// on the engine rather than the helpers.
+func TestStartHandsSecretValuesToTheComposeUp(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	env, ok := cmd.envFor("compose")
+	require.True(t, ok, "no compose call was recorded")
+	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db",
+		"the up must carry the values for the declarations the file makes, or the variable is declared and never resolved")
+}
+
+// The engine connection has to win a collision, because os/exec keeps the last
+// duplicate and a compose command talking to the wrong daemon is unrecoverable
+// from a UI — where a secret that loses simply does not reach the container.
+func TestStartLetsTheEngineConnectionWinOverSecretEnv(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	e.preferred = func() (engineConn, error) {
+		return engineConn{bin: "docker", env: []string{"DOCKER_HOST=unix:///real.sock"}}, nil
+	}
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"DOCKER_HOST": "unix:///attacker.sock"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	env, ok := cmd.envFor("compose")
+	require.True(t, ok)
+	var lastHost string
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "DOCKER_HOST=") {
+			lastHost = kv // os/exec resolves duplicates to the last one
+		}
+	}
+	assert.Equal(t, "DOCKER_HOST=unix:///real.sock", lastHost,
+		"a plan must not be able to retarget the compose invocation itself")
+}
+
+// Stop runs with no --file, so it never reads the declarations and has no reason
+// to carry the values. Handing them over anyway would widen where they travel for
+// nothing.
+func TestStopDoesNotCarrySecretValues(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+
+	af, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	cmd.env = nil // forget the start
+	require.NoError(t, af.Stop(context.Background(), rt.StopOptions{}))
+
+	for call, env := range cmd.env {
+		for _, kv := range env {
+			assert.NotContains(t, kv, "pw@h",
+				"a secret value reached %q, which does not read the file that declares it", call)
+		}
+	}
 }

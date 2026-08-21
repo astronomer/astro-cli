@@ -197,7 +197,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, err
 	}
 
-	env := airflowEnv(name, webPort, major, p.Env)
+	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName:   name,
 		Image:         image,
@@ -205,7 +205,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		WebPort:       webPort,
 		PostgresPort:  pgPort,
 		Env:           env,
-		PassEnv:       passEnv(p.PassthroughEnv, env),
+		PassEnv:       passEnv(p.PassthroughEnv, p.SecretEnv, env),
 		Mounts:        projectMounts(projectPath),
 		DBCommand:     dbCommand(major),
 		Services:      airflowServices(major),
@@ -214,7 +214,17 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, err
 	}
 
-	up := composeLine{conn: conn, file: composePath, name: name, projectDir: projectPath}
+	// The values for the declarations passEnv wrote. Only on the up: it is the one
+	// command that creates containers, and compose bakes the resolved value in at
+	// creation. Stop and down are run with no --file, so they never read the
+	// declarations at all — see passEnv.
+	up := composeLine{
+		conn:       conn,
+		file:       composePath,
+		name:       name,
+		projectDir: projectPath,
+		extraEnv:   secretEnviron(p.SecretEnv),
+	}
 	if err := e.runCompose(ctx, up, cb, "up", "--detach", "--quiet-pull"); err != nil {
 		return nil, fmt.Errorf("starting project containers: %w", err)
 	}
@@ -491,6 +501,10 @@ type composeLine struct {
 	file       string
 	name       string
 	projectDir string
+	// extraEnv is added to the compose process environment on top of the engine
+	// connection's own. It carries SecretEnv values, which the file declares
+	// without recording — see passEnv.
+	extraEnv []string
 }
 
 // runCompose runs one compose command, forwarding its output line by line
@@ -509,7 +523,24 @@ func (e *Engine) runCompose(ctx context.Context, l composeLine, cb rt.Callbacks,
 			cb.OnLine(rt.LogLine{Component: "compose", Time: e.now(), Text: line})
 		}
 	}}
-	err := e.cmd.Run(ctx, l.conn.env, rt.Stdio{Out: w, Err: w}, l.conn.bin, full...)
+	// A fresh slice rather than append onto conn.env: that slice is shared with
+	// every other compose line built from the same engine connection, and
+	// appending into spare capacity would leak one project's secrets into the
+	// next command that reused it.
+	//
+	// The connection goes LAST, and that ordering is load-bearing. os/exec keeps
+	// the last duplicate of a key, so anything in extraEnv that collides with
+	// DOCKER_HOST, CONTAINER_HOST or DOCKER_CONFIG would otherwise retarget this
+	// very compose invocation — a project's Airflow env is caller-supplied and can
+	// name anything, so a plan carrying DOCKER_HOST for a DockerOperator DAG would
+	// silently point the start at a different daemon while Stop, which uses
+	// conn.env untouched, still looked at the right one. A secret that loses to
+	// the engine connection simply does not reach the container; a compose command
+	// talking to the wrong daemon is unrecoverable from the UI.
+	cmdEnv := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
+	cmdEnv = append(cmdEnv, l.extraEnv...)
+	cmdEnv = append(cmdEnv, l.conn.env...)
+	err := e.cmd.Run(ctx, cmdEnv, rt.Stdio{Out: w, Err: w}, l.conn.bin, full...)
 	w.Flush()
 	return err
 }

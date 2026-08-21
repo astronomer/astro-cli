@@ -82,7 +82,9 @@ type Plan struct {
 	// it later. Persisted in the state record so other tools can see which
 	// way a running Airflow was started.
 	StopWithSession bool
-	// Env is the fully layered process environment for Airflow.
+	// Env is the fully layered process environment for Airflow. Docker mode writes
+	// these into its compose file; see SecretEnv for values that must not be
+	// written anywhere.
 	Env map[string]string
 	// PassthroughEnv names env vars satisfied only by the calling shell's
 	// environment. It never carries values, so engines that persist their
@@ -90,6 +92,37 @@ type Plan struct {
 	// runtime without writing the values to disk. Standalone mode ignores
 	// it: the Airflow process inherits the shell environment directly.
 	PassthroughEnv []string
+	// SecretEnv is environment the consumer does not want written into the
+	// runtime's own configuration. Same delivery as Env, different persistence:
+	// docker mode declares these keys in its compose file with no value and
+	// supplies the values to the compose process itself, so the file records that
+	// the variable exists and never what it holds.
+	//
+	// Be precise about what that buys, because it is narrower than "never written
+	// anywhere" and a consumer sizing a threat model off the wrong sentence will
+	// get it wrong. The compose file is protected, and it is the artifact that
+	// outlives the containers — it sits in the state directory until a --clean
+	// stop removes it. The container is not: compose resolves the declarations at
+	// creation and the daemon persists the result into the container's own config,
+	// where `docker inspect` reads it back for as long as the container exists.
+	// The property delivered is "not in our file, and gone when the containers
+	// are gone".
+	//
+	// The distinction is not stylistic. Env is written into a compose file that
+	// outlives the containers, and a consumer whose values come from a keyring —
+	// Astro Desktop's connection and variable vault — would otherwise decrypt
+	// secrets onto disk as a side effect of starting Airflow, in a file nothing
+	// cleans up until a --clean stop.
+	//
+	// PassthroughEnv does not solve this: it carries no values at all, so it can
+	// only describe variables the runtime's own environment already holds. A
+	// consumer holding values it must not persist needs to hand them over, which
+	// is what this field is for.
+	//
+	// A key in both Env and SecretEnv is treated as secret — the safer reading of
+	// a caller that contradicts itself. Standalone mode makes no distinction: it
+	// has no file, so both maps go to the process and neither is persisted.
+	SecretEnv map[string]string
 	// Hostname is the display hostname for this project, computed by the
 	// caller (e.g. from pkg/proxy's derivation). localrt persists it into
 	// the state record and reports it in Status; it is a label, never an

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func goldenInputFor(major, image string) composeInput {
 		Env: airflowEnv("astro-demo-abc123", 8081, major, map[string]string{
 			"AIRFLOW__CORE__LOAD_EXAMPLES": "True", // user override wins
 			"MY_SECRET":                    "it's quoted",
-		}),
+		}, nil),
 		PassEnv: []string{"SHELL_ONLY_TOKEN"},
 		Mounts: []mount{
 			{Host: "/home/me/demo/dags", Container: "/usr/local/airflow/dags"},
@@ -182,7 +183,7 @@ func TestGenerateComposePassEnv(t *testing.T) {
 // key would be invalid, and the on-disk value already reaches the container.
 func TestPassEnvDedupes(t *testing.T) {
 	env := []envVar{{Name: "MY_SECRET", Value: "'x'"}}
-	got := passEnv([]string{"MY_SECRET", "ZED", "ALPHA"}, env)
+	got := passEnv([]string{"MY_SECRET", "ZED", "ALPHA"}, nil, env)
 	assert.Equal(t, []string{"ALPHA", "ZED"}, got)
 }
 
@@ -221,4 +222,87 @@ func TestProjectMounts(t *testing.T) {
 		{Host: filepath.Join(project, "dags"), Container: "/usr/local/airflow/dags"},
 		{Host: filepath.Join(project, "tests"), Container: "/usr/local/airflow/tests"},
 	}, got)
+}
+
+// --- SecretEnv: declared in the file, never recorded in it ---
+
+// The property the field exists for, across both halves that produce it: a
+// consumer whose values come from a keyring must be able to deliver them without
+// decrypting secrets onto disk as a side effect of starting Airflow. Absent from
+// what the file records, present in what it declares.
+//
+// Deliberately asserts both halves rather than just the absence. Absence alone
+// passes trivially — airflowEnv never had the key to begin with, since it builds
+// from planEnv — so a test that only checked the file would still pass with the
+// declaration broken, and the variable would silently never reach the container.
+// The withholding logic in airflowEnv is the guard for a caller that puts a key in
+// BOTH maps, which TestSecretEnvWinsOverEnv covers.
+func TestSecretEnvIsDeclaredButNotRecorded(t *testing.T) {
+	const secret = "AIRFLOW_CONN_DB"
+	secretEnv := map[string]string{secret: "postgres://user:pw@host/db"}
+	env := airflowEnv("proj", 8080, "3", map[string]string{"PLAIN": "written"}, secretEnv)
+
+	var sawPlain bool
+	for _, e := range env {
+		if e.Name == secret {
+			t.Fatalf("a secret reached the compose file: %s=%s", e.Name, e.Value)
+		}
+		if strings.Contains(e.Value, "pw@host") {
+			t.Fatalf("a secret value reached the compose file under %s", e.Name)
+		}
+		if e.Name == "PLAIN" {
+			sawPlain = true
+		}
+	}
+	if !sawPlain {
+		t.Error("a non-secret value must still be written; only SecretEnv is withheld")
+	}
+
+	declared := passEnv(nil, secretEnv, env)
+	if len(declared) != 1 || declared[0] != secret {
+		t.Fatalf("passEnv = %v, want %s declared so compose has an entry to resolve", declared, secret)
+	}
+	if got := secretEnviron(secretEnv); len(got) != 1 || got[0] != secret+"=postgres://user:pw@host/db" {
+		t.Fatalf("secretEnviron = %v, want the value handed to the compose process instead", got)
+	}
+}
+
+// A caller that puts the same key in both maps is contradicting itself. Secret
+// wins, because the other reading writes a secret to disk.
+func TestSecretEnvWinsOverEnv(t *testing.T) {
+	const key = "AIRFLOW_VAR_TOKEN"
+	env := airflowEnv("proj", 8080, "3",
+		map[string]string{key: "from-env"},
+		map[string]string{key: "from-secret"})
+
+	for _, e := range env {
+		if e.Name == key {
+			t.Fatalf("%s was written as %s; a key in both maps must be treated as secret", key, e.Value)
+		}
+	}
+	if got := passEnv(nil, map[string]string{key: "from-secret"}, env); len(got) != 1 || got[0] != key {
+		t.Fatalf("passEnv = %v, want %s declared", got, key)
+	}
+}
+
+// PassthroughEnv and SecretEnv both render as a valueless entry, so a key in both
+// lists must not be declared twice — duplicate keys in a YAML mapping are invalid.
+func TestPassEnvDoesNotDuplicateAcrossBothSources(t *testing.T) {
+	got := passEnv([]string{"SHARED"}, map[string]string{"SHARED": "v"}, nil)
+	// Identity, not just count: a result of length one holding the wrong key
+	// satisfies a length check while declaring a variable nobody asked for.
+	assert.Equal(t, []string{"SHARED"}, got)
+}
+
+// The values have to reach the compose process, since that is what resolves the
+// declarations at container-creation time.
+func TestSecretEnvironRendersSortedKeyValues(t *testing.T) {
+	got := secretEnviron(map[string]string{"B_KEY": "2", "A_KEY": "1"})
+	want := []string{"A_KEY=1", "B_KEY=2"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("secretEnviron = %v, want %v", got, want)
+	}
+	if secretEnviron(nil) != nil {
+		t.Error("no secrets means no extra environment, not an empty entry")
+	}
 }

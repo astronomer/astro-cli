@@ -31,6 +31,14 @@ func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, 
 	for _, k := range sortedKeys(p.Env) {
 		env = setEnv(env, k, p.Env[k])
 	}
+	// SecretEnv is ordinary environment here. The distinction exists because
+	// docker mode persists a compose file and standalone persists nothing, so
+	// there is no second treatment for this engine to give it — and applying it
+	// after Env means a key in both resolves the way the contract says, secret
+	// wins.
+	for _, k := range sortedKeys(p.SecretEnv) {
+		env = setEnv(env, k, p.SecretEnv[k])
+	}
 	if airflowMajor(p.AirflowVersion) == "2" {
 		env = append(env, af2Env(port)...)
 		// Python's _scproxy calls SCDynamicStoreCopyProxies, which is not

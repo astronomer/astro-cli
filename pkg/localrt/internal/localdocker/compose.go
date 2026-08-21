@@ -174,7 +174,11 @@ func composeProjectName(projectPath string) (string, error) {
 // Plan's fully layered environment, so anything the user sets wins. The
 // settings both generations share are here; the rest come from
 // generationEnv.
-func airflowEnv(projectName string, webPort int, major string, planEnv map[string]string) []envVar {
+// airflowEnv layers the plan's environment over the baseline and returns what the
+// compose file records. secretEnv keys are deliberately absent from the result:
+// they are declared through passEnv instead, so the file names them without their
+// values. A key in both maps is treated as secret.
+func airflowEnv(projectName string, webPort int, major string, planEnv, secretEnv map[string]string) []envVar {
 	m := map[string]string{
 		"AIRFLOW__CORE__EXECUTOR":             "LocalExecutor",
 		"AIRFLOW__CORE__FERNET_KEY":           devFernetKey,
@@ -186,8 +190,24 @@ func airflowEnv(projectName string, webPort int, major string, planEnv map[strin
 	for k, v := range generationEnv(projectName, webPort, major) {
 		m[k] = v
 	}
+	// Track what the plan contributed, so a secret can displace the caller's own
+	// value without displacing the engine's.
+	fromPlan := make(map[string]bool, len(planEnv))
 	for k, v := range planEnv {
 		m[k] = v
+		fromPlan[k] = true
+	}
+	// A secret is declared, not recorded — but only where the value was the
+	// caller's to give. A SecretEnv key colliding with a baseline or
+	// generation setting leaves the baseline in place and is simply not applied,
+	// which is what standalone does too: there, the engine-critical blocks are
+	// appended after the plan and win the same way. Deleting unconditionally
+	// would make one plan produce two different Airflow configurations depending
+	// on mode, with nothing reporting it.
+	for k := range secretEnv {
+		if fromPlan[k] {
+			delete(m, k)
+		}
 	}
 	out := make([]envVar, 0, len(m))
 	for k, v := range m {
@@ -233,22 +253,79 @@ func generationEnv(projectName string, webPort int, major string) map[string]str
 // the YAML structure. Single-quoted YAML has exactly one escape: a quote
 // doubles itself.
 func quoteYAML(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+	// Two escapes, for two different readers of the same bytes.
+	//
+	// Doubling the quote is YAML's. Doubling the dollar is Compose's: it
+	// interpolates the PARSED value, so single quotes do not protect it, and a
+	// literal dollar has to arrive as "$$". Without this a password like
+	// "se$cret" silently becomes "se" — compose substitutes the unset $cret with
+	// nothing and only warns — while the file still reads correctly, and a value
+	// containing "${" aborts the start with an interpolation error instead. A
+	// dollar in a connection password is common enough that this is the failure
+	// this whole field is about.
+	//
+	// Escaping unconditionally is right because Plan.Env and Plan.SecretEnv are
+	// resolved values, never templates: nothing in them is meant to be
+	// interpolated by compose.
+	escaped := strings.ReplaceAll(s, "$", "$$")
+	return "'" + strings.ReplaceAll(escaped, "'", "''") + "'"
 }
 
-// passEnv is the pass-through names to render, sorted, minus any name the
-// value-carrying env already holds — a duplicate YAML key would be invalid,
-// and a name with a value on disk does not need passing through.
-func passEnv(names []string, env []envVar) []string {
+// passEnv returns the keys the compose file declares with no value: the plan's
+// PassthroughEnv, which the runtime's own environment satisfies, plus every
+// SecretEnv key, whose value the engine hands to the compose process instead.
+//
+// Both end up as the same YAML — `KEY:` — because compose resolves a valueless
+// entry from its own environment and omits the variable entirely when unset.
+//
+// A stop or a down needs none of these values, and not for the reason it first
+// looks: those commands are run with no --file at all. Down resolves the project
+// from container labels, so the declarations are never even read. The valueless
+// form would also be harmless if they were, which is the belt to that braces.
+func passEnv(names []string, secretEnv map[string]string, env []envVar) []string {
 	held := make(map[string]bool, len(env))
 	for _, e := range env {
 		held[e.Name] = true
 	}
 	var out []string
-	for _, n := range names {
-		if !held[n] {
-			out = append(out, n)
+	// held doubles as the emitted set: a key already carrying a value on disk is
+	// skipped for the same reason a key already declared is — a duplicate YAML key
+	// is invalid either way.
+	add := func(n string) {
+		if held[n] {
+			return
 		}
+		held[n] = true
+		out = append(out, n)
+	}
+	for _, n := range names {
+		add(n)
+	}
+	for n := range secretEnv {
+		add(n)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// secretEnviron renders SecretEnv as KEY=VALUE for a child process environment.
+// Sorted so a command line is reproducible; the compose child reads these to
+// resolve the valueless entries passEnv declared.
+func secretEnviron(secretEnv map[string]string) []string {
+	if len(secretEnv) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(secretEnv))
+	for k, v := range secretEnv {
+		// A key that cannot survive KEY=VALUE is dropped rather than rendered.
+		// "A=B" would reach the OS as key "A" holding "B=<value>", while the
+		// compose file declared "A=B" — so the variable would be declared, never
+		// resolved, and Airflow would start silently missing it. An empty key
+		// makes the file itself invalid. Neither is worth a half-delivery.
+		if k == "" || strings.Contains(k, "=") {
+			continue
+		}
+		out = append(out, k+"="+v)
 	}
 	sort.Strings(out)
 	return out
