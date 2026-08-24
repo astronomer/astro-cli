@@ -1,17 +1,20 @@
 package telemetry
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	sharedtel "github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/astronomer/astro-cli/version"
 )
@@ -55,6 +58,70 @@ func IsInteractive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
+// jwtSections is the header.payload.signature shape a JWT must have.
+const jwtSections = 3
+
+// jwtExpiry reads the exp claim without verifying the signature. The second
+// return is false when the token is not a readable JWT.
+func jwtExpiry(token string) (expiry time.Time, ok bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != jwtSections {
+		return time.Time{}, false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return time.Time{}, false
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(claims.Exp, 0), true
+}
+
+// tokenFreshnessMargin is how much life a token must have left to be worth
+// attaching. The sender runs asynchronously, so a token expiring in the next
+// moment would likely be rejected by the time the request lands.
+const tokenFreshnessMargin = 30 * time.Second
+
+// currentToken returns a bearer token to attach, or "" to send anonymously.
+//
+// It only returns a token that can plausibly be accepted: the gateway validates
+// the JWT and rejects the whole request when it fails, so attaching a token we
+// already know is bad loses the event outright, where attaching none still
+// records it anonymously. Expired tokens are dropped rather than refreshed —
+// the sender is a detached subprocess and refreshing would race the main process
+// for ~/.astro/config.yaml.
+//
+// Returns the raw token. Contexts persist it with a "Bearer " prefix (see
+// cmd/cloud/setup.go) while ASTRO_API_TOKEN holds it without one; SendWithToken
+// supplies the scheme.
+func currentToken() string {
+	token := strings.TrimPrefix(os.Getenv("ASTRO_API_TOKEN"), "Bearer ")
+	if token == "" {
+		ctx, err := config.GetCurrentContext()
+		if err != nil {
+			return ""
+		}
+		// Telemetry always posts to the production endpoint, which does not
+		// recognize tokens issued by a dev or stage domain. An explicit endpoint
+		// override means someone is pointing at their own listener, so trust it.
+		defaultEndpoint := sharedtel.GetTelemetryAPIURL() == sharedtel.TelemetryAPIURL
+		if defaultEndpoint && domainutil.FormatDomain(ctx.Domain) != domainutil.DefaultDomain {
+			return ""
+		}
+		token = strings.TrimPrefix(ctx.Token, "Bearer ")
+	}
+
+	expiry, ok := jwtExpiry(token)
+	if !ok || time.Now().Add(tokenFreshnessMargin).After(expiry) {
+		return ""
+	}
+	return token
+}
+
 // GetCommandPath extracts the command path from a cobra.Command
 // Returns the full command path (e.g., "deploy", "dev start")
 func GetCommandPath(cmd *cobra.Command) string {
@@ -66,16 +133,25 @@ func GetCommandPath(cmd *cobra.Command) string {
 	return ""
 }
 
-// showFirstRunNotice prints a one-time notice about telemetry on the first CLI invocation.
+// noticeVersion tracks the wording of the notice below. Bump it whenever the
+// notice makes a materially different claim about what is collected, so users
+// who accepted earlier wording see the change instead of inheriting it silently.
+// v1 predates this constant and is stored as "true".
+const noticeVersion = "2"
+
+// showFirstRunNotice prints a notice about telemetry on the first CLI invocation,
+// and again whenever noticeVersion changes.
 func showFirstRunNotice() {
-	if config.CFG.TelemetryNoticeShown.GetHomeString() != "" {
+	if config.CFG.TelemetryNoticeShown.GetHomeString() == noticeVersion {
 		return
 	}
 	fmt.Fprintln(os.Stderr,
-		"The Astro CLI now collects anonymous usage data to help us prioritize and invest in CLI features.\n"+
-			"Only commands, OS, and CLI version are tracked — no personal information is collected.\n"+
+		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
+			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
+			"While you are logged in, events are linked to your Astro organization.\n"+
+			"Logged-out usage stays anonymous.\n"+
 			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
-	_ = config.CFG.TelemetryNoticeShown.SetHomeString("true")
+	_ = config.CFG.TelemetryNoticeShown.SetHomeString(noticeVersion)
 }
 
 // buildCommandProperties constructs the telemetry property map for a command.
@@ -117,12 +193,15 @@ func TrackCommand(cmd *cobra.Command) {
 		return
 	}
 
-	showFirstRunNotice()
-
 	commandPath := GetCommandPath(cmd)
 	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
 		return
 	}
+
+	// After the filter above, so that commands which send nothing say nothing —
+	// notably `astro telemetry disable`, which otherwise announces collection to
+	// someone in the act of opting out.
+	showFirstRunNotice()
 
 	properties := buildCommandProperties(cmd)
 
@@ -134,13 +213,14 @@ func TrackCommand(cmd *cobra.Command) {
 	}
 
 	apiURL := sharedtel.GetTelemetryAPIURL()
+	token := currentToken()
 
 	if isDebugMode() {
-		sendDebug(payload, apiURL)
+		sendDebug(payload, apiURL, token)
 		return
 	}
 
-	spawnTelemetrySender(payload, apiURL)
+	spawnTelemetrySender(payload, apiURL, token)
 }
 
 // CreateTrackingHook returns a RunE function that tracks command execution
@@ -171,12 +251,17 @@ func isDebugMode() bool {
 	return val == "1" || strings.EqualFold(val, "true")
 }
 
-// sendDebug sends telemetry synchronously and prints debug output
-func sendDebug(payload sharedtel.TelemetryPayload, apiURL string) {
+// sendDebug sends telemetry synchronously and prints debug output.
+// It prints the event body and whether a token was attached, never the token.
+func sendDebug(payload sharedtel.TelemetryPayload, apiURL, token string) {
 	body, _ := json.MarshalIndent(payload, "", "  ")
-	fmt.Fprintf(os.Stderr, "[telemetry] POST %s\n%s\n", apiURL, body)
+	authState := "anonymous"
+	if token != "" {
+		authState = "authenticated"
+	}
+	fmt.Fprintf(os.Stderr, "[telemetry] POST %s (%s)\n%s\n", apiURL, authState, body)
 
-	status, err := sharedtel.Send(payload, apiURL)
+	status, err := sharedtel.SendWithToken(payload, apiURL, token)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[telemetry] error: %v\n", err)
 		return
@@ -185,15 +270,11 @@ func sendDebug(payload sharedtel.TelemetryPayload, apiURL string) {
 }
 
 // spawnTelemetrySender spawns a detached subprocess to send telemetry
-func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL string) {
-	type senderPayload struct {
-		sharedtel.TelemetryPayload
-		APIURL string `json:"api_url"`
-	}
-
-	sp := senderPayload{
+func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL, token string) {
+	sp := sharedtel.SenderPayload{
 		TelemetryPayload: payload,
 		APIURL:           apiURL,
+		Token:            token,
 	}
 	payloadJSON, err := json.Marshal(sp)
 	if err != nil {
