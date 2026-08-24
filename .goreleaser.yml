@@ -10,6 +10,10 @@ release:
   # "auto" marks prerelease tags (e.g. v1.43.0-rc.1, v1.43.0-nightly.20260522) as prerelease,
   # and clean semver tags (e.g. v1.43.0) as full releases.
   prerelease: auto
+  # install.sh is godownloader.sh with LATEST_VERSION set to this release, so
+  # the asset installs the release it ships with and nothing else.
+  extra_files:
+    - glob: ./install.sh
 changelog:
   sort: asc
   use: github
@@ -122,3 +126,5 @@ snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  extra_files:
+    - glob: ./install.sh
