@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -368,5 +369,148 @@ func TestConfigValidation(t *testing.T) {
 	}
 	if _, err := NewKeyringStore(Config{Service: "astro"}); err == nil {
 		t.Fatal("empty Dir should fail")
+	}
+}
+
+// A master key that is present but unusable means the same thing to a caller as
+// a keyring that cannot be reached: nothing in this vault can be read. It has to
+// say so with the same sentinel.
+//
+// The distinction is load-bearing for a consumer reading many keys, which must
+// tell "this one value is corrupt" (skip it, serve the rest) from "nothing will
+// work" (fail the read). Only success is cached in aead(), so a whole-vault
+// failure that reads as per-entry is retried for every entry — re-execing the OS
+// keyring N times and, on macOS, able to raise N keychain dialogs.
+func TestUnusableMasterKeyReportsTheVaultUnavailable(t *testing.T) {
+	const key = "conn:global:warehouse"
+	for name, corrupt := range map[string]string{
+		"not base64":   "!!!not-base64!!!",
+		"wrong length": base64.StdEncoding.EncodeToString([]byte("too short")),
+	} {
+		t.Run(name, func(t *testing.T) {
+			// A value has to exist first: Get reads the file before the keyring,
+			// so a missing key reports ErrNotFound without ever prompting, and
+			// would never reach the master key at all.
+			dir := t.TempDir()
+			kr := newFakeKeyring()
+			if err := testStore(t, kr, "astro", dir).Set(key, "topsecret"); err != nil {
+				t.Fatalf("seed value: %v", err)
+			}
+			if err := kr.Set("astro", keyringAccount, corrupt); err != nil {
+				t.Fatalf("corrupt the key: %v", err)
+			}
+
+			// A fresh store, because the first one cached its cipher.
+			_, err := testStore(t, kr, "astro", dir).Get(key)
+			if !errors.Is(err, ErrKeyringUnavailable) {
+				t.Errorf("err = %v, want it to wrap ErrKeyringUnavailable", err)
+			}
+		})
+	}
+}
+
+// Values on disk with no master key must be refused, not re-keyed.
+//
+// The keyring has no compare-and-swap and no history, so a missing entry is
+// indistinguishable from a never-used vault by looking at the keyring alone —
+// the value files are the only evidence. Minting a replacement builds a
+// perfectly valid cipher that decrypts nothing, so every existing value would
+// fail with an ordinary authentication error: a caller would report twenty
+// corrupt entries rather than one lost key, and the first write after that would
+// leave two key generations in one directory with nothing to tell them apart.
+func TestLostMasterKeyWithValuesPresentIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	kr := newFakeKeyring()
+	if err := testStore(t, kr, "astro", dir).Set("conn:global:warehouse", "topsecret"); err != nil {
+		t.Fatalf("seed value: %v", err)
+	}
+
+	// The keychain entry disappears; the files do not.
+	kr.mu.Lock()
+	delete(kr.entries, "astro\x00"+keyringAccount)
+	kr.mu.Unlock()
+
+	_, err := testStore(t, kr, "astro", dir).Get("conn:global:warehouse")
+	if !errors.Is(err, ErrVaultOrphaned) {
+		t.Errorf("err = %v, want ErrVaultOrphaned", err)
+	}
+	// Still the umbrella, so a caller that only tests for "the vault cannot be
+	// opened" keeps working.
+	if !errors.Is(err, ErrKeyringUnavailable) {
+		t.Errorf("ErrVaultOrphaned must wrap ErrKeyringUnavailable; got %v", err)
+	}
+
+	// And the ciphertext is untouched, which is what makes recovery the user's
+	// call rather than ours.
+	entries, rerr := os.ReadDir(dir)
+	if rerr != nil {
+		t.Fatalf("read dir: %v", rerr)
+	}
+	if len(entries) != 1 {
+		t.Errorf("want the value file left alone, found %d entries", len(entries))
+	}
+}
+
+// The other side of the same check: an empty vault has nothing to orphan, so a
+// first-ever use still mints a key and works.
+func TestFirstUseMintsAKey(t *testing.T) {
+	kr := newFakeKeyring()
+	s := testStore(t, kr, "astro", t.TempDir())
+
+	if err := s.Set("env:global:TOKEN", "v"); err != nil {
+		t.Fatalf("Set on a fresh vault: %v", err)
+	}
+	got, err := s.Get("env:global:TOKEN")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got != "v" {
+		t.Errorf("got %q, want %q", got, "v")
+	}
+}
+
+// A malformed entry is not the same condition as a missing one, and the
+// remediations are opposite: nothing is wrong with the machine, and recovering
+// means accepting the values are gone. Callers get a distinct sentinel under the
+// same umbrella.
+func TestUnusableMasterKeyIsItsOwnCondition(t *testing.T) {
+	dir := t.TempDir()
+	kr := newFakeKeyring()
+	if err := testStore(t, kr, "astro", dir).Set("env:global:TOKEN", "v"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := kr.Set("astro", keyringAccount, "!!!not-base64!!!"); err != nil {
+		t.Fatalf("corrupt: %v", err)
+	}
+
+	_, err := testStore(t, kr, "astro", dir).Get("env:global:TOKEN")
+	if !errors.Is(err, ErrMasterKeyUnusable) {
+		t.Errorf("err = %v, want ErrMasterKeyUnusable", err)
+	}
+	if errors.Is(err, ErrVaultOrphaned) {
+		t.Error("a malformed key is not an orphaned vault; the two need different remediations")
+	}
+}
+
+// The platform's own reason has to survive into the error chain. Whether the
+// keyring is permanently unavailable (an unsupported platform: stop asking,
+// disable the feature) or transiently so (no dbus session yet: worth another try
+// once the session is up) is the distinction that decides whether retrying costs
+// an OS keyring round trip per entry — and only the wrapped chain carries it.
+// Formatting it with %v looked identical and threw it away.
+func TestKeyringFailureKeepsThePlatformReason(t *testing.T) {
+	dir := t.TempDir()
+	kr := newFakeKeyring()
+	if err := testStore(t, kr, "astro", dir).Set("env:global:TOKEN", "v"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	kr.err = keyring.ErrUnsupportedPlatform
+	_, err := testStore(t, kr, "astro", dir).Get("env:global:TOKEN")
+	if !errors.Is(err, ErrKeyringUnavailable) {
+		t.Errorf("err = %v, want it to wrap ErrKeyringUnavailable", err)
+	}
+	if !errors.Is(err, keyring.ErrUnsupportedPlatform) {
+		t.Errorf("err = %v, want the platform's own error still reachable in the chain", err)
 	}
 }

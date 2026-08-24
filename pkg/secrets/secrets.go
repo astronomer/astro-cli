@@ -4,9 +4,18 @@
 // name a constructor parameter.
 //
 // The CLI and Astro Desktop share one vault: both open the store with
-// DefaultService and the shared value home (~/.astro/secrets), so a secret
-// saved in either is readable in both. Desktop adopts the shared vault
-// directly — it has no installed users, so there is nothing to migrate.
+// DefaultService and DefaultDir, so a secret saved in either is readable in
+// both. Call DefaultDir rather than joining "secrets" onto a home of your own —
+// the location is the interop, and two callers deriving it separately is how one
+// vault becomes two.
+//
+// State of the adoption, since this doc previously described a finished one that
+// had not started: the desktop is moving its three stores onto this package now.
+// It arrives with existing encrypted data under its own keyring service, so it
+// re-keys rather than adopting clean — the claim that there was nothing to
+// migrate was wrong, and acting on it would have orphaned every secret a user
+// had already saved. The CLI has no caller yet; internal/envresolve still needs
+// its vault provider before `astro local start` can read any of this.
 package secrets
 
 import "errors"
