@@ -415,21 +415,6 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	})
 }
 
-// captureStdout returns what fn printed to stdout.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-	r, w, err := os.Pipe()
-	assert.NoError(t, err)
-	realStdout := os.Stdout
-	os.Stdout = w
-	fn()
-	os.Stdout = realStdout
-	w.Close()
-	out, err := io.ReadAll(r)
-	assert.NoError(t, err)
-	return string(out)
-}
-
 func TestShouldSignup(t *testing.T) {
 	const domain = "astronomer.io"
 	tests := []struct {
@@ -484,6 +469,9 @@ func TestShouldSignup(t *testing.T) {
 
 func TestAuthDeviceLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// The prompt path is the one these tests were written for, and a test binary
+	// has no terminal, so say it has one unless a test says otherwise.
+	stubStdinIsTerminal(t, true)
 	t.Run("success without login link", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		callbackHandler := func() (string, error) {
@@ -614,6 +602,112 @@ func TestAuthDeviceLogin(t *testing.T) {
 		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
 		assert.ErrorIs(t, err, errMock)
 	})
+
+	t.Run("a terminal gets the Enter prompt", func(t *testing.T) {
+		stubStdinIsTerminal(t, true)
+		stdin := stubStdin(t, "\n")
+		browserOpened := false
+		openURL = func(url string) error {
+			browserOpened = true
+			return nil
+		}
+		callbackHandler := func() (string, error) { return "test-code", nil }
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
+			return Result{}, nil
+		}
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+
+		var err error
+		out := captureStdout(t, func() {
+			_, err = mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		})
+		assert.NoError(t, err)
+		assert.Contains(t, out, "to open the browser to log in")
+		assert.True(t, browserOpened)
+		assert.Equal(t, "", readAll(t, stdin))
+	})
+
+	t.Run("no terminal takes the login link without reading stdin", func(t *testing.T) {
+		stubStdinIsTerminal(t, false)
+		stdin := stubStdin(t, "unread\n")
+		openURL = func(url string) error {
+			t.Error("the login-link path must not open a browser")
+			return nil
+		}
+		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
+		callbackHandler := func() (string, error) { return "test-code", nil }
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
+			return mockResponse, nil
+		}
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+
+		var resp Result
+		var err error
+		out := captureStdout(t, func() {
+			resp, err = mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, mockResponse, resp)
+		assert.Contains(t, out, "Please visit the following link")
+		assert.NotContains(t, out, "to open the browser to log in")
+		// Nothing consumed stdin, so the line is still there to read.
+		assert.Equal(t, "unread\n", readAll(t, stdin))
+	})
+}
+
+// stubStdinIsTerminal answers the terminal check with one value, and puts the
+// real check back when the test ends.
+func stubStdinIsTerminal(t *testing.T, isTerminal bool) {
+	t.Helper()
+	previous := stdinIsTerminal
+	t.Cleanup(func() { stdinIsTerminal = previous })
+	stdinIsTerminal = func() bool { return isTerminal }
+}
+
+// stubStdin makes stdin hold text, and returns it so a test can read what the
+// code under test left behind.
+func stubStdin(t *testing.T, text string) *os.File {
+	t.Helper()
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	_, err = w.WriteString(text)
+	assert.NoError(t, err)
+	w.Close()
+	previous := os.Stdin
+	t.Cleanup(func() {
+		os.Stdin = previous
+		r.Close()
+	})
+	os.Stdin = r
+	return r
+}
+
+func readAll(t *testing.T, f *os.File) string {
+	t.Helper()
+	left, err := io.ReadAll(f)
+	assert.NoError(t, err)
+	return string(left)
+}
+
+// captureStdout collects what f prints to stdout.
+func captureStdout(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	previous := os.Stdout
+	os.Stdout = w
+	done := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+	f()
+	os.Stdout = previous
+	w.Close()
+	out := <-done
+	r.Close()
+	return out
 }
 
 // stubCreateOrganization answers the create-organization call with one status

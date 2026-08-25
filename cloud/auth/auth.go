@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
+	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/workspace"
@@ -42,6 +44,7 @@ const (
 var (
 	httpClient          = httputil.NewHTTPClient()
 	openURL             = browser.OpenURL
+	stdinIsTerminal     = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 	errEmailNotFound    = errors.New("cannot retrieve email")
 
@@ -238,8 +241,9 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 		authorizeURL += "&screen_hint=signup&ext-signup-source=cli"
 	}
 
-	// open browser
-	if !shouldDisplayLoginLink {
+	// A run without a terminal — a coding agent's shell, CI — never answers the
+	// prompt below, so it takes the login-link path instead of blocking on stdin.
+	if !shouldDisplayLoginLink && stdinIsTerminal() {
 		action := "log in"
 		if signup {
 			action = "create your Astro account"
