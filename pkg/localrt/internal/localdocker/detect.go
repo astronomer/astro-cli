@@ -112,6 +112,29 @@ func (e *Engine) probe(ctx context.Context, conn engineConn, projectPath string)
 	return name, nil
 }
 
+// projectContainers counts the containers compose knows about for one project
+// name, stopped ones included.
+//
+// Scoped, and --all, on purpose. `down --project-name X` can only remove
+// containers labeled with X, so X is the only scope whose contents decide
+// whether a teardown is safe. Asking the working-dir label instead — as an
+// earlier version of the failed-start cleanup did — got it wrong in both
+// directions: it missed stopped containers of our own, which the guard then
+// destroyed, and it reported foreign projects in the same directory that the
+// teardown could never have touched, which made it refuse to clean up after
+// itself.
+func (e *Engine) projectContainers(ctx context.Context, conn engineConn, name string) (int, error) {
+	out, err := e.cmd.Output(ctx, conn.env, conn.bin, "compose", "-p", name, "ps", "-aq")
+	if err != nil {
+		return 0, err
+	}
+	trimmed := strings.TrimSpace(string(out))
+	if trimmed == "" {
+		return 0, nil
+	}
+	return len(strings.Split(trimmed, "\n")), nil
+}
+
 // ContainersGone reports whether projectPath's containers are confirmed
 // absent from every reachable engine. It errors when no engine could be
 // reached, so a caller that deletes state (astro local list --clean) refuses

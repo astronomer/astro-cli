@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
@@ -108,7 +109,7 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 // healthy. The state record is written and the proxy route registered as
 // soon as the containers are up, so status/stop/logs work even when the
 // health wait fails or is interrupted.
-func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airflow, error) {
+func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.Airflow, err error) {
 	if p.Mode != rt.ModeDocker {
 		return nil, fmt.Errorf("localdocker got a %q plan", p.Mode)
 	}
@@ -117,6 +118,18 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
 	}
 	rt.OnState(cb, rt.StateStarting, nil)
+	// Every failure from here on reports StateError, once, with whatever error is
+	// actually returned. Emitting it per-site was a fix at the wrong depth: it
+	// covered the two exits that had been noticed while thirteen others — the
+	// image build, the port allocation, the compose write, the record save —
+	// ended the stream on "starting" and left a consumer to treat silence as
+	// failure. A deferred emit on the named return cannot drift as exits are
+	// added, and it reports the joined error rather than a prefix of it.
+	defer func() {
+		if err != nil {
+			rt.OnState(cb, rt.StateError, err)
+		}
+	}()
 
 	// Bring a stopped engine up first, so `start --docker` with the daemon
 	// down recovers instead of failing on the first compose call.
@@ -214,6 +227,29 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, err
 	}
 
+	// Whether THIS compose project already has containers, asked before the up so
+	// a failure can tell what it created from what it merely found. Without it a
+	// rollback is indiscriminate: `down` removes everything carrying the project
+	// label, and a start can fail without touching a container (a registry
+	// timeout, a daemon that went away), which would tear down a healthy Airflow
+	// somebody is using. That is reachable, because "already running" is decided
+	// from the state record and the record lives in a cache directory anything
+	// may clear.
+	//
+	// Scoped to the project name the teardown itself uses, and with --all, which
+	// is what makes the answer the right one. An earlier version asked the
+	// working-dir label with plain `ps`: that missed stopped containers (a
+	// `compose stop`, an earlier crash), so they read as "nothing here" and were
+	// destroyed by the very guard meant to protect them — and it refused to clean
+	// up when it found a FOREIGN project in the directory (v1's containers, the
+	// desktop's), which `down --project-name` provably cannot touch.
+	//
+	// A probe that ERRORS counts as "something might be there". The cost of being
+	// wrong that way is an orphan, which is the state this function improves on;
+	// the cost the other way is deleting a running Airflow.
+	existing, probeErr := e.projectContainers(ctx, conn, name)
+	mayCleanUp := probeErr == nil && existing == 0
+
 	// The values for the declarations passEnv wrote. Only on the up: it is the one
 	// command that creates containers, and compose bakes the resolved value in at
 	// creation. Stop and down are run with no --file, so they never read the
@@ -225,10 +261,57 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		projectDir: projectPath,
 		extraEnv:   secretEnviron(p.SecretEnv),
 	}
-	if err := e.runCompose(ctx, up, cb, "up", "--detach", "--quiet-pull"); err != nil {
-		return nil, fmt.Errorf("starting project containers: %w", err)
+	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
+		return nil, err
 	}
 
+	rec, err := e.publish(projectPath, name, hostname, major, webPort, pgPort, p, cb)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := e.health(ctx, healthURLs(webPort, major), e.healthTimeout); err != nil {
+		rt.OnState(cb, rt.StateError, err)
+		return nil, err
+	}
+	// The route landed before the health wait so status/stop worked during it;
+	// start the daemon now that Airflow answers, so <name>.localhost resolves.
+	localshared.EnsureDaemon(e.daemon, cb, e.now(), rec.Hostname)
+	rt.OnState(cb, rt.StateRunning, nil)
+	return &airflow{eng: e, rec: rec}, nil
+}
+
+// bringUp creates the containers, and cleans up after itself when it cannot.
+//
+// Its own function because Start is already at the complexity limit, and because
+// the decision it carries — whether a failure is this start's to clean up — is
+// worth reading in one place.
+func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) error {
+	if err := e.runCompose(ctx, *up, cb, "up", "--detach", "--quiet-pull"); err != nil {
+		startErr := fmt.Errorf("starting project containers: %w", err)
+		if !mayCleanUp {
+			// Containers were here before this start, or we could not tell —
+			// either way they are not ours to remove. Name the project so the
+			// user can clean up by hand if they were in fact ours.
+			return fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
+		}
+		// Joined rather than logged: a cleanup report gated on cb.OnLine, which
+		// the contract makes optional, would let a consumer passing
+		// rt.Callbacks{} leak containers with no signal anywhere. Joining keeps
+		// errors.Is on the start error intact, and Start's deferred StateError
+		// reports the joined value.
+		return errors.Join(startErr, e.rollback(ctx, up.conn, up.name, cb))
+	}
+	return nil
+}
+
+// publish records the running project and makes it reachable: the state record,
+// the proxy route, and the session watcher when one was asked for.
+//
+// Its own function because Start is at the complexity limit, and because these
+// three are one idea — everything that turns containers into a project other
+// tools can find.
+func (e *Engine) publish(projectPath, name, hostname, major string, webPort, pgPort int, p rt.Plan, cb rt.Callbacks) (localstate.Record, error) { //nolint:gocritic // hugeParam: rt.Plan matches the Airflow interface's own signature
 	rec := localstate.Record{
 		ProjectPath:     projectPath,
 		Mode:            rt.ModeDocker,
@@ -245,8 +328,20 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		// session has ended and the project should be killed.
 		rec.PID = os.Getpid()
 	}
-	if err := localstate.Save(rec); err != nil {
-		return nil, err
+	if err := e.saveRecord(rec); err != nil {
+		// Deliberately no rollback. Airflow is up and working, and this write is
+		// the kind of thing that loses a race rather than a disk: Save renames a
+		// temp file into place, and on Windows a rename over a file another
+		// process has open fails with a sharing violation — while the desktop
+		// reads this record on every status poll, on the one platform where
+		// docker is the only mode. Tearing down a healthy stack because
+		// bookkeeping lost a race would be the worse failure.
+		//
+		// But without the record nothing can reach those containers: no stop, no
+		// route, and no session watcher if one was asked for. So the error names
+		// the compose project, which is the only thing that makes them
+		// recoverable by hand.
+		return localstate.Record{}, fmt.Errorf("project started but could not be recorded; its containers are running as compose project %s: %w", name, err)
 	}
 	e.addRoute(rec, pgPort, cb)
 
@@ -264,15 +359,148 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		}
 	}
 
-	if err := e.health(ctx, healthURLs(webPort, major), e.healthTimeout); err != nil {
-		rt.OnState(cb, rt.StateError, err)
-		return nil, err
+	return rec, nil
+}
+
+// saveRecord writes the runtime record, retrying once.
+//
+// The failure it retries is a lost race, not a broken disk: fsatomic renames a
+// temp file into place, and on Windows a rename over a file another process has
+// open fails with a sharing violation — the desktop reads this record on every
+// status poll. One retry turns the common instance of that into a non-event,
+// and the caller still hears about it if it persists.
+func (e *Engine) saveRecord(rec localstate.Record) error {
+	err := localstate.Save(rec)
+	if err == nil {
+		return nil
 	}
-	// The route landed before the health wait so status/stop worked during it;
-	// start the daemon now that Airflow answers, so <name>.localhost resolves.
-	localshared.EnsureDaemon(e.daemon, cb, e.now(), rec.Hostname)
-	rt.OnState(cb, rt.StateRunning, nil)
-	return &airflow{eng: e, rec: rec}, nil
+	return errors.Join(err, localstate.Save(rec))
+}
+
+// rollbackTimeout bounds the teardown of a failed start. Short on purpose: the
+// start has already failed and the caller is waiting on an error, so a wedged
+// daemon must not turn a failure into a hang.
+// A var for the same reason as logCaptureTimeout: the property worth pinning is
+// how the two budgets relate, which a test can only exercise at millisecond
+// scale.
+var rollbackTimeout = 2 * time.Minute
+
+// logCaptureTimeout bounds the diagnostic read inside that budget. It gets its
+// own deadline because it runs first and is the optional half: sharing one
+// context let a wedged daemon block `compose logs` until the whole rollback
+// budget expired, after which os/exec refuses to spawn the `down` at all — the
+// same canceled-context defect this function was written to avoid, one level
+// further in.
+// A var, not a const, only so a test can shrink it: the behavior worth pinning
+// is that the teardown still runs after this expires, and asserting that against
+// the real 20 seconds would mean a 20-second test.
+var logCaptureTimeout = 20 * time.Second
+
+// rollback removes what a failed start created, in the one window where nothing
+// else can.
+//
+// Every path that stops a project reaches it through its state record, and that
+// record is written after `compose up` returns. So a start that fails in between
+// leaves containers, and a network, that no `astro local stop` can see: it fails
+// with "no local Airflow is recorded for this project", `astro local list
+// --clean` prunes records rather than containers, and the only way out is docker
+// directly. The containers also hold the ports the next attempt wants.
+//
+// Only called when the probe before the up found nothing: `down` removes
+// everything carrying the project label, which it cannot tell apart from what
+// this start created.
+//
+// Note what it does NOT remove: volumes. `down --volumes` here would delete the
+// database volume a PREVIOUS successful run filled, because a second start
+// against an existing project is exactly when this fires. Losing a developer's
+// local Airflow database to a failed start is worse than leaving a volume that
+// costs disk and nothing else, and a later `stop --clean` or `docker volume
+// prune` collects it. The compose file stays for the same reason it does after a
+// stop: the next start rewrites it.
+func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) error {
+	// Detached from the caller's context, which is the difference between this
+	// running and not. The failure this exists for is a wedged daemon or a stalled
+	// pull, and the desktop drives every docker action under a deadline — so the
+	// up frequently fails BECAUSE ctx is already done, and os/exec refuses to
+	// spawn a process on a canceled context. Reusing it would make the cleanup a
+	// silent no-op in exactly the case it was written for.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+	defer cancel()
+
+	// Before the containers go: their logs are the only diagnosis for the most
+	// common docker-start failure. Every service depends on the one-shot database
+	// migration, so a failing `airflow db migrate` surfaces as nothing more than
+	// "dependency failed to start ... exited (1)" while the traceback sits in that
+	// container. Removing it first makes the error unrecoverable.
+	tail := e.captureFailureLogs(ctx, conn, name, cb)
+
+	// cb is threaded through so the teardown is not silent. It can take most of a
+	// minute on a slow daemon, and a consumer rendering the event stream would
+	// otherwise show the failure and then nothing, which reads as a hang.
+	if err := e.downProject(ctx, conn, name, gracefulStopTimeout, cb); err != nil {
+		return errors.Join(fmt.Errorf("cleaning up after the failed start: %w", err), tail)
+	}
+	return tail
+}
+
+// captureFailureLogs reports what the containers said before they are removed,
+// and returns a bounded tail as an error when there is no line callback to send
+// it to.
+//
+// The nil-callback case is the point. rt.Callbacks makes every field optional, so
+// gating the diagnosis on OnLine — as an earlier version did — meant a consumer
+// passing rt.Callbacks{} had the container holding the only explanation removed
+// and its logs discarded, receiving nothing but "exit status 1". That is the same
+// argument that put the cleanup error in the return value rather than a log line.
+//
+// Best effort throughout: a start is already failing, so logs that cannot be read
+// are absent rather than a second failure.
+func (e *Engine) captureFailureLogs(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) error {
+	ctx, cancel := context.WithTimeout(ctx, logCaptureTimeout)
+	defer cancel()
+
+	// --timestamps, and each line through parseLogLine, so a caller sees the
+	// service that spoke and when — the same treatment Logs gives. Without it
+	// every line arrived stamped "now" and attributed to compose, with the
+	// "service-1  | " prefix still glued to the text.
+	//
+	// The tail is per container and there may be six services, so it is small.
+	var held []string
+	w := &rt.LineWriter{Emit: func(line string) {
+		l := parseLogLine(line, e.now)
+		if cb.OnLine != nil {
+			cb.OnLine(l)
+			return
+		}
+		if len(held) < heldLogLines {
+			held = append(held, l.Component+": "+l.Text)
+		}
+	}}
+	args := []string{"compose", "-p", name, "logs", "--no-color", "--timestamps", "--tail", "10"}
+	cmdEnv := make([]string, 0, len(conn.env))
+	cmdEnv = append(cmdEnv, conn.env...)
+	//nolint:errcheck // best effort by design; see the doc comment
+	_ = e.cmd.Run(ctx, cmdEnv, rt.Stdio{Out: w, Err: w}, conn.bin, args...)
+	w.Flush()
+
+	if cb.OnLine != nil || len(held) == 0 {
+		return nil
+	}
+	return fmt.Errorf("container output before cleanup: %s", strings.Join(held, "; "))
+}
+
+// heldLogLines bounds what captureFailureLogs folds into an error when nothing is
+// streaming. Enough to carry a Python traceback's tail, small enough that an
+// error stays readable.
+const heldLogLines = 20
+
+// downProject takes a compose project down. Shared with Stop so the two agree on
+// how that is spelled — no --file, since down works from container labels alone
+// and the generated file may already be gone.
+func (e *Engine) downProject(ctx context.Context, conn engineConn, name string, timeout int, cb rt.Callbacks, extra ...string) error {
+	args := append([]string{"down", "--timeout", strconv.Itoa(timeout)}, extra...)
+	line := composeLine{conn: conn, name: name}
+	return e.runCompose(ctx, line, cb, args...)
 }
 
 // Attach returns a handle to a running docker-mode Airflow from its state
@@ -360,15 +588,11 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	if opts.Force {
 		timeout = 0
 	}
-	args := []string{"down", "--timeout", strconv.Itoa(timeout)}
+	var extra []string
 	if opts.Clean {
-		args = append(args, "--volumes", "--remove-orphans")
+		extra = []string{"--volumes", "--remove-orphans"}
 	}
-	// No --file: down works from container labels alone, and the generated
-	// compose file may already be gone (an interrupted --clean, another
-	// tool's cleanup).
-	line := composeLine{conn: conn, name: name}
-	if err := a.eng.runCompose(ctx, line, rt.Callbacks{}, args...); err != nil {
+	if err := a.eng.downProject(ctx, conn, name, timeout, rt.Callbacks{}, extra...); err != nil {
 		return fmt.Errorf("stopping project containers: %w", err)
 	}
 	errs := []error{a.eng.removeRoute(a.rec), localstate.Remove(a.rec.ProjectPath)}

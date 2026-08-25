@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,12 @@ type fakeCmd struct {
 	calls  []string
 	output func(call string) ([]byte, error)
 	run    func(call string, s rt.Stdio) error
+	// delayFor, when set, makes Run block for the returned duration or until its
+	// context is done, whichever comes first — which is what exec.CommandContext
+	// does to a real subprocess. A plain time.Sleep here would outlive its own
+	// deadline and so could not model a command being killed by one, which is
+	// exactly what a test about competing deadlines needs.
+	delayFor func(call string) time.Duration
 	// env records the environment each Run was given, keyed by the call string.
 	// Without it the environment argument was dropped on the floor, which left
 	// the one thing that makes SecretEnv work — the values reaching the up, and
@@ -41,7 +48,10 @@ func (f *fakeCmd) envFor(substr string) ([]string, bool) {
 	return nil, false
 }
 
-func (f *fakeCmd) Output(_ context.Context, _ []string, name string, args ...string) ([]byte, error) {
+func (f *fakeCmd) Output(ctx context.Context, _ []string, name string, args ...string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	call := name + " " + strings.Join(args, " ")
 	f.calls = append(f.calls, call)
 	if f.output == nil {
@@ -50,13 +60,30 @@ func (f *fakeCmd) Output(_ context.Context, _ []string, name string, args ...str
 	return f.output(call)
 }
 
-func (f *fakeCmd) Run(_ context.Context, env []string, s rt.Stdio, name string, args ...string) error {
+// Run honors the context, because os/exec does: Cmd.Start returns ctx.Err()
+// before spawning anything on a context that is already done. A fake that
+// ignored it recorded calls no real process would have made, which hid whether
+// cleanup paths detach from the caller's canceled context — the difference
+// between a teardown that runs and one that silently does not.
+func (f *fakeCmd) Run(ctx context.Context, env []string, s rt.Stdio, name string, args ...string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	call := name + " " + strings.Join(args, " ")
 	f.calls = append(f.calls, call)
 	if f.env == nil {
 		f.env = map[string][]string{}
 	}
 	f.env[call] = env
+	if f.delayFor != nil {
+		if d := f.delayFor(call); d > 0 {
+			select {
+			case <-time.After(d):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
 	if f.run == nil {
 		return nil
 	}
@@ -119,9 +146,15 @@ func TestStartBringsProjectUp(t *testing.T) {
 	stateDir, err := rt.StateDir(p.ProjectPath)
 	require.NoError(t, err)
 	composeFile := filepath.Join(stateDir, composeFileName)
-	require.Len(t, cmd.calls, 1)
+	// Two calls: one `compose -p <name> ps -aq` asking whether THIS compose
+	// project already has containers (so a failed start knows whether the cleanup
+	// is its to do), then the up. Scoped to the name the teardown would use, and
+	// --all so stopped containers count.
+	require.Len(t, cmd.calls, 2)
+	assert.Equal(t, "docker compose -p "+name+" ps -aq", cmd.calls[0],
+		"the pre-flight probe must ask about the project the teardown would remove")
 	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull",
-		composeFile, p.ProjectPath, name), cmd.calls[0])
+		composeFile, p.ProjectPath, name), cmd.calls[1])
 	assert.FileExists(t, composeFile)
 
 	// The state record captures what other tools need to reconnect.
@@ -815,4 +848,336 @@ func TestStopDoesNotCarrySecretValues(t *testing.T) {
 				"a secret value reached %q, which does not read the file that declares it", call)
 		}
 	}
+}
+
+// A start that fails after compose created anything has to take it back down.
+//
+// Nothing else can: every stop path reaches a project through its state record,
+// and that record is written after the up returns. So containers from a failed
+// start are invisible to `astro local stop` (which fails with "no local Airflow
+// is recorded for this project"), untouched by `astro local list --clean` (which
+// prunes records, not containers), and holding the ports the next attempt wants.
+func TestStartRemovesContainersWhenTheUpFails(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.Error(t, err)
+
+	name, nerr := composeProjectName(p.ProjectPath)
+	require.NoError(t, nerr)
+	var down string
+	for _, c := range cmd.calls {
+		if strings.Contains(c, " down") {
+			down = c
+		}
+	}
+	require.NotEmpty(t, down, "a failed up must be followed by a down; calls were %v", cmd.calls)
+	assert.Contains(t, down, "--project-name "+name)
+	// No --file, matching Stop: down works from container labels alone, and the
+	// generated file may already be gone.
+	assert.NotContains(t, down, "--file")
+
+	// Volumes are deliberately left. A second start against an existing project
+	// is exactly when this fires, so --volumes here would delete the database a
+	// previous successful run filled — losing a developer's local Airflow data to
+	// a failed start is worse than leaving a volume that costs only disk.
+	assert.NotContains(t, down, "--volumes")
+	// The other half of that argument: postgres needs a graceful SIGTERM to flush
+	// before it exits, on a volume being preserved. "The start already failed,
+	// kill it fast" is a plausible edit, and Stop's Force path right next door
+	// spells exactly that.
+	assert.Contains(t, down, "--timeout "+strconv.Itoa(gracefulStopTimeout))
+
+	// The premise the rollback exists for: nothing else can reach these
+	// containers, because there is no record and no route. If a later change
+	// wrote the record before the up — a plausible refactor that would arguably
+	// obsolete this function — the assertions above would all still pass.
+	if _, err := localstate.Load(p.ProjectPath); !errors.Is(err, localstate.ErrNotRunning) {
+		t.Errorf("a failed start must leave no state record, got %v", err)
+	}
+}
+
+// A rollback must not remove containers this start did not create.
+//
+// `down` takes out everything carrying the project label, and it cannot tell
+// what the failed up made from what was already running. That case is reachable:
+// "already running" is decided from the state record, the record lives in a
+// cache directory anything may clear, and a start can then get as far as the up
+// and fail there without touching a container — a registry timeout, a daemon
+// that went away. Removing a healthy Airflow somebody is using would be a worse
+// outcome than the orphan this function exists to prevent.
+func TestStartLeavesPreexistingContainersAloneWhenTheUpFails(t *testing.T) {
+	cmd := &fakeCmd{}
+	// The probe answers with a container id, i.e. this project already has one.
+	cmd.output = func(string) ([]byte, error) { return []byte("abc123\n"), nil }
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.Error(t, err)
+
+	for _, c := range cmd.calls {
+		assert.NotContains(t, c, " down", "a pre-existing project must not be torn down; calls were %v", cmd.calls)
+	}
+}
+
+// The cleanup has to survive the cancellation that caused the failure.
+//
+// The failure this exists for is a wedged daemon or a stalled pull, and callers
+// run starts under a deadline — the desktop wraps every docker action in one. So
+// the up frequently fails BECAUSE the context is already done, and os/exec
+// refuses to spawn a process on a canceled context: reusing the caller's ctx
+// would make the teardown a silent no-op in exactly the case it was written for.
+func TestRollbackRunsEvenWhenTheStartContextIsCancelled(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			// What a killed compose looks like: the context is done and the
+			// command failed because of it.
+			cancel()
+			return ctx.Err()
+		}
+		return nil
+	}
+
+	_, err := e.Start(ctx, p, rt.Callbacks{})
+	require.Error(t, err)
+
+	var down bool
+	for _, c := range cmd.calls {
+		if strings.Contains(c, " down") {
+			down = true
+		}
+	}
+	assert.True(t, down, "the teardown must not inherit the canceled context; calls were %v", cmd.calls)
+}
+
+// A failed start reports the error state, like the health-timeout path does.
+// Without it a consumer driving a UI off the event stream sees "starting" and
+// then silence, and has to treat a stream that stopped as a failure.
+func TestStartEmitsErrorStateWhenTheUpFails(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+
+	var states []rt.State
+	cb := rt.Callbacks{OnState: func(s rt.State, _ error) { states = append(states, s) }}
+	if _, err := e.Start(context.Background(), p, cb); err == nil {
+		t.Fatal("want the start to fail")
+	}
+	assert.Equal(t, []rt.State{rt.StateStarting, rt.StateError}, states)
+}
+
+// A cleanup failure has to reach the caller even with no callbacks. The report
+// used to be gated on cb.OnLine, which the contract makes optional, so a
+// consumer passing rt.Callbacks{} could leak containers with no signal anywhere.
+func TestRollbackFailureIsReportedWithoutCallbacks(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		if strings.Contains(call, " down") {
+			return errors.New("daemon gone")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "starting project containers", "the start failure must stay in the message")
+	assert.Contains(t, err.Error(), "cleaning up", "the leak must be visible without callbacks")
+}
+
+// The container logs are the only diagnosis for the most common docker-start
+// failure — every service waits on the one-shot migration, so a failing
+// `airflow db migrate` surfaces as "dependency failed to start" and nothing
+// else. They have to be read before the containers are removed.
+func TestRollbackReportsLogsBeforeRemovingContainers(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{OnLine: func(rt.LogLine) {}})
+	require.Error(t, err)
+
+	logsAt, downAt := -1, -1
+	for i, c := range cmd.calls {
+		if strings.Contains(c, " logs ") && logsAt < 0 {
+			logsAt = i
+		}
+		if strings.Contains(c, " down") && downAt < 0 {
+			downAt = i
+		}
+	}
+	require.GreaterOrEqual(t, logsAt, 0, "logs were never read; calls were %v", cmd.calls)
+	require.GreaterOrEqual(t, downAt, 0, "containers were never removed; calls were %v", cmd.calls)
+	assert.Less(t, logsAt, downAt, "logs must be read before the containers are removed")
+}
+
+// A stopped container counts as pre-existing.
+//
+// The probe used to ask the working-dir label with plain `ps`, which lists only
+// running containers — so a project someone had `compose stop`ped, or one an
+// earlier crash left in `created`, read as "nothing here" and was removed by the
+// guard meant to protect it. `compose -p <name> ps -aq` is what answers the
+// question the guard actually asks.
+func TestStartLeavesStoppedPreexistingContainersAlone(t *testing.T) {
+	cmd := &fakeCmd{}
+	// A stopped container still has an id, which is the whole point.
+	cmd.output = func(string) ([]byte, error) { return []byte("stopped-id\n"), nil }
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.Error(t, err)
+	for _, c := range cmd.calls {
+		assert.NotContains(t, c, " down", "a stopped pre-existing project must not be torn down; calls were %v", cmd.calls)
+	}
+}
+
+// A probe that cannot answer must not license a teardown.
+//
+// This is the branch the reasoning leans on hardest and it had no test: with the
+// engine unreachable we do not know what is there, and the cost of guessing
+// "nothing" is deleting a running Airflow, while the cost of guessing "something"
+// is an orphan — the state this whole path improves on.
+func TestStartSkipsCleanupWhenTheProbeFails(t *testing.T) {
+	cmd := &fakeCmd{}
+	cmd.output = func(string) ([]byte, error) { return nil, errors.New("daemon gone") }
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.Error(t, err)
+	for _, c := range cmd.calls {
+		assert.NotContains(t, c, " down", "an unanswerable probe must not license a teardown; calls were %v", cmd.calls)
+	}
+	// And the user is told where to look, since we are leaving containers behind.
+	assert.Contains(t, err.Error(), "compose project", "the error should name the project so it can be cleaned up by hand")
+}
+
+// Every failure exit reports StateError, not just the two that were noticed.
+// The image build is the slowest and most failure-prone step in a start, and it
+// used to end the event stream on "starting".
+func TestStartEmitsErrorStateFromAnEarlyFailure(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	// The image build is the step this is about: slow, failure-prone, and it used
+	// to end the stream on "starting".
+	images := newStubImages()
+	images.err = errors.New("build failed")
+	e.images = images
+
+	var states []rt.State
+	cb := rt.Callbacks{OnState: func(s rt.State, _ error) { states = append(states, s) }}
+	if _, err := e.Start(context.Background(), testPlan(t), cb); err == nil {
+		t.Fatal("want the start to fail")
+	}
+	assert.Equal(t, []rt.State{rt.StateStarting, rt.StateError}, states)
+}
+
+// With no line callback the diagnosis has nowhere to stream, so it rides the
+// error instead. Otherwise the container holding the only explanation is removed
+// and its output is gone, leaving "exit status 1" and nothing else.
+func TestFailedStartCarriesContainerOutputWhenNothingIsStreaming(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, s rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		if strings.Contains(call, " logs ") && s.Out != nil {
+			_, _ = s.Out.Write([]byte("db-migration-1  | 2026-08-25T00:00:00.000000000Z Traceback: boom\n"))
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Traceback: boom", "the container output must survive in the error")
+	assert.Contains(t, err.Error(), "db-migration", "and name the service that said it")
+}
+
+// The diagnostic read must not be able to eat the teardown's budget.
+//
+// This is the same defect as reusing a canceled context, one level in. The log
+// capture runs first; when it shared a single rollback deadline, a wedged daemon
+// blocked it until that deadline expired, and os/exec then refuses to spawn the
+// `down` at all — so the containers leaked and the caller was told only that
+// cleanup had timed out.
+//
+// Both budgets are shrunk so the arrangement is what decides the outcome: the
+// capture is given less time than it needs, and the teardown needs what is left.
+func TestLogCaptureCannotStarveTheTeardown(t *testing.T) {
+	prevRollback, prevCapture := rollbackTimeout, logCaptureTimeout
+	rollbackTimeout, logCaptureTimeout = 300*time.Millisecond, 30*time.Millisecond
+	t.Cleanup(func() { rollbackTimeout, logCaptureTimeout = prevRollback, prevCapture })
+
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, _ rt.Stdio) error {
+		if strings.Contains(call, " up ") {
+			return errors.New("boom")
+		}
+		return nil
+	}
+	// A wedged daemon: the log read would block far longer than either budget.
+	cmd.delayFor = func(call string) time.Duration {
+		if strings.Contains(call, " logs ") {
+			return 5 * time.Second
+		}
+		return 0
+	}
+	e := testEngine(t, cmd)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{OnLine: func(rt.LogLine) {}})
+	require.Error(t, err)
+
+	var down bool
+	for _, c := range cmd.calls {
+		if strings.Contains(c, " down") {
+			down = true
+		}
+	}
+	assert.True(t, down, "the teardown must still run after the log capture times out; calls were %v", cmd.calls)
 }
