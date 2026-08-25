@@ -74,6 +74,23 @@ func (r *rewrite) Set(key []string, value any) error {
 	return nil
 }
 
+func (r *rewrite) EnsureTablesAtTop(keys [][]string) error {
+	// This implementation re-marshals the whole document, so it keeps no
+	// order to place the tables in: they only have to exist.
+	for _, key := range keys {
+		if len(key) == 0 {
+			return &KeyError{Key: key, Reason: "empty key"}
+		}
+		if _, ok := r.Get(key); ok {
+			continue
+		}
+		if _, err := setIn(r.root, key, key, map[string]any{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *rewrite) Delete(key []string) bool {
 	if len(key) == 0 {
 		return false

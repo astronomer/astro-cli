@@ -33,6 +33,12 @@ func adopt(dir string, data []byte, opts Options, res *Result) ([]byte, manifest
 	if _, ok := ed.Get([]string{"tool", "astro"}); ok {
 		return nil, pin, fmt.Errorf("%s %w; edit that manifest instead of re-initializing", dir, ErrAlreadyAstroProject)
 	}
+	// [project] and [tool.astro] are what make the directory an Astro project,
+	// so they lead the manifest the way [project] leads a pyproject.toml
+	// everywhere else, rather than trailing every tool's own section.
+	if err := ed.EnsureTablesAtTop([][]string{{"project"}, {"tool", "astro"}}); err != nil {
+		return nil, pin, err
+	}
 
 	deps := asStrings(mustGet(ed, "project", "dependencies"))
 	version, defaulted := resolveAirflowVersion(opts.AirflowVersion, deps)

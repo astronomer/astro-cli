@@ -30,6 +30,12 @@ type Editor interface {
 	// Setting over an existing table (or array of tables) is an error:
 	// delete it first to replace it wholesale.
 	Set(key []string, value any) error
+	// EnsureTablesAtTop creates each table of keys the document does not
+	// have yet, empty and in the order given, at the top of the document:
+	// above the first table the document has that keys does not name. A
+	// table already there keeps its place, and so does a leading comment
+	// block. Later Sets fill the tables where they now are.
+	EnsureTablesAtTop(keys [][]string) error
 	// Delete removes the value at key — a scalar, a whole table, or an
 	// array element — and reports whether it was present.
 	Delete(key []string) bool

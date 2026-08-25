@@ -228,6 +228,33 @@ func TestRunAdoptsAManifestWithNoProjectTable(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// [project] and [tool.astro] are what make the directory an Astro project, so
+// they lead the manifest instead of trailing every tool's own section
+//.
+func TestRunAdoptsPuttingTheAstroSectionsFirst(t *testing.T) {
+	dir := t.TempDir()
+	tools := "[tool.sqlfluff]\ndialect = 'snowflake'\n\n# AIR = airflow ruleset\n[tool.ruff.lint]\nselect = ['AIR']\n\n[tool.mypy]\nstrict = true\n"
+	existing := "# Copyright ACME\n# SPDX-License-Identifier: Apache-2.0\n\n" + tools
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+
+	_, err := Run(dir, Options{Name: "orders"})
+	require.NoError(t, err)
+
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	got := string(out)
+	// The license header keeps the top of the file; the two new sections come
+	// below it, [project] first, and the rest of the file is untouched.
+	assert.True(t, strings.HasPrefix(got, "# Copyright ACME\n# SPDX-License-Identifier: Apache-2.0\n\n[project]\n"), got)
+	assert.True(t, strings.HasSuffix(got, tools), got)
+	assert.Less(t, strings.Index(got, "[tool.astro]"), strings.Index(got, "[tool.sqlfluff]"), got)
+
+	m, err := manifest.Parse(out)
+	require.NoError(t, err)
+	assert.Equal(t, "orders", m.Project.Name)
+	assert.Equal(t, DefaultAirflowVersion, m.Astro.AirflowVersion)
+}
+
 // Most repos state the Airflow they run in a Dockerfile image tag, and most of
 // those are on 2.x. init does not read the tag, so it must at least say that
 // the pin it wrote is a default nobody chose.

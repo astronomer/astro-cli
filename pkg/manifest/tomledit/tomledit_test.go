@@ -402,10 +402,123 @@ func TestGet(t *testing.T) {
 	})
 }
 
+// TestEnsureTablesAtTop: a table the manifest does not have yet is created at
+// the top, above the tables already there, and everything else keeps its
+// place and its bytes.
+func TestEnsureTablesAtTop(t *testing.T) {
+	astro := [][]string{{"project"}, {"tool", "astro"}}
+	cases := map[string]struct {
+		src  string
+		want string
+	}{
+		"tool sections only": {
+			src:  "[tool.ruff]\nline-length = 100\n\n[tool.mypy]\nstrict = true\n",
+			want: "[project]\n\n[tool.astro]\n\n[tool.ruff]\nline-length = 100\n\n[tool.mypy]\nstrict = true\n",
+		},
+		"leading comment block stays first": {
+			src:  "# Copyright ACME\n# vim: ft=toml\n\n[tool.ruff]\nline-length = 100\n",
+			want: "# Copyright ACME\n# vim: ft=toml\n\n[project]\n\n[tool.astro]\n\n[tool.ruff]\nline-length = 100\n",
+		},
+		"comment attached to the first header travels with it": {
+			src:  "# ruff, not the linter you think\n[tool.ruff]\nline-length = 100\n",
+			want: "[project]\n\n[tool.astro]\n\n# ruff, not the linter you think\n[tool.ruff]\nline-length = 100\n",
+		},
+		"a table already there keeps its place": {
+			src:  "[project]\nname = 'orders'\n\n[project.urls]\nhome = 'https://example.com'\n\n[tool.ruff]\nline-length = 100\n",
+			want: "[project]\nname = 'orders'\n\n[project.urls]\nhome = 'https://example.com'\n\n[tool.astro]\n\n[tool.ruff]\nline-length = 100\n",
+		},
+		"key-values outside any table stay above": {
+			src:  "requires = 'nothing'\n\n[tool.ruff]\nline-length = 100\n",
+			want: "requires = 'nothing'\n\n[project]\n\n[tool.astro]\n\n[tool.ruff]\nline-length = 100\n",
+		},
+		"empty document": {
+			src:  "",
+			want: "[project]\n\n[tool.astro]\n",
+		},
+		"document with no tables": {
+			src:  "# nothing but a comment\n",
+			want: "# nothing but a comment\n\n[project]\n\n[tool.astro]\n",
+		},
+		"nothing to create": {
+			src:  "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n",
+			want: "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n",
+		},
+		"CRLF document": {
+			src:  "[tool.ruff]\r\nline-length = 100\r\n",
+			want: "[project]\r\n\r\n[tool.astro]\r\n\r\n[tool.ruff]\r\nline-length = 100\r\n",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e, err := NewSurgical([]byte(tc.src))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := e.EnsureTablesAtTop(astro); err != nil {
+				t.Fatalf("EnsureTablesAtTop: %v", err)
+			}
+			got, err := e.Bytes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tc.want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestEnsureTablesAtTopThenSet: the keys written afterwards land in the new
+// tables, where they now are, and both implementations carry the same data.
+func TestEnsureTablesAtTopThenSet(t *testing.T) {
+	src := []byte("[tool.ruff]\nline-length = 100\n")
+	both(t, src, func(t *testing.T, e Editor) {
+		if err := e.EnsureTablesAtTop([][]string{{"project"}, {"tool", "astro"}}); err != nil {
+			t.Fatal(err)
+		}
+		apply(t, e, []op{
+			set("orders", "project", "name"),
+			set("0.1.0", "project", "version"),
+			set("3.1", "tool", "astro", "airflow"),
+		})
+		out, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Project struct {
+				Name    string `toml:"name"`
+				Version string `toml:"version"`
+			} `toml:"project"`
+			Tool struct {
+				Astro struct {
+					Airflow string `toml:"airflow"`
+				} `toml:"astro"`
+				Ruff struct {
+					LineLength int `toml:"line-length"`
+				} `toml:"ruff"`
+			} `toml:"tool"`
+		}
+		if err := toml.Unmarshal(out, &doc); err != nil {
+			t.Fatal(err)
+		}
+		if doc.Project.Name != "orders" || doc.Project.Version != "0.1.0" {
+			t.Errorf("project = %+v", doc.Project)
+		}
+		if doc.Tool.Astro.Airflow != "3.1" || doc.Tool.Ruff.LineLength != 100 {
+			t.Errorf("tool = %+v", doc.Tool)
+		}
+	})
+}
+
 func TestEmptyKeySetFails(t *testing.T) {
 	both(t, []byte(""), func(t *testing.T, e Editor) {
 		if err := e.Set(nil, "x"); err == nil {
 			t.Error("Set with an empty key should fail")
+		}
+		if err := e.EnsureTablesAtTop([][]string{nil}); err == nil {
+			t.Error("EnsureTablesAtTop with an empty key should fail")
 		}
 	})
 }
