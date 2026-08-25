@@ -240,7 +240,12 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 
 	// open browser
 	if !shouldDisplayLoginLink {
-		fmt.Printf("%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
+		action := "log in"
+		if signup {
+			action = "create your Astro account"
+			fmt.Printf("Already have an Astro account? Log in from the same page, or run %s.\n", ansi.Cyan("astro login --signin"))
+		}
+		fmt.Printf("%s to open the browser to %s or %s to quit…", ansi.Green("Press Enter"), action, ansi.Red("^C"))
 		_, err := fmt.Scanln()
 		if err != nil {
 			return Result{}, err
@@ -475,6 +480,26 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		}
 	}
 	return nil
+}
+
+// ShouldSignup reports whether a login to domain should open the sign-up screen
+// rather than the sign-in screen. It says yes when the CLI holds nothing for
+// that domain, which is the state a first-run user is in.
+func ShouldSignup(domain string) bool {
+	return shouldSignup(context.GetContext, domainutil.FormatDomain(domain))
+}
+
+// getContext is a parameter, not a direct call, so a test does not need a real ~/.astro.
+func shouldSignup(getContext func(domain string) (config.Context, error), domain string) bool {
+	c, err := getContext(domain)
+	if err != nil {
+		return true
+	}
+	// Only a login to this domain writes these, so any one of them means the
+	// account exists. An expired token counts as much as a fresh one: it is
+	// stale, not proof that the user never signed up.
+	return c.Token == "" && c.RefreshToken == "" && c.Organization == "" &&
+		c.Workspace == "" && c.LastUsedWorkspace == "" && c.UserEmail == ""
 }
 
 // Login handles authentication to astronomer api and registry

@@ -415,6 +415,73 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	})
 }
 
+// captureStdout returns what fn printed to stdout.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	realStdout := os.Stdout
+	os.Stdout = w
+	fn()
+	os.Stdout = realStdout
+	w.Close()
+	out, err := io.ReadAll(r)
+	assert.NoError(t, err)
+	return string(out)
+}
+
+func TestShouldSignup(t *testing.T) {
+	const domain = "astronomer.io"
+	tests := []struct {
+		name     string
+		contexts map[string]config.Context
+		want     bool
+	}{
+		{"no context at all", nil, true},
+		{"a context for another domain only", map[string]config.Context{
+			"astronomer-dev.io": {Domain: "astronomer-dev.io", Token: "Bearer token"},
+		}, true},
+		{"a context for this domain with nothing in it", map[string]config.Context{
+			domain: {Domain: domain},
+		}, true},
+		{"an access token for this domain", map[string]config.Context{
+			domain: {Domain: domain, Token: "Bearer token"},
+		}, false},
+		{"a refresh token for this domain", map[string]config.Context{
+			domain: {Domain: domain, RefreshToken: "refresh-token"},
+		}, false},
+		{"a workspace for this domain", map[string]config.Context{
+			domain: {Domain: domain, Workspace: "test-workspace-id"},
+		}, false},
+		{"an organization for this domain", map[string]config.Context{
+			domain: {Domain: domain, Organization: "test-org-id"},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getContext := func(d string) (config.Context, error) {
+				c, ok := tt.contexts[d]
+				if !ok {
+					return config.Context{}, errMock
+				}
+				return c, nil
+			}
+			assert.Equal(t, tt.want, shouldSignup(getContext, domain))
+		})
+	}
+
+	// The expiry lives beside the context rather than in it, so read it through
+	// the real store: a stale token is still proof that the account exists.
+	t.Run("an expired token for this domain", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c := config.Context{Domain: domain}
+		assert.NoError(t, c.SetExpiresIn(-3600))
+		assert.False(t, ShouldSignup(domain))
+		assert.False(t, ShouldSignup("cloud.astronomer.io"))
+		assert.True(t, ShouldSignup("astronomer-dev.io"))
+	})
+}
+
 func TestAuthDeviceLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success without login link", func(t *testing.T) {
@@ -457,6 +524,33 @@ func TestAuthDeviceLogin(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, authorizeURL, "screen_hint=signup")
 		assert.Contains(t, authorizeURL, "ext-signup-source=cli")
+	})
+
+	t.Run("the prompt names the screen the browser opens", func(t *testing.T) {
+		openURL = func(url string) error {
+			return nil
+		}
+		callbackHandler := func() (string, error) {
+			return "test-code", nil
+		}
+		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
+			return Result{}, nil
+		}
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+
+		out := captureStdout(t, func() {
+			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, true)
+			assert.NoError(t, err)
+		})
+		assert.Contains(t, out, "to open the browser to create your Astro account")
+		assert.Contains(t, out, "astro login --signin")
+
+		out = captureStdout(t, func() {
+			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+			assert.NoError(t, err)
+		})
+		assert.Contains(t, out, "to open the browser to log in")
+		assert.NotContains(t, out, "create your Astro account")
 	})
 
 	t.Run("openURL & callback failure", func(t *testing.T) {

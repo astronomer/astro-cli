@@ -19,6 +19,8 @@ func (s *CmdSuite) TestAuthRootCommand() {
 	output, err := executeCommand("login", "--help")
 	s.NoError(err)
 	s.Contains(output, "Authenticate to Astro or APC")
+	s.Contains(output, "--signup")
+	s.Contains(output, "--signin")
 }
 
 func (s *CmdSuite) TestLogin() {
@@ -63,7 +65,7 @@ func (s *CmdSuite) TestLogin() {
 
 func (s *CmdSuite) TestLoginSignup() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	s.T().Cleanup(func() { signup = false })
+	s.T().Cleanup(func() { signup, signin, token = false, false, "" })
 
 	var got bool
 	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag bool) error {
@@ -72,13 +74,36 @@ func (s *CmdSuite) TestLoginSignup() {
 	}
 	buf := new(bytes.Buffer)
 
-	signup = true
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	// The config holds a context for astronomer.io and none for astronomer-dev.io.
+	const knownDomain, newDomain = "astronomer.io", "astronomer-dev.io"
+
+	signup, signin = true, false
+	s.NoError(login(&cobra.Command{}, []string{knownDomain}, nil, buf))
 	s.True(got)
 
-	signup = false
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	signup, signin = false, true
+	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
 	s.False(got)
+
+	signup, signin = false, false
+	s.NoError(login(&cobra.Command{}, []string{knownDomain}, nil, buf))
+	s.False(got)
+
+	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
+	s.True(got)
+
+	// A token login opens no browser, so it stays on the sign-in path.
+	token = "a-token"
+	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
+	s.False(got)
+}
+
+func (s *CmdSuite) TestLoginSignupAndSigninConflict() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	s.T().Cleanup(func() { signup, signin = false, false })
+
+	_, err := executeCommand("login", "--signup", "--signin")
+	s.ErrorContains(err, "[signup signin]")
 }
 
 // A sign-up that still needs the email address verified worked. Say so and exit

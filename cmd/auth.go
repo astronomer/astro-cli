@@ -21,6 +21,7 @@ var (
 	token                  string
 	oAuth                  bool
 	signup                 bool
+	signin                 bool
 
 	cloudLogin  = cloudAuth.Login
 	cloudLogout = cloudAuth.Logout
@@ -31,7 +32,7 @@ var (
 // newLoginCommand is a top-level alias for "astro auth login" kept for backward compatibility.
 func newLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := newAuthLoginCommand(astroV1Client, out)
-	cmd.Long = "Authenticate to Astro or APC. This is an alias for 'astro auth login'."
+	cmd.Long += " This is an alias for 'astro auth login'."
 	return cmd
 }
 
@@ -57,6 +58,19 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 	return err
 }
 
+// signupForDomain picks the browser screen for a login to domain. A flag the
+// user passed wins over the detection.
+func signupForDomain(domain string) bool {
+	switch {
+	case signup:
+		return true
+	case signin, token != "": // a token login opens no browser, so it keeps its old behavior
+		return false
+	default:
+		return cloudAuth.ShouldSignup(domain)
+	}
+}
+
 func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -71,15 +85,15 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 			}
 			return apcLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
-		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink, signup)
+		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(args[0]))
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(domainutil.DefaultDomain, token, astroV1Client, out, shouldDisplayLoginLink, signup)
+		return cloudLogin(domainutil.DefaultDomain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(domainutil.DefaultDomain))
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink, signup)
+		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(ctx.Domain))
 	}
 	return apcLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }
@@ -125,7 +139,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
-		Long:  "Authenticate to Astro or APC",
+		Long:  "Authenticate to Astro or APC. Without a saved account for the domain, the browser opens the sign-up screen; use --signin for an existing account.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return login(cmd, args, astroV1Client, out)
@@ -136,6 +150,8 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
 	cmd.Flags().BoolVar(&signup, "signup", false, "Create a new Astro account instead of signing in to an existing one")
+	cmd.Flags().BoolVar(&signin, "signin", false, "Sign in to an existing Astro account instead of creating one")
+	cmd.MarkFlagsMutuallyExclusive("signup", "signin")
 	return cmd
 }
 
