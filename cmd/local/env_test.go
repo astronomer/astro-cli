@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/internal/localenv"
 )
 
 // envProject writes a project with the given [tool.astro.env] body and points
@@ -182,9 +184,15 @@ func TestEnvGlobalScope(t *testing.T) {
 	if err := execute(t, d, "local", "env", "set", "SHARED", "--global"); err != nil {
 		t.Fatal(err)
 	}
-	// It went to ~/.astro/env (ASTRO_HOME), not the project .env.
-	home := os.Getenv("ASTRO_HOME")
-	gc, err := os.ReadFile(filepath.Join(home, "env"))
+	// It went to the global file, not the project .env. Through GlobalEnvPath
+	// rather than by joining a path here: the layout is that function's to own,
+	// and restating it is how this test agreed with the bug where ASTRO_HOME was
+	// read as .astro itself rather than as its parent.
+	gp, err := localenv.GlobalEnvPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gc, err := os.ReadFile(gp)
 	if err != nil {
 		t.Fatal(err)
 	}

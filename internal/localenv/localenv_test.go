@@ -159,9 +159,7 @@ func TestMultilineValueRejected(t *testing.T) {
 func TestInjectionWholesaleVsDeclared(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	if err := os.WriteFile(filepath.Join(home, "env"), []byte("DECLARED_GLOBAL=g\nUNDECLARED_GLOBAL=stray\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeGlobalEnv(t, "DECLARED_GLOBAL=g\nUNDECLARED_GLOBAL=stray\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("DECLARED_PROJECT=p\nUNDECLARED_PROJECT=alsohere\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -191,9 +189,7 @@ func TestInjectionWholesaleVsDeclared(t *testing.T) {
 func TestProviderPrecedence(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	if err := os.WriteFile(filepath.Join(home, "env"), []byte("K=global\nONLY_GLOBAL=g\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeGlobalEnv(t, "K=global\nONLY_GLOBAL=g\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("K=project\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -225,9 +221,7 @@ func firstHit(ps []envresolve.Provider, key string) (value, source string, ok bo
 func TestListSourceAndOrphans(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	if err := os.WriteFile(filepath.Join(home, "env"), []byte("STRAY_GLOBAL=x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeGlobalEnv(t, "STRAY_GLOBAL=x\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("DECLARED=p\nSTRAY_PROJECT=y\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -315,4 +309,59 @@ func TestListNeverHasValueField(t *testing.T) {
 	_ = it.Kind
 	_ = it.Name
 	_ = it.Source
+}
+
+// writeGlobalEnv puts a global env file where GlobalEnvPath says it goes.
+//
+// Through the function rather than by joining a path here: these tests used to
+// hardcode $ASTRO_HOME/env, which is the layout the code was getting wrong, so
+// they agreed with the bug and could not have caught it. What the layout IS is
+// pinned once, in TestGlobalEnvPathFollowsTheAstroHomeConvention.
+func writeGlobalEnv(t *testing.T, body string) {
+	t.Helper()
+	p, err := GlobalEnvPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ASTRO_HOME names the PARENT of .astro. config.HomeConfigPath and cmd/local's
+// routesDir both read it that way, and this function claimed to and did not:
+// it put the env file at $ASTRO_HOME/env while the config went to
+// $ASTRO_HOME/.astro/config.yaml. Relocating an astro home has to move one
+// directory, not scatter files either side of it.
+func TestGlobalEnvPathFollowsTheAstroHomeConvention(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("ASTRO_HOME", home)
+
+	got, err := GlobalEnvPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(home, ".astro", "env"); got != want {
+		t.Errorf("GlobalEnvPath() = %q, want %q — ASTRO_HOME is the parent of .astro", got, want)
+	}
+}
+
+// And with it unset the answer is unchanged, which is why the disagreement went
+// unnoticed for so long: both spellings land here.
+func TestGlobalEnvPathWithoutAstroHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("ASTRO_HOME", "")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	got, err := GlobalEnvPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(home, ".astro", "env"); got != want {
+		t.Errorf("GlobalEnvPath() = %q, want %q", got, want)
+	}
 }
