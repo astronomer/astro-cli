@@ -11,6 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
@@ -183,9 +184,17 @@ func (c *Config) BuildEnv() []string {
 	set("AIRFLOW_API_URL", c.AirflowURL)
 
 	if c.AirflowURL != "" {
-		// Default local Airflow credentials for af CLI token exchange
-		set("AIRFLOW_USERNAME", "admin")
-		set("AIRFLOW_PASSWORD", "admin")
+		// The account the engines provision, from pkg/airflowrt rather than
+		// spelled again here.
+		//
+		// Right for docker mode either version, and for macOS standalone. NOT
+		// right for a non-macOS standalone Airflow 2, whose password `airflow
+		// standalone` generates: detectV2Airflow refuses that case explicitly,
+		// detectV1Airflow has no Airflow-major or mode information to refuse it
+		// with, so a v1 standalone AF2 route still gets a pair that will 401.
+		// See the gap noted in pkg/airflowrt/account.go.
+		set("AIRFLOW_USERNAME", airflowrt.Airflow2AdminUser)
+		set("AIRFLOW_PASSWORD", airflowrt.Airflow2AdminPassword)
 	} else {
 		// We couldn't match the current project to a running Airflow.
 		// Point the af CLI at an empty config so it doesn't silently fall

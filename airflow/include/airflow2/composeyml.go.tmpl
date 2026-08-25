@@ -80,7 +80,7 @@ services:
         else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
         { airflow users create "$$@" || airflow create_user "$$@" ; } &&
         { airflow sync-perm || airflow sync_perm ;} &&
-        airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+        airflow webserver' -- -r Admin -u {{ .AdminUser }} -e admin@example.com -f admin -l user -p {{ .AdminPassword }}
     restart: unless-stopped
     networks:
       - airflow

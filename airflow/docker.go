@@ -43,6 +43,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -156,6 +157,12 @@ type ComposeConfig struct {
 	TriggererEnabled         bool
 	ProjectName              string
 	AuthCredentialsDirectory string
+	// AdminUser/AdminPassword are the Airflow 2 account the compose template
+	// creates. They come from pkg/airflowrt rather than the template so v1
+	// docker mode, v2 docker mode and the macOS standalone shim cannot drift
+	// apart — see that package's account.go.
+	AdminUser     string
+	AdminPassword string
 }
 
 type DockerCompose struct {
@@ -1751,7 +1758,8 @@ func airflowAPIURL(airflowMajorVersion uint64, portOvr *PortOverrides) string {
 // airflowAuthHeader returns the Authorization header for the local Airflow instance.
 func airflowAuthHeader(airflowMajorVersion uint64, portOvr *PortOverrides) string {
 	if airflowMajorVersion == airflowMajorVersion2 {
-		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
+		return "Basic " + base64.StdEncoding.EncodeToString(
+			[]byte(airflowrt.Airflow2AdminUser+":"+airflowrt.Airflow2AdminPassword))
 	}
 	// Airflow 3 uses JWT auth via /auth/token endpoint.
 	// With SimpleAuthManager + ALL_ADMINS=True, any credentials work.
@@ -1825,7 +1833,8 @@ func printProxyStatus(settingsFile string, envConns map[string]astrov1.Environme
 	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+pgPort+"/postgres"))
 
 	if airflowMajorVersion == airflowMajorVersion2 {
-		fmt.Printf(bullet+composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
+		fmt.Printf(bullet+composeUserPasswordMsg+"\n",
+			ansi.Bold(airflowrt.Airflow2AdminUser+":"+airflowrt.Airflow2AdminPassword))
 	}
 	fmt.Printf(bullet+postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
 
@@ -1876,7 +1885,8 @@ func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObj
 	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+pgPort+"/postgres"))
 	// The CLI configures Airflow 3 to run without UI credentials, so we don't want to print them out
 	if airflowMajorVersion == airflowMajorVersion2 {
-		fmt.Printf(bullet+composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
+		fmt.Printf(bullet+composeUserPasswordMsg+"\n",
+			ansi.Bold(airflowrt.Airflow2AdminUser+":"+airflowrt.Airflow2AdminPassword))
 	}
 	fmt.Printf(bullet+postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
 	if !(noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {

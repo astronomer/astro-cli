@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
@@ -46,17 +47,6 @@ const (
 	// way the state record spells them.
 	airflow2 = "2"
 	airflow3 = "3"
-)
-
-// The Airflow 2 admin account. Flask-AppBuilder has no all-admins mode, so
-// Airflow 2 needs a real user before anything can log in or mint a token; the
-// database service creates this one. The CLI's internal/instances names the
-// same pair as the local Airflow 2 account — that is how `astro api airflow`
-// and Otto reach a docker-mode Airflow 2 — and pins it in a test of its own,
-// since the two live in different modules and cannot share a constant.
-const (
-	adminUser     = "admin"
-	adminPassword = "admin"
 )
 
 // mountDirs are the project subdirectories mounted into the Airflow
@@ -138,9 +128,15 @@ func airflowServices(major string) []service {
 // repeat: creating a user that already exists prints so and exits 0.
 func dbCommand(major string) []string {
 	if major == airflow2 {
+		// Only the username and password come from the constant. Deriving the
+		// email and firstname from it looked tidier and was worse: the macOS shim
+		// hardcodes admin@example.com and "Admin", so a changed username would
+		// have made docker mode and the shim create differently-shaped users —
+		// manufacturing a divergence the literals do not have. Neither field is
+		// used to authenticate.
 		createAdmin := fmt.Sprintf(
 			"airflow users create --role Admin --username %s --password %s --email admin@example.com --firstname admin --lastname user",
-			adminUser, adminPassword)
+			airflowrt.Airflow2AdminUser, airflowrt.Airflow2AdminPassword)
 		return []string{"bash", "-c", "airflow db migrate && airflow sync-perm && " + createAdmin}
 	}
 	return []string{"airflow", "db", "migrate"}

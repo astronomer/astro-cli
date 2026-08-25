@@ -31,8 +31,14 @@ import (
 // Which of the two a project runs comes from the Airflow it pins — the same
 // fact the standalone engine branches on when it launches.
 const (
-	localUsername = "admin"
-	localPassword = "admin"
+	// The account every local engine provisions, from the package that owns the
+	// one writer nothing else can reach — standalone's macOS shim. NOT
+	// docker-only: localAccount returns this username for standalone too, and
+	// localPasswordFor falls back to this password whenever the generated file
+	// is missing or blank. Changing it moves docker mode, standalone on macOS,
+	// and every caller that authenticates, together.
+	localUsername = airflowrt.Airflow2AdminUser
+	localPassword = airflowrt.Airflow2AdminPassword
 	// localPasswordFile is where Airflow 2's standalone writes the password it
 	// generated, relative to the project's standalone AIRFLOW_HOME.
 	localPasswordFile = "standalone_admin_password.txt"

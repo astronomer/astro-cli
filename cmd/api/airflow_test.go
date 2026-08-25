@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -52,6 +53,19 @@ func TestAirflowCmdFlags(t *testing.T) {
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("deployment"))
 	assert.Equal(t, "d", cmd.PersistentFlags().ShorthandLookup("d").Name[:1])
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("url"))
+	// The local-auth defaults, which reach a live token mint on the --url path
+	// (see airflowtarget's NewTokenMinter) and are printed in --help. They come
+	// from the runtime that provisions the account, so this asserts the wiring
+	// rather than the value: nothing else in this package covered them.
+	for name, want := range map[string]string{
+		"username": airflowrt.Airflow2AdminUser,
+		"password": airflowrt.Airflow2AdminPassword,
+	} {
+		flag := cmd.PersistentFlags().Lookup(name)
+		require.NotNil(t, flag, name)
+		assert.Equal(t, want, flag.DefValue, "--%s default must come from pkg/airflowrt", name)
+	}
+
 	// The two spellings this command shipped with still parse, marked deprecated.
 	for _, name := range []string{"api-url", "deployment-id"} {
 		flag := cmd.PersistentFlags().Lookup(name)

@@ -98,15 +98,20 @@ func TestGenerateComposeAirflow2(t *testing.T) {
 		assert.NotContains(t, web.Environment, af3Only, "an Airflow 3 setting must not reach an Airflow 2 container")
 	}
 
-	// The migration also seeds the admin account the CLI mints with. Those two
-	// words are pinned in internal/instances too (localUsername,
-	// localPassword): the two modules share no constant, and a pair that
-	// disagrees turns every authenticated call into a 401.
+	// The migration also seeds the admin account every caller authenticates with,
+	// which now comes from airflowrt (the one package the macOS standalone shim
+	// can also reach). Asserted as a LITERAL on purpose: building the expected
+	// string from the same constants dbCommand uses is a tautology that passes
+	// whatever the value is, which is what the first version of this did — and
+	// the only remaining signal was the golden file, whose failure message tells
+	// you to regenerate it.
 	db := doc.Services["db-migration"].Command
 	require.Len(t, db, 3)
 	assert.Equal(t, []string{"bash", "-c"}, db[:2])
 	assert.Contains(t, db[2], "airflow db migrate")
-	assert.Contains(t, db[2], "--username admin --password admin")
+	// Trailing " --email" on purpose: "admin9" contains "admin", so an assertion
+	// that stops at the password passes for a changed value. Verified by mutation.
+	assert.Contains(t, db[2], "--username admin --password admin --email")
 }
 
 func TestHealthURLs(t *testing.T) {

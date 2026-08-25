@@ -17,6 +17,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -250,6 +251,8 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		TriggererEnabled:      triggererEnabled,
 		DuplicateImageVolumes: config.CFG.DuplicateImageVolumes.GetBool(),
 		ProjectName:           projectName,
+		AdminUser:             airflowrt.Airflow2AdminUser,
+		AdminPassword:         airflowrt.Airflow2AdminPassword,
 	}
 
 	buff := new(bytes.Buffer)

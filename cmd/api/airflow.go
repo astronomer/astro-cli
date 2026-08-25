@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
@@ -151,8 +152,8 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	cmd.PersistentFlags().MarkDeprecated("deployment-id", "use -d/--deployment")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace-id", "W", "", "Override workspace ID for deployment lookup")
-	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", "admin", "Username for Airflow API authentication (local only)")
-	cmd.PersistentFlags().StringVar(&opts.Password, "password", "admin", "Password for Airflow API authentication (local only)")
+	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (local only)")
+	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (local only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
 
 	// Request flags

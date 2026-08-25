@@ -244,7 +244,8 @@ func (s *Standalone) printLoginHint(bullet string) {
 		return
 	}
 	if runtime.GOOS == osDarwin {
-		fmt.Printf("%sLogin:      %s\n", bullet, ansi.Bold("admin / admin"))
+		fmt.Printf("%sLogin:      %s\n", bullet,
+			ansi.Bold(airflowrt.Airflow2AdminUser+" / "+airflowrt.Airflow2AdminPassword))
 		return
 	}
 	passwordFile := filepath.Join(standaloneDir, "standalone_admin_password.txt")
@@ -837,7 +838,8 @@ func (s *Standalone) standaloneAuthHeader(port string) string {
 		// If the user changes the admin password after first start, settings
 		// import/export will silently fail against the real credentials.
 		// This is acceptable for local dev but means credentials are coupled.
-		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
+		return "Basic " + base64.StdEncoding.EncodeToString(
+			[]byte(airflowrt.Airflow2AdminUser+":"+airflowrt.Airflow2AdminPassword))
 	}
 	token, err := fetchAirflowJWTToken(fmt.Sprintf("http://localhost:%s", port))
 	if err != nil {

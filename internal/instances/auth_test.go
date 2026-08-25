@@ -379,18 +379,6 @@ func TestLocalAccountFallsBackToTheManifest(t *testing.T) {
 	}
 }
 
-// TestDockerModeAccountLiterals pins the Airflow 2 account docker mode creates.
-// pkg/localrt's docker engine writes these two words into the compose file's
-// `airflow users create` line, and its own test pins them there; the pair has to
-// agree or every authenticated call to a docker-mode Airflow 2 gets a 401. The
-// two live in different modules and share no constant, so each side pins the
-// literal and names the other.
-func TestDockerModeAccountLiterals(t *testing.T) {
-	if localUsername != "admin" || localPassword != "admin" {
-		t.Fatalf("account = %s/%s, want admin/admin, which the docker engine's dbCommand creates", localUsername, localPassword)
-	}
-}
-
 // TestPasswordFileShapes: the file is written by `airflow standalone`, so what
 // it holds is not this code's choice. Whitespace-only counts as absent.
 func TestPasswordFileShapes(t *testing.T) {
