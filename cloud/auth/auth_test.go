@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -386,6 +387,21 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
 		wg.Wait()
+	})
+
+	t.Run("an address already taken returns an error", func(t *testing.T) {
+		held, err := net.Listen("tcp", "localhost:0")
+		assert.NoError(t, err)
+		defer held.Close()
+		previous := callbackServer
+		t.Cleanup(func() { callbackServer = previous })
+		callbackServer = held.Addr().String()
+
+		code, err := authorizeCallbackHandler()
+		assert.Error(t, err)
+		assert.Empty(t, code)
+		assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
+		assert.Contains(t, err.Error(), "Close any other astro login")
 	})
 
 	t.Run("error", func(t *testing.T) {

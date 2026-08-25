@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,7 +29,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -166,7 +166,7 @@ func authorizeError(errorCode, errorDescription []string) error {
 
 func authorizeCallbackHandler() (string, error) {
 	m := http.NewServeMux()
-	s := http.Server{Addr: callbackServer, Handler: m, ReadHeaderTimeout: 0}
+	s := http.Server{Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if errorCode, ok := req.URL.Query()["error"]; ok {
@@ -179,9 +179,17 @@ func authorizeCallbackHandler() (string, error) {
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/success", http.StatusFound)
 		}
 	})
+	// Bind before serving, so an address already taken reaches the caller as an
+	// error rather than ending the process from inside the goroutine below.
+	listener, err := net.Listen("tcp", callbackServer)
+	if err != nil {
+		return "", fmt.Errorf("cannot open the login callback on %s: %w. Close any other astro login and try again", callbackServer, err)
+	}
 	go func() {
-		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal(err)
+		if err := s.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// The caller selects on this channel, so it hears a server that
+			// stops early instead of waiting out the callback timeout.
+			callbackChannel <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}
 		}
 	}()
 
@@ -202,7 +210,7 @@ func authorizeCallbackHandler() (string, error) {
 			return "", errors.New("the operation has timed out")
 		}
 	}
-	err := s.Shutdown(http_context.Background())
+	err = s.Shutdown(http_context.Background())
 	if err != nil {
 		fmt.Printf("error: %s", err)
 	}
