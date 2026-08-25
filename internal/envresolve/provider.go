@@ -10,15 +10,17 @@ package envresolve
 // so the same key resolves against the shell, a project file, or a global
 // file with no per-source translation.
 //
-// The chain that ships is shell env > project .env > global ~/.astro/env
-// (internal/localenv builds it). The chain is the extension point: a
-// cloud-backed or exec-hook provider slots into the same ordered walk
-// without changing anything here.
+// The chain that ships is shell env > project .env > project vault > global
+// vault > global ~/.astro/env (internal/localenv assembles it; the vault tiers
+// come from internal/vaultenv). The chain is the extension point, and the vault
+// is the proof: it slotted into the same ordered walk without changing anything
+// here.
 type Provider interface {
 	// Lookup reports the raw stored value for an Airflow env-var key, and
 	// whether this provider holds one.
 	Lookup(envKey string) (value string, ok bool)
-	// Label names the source for reporting: "shell", "project", "global".
+	// Label names the source for reporting: "shell", "project", "global",
+	// the vault tiers, or "workspace" (plus its unavailable variants).
 	Label() string
 }
 

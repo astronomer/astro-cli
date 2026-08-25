@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -61,7 +62,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, passEnv, err := resolveEnv(m, proj, opts)
+	env, secretEnv, passEnv, err := resolveEnv(m, proj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +89,17 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// concrete version.
 			StopWithSession: opts.StopWithSession,
 			Env:             env,
-			PassthroughEnv:  passEnv,
-			Hostname:        proj.Hostname,
-			StateDir:        stateDir,
-			RequestedPort:   choosePort(opts.RequestedPort, us.Port),
+			// The vault's values, kept out of Env on purpose: docker mode
+			// writes Env into the compose file it leaves in the state
+			// directory, and a decrypted credential on disk would undo the
+			// reason the vault exists. SecretEnv is declared there without a
+			// value and handed to the compose process instead; standalone
+			// treats it as ordinary environment.
+			SecretEnv:      secretEnv,
+			PassthroughEnv: passEnv,
+			Hostname:       proj.Hostname,
+			StateDir:       stateDir,
+			RequestedPort:  choosePort(opts.RequestedPort, us.Port),
 		},
 	}, nil
 }
@@ -132,7 +140,8 @@ func PersistPort(projectPath string, chosen int) error {
 }
 
 // resolveEnv types the manifest's [tool.astro.env] section, resolves it
-// against the provider chain (shell env > project .env > global ~/.astro/env),
+// against the provider chain (shell env > project .env > project vault > global
+// vault > global ~/.astro/env),
 // and returns the environment injected into Airflow at start plus the
 // declared names only the shell satisfies (Plan.PassthroughEnv). A required
 // value with no source surfaces as *MissingEnvError — the clone-and-run gate.
@@ -141,16 +150,26 @@ func PersistPort(projectPath string, chosen int) error {
 // (every entry, docker-compose semantics) and the global file contributes
 // only its schema-declared entries (localenv.Sources.Injection). Both engines
 // apply the result identically through Plan.Env.
-func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env map[string]string, passthrough []string, err error) {
+//
+// The vault's values come back separately, for Plan.SecretEnv, and follow the
+// same shape one tier down: the project's own secrets wholesale, the
+// machine-wide ones only where the schema declares them
+// (vaultenv.SecretInjection).
+func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env, secretEnv map[string]string, passthrough []string, err error) {
 	schema, err := envresolve.ParseSchema(m.Astro.Env)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	src, err := localenv.LoadSources(os.Environ(), proj.Dir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	in := envresolve.Inputs{Schema: schema, Providers: src.Providers()}
+	// The vault shared with Astro Desktop. Opened here rather than inside
+	// localenv because this is the composition root and that package holds the
+	// plaintext files; opening it costs no keyring access until a name actually
+	// resolves from it.
+	vault := vaultenv.Load(proj.Dir)
+	in := envresolve.Inputs{Schema: schema, Providers: src.Providers(vault.Providers())}
 	if opts.AstroV1Client != nil {
 		if opts.Mode == localrt.ModeDocker {
 			// Docker start writes Plan.Env into the on-disk compose file, so a
@@ -165,7 +184,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env 
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	// The start gate is missing-required only: a value with no source blocks
 	// the run (the clone-and-run message). Value-level problems on values
@@ -174,7 +193,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env 
 	// whole job is validating without starting. Gating start on them too
 	// would split that responsibility across two commands.
 	if len(res.Missing) > 0 {
-		return nil, nil, &MissingEnvError{
+		return nil, nil, nil, &MissingEnvError{
 			Project: proj.Dir,
 			Missing: res.Missing,
 		}
@@ -186,7 +205,50 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env 
 	for k, v := range res.Injected {
 		inj[k] = v
 	}
-	return inj, passthroughKeys(res.Resolved, inj), nil
+	// The vault's own injection, separate the whole way down so it can be
+	// carried as SecretEnv. The two maps reach the engine as one environment, so
+	// a name in both would be decided by whichever the engine applied last
+	// rather than by the chain — which means everything the chain already decided
+	// has to be applied here by hand.
+	//
+	// Membership in `inj` was the wrong test, in both directions. `inj` carries
+	// the global file's schema-declared entries, and those sit BELOW both vault
+	// tiers, so keying on it let ~/.astro/env delete a secret that had won. And a
+	// name the shell environment satisfied is not in `inj` at all, so keying on it
+	// left the secret in place and let it override an explicit
+	// `FOO=bar astro local start`. Both inverted the documented order.
+	//
+	// The resolver already made this decision for every DECLARED name, so ask it
+	// rather than re-deriving. A name the schema does not declare was never
+	// resolved — the project tier injects wholesale — so those are checked
+	// against the sources that outrank the vault.
+	secretInj := vault.SecretInjection(schema)
+	winner := make(map[string]string, len(res.Resolved))
+	for _, r := range res.Resolved {
+		if r.Found {
+			winner[r.EnvKey] = r.Source
+		}
+	}
+	for k := range secretInj {
+		if source, declared := winner[k]; declared {
+			if vaultenv.IsVaultSource(source) {
+				// The vault won, so the file's value must not travel beside it.
+				// Leaving it in Env is not merely redundant: docker writes Env
+				// into the compose file it leaves in the state directory, so a
+				// plaintext credential that LOST would still land on disk.
+				delete(inj, k)
+			} else {
+				delete(secretInj, k)
+			}
+			continue
+		}
+		if src.AboveVault(k) {
+			delete(secretInj, k)
+			continue
+		}
+		delete(inj, k)
+	}
+	return inj, secretInj, passthroughKeys(res.Resolved, inj), nil
 }
 
 // passthroughKeys is the Airflow env-var names for declared values the shell

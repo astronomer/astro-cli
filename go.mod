@@ -46,6 +46,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/imagebuild v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/localrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/secrets v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
 	github.com/aws/aws-sdk-go-v2 v1.42.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
@@ -110,6 +111,7 @@ require (
 	github.com/containerd/ttrpc v1.2.8 // indirect
 	github.com/containerd/typeurl/v2 v2.2.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/docker/cli-docs-tool v0.11.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
@@ -137,6 +139,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
@@ -194,6 +197,7 @@ require (
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
+	github.com/zalando/go-keyring v0.2.8 // indirect
 	github.com/zclconf/go-cty v1.17.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect

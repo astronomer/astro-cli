@@ -7,12 +7,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zalando/go-keyring"
+
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
+
+func init() {
+	// Once per process. MockInit wipes the mock keyring, so calling it again
+	// while encrypted values are already on disk is a genuinely orphaned vault —
+	// pkg/secrets refuses that, correctly, and it looked like a test bug.
+	keyring.MockInit()
+}
 
 const manifestTOML = `[project]
 name = 'demo'
@@ -175,5 +186,161 @@ func TestMissingEnvError(t *testing.T) {
 	}
 	if err.Payload() == nil {
 		t.Error("Payload is nil")
+	}
+}
+
+// seedVault writes one secret into the shared vault at the given scope. HOME is
+// already a temp dir in these tests, which is what isolates pkg/secrets — it
+// resolves the real home directory and deliberately ignores ASTRO_HOME.
+func seedVault(t *testing.T, projectDir, name string) {
+	t.Helper()
+	w, err := vaultenv.NewWriter(projectDir)
+	if err != nil {
+		t.Fatalf("open vault writer: %v", err)
+	}
+	if _, err := w.Set(localenv.KindEnv, name, "from-vault"); err != nil {
+		t.Fatalf("seed vault: %v", err)
+	}
+}
+
+// The chain puts both vault tiers ABOVE the machine-wide plaintext file. The
+// injection merge dropped a vault value whenever anything in Plan.Env held the
+// name, and Plan.Env carries ~/.astro/env's schema-declared entries — so the
+// plaintext value won, and in docker mode it was the one written into the compose
+// file left on disk.
+func TestVaultBeatsTheGlobalPlaintextFile(t *testing.T) {
+	dir := t.TempDir()
+	manifest := manifestTOML + `
+[tool.astro.env]
+TOKEN = {}
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	// The global plaintext file declares the same name.
+	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte("TOKEN=from-global-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	seedVault(t, dir, "TOKEN")
+
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := built.Plan.SecretEnv["TOKEN"]; got != "from-vault" {
+		t.Errorf("SecretEnv[TOKEN] = %q, want the vault value: it outranks ~/.astro/env", got)
+	}
+	if got := built.Plan.Env["TOKEN"]; got != "" {
+		t.Errorf("Env[TOKEN] = %q — the plaintext value must not also be carried, and must not reach the compose file", got)
+	}
+}
+
+// The other end of the same list: an exported shell variable beats the vault. A
+// name the shell satisfied is not in Plan.Env at all, so a check keyed on Plan.Env
+// left the secret in place and it overrode the override.
+func TestShellBeatsTheVault(t *testing.T) {
+	dir := t.TempDir()
+	manifest := manifestTOML + `
+[tool.astro.env]
+TOKEN = {}
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	seedVault(t, dir, "TOKEN")
+	t.Setenv("TOKEN", "from-shell")
+
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := built.Plan.SecretEnv["TOKEN"]; ok {
+		t.Errorf("SecretEnv still carries TOKEN=%q, so the vault overrides an explicit shell value", got)
+	}
+	// It rides the passthrough list instead, by name, so docker can forward it
+	// without the value touching disk.
+	if got := built.Plan.PassthroughEnv; len(got) != 1 || got[0] != "TOKEN" {
+		t.Errorf("PassthroughEnv = %v, want [TOKEN]", got)
+	}
+}
+
+// An undeclared project secret still injects — the project tier is wholesale,
+// like the project .env — but a plaintext .env entry of the same name still wins.
+func TestProjectDotEnvBeatsAnUndeclaredVaultSecret(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("SHADOWED=from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	seedVault(t, dir, "SHADOWED")
+	seedVault(t, dir, "ONLY_VAULT")
+
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := built.Plan.SecretEnv["SHADOWED"]; ok {
+		t.Error("a plaintext .env entry must still win over a vaulted secret of the same name")
+	}
+	if got := built.Plan.SecretEnv["ONLY_VAULT"]; got != "from-vault" {
+		t.Errorf("SecretEnv[ONLY_VAULT] = %q, want the undeclared project secret injected wholesale", got)
+	}
+}
+
+// A declared value that IS set, in the vault, behind a keyring that will not
+// open. The run cannot start either way — but "not set on this machine" is the
+// wrong thing to tell someone whose secret is sitting right there, and it is the
+// only message they got: the resolver discarded a chain miss without asking any
+// provider why.
+func TestMissingValueExplainsAnUnreadableVault(t *testing.T) {
+	dir := t.TempDir()
+	manifest := manifestTOML + `
+[tool.astro.env]
+TOKEN = {}
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	seedVault(t, dir, "TOKEN")
+
+	// Now the keyring stops answering, with the value already on disk.
+	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit)
+
+	_, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	var missing *MissingEnvError
+	if !errors.As(err, &missing) {
+		t.Fatalf("want a missing-value error, got %v", err)
+	}
+	if len(missing.Missing) != 1 {
+		t.Fatalf("Missing = %+v, want one entry", missing.Missing)
+	}
+	note := missing.Missing[0].SourceNote
+	if note == "" {
+		t.Fatal("the missing value carries no cause, so the user is told it is simply not set")
+	}
+	if !strings.Contains(note, "keyring") {
+		t.Errorf("SourceNote = %q, want it to name the keyring", note)
 	}
 }

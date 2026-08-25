@@ -16,16 +16,61 @@ import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// scopeFlags carries the shared --project/--global choice. It is filled by
-// cobra before any RunE runs, so every env leaf reads the same struct.
+// vaultFlagHelp documents --secret, in one place because set, get and delete
+// each register the flag and must describe it identically. Named for the vault
+// rather than the flag so gosec's hardcoded-credential heuristic does not read
+// a help string as a password.
+const vaultFlagHelp = "Use the encrypted vault shared with Astro Desktop instead of a plain file"
+
+// scopeFlags carries the shared --project/--global choice and the --secret
+// store choice. It is filled by cobra before any RunE runs, so every env leaf
+// reads the same struct.
+//
+// The two are separate axes on purpose: --project/--global pick WHICH SCOPE a
+// value belongs to, --secret picks WHICH STORE holds it. They compose, so
+// `--global --secret` is a machine-wide secret and `--global` alone is a
+// machine-wide plaintext default.
 type scopeFlags struct {
 	project bool
 	global  bool
+	secret  bool
 }
+
+// valueStore is the one store a set/get/delete acts on: a plain dotenv file or
+// the vault shared with Astro Desktop. --secret picks which.
+//
+// The two already had the same three operations with the same signatures, which
+// is not a coincidence — the vault writer was built to mirror the file store,
+// so that `--secret` changes where a value goes and nothing else about how the
+// command behaves or what it reports.
+type valueStore interface {
+	Set(kind localenv.Kind, name, value string) (string, error)
+	Get(kind localenv.Kind, name string) (string, bool, error)
+	Delete(kind localenv.Kind, name string) (bool, error)
+	// ScopeName is the tier, for the confirmation message.
+	ScopeName() localenv.Scope
+	// Location is where the value went, for the same message.
+	Location() string
+	// DotenvPath is the plaintext file a write landed in, or empty when the
+	// store keeps nothing in the project. It exists so the gitignore advisory
+	// can be decided by the store that knows the answer: a type switch here
+	// meant every future store — an exec hook, a cloud provider — silently
+	// inherited whichever branch it happened to miss.
+	DotenvPath() string
+}
+
+// fileStore adapts localenv.Store, whose scope and path are fields, to the
+// interface the vault writer implements with methods.
+type fileStore struct{ *localenv.Store }
+
+func (f fileStore) ScopeName() localenv.Scope { return f.Scope }
+func (f fileStore) Location() string          { return f.Path }
+func (f fileStore) DotenvPath() string        { return f.Path }
 
 // setInput carries the shared value-source flags for `set`.
 type setInput struct {
@@ -44,10 +89,15 @@ func newEnvCmd(c *cli) *cobra.Command {
 		Short: "Set, read, and list local Airflow env values for this project",
 		Long: "Manage the environment values local Airflow runs with: plain env vars, connections, and Airflow Variables.\n\n" +
 			"Values are stored in plain files — the project's .env (default inside a project) or the global ~/.astro/env " +
-			"(--global) — created readable only by you. Resolution order at start is shell env > project .env > " +
-			"global ~/.astro/env > the workspace's Environment Manager. A name resolves from Environment Manager only " +
-			"when the schema declares source = \"workspace\" and you are logged in; a local value always wins. This is " +
-			"the local sibling of `astro env`, which manages values on the platform.",
+			"(--global) — created readable only by you. With --secret a value goes instead to the encrypted vault this " +
+			"machine shares with Astro Desktop, so a value set in either tool is readable in the other; that needs an OS " +
+			"keyring, and the command refuses where there is none rather than quietly writing a credential to a plain " +
+			"file.\n\n" +
+			"Resolution order at start is shell env > project .env > project vault > global vault > global ~/.astro/env > " +
+			"the workspace's Environment Manager. A plaintext file therefore still beats a vaulted value of the same " +
+			"name, and a project value beats a machine-wide one. A name resolves from Environment Manager only when the " +
+			"schema declares source = \"workspace\" and you are logged in; a local value always wins. This is the local " +
+			"sibling of `astro env`, which manages values on the platform.",
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -91,14 +141,19 @@ func newEnvSetCmd(c *cli, scope *scopeFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <NAME>",
 		Short: "Set an env var (or a connection / variable via the subcommands)",
-		Long: "Set a value in a .env file. The value never comes from a bare argument — it would land in shell " +
-			"history and `ps`. By default `set` prompts with echo off; pass --stdin to read it from a pipe, or " +
-			"--value to pass it inline (which is visible in shell history).",
+		Long: "Set a value in a .env file, or in the encrypted vault with --secret. The value never comes from a " +
+			"bare argument — it would land in shell history and `ps`. By default `set` prompts with echo off; pass " +
+			"--stdin to read it from a pipe, or --value to pass it inline (which is visible in shell history).\n\n" +
+			"--secret stores the value in the vault this machine shares with Astro Desktop, so a value set in " +
+			"either tool is readable in the other. It needs an OS keyring: on a headless machine or in CI there " +
+			"is none, and the command refuses rather than quietly writing a credential to a plain file. " +
+			"--project/--global choose the scope either way.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd, localenv.KindEnv, args[0])
 		},
 	}
+	cmd.PersistentFlags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	cmd.PersistentFlags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
 	cmd.PersistentFlags().StringVar(&in.value, "value", "", "Pass the value inline (visible in shell history; prefer a prompt or --stdin)")
 	cmd.AddCommand(
@@ -126,6 +181,7 @@ func newEnvGetCmd(c *cli, scope *scopeFlags) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE:  func(_ *cobra.Command, args []string) error { return run(localenv.KindEnv, args[0]) },
 	}
+	cmd.PersistentFlags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	cmd.AddCommand(
 		kindLeaf("conn <id>", "Get a connection", localenv.KindConn, run),
 		kindLeaf("var <key>", "Get an Airflow Variable", localenv.KindVar, run),
@@ -138,10 +194,11 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete <NAME>",
 		Aliases: []string{"rm"},
-		Short:   "Remove a value from a .env file",
+		Short:   "Remove a value from a .env file, or from the vault with --secret",
 		Args:    cobra.ExactArgs(1),
 		RunE:    func(_ *cobra.Command, args []string) error { return run(localenv.KindEnv, args[0]) },
 	}
+	cmd.PersistentFlags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	cmd.AddCommand(
 		kindLeaf("conn <id>", "Remove a connection", localenv.KindConn, run),
 		kindLeaf("var <key>", "Remove an Airflow Variable", localenv.KindVar, run),
@@ -194,10 +251,14 @@ func (c *cli) runEnvSet(scope *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	// Warn (on stderr, so json stdout stays clean) when a project .env would
 	// be tracked by git — the failure mode that actually leaks secrets.
-	c.warnUnignoredEnv(store, projectDir)
-	res := envResult{Kind: kind, Name: name, Scope: store.Scope, Status: "set"}
+	// Only a plain file can be committed by accident; the vault holds nothing
+	// inside the project, so it reports no dotenv path.
+	if path := store.DotenvPath(); path != "" {
+		c.warnUnignoredEnv(path, store.ScopeName(), projectDir)
+	}
+	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "set %s %s in %s (%s)\n", kind, name, store.Scope, store.Path)
+		_, werr := fmt.Fprintf(w, "set %s %s in %s (%s)\n", kind, name, store.ScopeName(), store.Location())
 		return werr
 	})
 }
@@ -209,7 +270,7 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 	}
 	// A scope flag reads that one file; no flag resolves the whole chain and
 	// reports the winning source.
-	if scope.project || scope.global {
+	if scope.project || scope.global || scope.secret {
 		store, _, err := c.envStore(scope)
 		if err != nil {
 			return err
@@ -219,9 +280,9 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("%s %q is not set in %s", kind, name, store.Scope)
+			return fmt.Errorf("%s %q is not set in %s", kind, name, store.ScopeName())
 		}
-		return emitValue(r, envValue{Kind: kind, Name: name, Source: string(store.Scope), Value: value})
+		return emitValue(r, envValue{Kind: kind, Name: name, Source: string(store.ScopeName()), Value: value})
 	}
 	return c.getResolved(r, kind, name)
 }
@@ -238,7 +299,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	if !ok {
 		return fmt.Errorf("%q is not a valid %s name", name, kind)
 	}
-	for _, p := range src.Providers() {
+	for _, p := range src.Providers(vaultenv.Load(projectDir).Providers()) {
 		if v, has := p.Lookup(key); has {
 			return emitValue(r, envValue{Kind: kind, Name: name, Source: p.Label(), Value: v})
 		}
@@ -253,7 +314,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	if ok {
 		return emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
 	}
-	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, or global ~/.astro/env)", kind, name)
+	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, the shared vault, or global ~/.astro/env)", kind, name)
 }
 
 // getFromWorkspace resolves a workspace-source name from Environment Manager
@@ -314,11 +375,11 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%s %q is not set in %s", kind, name, store.Scope)
+		return fmt.Errorf("%s %q is not set in %s", kind, name, store.ScopeName())
 	}
-	res := envResult{Kind: kind, Name: name, Scope: store.Scope, Status: "deleted"}
+	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "deleted"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", kind, name, store.Scope, store.Path)
+		_, werr := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", kind, name, store.ScopeName(), store.Location())
 		return werr
 	})
 }
@@ -334,6 +395,9 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool) error {
 		return err
 	}
 	opts := localenv.ListOptions{All: all}
+	// The vault tiers, or a name held only there reports as "absent" while start
+	// injects it and get returns it.
+	opts.VaultProviders = vaultenv.Load(projectDir).Providers()
 	// reveal = false: list reports where each name resolves, never a value, so
 	// it reads Environment Manager for presence only and pulls no secret.
 	if m != nil && c.d.AstroV1Client != nil {
@@ -382,31 +446,46 @@ func renderEnvList(w io.Writer, items []localenv.ListItem) error {
 	return tw.Flush()
 }
 
-// envStore resolves the scope flags to the one file a set/get/delete edits,
-// returning the store and the project dir (empty for global scope with no
-// project). --project outside a project is an error; the default is project
-// inside one, global otherwise.
-func (c *cli) envStore(scope *scopeFlags) (*localenv.Store, string, error) {
+// envStore resolves the flags to the one store a set/get/delete acts on,
+// returning it and the project dir (empty for global scope with no project).
+//
+// Two independent choices. The scope: --project outside a project is an error;
+// the default is project inside one, global otherwise. And the store: --secret
+// selects the shared vault, anything else a plain dotenv file. The scope is
+// decided first and identically for both, so --secret never changes which tier
+// a value belongs to.
+func (c *cli) envStore(scope *scopeFlags) (valueStore, string, error) {
 	if scope.project && scope.global {
 		return nil, "", errors.New("--project and --global are mutually exclusive")
 	}
 	projectDir, perr := c.discoverProject()
-	switch {
-	case scope.global:
-		store, err := localenv.GlobalStore()
-		return store, projectDir, err
-	case scope.project:
-		if perr != nil {
-			return nil, "", perr
-		}
-		return localenv.ProjectStore(projectDir), projectDir, nil
-	default:
-		if perr == nil {
-			return localenv.ProjectStore(projectDir), projectDir, nil
-		}
-		store, err := localenv.GlobalStore()
-		return store, "", err
+	global := scope.global || (!scope.project && perr != nil)
+	if scope.project && perr != nil {
+		return nil, "", perr
 	}
+	if scope.secret {
+		// The vault's project tier is keyed by the project path, so a global
+		// write must not pass one.
+		dir := projectDir
+		if global {
+			dir = ""
+		}
+		w, err := vaultenv.NewWriter(dir)
+		if err != nil {
+			return nil, "", err
+		}
+		return w, dir, nil
+	}
+	if global {
+		store, err := localenv.GlobalStore()
+		// projectDir is still reported for a --global write inside a project:
+		// the gitignore warning is about the project, not about the file.
+		if scope.global {
+			return fileStore{store}, projectDir, err
+		}
+		return fileStore{store}, "", err
+	}
+	return fileStore{localenv.ProjectStore(projectDir)}, projectDir, nil
 }
 
 // discoverProject returns the current project's root, or an error when the
@@ -470,13 +549,13 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, kind localenv.Kind,
 // warnUnignoredEnv prints a stderr warning when a project .env is not covered
 // by .gitignore, with the fix. Best-effort: a stat error is not worth failing
 // a successful set.
-func (c *cli) warnUnignoredEnv(store *localenv.Store, projectDir string) {
-	if store.Scope != localenv.ScopeProject || projectDir == "" {
+func (c *cli) warnUnignoredEnv(path string, scope localenv.Scope, projectDir string) {
+	if scope != localenv.ScopeProject || projectDir == "" {
 		return
 	}
 	ignored, err := localenv.EnvIgnored(projectDir)
 	if err != nil || ignored {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a line `.env` to it so the file is never committed\n", store.Path)
+	fmt.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a line `.env` to it so the file is never committed\n", path)
 }

@@ -8,7 +8,7 @@
 //
 // Resolution is an ordered chain (see Provider), lowest tiers last:
 //
-//	shell env > project .env > global ~/.astro/env > workspace EM > manifest default
+//	shell env > project .env > project vault > global vault > global ~/.astro/env > workspace EM > manifest default
 //
 // An exported variable is the most deliberate, most local statement, so it
 // wins; the project file beats the global one. A name declared source =

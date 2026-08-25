@@ -56,10 +56,10 @@ func GlobalStore() (*Store, error) {
 func (s *Store) Set(kind Kind, name, value string) (envKey string, err error) {
 	key, ok := EnvKeyFor(kind, name)
 	if !ok {
-		return "", invalidName(kind, name)
+		return "", InvalidName(kind, name)
 	}
 	if kind == KindConn {
-		value, err = normalizeConn(name, value)
+		value, err = NormalizeConn(name, value)
 		if err != nil {
 			return "", err
 		}
@@ -75,7 +75,7 @@ func (s *Store) Set(kind Kind, name, value string) (envKey string, err error) {
 func (s *Store) Get(kind Kind, name string) (value string, ok bool, err error) {
 	key, valid := EnvKeyFor(kind, name)
 	if !valid {
-		return "", false, invalidName(kind, name)
+		return "", false, InvalidName(kind, name)
 	}
 	m, err := readMap(s.Path)
 	if err != nil {
@@ -90,12 +90,16 @@ func (s *Store) Get(kind Kind, name string) (value string, ok bool, err error) {
 func (s *Store) Delete(kind Kind, name string) (ok bool, err error) {
 	key, valid := EnvKeyFor(kind, name)
 	if !valid {
-		return false, invalidName(kind, name)
+		return false, InvalidName(kind, name)
 	}
 	return mergeDelete(s.Path, key)
 }
 
-func invalidName(kind Kind, name string) error {
+// InvalidName is the per-kind rejection message, named as a rule the user can
+// act on rather than a generic "invalid". Exported so the vault writer reports a
+// bad name identically: --secret is meant to change where a value goes and
+// nothing else about what the command says.
+func InvalidName(kind Kind, name string) error {
 	switch kind {
 	case KindEnv:
 		return fmt.Errorf("%q is not a valid env var name (letters, digits, _; no leading digit)", name)
@@ -108,11 +112,11 @@ func invalidName(kind Kind, name string) error {
 	}
 }
 
-// normalizeConn turns a user-supplied connection value — a connection URI or
+// NormalizeConn turns a user-supplied connection value — a connection URI or
 // the AIRFLOW_CONN_* JSON — into the canonical single-line JSON the codec
 // produces, so `check` and `list` can always decode it. It stores credentials
 // in plaintext, which is the whole posture of this feature.
-func normalizeConn(connID, raw string) (string, error) {
+func NormalizeConn(connID, raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", fmt.Errorf("connection %q: empty value", connID)

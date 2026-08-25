@@ -202,7 +202,7 @@ func TestProviderPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ps := src.Providers()
+	ps := src.Providers(nil)
 	// shell beats project beats global.
 	if v, src, ok := firstHit(ps, "K"); !ok || v != "shell" || src != SourceShell {
 		t.Errorf("K resolved to %q from %q (ok=%v), want shell", v, src, ok)

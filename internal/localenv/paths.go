@@ -1,9 +1,15 @@
 // Package localenv is the local env-values feature: the dotenv files that
 // hold a project's and a user's Airflow values, the provider chain that
-// resolves them (shell env > project .env > global ~/.astro/env), and the
-// set/get/list/delete operations behind `astro local env`. It writes plain
-// files — no keyring, no encryption (docs/v2-secrets.md). cmd renders;
-// nothing here prints or exits.
+// resolves them, and the set/get/list/delete operations behind
+// `astro local env`.
+//
+// It writes plain files — no keyring, no encryption (docs/v2-secrets.md). The
+// encrypted tiers are internal/vaultenv's, and they are passed INTO the chain
+// this package assembles rather than built here, which is what keeps that true:
+//
+//	shell env > project .env > project vault > global vault > global ~/.astro/env
+//
+// cmd renders; nothing here prints or exits.
 package localenv
 
 import (

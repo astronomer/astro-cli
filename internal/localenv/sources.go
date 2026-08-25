@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
-	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
@@ -63,16 +62,49 @@ func LoadSources(environ []string, projectDir string) (Sources, error) {
 	return s, nil
 }
 
-// Providers is the ordered resolution chain: shell env > project .env >
-// global ~/.astro/env. The project provider is omitted when there is no
-// project.
-func (s Sources) Providers() []envresolve.Provider {
+// Providers is the ordered resolution chain:
+//
+//	shell env > project .env > project vault > global vault > global ~/.astro/env
+//
+// The project provider is omitted when there is no project.
+//
+// vault is the encrypted tier's providers, in their own order
+// (internal/vaultenv builds them). They are passed in rather than built here
+// because this package writes plain files and touches no keyring, and because
+// the caller is the composition root — the same reason the Environment Manager
+// provider arrives as a seam. Pass nil for a chain without the vault.
+//
+// The slot is the decision. A vault value sits BELOW the project's .env, so a
+// hand-written plaintext entry still wins, exactly as it does on the desktop;
+// and ABOVE the global file, so this machine's shared secret beats a global
+// plaintext default. Shell env stays on top, which is where a CLI user expects
+// `FOO=bar astro local start` to land.
+func (s Sources) Providers(vault []envresolve.Provider) []envresolve.Provider {
 	ps := []envresolve.Provider{mapProvider{label: SourceShell, vals: s.shell}}
 	if s.hasProject {
 		ps = append(ps, mapProvider{label: SourceProject, vals: s.project})
 	}
-	ps = append(ps, mapProvider{label: SourceGlobal, vals: s.global})
-	return ps
+	ps = append(ps, vault...)
+	return append(ps, mapProvider{label: SourceGlobal, vals: s.global})
+}
+
+// AboveVault reports whether a source that OUTRANKS the vault tiers holds key —
+// the shell environment, or the project's .env.
+//
+// It exists for the injection merge. The vault's project tier injects wholesale,
+// like the project .env, so it carries names the schema does not declare and the
+// resolver therefore never saw; those names still have to obey the chain, and
+// this is the half of the chain that beats them.
+func (s Sources) AboveVault(key string) bool {
+	if _, ok := s.shell[key]; ok {
+		return true
+	}
+	if s.hasProject {
+		if _, ok := s.project[key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Injection is the map layered into the Airflow environment at start: the
@@ -84,7 +116,7 @@ func (s Sources) Injection(schema *envschema.Schema) map[string]string {
 	inj := map[string]string{}
 	// Global: only the keys the schema declares. A stray global entry never
 	// leaks into a project that did not ask for it.
-	for _, key := range declaredEnvKeys(schema) {
+	for _, key := range envresolve.DeclaredEnvKeys(schema) {
 		if v, ok := s.global[key]; ok {
 			inj[key] = v
 		}
@@ -94,24 +126,6 @@ func (s Sources) Injection(schema *envschema.Schema) map[string]string {
 		inj[k] = v
 	}
 	return inj
-}
-
-// declaredEnvKeys is every Airflow env-var name the schema declares.
-func declaredEnvKeys(schema *envschema.Schema) []string {
-	if schema == nil {
-		return nil
-	}
-	var keys []string
-	for name := range schema.EnvVars {
-		keys = append(keys, name)
-	}
-	for key := range schema.AirflowVariables {
-		keys = append(keys, airflowenv.EnvKeyForVarKey(key))
-	}
-	for id := range schema.Connections {
-		keys = append(keys, airflowenv.EnvKeyForConnID(id))
-	}
-	return keys
 }
 
 // environMap converts os.Environ() form ("KEY=value") to a map.

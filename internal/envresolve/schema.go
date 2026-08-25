@@ -8,6 +8,31 @@ import (
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
+// DeclaredEnvKeys is every Airflow env-var name a schema declares, sorted.
+//
+// It lives here because it is a property of the schema rather than of any one
+// source, and because both places that gate a global tier on "did this project
+// ask for it?" need exactly this list: the plain global file (internal/localenv)
+// and the global vault tier (internal/vaultenv). Two copies of it would be two
+// answers to that question.
+func DeclaredEnvKeys(schema *envschema.Schema) []string {
+	if schema == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(schema.EnvVars)+len(schema.AirflowVariables)+len(schema.Connections))
+	for name := range schema.EnvVars {
+		keys = append(keys, name)
+	}
+	for key := range schema.AirflowVariables {
+		keys = append(keys, airflowenv.EnvKeyForVarKey(key))
+	}
+	for id := range schema.Connections {
+		keys = append(keys, airflowenv.EnvKeyForConnID(id))
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // Problem is one schema-decoding finding, addressed by the dotted TOML key
 // it concerns (mirroring manifest.Problem).
 type Problem struct {

@@ -44,6 +44,17 @@ type ListOptions struct {
 	// source "workspace" (or its unavailable variant). nil leaves such a name
 	// unresolved. Built presence-only (no secret values pulled).
 	WorkspaceProvider envresolve.Provider
+	// VaultProviders are the encrypted tier's providers, in order
+	// (internal/vaultenv). Passed in for the same reason WorkspaceProvider is:
+	// this package touches no keyring, and the caller is the composition root.
+	// nil lists without the vault.
+	//
+	// A listing does read values here, unlike the Environment Manager's
+	// presence-only fetch: resolving is what tells a project secret from a
+	// global one, the value never reaches a row, and a keyring that will not
+	// open is reported as the source's unavailable label rather than failing
+	// the listing.
+	VaultProviders []envresolve.Provider
 }
 
 // List builds the resolver-backed listing: every schema-declared name with
@@ -54,7 +65,7 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 	if err != nil {
 		return nil, err
 	}
-	providers := listProviders(src, opts.Scope)
+	providers := listProviders(src, opts.Scope, opts.VaultProviders)
 	res, err := envresolve.Resolve(envresolve.Inputs{
 		Schema:            schema,
 		Providers:         providers,
@@ -82,16 +93,22 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 }
 
 // listProviders picks the chain a list reads over. A scope flag narrows it to
-// one file so `list --project` shows exactly what that file holds; otherwise
-// the full shell > project > global chain reports the true winning source.
-func listProviders(src Sources, scope Scope) []envresolve.Provider {
+// one FILE so `list --project` shows exactly what that file holds; otherwise
+// the full chain reports the true winning source.
+//
+// The vault is deliberately absent from the narrowed chains: --project and
+// --global name the two dotenv files, which is what those flags have always
+// meant, and folding an encrypted tier into "what this file holds" would make
+// the answer untrue. A vault entry shows up in the default listing, labeled
+// with the tier that held it.
+func listProviders(src Sources, scope Scope, vault []envresolve.Provider) []envresolve.Provider {
 	switch scope {
 	case ScopeProject:
 		return []envresolve.Provider{mapProvider{label: SourceProject, vals: src.project}}
 	case ScopeGlobal:
 		return []envresolve.Provider{mapProvider{label: SourceGlobal, vals: src.global}}
 	default:
-		return src.Providers()
+		return src.Providers(vault)
 	}
 }
 
@@ -207,7 +224,7 @@ func kindFromKey(key string) (kind Kind, name string) {
 
 func declaredKeySet(schema *envschema.Schema) map[string]bool {
 	set := map[string]bool{}
-	for _, k := range declaredEnvKeys(schema) {
+	for _, k := range envresolve.DeclaredEnvKeys(schema) {
 		set[k] = true
 	}
 	return set
