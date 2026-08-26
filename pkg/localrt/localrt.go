@@ -18,7 +18,11 @@
 // supervisor and its argv markers. Neither links an engine.
 package localrt
 
-import "github.com/astronomer/astro-cli/pkg/localrt/rt"
+import (
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/proxy"
+)
 
 // The contract, re-exported. See internal/rt for the documentation on each.
 type (
@@ -71,3 +75,20 @@ func CacheRoot() (string, error) { return rt.CacheRoot() }
 
 // StateDir is a project's runtime state home under CacheRoot.
 func StateDir(projectPath string) (string, error) { return rt.StateDir(projectPath) }
+
+// RouteAlive is the record-aware prune predicate, for a consumer that keeps its
+// own proxy.Store rather than going through Runtime.
+//
+// pkg/proxy prunes routes.json on every write, and its default predicate asks
+// only whether the route's own PID is alive. That is wrong for a standalone
+// runtime in a way that shows up as a route disappearing from under a working
+// Airflow: `airflow standalone` spawns its components into the process group and
+// the master often exits before they do, so the recorded pid can be gone while
+// the runtime is serving. This resolves the route to its state record and asks
+// that record's mode for the answer, which for standalone is the whole group.
+//
+// Runtime wires this into its own store already. It is exported because the
+// second consumer builds a store of its own — the app owns its proxy lifecycle —
+// and two tools writing one routes.json with different liveness rules means each
+// prune pass evicts routes the other considers alive.
+func RouteAlive(r proxy.Route) bool { return localprune.RouteAlive(r) }
