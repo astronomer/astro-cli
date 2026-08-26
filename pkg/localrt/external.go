@@ -131,6 +131,25 @@ func (r *Runtime) Reserve(projectPath string) (*Reservation, error) {
 		unlock()
 		return nil, err
 	}
+	// Getting past refuseClaim means any record here is stale — same mode, not
+	// running — so it is cleared now rather than left for Claim to overwrite at
+	// the end of the start.
+	//
+	// Two things go wrong while it sits there. It lies to `astro local list`,
+	// which reports a project whose Airflow is gone. And it actively breaks the
+	// consumer, because RouteAlive resolves a standalone route to its record and
+	// asks THAT for liveness instead of the route's own pid: a consumer that
+	// registers a start-time route reservation carrying its own live pid has that
+	// route evicted by the next prune, because the dead record answers for it.
+	// The reservation exists to hold the hostname and port across provisioning,
+	// so losing it hands the port to whatever starts next.
+	//
+	// Safe here and nowhere else: the lock is held, and the runtime it described
+	// has already been established to be gone.
+	if err := localstate.Remove(path); err != nil {
+		unlock()
+		return nil, err
+	}
 	return &Reservation{rt: r, path: path, unlock: unlock}, nil
 }
 

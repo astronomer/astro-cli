@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
+	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // claimedRuntime is a Runtime with a fixed clock, so a claim's StartedAt is an
@@ -260,6 +261,58 @@ func TestClaimRefusesADockerRecordEvenWhenItProbesDead(t *testing.T) {
 	assert.Equal(t, ModeDocker, rec.Mode)
 	assert.Equal(t, "astro-analytics", rec.ComposeProject, "the compose project name is the only handle on that stack")
 	assert.Equal(t, 8080, rec.Port)
+}
+
+// Reserve clears a stale record instead of leaving it for Claim, and the reason
+// is a bug that only shows up through the prune predicate.
+//
+// RouteAlive resolves a standalone route to its record and asks THAT for
+// liveness rather than the route's own pid. So while a dead record sits on disk,
+// a consumer's start-time route reservation — carrying the consumer's own live
+// pid, holding the hostname and port across provisioning — is reported dead and
+// evicted by the next prune, handing the port to whatever starts next.
+//
+// Asserted through the real predicate and a real store, because that is the only
+// place the two halves meet.
+func TestReserveClearsAStaleRecordSoAReservationRouteSurvives(t *testing.T) {
+	r := claimedRuntime(t, time.Now())
+	project := t.TempDir()
+
+	// A project that was running and is not any more: the record outlives it.
+	deadPgid, reap := liveGroup(t)
+	res, err := r.Reserve(project)
+	require.NoError(t, err)
+	require.NoError(t, res.Claim(ExternalRuntime{
+		ProjectPath: project, PID: deadPgid, Pgid: deadPgid, Port: 8080,
+	}))
+	res.Close()
+	reap()
+
+	// The next start reserves the project again.
+	res, err = r.Reserve(project)
+	require.NoError(t, err, "a stale record must not block a fresh start")
+	defer res.Close()
+
+	// The stale record is gone, so nothing can answer "dead" on the
+	// reservation's behalf.
+	_, err = RecordedStatus(project)
+	require.True(t, IsNotRunning(err), "Reserve must clear the stale record, got %v", err)
+
+	// And the reservation route survives a prune, which is the behaviour that
+	// was broken: the store is built exactly as a consumer builds it.
+	routesDir := t.TempDir()
+	store := proxy.NewStore(routesDir, proxy.WithRouteLiveness(RouteAlive))
+	require.NoError(t, store.AddRoute(&proxy.Route{
+		Hostname:   "analytics.localhost",
+		Port:       "10123",
+		ProjectDir: project,
+		PID:        os.Getpid(), // the consumer itself, indisputably alive
+		Mode:       proxy.RouteModeStandalone,
+	}))
+	kept, err := store.ListRoutes()
+	require.NoError(t, err)
+	require.Len(t, kept, 1, "the reservation route was pruned while its owner was alive")
+	assert.Equal(t, "10123", kept[0].Port)
 }
 
 // A same-mode record whose runtime is gone is stale state from a crash, not a
