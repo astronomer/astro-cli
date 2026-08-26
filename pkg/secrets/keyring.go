@@ -15,6 +15,8 @@ import (
 	"sync"
 
 	"github.com/zalando/go-keyring"
+
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 // ErrKeyringUnavailable is the umbrella: the vault as a whole cannot be opened,
@@ -54,6 +56,10 @@ const (
 	keyringAccount = "master-key"
 	keyBytes       = 32 // AES-256
 	dirPerm        = 0o700
+	// valuePerm is owner-only. It used to be implicit — os.CreateTemp makes 0600
+	// and the file was renamed as-is — which was right by accident rather than by
+	// statement, for a file holding a credential.
+	valuePerm = 0o600
 )
 
 // keyringAPI seams the OS keyring so tests never touch the real one.
@@ -269,20 +275,15 @@ func (s *keyringStore) Set(key, value string) error {
 	// concurrent reader must see the old value or the new one, never a torn
 	// file. Per-value files also keep writers to different keys from ever
 	// contending, which a single flocked file would not.
-	tmp, err := os.CreateTemp(s.dir, ".tmp-*")
-	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
-	}
-	defer os.Remove(tmp.Name()) //nolint:errcheck // best-effort cleanup of a temp file we are about to rename away
-	if _, err := tmp.Write(raw); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp file: %w", err)
-	}
-	if err := os.Rename(tmp.Name(), s.path(key)); err != nil {
-		return fmt.Errorf("rename into place: %w", err)
+	//
+	// Through fsatomic rather than a rename here, because "atomic replace" is
+	// not one call on every platform. Windows fails the rename outright when
+	// another handle holds the destination — which is the ordinary case for a
+	// directory two processes share — and the hand-rolled version this replaced
+	// had no answer for it. One implementation, and it is the one that already
+	// had to learn this.
+	if err := fsatomic.WriteFile(s.path(key), raw, valuePerm); err != nil {
+		return err
 	}
 	return nil
 }

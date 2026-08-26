@@ -46,10 +46,7 @@ test:
 # Each pkg/* sub-module has its own go.mod, which the root `go test ./...`
 # never descends into, so their tests need a run of their own.
 test-submodules:
-	@set -e; for mod in pkg/*/go.mod; do \
-		echo "==> $$(dirname $$mod)"; \
-		(cd $$(dirname $$mod) && go test -count=1 -race -shuffle=on -timeout=15m ./...); \
-	done
+	@bash scripts/test-submodules.sh
 
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init

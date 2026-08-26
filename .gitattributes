@@ -1,0 +1,30 @@
+# Assets compiled into the binary with //go:embed must have the same bytes
+# regardless of the platform the binary was built on.
+#
+# Without this, a checkout on Windows (where git's core.autocrlf defaults to
+# true) rewrites these to CRLF, and the embed takes them as they are on disk —
+# so a Windows-built release ships CRLF where a Linux-built one ships LF. For a
+# Dockerfile that is merely inconsistent; for the standalone scripts it is not,
+# since a Python .pth file or a shebang script with carriage returns fails inside
+# the Linux container it is written into.
+#
+# Found by the first run of the sub-module tests on Windows: a scaffold test
+# compared an embedded Dockerfile against a literal and got "\r\n" where the
+# source file has "\n".
+*.tmpl                          text eol=lf
+airflow/include/**              text eol=lf
+internal/checks/**.py           text eol=lf
+pkg/airflowrt/include/**        text eol=lf
+pkg/airflowrt/standalone_scripts/** text eol=lf
+pkg/localrt/internal/localdocker/*.tmpl text eol=lf
+pkg/proxy/**.tmpl               text eol=lf
+
+# Shell scripts are executed as-is by CI and by the git hooks; CRLF makes them
+# fail with an unreadable "bad interpreter" error.
+*.sh                            text eol=lf
+
+# Golden fixtures are compared byte-for-byte against generated output, and the
+# generator emits LF. Left to git's platform default they arrive with CRLF on a
+# Windows checkout and every comparison fails on line endings rather than on
+# content — which is what the first Windows run of these tests actually reported.
+**/testdata/**                  text eol=lf

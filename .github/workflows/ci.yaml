@@ -69,7 +69,7 @@ jobs:
         run: make test
 
       - name: Run sub-module unit tests
-        run: make test-submodules
+        run: bash scripts/test-submodules.sh
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
@@ -89,6 +89,15 @@ jobs:
 
       - name: Run unit tests
         run: go test -count=1 -race -shuffle=on -timeout=15m -cover -covermode=atomic -test.v ./...
+
+      # The gap this closes: the root module's `./...` does not descend into
+      # pkg/*, so every sub-module went untested on Windows — including the
+      # GOOS-specific filepath and keyring code most likely to behave
+      # differently there. bash, not make: the runner has Git Bash and no GNU
+      # make.
+      - name: Run sub-module unit tests
+        shell: bash
+        run: bash scripts/test-submodules.sh
 
   detect-changes:
     if: github.event_name == 'pull_request'

@@ -12,6 +12,22 @@ import (
 
 func testStore(t *testing.T) *Store {
 	t.Helper()
+	// A liveness check that works on every platform, installed the same way the
+	// prune tests below install theirs.
+	//
+	// The default is IsPIDAlive, which on Windows is hardcoded false: the proxy
+	// daemon is not supported there, so the only routes that exist are
+	// docker-mode ones, which skip the PID check entirely. Left alone, every
+	// route these tests add was pruned the instant it was written and the whole
+	// file failed on a platform where the behavior it asserts does not apply.
+	//
+	// Overriding the var rather than injecting WithRouteLiveness on purpose: the
+	// prune tests override this same var, and an injected predicate would take
+	// precedence over their override and silently defeat them.
+	orig := IsPIDAlive
+	t.Cleanup(func() { IsPIDAlive = orig })
+	IsPIDAlive = func(pid int) bool { return pid == os.Getpid() }
+
 	return NewStore(filepath.Join(t.TempDir(), "proxy"))
 }
 
