@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localdocker"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
@@ -27,6 +28,10 @@ type Runtime struct {
 	// --clean sweep. It carries the record-aware prune predicate so listing
 	// never evicts a route whose owner is still alive.
 	routes *proxy.Store
+	// now stamps a claimed runtime's start time. The engines each carry their
+	// own clock for the records they write; this is the same seam for the
+	// records Claim writes, which have no engine behind them.
+	now func() time.Time
 }
 
 // Config is what a consumer supplies to build a Runtime. Nothing here is
@@ -53,6 +58,7 @@ func New(cfg Config) *Runtime {
 		docker:     localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images),
 		standalone: localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon),
 		routes:     proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
+		now:        time.Now,
 	}
 }
 

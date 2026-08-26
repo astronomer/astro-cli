@@ -1,9 +1,19 @@
 // Package localrttest seeds runtime state records for tests.
 //
-// Writing a record is the engines' job, so pkg/localrt does not expose a writer —
-// a consumer that could write one could also lie about what is running. But a test
-// for anything that READS the record has to get one onto disk somehow, and both
-// consumers have such tests.
+// This doc used to say that pkg/localrt exposes no writer, because "a consumer
+// that could write one could also lie about what is running". The first half
+// stopped being true when Reservation.Claim landed; the second half was right,
+// and is why that API validates rather than trusting. A claim must name a
+// process group that is actually alive, must not overwrite another mode's
+// record, and cannot be released by anything but its own pid — each of those
+// checks exists because a record is a claim about the world that readers cannot
+// re-verify cheaply.
+//
+// So the distinction this package rests on is no longer writer versus no writer.
+// It is that Claim publishes a runtime somebody is really supervising, while
+// Seed fabricates one for a test. A test that wants a fixture should not have to
+// stand up a live process group to get it, and production code should never
+// reach for something that skips those checks.
 //
 // Hence a separate package, in the httptest tradition: importing it in production
 // code is visibly wrong, while a _test.go file that needs a fixture has a

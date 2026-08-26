@@ -49,13 +49,9 @@ func routeAlive(r proxy.Route, load func(string) (localstate.Record, error), ali
 	}
 }
 
-// standaloneAlive checks the record's process group — its pgid, falling back
-// to the master PID — not the route's stored PID, which is what lets the
-// route survive an owner restart.
+// standaloneAlive checks the record's process group (Record.GroupID), not the
+// route's stored PID, which is what lets the route survive an owner restart.
 func standaloneAlive(rec localstate.Record, alive func(pgid int) bool) bool {
-	pgid := rec.Pgid
-	if pgid == 0 {
-		pgid = rec.PID
-	}
+	pgid := rec.GroupID()
 	return pgid > 0 && alive(pgid)
 }

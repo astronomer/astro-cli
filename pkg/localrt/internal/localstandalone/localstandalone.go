@@ -400,10 +400,7 @@ func (e *Engine) StatusOf(rec localstate.Record) rt.Status {
 // reachable. The group, not the master PID: components outlive the master
 // during shutdown, and a supervisor leads the group when session-tied.
 func (e *Engine) groupAlive(rec localstate.Record) bool {
-	pgid := rec.Pgid
-	if pgid == 0 {
-		pgid = rec.PID
-	}
+	pgid := rec.GroupID()
 	if pgid <= 0 {
 		return false
 	}
@@ -456,10 +453,7 @@ func (a *airflow) Status() (rt.Status, error) {
 // StopProcess still have; an earlier fix fixes it there).
 func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	e := a.eng
-	pgid := a.rec.Pgid
-	if pgid == 0 {
-		pgid = a.rec.PID
-	}
+	pgid := a.rec.GroupID()
 	if pgid > 0 && e.groupAlive(a.rec) {
 		if opts.Force {
 			// Airflow's sqlite runs in WAL mode, so SIGKILL cannot corrupt

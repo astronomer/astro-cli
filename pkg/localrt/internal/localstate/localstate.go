@@ -64,6 +64,35 @@ type Record struct {
 	StopWithSession bool      `json:"stopWithSession,omitempty"`
 }
 
+// GroupID is the process group to address for a standalone record: Pgid when
+// the record carries one, otherwise PID, which leads its own group.
+//
+// This is the single home for that fallback. It used to be spelled out at each
+// of three readers — the prune predicate, the engine's liveness probe, and its
+// stop path — which meant a change to the rule had to land in three places, and
+// a miss would show up as a record one code path calls alive and another calls
+// dead.
+//
+// Returns 0 whenever there is nothing addressable, which is what lets those
+// callers treat non-positive as "no group". A NEGATIVE Pgid returns 0 rather
+// than falling back to PID: it means the writer already negated for
+// kill(-pgid, 0) and stored the argument instead of the group, and quietly
+// substituting PID would turn that mistake into a record that looks healthy
+// while naming a different group than the writer intended. Docker records have
+// no group at all; their liveness is compose state, not a signal.
+func (r Record) GroupID() int {
+	if r.Pgid > 0 {
+		return r.Pgid
+	}
+	if r.Pgid < 0 {
+		return 0
+	}
+	if r.PID > 0 {
+		return r.PID
+	}
+	return 0
+}
+
 // Save writes the record for its ProjectPath, creating the state directory
 // as needed.
 func Save(rec Record) error {
