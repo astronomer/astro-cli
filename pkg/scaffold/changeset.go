@@ -135,12 +135,21 @@ func (cs *Changeset) result() *Result {
 // arrive from a UI, and filepath.Join would quietly Clean a "../" away rather
 // than reject it — writing outside the directory the user approved. Delete makes
 // it worse: an empty path or ".." names the project directory itself.
+//
+// A rooted path is refused separately from an absolute one because on Windows
+// they are not the same question: filepath.IsAbs("/tmp/x") is FALSE there, a
+// path being absolute on Windows meaning it carries a drive. Left to Join, that
+// path would land at <project>\tmp\x — inside the project, so nothing escapes,
+// but not the path the change set declared and not the one a preview showed.
+// The rule this upholds is that Apply performs what Plan decided, so a path it
+// cannot perform faithfully is refused rather than reinterpreted.
 func (c *Change) resolve(dir string) (string, error) {
 	if c.Path == "" {
 		return "", fmt.Errorf("change of kind %q has no path", c.Kind)
 	}
 	clean := filepath.Clean(filepath.FromSlash(c.Path))
-	if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	rooted := strings.HasPrefix(clean, string(filepath.Separator))
+	if filepath.IsAbs(clean) || rooted || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("change path %q leaves the project directory", c.Path)
 	}
 	return filepath.Join(dir, clean), nil
@@ -162,6 +171,16 @@ func (c *Change) apply(dir string) error {
 	case CreateFile:
 		if c.Content == nil {
 			return fmt.Errorf("%w: %s has no content to write", ErrChangedOnDisk, c.Path)
+		}
+		// The parent is made for the same reason CreateDir uses MkdirAll: a
+		// change set is reviewed at human speed, and the project can move under
+		// it. Every CreateFile used to target the project root, which Apply has
+		// already made, so the write could assume its directory. dags/exampledag.py
+		// is the first that cannot — its dags/ is only planned as a CreateDir when
+		// it was absent at Plan time, so a project that HAD the directory and lost
+		// it while the preview was on screen would fail the write instead.
+		if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
+			return fmt.Errorf("creating %s: %w", filepath.Dir(c.Path), err)
 		}
 		if err := os.WriteFile(path, c.Content, filePerm); err != nil {
 			return fmt.Errorf("creating %s: %w", c.Path, err)

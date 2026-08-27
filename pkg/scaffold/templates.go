@@ -1,9 +1,35 @@
 package scaffold
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 )
+
+// exampleDag is the DAG a new project starts with.
+//
+// Embedded rather than a string constant, unlike the other templates here,
+// because it is Python: a file is syntax-highlighted, diffable and lintable
+// where a Go string literal is none of those.
+//
+// It imports only airflow.sdk and the standard library, and that is a
+// requirement rather than a coincidence. Under v1 a project's dependencies came
+// from a fat runtime image, so the example could `import requests` and call an
+// API. A v2 project installs exactly what [project.dependencies] names, which
+// this scaffold writes as apache-airflow alone — so an example carrying a
+// third-party import would fail to load on the first `astro local start`, which
+// is a worse first run than no example at all.
+//
+// It is Airflow 3 only, because airflow.sdk is. pkg/airflowrt carries the v1
+// pair this one is not built from — include/airflow2/exampledag.py and
+// include/airflow3/exampledag.py, keyed by major and still written by the
+// Docker path — and they are where an Airflow 2 variant would be modeled from
+// if one is ever wanted. starterDagSuits is what keeps this file away from a
+// project that pins 2 in the meantime; the three copies are otherwise unrelated
+// and none of them is generated from the others.
+//
+//go:embed include/exampledag.py
+var exampleDag string
 
 const gitignoreTemplate = `# Derived environment (rebuilt by the astro CLI; never commit it)
 .venv/

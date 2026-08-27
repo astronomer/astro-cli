@@ -25,6 +25,12 @@ import (
 // concrete release happens at start time, so new projects track patches.
 const DefaultAirflowVersion = "3.1"
 
+// manifestKeyAirflow is the [tool.astro] key carrying the Airflow pin. Both
+// manifest arms write it and the starter DAG's import rule is checked against
+// it, which is three spellings of one name — the drift the file-name constants
+// below are kept for.
+const manifestKeyAirflow = "airflow"
+
 // Options adjust what Run scaffolds.
 type Options struct {
 	// Name is the [project] name. Empty derives it from the directory name.
@@ -69,6 +75,111 @@ const (
 	filePerm = 0o644
 )
 
+// projectHasNoDags reports whether the project has no DAGs yet: either no dags
+// directory at all, or one holding nothing that could be a DAG.
+//
+// It answers conservatively, because the two mistakes do not cost the same.
+// Skipping the example leaves someone without a file they could write in a
+// minute. Writing it can put a file somewhere that is not ours, or fail a run
+// that had no reason to fail — so anything this cannot read as a plain,
+// DAG-less directory counts as a project that already has DAGs.
+//
+// That is why `dags` present as anything other than a real directory — a
+// regular file, a symlink, an entry that will not stat — means skip, and why
+// nothing here returns an error. A regular file named `dags` used to scaffold
+// fine, and turning it into a hard failure of the whole run would be a
+// regression for a state nobody asked us to police. The symlink case matters on
+// its own: os.ReadDir follows one, so the example would be written THROUGH it,
+// landing outside the directory the preview showed and Change.resolve undertakes
+// not to leave. A dangling symlink is worse still, reading as empty right up
+// until the write fails half way through a run.
+//
+// Only the directory's own entries are counted, never a recursive walk: walking
+// a large tree to decide whether to write one small file is the wrong trade.
+// That makes an empty `dags/archive/` read as a project WITH DAGs. It is the
+// wrong answer for that one shape, and it is the conservative one.
+func projectHasNoDags(dir string) bool {
+	path := filepath.Join(dir, dagsDir)
+	info, err := os.Lstat(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return true
+	case err != nil || !info.IsDir():
+		return false
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if !isDagsPlaceholder(e.Name()) {
+			return false
+		}
+	}
+	return true
+}
+
+// isDagsPlaceholder reports whether an entry in dags/ is bookkeeping rather than
+// a DAG.
+//
+// Git cannot track an empty directory, so a repository that committed an empty
+// dags/ carries a .gitkeep inside it — which makes "a clone with a placeholder
+// in it" the single most common shape of a project with no DAGs, and counting
+// that entry would deny the example to exactly the projects it is for.
+// .DS_Store arrives from opening the folder in Finder; the .gitignore this
+// package writes lists it for that reason.
+func isDagsPlaceholder(name string) bool {
+	return strings.HasPrefix(name, ".") || name == "__pycache__"
+}
+
+// starterDagSuits reports whether the starter DAG can run on the Airflow this
+// project pins.
+//
+// The example imports airflow.sdk, which is the Airflow 3 Task SDK and does not
+// exist before it: Airflow 2 spells the same two decorators airflow.decorators,
+// which is why this repo's v1 templates keep a per-major pair
+// (pkg/airflowrt/include/airflow2 beside .../airflow3). The pin is not always 3.
+// pickAirflowVersion reads it from --airflow-version, the manifest, a Dockerfile
+// runtime tag or requirements.txt, and any of those can say 2 — adopting a v1
+// project is the ordinary way it happens.
+//
+// So a project pinning Airflow 2 gets no example, deliberately. A DAG that
+// cannot import is the first-run failure this whole file exists to avoid, and it
+// is worse than an empty dags directory rather than better — the same trade the
+// example's third-party imports were already decided on. An Airflow 2 variant
+// would differ by one import line, but nothing has asked for one, and a second
+// copy of the file earns its keep only once something does.
+//
+// A pin this cannot parse is treated as suitable. It has already been through
+// pickAirflowVersion by the time it arrives, so an unreadable one means the
+// manifest is unusual in ways this decision has no business adjudicating.
+func starterDagSuits(airflowVersion string) bool {
+	major, _, _ := strings.Cut(airflowVersion, ".")
+	n, err := strconv.Atoi(major)
+	if err != nil {
+		return true
+	}
+	return n >= firstAirflowWithTaskSDK
+}
+
+// firstAirflowWithTaskSDK is the Airflow major that introduced airflow.sdk, the
+// one import the starter DAG makes.
+const firstAirflowWithTaskSDK = 3
+
+// templateFile is one scaffolded file: where it goes, and what goes in it.
+type templateFile struct{ name, content string }
+
+// fileExampleDag is the starter DAG's path. It sits under the dags directory
+// projectDirs creates, and planFiles writes files after directories for that
+// reason.
+//
+// A new project had an empty dags/ until this landed: v1's scaffold wrote an
+// example and pkg/scaffold did not carry it over, so `astro init` followed by
+// `astro local start` gave you an Airflow with nothing in it. No decision was
+// recorded against having one, so this reads as an omission rather than a
+// choice.
+const fileExampleDag = dagsDir + "/exampledag.py"
+
 // Names written in more than one place, kept as constants so the spellings
 // never drift. gitignore.go uses these too — it arrived with its own
 // .gitignore and 0o644 constants, which is the drift this comment forbids.
@@ -79,7 +190,12 @@ const (
 )
 
 // projectDirs are the standard project directories, in creation order.
-var projectDirs = []string{"dags", "include", "plugins", "tests"}
+var projectDirs = []string{dagsDir, "include", "plugins", "tests"}
+
+// dagsDir is named because three things key off it: projectDirs creates it,
+// projectHasNoDags decides the starter DAG from what is in it, and
+// fileExampleDag is a path inside it.
+const dagsDir = "dags"
 
 // windowsOS is the GOOS whose layout skips the CLAUDE.md symlink.
 const windowsOS = "windows"
@@ -317,7 +433,7 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 	if err := ed.Set([]string{"project", "name"}, name); err != nil {
 		return nil, nil, err
 	}
-	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
+	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
 		return nil, nil, err
 	}
 	// The Airflow requirement leads, then whatever requirements.txt carried,
@@ -378,9 +494,20 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 		cs.Changes = append(cs.Changes, Change{Kind: CreateDir, Path: d, Labels: []string{d + "/"}})
 	}
 
-	files := []struct{ name, content string }{
+	files := []templateFile{
 		{fileGitignore, gitignoreTemplate},
 		{fileAgents, agentsContent()},
+	}
+	// The starter DAG is for a project that has none, which is not the same as
+	// a project that lacks a file called exampledag.py.
+	//
+	// Skip-existing answers the second question, and would drop an example into
+	// a repo full of real pipelines just because nothing there happened to carry
+	// that name. Adoption is the common case for init in an existing repo, so
+	// that would be clutter in someone's dags directory far more often than it
+	// would be a helpful first DAG.
+	if starterDagSuits(cs.AirflowVersion) && projectHasNoDags(dir) {
+		files = append(files, templateFile{fileExampleDag, exampleDag})
 	}
 	for _, f := range files {
 		if _, err := os.Lstat(filepath.Join(dir, f.name)); err == nil {

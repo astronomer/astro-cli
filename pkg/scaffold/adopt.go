@@ -94,7 +94,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 		}
 		carriedPackages = true
 	}
-	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
+	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
 		return nil, nil, pin, err
 	}
 

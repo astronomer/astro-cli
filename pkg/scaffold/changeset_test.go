@@ -255,20 +255,28 @@ func TestApplyRefusesWhatPlanWouldNeverProduce(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		c    Change
+		// want is the reason the refusal must give. Asserting only that an
+		// error came back let "an absolute path" pass on Windows for years
+		// without being refused at all: filepath.IsAbs("/tmp/x") is false
+		// there, so resolve admitted it and os.WriteFile failed on the missing
+		// parent instead. Any change that made the write succeed — creating the
+		// parent, say — turned a guarantee into a green test.
+		want string
 	}{
-		{"a path that climbs out", Change{Kind: CreateFile, Path: "../escaped.txt", Content: content}},
-		{"an absolute path", Change{Kind: CreateFile, Path: "/tmp/escaped.txt", Content: content}},
-		{"the project directory itself", Change{Kind: Delete, Path: ".."}},
-		{"no path at all", Change{Kind: CreateFile, Path: "", Content: content}},
-		{"a kind nothing knows", Change{Kind: "bogus", Path: "f.txt", Content: content}},
-		{"a create with no content", Change{Kind: CreateFile, Path: "f.txt"}},
-		{"an update with no content", Change{Kind: UpdateFile, Path: "f.txt"}},
+		{"a path that climbs out", Change{Kind: CreateFile, Path: "../escaped.txt", Content: content}, "leaves the project directory"},
+		{"an absolute path", Change{Kind: CreateFile, Path: "/tmp/escaped.txt", Content: content}, "leaves the project directory"},
+		{"the project directory itself", Change{Kind: Delete, Path: ".."}, "leaves the project directory"},
+		{"no path at all", Change{Kind: CreateFile, Path: "", Content: content}, "has no path"},
+		{"a kind nothing knows", Change{Kind: "bogus", Path: "f.txt", Content: content}, "bogus"},
+		{"a create with no content", Change{Kind: CreateFile, Path: "f.txt"}, "no content to write"},
+		{"an update with no content", Change{Kind: UpdateFile, Path: "f.txt"}, "no content to write"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			cs := &Changeset{Result: Result{Dir: dir}, Changes: []Change{tc.c}}
 			_, err := cs.Apply()
 			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want, "refused, but not for the reason this pins")
 		})
 	}
 }
@@ -323,6 +331,40 @@ func TestApplyToleratesWorkDoneWhileReviewing(t *testing.T) {
 	require.NoError(t, err)
 	_, statErr := os.Stat(filepath.Join(dir, "pyproject.toml"))
 	assert.NoError(t, statErr, "the run died before the manifest")
+}
+
+// The mirror image of the case above, and the one a nested write introduced.
+//
+// dags/ present at Plan time means no CreateDir is planned for it, so a project
+// that loses the directory while the preview is on screen leaves the starter DAG
+// with nowhere to go. Tolerating the directory appearing but not it going away
+// would be a coin-flip guarantee.
+func TestApplyMakesAMissingParentDirectory(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "dags"), 0o750))
+
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+	require.Contains(t, changePaths(cs), "dags/exampledag.py",
+		"the case only bites while dags/exampledag.py is planned without its CreateDir")
+	// The user removes dags/ again while deciding.
+	require.NoError(t, os.Remove(filepath.Join(dir, "dags")))
+
+	_, err = cs.Apply()
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(dir, "dags", "exampledag.py"))
+	_, statErr := os.Stat(filepath.Join(dir, "pyproject.toml"))
+	assert.NoError(t, statErr, "the run died before the manifest")
+}
+
+// changePaths lists a change set's paths, for asserting on what was planned
+// rather than on what a run happened to leave behind.
+func changePaths(cs *Changeset) []string {
+	out := make([]string, 0, len(cs.Changes))
+	for _, c := range cs.Changes {
+		out = append(out, c.Path)
+	}
+	return out
 }
 
 // The Result must not share backing arrays with the Changeset the caller still

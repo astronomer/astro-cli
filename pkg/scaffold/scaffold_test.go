@@ -444,6 +444,237 @@ func TestRunCreatesMissingDirectory(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// A new project starts with a DAG, and an existing one keeps its own.
+//
+// Two questions that look like one. Skip-existing answers "is there a file
+// called exampledag.py", which would drop an example into a repo full of real
+// pipelines just because nothing there carried that name, and adoption is the
+// common case for init in an existing repo. What decides it is whether the
+// project has any DAGs at all.
+func TestStarterDag(t *testing.T) {
+	t.Run("a new project gets one", func(t *testing.T) {
+		dir := t.TempDir()
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		assert.Contains(t, res.Created, "dags/exampledag.py")
+		assert.FileExists(t, filepath.Join(dir, "dags", "exampledag.py"))
+	})
+
+	t.Run("a project with DAGs keeps its own", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "dags"), 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "dags", "my_pipeline.py"), []byte("# theirs\n"), 0o600))
+
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		assert.NotContains(t, res.Created, "dags/exampledag.py")
+		assert.NoFileExists(t, filepath.Join(dir, "dags", "exampledag.py"))
+		// And theirs is untouched.
+		body, err := os.ReadFile(filepath.Join(dir, "dags", "my_pipeline.py"))
+		require.NoError(t, err)
+		assert.Equal(t, "# theirs\n", string(body))
+	})
+
+	t.Run("an empty dags directory still counts as new", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "dags"), 0o750))
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		assert.Contains(t, res.Created, "dags/exampledag.py")
+	})
+
+	// Git cannot track an empty directory, so a repository that committed an
+	// empty dags/ carries a placeholder in it. Counting that entry would deny
+	// the example to the commonest shape of a project with no DAGs.
+	t.Run("a placeholder is not a DAG", func(t *testing.T) {
+		for _, name := range []string{".gitkeep", ".gitignore", ".DS_Store", "__pycache__"} {
+			t.Run(name, func(t *testing.T) {
+				dir := t.TempDir()
+				require.NoError(t, os.MkdirAll(filepath.Join(dir, "dags"), 0o750))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "dags", name), nil, 0o600))
+
+				res, err := Run(dir, Options{Name: "p"})
+				require.NoError(t, err)
+				assert.Contains(t, res.Created, "dags/exampledag.py")
+			})
+		}
+	})
+
+	t.Run("an edited starter DAG is not replaced on a rerun", func(t *testing.T) {
+		// Belt and braces twice over: adopt refuses a manifest carrying
+		// [tool.astro] before reaching the files, so a rerun cannot get here at
+		// all, and the file makes dags/ hold a DAG, so the example is never
+		// planned in the first place. Neither of those is the skip-existing
+		// check, which this file can never reach — it is only offered when dags/
+		// holds no DAG, and a dags/ holding exampledag.py holds one.
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "dags"), 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "dags", "exampledag.py"), []byte("# edited\n"), 0o600))
+
+		_, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		body, err := os.ReadFile(filepath.Join(dir, "dags", "exampledag.py"))
+		require.NoError(t, err)
+		assert.Equal(t, "# edited\n", string(body))
+	})
+}
+
+// The one property the starter DAG must hold: it imports nothing the scaffold
+// does not install. [project.dependencies] names apache-airflow alone, so an
+// unresolvable import is a DAG that fails to load on the first
+// `astro local start` — a worse first run than no example at all.
+//
+// Asserted as an allowlist. A denylist of libraries passes everything nobody
+// thought to ban, which is every library except the few that came to mind: the
+// three names this used to check let numpy, boto3, httpx and
+// `from pandas import DataFrame` straight through.
+func TestStarterDagImportsOnlyWhatTheScaffoldInstalls(t *testing.T) {
+	allowed := map[string]bool{manifestKeyAirflow: true, "datetime": true}
+
+	var checked int
+	for _, line := range strings.Split(exampleDag, "\n") {
+		fields := strings.Fields(line)
+		// Matched on shape rather than on the first word alone, because the
+		// module docstring is prose and "from the function call rather than
+		// wired up by hand." is not an import of a package called "the".
+		var isImport bool
+		switch {
+		case len(fields) < 2:
+		case fields[0] == "import":
+			isImport = len(fields) == 2 || (len(fields) == 4 && fields[2] == "as")
+		case fields[0] == "from":
+			isImport = len(fields) >= 4 && fields[2] == "import"
+		}
+		if !isImport {
+			continue
+		}
+		root, _, _ := strings.Cut(fields[1], ".")
+		checked++
+		assert.Truef(t, allowed[root],
+			"the starter DAG imports %q, which the scaffold does not install; "+
+				"name it in [project.dependencies] or widen this allowlist deliberately", root)
+	}
+	// Or a rename turns the loop above into a test that asserts nothing.
+	require.GreaterOrEqual(t, checked, 2, "found no imports to check in the starter DAG")
+}
+
+// The rule above is settled by reading the file. That the file is Python at all
+// is not, and a typo in it would otherwise ship green and surface as a parse
+// error on somebody's first start.
+//
+// Skipped rather than failed where there is no interpreter: this is a Go
+// package, and a machine without python3 is not a reason to fail its build.
+func TestStarterDagIsValidPython(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	path := filepath.Join(t.TempDir(), "exampledag.py")
+	require.NoError(t, os.WriteFile(path, []byte(exampleDag), 0o600))
+
+	out, err := exec.Command(python, "-c",
+		"import ast,sys; ast.parse(open(sys.argv[1]).read())", path).CombinedOutput()
+	require.NoError(t, err, "the starter DAG is not valid Python:\n%s", out)
+}
+
+// The example imports airflow.sdk, which is the Airflow 3 Task SDK. Airflow 2
+// spells the same decorators airflow.decorators, so on a project pinning 2 the
+// example would fail to import on the first start — the failure the whole
+// feature is built to avoid. The pin reaches planFiles through
+// cs.AirflowVersion, and pickAirflowVersion sources it from a flag, the
+// manifest, a Dockerfile tag or requirements.txt, so 2 is an ordinary answer
+// rather than an exotic one.
+func TestStarterDagNeedsAirflow3(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		want    bool
+	}{
+		{"3.1", true},
+		{"3", true},
+		{"3.0.2", true},
+		{"4", true},
+		{"2", false},
+		{"2.10.5", false},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			dir := t.TempDir()
+			res, err := Run(dir, Options{Name: "p", AirflowVersion: tc.version})
+			require.NoError(t, err)
+
+			if tc.want {
+				assert.Contains(t, res.Created, "dags/exampledag.py")
+				return
+			}
+			assert.NotContains(t, res.Created, "dags/exampledag.py")
+			assert.NoFileExists(t, filepath.Join(dir, "dags", "exampledag.py"),
+				"an Airflow 2 project got a DAG that cannot import on Airflow 2")
+		})
+	}
+
+	// The flag is the least likely of the four sources. Adopting a v1 project
+	// whose Dockerfile names an Airflow 2 runtime is the ordinary way a 2 pin
+	// arrives, and it reaches the same decision by a different road.
+	t.Run("adopted from an Airflow 2 Dockerfile", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+			[]byte("FROM quay.io/astronomer/astro-runtime:9.6.0\n"), 0o600))
+
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		require.Equal(t, "2", res.AirflowVersion, "the Dockerfile no longer pins Airflow 2")
+		assert.NotContains(t, res.Created, "dags/exampledag.py")
+		assert.NoFileExists(t, filepath.Join(dir, "dags", "exampledag.py"))
+	})
+}
+
+// The starter DAG is the first file written to a nested path, so `dags` being
+// something other than a plain directory stopped being someone else's problem.
+// None of these shapes may fail the run: init scaffolded them all before the
+// example existed, and refusing to init over one would be a regression.
+func TestStarterDagLeavesAnOddDagsEntryAlone(t *testing.T) {
+	t.Run("a regular file named dags", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "dags"), []byte("not a directory\n"), 0o600))
+
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err, "a file named dags used to scaffold fine and must still")
+		assert.NotContains(t, res.Created, "dags/exampledag.py")
+		body, err := os.ReadFile(filepath.Join(dir, "dags"))
+		require.NoError(t, err)
+		assert.Equal(t, "not a directory\n", string(body))
+	})
+
+	if runtime.GOOS == windowsOS {
+		return // symlinks need a privilege the runner may not hold
+	}
+
+	t.Run("a dangling dags symlink", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.Symlink(filepath.Join(dir, "nowhere"), filepath.Join(dir, "dags")))
+
+		// os.ReadDir follows the link, so this read as an empty dags/ and the
+		// write then failed part way through the run.
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		assert.NotContains(t, res.Created, "dags/exampledag.py")
+		assert.FileExists(t, filepath.Join(dir, "pyproject.toml"), "the run died before the manifest")
+	})
+
+	t.Run("a dags symlink pointing outside the project", func(t *testing.T) {
+		dir, outside := t.TempDir(), t.TempDir()
+		require.NoError(t, os.Symlink(outside, filepath.Join(dir, "dags")))
+
+		res, err := Run(dir, Options{Name: "p"})
+		require.NoError(t, err)
+		assert.NotContains(t, res.Created, "dags/exampledag.py")
+		// Change.resolve undertakes that a change set never writes outside the
+		// project. It cleans the declared path but does not resolve symlinks, so
+		// the undertaking holds only while nothing writes THROUGH one.
+		assert.NoFileExists(t, filepath.Join(outside, "exampledag.py"),
+			"the scaffold wrote outside the directory the preview showed")
+	})
+}
+
 func TestAgentsMdCarriesTheDevMapping(t *testing.T) {
 	content := agentsContent()
 	for _, m := range DevReplacements() {
