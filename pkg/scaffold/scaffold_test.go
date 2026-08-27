@@ -259,11 +259,16 @@ func TestRunAdoptsPuttingTheAstroSectionsFirst(t *testing.T) {
 // those are on 2.x. init does not read the tag, so it must at least say that
 // the pin it wrote is a default nobody chose.
 func TestRunWarnsWhenThePinIsJustTheDefault(t *testing.T) {
+	// A tag that is not an Astro Runtime version at all. This used to be a
+	// Dockerfile tagged 9.1.0, which now READS as Airflow 2 and so has nothing
+	// left to warn about — see TestRunReadsTheAirflowVersionFromTheDockerfile.
+	// What survives is the narrower case the warning is now for: a file stated
+	// a version, and it was not one we could use.
 	withDockerfile := func(t *testing.T) string {
 		t.Helper()
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
-			[]byte("FROM quay.io/astronomer/astro-runtime:9.1.0\n"), 0o600))
+			[]byte("FROM quay.io/astronomer/astro-runtime:latest\n"), 0o600))
 		return dir
 	}
 	defaultPinNote := func(notes []string) bool {
@@ -335,7 +340,7 @@ func TestRunWarnsWhenAPinnedProjectFallsBackToTheDefault(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(string(out), "apache-airflow"))
 }
 
-func TestRunAdoptsAV1ProjectAndListsTheLeftovers(t *testing.T) {
+func TestRunConvertsAV1ProjectAndListsOnlyWhatIsLeft(t *testing.T) {
 	dir := t.TempDir()
 	for name, body := range map[string]string{
 		"Dockerfile":            "FROM quay.io/astronomer/astro-runtime:9\n",
@@ -347,14 +352,26 @@ func TestRunAdoptsAV1ProjectAndListsTheLeftovers(t *testing.T) {
 	}
 	require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
 
-	// init writes the manifest and names what it could not read, which is the
-	// work the port picks up.
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
+
+	// The three files init now READS are carried into the manifest.
+	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, "2", res.AirflowVersion, "the Dockerfile's runtime 9 is an Airflow 2 image")
+	assert.Equal(t, "2", m.Astro.AirflowVersion)
+	// The Airflow requirement leads and the carried pin follows it. A partial
+	// pin becomes a prefix match, the same rule the greenfield path uses.
+	assert.Equal(t, []string{"apache-airflow==2.*", "flask==2.0"}, m.Project.Dependencies)
+	assert.Equal(t, []string{"libpq-dev"}, m.Astro.Packages)
+
+	// And the hand-off list is now only what init did not read. This assertion
+	// is the point of the change: naming a file it already carried would be
+	// telling the user to do work that is done.
 	joined := strings.Join(res.Notes, "\n")
-	for _, want := range []string{"Dockerfile", "requirements.txt", "packages.txt", "airflow_settings.yaml"} {
-		assert.Contains(t, joined, want)
-	}
+	assert.Contains(t, joined, "airflow_settings.yaml")
+	assert.NotContains(t, joined, "requirements.txt: move")
+	assert.NotContains(t, joined, "packages.txt: move")
 }
 
 func TestRunKeepsExistingFiles(t *testing.T) {

@@ -31,22 +31,39 @@ func airflowRequirement(version string) string {
 	return airflowDist + "==" + version
 }
 
-// resolveAirflowVersion picks the pin for a project: the flag wins, then a
-// clean apache-airflow pin already in [project.dependencies], then the
-// default. Reading an existing pin keeps a project that runs 2.9 on 2.9,
-// instead of moving it without being asked. The second return reports whether
-// the answer is the default, which the caller warns about. A greenfield
-// project passes no dependencies and so always takes the flag or the default.
-func resolveAirflowVersion(flag string, deps []string) (version string, defaulted bool) {
-	if flag != "" {
-		return flag, false
-	}
+// pinFromDeps returns the version the first clean apache-airflow pin in a
+// dependency list states. Reading an existing pin keeps a project that runs 2.9
+// on 2.9 instead of moving it without being asked.
+//
+// The precedence chain that uses this lives in scaffold.go's pickAirflowVersion,
+// which is now the only place the ordering is written down. It used to be spread
+// between a resolveAirflowVersion here and a pickAirflowVersion there, and the
+// two disagreed about which source outranked which.
+func pinFromDeps(deps []string) (version string, ok bool) {
 	for _, spec := range deps {
 		if v, found := pinFromSpec(spec); found {
-			return v, false
+			return v, true
 		}
 	}
-	return DefaultAirflowVersion, true
+	return "", false
+}
+
+// airflowExtrasNote reports the extras lost when an apache-airflow requirement
+// is replaced by the one the pin generates.
+//
+// Both arms drop a v1 apache-airflow entry, on the grounds that it is where the
+// pin came from and the generated requirement says the same thing. That is only
+// true when the entry carries no extras: "apache-airflow[celery,statsd]==2.9.1"
+// also names two installed distributions, and the replacement
+// "apache-airflow==2.9.*" does not. They were vanishing silently.
+func airflowExtrasNote(spec string) []string {
+	lb := strings.Index(spec, "[")
+	rb := strings.Index(spec, "]")
+	if lb < 0 || rb < lb {
+		return nil
+	}
+	return []string{"requirements.txt: " + spec + " declares extras " + spec[lb:rb+1] +
+		", which the generated Airflow requirement does not carry: add them to the apache-airflow entry in [project.dependencies]"}
 }
 
 // pinsAirflow reports whether [project.dependencies] already names

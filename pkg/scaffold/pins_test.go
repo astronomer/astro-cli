@@ -77,29 +77,57 @@ func TestNamesAirflow(t *testing.T) {
 	}
 }
 
-func TestResolveAirflowVersion(t *testing.T) {
-	// The flag wins over anything the manifest says.
-	version, defaulted := resolveAirflowVersion("2.10", []string{"apache-airflow==2.9.3"})
+// The precedence chain, which is the one place the ordering is written down.
+//
+// Two of these orderings were wrong before review, and each produced a project
+// pinned a whole Airflow generation from where it actually was. They are
+// asserted here rather than in the arms because both arms call this, and the
+// bugs were that they disagreed.
+func TestPickAirflowVersion(t *testing.T) {
+	dockerfile := &v1Project{airflow: "3.1"}
+
+	// The caller's option wins over everything. This is what lets Plan stay
+	// offline: an Airflow 2 tag names no minor, so a caller that wants the exact
+	// one resolves it and passes it here.
+	version, defaulted := pickAirflowVersion("2.10", []string{"apache-airflow==2.9.3"}, dockerfile)
 	assert.Equal(t, "2.10", version)
 	assert.False(t, defaulted)
 
-	// Then a clean pin already in the manifest, so a project on 2.9 stays there.
-	version, defaulted = resolveAirflowVersion("", []string{"pandas", "apache-airflow==2.9.3"})
-	assert.Equal(t, "2.9.3", version)
+	// Then the MANIFEST's own pin, above the Dockerfile. Folding the Dockerfile
+	// into the flag slot put it on top, so adopting a manifest pinning 2.9.3
+	// beside a stale runtime:3.1-12 Dockerfile wrote airflow = "3.1" next to a
+	// dependency list still saying 2.9.3 — a manifest contradicting itself, with
+	// the image built for one and the venv installing the other.
+	version, defaulted = pickAirflowVersion("", []string{"pandas", "apache-airflow==2.9.3"}, dockerfile)
+	assert.Equal(t, "2.9.3", version, "a pin the manifest's author wrote outranks a Dockerfile tag")
 	assert.False(t, defaulted)
 
-	// Then the default, reported as such.
-	version, defaulted = resolveAirflowVersion("", []string{"apache-airflow>=2.9,<3"})
+	// Then the Dockerfile, above a requirements.txt pin: the image tag is what
+	// the project runs today, and a requirements.txt pin is what pip was asked
+	// to install into that image.
+	version, defaulted = pickAirflowVersion("", nil, &v1Project{
+		airflow:      "3.1",
+		dependencies: []string{"apache-airflow==2.9.3"},
+	})
+	assert.Equal(t, "3.1", version)
+	assert.False(t, defaulted)
+
+	// Then a requirements.txt pin, with no manifest pin and no Dockerfile. The
+	// adopt arm used to pass only the manifest's dependencies, so the same
+	// project answered differently depending on whether an unrelated
+	// pyproject.toml happened to exist: greenfield read this pin, adopt
+	// defaulted and then dropped it during the merge.
+	version, defaulted = pickAirflowVersion("", nil, &v1Project{dependencies: []string{"apache-airflow==2.9.3"}})
+	assert.Equal(t, "2.9.3", version, "requirements.txt is read on both arms, not just greenfield")
+	assert.False(t, defaulted)
+
+	// A pin in a shape no version can be read out of is not a pin.
+	version, defaulted = pickAirflowVersion("", []string{"apache-airflow>=2.9,<3"}, &v1Project{})
 	assert.Equal(t, DefaultAirflowVersion, version)
 	assert.True(t, defaulted)
 
-	version, defaulted = resolveAirflowVersion("", nil)
+	// Nothing stated anything.
+	version, defaulted = pickAirflowVersion("", nil, &v1Project{})
 	assert.Equal(t, DefaultAirflowVersion, version)
 	assert.True(t, defaulted)
-}
-
-func TestPinsAirflow(t *testing.T) {
-	assert.True(t, pinsAirflow([]string{"pandas", "apache-airflow[celery]>=2.9"}))
-	assert.False(t, pinsAirflow([]string{"pandas", "apache-airflow-providers-snowflake==5.1.0"}))
-	assert.False(t, pinsAirflow(nil))
 }

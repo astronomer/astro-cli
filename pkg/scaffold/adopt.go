@@ -22,7 +22,7 @@ import (
 // as its author left it. It refuses only a manifest carrying the section
 // already — that directory is an Astro project, and re-initializing it would
 // overwrite the pin.
-func adopt(dir string, data []byte, opts Options, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
+func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
 	path := filepath.Join(dir, manifest.Marker)
 	ed, err := tomledit.NewSurgical(data)
 	if err != nil {
@@ -39,7 +39,7 @@ func adopt(dir string, data []byte, opts Options, res *Result) (out []byte, labe
 	}
 
 	deps := asStrings(mustGet(ed, "project", "dependencies"))
-	version, defaulted := resolveAirflowVersion(opts.AirflowVersion, deps)
+	version, defaulted := pickAirflowVersion(opts.AirflowVersion, deps, v1)
 	pin = manifestFacts{
 		defaultedPin: defaulted,
 		// A manifest naming Airflow without a clean == pin — a range, a
@@ -64,9 +64,35 @@ func adopt(dir string, data []byte, opts Options, res *Result) (out []byte, labe
 		return nil, nil, pin, err
 	}
 
+	// requirements.txt merges into the dependencies already declared, by
+	// distribution name. A manifest that names a package is the authority on how
+	// it is pinned: the author wrote that specifier, and a requirements.txt in
+	// the same repo is the thing being retired, so "add what is missing" is the
+	// only merge that cannot silently change a pin someone chose.
+	carried, err := mergeDependencies(ed, v1.dependencies, pin.dynamicDeps, &pin.carriedNotes)
+	if err != nil {
+		return nil, nil, pin, err
+	}
+
 	added, err := ensureAirflowDependency(ed, version, pin.dynamicDeps)
 	if err != nil {
 		return nil, nil, pin, err
+	}
+	// packages.txt is carried unconditionally, and there is no "unless one is
+	// already there" case to handle.
+	//
+	// There was one, and it was dead code. A [tool.astro].packages key cannot
+	// exist without [tool.astro] existing, and a manifest carrying that table
+	// has already been refused above with ErrAlreadyAstroProject — so the guard
+	// could never run, and the test named for it exercised [tool.other] and
+	// asserted the list WAS carried. A branch no input can reach, described by a
+	// comment claiming it was a deliberate decision.
+	carriedPackages := false
+	if len(v1.packages) > 0 {
+		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(v1.packages)); err != nil {
+			return nil, nil, pin, err
+		}
+		carriedPackages = true
 	}
 	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
 		return nil, nil, pin, err
@@ -90,7 +116,83 @@ func adopt(dir string, data []byte, opts Options, res *Result) (out []byte, labe
 	if added != "" {
 		labels = append(labels, manifest.Marker+" (added "+added+" to dependencies)")
 	}
+	if carried > 0 {
+		labels = append(labels, manifest.Marker+" (carried "+strconv.Itoa(carried)+" from requirements.txt into dependencies)")
+	}
+	if carriedPackages {
+		labels = append(labels, manifest.Marker+" (carried packages.txt into packages)")
+	}
 	return out, labels, pin, nil
+}
+
+// mergeDependencies appends the requirements a manifest does not already name,
+// and reports how many it added.
+//
+// Matching is by distribution name, not by the whole specifier, because the
+// point is to avoid declaring the same package twice — PEP 621 has no rule that
+// forbids it, and pip resolves duplicates by intersecting them, so two entries
+// for one package is a resolution puzzle rather than an error. Anything already
+// named is left exactly as the manifest's author wrote it.
+//
+// A manifest declaring dependencies dynamic carries nothing: PEP 621 forbids a
+// static array beside it, so the requirements stay where they are and the
+// existing dynamic-deps note covers it.
+func mergeDependencies(ed tomledit.Editor, reqs []string, dynamic bool, extras *[]string) (int, error) {
+	if dynamic || len(reqs) == 0 {
+		return 0, nil
+	}
+	existing, ok := ed.Get([]string{"project", "dependencies"})
+	have := map[string]bool{}
+	for _, d := range asStrings(existing) {
+		have[distName(d)] = true
+	}
+
+	var add []string
+	for _, r := range reqs {
+		name := distName(r)
+		// Airflow is not carried here: ensureAirflowDependency writes the
+		// requirement that matches the pin, and this would race it.
+		if name == airflowDist {
+			// Where the pin came from, so ensureAirflowDependency writes the
+			// equivalent requirement. Its extras are not equivalent, though.
+			*extras = append(*extras, airflowExtrasNote(r)...)
+			continue
+		}
+		if have[name] {
+			continue
+		}
+		have[name] = true
+		add = append(add, r)
+	}
+	if len(add) == 0 {
+		return 0, nil
+	}
+
+	// No dependencies key at all: write the whole array. Otherwise append, and
+	// the index to append at is the length as it stands now — the same reason
+	// ensureAirflowDependency re-reads.
+	if !ok {
+		if err := ed.Set([]string{"project", "dependencies"}, asAny(add)); err != nil {
+			return 0, err
+		}
+		return len(add), nil
+	}
+	at := len(asStrings(existing))
+	for i, r := range add {
+		if err := ed.Set([]string{"project", "dependencies", strconv.Itoa(at + i)}, r); err != nil {
+			return 0, err
+		}
+	}
+	return len(add), nil
+}
+
+// asAny turns a string list into the []any a TOML array wants.
+func asAny(list []string) []any {
+	out := make([]any, len(list))
+	for i, s := range list {
+		out[i] = s
+	}
+	return out
 }
 
 // ensureAirflowDependency adds the requirement that installs the Airflow the

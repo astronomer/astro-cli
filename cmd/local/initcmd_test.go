@@ -114,9 +114,13 @@ func TestInitRefusesAnAstroProject(t *testing.T) {
 
 func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	d, dir, stdout := initDeps(t)
+	// airflow_settings.yaml is the file init still does not read.
+	// requirements.txt, packages.txt and the Dockerfile pin are carried now, so
+	// listing them would be telling the user to redo work init just did.
 	for name, body := range map[string]string{
-		"requirements.txt": "flask==2.0\n",
-		"Dockerfile":       "FROM quay.io/astronomer/astro-runtime:9\n",
+		"requirements.txt":      "flask==2.0\n",
+		"airflow_settings.yaml": "airflow:\n",
+		"Dockerfile":            "FROM quay.io/astronomer/astro-runtime:9\n",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
@@ -126,13 +130,29 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 		t.Fatalf("astro init: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Left to do:") {
+	_, handoff, found := strings.Cut(out, "Left to do:")
+	if !found {
 		t.Fatalf("no hand-off list:\n%s", out)
 	}
-	for _, want := range []string{"requirements.txt", "Dockerfile"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("%s not listed:\n%s", want, out)
-		}
+	if !strings.Contains(handoff, "airflow_settings.yaml") {
+		t.Errorf("airflow_settings.yaml not listed:\n%s", out)
+	}
+	// The Dockerfile still appears, but saying something different: its runtime
+	// 9 tag names Airflow 2 without a minor, so the pin is the coarse "2".
+	if !strings.Contains(handoff, "does not name the Airflow minor") {
+		t.Errorf("the coarse Airflow 2 pin was not explained:\n%s", out)
+	}
+	// Scoped to the hand-off section, not the whole output, and deliberately.
+	// This assertion was written against `out` and passed only because the
+	// greenfield arm printed no label at all; now that it reports "carried 1
+	// from requirements.txt into dependencies", the file is legitimately named
+	// in the CREATED list. What must not happen is it appearing as work left to
+	// do, which is a different claim about the same string.
+	if strings.Contains(handoff, "requirements.txt") {
+		t.Errorf("requirements.txt was carried, so it must not be work left to do:\n%s", out)
+	}
+	if !strings.Contains(out, "carried 1 from requirements.txt") {
+		t.Errorf("the conversion did not say it carried requirements.txt:\n%s", out)
 	}
 }
 

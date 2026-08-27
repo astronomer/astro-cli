@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -95,6 +97,15 @@ type manifestFacts struct {
 	// dynamicDeps reports that dependencies are declared dynamic, so the
 	// Airflow requirement could not be added beside them.
 	dynamicDeps bool
+	// carriedNotes is what building the manifest could not carry, discovered
+	// while building it rather than while reading the v1 files: extras on an
+	// apache-airflow requirement that the generated pin does not reproduce.
+	carriedNotes []string
+	// carriedLabels describes what the manifest write absorbed, for the
+	// Result's lists. The adopt arm returns its own labels directly; the
+	// greenfield arm cannot, because its label is fixed by Plan, so it reports
+	// them here instead.
+	carriedLabels []string
 }
 
 // Run makes dir an Astro project, creating dir if needed. A directory with no
@@ -135,6 +146,15 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	}
 	marker := filepath.Join(abs, manifest.Marker)
 
+	// What the v1 files say, read before either arm, because both need it: a
+	// greenfield manifest is BUILT from them and an adopted one is extended
+	// with them. This is the difference between init-in-an-existing-project
+	// converting it and init leaving a hand-off list beside files nobody read.
+	v1, err := readV1Project(abs)
+	if err != nil {
+		return nil, err
+	}
+
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
 	cs := &Changeset{Result: Result{Dir: abs}}
@@ -144,11 +164,11 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	data, readErr := os.ReadFile(marker)
 	switch {
 	case readErr == nil:
-		out, manifestLabels, pin, err = adopt(abs, data, opts, &cs.Result)
+		out, manifestLabels, pin, err = adopt(abs, data, opts, v1, &cs.Result)
 	case errors.Is(readErr, os.ErrNotExist):
 		// No labels from this arm: a scaffolded manifest is created rather than
 		// edited, so its one line is the filename, supplied below.
-		out, pin, err = scaffoldManifest(abs, opts, &cs.Result)
+		out, pin, err = scaffoldManifest(abs, opts, v1, &cs.Result)
 	default:
 		err = fmt.Errorf("reading %s: %w", marker, readErr)
 	}
@@ -167,7 +187,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	manifestChange := Change{Kind: UpdateFile, Path: manifest.Marker, Content: out, Labels: manifestLabels}
 	if !cs.Adopted {
 		manifestChange.Kind = CreateFile
-		manifestChange.Labels = []string{manifest.Marker}
+		manifestChange.Labels = append([]string{manifest.Marker}, pin.carriedLabels...)
 	}
 	cs.Changes = append(cs.Changes, manifestChange)
 
@@ -175,25 +195,103 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// beside them, so a change that is performed but unreported — or reported
 	// but not performed — cannot be constructed.
 	cs.report()
-	cs.Notes = leftovers(abs, pin)
+	// The v1 notes lead: they are about the files this run just read, so they
+	// describe what it could not carry. leftovers is about files it did not read
+	// at all, which is a weaker statement and belongs after.
+	cs.Notes = slices.Concat(v1.notes, pin.carriedNotes, leftovers(abs, cs.AirflowVersion, pin, v1))
 	return cs, nil
 }
 
 // scaffoldManifest renders the manifest for a directory that has none, and
 // records on the Result what it chose. It returns the manifest rather than
 // writing it, so write puts every file on disk in one place.
-func scaffoldManifest(dir string, opts Options, res *Result) ([]byte, manifestFacts, error) {
+func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]byte, manifestFacts, error) {
 	name := opts.Name
 	if name == "" {
 		name = deriveName(dir)
 	}
-	version, defaulted := resolveAirflowVersion(opts.AirflowVersion, nil)
-	pyproject, err := renderPyproject(name, version)
+	version, defaulted := pickAirflowVersion(opts.AirflowVersion, nil, v1)
+	pyproject, notes, err := renderPyproject(name, version, v1)
 	if err != nil {
 		return nil, manifestFacts{}, err
 	}
 	res.Name, res.AirflowVersion = name, version
-	return pyproject, manifestFacts{defaultedPin: defaulted}, nil
+	return pyproject, manifestFacts{
+		defaultedPin:  defaulted,
+		carriedNotes:  notes,
+		carriedLabels: carriedLabels(v1),
+	}, nil
+}
+
+// carriedLabels describes what a greenfield manifest absorbed from the v1 files.
+//
+// Without this the common case said nothing. A real v1 project has no
+// pyproject.toml, so it takes the greenfield arm, where Plan hardcodes the
+// manifest's label to the filename — so `astro init` printed "pyproject.toml"
+// and never mentioned that thirty requirement lines and a list of apt packages
+// had just been moved into it. The rarer adopt arm did say so.
+func carriedLabels(v1 *v1Project) []string {
+	var out []string
+	if n := len(v1.dependencies); n > 0 {
+		out = append(out, manifest.Marker+" (carried "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
+	}
+	if len(v1.packages) > 0 {
+		out = append(out, manifest.Marker+" (carried packages.txt into packages)")
+	}
+	if v1.airflow != "" {
+		out = append(out, manifest.Marker+" (read airflow = "+v1.airflow+" from the Dockerfile)")
+	}
+	return out
+}
+
+// pickAirflowVersion resolves the pin from every source that can state one, in
+// precedence order, and reports whether the answer is only the default.
+//
+//	Options.AirflowVersion
+//	  → an apache-airflow pin in the MANIFEST's [project.dependencies]
+//	    → the Dockerfile's runtime tag
+//	      → an apache-airflow pin in requirements.txt
+//	        → DefaultAirflowVersion
+//
+// Two of those orderings were wrong before, and both produced a project pinned a
+// whole Airflow generation from where it actually was.
+//
+// The manifest's own pin now outranks the Dockerfile. Folding the Dockerfile
+// into resolveAirflowVersion's flag slot put it above everything, so adopting a
+// manifest pinning apache-airflow==2.9.1 in a directory with a stale
+// runtime:3.1-12 Dockerfile wrote airflow = "3.1" beside a dependency list still
+// saying 2.9.1 — a manifest contradicting itself, with the image built for one
+// and the venv installing the other. Nothing cross-validates the two. A pin its
+// author wrote in the manifest is the strongest statement short of an explicit
+// flag.
+//
+// And requirements.txt is consulted on BOTH paths. The adopt arm passed the
+// manifest's dependencies and never looked at v1's, so the same project answered
+// differently depending on whether an unrelated pyproject.toml happened to
+// exist: greenfield read the requirements pin, adopt defaulted and then dropped
+// the pin during the merge.
+//
+// The caller's option stays on top, which is what lets Plan stay offline: an
+// Airflow 2 tag names no minor, so a caller that wants the exact one resolves it
+// through the release index and passes it here.
+//
+// The Dockerfile sits above a requirements.txt pin because the image tag is what
+// the project runs today, while a pin in requirements.txt is what pip was asked
+// to install INTO that image.
+func pickAirflowVersion(flag string, manifestDeps []string, v1 *v1Project) (version string, defaulted bool) {
+	if flag != "" {
+		return flag, false
+	}
+	if v, ok := pinFromDeps(manifestDeps); ok {
+		return v, false
+	}
+	if v1.airflow != "" {
+		return v1.airflow, false
+	}
+	if v, ok := pinFromDeps(v1.dependencies); ok {
+		return v, false
+	}
+	return DefaultAirflowVersion, true
 }
 
 // renderPyproject builds the greenfield manifest. It fills the template
@@ -204,7 +302,7 @@ func scaffoldManifest(dir string, opts Options, res *Result) ([]byte, manifestFa
 // validation error. [project.dependencies] carries the Airflow the project
 // pins, derived from the same version that fills [tool.astro].airflow, so
 // init → start needs no hand-edit.
-func renderPyproject(name, version string) ([]byte, error) {
+func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, notes []string, err error) {
 	tmpl := "[project]\n" +
 		"name = 'astro-project'\n" +
 		"version = '" + defaultProjectVersion + "'\n" +
@@ -214,25 +312,54 @@ func renderPyproject(name, version string) ([]byte, error) {
 		"airflow = '" + DefaultAirflowVersion + "'\n"
 	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := ed.Set([]string{"project", "name"}, name); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if err := ed.Set([]string{"project", "dependencies", "0"}, airflowRequirement(version)); err != nil {
-		return nil, err
+	// The Airflow requirement leads, then whatever requirements.txt carried,
+	// deduplicated by distribution name the way the adopt arm does.
+	//
+	// The dedup is not tidiness. A requirements.txt naming one distribution
+	// twice — "pandas==1.5.0" early and "pandas==2.1.0" later, or "Flask" and
+	// "flask", which are the same PEP 503 name — produced two entries for it.
+	// manifest.Parse accepts that, then uv intersects the specifiers and the
+	// environment is unsatisfiable at the first start. Only the adopt arm
+	// guarded against it, and greenfield is the arm a real v1 project takes.
+	deps := []any{airflowRequirement(version)}
+	seen := map[string]bool{airflowDist: true}
+	for _, d := range v1.dependencies {
+		name := distName(d)
+		if seen[name] {
+			// An apache-airflow entry is where `version` came from, so the
+			// generated requirement above already says it.
+			if name == airflowDist {
+				notes = append(notes, airflowExtrasNote(d)...)
+			}
+			continue
+		}
+		seen[name] = true
+		deps = append(deps, d)
+	}
+	if err := ed.Set([]string{"project", "dependencies"}, deps); err != nil {
+		return nil, nil, err
+	}
+	if len(v1.packages) > 0 {
+		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(v1.packages)); err != nil {
+			return nil, nil, err
+		}
 	}
 	data, err := ed.Bytes()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if _, err := manifest.Parse(data); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return data, nil
+	return data, notes, nil
 }
 
 // planFiles works out the scaffold half of a run: the standard directories, the
@@ -332,43 +459,53 @@ func deriveName(dir string) string {
 // on its own, with where each one belongs. Reading a Dockerfile means guessing
 // what its RUN lines were for, so init names it and stops there. The list is
 // the hand-off: what a person, or the agent working with them, does next.
-func leftovers(dir string, facts manifestFacts) []string {
+func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string {
+	// requirements.txt, packages.txt and the Dockerfile are READ now, so they
+	// are gone from this list: whatever they could not carry is a note from the
+	// reader that says which line and why, which is strictly better than
+	// "move its pins" about a file that was mostly carried.
 	checks := []struct{ file, note string }{
-		{"requirements.txt", "move its pins into [project.dependencies]"},
-		{"packages.txt", "move its entries into packages under [tool.astro]"},
 		{"airflow_settings.yaml", "move its connections, variables, and pools into [tool.astro]"},
 		{filepath.Join(".astro", "config.yaml"), "move the Deployments it names into deployments under [tool.astro]"},
-		{"Dockerfile", "not read — move what it installs into pyproject.toml"},
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
 		{"docker-compose.override.yml", "not read — move any service your dags need into your own setup"},
 		{"docker-compose.override.yaml", "not read — move any service your dags need into your own setup"},
 	}
 	var out []string
-	namesVersion := false
 	for _, c := range checks {
 		if _, err := os.Stat(filepath.Join(dir, c.file)); err != nil {
 			continue
 		}
 		out = append(out, c.file+": "+c.note)
-		// A Dockerfile image tag, or an apache-airflow pin in requirements.txt,
-		// states the Airflow this project runs today.
-		if c.file == "Dockerfile" || c.file == "requirements.txt" {
-			namesVersion = true
-		}
 	}
 	// A pin nobody chose leads the list. Most repos state the Airflow they run
 	// in a Dockerfile image tag, and most of those are on 2.x, so the default
 	// is the likeliest way this ends up a project that cannot start.
-	if facts.defaultedPin && (namesVersion || facts.namesAirflow) {
+	//
+	// v1.statedVersion is now what gates this rather than the presence of a
+	// Dockerfile or a requirements.txt. Presence used to stand in for "we did
+	// not read it", and that is no longer true: a Dockerfile whose tag we read
+	// leaves defaultedPin false, and one whose tag we could not read has
+	// already said so in its own note. What is left for this warning is the
+	// case where a file named a version and we still ended up defaulting.
+	if facts.defaultedPin && (v1.statedVersion || facts.namesAirflow) {
 		out = append([]string{"airflow = '" + DefaultAirflowVersion + "' is the default, not this project's version: " +
 			"set it from the Airflow this project already names"}, out...)
 	}
 	// Dependencies declared dynamic are supplied from somewhere this cannot
 	// reach, so the requirement that installs Airflow has to be put there.
+	// The version this run actually pinned, not the default. Telling someone to
+	// install apache-airflow==3.1.* under a manifest this run pinned to "2" is
+	// advice that installs the wrong Airflow generation and contradicts the file
+	// it was printed beside.
 	if facts.dynamicDeps {
 		out = append(out, "dependencies are dynamic, so the Airflow pin was not added: put "+
-			airflowRequirement(DefaultAirflowVersion)+" wherever this project lists its dependencies")
+			airflowRequirement(version)+" wherever this project lists its dependencies")
+		if len(v1.dependencies) > 0 {
+			out = append(out, "requirements.txt: dependencies are dynamic, so its "+
+				strconv.Itoa(len(v1.dependencies))+" requirements were not carried either")
+		}
 	}
 	return out
 }
