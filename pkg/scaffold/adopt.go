@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -24,7 +23,7 @@ import (
 // already — that directory is an Astro project, and re-initializing it would
 // overwrite the pin.
 func adopt(dir string, data []byte, opts Options, res *Result) ([]byte, manifestFacts, error) {
-	path := filepath.Join(dir, project.Marker)
+	path := filepath.Join(dir, manifest.Marker)
 	var pin manifestFacts
 	ed, err := tomledit.NewSurgical(data)
 	if err != nil {
@@ -86,9 +85,9 @@ func adopt(dir string, data []byte, opts Options, res *Result) ([]byte, manifest
 	res.Name = m.Project.Name
 	res.AirflowVersion = version
 	res.Adopted = true
-	res.Updated = append(res.Updated, project.Marker+" (added [tool.astro])")
+	res.Updated = append(res.Updated, manifest.Marker+" (added [tool.astro])")
 	if added != "" {
-		res.Updated = append(res.Updated, project.Marker+" (added "+added+" to dependencies)")
+		res.Updated = append(res.Updated, manifest.Marker+" (added "+added+" to dependencies)")
 	}
 	return out, pin, nil
 }

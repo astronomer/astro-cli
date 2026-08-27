@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -30,7 +29,7 @@ import (
 // manifest to fix, and the v2 path gives the clearer error. A pyproject without
 // [tool.astro] (a plain Python project) and a missing pyproject are not v2.
 func IsV2Project(dir string) bool {
-	_, err := manifest.Load(filepath.Join(dir, project.Marker))
+	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	switch {
 	case err == nil:
 		return true

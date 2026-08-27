@@ -69,6 +69,7 @@ require (
 	github.com/pb33f/libopenapi v0.34.0
 	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758
 	github.com/whilp/git-urls v1.0.0
+	github.com/zalando/go-keyring v0.2.8
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/mod v0.35.0
@@ -197,7 +198,6 @@ require (
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
-	github.com/zalando/go-keyring v0.2.8 // indirect
 	github.com/zclconf/go-cty v1.17.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
@@ -237,6 +237,7 @@ require (
 	github.com/Microsoft/hcsshim v0.14.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/scaffold v0.0.0-00010101000000-000000000000
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/bugsnag/bugsnag-go v1.5.0 // indirect
@@ -343,3 +344,5 @@ replace github.com/astronomer/astro-cli/pkg/connmodel => ./pkg/connmodel
 replace github.com/astronomer/astro-cli/pkg/airflowenv => ./pkg/airflowenv
 
 replace github.com/astronomer/astro-cli/pkg/airflowapi => ./pkg/airflowapi
+
+replace github.com/astronomer/astro-cli/pkg/scaffold => ./pkg/scaffold

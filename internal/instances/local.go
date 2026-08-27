@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -95,7 +94,7 @@ func pinnedAirflowMajor(projectPath string) string {
 	if projectPath == "" {
 		return ""
 	}
-	m, err := manifest.Load(filepath.Join(projectPath, project.Marker))
+	m, err := manifest.Load(filepath.Join(projectPath, manifest.Marker))
 	if err != nil {
 		return ""
 	}

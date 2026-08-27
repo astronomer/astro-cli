@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -192,7 +191,7 @@ func firstNonEmpty(vals ...string) string {
 // --deployment-id always meant and what CI already passes.
 func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*airflowTarget, error) {
 	var known []string
-	if m, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker)); err == nil {
+	if m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker)); err == nil {
 		set := instances.Build(m)
 		if instance, ok := set.Lookup(name); ok {
 			return linkTarget(ctx, opts, &instance)

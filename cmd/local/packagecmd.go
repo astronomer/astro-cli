@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/pack"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -90,7 +89,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	if err != nil {
 		return err
 	}
-	m, err := manifest.Load(filepath.Join(dir, project.Marker))
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	if err != nil {
 		return err
 	}

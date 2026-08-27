@@ -37,7 +37,6 @@ var v2BelowCmd = []string{
 	"internal/pack",
 	"internal/plan",
 	"internal/project",
-	"internal/scaffold",
 	"internal/userstate",
 	"internal/vaultenv",
 	"pkg/airflowapi",
@@ -48,6 +47,7 @@ var v2BelowCmd = []string{
 	"pkg/imagebuild",
 	"pkg/localrt",
 	"pkg/manifest",
+	"pkg/scaffold",
 	"pkg/secrets",
 }
 

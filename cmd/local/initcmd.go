@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/internal/scaffold"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // NewInitCmd builds the root-level `astro init`. The same constructor backs

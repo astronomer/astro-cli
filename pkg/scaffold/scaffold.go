@@ -14,8 +14,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/astronomer/astro-cli/internal/localenv"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -70,7 +68,8 @@ const (
 )
 
 // Names written in more than one place, kept as constants so the spellings
-// never drift.
+// never drift. gitignore.go uses these too — it arrived with its own
+// .gitignore and 0o644 constants, which is the drift this comment forbids.
 const (
 	fileGitignore = ".gitignore"
 	fileAgents    = "AGENTS.md"
@@ -112,7 +111,7 @@ func Run(dir string, opts Options) (*Result, error) {
 	if goos == "" {
 		goos = runtime.GOOS
 	}
-	marker := filepath.Join(abs, project.Marker)
+	marker := filepath.Join(abs, manifest.Marker)
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -149,7 +148,7 @@ func Run(dir string, opts Options) (*Result, error) {
 		return nil, fmt.Errorf("writing %s: %w", marker, err)
 	}
 	if !res.Adopted {
-		res.Created = append(res.Created, project.Marker)
+		res.Created = append(res.Created, manifest.Marker)
 	}
 	res.Notes = leftovers(abs, pin)
 	return res, nil
@@ -250,7 +249,7 @@ func write(dir string, withSymlink bool, res *Result) error {
 	// Ensure .gitignore covers .env even when it already existed and was kept
 	// above (a fresh template already lists it, so this only heals a .gitignore
 	// the repo already had). Local env values must never be committed.
-	if added, err := localenv.EnsureEnvIgnored(dir); err != nil {
+	if added, err := EnsureEnvIgnored(dir); err != nil {
 		return err
 	} else if added {
 		res.Updated = append(res.Updated, fileGitignore+" (added the .env rule)")

@@ -244,6 +244,18 @@ func (e *ValidationError) Error() string {
 	return b.String()
 }
 
+// Marker is the manifest's filename, and the file whose presence makes a
+// directory a project root.
+//
+// It lives here rather than in the package that walks the tree looking for it,
+// because it is a fact about the manifest rather than about discovery, and
+// because every consumer that needs it is already holding this package: a
+// caller joining a directory to a filename before calling Load should not have
+// to import a project-discovery package to learn what that filename is. It was
+// in internal/project, which put it out of reach of anything outside this
+// repo — Astro Desktop spells it out a second time for exactly that reason.
+const Marker = "pyproject.toml"
+
 // Load reads and validates the manifest at path (a pyproject.toml). A
 // missing file surfaces as ErrNotFound (which also satisfies
 // errors.Is(err, fs.ErrNotExist)); other failure shapes are

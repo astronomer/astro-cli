@@ -12,11 +12,17 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Marker is the file whose presence makes a directory a project root.
-const Marker = "pyproject.toml"
+//
+// Re-exported rather than moved outright: this package's callers ask it what a
+// project looks like, and sending every one of them to pkg/manifest for the
+// filename would be a wider change than the one it saves. The single definition
+// is manifest.Marker.
+const Marker = manifest.Marker
 
 // NotFoundError reports that no project marker was found in the start
 // directory or any of its parents.

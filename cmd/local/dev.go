@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/project"
-	"github.com/astronomer/astro-cli/internal/scaffold"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// The dev-to-local mapping lives in internal/scaffold, which also publishes
+// The dev-to-local mapping lives in pkg/scaffold, which also publishes
 // it in every scaffolded AGENTS.md; the stub renders the same data.
 type devReplacement = scaffold.DevReplacement
 

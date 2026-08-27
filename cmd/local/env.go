@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // vaultFlagHelp documents --secret, in one place because set, get and delete
@@ -553,7 +554,7 @@ func (c *cli) warnUnignoredEnv(path string, scope localenv.Scope, projectDir str
 	if scope != localenv.ScopeProject || projectDir == "" {
 		return
 	}
-	ignored, err := localenv.EnvIgnored(projectDir)
+	ignored, err := scaffold.EnvIgnored(projectDir)
 	if err != nil || ignored {
 		return
 	}
