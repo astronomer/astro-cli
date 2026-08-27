@@ -69,7 +69,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// it is pinned: the author wrote that specifier, and a requirements.txt in
 	// the same repo is the thing being retired, so "add what is missing" is the
 	// only merge that cannot silently change a pin someone chose.
-	carried, err := mergeDependencies(ed, v1.dependencies, pin.dynamicDeps, &pin.carriedNotes)
+	migrated, err := mergeDependencies(ed, v1.dependencies, pin.dynamicDeps, &pin.migrationNotes)
 	if err != nil {
 		return nil, nil, pin, err
 	}
@@ -87,12 +87,12 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// could never run, and the test named for it exercised [tool.other] and
 	// asserted the list WAS carried. A branch no input can reach, described by a
 	// comment claiming it was a deliberate decision.
-	carriedPackages := false
+	migratedPackages := false
 	if len(v1.packages) > 0 {
 		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(v1.packages)); err != nil {
 			return nil, nil, pin, err
 		}
-		carriedPackages = true
+		migratedPackages = true
 	}
 	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
 		return nil, nil, pin, err
@@ -116,11 +116,11 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if added != "" {
 		labels = append(labels, manifest.Marker+" (added "+added+" to dependencies)")
 	}
-	if carried > 0 {
-		labels = append(labels, manifest.Marker+" (carried "+strconv.Itoa(carried)+" from requirements.txt into dependencies)")
+	if migrated > 0 {
+		labels = append(labels, manifest.Marker+" (migrated "+strconv.Itoa(migrated)+" from requirements.txt into dependencies)")
 	}
-	if carriedPackages {
-		labels = append(labels, manifest.Marker+" (carried packages.txt into packages)")
+	if migratedPackages {
+		labels = append(labels, manifest.Marker+" (migrated packages.txt into packages)")
 	}
 	return out, labels, pin, nil
 }

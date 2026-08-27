@@ -118,7 +118,7 @@ func parseRequirements(data []byte) (deps, notes []string) {
 			// it. Emitting it produced a dependency whose text ended in a
 			// backslash, which manifest.Parse accepts and uv then chokes on.
 			notes = append(notes, "requirements.txt: "+line+
-				" ends in a line continuation with nothing following it, so it was not carried")
+				" ends in a line continuation with nothing following it, so it was not migrated")
 		case strings.HasPrefix(line, "-"):
 			notes = append(notes, requirementOptionNote(line))
 		case isBareURL(line):
@@ -161,7 +161,7 @@ func requirementOptionNote(line string) string {
 	case "--hash":
 		return prefix + line + " pins a hash, which [project.dependencies] cannot express: uv.lock records hashes instead"
 	default:
-		return prefix + line + " is a pip option, not a requirement, and was not carried"
+		return prefix + line + " is a pip option, not a requirement, and was not migrated"
 	}
 }
 

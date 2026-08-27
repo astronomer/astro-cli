@@ -144,14 +144,14 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	}
 	// Scoped to the hand-off section, not the whole output, and deliberately.
 	// This assertion was written against `out` and passed only because the
-	// greenfield arm printed no label at all; now that it reports "carried 1
+	// greenfield arm printed no label at all; now that it reports "migrated 1
 	// from requirements.txt into dependencies", the file is legitimately named
 	// in the CREATED list. What must not happen is it appearing as work left to
 	// do, which is a different claim about the same string.
 	if strings.Contains(handoff, "requirements.txt") {
 		t.Errorf("requirements.txt was carried, so it must not be work left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "carried 1 from requirements.txt") {
+	if !strings.Contains(out, "migrated 1 from requirements.txt") {
 		t.Errorf("the conversion did not say it carried requirements.txt:\n%s", out)
 	}
 }

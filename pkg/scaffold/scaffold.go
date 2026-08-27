@@ -213,15 +213,15 @@ type manifestFacts struct {
 	// dynamicDeps reports that dependencies are declared dynamic, so the
 	// Airflow requirement could not be added beside them.
 	dynamicDeps bool
-	// carriedNotes is what building the manifest could not carry, discovered
+	// migrationNotes is what building the manifest could not migrate, discovered
 	// while building it rather than while reading the v1 files: extras on an
 	// apache-airflow requirement that the generated pin does not reproduce.
-	carriedNotes []string
-	// carriedLabels describes what the manifest write absorbed, for the
+	migrationNotes []string
+	// migratedLabels describes what the manifest write absorbed, for the
 	// Result's lists. The adopt arm returns its own labels directly; the
 	// greenfield arm cannot, because its label is fixed by Plan, so it reports
 	// them here instead.
-	carriedLabels []string
+	migratedLabels []string
 }
 
 // Run makes dir an Astro project, creating dir if needed. A directory with no
@@ -303,7 +303,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	manifestChange := Change{Kind: UpdateFile, Path: manifest.Marker, Content: out, Labels: manifestLabels}
 	if !cs.Adopted {
 		manifestChange.Kind = CreateFile
-		manifestChange.Labels = append([]string{manifest.Marker}, pin.carriedLabels...)
+		manifestChange.Labels = append([]string{manifest.Marker}, pin.migratedLabels...)
 	}
 	cs.Changes = append(cs.Changes, manifestChange)
 
@@ -314,7 +314,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// The v1 notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	cs.Notes = slices.Concat(v1.notes, pin.carriedNotes, leftovers(abs, cs.AirflowVersion, pin, v1))
+	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, leftovers(abs, cs.AirflowVersion, pin, v1))
 	return cs, nil
 }
 
@@ -333,26 +333,26 @@ func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]b
 	}
 	res.Name, res.AirflowVersion = name, version
 	return pyproject, manifestFacts{
-		defaultedPin:  defaulted,
-		carriedNotes:  notes,
-		carriedLabels: carriedLabels(v1),
+		defaultedPin:   defaulted,
+		migrationNotes: notes,
+		migratedLabels: migratedLabels(v1),
 	}, nil
 }
 
-// carriedLabels describes what a greenfield manifest absorbed from the v1 files.
+// migratedLabels describes what a greenfield manifest absorbed from the v1 files.
 //
 // Without this the common case said nothing. A real v1 project has no
 // pyproject.toml, so it takes the greenfield arm, where Plan hardcodes the
 // manifest's label to the filename — so `astro init` printed "pyproject.toml"
 // and never mentioned that thirty requirement lines and a list of apt packages
 // had just been moved into it. The rarer adopt arm did say so.
-func carriedLabels(v1 *v1Project) []string {
+func migratedLabels(v1 *v1Project) []string {
 	var out []string
 	if n := len(v1.dependencies); n > 0 {
-		out = append(out, manifest.Marker+" (carried "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
+		out = append(out, manifest.Marker+" (migrated "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
 	}
 	if len(v1.packages) > 0 {
-		out = append(out, manifest.Marker+" (carried packages.txt into packages)")
+		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
 	}
 	if v1.airflow != "" {
 		out = append(out, manifest.Marker+" (read airflow = "+v1.airflow+" from the Dockerfile)")
@@ -631,7 +631,7 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 			airflowRequirement(version)+" wherever this project lists its dependencies")
 		if len(v1.dependencies) > 0 {
 			out = append(out, "requirements.txt: dependencies are dynamic, so its "+
-				strconv.Itoa(len(v1.dependencies))+" requirements were not carried either")
+				strconv.Itoa(len(v1.dependencies))+" requirements were not migrated either")
 		}
 	}
 	return out

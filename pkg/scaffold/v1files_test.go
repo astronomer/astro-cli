@@ -428,7 +428,7 @@ func TestAdoptMergesRequirementsWithoutTouchingExistingPins(t *testing.T) {
 
 	assert.Equal(t, distName("python-dateutil"), distName("Python_DateUtil==2.8.2"),
 		"the normalization the dedup relies on")
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "carried 1 from requirements.txt")
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "migrated 1 from requirements.txt")
 }
 
 // packages.txt is carried into a manifest that has another tool's packages key,
@@ -545,7 +545,7 @@ func TestDockerfileBuildStepsAreReported(t *testing.T) {
 // hardcodes the manifest's label to the filename: `astro init` printed
 // "pyproject.toml" and never mentioned that the requirements and packages had
 // just been moved into it. The rarer adopt arm did say so.
-func TestGreenfieldReportsWhatItCarried(t *testing.T) {
+func TestGreenfieldReportsWhatItMigrated(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pandas==2.1.0\nboto3\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600))
@@ -555,8 +555,8 @@ func TestGreenfieldReportsWhatItCarried(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	joined := strings.Join(res.Created, "\n")
-	assert.Contains(t, joined, "carried 2 from requirements.txt")
-	assert.Contains(t, joined, "carried packages.txt")
+	assert.Contains(t, joined, "migrated 2 from requirements.txt")
+	assert.Contains(t, joined, "migrated packages.txt")
 	assert.Contains(t, joined, "read airflow = 3.1 from the Dockerfile")
 }
 
