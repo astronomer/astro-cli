@@ -1,0 +1,209 @@
+package scaffold
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// Kind is what Apply does for one change.
+//
+// Delete has no producer yet. It is declared with the others because the
+// migration this split exists for removes requirements.txt, packages.txt and
+// airflow_settings.yaml once their contents are in the manifest, and a change
+// set that could only add would have to be reshaped to say so — after the
+// preview UI had already been built against it.
+type Kind string
+
+const (
+	CreateDir     Kind = "create-dir"
+	CreateFile    Kind = "create-file"
+	CreateSymlink Kind = "create-symlink"
+	UpdateFile    Kind = "update-file"
+	Delete        Kind = "delete"
+)
+
+// ErrChangedOnDisk reports that the project no longer matches what Plan saw, so
+// Apply refused rather than doing something the preview did not describe.
+var ErrChangedOnDisk = errors.New("the project changed since it was planned")
+
+// Change is one operation Apply performs on the project directory.
+//
+// Content is the FINAL bytes, not a description of an edit, and that is what
+// makes a preview possible: a caller can diff Content against what is on disk
+// and show a person exactly what changes. Computing it is why Plan reads the
+// project even though it writes nothing.
+type Change struct {
+	Kind Kind `json:"kind"`
+	// Path is relative to the project directory, in slash form, so it reads the
+	// same in a UI on any platform. Apply refuses a path that leaves the project.
+	Path string `json:"path"`
+	// Content is the bytes to write, for CreateFile and UpdateFile.
+	//
+	// Not serialized: a change set crosses a process boundary only to be
+	// DISPLAYED — the desktop calls this package in process, so the side
+	// that applies is always the side that planned. Sending file contents to a
+	// UI that only needs to list them is payload for nothing, and a diff view
+	// can read the file itself. Apply refuses a write whose Content is nil, so a
+	// round-tripped change set fails loudly instead of truncating the user's
+	// files to zero bytes.
+	Content []byte `json:"-"`
+	// Target is the symlink destination, for CreateSymlink.
+	Target string `json:"target,omitempty"`
+	// Labels are how this change reads in the Result's lists, which is not
+	// always the path: a directory reads "dags/", a symlink reads
+	// "CLAUDE.md -> AGENTS.md", and an adopted manifest needs two lines to say
+	// what was added to it. Result's lists are derived from these, so a change
+	// cannot be reported and unlabelled at the same time.
+	Labels []string `json:"labels,omitempty"`
+}
+
+// Changeset is the Result a run would produce, plus the operations that produce
+// it. Plan returns one without touching the project; Apply performs the
+// operations and returns the Result.
+type Changeset struct {
+	Result
+	// Changes are performed in order, and the order is load-bearing: the
+	// manifest is written LAST. A manifest carrying [tool.astro] is the one
+	// thing that makes a rerun refuse, so a run that dies part-way through is
+	// safe to repeat only if the manifest is not there yet.
+	Changes []Change `json:"changes"`
+}
+
+// report fills Created and Updated from Changes, so the lists a person reads and
+// the operations that produce them cannot disagree.
+//
+// They used to be appended side by side at each site, and they drifted exactly
+// as you would expect: the adopted manifest was added to one list and not the
+// other, so the single most important line in a conversion preview rendered
+// blank. Skipped stays separate because nothing is done for it.
+func (cs *Changeset) report() {
+	cs.Created, cs.Updated = nil, nil
+	for i := range cs.Changes {
+		c := &cs.Changes[i]
+		switch c.Kind {
+		case CreateDir, CreateFile, CreateSymlink:
+			cs.Created = append(cs.Created, c.Labels...)
+		case UpdateFile, Delete:
+			cs.Updated = append(cs.Updated, c.Labels...)
+		}
+	}
+}
+
+// Apply performs a change set and reports what it did.
+//
+// It executes what Plan decided rather than deciding anything itself: a preview
+// a person approved has to be what runs, so re-deriving a decision here — even
+// the same decision — would make the preview advisory rather than binding.
+//
+// What it does check is that the preconditions still hold. The window between
+// Plan and Apply is human-scale by design — the desktop shows the change set and
+// waits — so a project that moved underneath is ordinary rather than exotic. An
+// edit whose file has since been deleted, or a write with no content, fails with
+// ErrChangedOnDisk instead of resurrecting or truncating something.
+func (cs *Changeset) Apply() (*Result, error) {
+	if err := os.MkdirAll(cs.Dir, dirPerm); err != nil {
+		return nil, err
+	}
+	for i := range cs.Changes {
+		if err := cs.Changes[i].apply(cs.Dir); err != nil {
+			return nil, err
+		}
+	}
+	return cs.result(), nil
+}
+
+// result copies the Result out, including its slices. Handing back a struct that
+// shares backing arrays with the Changeset means an append by either side can
+// overwrite the other whenever there is spare capacity — silent, and dependent
+// on lengths nobody is tracking.
+func (cs *Changeset) result() *Result {
+	res := cs.Result
+	res.Created = append([]string(nil), cs.Created...)
+	res.Skipped = append([]string(nil), cs.Skipped...)
+	res.Updated = append([]string(nil), cs.Updated...)
+	res.Notes = append([]string(nil), cs.Notes...)
+	return &res
+}
+
+// resolve turns a change's project-relative path into an absolute one, refusing
+// anything that leaves the project.
+//
+// Changeset is exported and JSON-tagged, so a change set can be built by hand or
+// arrive from a UI, and filepath.Join would quietly Clean a "../" away rather
+// than reject it — writing outside the directory the user approved. Delete makes
+// it worse: an empty path or ".." names the project directory itself.
+func (c *Change) resolve(dir string) (string, error) {
+	if c.Path == "" {
+		return "", fmt.Errorf("change of kind %q has no path", c.Kind)
+	}
+	clean := filepath.Clean(filepath.FromSlash(c.Path))
+	if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("change path %q leaves the project directory", c.Path)
+	}
+	return filepath.Join(dir, clean), nil
+}
+
+func (c *Change) apply(dir string) error {
+	path, err := c.resolve(dir)
+	if err != nil {
+		return err
+	}
+	switch c.Kind {
+	case CreateDir:
+		// MkdirAll rather than Mkdir: the directory may have appeared since Plan
+		// looked, and a person creating dags/ while deciding whether to accept
+		// the preview should not abort the run half-applied.
+		if err := os.MkdirAll(path, dirPerm); err != nil {
+			return fmt.Errorf("creating %s: %w", c.Path, err)
+		}
+	case CreateFile:
+		if c.Content == nil {
+			return fmt.Errorf("%w: %s has no content to write", ErrChangedOnDisk, c.Path)
+		}
+		if err := os.WriteFile(path, c.Content, filePerm); err != nil {
+			return fmt.Errorf("creating %s: %w", c.Path, err)
+		}
+	case UpdateFile:
+		if c.Content == nil {
+			return fmt.Errorf("%w: %s has no content to write", ErrChangedOnDisk, c.Path)
+		}
+		// An update edits a file that is already there, and the distinction is
+		// not pedantic: os.WriteFile would happily CREATE one, so a file the
+		// user deleted while reviewing would come back — at filePerm rather than
+		// its own mode, carrying content they had thrown away.
+		//
+		// Opened without O_CREATE for the same reason, and written in place
+		// rather than through a rename: the file is the user's, and a rename
+		// drops its mode, writes through a read-only bit, and turns a symlink
+		// into a regular file.
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, filePerm)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("%w: %s was there when this was planned and is not now", ErrChangedOnDisk, c.Path)
+			}
+			return fmt.Errorf("writing %s: %w", c.Path, err)
+		}
+		defer func() { _ = f.Close() }()
+		if _, err := f.Write(c.Content); err != nil {
+			return fmt.Errorf("writing %s: %w", c.Path, err)
+		}
+	case CreateSymlink:
+		if err := os.Symlink(c.Target, path); err != nil && !errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("linking %s: %w", c.Path, err)
+		}
+	case Delete:
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("removing %s: %w", c.Path, err)
+		}
+	default:
+		// Kind is a plain string on an exported type, so an unknown one is
+		// reachable: a hand-built change set, or a kind added after the caller
+		// was compiled. Silently doing nothing would report a run as successful
+		// while dropping changes the user approved.
+		return fmt.Errorf("unknown change kind %q for %s", c.Kind, c.Path)
+	}
+	return nil
+}

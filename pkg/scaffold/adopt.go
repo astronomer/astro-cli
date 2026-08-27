@@ -22,21 +22,20 @@ import (
 // as its author left it. It refuses only a manifest carrying the section
 // already — that directory is an Astro project, and re-initializing it would
 // overwrite the pin.
-func adopt(dir string, data []byte, opts Options, res *Result) ([]byte, manifestFacts, error) {
+func adopt(dir string, data []byte, opts Options, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
 	path := filepath.Join(dir, manifest.Marker)
-	var pin manifestFacts
 	ed, err := tomledit.NewSurgical(data)
 	if err != nil {
-		return nil, pin, fmt.Errorf("parsing %s: %w", path, err)
+		return nil, nil, pin, fmt.Errorf("parsing %s: %w", path, err)
 	}
 	if _, ok := ed.Get([]string{"tool", "astro"}); ok {
-		return nil, pin, fmt.Errorf("%s %w; edit that manifest instead of re-initializing", dir, ErrAlreadyAstroProject)
+		return nil, nil, pin, fmt.Errorf("%s %w; edit that manifest instead of re-initializing", dir, ErrAlreadyAstroProject)
 	}
 	// [project] and [tool.astro] are what make the directory an Astro project,
 	// so they lead the manifest the way [project] leads a pyproject.toml
 	// everywhere else, rather than trailing every tool's own section.
 	if err := ed.EnsureTablesAtTop([][]string{{"project"}, {"tool", "astro"}}); err != nil {
-		return nil, pin, err
+		return nil, nil, pin, err
 	}
 
 	deps := asStrings(mustGet(ed, "project", "dependencies"))
@@ -54,42 +53,44 @@ func adopt(dir string, data []byte, opts Options, res *Result) ([]byte, manifest
 	// was never a Python package often has no [project] table at all.
 	if name := opts.Name; name != "" {
 		if err := ed.Set([]string{"project", "name"}, name); err != nil {
-			return nil, pin, err
+			return nil, nil, pin, err
 		}
 	} else if v, ok := ed.Get([]string{"project", "name"}); !ok || v == "" {
 		if err := ed.Set([]string{"project", "name"}, deriveName(dir)); err != nil {
-			return nil, pin, err
+			return nil, nil, pin, err
 		}
 	}
 	if err := ensureProjectVersion(ed); err != nil {
-		return nil, pin, err
+		return nil, nil, pin, err
 	}
 
 	added, err := ensureAirflowDependency(ed, version, pin.dynamicDeps)
 	if err != nil {
-		return nil, pin, err
+		return nil, nil, pin, err
 	}
 	if err := ed.Set([]string{"tool", "astro", "airflow"}, version); err != nil {
-		return nil, pin, err
+		return nil, nil, pin, err
 	}
 
-	out, err := ed.Bytes()
+	out, err = ed.Bytes()
 	if err != nil {
-		return nil, pin, err
+		return nil, nil, pin, err
 	}
 	m, err := manifest.Parse(out)
 	if err != nil {
-		return nil, pin, withPath(err, path)
+		return nil, nil, pin, withPath(err, path)
 	}
 
 	res.Name = m.Project.Name
 	res.AirflowVersion = version
 	res.Adopted = true
-	res.Updated = append(res.Updated, manifest.Marker+" (added [tool.astro])")
+	// Returned rather than appended to a list beside the change: these lines
+	// describe the manifest write, so they belong to it.
+	labels = []string{manifest.Marker + " (added [tool.astro])"}
 	if added != "" {
-		res.Updated = append(res.Updated, manifest.Marker+" (added "+added+" to dependencies)")
+		labels = append(labels, manifest.Marker+" (added "+added+" to dependencies)")
 	}
-	return out, pin, nil
+	return out, labels, pin, nil
 }
 
 // ensureAirflowDependency adds the requirement that installs the Airflow the

@@ -29,39 +29,40 @@ func EnvIgnored(projectDir string) (bool, error) {
 	return coversEnv(string(data)), nil
 }
 
-// EnsureEnvIgnored makes the project's .gitignore cover .env, appending a
-// rule when an existing file omits it. A missing .gitignore is left alone —
-// `astro init` writes one from its template — so this only heals an imported
-// or hand-made project. added reports whether a rule was appended.
-func EnsureEnvIgnored(projectDir string) (added bool, err error) {
-	path := filepath.Join(projectDir, fileGitignore)
-	data, err := os.ReadFile(path)
+// planEnvIgnored works out the change that would make .gitignore cover .env,
+// and returns nil when nothing is needed — no file, or a rule already there.
+//
+// Split out of EnsureEnvIgnored so the appended bytes can be shown to a person
+// before they land: this edits a file the user wrote, which is exactly the case
+// O3 requires a preview for. EnsureEnvIgnored stays as the do-it-now form for
+// callers that are not previewing anything.
+func planEnvIgnored(projectDir string) (*Change, error) {
+	data, err := os.ReadFile(filepath.Join(projectDir, fileGitignore))
 	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
+		return nil, nil
 	}
 	if err != nil {
-		return false, err
-	}
-	if coversEnv(string(data)) {
-		return false, nil
+		return nil, err
 	}
 	s := string(data)
+	if coversEnv(s) {
+		return nil, nil
+	}
 	var b strings.Builder
 	b.WriteString(s)
 	if s != "" && !strings.HasSuffix(s, "\n") {
 		b.WriteByte('\n')
 	}
 	b.WriteString("\n# Local env values (astro local env)\n.env\n")
-	// Written in place rather than through a temp file and a rename, for the
-	// same reason Run writes the manifest that way: this file is the user's, and
-	// a rename replaces it — dropping its mode, writing through a read-only bit
-	// that says don't, and turning a symlinked .gitignore into a regular file.
-	// This function only ever runs when the file already exists, so os.WriteFile
-	// truncates in place and the mode is the user's, not filePerm.
-	if err := os.WriteFile(path, []byte(b.String()), filePerm); err != nil {
-		return false, err
-	}
-	return true, nil
+	// UpdateFile rather than CreateFile: the file is the user's, and Apply
+	// writes an update in place so it keeps its mode and its identity. A rename
+	// would drop both.
+	return &Change{
+		Kind:    UpdateFile,
+		Path:    fileGitignore,
+		Content: []byte(b.String()),
+		Labels:  []string{fileGitignore + " (added the .env rule)"},
+	}, nil
 }
 
 // coversEnv reports whether a .gitignore leaves the .env file ignored. It

@@ -73,6 +73,7 @@ const (
 const (
 	fileGitignore = ".gitignore"
 	fileAgents    = "AGENTS.md"
+	fileClaude    = "CLAUDE.md"
 )
 
 // projectDirs are the standard project directories, in creation order.
@@ -101,7 +102,28 @@ type manifestFacts struct {
 // [tool.astro] is adopted, so `astro init` runs in an Airflow repo as it
 // stands. Either way, files already there are kept, and what Run could not
 // carry over is reported in Notes.
+//
+// Run is Plan followed by Apply, which is what a command wants: nobody is going
+// to review a change set at a terminal that has already asked for it. A caller
+// that shows the change set to a person first calls the two halves itself.
 func Run(dir string, opts Options) (*Result, error) {
+	cs, err := Plan(dir, opts)
+	if err != nil {
+		return nil, err
+	}
+	return cs.Apply()
+}
+
+// Plan works out what making dir an Astro project would do, and returns it
+// without touching the project.
+//
+// The split exists because this package's output lands in someone's repository.
+// A command can reasonably scaffold on request, but Astro Desktop offers to
+// convert a project the user already has, and O3 requires it to show the diff
+// first — which is impossible if the only way to learn what a run does is to
+// let it happen. Plan reads the project (it has to: an adopted manifest is
+// computed from the one already there) and writes nothing.
+func Plan(dir string, opts Options) (*Changeset, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
@@ -115,15 +137,18 @@ func Run(dir string, opts Options) (*Result, error) {
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
-	res := &Result{Dir: abs}
+	cs := &Changeset{Result: Result{Dir: abs}}
 	var out []byte
+	var manifestLabels []string
 	var pin manifestFacts
 	data, readErr := os.ReadFile(marker)
 	switch {
 	case readErr == nil:
-		out, pin, err = adopt(abs, data, opts, res)
+		out, manifestLabels, pin, err = adopt(abs, data, opts, &cs.Result)
 	case errors.Is(readErr, os.ErrNotExist):
-		out, pin, err = scaffoldManifest(abs, opts, res)
+		// No labels from this arm: a scaffolded manifest is created rather than
+		// edited, so its one line is the filename, supplied below.
+		out, pin, err = scaffoldManifest(abs, opts, &cs.Result)
 	default:
 		err = fmt.Errorf("reading %s: %w", marker, readErr)
 	}
@@ -131,27 +156,27 @@ func Run(dir string, opts Options) (*Result, error) {
 		return nil, err
 	}
 
-	// The scaffold lands before the manifest. A manifest carrying [tool.astro]
-	// is the one thing that makes a rerun refuse, so writing it last leaves a
-	// run that failed part-way through safe to repeat.
-	if err := write(abs, goos != windowsOS, res); err != nil {
+	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
 		return nil, err
 	}
-	// Written in place, not through a temp file and a rename. This manifest is
-	// often one this package did not create, and a rename replaces it: it
-	// drops the file's mode, writes through a read-only bit that says don't,
-	// and turns a symlinked manifest into a regular file. Every byte here has
-	// already been through manifest.Parse, so what lands is a manifest that
-	// loads.
-	//nolint:gosec // G703: marker is the directory the user named for their own project, joined with a fixed filename — writing there is what init does
-	if err := os.WriteFile(marker, out, filePerm); err != nil {
-		return nil, fmt.Errorf("writing %s: %w", marker, err)
+
+	// The manifest goes LAST, and the ordering is the reason Apply walks a
+	// slice rather than a map. A manifest carrying [tool.astro] is the one
+	// thing that makes a rerun refuse, so a run that dies part-way through is
+	// safe to repeat only while the manifest is still absent.
+	manifestChange := Change{Kind: UpdateFile, Path: manifest.Marker, Content: out, Labels: manifestLabels}
+	if !cs.Adopted {
+		manifestChange.Kind = CreateFile
+		manifestChange.Labels = []string{manifest.Marker}
 	}
-	if !res.Adopted {
-		res.Created = append(res.Created, manifest.Marker)
-	}
-	res.Notes = leftovers(abs, pin)
-	return res, nil
+	cs.Changes = append(cs.Changes, manifestChange)
+
+	// Created and Updated are derived from the changes rather than appended
+	// beside them, so a change that is performed but unreported — or reported
+	// but not performed — cannot be constructed.
+	cs.report()
+	cs.Notes = leftovers(abs, pin)
+	return cs, nil
 }
 
 // scaffoldManifest renders the manifest for a directory that has none, and
@@ -210,24 +235,20 @@ func renderPyproject(name, version string) ([]byte, error) {
 	return data, nil
 }
 
-// write puts the scaffold on disk — the directories, .gitignore, AGENTS.md and
-// the symlink. Existing entries are kept and reported as skipped, so a rerun
-// over a partial scaffold is safe. The manifest is Run's to write, on both
-// paths, so it is not here.
-func write(dir string, withSymlink bool, res *Result) error {
-	if err := os.MkdirAll(dir, dirPerm); err != nil {
-		return err
-	}
+// planFiles works out the scaffold half of a run: the standard directories, the
+// template files, the .env rule, and the CLAUDE.md symlink. It decides
+// everything by reading and appends the operations to cs, writing nothing.
+//
+// The decisions were previously made as each file was written, which is why the
+// preview did not exist: "does .gitignore already cover .env" was answered
+// inside the call that healed it.
+func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 	for _, d := range projectDirs {
-		path := filepath.Join(dir, d)
-		if _, err := os.Lstat(path); err == nil {
-			res.Skipped = append(res.Skipped, d+"/")
+		if _, err := os.Lstat(filepath.Join(dir, d)); err == nil {
+			cs.Skipped = append(cs.Skipped, d+"/")
 			continue
 		}
-		if err := os.Mkdir(path, dirPerm); err != nil {
-			return fmt.Errorf("creating %s: %w", d, err)
-		}
-		res.Created = append(res.Created, d+"/")
+		cs.Changes = append(cs.Changes, Change{Kind: CreateDir, Path: d, Labels: []string{d + "/"}})
 	}
 
 	files := []struct{ name, content string }{
@@ -235,38 +256,45 @@ func write(dir string, withSymlink bool, res *Result) error {
 		{fileAgents, agentsContent()},
 	}
 	for _, f := range files {
-		path := filepath.Join(dir, f.name)
-		if _, err := os.Lstat(path); err == nil {
-			res.Skipped = append(res.Skipped, f.name)
+		if _, err := os.Lstat(filepath.Join(dir, f.name)); err == nil {
+			cs.Skipped = append(cs.Skipped, f.name)
 			continue
 		}
-		if err := os.WriteFile(path, []byte(f.content), filePerm); err != nil {
-			return fmt.Errorf("creating %s: %w", f.name, err)
-		}
-		res.Created = append(res.Created, f.name)
+		cs.Changes = append(cs.Changes, Change{
+			Kind: CreateFile, Path: f.name, Content: []byte(f.content), Labels: []string{f.name},
+		})
 	}
 
-	// Ensure .gitignore covers .env even when it already existed and was kept
-	// above (a fresh template already lists it, so this only heals a .gitignore
-	// the repo already had). Local env values must never be committed.
-	if added, err := EnsureEnvIgnored(dir); err != nil {
+	// Local env values must never be committed, so a .gitignore lacking the rule
+	// gets it added. Computed here rather than performed, so the bytes can be
+	// shown before they land.
+	//
+	// Run unconditionally, deliberately. Guarding it on "we are not writing the
+	// template" reads like an optimization and is a dependency: it makes the
+	// heal rely on gitignoreTemplate containing a .env line, so an edit to that
+	// template would ship every new project with .env tracked by git and nothing
+	// would notice. Unguarded, planEnvIgnored reads whatever is on disk — which
+	// during Plan is still the pre-scaffold state — and returns nil when there
+	// is nothing to do.
+	healed, err := planEnvIgnored(dir)
+	if err != nil {
 		return err
-	} else if added {
-		res.Updated = append(res.Updated, fileGitignore+" (added the .env rule)")
+	}
+	if healed != nil {
+		cs.Changes = append(cs.Changes, *healed)
 	}
 
 	if !withSymlink {
 		return nil
 	}
-	link := filepath.Join(dir, "CLAUDE.md")
-	if _, err := os.Lstat(link); err == nil {
-		res.Skipped = append(res.Skipped, "CLAUDE.md")
+	if _, err := os.Lstat(filepath.Join(dir, fileClaude)); err == nil {
+		cs.Skipped = append(cs.Skipped, fileClaude)
 		return nil
 	}
-	if err := os.Symlink("AGENTS.md", link); err != nil {
-		return fmt.Errorf("linking CLAUDE.md: %w", err)
-	}
-	res.Created = append(res.Created, "CLAUDE.md -> AGENTS.md")
+	cs.Changes = append(cs.Changes, Change{
+		Kind: CreateSymlink, Path: fileClaude, Target: fileAgents,
+		Labels: []string{fileClaude + " -> " + fileAgents},
+	})
 	return nil
 }
 
