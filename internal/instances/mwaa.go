@@ -158,8 +158,8 @@ func (t *awsTransport) Do(ctx context.Context, req airflowapi.Request) (airflowa
 		return fallback.Do(ctx, req)
 	}
 	if len(req.Header) > 0 {
-		return airflowapi.Response{}, fmt.Errorf("MWAA's AWS API carries no request headers, so %s cannot be sent for %s: this request is signed as your AWS identity and nothing can override that. Reach this environment by URL if you need to set headers",
-			strings.Join(headerNames(req.Header), ", "), t.environment)
+		return airflowapi.Response{}, fmt.Errorf("%w: MWAA's AWS API carries no request headers, so %s cannot be sent for %s. This request is signed as your AWS identity and nothing can override that. Reach this environment by URL if you need to set headers",
+			airflowapi.ErrHeadersUnsupported, strings.Join(headerNames(req.Header), ", "), t.environment)
 	}
 	if req.Generation == airflowapi.GenerationNone {
 		// A request below the API prefix — /health, /openapi.json — has no

@@ -24,6 +24,16 @@ var (
 	// existing — never tabulated against a minor version. A caller with
 	// something else to show branches here.
 	ErrNotServed = errors.New("not served by this airflow")
+	// ErrHeadersUnsupported reports a door with nowhere to put Request.Header
+	// — MWAA's InvokeRestApi, which takes a path, a method, a query, and a
+	// body and nothing else. A transport that cannot carry headers wraps this
+	// rather than dropping them silently (see the Transport contract).
+	//
+	// It is a sentinel so a caller whose header is a preference rather than a
+	// requirement can ask again without it. Only Client.TaskLogs does that
+	// today: text/plain makes an Airflow 2 log readable, and where it cannot
+	// be asked for, the log still arrives in the shape it always had.
+	ErrHeadersUnsupported = errors.New("this door carries no request headers")
 )
 
 // maxBodyInError bounds how much of an unexplained error body reaches the

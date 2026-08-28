@@ -180,10 +180,11 @@ func mediaType(header http.Header) string {
 //   - Apply Request.Header over its own headers, Authorization included. An
 //     implementation with nowhere to put them — MWAA's InvokeRestApi takes a
 //     path, a method, a query, and a body, and no headers at all — returns an
-//     error naming what it cannot carry rather than dropping it. Authorization
-//     is the header a caller is most likely to set and this contract promises
-//     it wins; sending the request as somebody else instead would be a
-//     surprise nobody could see.
+//     error wrapping ErrHeadersUnsupported and naming what it cannot carry,
+//     rather than dropping it. Authorization is the header a caller is most
+//     likely to set and this contract promises it wins; sending the request as
+//     somebody else instead would be a surprise nobody could see. The sentinel
+//     lets a caller whose header was only a preference ask again without it.
 type Transport interface {
 	Do(ctx context.Context, req Request) (Response, error)
 }
@@ -227,8 +228,13 @@ func basicValue(username, password string) string {
 // task logs and a cold /config, both well inside this.
 const defaultTimeout = 30 * time.Second
 
-// jsonMediaType is what the API answers with, and what every request asks for.
-const jsonMediaType = "application/json"
+// jsonMediaType is what the API answers with, and what every request asks for
+// unless it says otherwise. textMediaType is the one exception: Airflow 2
+// serves a task log as text to a caller who asks for text (Client.TaskLogs).
+const (
+	jsonMediaType = "application/json"
+	textMediaType = "text/plain"
+)
 
 // HTTPTransport is the common Transport: a base URL plus a credential source
 // applied to every request.

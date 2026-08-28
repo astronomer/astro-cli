@@ -1,7 +1,9 @@
 package airflowapi
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"testing"
@@ -108,15 +110,41 @@ func TestTaskLogTextRendersBothShapes(t *testing.T) {
 	}
 }
 
-func TestTaskLogContentIsHandedBackAsAirflowSentIt(t *testing.T) {
-	// Airflow 2 answers with a string holding the Python repr of its
-	// (hostname, log) pairs. Making that readable belongs to the logs
-	// command; the client hands over what came.
+// Airflow 2's JSON answer wraps the log in the Python repr of its
+// (hostname, log) pairs, which is one line holding every real line as an
+// escape. The endpoint has served text/plain since 2.0.0, so the client asks
+// for that and the reader gets the log itself.
+func TestTaskLogsAskAirflow2ForPlainText(t *testing.T) {
+	const plain = "[2026-01-01T00:00:00+0000] INFO - Started\n[2026-01-01T00:00:01+0000] INFO - Done\n"
+	stub := newAF2Stub(t)
+	stub.route(http.MethodGet, "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/logs/1", plain)
+	client := stub.client()
+
+	log, err := client.TaskLogs(t.Context(), "etl", "r1", "load", TaskLogsOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stub.lastRequest().Header.Get("Accept"); got != textMediaType {
+		t.Errorf("Accept = %q, want %q", got, textMediaType)
+	}
+	if log.Text() != plain {
+		t.Errorf("Text() = %q, want the log as served", log.Text())
+	}
+}
+
+// A door with nowhere to put a header cannot ask for text — MWAA under
+// InvokeRestApi. The log still has to arrive, so the client asks again without
+// the header and hands back the shape Airflow 2's JSON gives it.
+func TestTaskLogsFallBackWhenTheDoorTakesNoHeaders(t *testing.T) {
 	const repr = `[('worker-1', '[2026-01-01T00:00:00+0000] INFO - Started\n')]`
 	stub := newAF2Stub(t)
 	stub.route(http.MethodGet, "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/logs/1",
 		`{"content":`+strconv.Quote(repr)+`,"continuation_token":"abc"}`)
-	client := stub.client()
+	transport, err := NewHTTPTransport(stub.URL)
+	if err != nil {
+		t.Fatalf("build transport: %v", err)
+	}
+	client := New(headerlessTransport{transport})
 
 	log, err := client.TaskLogs(t.Context(), "etl", "r1", "load", TaskLogsOptions{})
 	if err != nil {
@@ -128,6 +156,16 @@ func TestTaskLogContentIsHandedBackAsAirflowSentIt(t *testing.T) {
 	if log.ContinuationToken != "abc" {
 		t.Errorf("continuation token = %q, want it kept", log.ContinuationToken)
 	}
+}
+
+// headerlessTransport refuses a request carrying headers, the way MWAA's does.
+type headerlessTransport struct{ Transport }
+
+func (t headerlessTransport) Do(ctx context.Context, req Request) (Response, error) {
+	if len(req.Header) > 0 {
+		return Response{}, fmt.Errorf("%w: this door carries none", ErrHeadersUnsupported)
+	}
+	return t.Transport.Do(ctx, req)
 }
 
 func TestClearTaskInstancesSendsEveryFlagAsGiven(t *testing.T) {

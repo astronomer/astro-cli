@@ -53,8 +53,9 @@ func TestTasksInstanceShowsWhatOneRunDid(t *testing.T) {
 	}
 }
 
-// Both generations answer a log request in their own shape and neither is
-// reshaped by the client, so the command is what makes them read the same.
+// The two generations answer a log request in their own shape — Airflow 3 with
+// structured entries, Airflow 2 with the plain text the client asks it for —
+// and both reach the reader as lines.
 func TestTasksLogsRenderBothGenerations(t *testing.T) {
 	af3 := newAirflowStub(t)
 	af3.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/run_1/taskInstances/load/logs/1",
@@ -69,7 +70,7 @@ func TestTasksLogsRenderBothGenerations(t *testing.T) {
 
 	af2 := newAirflow2Stub(t)
 	af2.route(http.MethodGet, "/api/v1/dags/orders_etl/dagRuns/run_1/taskInstances/load/logs/1",
-		`{"content":"a plain airflow 2 log"}`)
+		"a plain airflow 2 log")
 	out, _, err = runQuery(t, af2, "tasks", "logs", "orders_etl", "run_1", "load")
 	if err != nil {
 		t.Fatalf("tasks logs on airflow 2: %v", err)
