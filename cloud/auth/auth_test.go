@@ -1390,7 +1390,18 @@ func TestLogout(t *testing.T) {
 }
 
 func Test_writeResultToContext(t *testing.T) {
-	assertConfigContents := func(expToken string, expRefresh string, expExpires time.Time, expUserEmail string) {
+	// The expiry is bracketed rather than compared for equality. SetExpiresIn
+	// reads the clock itself, so the stored value can only be pinned down to
+	// the window the write happened in — asserting it against a second reading
+	// taken afterwards compared two different clocks, and rounding both to the
+	// second only hid that until a `.5` boundary fell between them. It failed
+	// roughly as often as the write was slow, which is why CI saw it and a
+	// laptop did not.
+	//
+	// The bracket keeps the assertion exact: the stored time must be the
+	// duration under test past the clock, to the millisecond, and a write that
+	// stored 1233 seconds instead of 1234 still fails.
+	assertConfigContents := func(expToken string, expRefresh string, notBefore, notAfter time.Time, expUserEmail string) {
 		context, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		// test the output on the config file
@@ -1398,7 +1409,8 @@ func Test_writeResultToContext(t *testing.T) {
 		assert.Equal(t, expRefresh, context.RefreshToken)
 		expiresIn, err := context.GetExpiresIn()
 		assert.NoError(t, err)
-		assert.Equal(t, expExpires.Round(time.Second), expiresIn.Round(time.Second))
+		assert.False(t, expiresIn.Before(notBefore), "expiry %s is before the window opened at %s", expiresIn, notBefore)
+		assert.False(t, expiresIn.After(notAfter), "expiry %s is after the window closed at %s", expiresIn, notAfter)
 		assert.Equal(t, expUserEmail, context.UserEmail)
 		assert.NoError(t, err)
 	}
@@ -1416,14 +1428,18 @@ func Test_writeResultToContext(t *testing.T) {
 	}
 	// test before changes
 	var timeZero time.Time
-	assertConfigContents("old_token", "", timeZero, "")
+	assertConfigContents("old_token", "", timeZero, timeZero, "")
 
 	// apply function
 	c, err = config.GetCurrentContext()
 	assert.NoError(t, err)
+	before := time.Now()
 	err = res.writeToContext(&c)
+	after := time.Now()
 	assert.NoError(t, err)
 
 	// test after changes
-	assertConfigContents("Bearer new_token", "new_refresh_token", time.Now().Add(1234*time.Second), "test.user@astronomer.io")
+	expiry := time.Duration(res.ExpiresIn) * time.Second
+	assertConfigContents("Bearer new_token", "new_refresh_token",
+		before.Add(expiry), after.Add(expiry), "test.user@astronomer.io")
 }
