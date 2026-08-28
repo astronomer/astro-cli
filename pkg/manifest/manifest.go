@@ -167,7 +167,7 @@ func (l Link) Kind() LinkKind {
 //
 // It lives here because it is a fact about the manifest, and because both the
 // deploy path and instance resolution ask it. Two copies of this rule would
-// drift, and the day they did, `astro deploy` and `astro dags list` would
+// drift, and the day they did, `astro deploy` and `astro af dags list` would
 // disagree about where a project points.
 func DefaultLink(links map[string]Link) (string, Link, bool) {
 	// Ranged by key: a link is a wide struct, and copying one per iteration to

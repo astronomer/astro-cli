@@ -37,7 +37,7 @@ func newUseCmd(c *cli) *cobra.Command {
 			"The pin is one layer of the resolution rule: -d/--deployment beats " + instances.EnvVar + ", which beats " +
 			"the pin, which beats the manifest's default link. `astro use --unset` clears the pin.\n\n" +
 			"Deployments only. The Airflow running on this machine is not one of them and is never resolved to: " +
-			"`astro local dags list`, `astro local health`, and the rest of `astro local` act on it.",
+			"`astro local af dags list`, `astro local af health`, and the rest of `astro local` act on it.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			switch {
@@ -271,7 +271,7 @@ func localRowName(l instances.Local, own string, taken map[string]bool) string {
 func localRowNote(i instances.Instance, own bool) string {
 	switch {
 	case own:
-		return "this machine — `astro local dags list`, `astro local health`, …"
+		return "this machine — `astro local af dags list`, `astro local af health`, …"
 	case i.URL == "":
 		// The record carried no port, so there is no address to offer at all.
 		return "another project's Airflow; its record has no port"

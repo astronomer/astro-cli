@@ -39,8 +39,8 @@ func AddCmds(d Deps) []*cobra.Command {
 	}
 	// The query surface at the top level acts on a deployment. The same
 	// commands, built by the same code, act on this machine under
-	// `astro local` (NewLocalCmd).
-	cmds = append(cmds, queryFamilies(d, func() target { return &deploymentTarget{} })...)
+	// `astro local af` (NewLocalCmd).
+	cmds = append(cmds, newAfCmd(d, func() target { return &deploymentTarget{} }))
 	cmds = append(cmds, rootAliasCmds(d)...)
 	for _, cmd := range cmds {
 		silenceUsage(cmd)

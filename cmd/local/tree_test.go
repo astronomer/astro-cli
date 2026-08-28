@@ -67,7 +67,7 @@ func TestLocalTreeHasEverySpecCommand(t *testing.T) {
 func TestRootHasAliasesInitAndDev(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs", "use"} {
+	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs", "use", "af"} {
 		found := false
 		for _, sub := range root.Commands() {
 			if sub.Name() == name {
@@ -76,6 +76,37 @@ func TestRootHasAliasesInitAndDev(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("astro %s is missing from the v2 root", name)
+		}
+	}
+}
+
+// afGroup resolves the `af` node under root, or under the path given (the one
+// caller passes "local"). It fails the test rather than returning nil, because
+// every caller below is about what hangs off that node.
+func afGroup(t *testing.T, root *cobra.Command, path ...string) *cobra.Command {
+	t.Helper()
+	cmd, _, err := root.Find(append(append([]string{}, path...), afName))
+	if err != nil || cmd.Name() != afName {
+		t.Fatalf("astro %s is missing: %v", strings.Join(append(append([]string{}, path...), afName), " "), err)
+	}
+	return cmd
+}
+
+// Both spellings of the group reach the same command, on both surfaces. The
+// alias is the whole reason `af` can stay the short primary: a reader who never
+// met that CLI spells it out and lands in the same place.
+func TestAfGroupAnswersToAirflow(t *testing.T) {
+	d, _ := testDeps(t)
+	root := NewRootCmd(d)
+	for _, path := range [][]string{{}, {"local"}} {
+		spelled, _, err := root.Find(append(append([]string{}, path...), afAlias, "dags"))
+		if err != nil {
+			t.Errorf("astro %s %s dags is missing: %v", strings.Join(path, " "), afAlias, err)
+			continue
+		}
+		if short, _, _ := root.Find(append(append([]string{}, path...), afName, "dags")); short != spelled {
+			t.Errorf("astro %s %s dags and astro %s %s dags are different commands",
+				strings.Join(path, " "), afAlias, strings.Join(path, " "), afName)
 		}
 	}
 }
@@ -112,13 +143,9 @@ var querySurface = map[string][]string{
 func TestQuerySurfaceHasEveryCommand(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	localCmd, _, err := root.Find([]string{"local"})
-	if err != nil {
-		t.Fatalf("astro local is missing: %v", err)
-	}
-	// Both spellings carry the whole surface: the machine's under `astro local`,
-	// a deployment's at the top level.
-	for _, parent := range []*cobra.Command{root, localCmd} {
+	// Both spellings carry the whole surface: the machine's under
+	// `astro local af`, a deployment's under `astro af`.
+	for _, parent := range []*cobra.Command{afGroup(t, root), afGroup(t, root, "local")} {
 		for family, verbs := range querySurface {
 			cmd, _, err := parent.Find([]string{family})
 			if err != nil || cmd.Name() != family {
@@ -146,31 +173,28 @@ func TestQuerySurfaceHasEveryCommand(t *testing.T) {
 func TestBothRegistrationsAreTheSameCommands(t *testing.T) {
 	d, _ := testDeps(t)
 	root := NewRootCmd(d)
-	localCmd, _, err := root.Find([]string{"local"})
-	if err != nil {
-		t.Fatalf("astro local is missing: %v", err)
-	}
+	top, machine := afGroup(t, root), afGroup(t, root, "local")
 	// The flags the top-level registration adds and the machine's does not.
 	selectors := map[string]bool{"deployment": true, "url": true}
 
 	for family := range querySurface {
-		top, _, err := root.Find([]string{family})
+		topFamily, _, err := top.Find([]string{family})
 		if err != nil {
-			t.Errorf("astro %s is missing", family)
+			t.Errorf("astro af %s is missing", family)
 			continue
 		}
-		machine, _, err := localCmd.Find([]string{family})
+		machineFamily, _, err := machine.Find([]string{family})
 		if err != nil {
-			t.Errorf("astro local %s is missing", family)
+			t.Errorf("astro local af %s is missing", family)
 			continue
 		}
 		// The selectors sit on the top-level family and nowhere else.
 		for name := range selectors {
-			if top.PersistentFlags().Lookup(name) == nil {
-				t.Errorf("astro %s cannot reach --%s", family, name)
+			if topFamily.PersistentFlags().Lookup(name) == nil {
+				t.Errorf("astro af %s cannot reach --%s", family, name)
 			}
 		}
-		compareRegistrations(t, top, machine, selectors)
+		compareRegistrations(t, topFamily, machineFamily, selectors)
 	}
 }
 
@@ -240,23 +264,23 @@ func equalNames(a, b []string) bool {
 // drifting into three spellings of one idea.
 func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	top := afGroup(t, NewRootCmd(d))
 	for _, family := range []string{"dags", "runs", "tasks", "assets", "connections", "variables", "pools", "health"} {
-		cmd, _, err := root.Find([]string{family})
+		cmd, _, err := top.Find([]string{family})
 		if err != nil {
-			t.Errorf("astro %s is missing", family)
+			t.Errorf("astro af %s is missing", family)
 			continue
 		}
 		deployment := cmd.PersistentFlags().Lookup("deployment")
 		if deployment == nil || deployment.Shorthand != "d" {
-			t.Errorf("astro %s: --deployment = %+v, want it registered with -d", family, deployment)
+			t.Errorf("astro af %s: --deployment = %+v, want it registered with -d", family, deployment)
 		}
 		if cmd.PersistentFlags().Lookup("url") == nil {
-			t.Errorf("astro %s cannot reach --url", family)
+			t.Errorf("astro af %s cannot reach --url", family)
 		}
 		for _, sub := range cmd.Commands() {
 			if sub.InheritedFlags().Lookup("deployment") == nil {
-				t.Errorf("astro %s %s cannot reach -d", family, sub.Name())
+				t.Errorf("astro af %s %s cannot reach -d", family, sub.Name())
 			}
 		}
 	}

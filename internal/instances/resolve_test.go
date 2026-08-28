@@ -64,7 +64,7 @@ func TestLocalIsNotASelectableName(t *testing.T) {
 			t.Fatalf("select(%+v) = %v, want the machine's own commands named", req, err)
 		}
 	}
-	if !strings.Contains(ErrLocalNotADeployment.Error(), "astro local dags list") {
+	if !strings.Contains(ErrLocalNotADeployment.Error(), "astro local af dags list") {
 		t.Errorf("the refusal does not show the new spelling: %s", ErrLocalNotADeployment)
 	}
 }

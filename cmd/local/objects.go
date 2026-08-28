@@ -45,7 +45,7 @@ type connectionListRow struct {
 }
 
 // connectionRow is one connection read on purpose, Extra included. Asking for a
-// single connection by name is a deliberate act, the way `astro variables get`
+// single connection by name is a deliberate act, the way `astro af variables get`
 // is; the password is still absent, because the client never decodes it.
 type connectionRow struct {
 	connectionListRow

@@ -396,7 +396,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		Interactive:      interactive,
 		// Two lines, once the target is settled and before anything is built.
 		// The first is the → line every resolving command prints, so a deploy
-		// says what it is about to act on the way `astro dags list` does. The
+		// says what it is about to act on the way `astro af dags list` does. The
 		// second says an image build can run for minutes with no transport
 		// output yet; the transport itself stays silent (v2 layer rules).
 		//

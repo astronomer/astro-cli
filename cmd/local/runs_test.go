@@ -185,7 +185,7 @@ func TestRunsTriggerReportsTheUnpauseItLeavesBehind(t *testing.T) {
 	if err == nil {
 		t.Fatal("the trigger must fail")
 	}
-	want := "astro dags pause orders_etl --url " + stub.URL
+	want := "astro af dags pause orders_etl --url " + stub.URL
 	if !strings.Contains(err.Error(), want) {
 		t.Errorf("err = %q, want it to name the state it left and how to undo it on this Airflow (%q)", err, want)
 	}
@@ -219,22 +219,22 @@ func TestRecoveryCommandsCarryTheSelector(t *testing.T) {
 		dir := instanceProject(t, "\n[tool.astro.deployments.staging]\nurl = '"+stub.URL+"'\nauth = { method = 'none' }\n")
 		d, _, _ := queryDeps(t)
 		d.WorkingDir = func() (string, error) { return dir, nil }
-		err := execute(t, d, "runs", "trigger", "orders_etl", "-d", "staging")
+		err := execute(t, d, "af", "runs", "trigger", "orders_etl", "-d", "staging")
 		if err == nil {
 			t.Fatal("the trigger must fail")
 		}
-		if !strings.Contains(err.Error(), "astro dags pause orders_etl -d staging") {
+		if !strings.Contains(err.Error(), "astro af dags pause orders_etl -d staging") {
 			t.Errorf("err = %q, want the undo to carry -d staging", err)
 		}
 	})
 
 	t.Run("the machine keeps its own spelling", func(t *testing.T) {
 		stub := pausedDAG(t)
-		_, _, err := runLocalQuery(t, stub, "local", "runs", "trigger", "orders_etl")
+		_, _, err := runLocalQuery(t, stub, "local", "af", "runs", "trigger", "orders_etl")
 		if err == nil {
 			t.Fatal("the trigger must fail")
 		}
-		if !strings.Contains(err.Error(), "astro local dags pause orders_etl") {
+		if !strings.Contains(err.Error(), "astro local af dags pause orders_etl") {
 			t.Errorf("err = %q, want the undo spelled for this machine", err)
 		}
 		if strings.Contains(err.Error(), "--url") || strings.Contains(err.Error(), "-d ") {

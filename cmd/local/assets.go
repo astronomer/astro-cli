@@ -118,7 +118,7 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 			})
 		},
 	}
-	// Most recent first, for the same reason `astro runs list` sorts that way:
+	// Most recent first, for the same reason `astro af runs list` sorts that way:
 	// the question behind an event listing is nearly always "what just changed".
 	addListFlags(cmd, &list, "-timestamp")
 	cmd.Flags().StringVar(&source.dagID, "dag-id", "", "Only events produced by this DAG")

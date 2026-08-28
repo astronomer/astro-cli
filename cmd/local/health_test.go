@@ -44,14 +44,14 @@ func TestHealthComposesAndDegrades(t *testing.T) {
 }
 
 // The same report against the machine, reached by spelling the command
-// `astro local health` and passing no selector at all.
+// `astro local af health` and passing no selector at all.
 func TestLocalHealthReadsTheMachine(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/importErrors", `{"import_errors":[],"total_entries":0}`)
 	stub.route(http.MethodGet, "/api/v2/dagWarnings", `{"dag_warnings":[],"total_entries":0}`)
 	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[],"total_entries":0}`)
 
-	out, errOut, err := runLocalQuery(t, stub, "local", "health", "-o", "json")
+	out, errOut, err := runLocalQuery(t, stub, "local", "af", "health", "-o", "json")
 	if err != nil {
 		t.Fatalf("local health: %v", err)
 	}

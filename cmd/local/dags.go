@@ -30,7 +30,7 @@ func newDagsCmd(d Deps, t target) *cobra.Command {
 }
 
 // dagRow is a DAG as this surface reports it: one shape for the listing and the
-// detail, so `astro dags list -o json` and `astro dags get -o json` never
+// detail, so `astro af dags list -o json` and `astro af dags get -o json` never
 // disagree about what a DAG's fields are called. The two API generations
 // disagree about the schedule and the next run, and both are folded here into
 // one field, because which spelling arrived is the client's business, not a
@@ -257,7 +257,7 @@ func (q *query) runDagsStats(ctx context.Context, dagIDs []string) error {
 	return emitRows(r, dagStatRows(stats), renderDAGStatsTable)
 }
 
-// dagStatRows turns the client's per-state counts into rows. `astro dags stats`
+// dagStatRows turns the client's per-state counts into rows. `astro af dags stats`
 // and the health report read the same endpoint, so they share the shape.
 func dagStatRows(stats airflowapi.DAGStats) []dagStatRow {
 	return mapRows(stats.DAGs, func(stat airflowapi.DAGStat) dagStatRow {

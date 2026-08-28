@@ -4,7 +4,7 @@
 // opens a pkg/airflowapi transport to it (docs/v2-instances.md).
 //
 // The machine's own Airflow is not in that set. It is not a deployment and it
-// never competes for a name: `astro local dags list` acts on it, spelled that
+// never competes for a name: `astro local af dags list` acts on it, spelled that
 // way so a top-level command can never silently hit localhost. LocalInstance
 // builds it for the commands that do act on it, and for the inventory bare
 // `astro use` prints.

@@ -99,7 +99,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 			})
 		},
 	}
-	// Most recent first without being asked: a bare `astro runs list` is nearly
+	// Most recent first without being asked: a bare `astro af runs list` is nearly
 	// always "what just happened", and Airflow's own default order is not that.
 	addListFlags(cmd, &list, "-start_date")
 	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this DAG (default: every DAG)")

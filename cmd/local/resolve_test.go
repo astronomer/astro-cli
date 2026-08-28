@@ -367,11 +367,11 @@ func TestFallThroughNamesTheLocalSpelling(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := instanceProject(t, tc.links)
 			d, _, _ := instanceDeps(t, dir)
-			err := execute(t, d, "dags", "list")
+			err := execute(t, d, "af", "dags", "list")
 			if err == nil {
 				t.Fatal("resolution succeeded with nothing to go on")
 			}
-			if !strings.Contains(err.Error(), "astro local dags") {
+			if !strings.Contains(err.Error(), "astro local af dags") {
 				t.Errorf("message does not spell out the machine's form: %s", err)
 			}
 		})

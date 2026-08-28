@@ -112,7 +112,7 @@ func TestUseRefusesTheReservedName(t *testing.T) {
 	if err == nil {
 		t.Fatal("the reserved name was pinned")
 	}
-	for _, want := range []string{"astro local start", "astro local dags list"} {
+	for _, want := range []string{"astro local start", "astro local af dags list"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("message does not name %s: %s", want, err)
 		}

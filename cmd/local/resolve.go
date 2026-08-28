@@ -215,7 +215,7 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 		return instances.Selection{}, instances.ErrMutuallyExclusive
 	}
 	// --url is the no-project escape hatch, so it is answered before anything
-	// looks for a project: `astro dags list --url https://airflow.corp.dev` has
+	// looks for a project: `astro af dags list --url https://airflow.corp.dev` has
 	// to work from any directory on the machine.
 	if f.url != "" {
 		return instances.Selection{Instance: instances.URLInstance(f.url), From: instances.LayerURL}, nil

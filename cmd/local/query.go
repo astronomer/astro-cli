@@ -76,18 +76,18 @@ func (t *deploymentTarget) note() string {
 func (t *deploymentTarget) suggest(command string) string {
 	switch {
 	case t.f.url != "":
-		return "astro " + command + " --url " + t.f.url
+		return "astro " + afName + " " + command + " --url " + t.f.url
 	case t.f.deployment != "":
-		return "astro " + command + " -d " + t.f.deployment
+		return "astro " + afName + " " + command + " -d " + t.f.deployment
 	default:
-		return "astro " + command
+		return "astro " + afName + " " + command
 	}
 }
 
 // localForm is this family under `astro local`, the spelling that needs no
 // resolution at all. Help and the fall-through error both name it, from here,
 // so the two cannot drift.
-func (t *deploymentTarget) localForm() string { return "astro local " + t.family }
+func (t *deploymentTarget) localForm() string { return "astro local " + afName + " " + t.family }
 
 func (t *deploymentTarget) open(ctx context.Context, c *cli) (*airflowapi.Client, error) {
 	client, err := c.deploymentClient(ctx, t.f)
@@ -123,7 +123,7 @@ func (machineTarget) note() string {
 		"flag to point it elsewhere. Drop the `local` to act on a deployment instead."
 }
 
-func (machineTarget) suggest(command string) string { return "astro local " + command }
+func (machineTarget) suggest(command string) string { return "astro local " + afName + " " + command }
 
 func (machineTarget) open(ctx context.Context, c *cli) (*airflowapi.Client, error) {
 	return c.machineClient(ctx)

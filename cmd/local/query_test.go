@@ -135,7 +135,9 @@ func (s *airflowStub) sawRequest(method, path string) bool {
 func runQuery(t *testing.T, stub *airflowStub, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	d, out, errOut := queryDeps(t)
-	err = execute(t, d, append(args, "--url", stub.URL)...)
+	// Every query family hangs under the group, so the prefix lives here rather
+	// than at a hundred call sites.
+	err = execute(t, d, append(append([]string{afName}, args...), "--url", stub.URL)...)
 	return out.String(), errOut.String(), err
 }
 
@@ -232,7 +234,7 @@ func TestQueryCommandResolvesAManifestLink(t *testing.T) {
 	d, out, errOut := queryDeps(t)
 	d.WorkingDir = func() (string, error) { return dir, nil }
 
-	if err := execute(t, d, "pools", "list", "-d", "staging"); err != nil {
+	if err := execute(t, d, "af", "pools", "list", "-d", "staging"); err != nil {
 		t.Fatalf("pools list -d staging: %v", err)
 	}
 	if !strings.Contains(out.String(), "default_pool") {
@@ -247,7 +249,7 @@ func TestQueryCommandResolvesAManifestLink(t *testing.T) {
 	// A name no link declares fails, and says what there is.
 	d2, _, _ := queryDeps(t)
 	d2.WorkingDir = func() (string, error) { return dir, nil }
-	err := execute(t, d2, "pools", "list", "-d", "nope")
+	err := execute(t, d2, "af", "pools", "list", "-d", "nope")
 	if err == nil || !strings.Contains(err.Error(), "staging") {
 		t.Fatalf("err = %v, want it to name the links that exist", err)
 	}

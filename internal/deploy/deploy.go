@@ -433,7 +433,7 @@ const (
 // onto a neighbor.
 //
 // The order — env, then pin, then marker — is the query commands' resolution
-// chain, so the cursor lands where `astro dags list` would have gone. Only the
+// chain, so the cursor lands where `astro af dags list` would have gone. Only the
 // deciding is different here; the ranking is the same one rule.
 func preselect(req Request, links map[string]manifest.Link, deployable []string) Preselect {
 	if req.Preselect != "" && slices.Contains(deployable, req.Preselect) {
