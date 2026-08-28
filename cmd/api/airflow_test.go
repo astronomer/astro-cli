@@ -339,6 +339,21 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 	assert.Equal(t, "https://airflow.staging.corp.dev/api/v2", target.apiBase("3.0.3"))
 }
 
+// An Astro Deployment's WebServerAirflowApiUrl comes back with no scheme, and
+// a manifest cannot hold one — it requires a full address — so this is the one
+// place a schemeless URL enters. The transport adds the scheme, which is why
+// the query commands always worked; this command builds its own requests, so
+// the target has to carry the URL the transport settled on rather than the raw
+// string it was handed. Without that, every -d against a deployment failed with
+// "unsupported protocol scheme".
+func TestHTTPTargetCarriesTheTransportsURL(t *testing.T) {
+	opts := &AirflowOptions{RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	target, err := opts.httpTarget("prod", "airflow.corp.dev/api/v2", "")
+	require.NoError(t, err)
+	assert.Equal(t, "https://airflow.corp.dev", target.hostRoot)
+	assert.Equal(t, "https://airflow.corp.dev/api/v2", target.apiBase("3.0.3"))
+}
+
 // The same, end to end: the request lands on the API rather than under a
 // doubled prefix.
 func TestRunAirflow_LinkWithAPrefixedURLLandsOnTheAPI(t *testing.T) {

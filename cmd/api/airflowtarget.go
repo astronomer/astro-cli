@@ -335,7 +335,12 @@ func (o *AirflowOptions) httpTarget(name, hostRoot, authorization string) (*airf
 	if err != nil {
 		return nil, err
 	}
-	return &airflowTarget{name: name, hostRoot: hostRoot, authorization: authorization, transport: transport}, nil
+	// The transport's own URL, not the one handed in. An Astro Deployment's
+	// WebServerAirflowApiUrl arrives with no scheme, and this command builds its
+	// own requests rather than sending them through the transport — so taking
+	// the raw string here produced "unsupported protocol scheme" on every
+	// deployment, and a --generate curl nobody could paste.
+	return &airflowTarget{name: name, hostRoot: transport.BaseURL(), authorization: authorization, transport: transport}, nil
 }
 
 // resolveDeploymentAirflowURL fetches the Airflow API URL from an Astro

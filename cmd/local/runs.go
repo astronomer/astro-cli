@@ -17,11 +17,12 @@ func newRunsCmd(d Deps, t target) *cobra.Command {
 	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "runs",
 		Short: "List, trigger, and clear DAG runs on an Airflow",
-		Long: "Work with the runs on " + t.which() + ": list them, read one, start " +
-			"one, and delete or clear one.",
+		Long: "Work with the runs on " + t.which() + ": list them, read one, see what its " +
+			"tasks did, start one, and delete or clear one.",
 	},
 		newRunsListCmd,
 		newRunsGetCmd,
+		newRunsTasksCmd,
 		newRunsTriggerCmd,
 		newRunsDeleteCmd,
 		newRunsClearCmd,
@@ -151,6 +152,49 @@ func newRunsGetCmd(q *query) *cobra.Command {
 			return q.runRunsGet(cmd.Context(), args[0], args[1])
 		},
 	}
+}
+
+// newRunsTasksCmd answers the question a failed run raises: which task, and in
+// what state. `tasks list` reads a DAG's definitions and says nothing about a
+// run; `tasks instance` reads one instance and needs the task named already.
+// Until this, the only view of a whole run's instances was the table
+// `runs clear --dry-run` prints, which is a strange door to walk through to
+// read something.
+func newRunsTasksCmd(q *query) *cobra.Command {
+	var f listFlags
+	cmd := &cobra.Command{
+		Use:   "tasks <DAG_ID> <RUN_ID>",
+		Short: "List what each task in a run did, and how it ended",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return q.runRunsTasks(cmd.Context(), args[0], args[1], f)
+		},
+	}
+	addListFlags(cmd, &f, "")
+	return cmd
+}
+
+func (q *query) runRunsTasks(ctx context.Context, dagID, runID string, f listFlags) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	list, err := client.ListTaskInstances(ctx, dagID, runID, f.options())
+	if err != nil {
+		return err
+	}
+	return emitRows(r, mapRows(list.TaskInstances, newTaskInstanceRow), renderRunTaskTable)
+}
+
+// renderRunTaskTable drops the dag and run columns renderTaskInstanceTable
+// carries: both are on the command line, and repeating a long run id on every
+// row pushes the states off the right of a terminal.
+func renderRunTaskTable(w io.Writer, rows []taskInstanceRow) error {
+	return renderTable(w, rows, "This run has no task instances.",
+		[]string{"TASK_ID", "STATE", "TRY", "START", "DURATION"},
+		func(row taskInstanceRow) []string {
+			return []string{row.TaskID, row.State, count(row.TryNumber), row.StartDate, formatDuration(row.Duration)}
+		})
 }
 
 func (q *query) runRunsGet(ctx context.Context, dagID, runID string) error {

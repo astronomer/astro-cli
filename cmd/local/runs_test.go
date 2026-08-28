@@ -277,6 +277,32 @@ func TestRunsDeleteAndClearNeedConsent(t *testing.T) {
 	}
 }
 
+// The view a failed run sends you to: which task, and how it ended. The dag and
+// run columns are dropped because both are on the command line, and a run id is
+// long enough to push the states off a terminal.
+func TestRunsTasksListsWhatEachTaskDid(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/run_1/taskInstances",
+		`{"task_instances":[
+			{"task_id":"extract","dag_id":"orders_etl","dag_run_id":"run_1","state":"success","try_number":1,"duration":2.5},
+			{"task_id":"transform","dag_id":"orders_etl","dag_run_id":"run_1","state":"failed","try_number":1,"duration":0.068},
+			{"task_id":"load","dag_id":"orders_etl","dag_run_id":"run_1","state":"upstream_failed","try_number":0}
+		],"total_entries":3}`)
+
+	out, _, err := runQuery(t, stub, "runs", "tasks", "orders_etl", "run_1")
+	if err != nil {
+		t.Fatalf("runs tasks: %v", err)
+	}
+	for _, want := range []string{"TASK_ID", "STATE", "transform", "failed", "upstream_failed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table is missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "RUN_ID") {
+		t.Errorf("table repeats the run id, which is already on the command line:\n%s", out)
+	}
+}
+
 // A dry run changes nothing, so it asks nothing — which also makes it the way
 // to see what a clear would do from a script.
 func TestRunsClearDryRunAsksNothing(t *testing.T) {

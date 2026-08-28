@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -85,8 +86,9 @@ type TaskLog struct {
 }
 
 // Text renders the log as lines: Airflow 2's text as it arrived, and Airflow
-// 3's entries as their event text. An entry with no event text renders as its
-// raw JSON, so nothing is silently dropped.
+// 3's entries as their event text, with a traceback under any entry that
+// carries one. An entry with no event text renders as its raw JSON, so nothing
+// is silently dropped.
 func (l TaskLog) Text() string {
 	if l.text != "" {
 		return l.text
@@ -113,11 +115,83 @@ func logLine(entry json.RawMessage) string {
 	}
 	var structured struct {
 		Event string `json:"event"`
+		// Held raw and decoded separately below, so an error_detail in a shape
+		// this does not know costs the traceback and nothing else. Typed here,
+		// it would fail the whole entry and dump the raw JSON in place of a line
+		// that used to read fine.
+		Error json.RawMessage `json:"error_detail"`
 	}
 	if err := json.Unmarshal(entry, &structured); err == nil && structured.Event != "" {
+		if trace := tracebackOf(structured.Error); trace != "" {
+			return structured.Event + "\n" + trace
+		}
 		return structured.Event
 	}
 	return string(entry)
+}
+
+// exceptionV3 is one exception in an Airflow 3 log entry's error_detail. The
+// entry carries "Task failed with exception" as its event and everything a
+// reader actually needs — the type, the value, the frames — beside it, so an
+// entry rendered by its event alone says a task failed and never why.
+type exceptionV3 struct {
+	Type    string    `json:"exc_type"`
+	Value   string    `json:"exc_value"`
+	Notes   []string  `json:"exc_notes"`
+	IsCause bool      `json:"is_cause"`
+	Frames  []frameV3 `json:"frames"`
+}
+
+// frameV3 is one stack frame of an exceptionV3.
+type frameV3 struct {
+	Filename string `json:"filename"`
+	Lineno   int    `json:"lineno"`
+	Name     string `json:"name"`
+}
+
+// tracebackOf renders an entry's error_detail, or "" when there is nothing to
+// render — absent, empty, or a shape this does not recognize. Every one of the
+// three means the same thing to a caller: print the event line alone, as every
+// ordinary log line already does.
+func tracebackOf(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var chain []exceptionV3
+	if err := json.Unmarshal(raw, &chain); err != nil || len(chain) == 0 {
+		return ""
+	}
+	return traceback(chain)
+}
+
+// traceback renders error_detail the way Python prints it, innermost exception
+// last, so a reader recognizes the shape without being told. Airflow lists a
+// chain oldest first and flags each link's relationship to the next, which is
+// the same order Python's own traceback uses.
+func traceback(chain []exceptionV3) string {
+	var b strings.Builder
+	for i, exc := range chain {
+		if i > 0 {
+			b.WriteString("\n")
+			if chain[i-1].IsCause {
+				b.WriteString("\nThe above exception was the direct cause of the following exception:\n\n")
+			} else {
+				b.WriteString("\nDuring handling of the above exception, another exception occurred:\n\n")
+			}
+		}
+		b.WriteString("Traceback (most recent call last):")
+		for _, f := range exc.Frames {
+			fmt.Fprintf(&b, "\n  File %q, line %d, in %s", f.Filename, f.Lineno, f.Name)
+		}
+		b.WriteString("\n" + exc.Type)
+		if exc.Value != "" {
+			b.WriteString(": " + exc.Value)
+		}
+		for _, note := range exc.Notes {
+			b.WriteString("\n" + note)
+		}
+	}
+	return b.String()
 }
 
 // TaskLogs reads one try of a task instance's log.

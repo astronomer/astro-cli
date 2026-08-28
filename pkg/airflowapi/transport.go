@@ -301,6 +301,16 @@ func DefaultHTTPClient() *http.Client {
 	}
 }
 
+// BaseURL is the URL this transport addresses, after normalizing: a scheme
+// added where the caller's had none, any trailing slash and API prefix removed.
+//
+// It exists for a caller that builds its own requests rather than sending them
+// through Do — `astro api airflow`, which generates curl commands and rewrites
+// query strings — so that caller addresses the same Airflow the transport
+// would, instead of re-deriving it from the raw string and getting a URL with
+// no scheme.
+func (t *HTTPTransport) BaseURL() string { return t.baseURL }
+
 func (t *HTTPTransport) Do(ctx context.Context, req Request) (Response, error) {
 	body, err := encodeBody(req.Body)
 	if err != nil {

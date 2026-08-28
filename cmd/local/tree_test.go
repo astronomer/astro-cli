@@ -129,7 +129,7 @@ func TestTheInstanceNamesStayUnclaimed(t *testing.T) {
 // and a walk would pass whatever the tree happened to hold.
 var querySurface = map[string][]string{
 	"dags":        {"list", "get", "source", "stats", "pause", "unpause"},
-	"runs":        {"list", "get", "trigger", "delete", "clear"},
+	"runs":        {"list", "get", "tasks", "trigger", "delete", "clear"},
 	"tasks":       {"list", "get", "instance", "logs", "clear"},
 	"assets":      {"list", "events"},
 	"connections": {"list", "get"},
