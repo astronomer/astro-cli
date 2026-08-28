@@ -151,11 +151,17 @@ type DAGStateCount struct {
 // report stats at all.
 const dagStatsListLimit = 1000
 
-// DAGStats reports run counts by state. Both generations need help here.
-// Airflow 2 refuses without dag_ids, so an empty list means listing the DAGs
-// first. Airflow 3 wants an empty dag_ids rather than no parameter for "all
-// DAGs", and some builds answer 500 when several ids arrive together, so ids
-// are always asked for one at a time.
+// DAGStats reports run counts by state. Both generations need help here, and
+// they need opposite help.
+//
+// Airflow 2 declares dag_ids a required string, so it refuses without one: an
+// empty list means listing the DAGs first and joining their ids.
+//
+// Airflow 3 declares dag_ids an optional array, so "all DAGs" is the parameter
+// left off. Sending it empty is not the same request — it asks for the one DAG
+// whose id is the empty string, and the answer is always nothing. Some builds
+// also answer 500 when several ids arrive together, so ids are asked for one at
+// a time.
 func (c *Client) DAGStats(ctx context.Context, dagIDs []string) (DAGStats, error) {
 	generation, err := c.Generation(ctx)
 	if err != nil {
@@ -195,10 +201,16 @@ func (c *Client) DAGStats(ctx context.Context, dagIDs []string) (DAGStats, error
 }
 
 // dagStats asks for one dag_ids filter, which is the only parameter the
-// endpoint takes in either generation.
+// endpoint takes in either generation. An empty filter is sent as no parameter
+// at all: only Airflow 3 asks with one, and there an empty dag_ids selects
+// nothing rather than everything.
 func (c *Client) dagStats(ctx context.Context, dagIDs string) (DAGStats, error) {
 	var stats DAGStats
-	err := c.getCollection(ctx, "/dagStats", url.Values{"dag_ids": {dagIDs}}, &stats)
+	query := url.Values{}
+	if dagIDs != "" {
+		query.Set("dag_ids", dagIDs)
+	}
+	err := c.getCollection(ctx, "/dagStats", query, &stats)
 	return stats, err
 }
 

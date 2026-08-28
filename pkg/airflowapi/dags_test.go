@@ -143,17 +143,25 @@ func TestDAGStatsReturnsNothingWhenAirflow2HasNoDAGs(t *testing.T) {
 	}
 }
 
-func TestDAGStatsAsksAirflow3ForAllDAGsWithAnEmptyFilter(t *testing.T) {
+// Airflow 3 reads dag_ids as an optional array, so "all DAGs" is the parameter
+// left off. Sending it empty asks for the DAG whose id is "" and answers with
+// nothing every time — which is silent, because an Airflow with no runs answers
+// the same way. The stub returns real counts here so the empty answer cannot
+// pass for the true one.
+func TestDAGStatsAsksAirflow3ForAllDAGsWithNoFilterAtAll(t *testing.T) {
 	stub := newAF3Stub(t)
-	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[],"total_entries":0}`)
+	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[{"dag_id":"etl","stats":[{"state":"success","count":4}]}],"total_entries":1}`)
 	client := stub.client()
 
-	if _, err := client.DAGStats(t.Context(), nil); err != nil {
+	stats, err := client.DAGStats(t.Context(), nil)
+	if err != nil {
 		t.Fatal(err)
 	}
-	query := stub.lastRequest().Query
-	if _, ok := query["dag_ids"]; !ok || query.Get("dag_ids") != "" {
-		t.Errorf("dag_ids = %v, want it present and empty", query["dag_ids"])
+	if _, sent := stub.lastRequest().Query["dag_ids"]; sent {
+		t.Errorf("dag_ids = %v, want it absent: an empty filter selects no DAG", stub.lastRequest().Query["dag_ids"])
+	}
+	if len(stats.DAGs) != 1 || stats.DAGs[0].Stats[0].Count != 4 {
+		t.Errorf("stats = %+v, want the counts", stats)
 	}
 }
 
