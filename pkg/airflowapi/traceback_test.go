@@ -56,15 +56,23 @@ func TestTracebackJoinsAChainTheWayPythonDoes(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// As Airflow sends it: the exception that killed the task first,
+			// the one it was raised from or during second. Verified against a
+			// live Airflow 3 — a urllib URLError arrives ahead of the gaierror
+			// underneath it.
 			got := traceback([]exceptionV3{
-				{Type: "KeyError", Value: "'rows'", IsCause: tc.isCause, Frames: []frameV3{{Filename: "/tmp/etl.py", Lineno: 12, Name: "transform"}}},
 				{Type: "ValueError", Value: "no rows", Frames: []frameV3{{Filename: "/tmp/etl.py", Lineno: 14, Name: "transform"}}},
+				{Type: "KeyError", Value: "'rows'", IsCause: tc.isCause, Frames: []frameV3{{Filename: "/tmp/etl.py", Lineno: 12, Name: "transform"}}},
 			})
 			if !strings.Contains(got, tc.want) {
 				t.Errorf("traceback() is missing %q\ngot:\n%s", tc.want, got)
 			}
+			// Python prints the chain oldest first and the exception that was
+			// actually raised last, under the same "most recent call last" the
+			// frames follow. Printing it the other way up reads as though the
+			// task died of the thing it merely started with.
 			if strings.Index(got, "KeyError") > strings.Index(got, "ValueError") {
-				t.Errorf("chain is out of order, want the raised-last exception last\ngot:\n%s", got)
+				t.Errorf("chain is upside down, want the raised exception last\ngot:\n%s", got)
 			}
 		})
 	}

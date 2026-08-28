@@ -164,16 +164,25 @@ func tracebackOf(raw json.RawMessage) string {
 	return traceback(chain)
 }
 
-// traceback renders error_detail the way Python prints it, innermost exception
-// last, so a reader recognizes the shape without being told. Airflow lists a
-// chain oldest first and flags each link's relationship to the next, which is
-// the same order Python's own traceback uses.
+// traceback renders error_detail the way Python prints it, so a reader
+// recognizes the shape without being told.
+//
+// Airflow serializes a chain newest first: the exception that actually killed
+// the task, then whatever it was raised from or during. Python prints the
+// reverse — the oldest first, the raised one last, which is what "most recent
+// call last" means about the chain as well as about the frames — so this walks
+// the list backwards.
 func traceback(chain []exceptionV3) string {
 	var b strings.Builder
-	for i, exc := range chain {
-		if i > 0 {
+	for i := len(chain) - 1; i >= 0; i-- {
+		exc := chain[i]
+		if i < len(chain)-1 {
+			// The exception just printed is older than this one. How the two
+			// are joined is a fact about the older one: `raise X from Y` makes
+			// Y a direct cause, and a bare raise inside an except block leaves
+			// it as context.
 			b.WriteString("\n")
-			if chain[i-1].IsCause {
+			if chain[i+1].IsCause {
 				b.WriteString("\nThe above exception was the direct cause of the following exception:\n\n")
 			} else {
 				b.WriteString("\nDuring handling of the above exception, another exception occurred:\n\n")
