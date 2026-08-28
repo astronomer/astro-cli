@@ -154,6 +154,35 @@ func TestHealthWithholdsHealthyWhenASectionIsUnread(t *testing.T) {
 	}
 }
 
+// A refusal reads as one about the token, not about the Airflow. Some
+// deployments grant no role the permission /dagWarnings needs, so this is the
+// shape a reader meets rather than an exotic case — and it must not turn a
+// health report into five lines of raw problem+json. The section still counts
+// as unread, because not being allowed to look is not a clean bill.
+func TestHealthSaysARefusalIsAboutTheToken(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/importErrors", `{"import_errors":[],"total_entries":0}`)
+	stub.routeStatus(http.MethodGet, "/api/v2/dagWarnings", http.StatusForbidden,
+		`{"detail":null,"status":403,"title":"Forbidden","type":"http://apache-airflow-docs.s3-website.eu-central-1.amazonaws.com/docs/apache-airflow/stable/stable-rest-api-ref.html#section/Errors/PermissionDenied"}`)
+	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[],"total_entries":0}`)
+
+	out, _, err := runQuery(t, stub, "health")
+	if err != nil {
+		t.Fatalf("health: %v", err)
+	}
+	if want := "dag warnings: could not be read (this token is not allowed to read it)"; !strings.Contains(out, want) {
+		t.Errorf("stdout is missing %q:\n%s", want, out)
+	}
+	for _, unwanted := range []string{"apache-airflow-docs", `"status": 403`, "PermissionDenied"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("the raw problem document leaked into the report (%q):\n%s", unwanted, out)
+		}
+	}
+	if !strings.Contains(out, "not enough was read to judge") {
+		t.Errorf("a refused section must still withhold a clean bill:\n%s", out)
+	}
+}
+
 // A report of nothing is not a report: when every section fails the command
 // fails too, so a script cannot read a verdict off an Airflow it never reached.
 func TestHealthFailsWhenNothingCouldBeRead(t *testing.T) {

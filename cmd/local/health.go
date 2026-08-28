@@ -171,10 +171,23 @@ func (q *query) runHealth(ctx context.Context) error {
 	return r.Emit(report, func(w io.Writer) error { return renderHealth(w, report) })
 }
 
+// sectionFailure is why a section could not be read, in the fewest words that
+// stay true. A refusal is about the caller rather than the Airflow — some
+// deployments grant no role the permission an endpoint needs — and a bare
+// status sends the reader off to check their Airflow when the thing to change
+// is the token. The section still counts as unread, because "not allowed to
+// look" and "looked and it was clean" must not reach the same verdict.
+func sectionFailure(err error) string {
+	if errors.Is(err, airflowapi.ErrForbidden) {
+		return "this token is not allowed to read it"
+	}
+	return err.Error()
+}
+
 func readHealthVersion(ctx context.Context, client *airflowapi.Client) healthVersion {
 	info, err := client.Version(ctx)
 	if err != nil {
-		return healthVersion{Error: err.Error()}
+		return healthVersion{Error: sectionFailure(err)}
 	}
 	return healthVersion{versionRow: newVersionRow(info)}
 }
@@ -183,7 +196,7 @@ func readHealthVersion(ctx context.Context, client *airflowapi.Client) healthVer
 func readHealthImportErrors(ctx context.Context, client *airflowapi.Client) healthImportErrors {
 	list, err := client.ListImportErrors(ctx, airflowapi.ListOptions{})
 	if err != nil {
-		return healthImportErrors{Error: err.Error()}
+		return healthImportErrors{Error: sectionFailure(err)}
 	}
 	rows := mapRows(list.ImportErrors, func(e airflowapi.ImportError) importErrorRow {
 		return importErrorRow{
@@ -204,7 +217,7 @@ func readHealthImportErrors(ctx context.Context, client *airflowapi.Client) heal
 func readHealthDAGWarnings(ctx context.Context, client *airflowapi.Client) healthDAGWarnings {
 	list, err := client.ListDAGWarnings(ctx, airflowapi.ListOptions{})
 	if err != nil {
-		return healthDAGWarnings{Error: err.Error()}
+		return healthDAGWarnings{Error: sectionFailure(err)}
 	}
 	rows := mapRows(list.DAGWarnings, func(w airflowapi.DAGWarning) dagWarningRow {
 		return dagWarningRow{
@@ -236,7 +249,7 @@ func readHealthDAGStats(ctx context.Context, client *airflowapi.Client) healthDA
 		return healthDAGStats{Note: notServedMessage("DAG run statistics")}
 	}
 	if err != nil {
-		return healthDAGStats{Error: err.Error()}
+		return healthDAGStats{Error: sectionFailure(err)}
 	}
 	return healthDAGStats{Available: true, DAGs: dagStatRows(stats)}
 }

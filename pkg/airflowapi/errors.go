@@ -64,10 +64,41 @@ func (e *StatusError) Error() string {
 	if detail := e.Detail(); detail != "" {
 		return msg + ": " + detail
 	}
+	// A problem document that explained nothing is still a document. Airflow
+	// answers some refusals with a detail of null and the status spelled out
+	// again as a title, and dumping that raw put five lines of JSON and half a
+	// docs URL where one line belongs. Its title earns a place only when it says
+	// something the status text above does not.
+	if title, ok := e.problemTitle(); ok {
+		if title != "" && !strings.EqualFold(title, http.StatusText(e.StatusCode)) {
+			return msg + ": " + title
+		}
+		return msg
+	}
 	if body := strings.TrimSpace(string(e.Body)); body != "" {
 		return msg + ": " + truncate(body, maxBodyInError)
 	}
 	return msg
+}
+
+// problemTitle reads the title of Airflow's problem document, and reports
+// whether the body was one at all. A body that is some other shape — an HTML
+// error page, a proxy's plain text — is not a problem document, and the caller
+// falls back to showing it, because there it is all the reader has.
+func (e *StatusError) problemTitle() (string, bool) {
+	var payload struct {
+		Title  string          `json:"title"`
+		Status int             `json:"status"`
+		Type   string          `json:"type"`
+		Detail json.RawMessage `json:"detail"`
+	}
+	if err := json.Unmarshal(e.Body, &payload); err != nil {
+		return "", false
+	}
+	if payload.Title == "" && payload.Status == 0 && payload.Type == "" && len(payload.Detail) == 0 {
+		return "", false
+	}
+	return payload.Title, true
 }
 
 func (e *StatusError) Unwrap() []error {
