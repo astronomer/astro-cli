@@ -125,6 +125,10 @@ func stubAWSConfig(t *testing.T, endpoint string) func(context.Context, string) 
 			Region:      region,
 			Credentials: awscreds.NewStaticCredentialsProvider("AKID", "SECRET", ""),
 			HTTPClient:  &hostRewriter{target: target, inner: http.DefaultClient},
+			// One attempt: the stub answers 5xx on purpose in several cases,
+			// and the SDK's default three tries with backoff spend seconds
+			// re-asking a stub whose next answer is already known.
+			RetryMaxAttempts: 1,
 		}, nil
 	}
 }

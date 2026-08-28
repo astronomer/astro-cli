@@ -54,8 +54,10 @@ type mwaaAPI interface {
 // two named.
 var errNoAWSCredentials = errors.New("no AWS credentials found — run `aws sso login`, or set AWS_PROFILE")
 
-// awsCredentialTimeout bounds the up-front walk of the credential chain.
-const awsCredentialTimeout = 15 * time.Second
+// awsCredentialTimeout bounds the up-front walk of the credential chain. A
+// var, not a const, so the slow-chain test can cut it to milliseconds instead
+// of waiting the whole bound out.
+var awsCredentialTimeout = 15 * time.Second
 
 // awsCredentialFailure tells a chain that answered "nobody" from one that did
 // not answer in time. They read the same to the SDK and mean opposite things to

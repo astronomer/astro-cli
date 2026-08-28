@@ -40,8 +40,12 @@ lint-submodules:
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
+# GORACE=atexit_sleep_ms=0: a -race binary sleeps one second before it exits,
+# to catch races with C atexit() handlers that Go does not have
+# (golang/go#20364). One second per package over ~90 packages was most of this
+# target's runtime: 75s to 9s on a warm cache.
 test:
-	go test -count=1 -race -shuffle=on -timeout=15m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
+	GORACE=atexit_sleep_ms=0 go test -count=1 -race -shuffle=on -timeout=15m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
 
 # Each pkg/* sub-module has its own go.mod, which the root `go test ./...`
 # never descends into, so their tests need a run of their own.

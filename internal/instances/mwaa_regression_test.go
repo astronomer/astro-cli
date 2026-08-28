@@ -251,7 +251,8 @@ func (s slowCredentials) Retrieve(ctx context.Context) (aws.Credentials, error) 
 // they are in the middle of.
 func TestMWAATellsASlowChainFromAnEmptyOne(t *testing.T) {
 	i := link(t, mwaaLink)
-	slow := &shortPreflight{delay: 2 * awsCredentialTimeout}
+	shortCredentialTimeout(t)
+	slow := &slowPreflight{delay: 2 * awsCredentialTimeout}
 	_, err := i.Transport(context.Background(), Deps{AWSConfig: slow.config})
 	if err == nil {
 		t.Fatal("a chain that never answered resolved")
@@ -264,11 +265,20 @@ func TestMWAATellsASlowChainFromAnEmptyOne(t *testing.T) {
 	}
 }
 
-// shortPreflight cuts the preflight bound down so the slow-chain case runs in
-// milliseconds: the deadline it produces is the same one the real bound would.
-type shortPreflight struct{ delay time.Duration }
+// shortCredentialTimeout cuts the preflight bound down so a slow chain runs
+// out in milliseconds: the deadline it produces is the same one the real bound
+// would.
+func shortCredentialTimeout(t *testing.T) {
+	t.Helper()
+	original := awsCredentialTimeout
+	awsCredentialTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { awsCredentialTimeout = original })
+}
 
-func (s *shortPreflight) config(ctx context.Context, _ string) (aws.Config, error) {
+// slowPreflight hands the SDK a chain that takes its time answering.
+type slowPreflight struct{ delay time.Duration }
+
+func (s *slowPreflight) config(ctx context.Context, _ string) (aws.Config, error) {
 	return aws.Config{Region: "us-west-2", Credentials: slowCredentials{delay: s.delay}}, nil
 }
 

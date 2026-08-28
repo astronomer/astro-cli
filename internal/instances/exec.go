@@ -29,8 +29,9 @@ const maxHelperOutput = 8 << 10
 
 // execWaitDelay is how long a killed helper's output pipes are given to close
 // before they are taken away. Short: by then the helper is already dead and
-// only whatever it left behind is still holding them.
-const execWaitDelay = 2 * time.Second
+// only whatever it left behind is still holding them. A var, not a const, so
+// the tests that leave a child holding the pipes need not wait it out.
+var execWaitDelay = 2 * time.Second
 
 // execCredentials runs the link's helper and reads a token from its stdout —
 // the kubectl exec-plugin pattern, and the escape hatch that lets the auth

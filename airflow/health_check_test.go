@@ -19,9 +19,10 @@ func (s *Suite) TestWebserverHealthCheck() {
 		s.NoError(err)
 	})
 	s.Run("Failure", func() {
-		// Create a mock server that responds slowly.
+		// Answers nothing until the client gives up. A sleep would keep
+		// server.Close() waiting after the client had already gone.
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second) // Simulate a long response
+			<-r.Context().Done()
 		}))
 		defer server.Close()
 
@@ -69,14 +70,14 @@ func (s *Suite) TestHealthCheck() {
 	})
 
 	s.Run("Timeout", func() {
-		// Create a server that never responds
+		// Answers nothing until the client gives up.
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second) // Simulate a long response
+			<-r.Context().Done()
 		}))
 		defer server.Close()
 
 		// Set a shorter timeout
-		client := &http.Client{Timeout: 1 * time.Second}
+		client := &http.Client{Timeout: 100 * time.Millisecond}
 		ctx := context.Background()
 		code, err := healthCheck(ctx, client, server.URL)
 		s.Equal(0, code)

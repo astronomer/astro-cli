@@ -102,7 +102,9 @@ func (s *Suite) TestStandaloneStart_Airflow2Accepted() {
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
 
-	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
+	// NoProxy keeps the post-start goroutine from launching the real proxy
+	// daemon (a re-exec of the test binary that just times out here).
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, NoProxy: true})
 	s.NoError(err)
 	s.Equal("2", handler.airflowMajorVersion)
 
@@ -976,9 +978,10 @@ func (s *Suite) TestStandaloneStart_Background() {
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
 	s.NoError(err)
-	// Default is background mode (foreground = false)
-
-	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute})
+	// Default is background mode (foreground = false). NoProxy keeps the
+	// post-start goroutine from launching the real proxy daemon (a re-exec of
+	// the test binary that just times out here).
+	err = handler.Start(&types.StartOptions{SettingsFile: "airflow_settings.yaml", WaitTime: 1 * time.Minute, NoProxy: true})
 	s.NoError(err)
 
 	// Verify PID file was written

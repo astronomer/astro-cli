@@ -38,7 +38,7 @@ func TestCheckHealth_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := checkHealthURL(srv.URL+"/api/v2/monitor/health", 2*time.Second)
+	err := checkHealthURL(srv.URL+"/api/v2/monitor/health", 100*time.Millisecond)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "timed out")
 }
@@ -55,7 +55,7 @@ func checkHealthURL(url string, timeout time.Duration) error {
 				return nil
 			}
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 	}
 	return fmt.Errorf("health check timed out after %s", timeout)
 }

@@ -16,6 +16,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# A -race binary sleeps one second before it exits, to catch races with C
+# atexit() handlers that Go does not have (golang/go#20364). One second per
+# test binary was most of this script's runtime.
+export GORACE=atexit_sleep_ms=0
+
 status=0
 for mod in pkg/*/go.mod; do
   dir="$(dirname "$mod")"

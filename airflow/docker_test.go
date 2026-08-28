@@ -889,6 +889,14 @@ func (s *Suite) TestDockerComposeExport() {
 func (s *Suite) TestDockerComposeStop() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
 
+	// The poll interval is a second in production, and the cases below wait out
+	// one or two of them. These are package variables, so put them back after.
+	origTimeout, origTicker := stopPostgresWaitTimeout, stopPostgresWaitTicker
+	stopPostgresWaitTicker = 10 * time.Millisecond
+	s.T().Cleanup(func() {
+		stopPostgresWaitTimeout, stopPostgresWaitTicker = origTimeout, origTicker
+	})
+
 	s.Run("success", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(labels, nil).Once()
@@ -962,9 +970,8 @@ func (s *Suite) TestDockerComposeStop() {
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-postgres", Name: "test-postgres", State: "running"}}, nil)
 
-		// reducing timeout
+		// reducing timeout: one tick fits inside it, the second does not
 		stopPostgresWaitTimeout = 11 * time.Millisecond
-		stopPostgresWaitTicker = 10 * time.Millisecond
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler

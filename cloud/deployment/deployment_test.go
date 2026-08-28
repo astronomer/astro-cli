@@ -1241,6 +1241,12 @@ func (s *Suite) TestLogs() {
 
 func (s *Suite) TestCreate() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// SleepTime and TickNum are whole seconds, and the wait-for-status cases
+	// below poll a mock that is already healthy: no head start, one tick. They
+	// are package variables, so put them back after.
+	origSleep, origTick := SleepTime, TickNum
+	SleepTime, TickNum = 0, 1
+	s.T().Cleanup(func() { SleepTime, TickNum = origSleep, origTick })
 	csID := "test-cluster-id"
 	var (
 		cloudProvider                = astrov1.DeploymentCloudProviderAWS
@@ -1543,9 +1549,6 @@ func (s *Suite) TestCreate() {
 		defer testUtil.MockUserInput(s.T(), "test-name")()
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		SleepTime = 1
-		TickNum = 2
-
 		// Call the Create function with Dedicated Deployment and wait for status
 		err := Create("test-name", ws, "test-desc", csID, "3.0-1", dagDeploy, AstroExecutor, "", "", "", "", "", "", "", "", "", "", "", astrov1.DeploymentTypeDEDICATED, 0, 0, false, nil, nil, nil, mockV1Client, true, 300*time.Second)
 		s.NoError(err)
@@ -1565,9 +1568,6 @@ func (s *Suite) TestCreate() {
 		// Mock user input for deployment name and wait for status
 		defer testUtil.MockUserInput(s.T(), "test-name")()
 		defer testUtil.MockUserInput(s.T(), "y")()
-
-		SleepTime = 1
-		TickNum = 2
 
 		// Call the Create function with Dedicated Deployment and wait for status
 		allowedIPAddressRanges := []string{"1.2.3.4/32"}
@@ -1591,10 +1591,6 @@ func (s *Suite) TestCreate() {
 		// Mock user input for deployment name and wait for status
 		defer testUtil.MockUserInput(s.T(), "test-name")()
 		defer testUtil.MockUserInput(s.T(), "y")()
-
-		// setup wait for test
-		SleepTime = 1
-		TickNum = 2
 
 		// Call the Create function with Dedicated Deployment and wait for status
 		err := Create("test-name", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", "", astrov1.DeploymentTypeDEDICATED, 0, 0, false, nil, nil, nil, mockV1Client, true, 300*time.Second)

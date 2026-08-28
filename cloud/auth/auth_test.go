@@ -374,7 +374,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			time.Sleep(2 * time.Second) // time to spin up the server in authorizeCallbackHandler
+			awaitCallbackServer(t, callbackServer)
 
 			opts := &httputil.DoOptions{
 				Method: http.MethodGet,
@@ -410,7 +410,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			time.Sleep(2 * time.Second) // time to spin up the server in authorizeCallbackHandler
+			awaitCallbackServer(t, callbackServer)
 			opts := &httputil.DoOptions{
 				Method: http.MethodGet,
 				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
@@ -429,6 +429,22 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		_, err := authorizeCallbackHandler()
 		assert.Contains(t, err.Error(), "the operation has timed out")
 	})
+}
+
+// awaitCallbackServer waits for authorizeCallbackHandler, which runs in the
+// test's own goroutine, to open its listener. A fixed sleep would be both
+// slower and still a race.
+func awaitCallbackServer(t *testing.T, addr string) {
+	t.Helper()
+	for range 400 {
+		conn, err := net.Dial("tcp", addr)
+		if err == nil {
+			conn.Close()
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Errorf("the login callback never opened %s", addr)
 }
 
 func TestShouldSignup(t *testing.T) {

@@ -28,10 +28,21 @@ func shellHelper(t *testing.T, body string) string {
 	return path
 }
 
+// shortWaitDelay cuts the grace period a killed helper's pipes get. The cases
+// that call it leave a child holding the pipes, so each one would otherwise
+// spend the whole two seconds waiting there.
+func shortWaitDelay(t *testing.T) {
+	t.Helper()
+	original := execWaitDelay
+	execWaitDelay = 100 * time.Millisecond
+	t.Cleanup(func() { execWaitDelay = original })
+}
+
 // TestExecTimeoutIsAWallClockBound: killing the helper does not close the pipes
 // a grandchild inherited, and cmd.Run waits for them. Without WaitDelay a 30s
 // bound is 30s plus however long the grandchild feels like living.
 func TestExecTimeoutIsAWallClockBound(t *testing.T) {
+	shortWaitDelay(t)
 	h := &execHelper{
 		deployment: "prod",
 		argv:       []string{shellHelper(t, "sleep 30")},
@@ -52,6 +63,7 @@ func TestExecTimeoutIsAWallClockBound(t *testing.T) {
 // is doing its job. Waiting for that agent's whole life would hang every
 // command the helper serves.
 func TestExecHelperMayLeaveAChildBehind(t *testing.T) {
+	shortWaitDelay(t)
 	h := &execHelper{
 		deployment: "prod",
 		argv:       []string{shellHelper(t, "sleep 30 &\nprintf 'tok\\n'\nexit 0")},
@@ -120,6 +132,7 @@ func TestExecNonzeroExitBeatsATokenOnStdout(t *testing.T) {
 // than the helper's own bound is the one that ran out, and saying "30s" would
 // send the reader hunting a slow helper.
 func TestExecReportsTheDeadlineThatActuallyExpired(t *testing.T) {
+	shortWaitDelay(t)
 	h := &execHelper{deployment: "prod", argv: []string{shellHelper(t, "sleep 30")}, timeout: 30 * time.Second}
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()

@@ -59,9 +59,23 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # setup-go's own cache key is the same for every Linux job here, and only
+      # the first job to finish writes it — that is `lint`, whose build cache
+      # holds no -race or -cover objects. This job then rebuilt the whole tree
+      # from cold every run. Keep a cache of its own instead.
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Cache Go build and module cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-test-${{ runner.os }}-
 
       - name: Run unit tests
         env:
@@ -88,6 +102,8 @@ jobs:
           go-version-file: go.mod
 
       - name: Run unit tests
+        env:
+          GORACE: atexit_sleep_ms=0 # see the `test` target in the Makefile
         run: go test -count=1 -race -shuffle=on -timeout=15m -cover -covermode=atomic -test.v ./...
 
       # The gap this closes: the root module's `./...` does not descend into

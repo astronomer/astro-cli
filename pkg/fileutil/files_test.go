@@ -637,7 +637,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             map[string]string{},
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -666,7 +666,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             map[string]string{},
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -695,7 +695,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             map[string]string{},
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            3,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -729,7 +729,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             headers,
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -765,7 +765,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             headers,
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -792,7 +792,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             map[string]string{},
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -825,7 +825,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             headers,
 			Description:         "Deployed via <astro deploy --dags>",
 			MaxTries:            2,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
@@ -862,7 +862,7 @@ func (s *Suite) TestUploadFile() {
 			Headers:             headers,
 			Description:         "",
 			MaxTries:            2,
-			InitialDelayInMS:    1 * 1000,
+			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
