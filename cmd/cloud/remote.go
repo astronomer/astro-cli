@@ -8,6 +8,7 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -57,10 +58,19 @@ func newRemoteRootCmd() *cobra.Command {
 // newRemoteDeployCmd creates the remote deploy command
 func newRemoteDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deploy",
-		Short:   "Deploy a client image to the remote registry",
-		Long:    "Build and deploy a client image to the configured remote registry. This command assumes you have already authenticated with the registry.",
-		PreRunE: utils.EnsureProjectDir,
+		Use:   "deploy",
+		Short: "Deploy a client image to the remote registry",
+		Long:  "Build and deploy a client image to the configured remote registry. This command assumes you have already authenticated with the registry.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// A v2 project has no .astro/config.yaml, so the v1 check would
+			// reject it. astro deploy grew this bypass and its sibling here
+			// never did, which left remote deploy refusing every v2 project
+			// with advice to run astro dev init, a command v2 removed.
+			if v2deploy.IsV2Project(config.WorkingPath) {
+				return nil
+			}
+			return utils.EnsureProjectDir(cmd, args)
+		},
 		RunE:    remoteDeploy,
 		Example: remoteDeployExample,
 	}

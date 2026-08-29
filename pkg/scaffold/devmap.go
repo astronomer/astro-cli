@@ -24,11 +24,11 @@ func DevReplacements() []DevReplacement {
 		{"kill", "astro local stop --clean"},
 		{"pytest", "uv run pytest"},
 		{"init", "astro init"},
-		// Connections and variables move to the env schema in pyproject.toml.
-		// There is no `astro local env` command yet, so name the schema, not a
-		// phantom subcommand.
-		{"object import", "the env schema in pyproject.toml"},
-		{"object export", "the env schema in pyproject.toml"},
-		{"object", "the env schema in pyproject.toml"},
+		// v1 bulk-loaded connections and variables into a running Airflow and
+		// dumped them back out. v2 declares them per name instead, so there is
+		// no bulk equivalent and these name the command that does the job.
+		{"object import", "astro local env set"},
+		{"object export", "astro local env list"},
+		{"object", "astro local env"},
 	}
 }

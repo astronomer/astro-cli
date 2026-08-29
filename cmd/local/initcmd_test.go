@@ -175,10 +175,24 @@ func TestInitSaysCreatedWhenItWroteTheManifest(t *testing.T) {
 	}
 }
 
-func TestLocalInitAliasWorks(t *testing.T) {
+// astro local init is gone. `astro local` means the Airflow running on this
+// machine, and init writes a manifest — it never belonged to that family. The
+// spelling still names where the command went rather than reading as a typo.
+func TestLocalInitPointsAtAstroInit(t *testing.T) {
+	d, _, _ := initDeps(t)
+	err := execute(t, d, "local", "init")
+	if err == nil {
+		t.Fatal("astro local init should no longer resolve")
+	}
+	if !strings.Contains(err.Error(), "astro init") {
+		t.Errorf("error should name astro init; got %q", err)
+	}
+}
+
+func TestInitStillWorksAtTheRoot(t *testing.T) {
 	d, dir, _ := initDeps(t)
-	if err := execute(t, d, "local", "init"); err != nil {
-		t.Fatalf("astro local init: %v", err)
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
 		t.Errorf("missing pyproject.toml: %v", err)

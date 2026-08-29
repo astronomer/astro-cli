@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 )
 
 var (
@@ -22,11 +23,27 @@ func newRunCommand() *cobra.Command {
 		Short: "Run a local DAG with Python by running its tasks sequentially",
 		Long:  "Run a local DAG by running its tasks sequentially. This command spins up a single Airflow worker to execute your DAG code. It parses all files in your dags folder if the --dag-file flag is not used. Use the --dag-file flag to only parse the DAG file where your DAG is defined.",
 		Args:  cobra.ExactArgs(1),
+		// Not listed. astro local run is the v2 spelling, and this command
+		// answers only for the v1 projects that still have it.
+		Hidden: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		PreRunE: utils.EnsureProjectDir,
-		RunE:    run,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// In a v2 project the v1 check below fails with advice to run
+			// astro dev init, a command v2 removed, which left no way out.
+			// Name the command that does this job instead.
+			if v2deploy.IsV2Project(config.WorkingPath) {
+				cmd.SilenceUsage = true
+				dag := ""
+				if len(args) == 1 {
+					dag = " " + args[0]
+				}
+				return fmt.Errorf("`astro run` was removed in Astro CLI v2. Use `astro local run airflow dags test%s` instead", dag)
+			}
+			return utils.EnsureProjectDir(cmd, args)
+		},
+		RunE: run,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")

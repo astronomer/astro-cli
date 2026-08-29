@@ -52,7 +52,7 @@ func TestTreeInvariants(t *testing.T) {
 func TestLocalTreeHasEverySpecCommand(t *testing.T) {
 	d, _ := testDeps(t)
 	localCmd := NewLocalCmd(d)
-	want := []string{"start", "stop", "restart", "status", "list", "logs", "run", "shell", "open", "reset", "check", "init", "api"}
+	want := []string{"start", "stop", "restart", "status", "list", "logs", "run", "shell", "open", "reset", "check", "api"}
 	have := map[string]bool{}
 	for _, sub := range localCmd.Commands() {
 		have[sub.Name()] = true
@@ -325,5 +325,57 @@ func TestShorthandsMeanOneThingEachAcrossTheV2Tree(t *testing.T) {
 	}
 	if got := meaning["d"]; got.flag != "deployment" {
 		t.Errorf("-d is --%s, want --deployment", got.flag)
+	}
+}
+
+// TestEveryReplacementNamesARealCommand ties the dev-removal table to the tree
+// it points at. Nothing did before, so a row could name a command that was
+// never built, or one that had since moved, and both compiled and passed.
+//
+// Airflow shipped exactly that bug and still has it: UPDATING.md says
+// list_dags became dags list, the mapping table below it says list_dag, and
+// the tombstones were generated from the table — so the command nobody types
+// gets the helpful pointer and the real one gets a list of valid choices.
+//
+// This CLI has its own version of the same lesson. astro airflow was aliased
+// to astro dev in 2019 with a deprecation notice, which worked; by the time
+// astro airflow was removed the notice was gone, and it now answers with a
+// bare unknown-command error.
+func TestEveryReplacementNamesARealCommand(t *testing.T) {
+	d, _ := testDeps(t)
+	root := NewRootCmd(d)
+	for _, m := range devReplacements() {
+		if !strings.HasPrefix(m.Replacement, "astro ") {
+			continue // uv run pytest, and anything else outside this tree
+		}
+		var path []string
+		for _, word := range strings.Fields(strings.TrimPrefix(m.Replacement, "astro ")) {
+			if strings.HasPrefix(word, "-") {
+				break // astro local stop --clean
+			}
+			path = append(path, word)
+		}
+		found, _, err := root.Find(path)
+		if err != nil || found == nil || found.CommandPath() != "astro "+strings.Join(path, " ") {
+			t.Errorf("astro dev %s points at %q, which does not resolve; the table and the tree disagree",
+				m.Command, m.Replacement)
+		}
+	}
+}
+
+// TestOldAirflowSpellingStillPoints covers the spelling this CLI reassigned.
+// astro airflow meant the local project in 2019 and became astro dev; today it
+// is the alias for the af group, so an old script asking for astro airflow
+// start was answered with an unknown-command error naming astro af — a
+// different thing entirely, and no route to astro local start.
+func TestOldAirflowSpellingStillPoints(t *testing.T) {
+	d, stdout := testDeps(t)
+	err := execute(t, d, "airflow", "start")
+	if err == nil {
+		t.Fatal("astro airflow start should fail")
+	}
+	combined := stdout.String() + err.Error()
+	if !strings.Contains(combined, "astro local start") {
+		t.Errorf("astro airflow start should name astro local start; got %q", combined)
 	}
 }

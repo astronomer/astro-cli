@@ -112,6 +112,12 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			if len(args) == 0 {
 				return cmd.Help()
 			}
+			// Spellings that used to work here, or that someone reaches for
+			// out of v1 habit, get named rather than refused: `init` moved up
+			// to `astro init`, and `ps` was always `status`.
+			if replacement, ok := devReplacementFor(args[0]); ok {
+				return fmt.Errorf("unknown command %q for %q. Use `%s`", args[0], cmd.CommandPath(), replacement)
+			}
 			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
 		},
 	}
@@ -128,7 +134,6 @@ func NewLocalCmd(d Deps) *cobra.Command {
 		newOpenCmd(c),
 		newResetCmd(c),
 		newCheckCmd(c),
-		newInitCmd(c),
 		newEnvCmd(c),
 		newAPICmd(c),
 	)

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // fakeRuntime fails every call; the engine does not exist in these tests.
@@ -50,37 +51,23 @@ func execute(t *testing.T, d Deps, args ...string) error {
 	return root.Execute()
 }
 
+// TestDevStubNamesTheReplacement drives the real table rather than a copy of
+// it. The copy that used to live here covered whatever someone had pasted:
+// a row added to devmap.go was tested nowhere, and a row corrected there
+// failed here as though the correction were the regression.
 func TestDevStubNamesTheReplacement(t *testing.T) {
-	cases := []struct {
-		typed []string
-		want  string
-	}{
-		{[]string{"start"}, "astro local start"},
-		{[]string{"stop"}, "astro local stop"},
-		{[]string{"restart"}, "astro local restart"},
-		{[]string{"ps"}, "astro local status"},
-		{[]string{"logs"}, "astro local logs"},
-		{[]string{"run"}, "astro local run"},
-		{[]string{"bash"}, "astro local shell"},
-		{[]string{"parse"}, "astro local check"},
-		{[]string{"kill"}, "astro local stop --clean"},
-		{[]string{"pytest"}, "uv run pytest"},
-		{[]string{"init"}, "astro init"},
-		{[]string{"object", "import"}, "the env schema in pyproject.toml"},
-		{[]string{"object", "export"}, "the env schema in pyproject.toml"},
-	}
-	for _, tc := range cases {
-		t.Run(strings.Join(tc.typed, " "), func(t *testing.T) {
+	for _, m := range scaffold.DevReplacements() {
+		t.Run(m.Command, func(t *testing.T) {
 			d, _ := testDeps(t)
-			err := execute(t, d, append([]string{"dev"}, tc.typed...)...)
+			err := execute(t, d, append([]string{"dev"}, strings.Fields(m.Command)...)...)
 			if err == nil {
 				t.Fatal("astro dev must fail")
 			}
 			msg := err.Error()
-			if !strings.Contains(msg, "Use `"+tc.want+"` instead") {
-				t.Errorf("error does not name the replacement %q:\n%s", tc.want, msg)
+			if !strings.Contains(msg, "Use `"+m.Replacement+"` instead") {
+				t.Errorf("error does not name the replacement %q:\n%s", m.Replacement, msg)
 			}
-			typed := "astro dev " + strings.Join(tc.typed, " ")
+			typed := "astro dev " + m.Command
 			if !strings.Contains(msg, "`"+typed+"` was removed") {
 				t.Errorf("error does not name the typed command %q:\n%s", typed, msg)
 			}

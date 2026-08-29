@@ -101,7 +101,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
 		Use:     "workers",
-		Aliases: []string{"workers", "worker", "wrk"},
+		Aliases: []string{"worker", "wrk"},
 		Short:   "Stream logs from Airflow workers",
 		Long: `Stream logs from Airflow workers. For example:
 
@@ -123,7 +123,7 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
 		Use:     "triggerer",
-		Aliases: []string{"triggerers", "triggerer", "trg"},
+		Aliases: []string{"triggerers", "trg"},
 		Short:   "Stream logs from Airflow triggerer",
 		Long: `Stream logs from Airflow triggerer. For example:
 

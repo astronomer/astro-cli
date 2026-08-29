@@ -57,12 +57,18 @@ func (s *CmdSuite) TestRootCommandCloudContext() {
 	s.Contains(output, "completion")
 	s.Contains(output, "deploy")
 	s.Contains(output, "deployment")
-	s.Contains(output, "dev")
 	s.Contains(output, "help")
 	s.Contains(output, "version")
 	s.Contains(output, "workspace")
 	s.Contains(output, "run")
 	s.NotContains(output, "Run flow commands")
+	// The removal stub still answers when typed; it is not listed.
+	s.NotContains(output, "dev")
+	s.Contains(output, "Develop locally:")
+	s.Contains(output, "Inspect Airflow:")
+	s.Contains(output, "Ship:")
+	s.Contains(output, "Manage Astro:")
+	s.Contains(output, "Set up the CLI:")
 }
 
 func (s *CmdSuite) TestRootCompletionCommand() {
@@ -81,7 +87,6 @@ func (s *CmdSuite) TestRootCommandSoftwareContext() {
 	s.NoError(err)
 	s.Contains(output, "astro [command]")
 	s.Contains(output, "completion")
-	s.Contains(output, "dev")
 	s.Contains(output, "help")
 	s.Contains(output, "version")
 	s.Contains(output, "workspace")
@@ -90,4 +95,5 @@ func (s *CmdSuite) TestRootCommandSoftwareContext() {
 	s.Contains(output, "deployment")
 	s.Contains(output, "run")
 	s.NotContains(output, "Run flow commands")
+	s.NotContains(output, "dev")
 }

@@ -29,8 +29,8 @@ var (
 func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
-		Short:             "Manage a project's configurations",
-		Long:              "Manage the project configurations stored at '.astro/config.yaml'. Please see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for list of available cli configurations",
+		Short:             "Manage CLI settings for this machine",
+		Long:              "Manage CLI settings, stored globally with -g or in a v1 project's .astro/config.yaml. Please see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for list of available cli configurations",
 		PersistentPreRunE: ensureGlobalFlag,
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
@@ -65,11 +65,20 @@ func newConfigSetCmd(_ io.Writer) *cobra.Command {
 }
 
 func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
+	// Cobra runs a PersistentPreRunE before the subcommand's own argument
+	// check, so a bare `astro config set` arrives here with nothing to index
+	// and used to panic. Let it through; configSet reports the arity.
+	if len(args) == 0 {
+		return nil
+	}
 	isProjectDir, _ := config.IsProjectDir(config.WorkingPath) //nolint:errcheck // treated as absent on error
 
 	if !isProjectDir && !globalFlag {
-		c := "astro config " + cmd.Use + " " + args[0] + " -g"
-		return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Use, cmd.Use, c)
+		// cmd.Name(), not cmd.Use: Use carries the argument placeholder, so
+		// the suggested command read "astro config set [setting-name]
+		// project.name -g", which nobody can run.
+		c := "astro config " + cmd.Name() + " " + args[0] + " -g"
+		return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
 	}
 	return nil
 }

@@ -159,8 +159,11 @@ func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentAirflowVariableRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "airflow-variable",
-		Aliases: []string{"var"},
+		Use: "airflow-variable",
+		// `var` belongs to the sibling `variable` command, which registers it
+		// first; claiming it here left no short spelling reaching this one at
+		// all. These are the spellings `astro env airflow-variable` already uses.
+		Aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
 		Short:   "Manage Airflow variables in an Astro Deployment",
 		Long:    "Manage Airflow variables stored in an Astro Deployment's metadata database.",
 	}

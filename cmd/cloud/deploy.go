@@ -83,7 +83,7 @@ const (
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy DEPLOYMENT-ID",
-		Short: "Deploy your project to a Deployment on Astro",
+		Short: "Ship this project's code to a Deployment",
 		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -305,6 +305,9 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	withinAstroProject, err := config.IsWithinProjectDir(nonDagsBundlePath)
 	if err != nil {
 		return fmt.Errorf("failed to verify bundle path is not within an Astro project: %w", err)
+	}
+	if !withinAstroProject {
+		withinAstroProject = isWithinV2Project(nonDagsBundlePath)
 	}
 	if withinAstroProject {
 		return errors.New("bundle path is within an Astro project. Non-DAG bundles must be a separate directory")
@@ -730,4 +733,28 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
 	}, nil
+}
+
+// isWithinV2Project reports whether path sits at or inside a v2 project.
+//
+// config.IsWithinProjectDir only knows the v1 marker, .astro/config.yaml, so it
+// answers false at every level of a v2 project. That left both containment
+// refusals in this package unreachable for exactly the projects v2 users have:
+// a dbt project or a non-DAG bundle nested inside one shipped where the check
+// meant to stop it.
+func isWithinV2Project(path string) bool {
+	abs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return false
+	}
+	for dir := abs; ; {
+		if v2deploy.IsV2Project(dir) {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
 }

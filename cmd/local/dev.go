@@ -40,7 +40,10 @@ func NewDevCmd(d Deps) *cobra.Command {
 		Use:     nameDev,
 		Aliases: []string{"d"},
 		Short:   "Removed in v2 — local Airflow lives under `astro local`",
-		Args:    cobra.ArbitraryArgs,
+		// Listed nowhere: the guidance is for someone who typed the old
+		// command, not a menu entry teaching a command that is gone.
+		Hidden: true,
+		Args:   cobra.ArbitraryArgs,
 		// Old invocations carry flags this stub does not know; parsing
 		// them would fail before the guidance prints.
 		DisableFlagParsing: true,
@@ -101,6 +104,21 @@ func devWantsJSON(args []string) bool {
 	return false
 }
 
+// devReplacementFor finds the v2 command for an `astro dev` subcommand. The
+// table is ordered longest-prefix first, so the first match wins.
+//
+// It is shared with the af group, which answers to `airflow` — the spelling
+// that meant the local project before 2019 and became `astro dev`. An old
+// invocation lands there, not here.
+func devReplacementFor(typed string) (string, bool) {
+	for _, m := range devReplacements() {
+		if typed == m.Command || strings.HasPrefix(typed, m.Command+" ") {
+			return m.Replacement, true
+		}
+	}
+	return "", false
+}
+
 func buildDevRemoved(typed string, v1Project bool) devRemoved {
 	mapping := devReplacements()
 	p := devRemoved{
@@ -112,11 +130,8 @@ func buildDevRemoved(typed string, v1Project bool) devRemoved {
 		p.Error = "astro dev was removed in Astro CLI v2"
 		return p
 	}
-	for _, m := range mapping {
-		if typed == m.Command || strings.HasPrefix(typed, m.Command+" ") {
-			p.Replacement = m.Replacement
-			break
-		}
+	if replacement, ok := devReplacementFor(typed); ok {
+		p.Replacement = replacement
 	}
 	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
 	return p

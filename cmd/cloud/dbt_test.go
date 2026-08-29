@@ -148,6 +148,21 @@ func (s *DbtSuite) TestDbtDeploy_WithinAstroProject() {
 	assert.Contains(s.T(), err.Error(), "dbt project is within an Astro project")
 }
 
+// A v2 project carries no .astro/config.yaml, so the v1 walk answers false at
+// every level of it. Before this, a dbt project nested inside one bundled and
+// deployed instead of being refused.
+func (s *DbtSuite) TestDbtDeploy_WithinV2Project() {
+	projectDir := s.T().TempDir()
+	manifest := "[project]\nname = \"demo\"\n\n[tool.astro]\n"
+	assert.NoError(s.T(), os.WriteFile(filepath.Join(projectDir, "pyproject.toml"), []byte(manifest), 0o600))
+	nested := filepath.Join(projectDir, "analytics")
+	assert.NoError(s.T(), os.MkdirAll(nested, 0o755))
+
+	err := testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", nested)
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "dbt project is within an Astro project")
+}
+
 func (s *DbtSuite) TestDbtDelete_PickDeployment() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")

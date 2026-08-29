@@ -25,7 +25,20 @@ func (s *CmdSuite) TestConfigGetCommandFailure() {
 
 	_, err = executeCommand("config", "get", "test")
 	s.Error(err)
-	s.Contains(err.Error(), "You are attempting to get [setting-name] a project config outside of a project directory")
+	s.Contains(err.Error(), "You are attempting to get a project config outside of a project directory")
+	// The suggested command has to be runnable. It used to interpolate the
+	// argument placeholder alongside the real argument.
+	s.Contains(err.Error(), "astro config get test -g")
+	s.NotContains(err.Error(), "[setting-name]")
+}
+
+// A bare `astro config set` panicked: ensureGlobalFlag runs as a
+// PersistentPreRunE, which cobra calls before the subcommand checks its own
+// arguments, and it indexed args[0] unguarded.
+func (s *CmdSuite) TestConfigSetWithNoArgumentsReportsArity() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	_, err := executeCommand("config", "set")
+	s.ErrorIs(err, errInvalidSetArgs)
 }
 
 func (s *CmdSuite) TestConfigSetCommandFailure() {

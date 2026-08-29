@@ -58,19 +58,20 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 		t.Fatalf("-d in the v2 tree is --%s, want --deployment", v2["d"])
 	}
 
-	root := NewRootCmd()
-	for _, top := range root.Commands() {
-		if v2Names[top.Name()] {
-			continue
-		}
-		walkCmd(top, func(cmd *cobra.Command) {
-			collect(cmd, func(f *pflag.Flag) {
-				if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || v1DashDExceptions[f.Name] {
-					return
-				}
-				t.Errorf("%s: -d is --%s; an earlier fix settled -d for the deployment selector", cmd.CommandPath(), f.Name)
+	for platform, root := range rootsUnderTest(t) {
+		for _, top := range root.Commands() {
+			if v2Names[top.Name()] {
+				continue
+			}
+			walkCmd(top, func(cmd *cobra.Command) {
+				collect(cmd, func(f *pflag.Flag) {
+					if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || v1DashDExceptions[f.Name] {
+						return
+					}
+					t.Errorf("[%s] %s: -d is --%s; an earlier fix settled -d for the deployment selector", platform, cmd.CommandPath(), f.Name)
+				})
 			})
-		})
+		}
 	}
 }
 
@@ -80,15 +81,18 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 func TestV1DashDExceptionsAreAllStillReal(t *testing.T) {
 	testUtil.SetupOSArgsForGinkgo()
 	seen := map[string]bool{}
-	root := NewRootCmd()
-	for _, top := range root.Commands() {
-		walkCmd(top, func(cmd *cobra.Command) {
-			collect(cmd, func(f *pflag.Flag) {
-				if f.Shorthand == "d" {
-					seen[f.Name] = true
-				}
+	// The union across both branches: an entry reachable in only one of them
+	// is still real, and building one root would call it stale.
+	for _, root := range rootsUnderTest(t) {
+		for _, top := range root.Commands() {
+			walkCmd(top, func(cmd *cobra.Command) {
+				collect(cmd, func(f *pflag.Flag) {
+					if f.Shorthand == "d" {
+						seen[f.Name] = true
+					}
+				})
 			})
-		})
+		}
 	}
 	var stale []string
 	for name := range v1DashDExceptions {
