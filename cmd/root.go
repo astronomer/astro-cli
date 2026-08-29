@@ -128,7 +128,6 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newVersionCommand(),
 		newContextCmd(o.out),
 		newConfigRootCmd(o.out),
-		newRunCommand(),
 		api.NewAPICmd(),
 		newTelemetryCmd(o.out),
 		newTelemetrySendCmd(),
@@ -187,7 +186,7 @@ var commandGroups = []struct {
 	title string
 	names []string
 }{
-	{groupDevelop, "Develop locally:", []string{"init", "local", "start", "stop", "logs", "run"}},
+	{groupDevelop, "Develop locally:", []string{"init", "local", "start", "stop", "logs"}},
 	{groupInspect, "Inspect Airflow:", []string{"af", "use", "api"}},
 	{groupShip, "Ship:", []string{"package", "deploy", "remote", "dbt"}},
 	{groupManage, "Manage Astro:", []string{

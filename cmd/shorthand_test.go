@@ -25,7 +25,6 @@ import (
 // and re-listing them whenever one moves. Named here so the next person to
 // widen the tree knows what this does not catch.
 var v1DashDExceptions = map[string]bool{
-	"dag-file":    true, // astro run
 	"dags":        true, // astro deploy (and software deploy, where houston allows)
 	"description": true, // deployment, workspace, team, and token create/update
 	"domain":      true, // astro auth token

@@ -5,13 +5,6 @@ import (
 )
 
 var (
-	errInvalidBothAirflowAndRuntimeVersions        = errors.New("you provided both a runtime version and an Airflow version. You have to provide only one of these to initialize your project")
-	errInvalidBothAirflowAndRuntimeVersionsUpgrade = errors.New("you provided both a runtime version and an Airflow version. You have to provide only one of these to upgrade")
-	errInvalidBothCustomImageandVersion            = errors.New("you provided both a Custom image and a version. You have to provide only one of these to upgrade")
-
-	errConfigProjectName               = errors.New("project name is invalid")
-	errConfigProjectNameSpecifiedTwice = errors.New("project name cannot be set with the --name flag and positional argument, please choose one")
-
 	errInvalidSetArgs    = errors.New("must specify exactly two arguments (key value) when setting a config")
 	errInvalidConfigPath = errors.New("config does not exist, check your config key")
 )
