@@ -15,9 +15,19 @@ import (
 // makes init in an existing project a CONVERSION rather than a scaffold beside
 // files nobody looked at.
 //
-// Everything here reads. Nothing writes, and nothing deletes: the v1 files stay
-// exactly where they are, because a conversion the user has not reviewed yet
-// must be reversible by ignoring it. Retiring them is a separate decision.
+// Everything here reads. Nothing in this file writes or deletes — the decision
+// to retire one of these files is planRetirements' in scaffold.go, and it is
+// made after the manifest is rendered, because only then is it known what
+// actually reached it.
+//
+// That decision was a separate one until O27 and 2c settled it, and the
+// reasoning it replaced is worth keeping: the v1 files used to stay put so that
+// a conversion the user had not reviewed was reversible by ignoring it. What
+// replaces that guarantee is narrower and worth stating plainly — a file is
+// removed only when everything it said is in the manifest, so ignoring the
+// conversion is no longer how you undo it. The undo is the diff, which is why
+// the desktop shows one before applying and why `astro init` now prints a
+// Removed line per file.
 //
 // The rule for anything ambiguous is a note, never a guess. These files feed a
 // preview a person approves, so "this line was not carried, and here is why" is
@@ -41,6 +51,28 @@ type v1Project struct {
 	statedVersion bool
 	// notes is what could not be carried, with the reason.
 	notes []string
+	// present names the v1 files this directory actually has, in read order.
+	//
+	// Presence only. Whether a file can be RETIRED is decided by planRetirements
+	// once the manifest has been rendered, and it cannot be decided here,
+	// because the carrying happens later: mergeDependencies can drop every
+	// requirement in the file (dynamic dependencies), keep the manifest's
+	// specifier over this file's, or dedup two spellings of one distribution,
+	// and pickAirflowVersion can rank an --airflow-version or an existing pin
+	// above the Dockerfile's tag. An earlier version decided retirement from
+	// parseRequirements' notes alone, and deleted a requirements.txt whose
+	// contents had been carried nowhere — while the run's own notes said so.
+	present []string
+	// dockerfilePinOnly reports that the Dockerfile says nothing except which
+	// runtime image to build on. A fact about the file's text, which is why it
+	// is read here, and only half of whether the file can go: the other half is
+	// whether its tag is the pin that won.
+	dockerfilePinOnly bool
+	// dockerfileBody is kept so a retirement can ask what the file references.
+	// A Dockerfile that survives because it has a RUN may name requirements.txt
+	// inside it, and deleting that file while keeping the build that reads it is
+	// worse than either outcome alone.
+	dockerfileBody []byte
 }
 
 // readV1Project reads whatever v1 files dir has. A missing file is not an
@@ -61,12 +93,14 @@ func readV1Project(dir string) (*v1Project, error) {
 		if pinsAirflow(deps) {
 			v1.statedVersion = true
 		}
+		v1.present = append(v1.present, "requirements.txt")
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, "packages.txt")); err != nil {
 		return nil, err
 	} else if data != nil {
 		v1.packages = parsePackages(data)
+		v1.present = append(v1.present, "packages.txt")
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {
@@ -74,14 +108,68 @@ func readV1Project(dir string) (*v1Project, error) {
 	} else if data != nil {
 		version, stated, notes := airflowFromDockerfile(data)
 		v1.airflow = version
+		build := buildStepsNote(data)
 		v1.notes = append(v1.notes, notes...)
-		v1.notes = append(v1.notes, buildStepsNote(data)...)
+		v1.notes = append(v1.notes, build...)
 		if stated {
 			v1.statedVersion = true
+		}
+		v1.present = append(v1.present, "Dockerfile")
+		v1.dockerfilePinOnly = dockerfileIsPinOnly(data)
+		v1.dockerfileBody = data
+		// A Dockerfile that is not pin-only and drew no note is kept and
+		// unmentioned, which O27 says it must not be: the point of keeping it
+		// is that the project still has a build the manifest does not describe,
+		// and the user has to be told. buildStepsNote covers the RUN/COPY/ENV
+		// shapes; this covers the rest — a second stage, an instruction no
+		// regex here knows — where the file survives precisely because nothing
+		// recognized it.
+		if !v1.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
+			v1.notes = append(v1.notes,
+				"Dockerfile: it does more than name a base image, so it was kept; v2 builds no Dockerfile, "+
+					"and nothing in pyproject.toml describes what it does")
 		}
 	}
 
 	return v1, nil
+}
+
+// dockerfileIsPinOnly reports a Dockerfile that says nothing except which
+// runtime image to build on, so the manifest's airflow pin can replace it whole.
+//
+// This is the test, and it is an allowlist of ONE thing rather than a denylist
+// of instructions. The first version asked buildInstructionRe — the regex naming
+// RUN, COPY, ENV and eleven others for the note it writes — and read "no match"
+// as "nothing here". That is backwards for a decision that deletes. MAINTAINER
+// is not in that list, so `FROM runtime:3.1-12` plus `MAINTAINER someone` matched
+// nothing, produced no note, and the file was destroyed; every instruction Docker
+// adds in future would do the same.
+//
+// So the question is inverted. Every line must be blank, a comment, or the one
+// FROM, and anything this does not positively recognize keeps the file — which
+// is what "conservative by construction" was supposed to mean and did not.
+//
+// It says nothing about whether the tag WON. A pin-only Dockerfile can still be
+// the only record of a version the manifest did not take, so planRetirements
+// checks that separately.
+func dockerfileIsPinOnly(data []byte) bool {
+	seenFrom := false
+	for _, raw := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
+		switch {
+		case line == "", strings.HasPrefix(line, "#"):
+			continue
+		case strings.HasPrefix(strings.ToUpper(line), "FROM "):
+			if seenFrom {
+				// A second stage is a build, even with no RUN of its own.
+				return false
+			}
+			seenFrom = true
+		default:
+			return false
+		}
+	}
+	return seenFrom
 }
 
 // readIfPresent returns nil bytes and no error when the file is not there.

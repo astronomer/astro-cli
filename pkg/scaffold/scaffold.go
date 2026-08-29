@@ -54,6 +54,10 @@ type Result struct {
 	Skipped []string `json:"skipped,omitempty"`
 	// Updated lists files this run changed rather than created.
 	Updated []string `json:"updated,omitempty"`
+	// Deleted lists the v1 files this run removed, once their contents were in
+	// the manifest. Separate from Updated because a caller that renders the two
+	// the same way tells the user a destroyed file was edited.
+	Deleted []string `json:"deleted,omitempty"`
 	// Adopted reports that the manifest was already there and gained a
 	// [tool.astro] section, rather than being written by this run. A status
 	// bool a json consumer reads, so it stays present when false.
@@ -296,10 +300,12 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		return nil, err
 	}
 
-	// The manifest goes LAST, and the ordering is the reason Apply walks a
-	// slice rather than a map. A manifest carrying [tool.astro] is the one
-	// thing that makes a rerun refuse, so a run that dies part-way through is
-	// safe to repeat only while the manifest is still absent.
+	// The manifest goes after everything that ADDS, and the ordering is the
+	// reason Apply walks a slice rather than a map. A manifest carrying
+	// [tool.astro] is the one thing that makes a rerun refuse, so a run that
+	// dies part-way through is safe to repeat only while the manifest is still
+	// absent. Deletions then go after the manifest — see below, where the
+	// invariant is "manifest before any deletion, deletions last".
 	manifestChange := Change{Kind: UpdateFile, Path: manifest.Marker, Content: out, Labels: manifestLabels}
 	if !cs.Adopted {
 		manifestChange.Kind = CreateFile
@@ -307,15 +313,99 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	}
 	cs.Changes = append(cs.Changes, manifestChange)
 
-	// Created and Updated are derived from the changes rather than appended
-	// beside them, so a change that is performed but unreported — or reported
-	// but not performed — cannot be constructed.
-	cs.report()
+	// The notes are computed BEFORE the retirements, because they are what the
+	// retirements are decided from. Deciding earlier is what made the first
+	// version of this delete a requirements.txt that had been carried nowhere.
+	//
 	// The v1 notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
 	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, leftovers(abs, cs.AirflowVersion, pin, v1))
+
+	// And the deletions go last of all. Apply walks this slice in order and
+	// stops at the first failure, so removing requirements.txt before the
+	// manifest that replaces it means a run dying in between has taken the
+	// dependencies away and put nothing in their place. Failing the other way
+	// round leaves the project carrying both, which a person can sort out.
+	//
+	// That state does make a rerun refuse, since a manifest carrying
+	// [tool.astro] is what ErrAlreadyAstroProject tests. Refusing over a project
+	// whose dependencies are intact is the better half of the trade.
+	for _, name := range planRetirements(v1, cs.Notes, cs.AirflowVersion) {
+		cs.Changes = append(cs.Changes, Change{
+			Kind:   Delete,
+			Path:   name,
+			Labels: []string{name + " (carried into " + manifest.Marker + ", so removed)"},
+		})
+	}
+
+	// Created, Updated and Deleted are derived from the changes rather than
+	// appended beside them, so a change that is performed but unreported — or
+	// reported but not performed — cannot be constructed.
+	cs.report()
 	return cs, nil
+}
+
+// planRetirements names the v1 files this run may delete.
+//
+// The rule is "carried, so removable", and the whole difficulty is that only
+// this function is in a position to know. readV1Project sees what each file
+// SAID; what reached the manifest is settled later, by mergeDependencies,
+// renderPyproject and pickAirflowVersion, any of which can drop what it read.
+//
+// So the test is the run's own notes. Every path that fails to carry something
+// writes one, and every one of them names the file it is about — that is a
+// convention this now depends on, and the tests pin the cases. A file any note
+// mentions is still the only record of whatever the note describes, so it stays.
+//
+// It is not a clever test and it does not need to be. It errs toward keeping,
+// which is the direction to err: a file wrongly kept is untidy, a file wrongly
+// deleted is gone.
+func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
+	var out []string
+	for _, name := range v1.present {
+		if namedInAny(notes, name) {
+			continue
+		}
+		if name == "Dockerfile" && !dockerfileIsSpent(v1, pinned) {
+			continue
+		}
+		out = append(out, name)
+	}
+	// A Dockerfile that SURVIVES may name the other files inside it, and a build
+	// that reads a file this run deleted is broken in a way neither outcome
+	// alone would be. `RUN pip install -r requirements.txt` is the common one,
+	// and packages.txt is consumed the same way by the runtime image's ONBUILD
+	// step, from the build context.
+	if !slices.Contains(out, "Dockerfile") && len(v1.dockerfileBody) > 0 {
+		body := string(v1.dockerfileBody)
+		out = slices.DeleteFunc(out, func(name string) bool {
+			return strings.Contains(body, name)
+		})
+	}
+	return out
+}
+
+// dockerfileIsSpent reports a Dockerfile with nothing left to say: it names only
+// a base image, and the version that image named is the one the manifest pinned.
+//
+// Both halves are needed and the second is easy to miss. pickAirflowVersion
+// ranks an explicit --airflow-version, and an existing manifest pin, ABOVE the
+// Dockerfile's tag. A run that took either of those and then deleted the
+// Dockerfile would destroy the only record of a version the project actually
+// built on, while the manifest claims a different one.
+func dockerfileIsSpent(v1 *v1Project, pinned string) bool {
+	return v1.dockerfilePinOnly && v1.airflow != "" && v1.airflow == pinned
+}
+
+// namedInAny reports whether any note is about this file.
+func namedInAny(notes []string, name string) bool {
+	for _, n := range notes {
+		if strings.Contains(n, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // scaffoldManifest renders the manifest for a directory that has none, and
@@ -454,7 +544,16 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 			// generated requirement above already says it.
 			if name == airflowDist {
 				notes = append(notes, airflowExtrasNote(d)...)
+				continue
 			}
+			// Every other duplicate is a specifier that exists in exactly one
+			// place and is about to exist in none. requirements.txt permits two
+			// entries for one distribution and pip intersects them; PEP 621 has
+			// no such rule, so one of them has to go — but which one went is the
+			// user's to know, and until this said so the losing pin was dropped
+			// in silence and the file holding it was then retired.
+			notes = append(notes, "requirements.txt: "+d+
+				" names a distribution the manifest already lists, so this specifier was not carried")
 			continue
 		}
 		seen[name] = true

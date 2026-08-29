@@ -387,11 +387,155 @@ func TestPlanConvertsAV1ProjectWithNoManifest(t *testing.T) {
 	// The include could not be followed, so it is reported rather than dropped.
 	assert.Contains(t, strings.Join(cs.Notes, "\n"), "includes another requirements file")
 
-	// And the v1 files are still there. A conversion the user has not reviewed
-	// has to be ignorable, which it is not if the inputs are gone.
-	for _, name := range []string{"Dockerfile", "requirements.txt", "packages.txt"} {
-		assert.FileExists(t, filepath.Join(dir, name))
+	// The v1 files that were carried whole are gone, and the one that was not
+	// is still here. This fixture happens to cover both halves of the rule.
+	//
+	// The Dockerfile is a single FROM naming a runtime tag, so the manifest's
+	// airflow pin is everything it said. packages.txt has no note path at all.
+	// Both are now duplicate statements of what pyproject.toml holds, which is
+	// the dual read the conversion exists to end.
+	for _, name := range []string{"Dockerfile", "packages.txt"} {
+		assert.NoFileExists(t, filepath.Join(dir, name), "%s was carried whole, so it should be gone", name)
 	}
+	// requirements.txt stays, and its `-r dev.txt` is the reason: that line
+	// never reached [project] dependencies, so this file is still the only copy
+	// of it. Deleting a file whose contents were only partly carried is the one
+	// way this change could lose someone's dependency.
+	assert.FileExists(t, filepath.Join(dir, "requirements.txt"),
+		"an include could not be carried, so the file is still the only record of it")
+}
+
+// Which Dockerfiles the conversion removes, and which it leaves alone. O27.
+//
+// The asymmetry is the point: a file wrongly kept is untidy, a file wrongly
+// deleted is a build someone wrote and no longer has. So every case that is not
+// plainly "this file says nothing the manifest does not" keeps it.
+func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
+	const runtimeRef = "astrocrpublic.azurecr.io/runtime:3.1-12"
+
+	cases := []struct {
+		name    string
+		body    string
+		retired bool
+		why     string
+	}{
+		{
+			name:    "a bare FROM",
+			body:    "FROM " + runtimeRef + "\n",
+			retired: true,
+			why:     "the tag is the only fact in it and the manifest now carries it",
+		},
+		{
+			name:    "comments and blank lines around it",
+			body:    "# our runtime\n\nFROM " + runtimeRef + "\n\n",
+			retired: true,
+			why:     "neither adds anything the manifest does not say",
+		},
+		{
+			name:    "a RUN",
+			body:    "FROM " + runtimeRef + "\nRUN apt-get install -y unixodbc-dev\n",
+			retired: false,
+			why:     "installing a system package is work v2 does not do and the manifest cannot express",
+		},
+		{
+			name:    "a COPY",
+			body:    "FROM " + runtimeRef + "\nCOPY certs/ /usr/local/share/ca-certificates/\n",
+			retired: false,
+			why:     "the same, and the paths are the user's own",
+		},
+		{
+			name:    "an ENV",
+			body:    "FROM " + runtimeRef + "\nENV TZ=UTC\n",
+			retired: false,
+			why:     "small, but still something only this file says",
+		},
+		{
+			name:    "multi-stage",
+			body:    "FROM python:3.11 AS builder\nFROM " + runtimeRef + "\n",
+			retired: false,
+			why:     "a builder stage is real even when it carries no RUN of its own",
+		},
+		{
+			name:    "an Airflow 2 tag",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:12.1.0\n",
+			retired: false,
+			why:     "the pin becomes \"2\", so the tag is more specific than what the manifest holds and this is its only record",
+		},
+		{
+			name:    "a tag that is not a runtime version",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:latest\n",
+			retired: false,
+			why:     "nothing was read from it, so nothing replaced it",
+		},
+		{
+			name:    "not an Astro Runtime image at all",
+			body:    "FROM apache/airflow:2.9.0\n",
+			retired: false,
+			why:     "the manifest pin was defaulted rather than carried from here",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(tc.body), 0o600))
+
+			cs, err := Plan(dir, Options{})
+			require.NoError(t, err)
+			_, err = cs.Apply()
+			require.NoError(t, err)
+
+			if tc.retired {
+				assert.NoFileExists(t, filepath.Join(dir, "Dockerfile"), tc.why)
+			} else {
+				assert.FileExists(t, filepath.Join(dir, "Dockerfile"), tc.why)
+			}
+		})
+	}
+}
+
+// A deletion is planned, not performed, so a preview can show it.
+func TestPlanDoesNotDeleteAnything(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600))
+
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(dir, "packages.txt"), "Plan must not touch the project")
+	var deletes []string
+	for _, c := range cs.Changes {
+		if c.Kind == Delete {
+			deletes = append(deletes, c.Path)
+		}
+	}
+	assert.Equal(t, []string{"packages.txt"}, deletes, "the deletion is described up front")
+}
+
+// The manifest is written before anything is removed, so a run that dies
+// part-way leaves the project carrying both rather than neither.
+func TestPlanOrdersDeletionsAfterTheManifest(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"), 0o600))
+
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+
+	manifestAt, firstDeleteAt := -1, -1
+	for i, c := range cs.Changes {
+		if c.Path == manifest.Marker {
+			manifestAt = i
+		}
+		if c.Kind == Delete && firstDeleteAt == -1 {
+			firstDeleteAt = i
+		}
+	}
+	require.NotEqual(t, -1, manifestAt)
+	require.NotEqual(t, -1, firstDeleteAt)
+	assert.Less(t, manifestAt, firstDeleteAt,
+		"deleting before the manifest lands would take the dependencies away and put nothing in their place")
 }
 
 // Adopting a manifest that already declares dependencies must not restate or

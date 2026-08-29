@@ -143,8 +143,13 @@ func mergeDependencies(ed tomledit.Editor, reqs []string, dynamic bool, extras *
 	}
 	existing, ok := ed.Get([]string{"project", "dependencies"})
 	have := map[string]bool{}
+	// Which names the MANIFEST already had, kept apart from the ones this loop
+	// adds, because the two produce different notes: one is the manifest
+	// outranking the file, the other is the file contradicting itself.
+	fromManifest := map[string]bool{}
 	for _, d := range asStrings(existing) {
 		have[distName(d)] = true
+		fromManifest[distName(d)] = true
 	}
 
 	var add []string
@@ -159,6 +164,18 @@ func mergeDependencies(ed tomledit.Editor, reqs []string, dynamic bool, extras *
 			continue
 		}
 		if have[name] {
+			// Dropped, and said so. "Anything already named is left exactly as
+			// the manifest's author wrote it" is a defensible merge rule only
+			// while the losing specifier survives somewhere — and it does not,
+			// once requirements.txt is retired. Naming the file is also what
+			// keeps planRetirements from deleting it.
+			if fromManifest[name] {
+				*extras = append(*extras, "requirements.txt: "+r+
+					" was not carried, because pyproject.toml already pins "+name+" and the manifest wins")
+			} else {
+				*extras = append(*extras, "requirements.txt: "+r+
+					" names a distribution listed earlier in the same file, so this specifier was not carried")
+			}
 			continue
 		}
 		have[name] = true

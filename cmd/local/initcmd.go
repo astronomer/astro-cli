@@ -100,6 +100,14 @@ func renderInit(w io.Writer, res *scaffold.Result) error {
 			return err
 		}
 	}
+	// Removed files get their own line and their own word. They arrive in their
+	// own list for the same reason: rendered beside Updated, in the unlabelled
+	// block above, a destroyed file reads exactly like an edited one.
+	for _, entry := range res.Deleted {
+		if _, err := fmt.Fprintf(w, "  Removed %s\n", entry); err != nil {
+			return err
+		}
+	}
 	if err := renderLeftToDo(w, res.Notes); err != nil {
 		return err
 	}

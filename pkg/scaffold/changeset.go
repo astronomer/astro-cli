@@ -10,11 +10,10 @@ import (
 
 // Kind is what Apply does for one change.
 //
-// Delete has no producer yet. It is declared with the others because the
-// migration this split exists for removes requirements.txt, packages.txt and
-// airflow_settings.yaml once their contents are in the manifest, and a change
-// set that could only add would have to be reshaped to say so — after the
-// preview UI had already been built against it.
+// Delete is produced by planRetirements, for the v1 files whose entire contents
+// reached the manifest. airflow_settings.yaml is NOT among them: its values go
+// to a vault and its shape to an env schema, neither of which this package
+// knows about, so it is still handed off in a note.
 type Kind string
 
 const (
@@ -65,29 +64,45 @@ type Change struct {
 // operations and returns the Result.
 type Changeset struct {
 	Result
-	// Changes are performed in order, and the order is load-bearing: the
-	// manifest is written LAST. A manifest carrying [tool.astro] is the one
-	// thing that makes a rerun refuse, so a run that dies part-way through is
-	// safe to repeat only if the manifest is not there yet.
+	// Changes are performed in order, and the order is load-bearing in two
+	// places.
+	//
+	// The manifest is written after everything that adds, because a manifest
+	// carrying [tool.astro] is the one thing that makes a rerun refuse: a run
+	// that dies before it is safe to repeat.
+	//
+	// Deletions come after the manifest, and last of all. Apply stops at the
+	// first failure, so removing requirements.txt before the manifest that
+	// replaces it means a run dying in between has taken the dependencies away
+	// and put nothing in their place. Failing the other way round leaves the
+	// project carrying both, which a person can sort out.
 	Changes []Change `json:"changes"`
 }
 
-// report fills Created and Updated from Changes, so the lists a person reads and
-// the operations that produce them cannot disagree.
+// report fills Created, Updated and Deleted from Changes, so the lists a person
+// reads and the operations that produce them cannot disagree.
 //
 // They used to be appended side by side at each site, and they drifted exactly
 // as you would expect: the adopted manifest was added to one list and not the
 // other, so the single most important line in a conversion preview rendered
 // blank. Skipped stays separate because nothing is done for it.
 func (cs *Changeset) report() {
-	cs.Created, cs.Updated = nil, nil
+	cs.Created, cs.Updated, cs.Deleted = nil, nil, nil
 	for i := range cs.Changes {
 		c := &cs.Changes[i]
 		switch c.Kind {
 		case CreateDir, CreateFile, CreateSymlink:
 			cs.Created = append(cs.Created, c.Labels...)
-		case UpdateFile, Delete:
+		case UpdateFile:
 			cs.Updated = append(cs.Updated, c.Labels...)
+		case Delete:
+			// Its own list, and not folded into Updated, which is where it
+			// started. A caller rendering "updated: requirements.txt" for a file
+			// that no longer exists tells the user the opposite of what
+			// happened, and every consumer of this Result — `astro init`'s
+			// output, the desktop's preview — reads these lists rather than
+			// Changes.
+			cs.Deleted = append(cs.Deleted, c.Labels...)
 		}
 	}
 }
