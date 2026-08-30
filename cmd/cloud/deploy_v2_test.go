@@ -585,3 +585,56 @@ func TestDeployRoutesV1Project(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, called, "a v1 project should run the v1 deploy path")
 }
+
+// Six flags reach astro deploy that the v2 path never reads. Accepting them
+// silently means a deploy someone believes ran their tests, or shipped from a
+// DAGs path it never looked at. Each is refused with what to do instead until
+// an earlier fix ports the ones worth porting.
+func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
+	cases := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--pytest"}, "uv run pytest"},
+		{[]string{"--parse"}, "astro local check"},
+		{[]string{"--dags-path", "./elsewhere"}, "not supported yet"},
+		{[]string{"--dag-bundle-name", "nightly"}, "not supported on a v2 project yet"},
+		{[]string{"--build-secret", "id=pypi"}, "project Dockerfile"},
+		{[]string{"--build-secrets", "id=pypi"}, "project Dockerfile"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.args[0], func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			resetDeployFlagVars()
+
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(v2ManifestForRouting), 0o600))
+			orig := config.WorkingPath
+			config.WorkingPath = dir
+			t.Cleanup(func() { config.WorkingPath = orig })
+
+			err := execDeployCmd(tc.args...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "has no effect when deploying a v2 project")
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+// The same flags still work on a v1 project, where the v1 deploy path reads
+// them. The refusal is on the v2 branch only.
+func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	resetDeployFlagVars()
+
+	dir := t.TempDir() // no pyproject.toml, so the v1 path
+	orig := config.WorkingPath
+	config.WorkingPath = dir
+	t.Cleanup(func() { config.WorkingPath = orig })
+
+	err := execDeployCmd("--pytest")
+	if err != nil {
+		assert.NotContains(t, err.Error(), "has no effect when deploying a v2 project")
+	}
+}

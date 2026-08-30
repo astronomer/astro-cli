@@ -182,6 +182,38 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 	return pytestFile
 }
 
+// v2DeployIgnores are the flags astro deploy accepts that the v2 path never
+// reads, mapped to what to do instead. Each was built for the v1 deploy, and
+// on a v2 project nothing carries it: not the Request built below, and not
+// internal/deploy, which contains no reference to any of them.
+//
+// Refusing beats ignoring. A deploy that quietly skipped --pytest is a deploy
+// someone believes ran their tests, and the flag having no effect is exactly
+// the thing they cannot see. Porting them is an earlier fix; --build-secret needs
+// tier 3 first, which is why it is refused here rather than wired.
+var v2DeployIgnores = []struct {
+	flag string
+	do   string
+}{
+	{"pytest", "run your tests before deploying: `uv run pytest && astro deploy`"},
+	{"parse", "check your DAGs before deploying: `astro local check && astro deploy`"},
+	{"dags-path", "deploy from the project directory; a DAGs path other than dags/ is not supported yet"},
+	{"dag-bundle-name", "named DAG bundles are not supported on a v2 project yet"},
+	{"build-secret", "build secrets need a project Dockerfile, which a v2 project cannot declare yet"},
+	{"build-secrets", "build secrets need a project Dockerfile, which a v2 project cannot declare yet"},
+}
+
+// refuseFlagsV2DeployIgnores stops a v2 deploy that was given a flag it would
+// silently drop.
+func refuseFlagsV2DeployIgnores(cmd *cobra.Command) error {
+	for _, ignored := range v2DeployIgnores {
+		if cmd.Flags().Changed(ignored.flag) {
+			return fmt.Errorf("--%s has no effect when deploying a v2 project (a pyproject.toml with [tool.astro]): %s", ignored.flag, ignored.do)
+		}
+	}
+	return nil
+}
+
 func deploy(cmd *cobra.Command, args []string) error {
 	// Route by project type. A v2 project (a pyproject.toml with [tool.astro])
 	// takes the new v2 deploy path; everything else runs the v1 path below,
@@ -338,6 +370,10 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 // or both — then render the result. The v2 logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
 func deployV2(cmd *cobra.Command, args []string) error {
+	if err := refuseFlagsV2DeployIgnores(cmd); err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
 	format, err := parseDeployFormat(deployOutput)
 	if err != nil {
 		return err
