@@ -69,6 +69,7 @@ func (s *CmdSuite) TestRootCommandCloudContext() {
 	s.Contains(output, "Ship:")
 	s.Contains(output, "Manage Astro:")
 	s.Contains(output, "Set up the CLI:")
+	s.NotContains(output, "Additional Commands:")
 }
 
 func (s *CmdSuite) TestRootCompletionCommand() {
@@ -96,4 +97,7 @@ func (s *CmdSuite) TestRootCommandSoftwareContext() {
 	s.Contains(output, "run")
 	s.NotContains(output, "Run flow commands")
 	s.NotContains(output, "dev")
+	// The APC branch adds `user` and `team`; an unclassified command would
+	// land here instead of in a group.
+	s.NotContains(output, "Additional Commands:")
 }

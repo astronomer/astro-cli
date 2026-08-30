@@ -94,6 +94,9 @@ func rootAliasCmds(d Deps) []*cobra.Command {
 		c := &cli{d: d}
 		cmd := build(c)
 		cmd.Short += " (alias for `astro local " + cmd.Name() + "`)"
+		// The alias answers when typed but stays out of the root list, which
+		// already carries `local` one line away.
+		cmd.Hidden = true
 		addOutputFlag(cmd, &c.output)
 		markSkipPreRun(cmd)
 		cmds = append(cmds, cmd)
