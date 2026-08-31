@@ -15,7 +15,7 @@ import (
 	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
 	"github.com/astronomer/astro-cli/cmd/api"
-	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
@@ -136,7 +136,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if isCloudCtx { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, o.out)...,
+			astroCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, o.out)...,
 		)
 	} else { // Include all the commands to be exposed for APC users
 		rootCmd.AddCommand(

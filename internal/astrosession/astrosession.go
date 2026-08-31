@@ -37,7 +37,7 @@ var (
 
 // Credential is the credential inside a stored context token, empty when there
 // is none. A context that has been logged out of keeps its scheme and loses its
-// token — it reads as "Bearer " with nothing after it (cmd/cloud/setup.go reads
+// token — it reads as "Bearer " with nothing after it (cmd/astro/setup.go reads
 // it the same way) — so "is anyone logged in" is a question about what follows
 // the scheme, not about whether the field is set.
 //

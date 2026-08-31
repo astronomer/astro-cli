@@ -182,9 +182,13 @@ func TestV2PackagesNeverImportConfigOrV1Cmd(t *testing.T) {
 				// The v1 cmd package: everything directly under cmd/,
 				// plus its v1 subpackages. The v2 tree may import its
 				// own packages.
+				//
+				// cmd/astro is not among them. A cmd/astro existed briefly
+				// as the v2 composition root and went when that root
+				// moved onto cmd/ proper; the name now holds the v1
+				// Astro command tree, which is exactly what this forbids.
 				if strings.HasPrefix(imp, modulePrefix+"cmd") &&
-					!strings.HasPrefix(imp, modulePrefix+"cmd/local") &&
-					!strings.HasPrefix(imp, modulePrefix+"cmd/astro") {
+					!strings.HasPrefix(imp, modulePrefix+"cmd/local") {
 					t.Errorf("%s imports %s: v2 packages never import the v1 cmd tree", rel, imp)
 				}
 			}

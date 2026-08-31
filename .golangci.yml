@@ -135,9 +135,11 @@ linters:
       # "fix" it to a plural. `local` used to be one too, covering
       # localdocker/localstate/…; those moved into pkg/localrt (its own module,
       # which a root run does not descend into), leaving localenv as the only
-      # internal/local* package.
+      # internal/local* package. cmd/astro was listed here for the short-lived
+      # v2 composition root; the name now holds the v1 Astro
+      # tree, which gets no v2 exemption.
       - linters: [gocritic]
-        path: ^(cmd/(local|astro)|internal/(localenv|envresolve|deploy|instance|pack)|pkg/airflowapi)
+        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack)|pkg/airflowapi)
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

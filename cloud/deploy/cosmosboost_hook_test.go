@@ -119,7 +119,7 @@ func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 
 // TestDeployBundleDbtPathRunsPreDeployWhenEnabled drives the full
 // `astro dbt deploy` bundle path (DeployBundle into UploadBundle) to pin that
-// moving the hook out of cmd/cloud/dbt.go did not lose dbt-deploy coverage.
+// moving the hook out of cmd/astro/dbt.go did not lose dbt-deploy coverage.
 func TestDeployBundleDbtPathRunsPreDeployWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))

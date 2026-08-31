@@ -11,7 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
-	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/version"
@@ -39,7 +39,7 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 			}
 		}
 		if context.IsCloudContext() {
-			err := cloudCmd.Setup(cmd, astroV1Client)
+			err := astroCmd.Setup(cmd, astroV1Client)
 			if err != nil {
 				if strings.Contains(err.Error(), "token is invalid or malformed") {
 					return errors.New("API Token is invalid or malformed")
