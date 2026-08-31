@@ -137,7 +137,7 @@ func GetCommandPath(cmd *cobra.Command) string {
 // notice makes a materially different claim about what is collected, so users
 // who accepted earlier wording see the change instead of inheriting it silently.
 // v1 predates this constant and is stored as "true".
-const noticeVersion = "2"
+const noticeVersion = "3"
 
 // showFirstRunNotice prints a notice about telemetry on the first CLI invocation,
 // and again whenever noticeVersion changes.
@@ -148,6 +148,7 @@ func showFirstRunNotice() {
 	fmt.Fprintln(os.Stderr,
 		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
 			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
+			"A command the CLI does not have is tracked too, so we can see what to add.\n"+
 			"While you are logged in, events are linked to your Astro organization.\n"+
 			"Logged-out usage stays anonymous.\n"+
 			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
@@ -203,11 +204,15 @@ func TrackCommand(cmd *cobra.Command) {
 	// someone in the act of opting out.
 	showFirstRunNotice()
 
-	properties := buildCommandProperties(cmd)
+	track(EventCommandExecution, buildCommandProperties(cmd))
+}
 
+// track sends one event. It goes out in the background, unless debug mode asks
+// for it in the foreground.
+func track(event string, properties map[string]interface{}) {
 	payload := sharedtel.TelemetryPayload{
 		Source:      SourceName,
-		Event:       EventCommandExecution,
+		Event:       event,
 		AnonymousID: GetAnonymousID(),
 		Properties:  properties,
 	}
