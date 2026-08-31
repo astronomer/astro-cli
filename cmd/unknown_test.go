@@ -2,10 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -178,4 +182,84 @@ func TestHandleUnknownCommandOnTheRealTree(t *testing.T) {
 			}
 		})
 	}
+}
+
+// parseError returns the error pflag gives for args, which is the error cobra
+// hands to the flag error function.
+func parseError(t *testing.T, args ...string) error {
+	t.Helper()
+
+	flags := pflag.NewFlagSet("astro", pflag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	flags.String("verbosity", "warn", "log level")
+	flags.BoolP("all", "a", false, "every one of them")
+
+	return flags.Parse(args)
+}
+
+func TestUnknownFlag(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"a long flag we do not have", []string{"--wait-for-deploy"}, "--wait-for-deploy"},
+		{"a long flag with a value", []string{"--api-token=sekret-123"}, "--api-token"},
+		{"a shorthand we do not have", []string{"-Z"}, "-Z"},
+		{"a shorthand inside a group", []string{"-aZ"}, "-Z"},
+		{"a flag we do have", []string{"--verbosity", "debug"}, ""},
+		{"a flag missing its value", []string{"--verbosity"}, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, unknownFlag(parseError(t, tt.args...)))
+		})
+	}
+
+	assert.Empty(t, unknownFlag(nil))
+	assert.Empty(t, unknownFlag(errors.New("something else")))
+}
+
+// TestTrackUnknownFlagPassesTheErrorThrough checks that the hook only listens.
+// Cobra reports the error, and it has to arrive unchanged.
+func TestTrackUnknownFlagPassesTheErrorThrough(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	err := parseError(t, "--wait-for-deploy")
+	cmd := &cobra.Command{Use: "deploy"}
+
+	assert.Equal(t, err, trackUnknownFlag(cmd, err))
+}
+
+func TestTrackUnknownFlagSkipsShellCompletion(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	original := os.Args
+	defer func() { os.Args = original }()
+	os.Args = []string{"astro", cobra.ShellCompRequestCmd, "deploy", "--wai"}
+
+	err := parseError(t, "--wai")
+	cmd := &cobra.Command{Use: "deploy"}
+
+	assert.Equal(t, err, trackUnknownFlag(cmd, err))
+}
+
+// TestUnknownFlagOnTheRealTree checks that the root's error function reaches a
+// command several levels down, and that the CLI still reports what it always
+// reported.
+func TestUnknownFlagOnTheRealTree(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	root := NewRootCmd()
+	out := new(bytes.Buffer)
+	root.SetOut(out)
+	root.SetErr(out)
+	root.SetArgs([]string{"deployment", "list", "--wait-for-deploy"})
+
+	err := root.Execute()
+
+	require.Error(t, err)
+	assert.Equal(t, "unknown flag: --wait-for-deploy", err.Error())
+	assert.Contains(t, out.String(), "Error: unknown flag: --wait-for-deploy")
 }

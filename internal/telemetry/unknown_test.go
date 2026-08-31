@@ -45,3 +45,36 @@ func TestTrackUnknownCommandSendsNothingInTests(t *testing.T) {
 		TrackUnknownCommand(&cobra.Command{Use: "astro"}, "fly", "")
 	})
 }
+
+func TestUnknownFlagName(t *testing.T) {
+	tests := []struct {
+		name string
+		flag string
+		want string
+	}{
+		{"a long flag", "--wait-for-deploy", "--wait-for-deploy"},
+		{"a shorthand", "-Z", "-Z"},
+		{"a digit shorthand", "-3", "-3"},
+		{"digits and dashes", "--dag-2", "--dag-2"},
+		{"capitals are redacted", "--waitForDeploy", RedactedCommand},
+		{"a token-shaped flag is redacted", "--ey_JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", RedactedCommand},
+		{"a long shorthand is redacted", "-abc", RedactedCommand},
+		{"punctuation is redacted", "--wait!", RedactedCommand},
+		{"a bare word is redacted", "wait", RedactedCommand},
+		{"an over-long flag is redacted", "--" + strings.Repeat("a", maxCommandLength+1), RedactedCommand},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, unknownFlagName(tt.flag))
+		})
+	}
+}
+
+func TestTrackUnknownFlagSendsNothingInTests(t *testing.T) {
+	initTestConfig(t)
+
+	assert.NotPanics(t, func() {
+		TrackUnknownFlag(&cobra.Command{Use: "deploy"}, "--wait-for-deploy")
+	})
+}

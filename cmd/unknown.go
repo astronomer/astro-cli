@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -51,6 +53,40 @@ func HandleUnknownCommand(root *cobra.Command, args []string, out io.Writer) boo
 	telemetry.TrackUnknownCommand(unknown.parent, unknown.word, unknown.suggestion())
 	unknown.report(out)
 	return true
+}
+
+// trackUnknownFlag records a flag the CLI does not have, then hands the error
+// back for cobra to report as it always has. Cobra parses the flags before it
+// runs the hook that tracks commands, so a wrong flag sends nothing at all
+// without this.
+//
+// The root sets it once. A command with no error function of its own asks its
+// parent for one, so this covers every command in the tree.
+func trackUnknownFlag(cmd *cobra.Command, err error) error {
+	if isShellCompletion(os.Args[1:]) {
+		return err
+	}
+	if flag := unknownFlag(err); flag != "" {
+		telemetry.TrackUnknownFlag(cmd, flag)
+	}
+	return err
+}
+
+// unknownFlag returns the flag as it was typed when pflag has no such flag,
+// and "" for every other parse error. A missing value, or a value of the wrong
+// type, is a mistake on a flag we do have, which is not what we are counting.
+//
+// pflag reports the name on its own, so `--api-token=secret` arrives here as
+// `--api-token` and the value never reaches us.
+func unknownFlag(err error) string {
+	var notExist *pflag.NotExistError
+	if !errors.As(err, &notExist) {
+		return ""
+	}
+	if notExist.GetSpecifiedShortnames() != "" {
+		return "-" + notExist.GetSpecifiedName()
+	}
+	return "--" + notExist.GetSpecifiedName()
 }
 
 // isShellCompletion reports whether the shell is asking cobra for completions.
