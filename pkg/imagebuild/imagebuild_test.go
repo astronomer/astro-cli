@@ -325,3 +325,148 @@ func TestBuildDockerfileModeStillPinsPlatform(t *testing.T) {
 	assert.True(t, hasCall(cmd.calls, "--platform linux/amd64"),
 		"a deploy build pins the platform in either mode, got %v", cmd.calls)
 }
+
+// A declared Dockerfile that names nothing is refused, before docker runs.
+//
+// Checked here rather than in each caller because this is where they meet:
+// localdocker reaches Build through the rt.ImageBuilder seam, and deploy and
+// package call it directly. An earlier version of this guard lived in
+// localdocker, which left the other two paths to fail inside a build with output
+// that never mentions the pyproject.toml key the user has to fix.
+//
+// The directory rows are the ones that get here by accident: pkg/manifest
+// validates the declared path with filepath.IsLocal, which is lexical and says
+// yes to ".", so a check that only asked whether the path EXISTS would pass the
+// project directory and hand `docker build -f` a directory.
+func TestBuildRefusesADeclaredDockerfileItCannotRead(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		setup   func(t *testing.T, dir string) string // returns the Dockerfile path to declare
+		wantMsg string
+	}{
+		{
+			name:    "missing",
+			setup:   func(_ *testing.T, dir string) string { return filepath.Join(dir, "docker", "Dockerfile") },
+			wantMsg: "could not be read",
+		},
+		{
+			name:    "the project directory itself",
+			setup:   func(_ *testing.T, dir string) string { return dir },
+			wantMsg: "is not a file",
+		},
+		{
+			name: "some other directory",
+			setup: func(t *testing.T, dir string) string {
+				t.Helper()
+				sub := filepath.Join(dir, "dags")
+				if err := os.MkdirAll(sub, 0o750); err != nil {
+					t.Fatal(err)
+				}
+				return sub
+			},
+			wantMsg: "is not a file",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &fakeCmd{}
+			req := testRequest(t)
+			dir := t.TempDir()
+			req.Dockerfile = tc.setup(t, dir)
+			req.Context = dir
+
+			_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+			if err == nil {
+				t.Fatal("want an error naming the declared Dockerfile")
+			}
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("error = %q, want it to contain %q", err, tc.wantMsg)
+			}
+			if !strings.Contains(err.Error(), req.Dockerfile) {
+				t.Errorf("error = %q, want it to name the path %q, which is the thing to fix", err, req.Dockerfile)
+			}
+			if len(cmd.calls) != 0 {
+				t.Errorf("docker was invoked (%v); a failure knowable without asking docker should not cost a build", cmd.calls)
+			}
+		})
+	}
+}
+
+// And a declared Dockerfile that IS there builds from it, with the project as
+// the context so a COPY of anything beside the file still resolves.
+func TestBuildUsesADeclaredDockerfile(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := testRequest(t)
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "docker")
+	if err := os.MkdirAll(sub, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	dockerfile := filepath.Join(sub, "Dockerfile")
+	if err := os.WriteFile(dockerfile, []byte("FROM my-own-base\nRUN echo hi\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	req.Dockerfile = dockerfile
+	req.Context = dir
+
+	got, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != req.Tag {
+		t.Errorf("Build = %q, want the built tag %q", got, req.Tag)
+	}
+	if !hasCall(cmd.calls, "--file "+dockerfile) {
+		t.Errorf("calls = %v, want the declared file passed to --file", cmd.calls)
+	}
+	if !hasCall(cmd.calls, " "+dir) {
+		t.Errorf("calls = %v, want the project as the build context", cmd.calls)
+	}
+}
+
+// Secrets reach docker build as --secret, one flag per spec, in order.
+//
+// The SPEC is forwarded, never a value: docker reads the secret itself from the
+// src file or the named env var, which is why these strings are safe on a
+// command line and in the build log they end up in.
+func TestBuildForwardsSecretsToDocker(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := testRequest(t)
+	dir := t.TempDir()
+	dockerfile := filepath.Join(dir, "Dockerfile")
+	if err := os.WriteFile(dockerfile, []byte("FROM my-own-base\nRUN --mount=type=secret,id=pypi true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	req.Dockerfile, req.Context = dockerfile, dir
+	req.Secrets = []string{"id=pypi,src=/tmp/pypi.txt", "id=other,env=OTHER"}
+
+	if _, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{}); err != nil {
+		t.Fatal(err)
+	}
+	if !hasCall(cmd.calls, "--secret id=pypi,src=/tmp/pypi.txt") {
+		t.Errorf("calls = %v, want the first secret forwarded", cmd.calls)
+	}
+	if !hasCall(cmd.calls, "--secret id=other,env=OTHER") {
+		t.Errorf("calls = %v, want the second secret forwarded", cmd.calls)
+	}
+	if strings.Count(strings.Join(cmd.calls, " "), "--secret") != 2 {
+		t.Errorf("calls = %v, want exactly one --secret per spec", cmd.calls)
+	}
+}
+
+// A generated build passes no secret, because there is nothing of the project's
+// to mount one into: its Dockerfile is `FROM <base>` and the install happens in
+// the runtime image's own ONBUILD triggers. Callers refuse the combination, and
+// this pins that nothing here smuggles it through anyway.
+func TestBuildGeneratedModeIgnoresSecrets(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := testRequest(t)
+	req.Dependencies = []string{"pandas"}
+	req.Secrets = []string{"id=pypi,src=/tmp/pypi.txt"}
+
+	if _, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{}); err != nil {
+		t.Fatal(err)
+	}
+	if hasCall(cmd.calls, "--secret") {
+		t.Errorf("calls = %v, want no --secret on a generated build", cmd.calls)
+	}
+}

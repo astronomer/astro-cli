@@ -94,6 +94,13 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 		}
 		migratedPackages = true
 	}
+	// A repo that already had a pyproject.toml can have a Dockerfile too, and
+	// it is load-bearing there for the same reason it is in the greenfield arm.
+	// Both arms declare it or the field would only be true of projects that
+	// arrived one particular way.
+	if err := setDockerfileDeclaration(ed, v1); err != nil {
+		return nil, nil, pin, err
+	}
 	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
 		return nil, nil, pin, err
 	}
@@ -121,6 +128,12 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	}
 	if migratedPackages {
 		labels = append(labels, manifest.Marker+" (migrated packages.txt into packages)")
+	}
+	// Same reason as the greenfield arm's: this is the key that decides whether
+	// the image is generated or built from the user's own file, so a preview
+	// without it hides the most consequential thing the run did.
+	if declaresDockerfile(v1) {
+		labels = append(labels, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
 	}
 	return out, labels, pin, nil
 }

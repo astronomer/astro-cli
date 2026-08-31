@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -74,9 +75,21 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, errors.New("the project has no name; set [project] name in pyproject.toml")
 	}
 	airflowVersion := req.Manifest.Astro.AirflowVersion
-	base, err := imagebuild.RuntimeImage(airflowVersion)
-	if err != nil {
-		return Result{}, err
+	// A declared Dockerfile IS the build, so no base is resolved for it — the
+	// same rule local docker mode and deploy follow. Without this, packaging a
+	// tier-3 project produced an artifact built over the runtime base with none
+	// of the project's own build in it.
+	declared := ""
+	if req.Manifest.Astro.Dockerfile != "" {
+		declared = filepath.Join(req.ProjectDir, filepath.FromSlash(req.Manifest.Astro.Dockerfile))
+	}
+	base := ""
+	if declared == "" {
+		var err error
+		base, err = imagebuild.RuntimeImage(airflowVersion)
+		if err != nil {
+			return Result{}, err
+		}
 	}
 
 	// The astro artifact is an image, so Docker is required. Probe the engine up
@@ -87,7 +100,10 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 
 	deps := req.Manifest.Project.Dependencies
 	packages := req.Manifest.Astro.Packages
-	hash := contentHash(base, req.Platform, deps, packages)
+	hash, err := contentHash(base, req.Platform, deps, packages, req.Manifest.Astro.Dockerfile, declared)
+	if err != nil {
+		return Result{}, err
+	}
 
 	// The build context lives in a scratch dir the target owns unless the caller
 	// pins one (a test). A pinned WorkDir is left in place; a made one is removed.
@@ -110,9 +126,14 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		Tag:          workingTag,
 		Dependencies: deps,
 		Packages:     packages,
-		Platform:     req.Platform,
-		Bin:          t.bin,
-		Env:          t.env,
+		// Set together: Dockerfile mode builds the project's file against the
+		// project as context, and imagebuild ignores Dependencies and Packages
+		// there rather than rejecting them.
+		Dockerfile: declared,
+		Context:    dockerfileContext(declared, req.ProjectDir),
+		Platform:   req.Platform,
+		Bin:        t.bin,
+		Env:        t.env,
 	}, cb)
 	if err != nil {
 		return Result{}, err
@@ -256,7 +277,26 @@ func (t *AstroTarget) save(ctx context.Context, image, path string, cb localrt.C
 // same inputs produce the same tag and a rebuild is a cache hit. Dependencies
 // and packages are sorted first, so reordering the manifest does not move the
 // tag.
-func contentHash(base, platform string, deps, packages []string) string {
+// contentHash is the content address of the image this request would build.
+//
+// A declared Dockerfile contributes the DECLARED path and the file's BYTES.
+//
+// Its bytes, because in Dockerfile mode the file is the whole build and
+// imagebuild ignores base, deps and packages — so a hash built only from those
+// gave two different images the same content-addressed tag, and editing the
+// Dockerfile republished under the tag the previous image already held.
+//
+// The DECLARED path, meaning the manifest's own slash-separated value, not the
+// absolute path it resolves to. Hashing the absolute path would make the content
+// address depend on where the project happens to sit, so the same commit built
+// in two checkouts — or in CI — would produce different tags for an identical
+// image. Caught by the test for this, which builds the same project twice from
+// two temp dirs.
+//
+// Reading the file makes this fallible, which is the honest signature: a
+// declaration naming something unreadable cannot be content-addressed, and
+// imagebuild.Build refuses it a moment later anyway.
+func contentHash(base, platform string, deps, packages []string, declaredRel, declaredAbs string) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -269,5 +309,27 @@ func contentHash(base, platform string, deps, packages []string) string {
 	for _, p := range sortedCopy(packages) {
 		writeField("pkg", p)
 	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:7]
+	if declaredAbs != "" {
+		writeField("dockerfile", filepath.ToSlash(declaredRel))
+		body, err := os.ReadFile(declaredAbs)
+		if err != nil {
+			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", declaredRel, err)
+		}
+		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
+}
+
+// dockerfileContext is the build context for a declared Dockerfile, and empty
+// for a generated build (which builds its own context under WorkDir).
+//
+// Paired in one function because the two fields are only correct together:
+// Context without Dockerfile changes nothing, and Dockerfile without Context
+// builds the project's file against imagebuild's generated directory, where none
+// of the project's own COPY paths exist.
+func dockerfileContext(declared, projectDir string) string {
+	if declared == "" {
+		return ""
+	}
+	return projectDir
 }

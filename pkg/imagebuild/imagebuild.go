@@ -107,6 +107,19 @@ type Request struct {
 	// (astrocrpublic.azurecr.io/runtime:<version>). Empty in Dockerfile mode:
 	// the project's own file declares what it builds on.
 	BaseImage string
+	// Secrets are docker build --secret specs ("id=mysecret[,src=/local/secret]"),
+	// one per entry, forwarded verbatim in the order given.
+	//
+	// Only meaningful in Dockerfile mode: a generated build's Dockerfile is
+	// `FROM <base>` and the install happens in the runtime image's own ONBUILD
+	// triggers, so there is no RUN of the project's for a secret to be mounted
+	// into. Callers refuse the combination rather than passing secrets that
+	// could not be read — see cmd/cloud's v2 deploy.
+	//
+	// The SPEC is forwarded, never a secret value: docker reads the value itself
+	// from the src file or the named env var. So these strings are safe in a
+	// command line and in the build log, which is where they end up.
+	Secrets []string
 	// Dockerfile and Context switch this into Dockerfile mode — the project
 	// supplied a real Dockerfile ("tier 3" in the project design) and it, not
 	// the manifest, is the build. Both are absolute, and set together.
@@ -181,6 +194,23 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // a named error, never a hang.
 func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (string, error) {
 	if req.Dockerfile != "" {
+		// Checked here rather than in each caller, because this is where they
+		// meet: localdocker reaches it through the rt.ImageBuilder seam, and
+		// deploy and package call it directly. A declaration that names nothing
+		// is the one failure this mode can have that is entirely the manifest's
+		// fault, and left to docker it arrives as build output that never
+		// mentions the pyproject.toml key the user has to fix.
+		//
+		// A regular FILE, not merely something that exists: pkg/manifest
+		// validates the declared path with filepath.IsLocal, which is lexical
+		// and says yes to ".", so a Stat alone would pass the project directory
+		// and the failure would land on `docker build -f <a directory>`.
+		switch info, err := os.Stat(req.Dockerfile); {
+		case err != nil:
+			return "", fmt.Errorf("the Dockerfile this project declares (%s) could not be read: %w", req.Dockerfile, err)
+		case !info.Mode().IsRegular():
+			return "", fmt.Errorf("the Dockerfile this project declares (%s) is not a file", req.Dockerfile)
+		}
 		// No fast path here. An unchanged Dockerfile is the daemon's layer cache
 		// to short-circuit, not ours to skip: we cannot tell from the outside
 		// whether the file's own steps would produce something new.
@@ -241,6 +271,17 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	// platform (deploy wants linux/amd64) is added only when set, so the
 	// host-platform local build keeps its exact command.
 	args := []string{"build", "--tag", req.Tag, "--file", dockerfile, "--pull"}
+	// Gated on Dockerfile mode, not just left to the caller. build() is shared,
+	// and a generated build's Dockerfile is one this package wrote — `FROM
+	// <base>`, with the install in the runtime image's ONBUILD triggers — so a
+	// secret has nothing of the project's to be mounted into. Callers refuse the
+	// combination; this makes the invariant hold whether or not they do, rather
+	// than handing docker a flag that cannot work.
+	if req.Dockerfile != "" {
+		for _, secret := range req.Secrets {
+			args = append(args, "--secret", secret)
+		}
+	}
 	if req.Platform != "" {
 		args = append(args, "--platform", req.Platform)
 	}
@@ -263,6 +304,53 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 // script rejects apache-airflow in requirements.txt ("change the base image
 // instead"). Every other dependency — providers, pandas, and the rest —
 // installs normally.
+// shouldPull reports whether the build may force-refresh its base images.
+//
+// Always, for a generated build: the Dockerfile is one this package wrote, its
+// FROM is the runtime base, and the tag floats — so pulling is how a project
+// picks up a new patch.
+//
+// For a DECLARED Dockerfile the FROM belongs to the user, and forcing a pull
+// breaks any base that is not in a registry this machine can reach: a locally
+// built image, or a private registry the daemon is not logged into. A plain
+// `docker build` succeeds there and this failed, which is not a tradeoff a
+// tier-3 escape hatch gets to make.
+//
+// The rule is v1's, deliberately: airflow/docker_image.go's shouldAddPullFlag
+// skips --pull as soon as ANY FROM names something other than an Astro base, so
+// a project moving to v2 keeps the behaviour it had. Any is the right quantifier
+// rather than the final stage — a builder stage on an unreachable image fails
+// the build just as hard.
+func shouldPull(declared, dockerfile string) bool {
+	if declared == "" {
+		return true
+	}
+	data, err := os.ReadFile(dockerfile)
+	if err != nil {
+		// Unreadable is Build's guard to report, not this function's to guess
+		// about; the safe answer is the one that adds no failure mode.
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(strings.ToUpper(line), "FROM ") {
+			continue
+		}
+		ref := strings.TrimSpace(line[5:])
+		if !strings.HasPrefix(ref, astroRegistryHost) && !strings.HasPrefix(ref, quayAstronomerRepo) {
+			return false
+		}
+	}
+	return true
+}
+
+// The registries an Astro Runtime base comes from. Spelled here rather than
+// imported from airflow/: that is the v1 tree, and pkg/* does not depend on it.
+const (
+	astroRegistryHost  = "astrocrpublic.azurecr.io"
+	quayAstronomerRepo = "quay.io/astronomer"
+)
+
 func runtimeDeps(deps []string) []string {
 	out := make([]string, 0, len(deps))
 	for _, d := range deps {

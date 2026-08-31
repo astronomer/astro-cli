@@ -344,3 +344,43 @@ TOKEN = {}
 		t.Errorf("SourceNote = %q, want it to name the keyring", note)
 	}
 }
+
+// A declared Dockerfile reaches the plan, and an undeclared one leaves it empty.
+//
+// The empty case is half the point. Plan.Dockerfile switches docker mode from a
+// generated image to running the project's file, so a value appearing when the
+// manifest declared none would take every ordinary v2 project down the wrong
+// path — and the failure would be a docker build error naming nothing about the
+// manifest.
+//
+// The populated case is the bug this fixes: Build never set the field, so a
+// converted project that kept a load-bearing Dockerfile got a generated image
+// from `astro local` while the desktop, inferring the tier from the file being
+// present, built from the file. One project, two tools, two images.
+func TestBuildCarriesTheDeclaredDockerfile(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		decl string
+		want string
+	}{
+		{"declared", "dockerfile = 'Dockerfile'\n", "Dockerfile"},
+		{"declared in a subdirectory", "dockerfile = 'docker/Dockerfile'\n", "docker/Dockerfile"},
+		{"not declared", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML+tc.decl), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+			built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if built.Plan.Dockerfile != tc.want {
+				t.Errorf("Plan.Dockerfile = %q, want %q", built.Plan.Dockerfile, tc.want)
+			}
+		})
+	}
+}

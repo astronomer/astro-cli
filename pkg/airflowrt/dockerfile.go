@@ -3,6 +3,7 @@ package airflowrt
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -14,29 +15,80 @@ var (
 	FullRuntimeTagRe = regexp.MustCompile(`^\d+\.\d+-\d+`)
 )
 
-// ParseDockerfile extracts the runtime image name and tag from a project's Dockerfile.
+// ParseDockerfile extracts the runtime image name and tag from the Dockerfile at
+// the root of projectPath. It is ParseDockerfileAt for the file's one v1
+// location, kept because most callers only ever ask about that one.
 func ParseDockerfile(projectPath string) (image, tag string, err error) {
-	data, err := os.ReadFile(projectPath + "/Dockerfile")
+	return ParseDockerfileAt(filepath.Join(projectPath, "Dockerfile"))
+}
+
+// ParseDockerfileAt is ParseDockerfile against a named file, for a project that
+// declared its Dockerfile somewhere other than the root ([tool.astro]
+// dockerfile).
+//
+// The path is needed because the generation a caller reads here has to come from
+// the file that will actually be built. Taking it from the manifest's pin
+// instead looks equivalent and is not: a conversion writes the declaration
+// itself and may have DEFAULTED the pin, so a project whose Dockerfile sits on
+// an Airflow 2 base can carry a pin that says 3 — and a caller trusting the pin
+// then picks the compose service set for the wrong generation.
+func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
+	data, err := os.ReadFile(dockerfilePath)
 	if err != nil {
 		return "", "", fmt.Errorf("error reading Dockerfile: %w", err)
 	}
 
+	// The LAST stage, not the first, and then back through any alias it names.
+	//
+	// docker builds the final image from the final FROM, so the first one answers
+	// a different question — and gets it wrong for exactly the file this parsing
+	// exists to read. A multi-stage build is the headline reason a project
+	// declares its own Dockerfile, and those start `FROM python:3.12-slim AS
+	// builder`: taking the first FROM reported the builder's base, so an Airflow
+	// 3 project read as Airflow 2 and its compose file got the Airflow 2 service
+	// set. The old code even stripped the ` AS ` alias, so it knew multi-stage
+	// existed and still took the wrong stage.
+	//
+	// A final stage may name an earlier one (`FROM base`), so aliases are
+	// followed to the image they resolve to. Bounded by the number of stages,
+	// since each hop moves strictly earlier in the file.
+	type stage struct{ alias, ref string }
+	var stages []stage
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(strings.ToUpper(line), "FROM ") {
-			ref := strings.TrimSpace(line[5:])
-			// Remove AS alias
-			if idx := strings.Index(strings.ToUpper(ref), " AS "); idx >= 0 {
-				ref = ref[:idx]
-			}
-			parts := strings.SplitN(ref, ":", 2)
-			if len(parts) == 2 {
-				return parts[0], parts[1], nil
-			}
-			return parts[0], "latest", nil
+		if !strings.HasPrefix(strings.ToUpper(line), "FROM ") {
+			continue
 		}
+		ref, alias := strings.TrimSpace(line[5:]), ""
+		if idx := strings.Index(strings.ToUpper(ref), " AS "); idx >= 0 {
+			alias = strings.ToLower(strings.TrimSpace(ref[idx+4:]))
+			ref = strings.TrimSpace(ref[:idx])
+		}
+		stages = append(stages, stage{alias: alias, ref: ref})
 	}
-	return "", "", fmt.Errorf("no FROM instruction found in Dockerfile")
+	if len(stages) == 0 {
+		return "", "", fmt.Errorf("no FROM instruction found in Dockerfile")
+	}
+
+	ref := stages[len(stages)-1].ref
+	for hop := 0; hop < len(stages); hop++ {
+		earlier := -1
+		for i, st := range stages[:len(stages)-1] {
+			if st.alias != "" && st.alias == strings.ToLower(ref) {
+				earlier = i
+			}
+		}
+		if earlier < 0 {
+			break
+		}
+		ref = stages[earlier].ref
+	}
+
+	parts := strings.SplitN(ref, ":", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1], nil
+	}
+	return parts[0], "latest", nil
 }
 
 // ParseRuntimeTagPython extracts the base runtime tag and the Python version from a

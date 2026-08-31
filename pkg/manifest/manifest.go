@@ -34,6 +34,7 @@ import (
 	"io/fs"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -84,6 +85,26 @@ type Astro struct {
 	// Env is the decoded [tool.astro.env] section, untyped: its schema
 	// belongs to pkg/envschema, which this package must not import.
 	Env map[string]any
+	// Dockerfile is [tool.astro] dockerfile, a slash-separated project-relative
+	// path (shape-validated only — see validate) to the
+	// project's own Dockerfile — "tier 3" in the project design, the escape
+	// hatch for a multi-stage build or anything else a manifest cannot
+	// express. Empty is the common case and means the image is generated from
+	// AirflowVersion, Packages and [project] dependencies.
+	//
+	// DECLARED, rather than inferred from the file being on disk, and that is
+	// the whole reason this key exists. Presence answers "is there a
+	// Dockerfile", which is not the same question as "is it the build": a
+	// conversion KEEPS a Dockerfile whose instructions it could not carry, and
+	// with only presence to go on the desktop built from that file while
+	// `astro local` generated an image over the runtime base and ignored it.
+	// One project, two tools, two different images — the thing sharing a disk
+	// contract is supposed to prevent.
+	//
+	// Docker mode runs this file as the build, and AirflowVersion, Packages and
+	// the dependency list stop describing the image. Standalone mode has no
+	// image and ignores it.
+	Dockerfile string
 }
 
 // Link is one committed deployment link: an Airflow the project talks to,
@@ -319,7 +340,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "deployments", "env", "packages", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "deployments", "dockerfile", "env", "packages", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
@@ -354,6 +375,12 @@ func (p *parser) astro(raw map[string]any) Astro {
 		Target:         p.defaultTarget(raw["target"]),
 		Targets:        p.targets(raw["targets"]),
 		Env:            p.table(astroRoot+".env", raw["env"]),
+		// Trimmed at DECODE, not just in validate, because the stored value is
+		// what consumers branch on. `dockerfile = " "` is non-empty to a
+		// `declared != ""` test and names no file, so leaving it untrimmed here
+		// would have let a whitespace declaration suppress the desktop's
+		// presence fallback and take the project's real Dockerfile away.
+		Dockerfile: strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
 	}
 	a.Deployments = p.links(raw["deployments"], &a)
 	return a
@@ -630,6 +657,54 @@ func (p *parser) validate(m *Manifest) {
 
 	if v := m.Astro.AirflowVersion; v != "" && !airflowVersionRe.MatchString(v) {
 		p.add(astroRoot+".airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", v))
+	}
+
+	// The path has to stay inside the project, because the consumer joins it to
+	// the project directory and hands the result to a docker build. An absolute
+	// path or one climbing out with .. would make the build read a file the
+	// project does not contain, which a manifest has no business asking for
+	// even when its author is the one who wrote it.
+	//
+	// filepath.IsLocal is a LEXICAL check, and shape is all this validation
+	// claims. It rejects absolute paths and every .. escape, including ones
+	// laundered through a subdirectory (a/../../Dockerfile), and it says yes to
+	// "." — so a consumer joining this to the project directory still has to
+	// check it named a FILE. It also cannot see symlinks, so a link inside the
+	// project pointing out of it passes here and resolves outside. That is not a
+	// boundary this field can enforce anyway: anyone who can write the manifest
+	// can write a Dockerfile with the same effect. The point is a well-defined
+	// field, not a sandbox.
+	//
+	// It is stricter on Windows, where it also refuses the reserved device
+	// names, so a manifest can in principle validate on one OS and not another
+	// — the safe direction for a difference to run in, and `dockerfile = "NUL"`
+	// is not a thing to keep portable.
+	//
+	// TrimSpace, because `dockerfile = " "` is non-empty to a consumer and names
+	// no file. p.str does not trim and every reader tests against "", so a
+	// whitespace-only declaration passed validation, then satisfied
+	// `declared != ""` in the desktop and took the project's real Dockerfile
+	// away — the exact outcome the presence fallback exists to prevent.
+	// p.packages already treats a blank entry as a problem; this is that rule
+	// for a scalar.
+	if v := m.Astro.Dockerfile; v != "" {
+		// Backslashes are refused on every platform, including the one where
+		// they work. This manifest is committed and read on macOS, Linux and
+		// Windows, and a backslash is a path separator on exactly one of them —
+		// so `dockerfile = 'docker\Dockerfile'` resolves for the Windows user
+		// who wrote it and is one filename containing a backslash to everyone
+		// who pulls it, failing with a missing file they did not write. Refusing
+		// it puts the error on the machine that can fix it. Forward slashes work
+		// on Windows too, so nothing is lost.
+		switch {
+		case strings.Contains(v, "\\"):
+			p.add(astroRoot+".dockerfile", fmt.Sprintf("%q has to use forward slashes, which work on every platform", v))
+		case !filepath.IsLocal(v):
+			// Lexical, and it says yes to "." — a consumer that joins this to
+			// the project directory has to check it is a file, not just that
+			// something is there. See pkg/localrt.
+			p.add(astroRoot+".dockerfile", fmt.Sprintf("%q has to be a path inside the project", v))
+		}
 	}
 
 	var defaults []string

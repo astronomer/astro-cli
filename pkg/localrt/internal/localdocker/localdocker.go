@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
@@ -155,7 +156,43 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 			return nil, err
 		}
 	}
+	// Resolved once, and used for both the build and the generation below. The
+	// pairing of Dockerfile with Context is only correct together, and doing it
+	// twice in one function is how they drift.
+	declared := ""
+	if p.Dockerfile != "" {
+		// FromSlash because the manifest carries a slash-separated path (see the
+		// field's doc) and this may be Windows.
+		declared = filepath.Join(projectPath, filepath.FromSlash(p.Dockerfile))
+	}
+
+	// The generation comes from the declared Dockerfile where there is one, and
+	// from the pin otherwise.
+	//
+	// The pin alone was wrong for exactly the projects this field is for. A
+	// conversion writes the declaration itself and may have DEFAULTED the pin, so
+	// a Dockerfile on an Airflow 2 base can sit beside `airflow = "3.1"` — and
+	// major decides the compose service set (Airflow 2 has no api-server or
+	// dag-processor) and the db command. Building the AF2 file while emitting the
+	// AF3 service set is a stack that cannot come up.
+	//
+	// Astro Desktop fixed this in its own plan builder first; this is the same
+	// bug in the CLI's, and leaving it would have relocated the divergence the
+	// declared tier exists to end rather than closing it.
+	//
+	// A file that cannot be read falls back to the pin: imagebuild.Build reports
+	// that failure properly a moment later, and guessing here would put the wrong
+	// services in the compose file on the way to a better message.
 	major := airflowMajor(p.AirflowVersion)
+	if declared != "" {
+		if image, tag, err := airflowrt.ParseDockerfileAt(declared); err == nil && strings.Contains(image, "runtime") {
+			baseTag, _ := airflowrt.ParseRuntimeTagPython(tag)
+			major = "2"
+			if airflowrt.IsRuntime3(baseTag) {
+				major = "3"
+			}
+		}
+	}
 	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
 		return nil, err
@@ -202,8 +239,11 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		Bin:          conn.bin,
 		Env:          conn.env,
 	}
-	if p.Dockerfile != "" {
-		build.Dockerfile = filepath.Join(projectPath, p.Dockerfile)
+	if declared != "" {
+		// Existence is NOT checked here: imagebuild.Build does it, and that is
+		// where this path, the deploy path and the package path meet. Two copies
+		// of that guard would be two messages for one mistake.
+		build.Dockerfile = declared
 		build.Context = projectPath
 	}
 	if image, err = e.images.Build(ctx, build, cb); err != nil {

@@ -280,3 +280,74 @@ func hasImageCall(calls []string, substr string) bool {
 	}
 	return false
 }
+
+// Deploying a project that declared its own Dockerfile builds THAT file.
+//
+// Before this the v2 deploy resolved a runtime base from the manifest pin and
+// built a generated image, so a tier-3 project shipped with every RUN and COPY
+// step silently dropped. The DAG then worked locally, where the declaration IS
+// read, and failed in the Deployment on whatever the Dockerfile installed —
+// which is the worst shape for a bug like this, because local success is what
+// convinces you the image is right.
+func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	mockV2Deployment(client, true, false)
+	mockDeploymentOptions(client, "7.0.0")
+	mockCreateImageDeploy(client, "https://upload-url")
+	mockFinalizeDeploy(client)
+	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+
+	cmd, _ := withImageSeams(t, "7.0.0")
+
+	dir := v2ProjectDir(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docker"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "docker", "Dockerfile"),
+		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN apt-get install -y unixodbc-dev\n"), 0o600))
+
+	_, err := DeployImageV2(ImageDeployV2Input{
+		ProjectDir:     dir,
+		DeploymentID:   "test-deployment-id",
+		AirflowVersion: "3.1",
+		Dependencies:   []string{"pandas"},
+		Dockerfile:     "docker/Dockerfile",
+		IncludeDags:    true,
+	}, client)
+	require.NoError(t, err)
+
+	declared := filepath.Join(dir, "docker", "Dockerfile")
+	assert.True(t, hasImageCall(cmd.calls, "--file "+declared),
+		"the declared file has to be the build, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"),
+		"a deploy build stays linux/amd64 in Dockerfile mode too, got %v", cmd.calls)
+	// The base is never resolved in this mode, so nothing is pulled for it.
+	//
+	// Matched as a `docker pull` COMMAND, not the substring "pull": imagebuild's
+	// build always passes --pull, so "pull --platform" matches the build's own
+	// flags and this assertion passed against a command it was not about.
+	assert.False(t, hasImageCall(cmd.calls, "docker pull"),
+		"a declared Dockerfile names its own FROM; pulling a base we do not use is a needless network dependency, got %v", cmd.calls)
+}
+
+// A declaration naming nothing fails before any build, naming the path.
+func TestDeployImageV2_RefusesAnUnreadableDeclaration(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	mockV2Deployment(client, true, false)
+	mockDeploymentOptions(client, "7.0.0")
+
+	cmd, _ := withImageSeams(t, "7.0.0")
+
+	_, err := DeployImageV2(ImageDeployV2Input{
+		ProjectDir:     v2ProjectDir(t),
+		DeploymentID:   "test-deployment-id",
+		AirflowVersion: "3.1",
+		Dockerfile:     "docker/Dockerfile", // never written
+	}, client)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Dockerfile")
+	assert.False(t, hasImageCall(cmd.calls, "build --tag"),
+		"nothing should be built when the declared file cannot be read, got %v", cmd.calls)
+}

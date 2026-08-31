@@ -96,3 +96,57 @@ func TestParseDockerfile_NoFile(t *testing.T) {
 	_, _, err := ParseDockerfile(t.TempDir())
 	assert.Error(t, err)
 }
+
+// The final stage decides the image, and an alias is followed back to it.
+//
+// The first FROM answers a different question, and got it wrong for the file
+// this parsing exists to read: a multi-stage build is the headline reason a
+// project declares its own Dockerfile, and those open with a builder stage. A
+// caller reading the builder's base saw python where the runtime was, so an
+// Airflow 3 project was handed the Airflow 2 compose service set.
+func TestParseDockerfileAtResolvesTheFinalStage(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, wantImage, wantTag string
+	}{
+		{
+			name:      "single stage is unchanged",
+			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-2",
+		},
+		{
+			name:      "builder first, runtime last",
+			body:      "FROM python:3.12-slim AS builder\nRUN pip install poetry\nFROM astrocrpublic.azurecr.io/runtime:3.1-2\nCOPY --from=builder /x /x\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-2",
+		},
+		{
+			name:      "final stage names an earlier alias",
+			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2 AS base\nFROM python:3.12 AS tools\nFROM base\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-2",
+		},
+		{
+			name:      "alias chain",
+			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2 AS one\nFROM one AS two\nFROM two\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-2",
+		},
+		{
+			name:      "no tag defaults to latest",
+			body:      "FROM python AS builder\nFROM my-own-base\n",
+			wantImage: "my-own-base", wantTag: "latest",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "Dockerfile")
+			if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			image, tag, err := ParseDockerfileAt(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if image != tc.wantImage || tag != tc.wantTag {
+				t.Errorf("ParseDockerfileAt = %q:%q, want %q:%q", image, tag, tc.wantImage, tc.wantTag)
+			}
+		})
+	}
+}

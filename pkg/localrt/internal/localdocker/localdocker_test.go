@@ -759,10 +759,15 @@ func TestStartWithoutProjectDockerfileStillResolvesBase(t *testing.T) {
 	assert.Equal(t, []string{"pandas"}, req.Dependencies)
 }
 
-// AirflowVersion still has to be honored with a Dockerfile, because the compose
-// service set depends on the generation and a user's Dockerfile cannot be read
-// for it. An Airflow 2 project is the case that would break: it has no
-// dag-processor, and declaring one fails the whole compose merge.
+// AirflowVersion is honored with a Dockerfile whose base says nothing.
+//
+// The comment here used to say a user's Dockerfile "cannot be read" for the
+// generation. It can now — see
+// TestStartReadsTheGenerationFromTheDeclaredDockerfile — so this row survives
+// for a narrower reason: dockerfilePlan's file is `FROM my-own-base`, which is
+// not an Astro runtime, so nothing is read from it and the pin is the only
+// statement there is. An Airflow 2 project is the case that would break: it has
+// no dag-processor, and declaring one fails the whole compose merge.
 func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
@@ -1180,4 +1185,104 @@ func TestLogCaptureCannotStarveTheTeardown(t *testing.T) {
 		}
 	}
 	assert.True(t, down, "the teardown must still run after the log capture times out; calls were %v", cmd.calls)
+}
+
+// A declared Dockerfile in a subdirectory resolves and builds.
+//
+// The refusal tests above pass whether or not a subdirectory path resolves,
+// because Stat failing is what they assert — so without this the positive case
+// was untested, and the interesting platform is Windows. The manifest carries a
+// slash-separated path (see the field's doc), filepath.Join turns it into
+// C:\proj\docker/Dockerfile there, and mixed separators are only fine because
+// the Windows API accepts both. CI runs this sub-module on Windows via
+// scripts/test-submodules.sh, so that is asserted rather than assumed.
+func TestStartResolvesADeclaredDockerfileInASubdirectory(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+
+	p := testPlan(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(p.ProjectPath, "docker"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "docker", "Dockerfile"),
+		[]byte("FROM my-own-base\nRUN echo hi\n"), 0o600))
+	p.Dockerfile = "docker/Dockerfile"
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	require.Len(t, images.requests, 1)
+	assert.Equal(t, filepath.Join(p.ProjectPath, "docker", "Dockerfile"), images.requests[0].Dockerfile)
+	assert.Equal(t, p.ProjectPath, images.requests[0].Context,
+		"the context stays the project even when the file is deeper, or a COPY of anything above it breaks")
+}
+
+// The compose service set follows the declared Dockerfile's base, not the pin.
+//
+// A conversion writes the declaration itself and may have DEFAULTED the pin, so
+// an Airflow 2 Dockerfile beside `airflow = "3.1"` is a real shape. Taking the
+// pin built the AF2 file while emitting the AF3 service set (api-server,
+// dag-processor) and the AF3 db command — a stack that cannot come up.
+//
+// Astro Desktop fixed this in its own plan builder; this asserts the CLI's, so
+// the two tools agree rather than the divergence moving.
+func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
+	for _, tc := range []struct {
+		name, pin, body, wantMajor string
+	}{
+		{
+			name: "pin says 3, file is airflow 2",
+			pin:  "3.1",
+			body: "FROM astrocrpublic.azurecr.io/runtime:12.1.0\nRUN echo hi\n",
+			// runtime 12.x is an Airflow 2 image.
+			wantMajor: "2",
+		},
+		{
+			name:      "pin says 2, file is airflow 3",
+			pin:       "2",
+			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n",
+			wantMajor: "3",
+		},
+		{
+			name:      "multi-stage takes the final stage",
+			pin:       "2",
+			body:      "FROM python:3.12-slim AS builder\nFROM astrocrpublic.azurecr.io/runtime:3.1-2\n",
+			wantMajor: "3",
+		},
+		{
+			name: "a non-runtime base leaves the pin alone",
+			pin:  "3.1",
+			body: "FROM my-own-base:1.0\nRUN echo hi\n",
+			// Nothing was read from it, so the pin is the only statement there is.
+			wantMajor: "3",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &fakeCmd{output: noProjects}
+			e := testEngine(t, cmd)
+
+			p := testPlan(t)
+			p.AirflowVersion = tc.pin
+			p.Dockerfile = "Dockerfile"
+			require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"), []byte(tc.body), 0o600))
+
+			_, err := e.Start(context.Background(), p, rt.Callbacks{})
+			require.NoError(t, err)
+
+			// Asserted through the compose file rather than an internal, because
+			// the service set IS the consequence: Airflow 2 has no dag-processor,
+			// and declaring one fails the whole compose merge.
+			stateDir, err := rt.StateDir(p.ProjectPath)
+			require.NoError(t, err)
+			compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+			require.NoError(t, err)
+			if tc.wantMajor == "3" {
+				assert.Contains(t, string(compose), "dag-processor",
+					"an Airflow 3 stack has a dag-processor")
+			} else {
+				assert.NotContains(t, string(compose), "dag-processor",
+					"an Airflow 2 stack has none, and declaring one fails the merge")
+			}
+		})
+	}
 }

@@ -598,3 +598,96 @@ func TestRun_TransportErrorPropagates(t *testing.T) {
 	}, d)
 	require.ErrorIs(t, err, sentinel)
 }
+
+// The manifest's declared Dockerfile reaches the transport.
+//
+// This is the layer that reads the manifest, and it had no test: a mutant that
+// stopped carrying the field survived the whole internal/deploy suite, because
+// the cloud/deploy tests construct ImageDeployV2Input directly and never
+// exercise runImage. Without the carry a tier-3 project deploys a generated
+// image with its own build silently dropped.
+//
+// The absent case is asserted too, so the field cannot be filled from something
+// other than the manifest and still pass.
+func TestRun_CarriesTheDeclaredDockerfile(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		declared string
+	}{
+		{"declared", "docker/Dockerfile"},
+		{"not declared", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &fakeDeployer{img: ImageResult{WorkspaceID: "ws-prod", RuntimeVersion: "3.1-2"}}
+			_, err := Run(Request{
+				ProjectDir: "/proj",
+				LinkName:   "prod",
+				Manifest: &manifest.Manifest{
+					Project: manifest.Project{Dependencies: []string{"pandas"}},
+					Astro: manifest.Astro{
+						AirflowVersion: "3.1",
+						Dockerfile:     tc.declared,
+						Deployments: map[string]manifest.Link{
+							"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
+						},
+					},
+				},
+			}, d)
+			require.NoError(t, err)
+			assert.Equal(t, tc.declared, d.imgInput.Dockerfile)
+		})
+	}
+}
+
+// --build-secret reaches the image build when the project declares a Dockerfile.
+//
+// This replaces a blanket refusal of the flag on every v2 project. That refusal
+// was right about the rule and wrong about the reason: it said a v2 project
+// "cannot declare" a Dockerfile, which stopped being true when [tool.astro]
+// dockerfile landed.
+func TestRun_CarriesBuildSecretsWithADeclaredDockerfile(t *testing.T) {
+	d := &fakeDeployer{img: ImageResult{WorkspaceID: "ws-prod", RuntimeVersion: "3.1-2"}}
+	_, err := Run(Request{
+		ProjectDir:   "/proj",
+		LinkName:     "prod",
+		BuildSecrets: []string{"id=pypi,src=/tmp/pypi.txt"},
+		Manifest: &manifest.Manifest{
+			Astro: manifest.Astro{
+				AirflowVersion: "3.1",
+				Dockerfile:     "Dockerfile",
+				Deployments: map[string]manifest.Link{
+					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
+				},
+			},
+		},
+	}, d)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"id=pypi,src=/tmp/pypi.txt"}, d.imgInput.BuildSecrets)
+}
+
+// Secrets are CARRIED without a Dockerfile, not refused.
+//
+// The refusal moved to cmd/cloud, and this pins why. ResolveBuildSecrets also
+// reads BUILD_SECRET_INPUT from the environment, so a refusal here — which
+// cannot tell a flag from an ambient variable — turned an exported
+// BUILD_SECRET_INPUT into a hard failure for every project that generates its
+// image, with no flag given and a message telling the user to declare a
+// Dockerfile they never wanted. imagebuild drops them in generated mode anyway.
+func TestRun_CarriesBuildSecretsEvenWithoutADockerfile(t *testing.T) {
+	d := &fakeDeployer{img: ImageResult{WorkspaceID: "ws-prod", RuntimeVersion: "3.1-2"}}
+	_, err := Run(Request{
+		ProjectDir:   "/proj",
+		LinkName:     "prod",
+		BuildSecrets: []string{"id=pypi"},
+		Manifest: &manifest.Manifest{
+			Astro: manifest.Astro{
+				AirflowVersion: "3.1", // no dockerfile declared
+				Deployments: map[string]manifest.Link{
+					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
+				},
+			},
+		},
+	}, d)
+	require.NoError(t, err, "an ambient BUILD_SECRET_INPUT must not fail a deploy that asked for nothing")
+	assert.Equal(t, 1, d.imgDeploys)
+}

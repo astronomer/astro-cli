@@ -83,6 +83,18 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// OS packages: docker mode bakes them into the image; standalone
 			// mode has no image and is warned about them (cmd/local start).
 			Packages: m.Astro.Packages,
+			// The project's own Dockerfile, when it declared one. Docker mode
+			// then runs that file as the build and AirflowVersion, Dependencies
+			// and Packages stop describing the image; standalone ignores it.
+			//
+			// This was missing rather than deliberately omitted, and the gap was
+			// only visible from outside: a converted project that KEPT a
+			// Dockerfile (one doing more than naming a base image) built from
+			// that file in the desktop, which inferred the tier from the file
+			// being present, and got a generated image here, which read no such
+			// thing. Same project, two tools, two different images, and the one
+			// that dropped the user's RUN steps was this one.
+			Dockerfile: m.Astro.Dockerfile,
 			// PythonVersion is left empty on purpose: uv resolves the
 			// interpreter from the manifest's requires-python, so a specifier
 			// like ">=3.10" never reaches uv's --python, which wants a

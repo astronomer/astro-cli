@@ -277,3 +277,73 @@ func TestAstroResultJSONShape(t *testing.T) {
 	assert.NotContains(t, got, "tree_path")
 	assert.NotContains(t, got, "bundle_path")
 }
+
+// declaringRequest is testRequest with a real declared Dockerfile on disk.
+func declaringRequest(t *testing.T, rel, body string) Request {
+	t.Helper()
+	req := testRequest(t)
+	req.Manifest.Astro.Dockerfile = rel
+	full := filepath.Join(req.ProjectDir, filepath.FromSlash(rel))
+	require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o750))
+	require.NoError(t, os.WriteFile(full, []byte(body), 0o600))
+	return req
+}
+
+// Packaging a project that declared its own Dockerfile builds THAT file.
+//
+// Before this the astro target resolved a runtime base from the pin and built a
+// generated image, so `astro package` produced an artifact that did not contain
+// the project's own build — every RUN and COPY silently absent, in the artifact
+// whose whole purpose is to be the thing that ships.
+func TestAstroBuildUsesADeclaredDockerfile(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := declaringRequest(t, "docker/Dockerfile", "FROM my-own-base\nRUN echo hi\n")
+
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(req.ProjectDir, "docker", "Dockerfile"), builder.gotReq.Dockerfile)
+	assert.Equal(t, req.ProjectDir, builder.gotReq.Context,
+		"the context has to be the project, or the file's own COPY paths do not resolve")
+	assert.Empty(t, builder.gotReq.BaseImage,
+		"a declared Dockerfile names its own FROM, so resolving a base would be a version-service call for an image nobody uses")
+}
+
+// The content address covers the Dockerfile's BYTES, not just its path.
+//
+// In Dockerfile mode the file is the whole build and imagebuild ignores base,
+// dependencies and packages — so a hash built only from those gave two different
+// images the same content-addressed tag. Editing the Dockerfile then republished
+// under the tag the previous image already held, which is the one thing a
+// content-addressed scheme exists to prevent.
+func TestAstroBuildContentAddressCoversTheDockerfileBody(t *testing.T) {
+	build := func(t *testing.T, body string) string {
+		t.Helper()
+		req := declaringRequest(t, "Dockerfile", body)
+		res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		return res.Image
+	}
+
+	same := build(t, "FROM my-own-base\nRUN echo hi\n")
+	again := build(t, "FROM my-own-base\nRUN echo hi\n")
+	assert.Equal(t, same, again, "identical inputs must produce the same tag")
+
+	edited := build(t, "FROM my-own-base\nRUN echo something-else\n")
+	assert.NotEqual(t, same, edited,
+		"an edited Dockerfile is a different image and must not reuse the tag")
+}
+
+// A declaration naming nothing fails before the build, naming the path.
+//
+// contentHash reads the file, so this is refused here rather than reaching
+// imagebuild — either way the message names the declared path, which is the
+// thing to fix.
+func TestAstroBuildRefusesAnUnreadableDeclaration(t *testing.T) {
+	req := testRequest(t)
+	req.Manifest.Astro.Dockerfile = "docker/Dockerfile" // never written
+
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "docker/Dockerfile")
+}

@@ -462,6 +462,32 @@ func TestValidation(t *testing.T) {
 			wantKeys: []string{"tool.astro.packages[1]"},
 		},
 		{
+			// The consumer joins this to the project dir and hands it to a
+			// docker build, so a path climbing out of the project is refused
+			// rather than resolved.
+			name:     "dockerfile escaping the project",
+			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"../../etc/Dockerfile\"\n",
+			wantKeys: []string{"tool.astro.dockerfile"},
+		},
+		{
+			name:     "absolute dockerfile path",
+			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"/etc/Dockerfile\"\n",
+			wantKeys: []string{"tool.astro.dockerfile"},
+		},
+		{
+			// Works on Windows, is one filename with a backslash in it
+			// everywhere else. Refused on every platform so the error lands on
+			// the machine that wrote it, not on a colleague who pulled it.
+			name:     "dockerfile with windows separators",
+			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 'docker\\Dockerfile'\n",
+			wantKeys: []string{"tool.astro.dockerfile"},
+		},
+		{
+			name:     "dockerfile of the wrong shape",
+			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 3\n",
+			wantKeys: []string{"tool.astro.dockerfile"},
+		},
+		{
 			name:     "unknown key in [tool.astro]",
 			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nairflw = \"3.1\"\n",
 			wantKeys: []string{"tool.astro.airflw"},
@@ -997,5 +1023,41 @@ func TestDefaultLink(t *testing.T) {
 	}
 	if _, _, ok := DefaultLink(nil); ok {
 		t.Error("no links produced a default")
+	}
+}
+
+// A declared Dockerfile decodes, and the shapes that stay inside the project are
+// accepted rather than merely not-refused.
+//
+// The subdirectory case is the one worth pinning: "tier 3" exists for builds a
+// manifest cannot express, and a project that keeps its build files under
+// docker/ is exactly that, so restricting this to a bare "Dockerfile" at the
+// root would have made the escape hatch narrower than the thing it is for.
+func TestParseDockerfileDeclaration(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		decl string
+		want string
+	}{
+		{"root", `dockerfile = "Dockerfile"`, "Dockerfile"},
+		{"named variant", `dockerfile = "Dockerfile.prod"`, "Dockerfile.prod"},
+		{"subdirectory", `dockerfile = "docker/Dockerfile"`, "docker/Dockerfile"},
+		{"absent", "", ""},
+		// Whitespace decodes to empty, so a consumer's `declared != ""` reads it
+		// as "not declared" rather than as a file named " ". Untrimmed, this
+		// suppressed the desktop's presence fallback and took the project's real
+		// Dockerfile away.
+		{"whitespace only", `dockerfile = "   "`, ""},
+		{"padded", `dockerfile = "  Dockerfile  "`, "Dockerfile"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := Load(write(t, "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n"+tc.decl+"\n"))
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if m.Astro.Dockerfile != tc.want {
+				t.Errorf("Dockerfile = %q, want %q", m.Astro.Dockerfile, tc.want)
+			}
+		})
 	}
 }

@@ -189,13 +189,20 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 //
 // Refusing beats ignoring. A deploy that quietly skipped --pytest is a deploy
 // someone believes ran their tests, and the flag having no effect is exactly
-// the thing they cannot see. Porting them is an earlier fix; --build-secret needs
-// tier 3 first, which is why it is refused here rather than wired.
+// the thing they cannot see. Porting them is an earlier fix.
 //
 // --force and --prompt are deliberately absent: the v2 path reads neither, but
 // neither leaves a false belief behind. There is no uncommitted-changes gate on
 // this path for --force to open, and a v2 deploy always asks, which is what
 // --prompt was for. Both get the outcome the flag asked for.
+//
+// --build-secret has LEFT this list, which is the one entry that went the other
+// way. It was blocked on tier 3, then on imagebuild passing a
+// --secret; both have landed, so the flag is READ now. It still needs a project
+// Dockerfile to be mounted into, and deployV2 refuses it without one — a refusal
+// about what the project declares rather than about which version it is, gated on
+// the flag being given rather than on a resolved value, since
+// util.ResolveBuildSecrets also reads BUILD_SECRET_INPUT from the environment.
 var v2DeployIgnores = []struct {
 	flag string
 	do   string
@@ -204,8 +211,6 @@ var v2DeployIgnores = []struct {
 	{"parse", "check your DAGs before deploying: `astro local check && astro deploy`"},
 	{"dags-path", "deploy from the project directory; a DAGs path other than dags/ is not supported yet"},
 	{"dag-bundle-name", "named DAG bundles are not supported on a v2 project yet"},
-	{"build-secret", "build secrets need a project Dockerfile, which a v2 project cannot declare yet"},
-	{"build-secrets", "build secrets need a project Dockerfile, which a v2 project cannot declare yet"},
 	{"test", "run your tests before deploying: `uv run pytest <path> && astro deploy`"},
 	{"env", "a v2 deploy runs no tests, so it reads no test env file; run `uv run pytest` yourself"},
 	{"save", "a v2 deploy always asks; mark a link `default = true` in [tool.astro.deployments] to move the cursor"},
@@ -395,6 +400,34 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		return deployV2Err(cmd, format, err)
 	}
 
+	// --build-secret is refused HERE, not in internal/deploy, and gated on the
+	// FLAG rather than on the resolved value. Three regressions came from getting
+	// this wrong when the blanket refusal was removed:
+	//
+	//   - ResolveBuildSecrets reads BUILD_SECRET_INPUT whether or not the flag was
+	//     given, so a refusal keyed on the resolved slice broke every ordinary
+	//     v2 deploy on any runner that exports that variable — no flag, no
+	//     Dockerfile, and a hard error telling the user to declare one they never
+	//     wanted. cmd.Flags().Changed is what the old refusal used.
+	//   - --dags never reaches runImage, so a refusal there let
+	//     `--dags --build-secret` succeed with the flag silently dropped.
+	//   - --image-name returns before any build, so the same silent drop applied
+	//     whenever the project happened to declare a Dockerfile. The v1 body has a
+	//     cross-flag guard listing build-secret, but a v2 project branches away
+	//     before reaching it.
+	//
+	// One place, before anything is resolved or prompted for.
+	if cmd.Flags().Changed("build-secret") || cmd.Flags().Changed("build-secrets") {
+		switch {
+		case dags:
+			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))
+		case imageName != "":
+			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --image-name: the image is already built"))
+		case m.Astro.Dockerfile == "":
+			return deployV2Err(cmd, format, errors.New("--build-secret needs a project Dockerfile to read it. Declare one with `dockerfile` under [tool.astro] in pyproject.toml and mount the secret in a RUN step; a generated image installs your dependencies through the runtime image and has no build step of yours for a secret to reach"))
+		}
+	}
+
 	linkName := ""
 	if len(args) > 0 {
 		linkName = args[0]
@@ -442,6 +475,10 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		WaitTime:         waitTime,
 		NoDagsBaseDir:    noDagsBaseDir,
 		Interactive:      interactive,
+		// Same resolution the v1 path uses, so a CI job setting
+		// BUILD_SECRET_INPUT keeps working across the version boundary rather
+		// than silently losing its secrets on the day the project converts.
+		BuildSecrets: util.ResolveBuildSecrets(buildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
 		// Two lines, once the target is settled and before anything is built.
 		// The first is the → line every resolving command prints, so a deploy
 		// says what it is about to act on the way `astro af dags list` does. The
@@ -761,6 +798,8 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		AirflowVersion: in.AirflowVersion,
 		Dependencies:   in.Dependencies,
 		Packages:       in.Packages,
+		Dockerfile:     in.Dockerfile,
+		BuildSecrets:   in.BuildSecrets,
 		ImageName:      in.ImageName,
 		IncludeDags:    in.IncludeDags,
 		Description:    in.Description,

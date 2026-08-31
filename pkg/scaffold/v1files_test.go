@@ -721,3 +721,207 @@ func TestOptionsAirflowVersionBeatsTheDockerfile(t *testing.T) {
 	assert.Equal(t, "2.10.5", m.Astro.AirflowVersion)
 	assert.Equal(t, []string{"apache-airflow==2.10.5"}, m.Project.Dependencies)
 }
+
+// A Dockerfile that IS the build is DECLARED in the manifest.
+//
+// An earlier version of this comment said kept and declared are the same
+// decision. They are not, and believing that produced a real bug: retirement
+// asks "may this be deleted", which a pin-only Dockerfile survives whenever the
+// pin came from elsewhere, and declaring that file made imagebuild ignore the
+// dependencies the same run had just migrated. planRetirements keeps a file for
+// a third reason again (being named in a note), so "kept" is broader than
+// either. The declaration asks only whether the file does more than name a base
+// image. See TestConversionNeverDeclaresAPinOnlyDockerfile for the cases where
+// the two answers diverge.
+//
+// This is what makes "tier 3" real. Before the key existed a surviving
+// Dockerfile was a file nothing declared, so each consumer guessed from
+// presence and they guessed differently: the desktop built from it, and
+// `astro local` generated an image over the runtime base and ignored it. One
+// project, two tools, two images.
+//
+// Read back through manifest.Parse rather than by grepping the TOML, so the
+// test fails if the key is written somewhere the manifest does not read it
+// from — which is the mistake a string match would pass.
+func TestConversionDeclaresAKeptDockerfile(t *testing.T) {
+	const runtimeRef = "astrocrpublic.azurecr.io/runtime:3.1-12"
+
+	for _, tc := range []struct {
+		name     string
+		body     string
+		existing string // a pyproject.toml already there sends the run down the adopt arm
+		want     string
+	}{
+		{
+			name: "kept, greenfield",
+			body: "FROM " + runtimeRef + "\nRUN apt-get install -y unixodbc-dev\n",
+			want: "Dockerfile",
+		},
+		{
+			name: "kept, adopt arm",
+			body: "FROM " + runtimeRef + "\nRUN apt-get install -y unixodbc-dev\n",
+			// A repo that was already a Python package. Its Dockerfile is
+			// load-bearing for the same reason, so both arms must declare it.
+			existing: "[project]\nname = \"theirs\"\nversion = \"0.1.0\"\n",
+			want:     "Dockerfile",
+		},
+		{
+			name: "retired, so nothing to declare",
+			body: "FROM " + runtimeRef + "\n",
+			want: "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(tc.body), 0o600))
+			if tc.existing != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(tc.existing), 0o600))
+			}
+
+			cs, err := Plan(dir, Options{})
+			require.NoError(t, err)
+			_, err = cs.Apply()
+			require.NoError(t, err)
+
+			data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			m, err := manifest.Parse(data)
+			require.NoError(t, err, "the manifest a conversion wrote has to load")
+
+			assert.Equal(t, tc.want, m.Astro.Dockerfile)
+			if tc.want != "" {
+				assert.FileExists(t, filepath.Join(dir, "Dockerfile"),
+					"a declared Dockerfile that is not there would fail every build")
+				// The preview has to SAY so. This key decides whether the image
+				// is generated or built from the user's file, and it was written
+				// with no label at all — invisible in `astro init`'s output and
+				// in the desktop's change preview.
+				var labels []string
+				for _, c := range cs.Changes {
+					labels = append(labels, c.Labels...)
+				}
+				assert.Contains(t, strings.Join(labels, "\n"), "declared Dockerfile as this project's build",
+					"a change this consequential must not be performed unreported")
+			}
+		})
+	}
+}
+
+// A pin-only Dockerfile is never declared, even when it survives the run.
+//
+// This is the case an earlier version got wrong, by deciding the declaration
+// from dockerfileIsSpent — which answers "may this be DELETED" and has extra
+// clauses about not destroying the only record of a version. A pin-only
+// Dockerfile survives whenever the pin came from somewhere else, and declaring
+// it made imagebuild treat that file as the build. imagebuild ignores
+// Dependencies and Packages in that mode, so the run migrated requirements.txt
+// into the manifest, deleted the file, and then produced an image with none of
+// those packages in it.
+//
+// Both halves are asserted, because the declaration alone reads as harmless: the
+// packages have to be in the manifest AND the file has to stay undeclared, or
+// the conversion has quietly cost the project its dependencies.
+func TestConversionNeverDeclaresAPinOnlyDockerfile(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, pinOverride string
+	}{
+		{
+			// The pin is overridden, so the Dockerfile's tag is not the one the
+			// manifest carries and the file is kept as the only record of it.
+			name:        "kept because the pin was overridden",
+			body:        "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
+			pinOverride: "3.0",
+		},
+		{
+			// Not an Astro runtime, so nothing was read from the tag and the
+			// pin is the default. Kept, and it still only names a base image.
+			name: "kept because its base is not a runtime",
+			body: "FROM python:3.12-slim\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(tc.body), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pandas==2.1.0\n"), 0o600))
+
+			cs, err := Plan(dir, Options{AirflowVersion: tc.pinOverride})
+			require.NoError(t, err)
+			_, err = cs.Apply()
+			require.NoError(t, err)
+
+			data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			m, err := manifest.Parse(data)
+			require.NoError(t, err)
+
+			assert.Empty(t, m.Astro.Dockerfile,
+				"a file that only names a base image must not become the build: imagebuild then ignores the dependencies this run just migrated")
+			assert.Contains(t, strings.Join(m.Project.Dependencies, " "), "pandas==2.1.0",
+				"the migrated dependency has to be in the manifest")
+			assert.FileExists(t, filepath.Join(dir, "Dockerfile"),
+				"this row is about a Dockerfile that SURVIVES, so the fixture is wrong if it went")
+		})
+	}
+}
+
+// Declaring a Dockerfile keeps requirements.txt and packages.txt.
+//
+// The bug this pins was a completely ordinary conversion: a Dockerfile with an
+// ENV line (so not pin-only, so declared and kept) plus the two v1 files. Both
+// lists migrated into the manifest and both files were DELETED — and declaring
+// the file puts the build into imagebuild's Dockerfile mode, where those
+// manifest lists are ignored by design and the runtime base's own ONBUILD
+// `COPY requirements.txt .` reads the file from the build context. So the build
+// either failed on the missing COPY or produced an image with none of the
+// project's packages.
+//
+// The earlier pin-only fix separated "is this the build" from "may this be
+// deleted" but only taught the declaration side; this is the retirement side of
+// the same confusion.
+func TestConversionKeepsTheV1FilesADeclaredDockerfileNeeds(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+		[]byte("FROM quay.io/astronomer/astro-runtime:7.4.0\nENV FOO=bar\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pandas==2.1.0\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600))
+
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	m, err := manifest.Parse(data)
+	require.NoError(t, err)
+	require.Equal(t, "Dockerfile", m.Astro.Dockerfile, "an ENV makes this the build, so it is declared")
+
+	assert.FileExists(t, filepath.Join(dir, "requirements.txt"),
+		"the declared build's base COPYs this from the context; deleting it breaks every build")
+	assert.FileExists(t, filepath.Join(dir, "packages.txt"),
+		"same, through the runtime image's ONBUILD step")
+	assert.NotContains(t, res.Deleted, "requirements.txt")
+	assert.NotContains(t, res.Deleted, "packages.txt")
+
+	// The manifest lists are still written, so dropping the Dockerfile later
+	// leaves a project that still builds. The user is told both exist.
+	assert.Contains(t, strings.Join(m.Project.Dependencies, " "), "pandas==2.1.0")
+	assert.Contains(t, strings.Join(res.Notes, "\n"), "requirements.txt",
+		"two sources for one list is worth a sentence rather than a surprise")
+}
+
+// A conversion with no declared Dockerfile still retires them, which is the
+// whole point of the retirement.
+func TestConversionStillRetiresThemWithNoDeclaration(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pandas==2.1.0\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600))
+
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+	_, err = cs.Apply()
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, filepath.Join(dir, "requirements.txt"))
+	assert.NoFileExists(t, filepath.Join(dir, "packages.txt"))
+}

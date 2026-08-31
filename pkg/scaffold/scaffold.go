@@ -31,6 +31,10 @@ const DefaultAirflowVersion = "3.1"
 // below are kept for.
 const manifestKeyAirflow = "airflow"
 
+// manifestKeyDockerfile is the [tool.astro] key naming the project's own
+// Dockerfile, written by both manifest arms whenever a run keeps one.
+const manifestKeyDockerfile = "dockerfile"
+
 // Options adjust what Run scaffolds.
 type Options struct {
 	// Name is the [project] name. Empty derives it from the directory name.
@@ -191,6 +195,13 @@ const (
 	fileGitignore = ".gitignore"
 	fileAgents    = "AGENTS.md"
 	fileClaude    = "CLAUDE.md"
+	// fileDockerfile is the one place a v1 layout can put a Dockerfile, so it
+	// is both the file the retirement decision is about and the value the
+	// manifest declaration carries. The literals in v1files.go are left alone
+	// deliberately: several of them are note prefixes with the name inside
+	// prose ("Dockerfile: its RUN instructions..."), which a constant cannot
+	// cover, and half-converting them would read worse than neither.
+	fileDockerfile = "Dockerfile"
 )
 
 // projectDirs are the standard project directories, in creation order.
@@ -372,6 +383,27 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 		}
 		out = append(out, name)
 	}
+	// A DECLARED Dockerfile makes requirements.txt and packages.txt load-bearing
+	// again, whether or not it names them.
+	//
+	// This is the bug the pin-only fix left behind. Declaring the file puts the
+	// build into imagebuild's Dockerfile mode, where Dependencies and Packages
+	// are ignored by design because the file decides what goes in — and if that
+	// file is FROM an Astro runtime, the base's own ONBUILD `COPY
+	// requirements.txt .` fires and reads the file from the build context. So an
+	// entirely ordinary conversion (a Dockerfile with an ENV, plus the two v1
+	// files) migrated both lists into the manifest, deleted both files, and left
+	// a build that either fails on the missing COPY or produces an image with
+	// none of the project's packages.
+	//
+	// Kept rather than un-migrated: the manifest lists stay, because a project
+	// that later drops its Dockerfile needs them, and they cost nothing while the
+	// declaration stands. The note below tells the user both exist.
+	if declaresDockerfile(v1) {
+		out = slices.DeleteFunc(out, func(name string) bool {
+			return name == "requirements.txt" || name == "packages.txt"
+		})
+	}
 	// A Dockerfile that SURVIVES may name the other files inside it, and a build
 	// that reads a file this run deleted is broken in a way neither outcome
 	// alone would be. `RUN pip install -r requirements.txt` is the common one,
@@ -396,6 +428,54 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 // built on, while the manifest claims a different one.
 func dockerfileIsSpent(v1 *v1Project, pinned string) bool {
 	return v1.dockerfilePinOnly && v1.airflow != "" && v1.airflow == pinned
+}
+
+// declaresDockerfile reports that this project's Dockerfile IS the build: it is
+// present, and it does more than name a base image.
+//
+// Named because three places ask it — the declaration, and a label in each
+// manifest arm — and because the whole point of separating it from
+// dockerfileIsSpent was that they are different questions. Spelled out three
+// times, any refinement (a file with only comments and a FROM, an ARG-only one)
+// lands in some of them and the label and the declaration disagree.
+func declaresDockerfile(v1 *v1Project) bool {
+	return len(v1.dockerfileBody) > 0 && !v1.dockerfilePinOnly
+}
+
+// setDockerfileDeclaration records the project's own Dockerfile in the manifest,
+// for a Dockerfile that IS the build. A no-op otherwise.
+//
+// The condition is that the file does more than name a base image, which is what
+// dockerfilePinOnly already answers. It is deliberately NOT "the file survives
+// this run", which is a different question that an earlier version of this
+// conflated with it, via dockerfileIsSpent:
+//
+//   - dockerfileIsSpent answers "may this be DELETED", and its extra clauses are
+//     about not destroying the only record of a version. A pin-only Dockerfile
+//     survives whenever the pin came from somewhere else — an explicit
+//     --airflow-version, or an existing manifest pin. Declaring that file made
+//     imagebuild treat it as the build, and imagebuild ignores Dependencies and
+//     Packages in that mode, so a conversion that had just migrated
+//     requirements.txt into the manifest AND deleted it produced an image with
+//     none of those packages in it. `FROM python:3.12-slim` is worse: no Airflow.
+//   - planRetirements keeps a file for a further reason still — being named in
+//     any note — so "kept" is broader than either. A pin-only Dockerfile kept by
+//     an Airflow 2 tag note is on disk and undeclared, and that is the right
+//     answer for it: it contributes nothing a generated image does not, and
+//     declaring it would cost the project its dependencies.
+//
+// So the two decisions overlap and are not the same, and only this one is about
+// what builds the image.
+//
+// The value is the filename rather than a discovered path because the v1 layout
+// this converts from has exactly one place a Dockerfile can be. A project that
+// wants its build somewhere else can say so by hand; the manifest accepts any
+// path inside the project.
+func setDockerfileDeclaration(ed tomledit.Editor, v1 *v1Project) error {
+	if !declaresDockerfile(v1) {
+		return nil
+	}
+	return ed.Set([]string{"tool", "astro", manifestKeyDockerfile}, fileDockerfile)
 }
 
 // namedInAny reports whether any note is about this file.
@@ -446,6 +526,15 @@ func migratedLabels(v1 *v1Project) []string {
 	}
 	if v1.airflow != "" {
 		out = append(out, manifest.Marker+" (read airflow = "+v1.airflow+" from the Dockerfile)")
+	}
+	// The declaration is the one key here that changes what gets BUILT — with it
+	// the project's own Dockerfile is the image, and the dependencies and
+	// packages above stop describing it. Reporting the two migrations and not
+	// this would show a preview whose most consequential line is missing, which
+	// is the rule Plan's own comment states: a change performed but unreported
+	// cannot be reviewed.
+	if declaresDockerfile(v1) {
+		out = append(out, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
 	}
 	return out
 }
@@ -566,6 +655,9 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(v1.packages)); err != nil {
 			return nil, nil, err
 		}
+	}
+	if err := setDockerfileDeclaration(ed, v1); err != nil {
+		return nil, nil, err
 	}
 	data, err := ed.Bytes()
 	if err != nil {

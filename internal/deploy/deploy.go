@@ -75,6 +75,14 @@ type Request struct {
 	// ImageName is --image-name: a prebuilt local image to deploy instead of
 	// building from the manifest. "" means build.
 	ImageName string
+	// BuildSecrets are --build-secret specs forwarded to the image build.
+	//
+	// Only a project that declared its own Dockerfile can use one: a generated
+	// build's Dockerfile is `FROM <base>` and the install happens in the runtime
+	// image's ONBUILD triggers, so there is no RUN of the project's for a secret
+	// to be mounted into. runImage refuses the combination rather than accepting
+	// secrets nothing could read.
+	BuildSecrets []string
 	// Description is recorded on the deploy.
 	Description string
 	// Wait polls the deployment until it reports healthy.
@@ -140,12 +148,21 @@ type ImageDeploy struct {
 	AirflowVersion string
 	Dependencies   []string
 	Packages       []string
-	ImageName      string
-	IncludeDags    bool
-	Description    string
-	NoDagsBaseDir  bool
-	Wait           bool
-	WaitTime       time.Duration
+	// Dockerfile is the project's declared Dockerfile ([tool.astro] dockerfile),
+	// slash-separated and relative to ProjectDir; "" builds a generated image.
+	// With it set the file is the build and AirflowVersion, Dependencies and
+	// Packages stop describing the image.
+	Dockerfile string
+	// BuildSecrets are docker build --secret specs to expose to that file's
+	// build. Empty unless the project declared a Dockerfile, which is the only
+	// build with a RUN of the project's own to consume one.
+	BuildSecrets  []string
+	ImageName     string
+	IncludeDags   bool
+	Description   string
+	NoDagsBaseDir bool
+	Wait          bool
+	WaitTime      time.Duration
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
@@ -242,12 +259,29 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 // default "both" deploy. --image drops the dags.
 func runImage(req Request, target Target, d Deployer) (Result, error) {
 	var deps, packages []string
-	airflowVersion := ""
+	airflowVersion, dockerfile := "", ""
 	if req.Manifest != nil {
 		deps = req.Manifest.Project.Dependencies
 		packages = req.Manifest.Astro.Packages
 		airflowVersion = req.Manifest.Astro.AirflowVersion
+		// Carried for the same reason local docker mode carries it: a project
+		// that declared its own Dockerfile means that file, not a generated
+		// image. Without this a tier-3 project deployed an image built over the
+		// runtime base with every RUN and COPY step silently dropped — the DAG
+		// then works locally, where the declaration IS read, and fails in the
+		// Deployment on a missing driver.
+		dockerfile = req.Manifest.Astro.Dockerfile
 	}
+	// Secrets are carried, not validated. Whether asking for one is a mistake
+	// depends on whether the USER asked — ResolveBuildSecrets also reads
+	// BUILD_SECRET_INPUT from the environment — and this package cannot see the
+	// difference between a flag and an ambient variable. cmd/cloud can, and
+	// refuses there, before anything is resolved or prompted for.
+	//
+	// An earlier version refused here on `len(req.BuildSecrets) > 0 && dockerfile
+	// == ""`, which turned an exported BUILD_SECRET_INPUT into a hard failure for
+	// every project that generates its image. imagebuild drops them in generated
+	// mode regardless, so carrying them costs nothing.
 	includeDags := !req.Image
 	img, err := d.DeployImage(&ImageDeploy{
 		DeploymentID:   target.DeploymentID,
@@ -256,6 +290,8 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		AirflowVersion: airflowVersion,
 		Dependencies:   deps,
 		Packages:       packages,
+		Dockerfile:     dockerfile,
+		BuildSecrets:   req.BuildSecrets,
 		ImageName:      req.ImageName,
 		IncludeDags:    includeDags,
 		Description:    req.Description,

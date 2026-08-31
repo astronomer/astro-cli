@@ -586,10 +586,16 @@ func TestDeployRoutesV1Project(t *testing.T) {
 	assert.True(t, called, "a v1 project should run the v1 deploy path")
 }
 
-// Ten flags reach astro deploy that the v2 path never reads. Accepting them
+// Eight flags reach astro deploy that the v2 path never reads. Accepting them
 // silently means a deploy someone believes ran their tests, shipped from a
 // DAGs path it never looked at, or saved a target it did not save. Each is
 // refused with what to do instead until an earlier fix ports the ones worth porting.
+//
+// Eight rather than ten: --build-secret and --build-secrets are deliberately NOT
+// in this table any more, because the v2 path READS them now. They still need a
+// project Dockerfile to be mounted into, and that refusal lives with the other
+// build-secret checks in TestDeployV2BuildSecretRefusals — gated on the flag
+// being given, which is why it cannot be a row here.
 func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 	cases := []struct {
 		args []string
@@ -599,8 +605,6 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 		{[]string{"--parse"}, "astro local check"},
 		{[]string{"--dags-path", "./elsewhere"}, "not supported yet"},
 		{[]string{"--dag-bundle-name", "nightly"}, "not supported on a v2 project yet"},
-		{[]string{"--build-secret", "id=pypi"}, "project Dockerfile"},
-		{[]string{"--build-secrets", "id=pypi"}, "project Dockerfile"},
 		{[]string{"--test", "tests/test_dags.py"}, "uv run pytest"},
 		{[]string{"--env", ".env.ci"}, "runs no tests"},
 		{[]string{"--save"}, "always asks"},
@@ -664,5 +668,88 @@ func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
 	err := execDeployCmd("--pytest")
 	if err != nil {
 		assert.NotContains(t, err.Error(), "has no effect when deploying a v2 project")
+	}
+}
+
+// --build-secret is refused where it cannot work, and only when the USER asked.
+//
+// Three regressions are pinned here, all from validating in internal/deploy
+// instead of at the flags:
+//
+//   - --dags never reaches runImage, so the refusal there let the flag be
+//     silently dropped by a dags-only deploy.
+//   - --image-name returns before any build, so the same silent drop applied
+//     whenever the project declared a Dockerfile.
+//   - the env-var row is the important one. ResolveBuildSecrets reads
+//     BUILD_SECRET_INPUT whether or not the flag was given, so a refusal keyed on
+//     the resolved slice hard-failed every ordinary v2 deploy on any runner
+//     exporting that variable. No flag, no Dockerfile, and an error telling the
+//     user to declare one they never wanted.
+func TestDeployV2BuildSecretRefusals(t *testing.T) {
+	const manifestWithDockerfile = "[project]\nname = 'p'\nversion = '0.1.0'\n\n[tool.astro]\nairflow = '3.1'\ndockerfile = 'Dockerfile'\n"
+
+	for _, tc := range []struct {
+		name     string
+		body     string
+		args     []string
+		env      string
+		wantErr  string
+		wantPass bool
+	}{
+		{
+			name:    "no dockerfile declared",
+			body:    v2ManifestForRouting,
+			args:    []string{"--build-secret", "id=pypi"},
+			wantErr: "needs a project Dockerfile",
+		},
+		{
+			name:    "with --dags",
+			body:    manifestWithDockerfile,
+			args:    []string{"--dags", "--build-secret", "id=pypi"},
+			wantErr: "no effect with --dags",
+		},
+		{
+			name:    "with --image-name",
+			body:    manifestWithDockerfile,
+			args:    []string{"--image-name", "my:tag", "--build-secret", "id=pypi"},
+			wantErr: "no effect with --image-name",
+		},
+		{
+			// The flag was not given. An ambient variable must not turn an
+			// ordinary deploy into an error about a Dockerfile.
+			name:     "BUILD_SECRET_INPUT set but no flag",
+			body:     v2ManifestForRouting,
+			args:     nil,
+			env:      "id=pypi,src=/tmp/x",
+			wantPass: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			resetDeployFlagVars()
+			if tc.env != "" {
+				t.Setenv("BUILD_SECRET_INPUT", tc.env)
+			}
+
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(tc.body), 0o600))
+			orig := config.WorkingPath
+			config.WorkingPath = dir
+			t.Cleanup(func() { config.WorkingPath = orig })
+
+			err := execDeployCmd(tc.args...)
+			if tc.wantPass {
+				// It gets past the flag checks. Whatever it fails on afterwards
+				// is a deploy concern, not a build-secret one — which is the
+				// whole assertion.
+				if err != nil {
+					assert.NotContains(t, err.Error(), "build-secret",
+						"an ambient BUILD_SECRET_INPUT must not be refused: %v", err)
+				}
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+		})
 	}
 }

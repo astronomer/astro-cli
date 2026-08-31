@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -117,6 +118,24 @@ func readV1Project(dir string) (*v1Project, error) {
 		v1.present = append(v1.present, "Dockerfile")
 		v1.dockerfilePinOnly = dockerfileIsPinOnly(data)
 		v1.dockerfileBody = data
+		// Two sources for one list, so say it rather than let someone find out.
+		//
+		// A declared Dockerfile is the build, and imagebuild ignores the
+		// manifest's dependencies and packages in that mode, so requirements.txt
+		// and packages.txt are KEPT (planRetirements spares them) because the
+		// runtime base's ONBUILD reads them from the context. The manifest gets
+		// the lists too, for the day the Dockerfile goes away. Both being live
+		// at once is deliberate and is exactly the kind of thing that reads as a
+		// conversion bug when nothing mentions it.
+		if !v1.dockerfilePinOnly {
+			for _, kept := range []string{"requirements.txt", "packages.txt"} {
+				if slices.Contains(v1.present, kept) {
+					v1.notes = append(v1.notes, kept+": kept, because your Dockerfile's base image reads it "+
+						"during the build. Its contents are in pyproject.toml as well, which is what a project "+
+						"without a Dockerfile installs from")
+				}
+			}
+		}
 		// A Dockerfile that is not pin-only and drew no note is kept and
 		// unmentioned, which O27 says it must not be: the point of keeping it
 		// is that the project still has a build the manifest does not describe,
@@ -126,8 +145,9 @@ func readV1Project(dir string) (*v1Project, error) {
 		// recognized it.
 		if !v1.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
 			v1.notes = append(v1.notes,
-				"Dockerfile: it does more than name a base image, so it was kept; v2 builds no Dockerfile, "+
-					"and nothing in pyproject.toml describes what it does")
+				"Dockerfile: it does more than name a base image, so it was kept and declared as this "+
+					"project's build. What it does is not described in pyproject.toml, which is the point of "+
+					"declaring it")
 		}
 	}
 
@@ -493,8 +513,14 @@ func buildStepsNote(data []byte) []string {
 			kinds = append(kinds, kind)
 		}
 	}
+	// "were not read" is the accurate half: nothing here parses a RUN or a COPY.
+	// The old second half said "v2 builds no Dockerfile: move what they install
+	// or set into pyproject.toml", which the dockerfile key made false — the file
+	// IS the build now, so these instructions run, and moving them into the
+	// manifest would be work for nothing. Saying so kept a v1-era sentence
+	// giving v2 users the opposite of the right advice.
 	return []string{"Dockerfile: its " + strings.Join(kinds, ", ") +
-		" instructions were not read, and v2 builds no Dockerfile: move what they install or set into pyproject.toml"}
+		" instructions were not read here, so the manifest does not describe them. The Dockerfile stays your build and they still run"}
 }
 
 // splitImageRef turns the text after FROM into an image reference and its tag,
