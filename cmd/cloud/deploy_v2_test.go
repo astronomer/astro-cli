@@ -586,10 +586,10 @@ func TestDeployRoutesV1Project(t *testing.T) {
 	assert.True(t, called, "a v1 project should run the v1 deploy path")
 }
 
-// Six flags reach astro deploy that the v2 path never reads. Accepting them
-// silently means a deploy someone believes ran their tests, or shipped from a
-// DAGs path it never looked at. Each is refused with what to do instead until
-// an earlier fix ports the ones worth porting.
+// Ten flags reach astro deploy that the v2 path never reads. Accepting them
+// silently means a deploy someone believes ran their tests, shipped from a
+// DAGs path it never looked at, or saved a target it did not save. Each is
+// refused with what to do instead until an earlier fix ports the ones worth porting.
 func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 	cases := []struct {
 		args []string
@@ -601,6 +601,10 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 		{[]string{"--dag-bundle-name", "nightly"}, "not supported on a v2 project yet"},
 		{[]string{"--build-secret", "id=pypi"}, "project Dockerfile"},
 		{[]string{"--build-secrets", "id=pypi"}, "project Dockerfile"},
+		{[]string{"--test", "tests/test_dags.py"}, "uv run pytest"},
+		{[]string{"--env", ".env.ci"}, "runs no tests"},
+		{[]string{"--save"}, "always asks"},
+		{[]string{"--deployment-name", "prod"}, "--deployment"},
 	}
 
 	for _, tc := range cases {
@@ -618,6 +622,30 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "has no effect when deploying a v2 project")
 			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+// --force and --prompt are read by neither path but refused by neither either.
+// The v2 path has no uncommitted-changes gate for --force to open, and it always
+// asks, which is what --prompt requested — so both get the outcome the flag
+// asked for and refusing them would break CI that passes them out of habit.
+func TestDeployAcceptsForceAndPromptOnAV2Project(t *testing.T) {
+	for _, flag := range []string{"--force", "--prompt"} {
+		t.Run(flag, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			resetDeployFlagVars()
+
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(v2ManifestForRouting), 0o600))
+			orig := config.WorkingPath
+			config.WorkingPath = dir
+			t.Cleanup(func() { config.WorkingPath = orig })
+
+			err := execDeployCmd(flag)
+			if err != nil {
+				assert.NotContains(t, err.Error(), "has no effect when deploying a v2 project")
+			}
 		})
 	}
 }

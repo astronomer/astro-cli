@@ -191,6 +191,11 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 // someone believes ran their tests, and the flag having no effect is exactly
 // the thing they cannot see. Porting them is an earlier fix; --build-secret needs
 // tier 3 first, which is why it is refused here rather than wired.
+//
+// --force and --prompt are deliberately absent: the v2 path reads neither, but
+// neither leaves a false belief behind. There is no uncommitted-changes gate on
+// this path for --force to open, and a v2 deploy always asks, which is what
+// --prompt was for. Both get the outcome the flag asked for.
 var v2DeployIgnores = []struct {
 	flag string
 	do   string
@@ -201,6 +206,10 @@ var v2DeployIgnores = []struct {
 	{"dag-bundle-name", "named DAG bundles are not supported on a v2 project yet"},
 	{"build-secret", "build secrets need a project Dockerfile, which a v2 project cannot declare yet"},
 	{"build-secrets", "build secrets need a project Dockerfile, which a v2 project cannot declare yet"},
+	{"test", "run your tests before deploying: `uv run pytest <path> && astro deploy`"},
+	{"env", "a v2 deploy runs no tests, so it reads no test env file; run `uv run pytest` yourself"},
+	{"save", "a v2 deploy always asks; mark a link `default = true` in [tool.astro.deployments] to move the cursor"},
+	{"deployment-name", "name the target with --deployment, which takes a link name or a Deployment id"},
 }
 
 // refuseFlagsV2DeployIgnores stops a v2 deploy that was given a flag it would
