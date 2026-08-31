@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	apcAuth "github.com/astronomer/astro-cli/apc/auth"
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	apcAuth "github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 )
 

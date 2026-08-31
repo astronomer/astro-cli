@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/apc/teams"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/platform/apc/teams"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 

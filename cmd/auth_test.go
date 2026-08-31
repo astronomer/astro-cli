@@ -10,7 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/astronomer/astro-cli/apc/teams"
-	"github.com/astronomer/astro-cli/houston"
-	mocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/apc/teams"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

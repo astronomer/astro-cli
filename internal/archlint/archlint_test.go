@@ -70,6 +70,11 @@ var v1Internal = []string{
 	"internal/otto",
 	"internal/platformversions",
 	"internal/telemetry",
+	// The whole APC platform, transport included: v1 code that prints and
+	// reads config/, moved under internal/ without being rewritten. The
+	// subtree form says "every package here is v1" in one line; a v2 package
+	// added under internal/platform (local, when it lands) has to name itself.
+	"internal/platform/apc/...",
 }
 
 // v2All lists every v2 package barred from importing config/ or the v1 cmd
@@ -86,22 +91,73 @@ var v2All = append([]string{
 func TestEveryInternalPackageIsAccountedFor(t *testing.T) {
 	root := repoRoot(t)
 	known := map[string]bool{}
+	var subtrees []string
 	for _, pkg := range slices.Concat(v2BelowCmd, v2ConfigReaders, v1Internal) {
-		known[pkg] = true
-	}
-	entries, err := os.ReadDir(filepath.Join(root, "internal"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
+		if prefix, ok := strings.CutSuffix(pkg, "/..."); ok {
+			subtrees = append(subtrees, prefix+"/")
 			continue
 		}
-		pkg := "internal/" + entry.Name()
-		if !known[pkg] {
+		known[pkg] = true
+	}
+	covered := func(pkg string) bool {
+		if known[pkg] {
+			return true
+		}
+		for _, prefix := range subtrees {
+			if strings.HasPrefix(pkg, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pkg := range accountablePackages(t, root, "internal") {
+		if !covered(pkg) {
 			t.Errorf("%s is in none of v2BelowCmd, v2ConfigReaders, or v1Internal: add it to the one it belongs to (and to .golangci.yml's forbidigo path list if it is a v2 package)", pkg)
 		}
 	}
+}
+
+// accountablePackages lists the directories under dir that a rule has to name.
+//
+// A directory holding .go files is one of them, and its own subdirectories ride
+// along on its entry — internal/otto has always worked that way. A directory
+// holding no .go files is a grouping directory (internal/platform), so the
+// packages under it are named individually. Without that, adding one grouping
+// directory to a list would exempt everything anyone ever puts inside it, and
+// internal/platform holds both v1 and v2 code on purpose.
+func accountablePackages(t *testing.T, root, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join(root, dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pkgs []string
+	var subdirs []string
+	hasGo := false
+	for _, entry := range entries {
+		switch {
+		case entry.IsDir():
+			subdirs = append(subdirs, entry.Name())
+		case strings.HasSuffix(entry.Name(), ".go"):
+			hasGo = true
+		}
+	}
+	for _, name := range subdirs {
+		child := dir + "/" + name
+		if hasGo {
+			// dir is itself a package; its subdirectories ride on its entry.
+			continue
+		}
+		if sub := accountablePackages(t, root, child); len(sub) > 0 {
+			pkgs = append(pkgs, sub...)
+			continue
+		}
+		pkgs = append(pkgs, child)
+	}
+	if hasGo {
+		return nil
+	}
+	return pkgs
 }
 
 func repoRoot(t *testing.T) string {

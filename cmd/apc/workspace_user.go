@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/apc/workspace"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 

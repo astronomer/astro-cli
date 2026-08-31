@@ -3,7 +3,7 @@ package apc
 import (
 	"github.com/stretchr/testify/assert"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
 func (s *Suite) TestValidateDagDeploymentArgs() {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
 var cmdAvailabilityByVersion = map[string]houston.VersionRestrictions{

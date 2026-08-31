@@ -19,7 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"

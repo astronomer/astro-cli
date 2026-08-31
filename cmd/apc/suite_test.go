@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/apc/deploy"
+	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
