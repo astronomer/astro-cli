@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -227,19 +226,6 @@ func TestTrackUnknownFlagPassesTheErrorThrough(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	err := parseError(t, "--wait-for-deploy")
-	cmd := &cobra.Command{Use: "deploy"}
-
-	assert.Equal(t, err, trackUnknownFlag(cmd, err))
-}
-
-func TestTrackUnknownFlagSkipsShellCompletion(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	original := os.Args
-	defer func() { os.Args = original }()
-	os.Args = []string{"astro", cobra.ShellCompRequestCmd, "deploy", "--wai"}
-
-	err := parseError(t, "--wai")
 	cmd := &cobra.Command{Use: "deploy"}
 
 	assert.Equal(t, err, trackUnknownFlag(cmd, err))

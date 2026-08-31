@@ -23,11 +23,11 @@ func TestUnknownCommandPath(t *testing.T) {
 		{"under a parent", dev, "restrt", "dev restrt"},
 		{"dashes and digits are command-like", root, "run-dag2", "run-dag2"},
 		{"punctuation is redacted", dev, "tok_ab123!!", "dev <redacted>"},
-		{"a token-shaped word is redacted", root, "ey_JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", RedactedCommand},
-		{"capitals are redacted", root, "Deploy", RedactedCommand},
-		{"a leading digit is redacted", root, "2fly", RedactedCommand},
-		{"a path is redacted", root, "/Users/me/project", RedactedCommand},
-		{"an over-long word is redacted", root, strings.Repeat("a", maxCommandLength+1), RedactedCommand},
+		{"a token-shaped word is redacted", root, "ey_JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", redacted},
+		{"capitals are redacted", root, "Deploy", redacted},
+		{"a leading digit is redacted", root, "2fly", redacted},
+		{"a path is redacted", root, "/Users/me/project", redacted},
+		{"an over-long word is redacted", root, strings.Repeat("a", maxCommandLength+1), redacted},
 		{"a word at the limit is kept", root, strings.Repeat("a", maxCommandLength), strings.Repeat("a", maxCommandLength)},
 	}
 
@@ -56,12 +56,12 @@ func TestUnknownFlagName(t *testing.T) {
 		{"a shorthand", "-Z", "-Z"},
 		{"a digit shorthand", "-3", "-3"},
 		{"digits and dashes", "--dag-2", "--dag-2"},
-		{"capitals are redacted", "--waitForDeploy", RedactedCommand},
-		{"a token-shaped flag is redacted", "--ey_JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", RedactedCommand},
-		{"a long shorthand is redacted", "-abc", RedactedCommand},
-		{"punctuation is redacted", "--wait!", RedactedCommand},
-		{"a bare word is redacted", "wait", RedactedCommand},
-		{"an over-long flag is redacted", "--" + strings.Repeat("a", maxCommandLength+1), RedactedCommand},
+		{"capitals are redacted", "--waitForDeploy", redacted},
+		{"a token-shaped flag is redacted", "--ey_JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", redacted},
+		{"a long shorthand is redacted", "-abc", redacted},
+		{"punctuation is redacted", "--wait!", redacted},
+		{"a bare word is redacted", "wait", redacted},
+		{"an over-long flag is redacted", "--" + strings.Repeat("a", maxCommandLength+1), redacted},
 	}
 
 	for _, tt := range tests {

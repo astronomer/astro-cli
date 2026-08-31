@@ -190,21 +190,33 @@ func buildCommandProperties(cmd *cobra.Command) map[string]interface{} {
 // TrackCommand sends telemetry data for a command execution.
 // It spawns a subprocess to send the data asynchronously.
 func TrackCommand(cmd *cobra.Command) {
-	if !IsEnabled() || isTestRun() {
+	if commandPath := GetCommandPath(cmd); commandPath == "" || cmd.Hidden {
 		return
+	}
+	if !canTrack(cmd) {
+		return
+	}
+
+	track(EventCommandExecution, buildCommandProperties(cmd))
+}
+
+// canTrack reports whether an event for cmd should be sent, and shows the
+// first-run notice when it should. It runs before every event, so that a
+// command which sends nothing says nothing — notably `astro telemetry
+// disable`, which would otherwise announce collection to someone in the act of
+// opting out, and a mistyped version of it, which would report the mistake.
+func canTrack(cmd *cobra.Command) bool {
+	if !IsEnabled() || isTestRun() {
+		return false
 	}
 
 	commandPath := GetCommandPath(cmd)
-	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
-		return
+	if strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
+		return false
 	}
 
-	// After the filter above, so that commands which send nothing say nothing —
-	// notably `astro telemetry disable`, which otherwise announces collection to
-	// someone in the act of opting out.
 	showFirstRunNotice()
-
-	track(EventCommandExecution, buildCommandProperties(cmd))
+	return true
 }
 
 // track sends one event. It goes out in the background, unless debug mode asks

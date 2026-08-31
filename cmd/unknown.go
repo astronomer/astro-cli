@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -13,8 +12,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/telemetry"
 )
 
-// unknownCommand is a word the CLI has no command for, under the command it
-// was typed against.
 type unknownCommand struct {
 	parent      *cobra.Command
 	word        string
@@ -22,21 +19,15 @@ type unknownCommand struct {
 }
 
 // HandleUnknownCommand reports and tracks a command the CLI does not have, and
-// returns true when it found one. It runs before Execute, so it first registers
-// the help and completion commands that Execute would otherwise add after this
-// point, which would make `astro help` read as a command we do not have.
+// returns true when it found one. It runs before Execute, and so registers the
+// help and completion commands that Execute adds after this point, which would
+// otherwise make `astro help` read as a command we do not have.
 //
-// Cobra handles this in two ways and neither is much use. At the root it
-// returns an error from Execute, which is too late for the hook that tracks
-// commands. Under a parent such as `dev` it prints the help and exits 0, so a
-// wrong guess reads as a success.
-//
-// The fix cobra would want, an Args validator on each parent, does not work
-// here: cobra returns the help for a command that does not run before it
-// validates the arguments, so every parent would have to become runnable. That
-// would run their pre-run hooks on a bare `astro dev`, which checks for a
-// container runtime, and `astro dev` would report a missing Docker where today
-// it prints the help.
+// An Args validator on each parent is the cobra way and does not work here:
+// cobra returns the help for a command that does not run before it validates
+// the arguments, so every parent would have to become runnable. Their pre-run
+// hooks would then fire on a bare `astro dev`, which checks for a container
+// runtime, and `astro dev` would report a missing Docker instead of the help.
 func HandleUnknownCommand(root *cobra.Command, args []string, out io.Writer) bool {
 	if isShellCompletion(args) {
 		return false
@@ -57,27 +48,20 @@ func HandleUnknownCommand(root *cobra.Command, args []string, out io.Writer) boo
 
 // trackUnknownFlag records a flag the CLI does not have, then hands the error
 // back for cobra to report as it always has. Cobra parses the flags before it
-// runs the hook that tracks commands, so a wrong flag sends nothing at all
-// without this.
-//
-// The root sets it once. A command with no error function of its own asks its
-// parent for one, so this covers every command in the tree.
+// runs the hook that tracks commands, so a wrong flag sends nothing without
+// this. The root sets it once: a command with no error function of its own asks
+// its parent for one.
 func trackUnknownFlag(cmd *cobra.Command, err error) error {
-	if isShellCompletion(os.Args[1:]) {
-		return err
-	}
 	if flag := unknownFlag(err); flag != "" {
 		telemetry.TrackUnknownFlag(cmd, flag)
 	}
 	return err
 }
 
-// unknownFlag returns the flag as it was typed when pflag has no such flag,
-// and "" for every other parse error. A missing value, or a value of the wrong
-// type, is a mistake on a flag we do have, which is not what we are counting.
-//
-// pflag reports the name on its own, so `--api-token=secret` arrives here as
-// `--api-token` and the value never reaches us.
+// unknownFlag returns the flag as it was typed when pflag has no such flag, and
+// "" for every other parse error: a missing value, or a value of the wrong
+// type, is a mistake on a flag we do have. pflag reports the name on its own,
+// so `--api-token=secret` arrives here as `--api-token`.
 func unknownFlag(err error) string {
 	var notExist *pflag.NotExistError
 	if !errors.As(err, &notExist) {
@@ -91,8 +75,7 @@ func unknownFlag(err error) string {
 
 // isShellCompletion reports whether the shell is asking cobra for completions.
 // Cobra registers __complete from a private call we cannot make, so the command
-// does not exist yet when we resolve the tree. The shell is talking to itself
-// here, and a word it has not finished typing is not a guess at a command.
+// does not exist yet when we resolve the tree.
 func isShellCompletion(args []string) bool {
 	if len(args) == 0 {
 		return false
@@ -101,10 +84,8 @@ func isShellCompletion(args []string) bool {
 }
 
 // findUnknownCommand returns the first word that names no command, or nil when
-// every word resolves.
-//
-// A command that runs takes its own arguments, so a word after it is an
-// argument and not a guess at a command name.
+// every word resolves. A command that runs takes its own arguments, so a word
+// after one is an argument and not a guess at a command name.
 func findUnknownCommand(root *cobra.Command, args []string) *unknownCommand {
 	matched, rest, _ := root.Find(args)
 	if matched.Runnable() || !matched.HasSubCommands() {
@@ -123,9 +104,6 @@ func findUnknownCommand(root *cobra.Command, args []string) *unknownCommand {
 	}
 }
 
-// suggestion returns the nearest command name, or "" when the word is nothing
-// like a command we have. An empty suggestion is the interesting case: it marks
-// a command someone expected to exist.
 func (u *unknownCommand) suggestion() string {
 	if len(u.suggestions) == 0 {
 		return ""
@@ -156,8 +134,8 @@ func (u *unknownCommand) report(out io.Writer) {
 }
 
 // suggestionDistance is the edit distance cobra uses for "Did you mean this?".
-// SuggestionsFor reads it from the command, which cobra fills in only on the
-// error path, so we set it ourselves to get the same answer.
+// SuggestionsFor reads it from the command, which cobra fills in only on its
+// own error path.
 const suggestionDistance = 2
 
 func suggestionsFor(parent *cobra.Command, word string) []string {
@@ -185,8 +163,7 @@ func stripFlags(cmd *cobra.Command, args []string) []string {
 		switch {
 		case arg == "--":
 			return operands
-		case strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") && !takesNoValue(flags.Lookup(arg[2:])),
-			strings.HasPrefix(arg, "-") && !strings.Contains(arg, "=") && len(arg) == 2 && !takesNoValue(flags.ShorthandLookup(arg[1:])):
+		case consumesNextValue(flags, arg):
 			if len(args) <= 1 {
 				return operands
 			}
@@ -196,6 +173,19 @@ func stripFlags(cmd *cobra.Command, args []string) []string {
 		}
 	}
 	return operands
+}
+
+// consumesNextValue reports whether arg is a flag that takes the word after it
+// as its value. A flag we do not have is assumed to take one, which is what
+// cobra assumes.
+func consumesNextValue(flags *pflag.FlagSet, arg string) bool {
+	if strings.Contains(arg, "=") {
+		return false
+	}
+	if strings.HasPrefix(arg, "--") {
+		return !takesNoValue(flags.Lookup(arg[2:]))
+	}
+	return len(arg) == 2 && strings.HasPrefix(arg, "-") && !takesNoValue(flags.ShorthandLookup(arg[1:]))
 }
 
 func takesNoValue(flag *pflag.Flag) bool {
