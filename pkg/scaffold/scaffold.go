@@ -335,7 +335,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		cs.Changes = append(cs.Changes, Change{
 			Kind:   Delete,
 			Path:   name,
-			Labels: []string{name + " (carried into " + manifest.Marker + ", so removed)"},
+			Labels: []string{name + " (migrated into " + manifest.Marker + ", so removed)"},
 		})
 	}
 
