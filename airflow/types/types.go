@@ -17,7 +17,7 @@ type ImageBuildConfig struct {
 // StartOptions holds all options for the Start command.
 // Fields that don't apply to a given handler are silently ignored.
 type StartOptions struct {
-	// Common options (used by both Docker and Standalone)
+	// Common options
 	ImageName    string
 	SettingsFile string
 	ComposeFile  string
@@ -29,8 +29,4 @@ type StartOptions struct {
 
 	// Proxy options
 	NoProxy bool // disable the reverse proxy (use fixed ports instead)
-
-	// Standalone-specific options (ignored by DockerCompose)
-	Foreground bool   // standalone: run in the foreground
-	Port       string // standalone: webserver port override
 }
