@@ -27,7 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	cloudenv "github.com/astronomer/astro-cli/internal/platform/astro/env"
+	astroenv "github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
 // sourceLabel is the source name a workspace-resolved value reports.
@@ -250,7 +250,7 @@ func statusError(resp *astrov1.ListEnvironmentObjectsResponse) error {
 		return &httpError{err: errors.New("empty response from Environment Manager")}
 	}
 	apiErr := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if cloudenv.IsSecretsFetchingNotAllowedError(apiErr) {
+	if astroenv.IsSecretsFetchingNotAllowedError(apiErr) {
 		return errSecretsDisabled
 	}
 	return &httpError{code: resp.HTTPResponse.StatusCode, err: apiErr}

@@ -11,7 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	apcAuth "github.com/astronomer/astro-cli/internal/platform/apc/auth"
-	cloudAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 )
@@ -23,8 +23,8 @@ var (
 	signup                 bool
 	signin                 bool
 
-	cloudLogin  = cloudAuth.Login
-	cloudLogout = cloudAuth.Logout
+	cloudLogin  = astroAuth.Login
+	cloudLogout = astroAuth.Logout
 	apcLogin    = apcAuth.Login
 	apcLogout   = apcAuth.Logout
 )
@@ -51,7 +51,7 @@ After you verify your email address, run 'astro login' to finish signing in.`
 
 func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	err := runLogin(cmd, args, astroV1Client, out)
-	if errors.Is(err, cloudAuth.ErrEmailVerificationPending) {
+	if errors.Is(err, astroAuth.ErrEmailVerificationPending) {
 		fmt.Fprintf(out, "\n%s\n", signupVerificationMsg)
 		return nil
 	}
@@ -67,7 +67,7 @@ func signupForDomain(domain string) bool {
 	case signin, token != "": // a token login opens no browser, so it keeps its old behavior
 		return false
 	default:
-		return cloudAuth.ShouldSignup(domain)
+		return astroAuth.ShouldSignup(domain)
 	}
 }
 

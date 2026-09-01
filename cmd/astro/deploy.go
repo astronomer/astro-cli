@@ -21,7 +21,7 @@ import (
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/instances"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/internal/userstate"
@@ -65,7 +65,7 @@ Menu will be presented if you do not specify a deployment ID:
   $ astro deploy
 `
 
-	DeployImage      = cloud.Deploy
+	DeployImage      = astrodeploy.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
 	buildSecrets     = []string{}
 )
@@ -298,7 +298,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	deployInput := cloud.InputDeploy{
+	deployInput := astrodeploy.InputDeploy{
 		Path:           config.WorkingPath,
 		RuntimeID:      deploymentID,
 		WsID:           workspaceID,
@@ -366,7 +366,7 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 
 	cmd.SilenceUsage = true
 
-	deployBundleInput := &cloud.DeployBundleInput{
+	deployBundleInput := &astrodeploy.DeployBundleInput{
 		BundlePath:    nonDagsBundlePath,
 		MountPath:     nonDagsMountPath,
 		DeploymentID:  targetDeploymentID,
@@ -770,7 +770,7 @@ func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
 
 // DeployDags reuses the v1 dags-only transport for the v2 project's dags/.
 func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, error) {
-	res, err := cloud.DeployDagsV2(cloud.DagDeployV2Input{
+	res, err := astrodeploy.DeployDagsV2(astrodeploy.DagDeployV2Input{
 		ProjectDir:    in.ProjectDir,
 		DeploymentID:  in.DeploymentID,
 		Description:   in.Description,
@@ -792,7 +792,7 @@ func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, erro
 // DeployImage builds or adopts the project image and ships it through the
 // cloud/deploy transport.
 func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
-	res, err := cloud.DeployImageV2(cloud.ImageDeployV2Input{
+	res, err := astrodeploy.DeployImageV2(astrodeploy.ImageDeployV2Input{
 		ProjectDir:     in.ProjectDir,
 		DeploymentID:   in.DeploymentID,
 		AirflowVersion: in.AirflowVersion,

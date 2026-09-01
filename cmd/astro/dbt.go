@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/astronomer/astro-cli/config"
-	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 )
@@ -20,8 +20,8 @@ var (
 	mountPath      string
 	dbtProjectPath string
 
-	DeployBundle = cloud.DeployBundle
-	DeleteBundle = cloud.DeleteBundle
+	DeployBundle = astrodeploy.DeployBundle
+	DeleteBundle = astrodeploy.DeleteBundle
 )
 
 const (
@@ -149,7 +149,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	// deploy the dbt project as a bundle
-	deployBundleInput := &cloud.DeployBundleInput{
+	deployBundleInput := &astrodeploy.DeployBundleInput{
 		BundlePath:    dbtProjectPath,
 		MountPath:     mountPath,
 		DeploymentID:  deploymentID,
@@ -236,7 +236,7 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 		mountPath = dbtDefaultMountPathPrefix + dbtProjectName
 	}
 
-	deleteBundleInput := &cloud.DeleteBundleInput{
+	deleteBundleInput := &astrodeploy.DeleteBundleInput{
 		MountPath:     mountPath,
 		DeploymentID:  deploymentID,
 		WorkspaceID:   workspaceID,

@@ -19,7 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instances"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
-	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -576,7 +576,7 @@ func TestDeployRoutesV1Project(t *testing.T) {
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	called := false
-	DeployImage = func(cloud.InputDeploy, astrov1.APIClient, astrov1alpha1.APIClient) error {
+	DeployImage = func(astrodeploy.InputDeploy, astrov1.APIClient, astrov1alpha1.APIClient) error {
 		called = true
 		return nil
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
-	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -34,7 +34,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	DeployImage = func(deployInput astrodeploy.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -82,7 +82,7 @@ func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
 		return nil
 	}
 
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	DeployImage = func(deployInput astrodeploy.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -140,7 +140,7 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	}()
 
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	DeployImage = func(deployInput astrodeploy.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -163,7 +163,7 @@ func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {
 		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	}()
 
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	DeployImage = func(deployInput astrodeploy.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -204,7 +204,7 @@ func TestDeployImageNameRejectsIncompatibleFlags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	DeployImage = func(deployInput astrodeploy.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 		return nil
 	}
 
@@ -233,7 +233,7 @@ type NonDagsDeploySuite struct {
 	suite.Suite
 	mockV1Client     *astrov1_mocks.ClientWithResponsesInterface
 	origV1Client     astrov1.APIClient
-	origDeployBundle func(deployInput *cloud.DeployBundleInput) error
+	origDeployBundle func(deployInput *astrodeploy.DeployBundleInput) error
 	origWorkingPath  string
 	origWd           string
 	tmpWorkingDir    string
@@ -284,8 +284,8 @@ func (s *NonDagsDeploySuite) TestRequiresMountPath() {
 }
 
 func (s *NonDagsDeploySuite) TestBundleTypeDefaultsToNone() {
-	var captured *cloud.DeployBundleInput
-	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+	var captured *astrodeploy.DeployBundleInput
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
 		captured = deployInput
 		return nil
 	}
@@ -303,8 +303,8 @@ func (s *NonDagsDeploySuite) TestRejectsIncompatibleFlag() {
 }
 
 func (s *NonDagsDeploySuite) TestProvidedDeploymentId() {
-	var captured *cloud.DeployBundleInput
-	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+	var captured *astrodeploy.DeployBundleInput
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
 		captured = deployInput
 		return nil
 	}

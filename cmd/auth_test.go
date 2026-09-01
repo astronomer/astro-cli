@@ -9,7 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	cloudAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -111,7 +111,7 @@ func (s *CmdSuite) TestLoginSignupAndSigninConflict() {
 func (s *CmdSuite) TestLoginEmailVerificationPending() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag bool) error {
-		return cloudAuth.ErrEmailVerificationPending
+		return astroAuth.ErrEmailVerificationPending
 	}
 
 	buf := new(bytes.Buffer)

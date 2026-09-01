@@ -14,7 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
-	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -22,8 +22,8 @@ type DbtSuite struct {
 	suite.Suite
 	mockV1Client     *astrov1_mocks.ClientWithResponsesInterface
 	origV1Client     astrov1.APIClient
-	origDeployBundle func(deployInput *cloud.DeployBundleInput) error
-	origDeleteBundle func(deleteInput *cloud.DeleteBundleInput) error
+	origDeployBundle func(deployInput *astrodeploy.DeployBundleInput) error
+	origDeleteBundle func(deleteInput *astrodeploy.DeleteBundleInput) error
 	origWorkingPath  string
 	origWd           string
 	tmpWorkingDir    string
@@ -78,7 +78,7 @@ func (s *DbtSuite) TestDbtDeploy_PickDeployment() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
 		return nil
 	}
 
@@ -94,7 +94,7 @@ func (s *DbtSuite) TestDbtDeploy_ProvidedDeploymentId() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
 		return nil
 	}
 
@@ -110,7 +110,7 @@ func (s *DbtSuite) TestDbtDeploy_CustomProjectPath() {
 	s.createDbtProjectFile(filepath.Join(projectPath, "dbt_project.yml"))
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
 		if deployInput.BundlePath != projectPath {
 			return assert.AnError
 		}
@@ -126,7 +126,7 @@ func (s *DbtSuite) TestDbtDeploy_CustomMountPath() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
 		if deployInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
 			return assert.AnError
 		}
@@ -167,7 +167,7 @@ func (s *DbtSuite) TestDbtDelete_PickDeployment() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *cloud.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
 		return nil
 	}
 
@@ -183,7 +183,7 @@ func (s *DbtSuite) TestDbtDelete_ProvidedDeploymentId() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *cloud.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
 		return nil
 	}
 
@@ -199,7 +199,7 @@ func (s *DbtSuite) TestDbtDelete_CustomProjectPath() {
 	s.createDbtProjectFile(filepath.Join(projectPath, "dbt_project.yml"))
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *cloud.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
 		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
 			return assert.AnError
 		}
@@ -215,7 +215,7 @@ func (s *DbtSuite) TestDbtDelete_NoMountPathOrProjectPath() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *cloud.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
 		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
 			return assert.AnError
 		}
@@ -238,7 +238,7 @@ func (s *DbtSuite) TestDbtDelete_CustomMountPath() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *cloud.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
 		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
 			return assert.AnError
 		}

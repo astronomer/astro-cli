@@ -8,7 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
-	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -88,7 +88,7 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	deployInput := cloud.InputClientDeploy{
+	deployInput := astrodeploy.InputClientDeploy{
 		Path:         config.WorkingPath,
 		ImageName:    remoteImageName,
 		Platform:     remotePlatform,
@@ -96,5 +96,5 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		DeploymentID: remoteDeploymentID,
 	}
 
-	return cloud.DeployClientImage(deployInput, astroV1Client)
+	return astrodeploy.DeployClientImage(deployInput, astroV1Client)
 }
