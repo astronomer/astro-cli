@@ -183,7 +183,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 		return err
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
-	opts.AstroV1Client = c.d.AstroV1Client
+	opts.WorkspaceProvider = c.workspaceProvider()
 	built, err := plan.Build(wd, opts)
 	if err != nil {
 		return c.reportBuildError(r, err)
@@ -319,7 +319,8 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 		Mode:            st.Mode,
 		RequestedPort:   st.Port,
 		StopWithSession: st.StopWithSession,
-		AstroV1Client:   c.d.AstroV1Client,
+
+		WorkspaceProvider: c.workspaceProvider(),
 	})
 	if err != nil {
 		return c.reportBuildError(r, err)

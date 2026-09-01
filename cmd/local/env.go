@@ -319,6 +319,22 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 }
 
 // getFromWorkspace resolves a workspace-source name from Environment Manager
+// workspaceProvider adapts the Astro client this command was wired with into
+// the constructor plan.Options asks for, and returns nil when there is no
+// client — which is what leaves workspace-source names unresolved offline.
+//
+// plan takes a constructor rather than the client because the workspace comes
+// from the manifest, which plan is what reads. Building it here keeps the Astro
+// client in cmd/, where reaching into a platform is allowed.
+func (c *cli) workspaceProvider() func(string, bool) envresolve.Provider {
+	if c.d.AstroV1Client == nil {
+		return nil
+	}
+	return func(workspace string, reveal bool) envresolve.Provider {
+		return emenv.NewProvider(workspace, c.d.AstroV1Client, reveal)
+	}
+}
+
 // for `get`. It returns ok=false (no error) when the name has no workspace
 // source, so the caller reports the plain "not set anywhere". A workspace-source
 // name that cannot be fetched is an error naming the cause.

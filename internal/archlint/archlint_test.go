@@ -5,6 +5,7 @@
 //  1. Nothing under internal/ imports cmd/.
 //  2. v2 packages below cmd/ never print, exit, or log fatally.
 //  3. v2 packages never import config/ (or the v1 cmd tree).
+//  4. Only the named seams import internal/platform/.
 //
 // Closed value sets (localrt.Mode, localrt.State, ...) are covered by the
 // `exhaustive` linter, already enabled repo-wide in .golangci.yml.
@@ -83,6 +84,57 @@ var v1Internal = []string{
 var v2All = append([]string{
 	"cmd/local",
 }, v2BelowCmd...)
+
+// platformSeams are the packages under internal/ allowed to import
+// internal/platform/. Each exists to be the one place in the tree that reaches
+// a platform, so the packages needing what it fetches take it as a seam
+// instead — the same posture as v2ConfigReaders above, and for the same reason.
+// instancelocate's own doc comment says so in as many words.
+//
+// A package earns a place here by being that door for something, not by
+// happening to need a client. internal/plan wanted one and took a constructor
+// instead.
+var platformSeams = []string{
+	"internal/emenv",
+	"internal/instancelocate",
+}
+
+// TestOnlyTheSeamsReachIntoAPlatform is the rule the internal/platform layout
+// exists for: logic that is not about one platform takes an interface, and
+// cmd/ wires the implementation. Anything else is coupling that spreads
+// quietly, and unlike "is this package v1 or v2" it is decidable from the
+// import path with no list to maintain.
+//
+// Test files are exempt on purpose. The rule is about the production
+// dependency graph — what a platform-agnostic package needs to be built
+// against. A test that wires a platform mock to drive a seam is testing the
+// seam, and forbidding it would move those assertions somewhere less specific;
+// internal/plan/workspace_env_test.go is the case in point, where the mock is
+// what makes the Environment Manager messages assertable at all.
+func TestOnlyTheSeamsReachIntoAPlatform(t *testing.T) {
+	root := repoRoot(t)
+	seam := map[string]bool{}
+	for _, pkg := range platformSeams {
+		seam[pkg] = true
+	}
+	platformPrefix := modulePrefix + "internal/platform/"
+
+	for _, pkg := range accountablePackages(t, root, "internal") {
+		if seam[pkg] || strings.HasPrefix(pkg, "internal/platform/") {
+			continue
+		}
+		goFiles(t, root, pkg, func(rel string) {
+			if strings.HasSuffix(rel, "_test.go") {
+				return
+			}
+			for _, imp := range imports(t, filepath.Join(root, rel)) {
+				if strings.HasPrefix(imp, platformPrefix) {
+					t.Errorf("%s imports %s: only the platformSeams may import internal/platform/ — take an interface and let cmd/ wire it", rel, imp)
+				}
+			}
+		})
+	}
+}
 
 // TestEveryInternalPackageIsAccountedFor: the lists above are what the rules
 // are made of, and a rule nobody is on is not a rule. A new package under

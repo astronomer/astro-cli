@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
-	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
@@ -31,10 +30,16 @@ type Options struct {
 	RequestedPort int
 	// StopWithSession ties Airflow's lifetime to the calling process.
 	StopWithSession bool
-	// AstroV1Client, when set, turns on Environment Manager resolution for names
-	// declared `source = "workspace"`. nil leaves a workspace source unresolved
-	// (a required one gates as missing) — the offline default, no network.
-	AstroV1Client astrov1.APIClient
+	// WorkspaceProvider, when set, turns on Environment Manager resolution for
+	// names declared `source = "workspace"`. nil leaves a workspace source
+	// unresolved (a required one gates as missing) — the offline default, no
+	// network.
+	//
+	// It is a constructor rather than a client because the workspace comes from
+	// the manifest, which this package is what reads. Taking the Astro client
+	// directly would make every plan build import a platform, which the layer
+	// rules forbid below cmd/ (docs/v2-architecture.md).
+	WorkspaceProvider func(workspace string, reveal bool) envresolve.Provider
 }
 
 // Built is a resolved plan plus the discovered project, so cmd can persist the
@@ -182,7 +187,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 	// resolves from it.
 	vault := vaultenv.Load(proj.Dir)
 	in := envresolve.Inputs{Schema: schema, Providers: src.Providers(vault.Providers())}
-	if opts.AstroV1Client != nil {
+	if opts.WorkspaceProvider != nil {
 		if opts.Mode == localrt.ModeDocker {
 			// Docker start writes Plan.Env into the on-disk compose file, so a
 			// resolved Environment Manager value would land on disk — the one
@@ -191,7 +196,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 			in.WorkspaceProvider = emenv.Unavailable("Environment Manager values are injected in standalone mode only; run without --docker, or set it locally")
 		} else {
 			// reveal = true: start needs the real values to run Airflow.
-			in.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, opts.AstroV1Client, true)
+			in.WorkspaceProvider = opts.WorkspaceProvider(m.Astro.Workspace, true)
 		}
 	}
 	res, err := envresolve.Resolve(in)

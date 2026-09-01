@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/internal/emenv"
+	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -40,6 +42,16 @@ func newWorkspaceProject(t *testing.T, body string) string {
 	return dir
 }
 
+// emProvider wires a mock client into the constructor Options takes, so these
+// tests still exercise the real emenv provider — its fetch, its scoping, and
+// the messages asserted below — rather than a stub that would only prove plan
+// calls something.
+func emProvider(mc astrov1.APIClient) func(string, bool) envresolve.Provider {
+	return func(workspace string, reveal bool) envresolve.Provider {
+		return emenv.NewProvider(workspace, mc, reveal)
+	}
+}
+
 func okListResp(objs ...astrov1.EnvironmentObject) *astrov1.ListEnvironmentObjectsResponse {
 	return &astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -61,7 +73,7 @@ func TestBuildInjectsWorkspaceValue(t *testing.T) {
 			EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "postgres://cloud"},
 		}), nil)
 
-	built, err := Build(dir, Options{AstroV1Client: mc})
+	built, err := Build(dir, Options{WorkspaceProvider: emProvider(mc)})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -77,7 +89,7 @@ func TestBuildLoggedOutGatesWithCause(t *testing.T) {
 	dir := newWorkspaceProject(t, workspaceManifest)
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
-	_, err := Build(dir, Options{AstroV1Client: mc})
+	_, err := Build(dir, Options{WorkspaceProvider: emProvider(mc)})
 
 	var missing *MissingEnvError
 	if !errors.As(err, &missing) {
@@ -119,7 +131,7 @@ DATA_WAREHOUSE_URI = { source = 'workspace' }
 	dir := newWorkspaceProject(t, body)
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
-	_, err := Build(dir, Options{AstroV1Client: mc})
+	_, err := Build(dir, Options{WorkspaceProvider: emProvider(mc)})
 
 	var missing *MissingEnvError
 	if !errors.As(err, &missing) {
@@ -140,7 +152,7 @@ func TestBuildDockerWithholdsWorkspaceValue(t *testing.T) {
 	dir := newWorkspaceProject(t, workspaceManifest)
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
-	_, err := Build(dir, Options{Mode: localrt.ModeDocker, AstroV1Client: mc})
+	_, err := Build(dir, Options{Mode: localrt.ModeDocker, WorkspaceProvider: emProvider(mc)})
 
 	var missing *MissingEnvError
 	if !errors.As(err, &missing) {
