@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
+	cloud "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 

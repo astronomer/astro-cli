@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"

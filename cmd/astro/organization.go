@@ -10,11 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/cloud/organization"
-	roleClient "github.com/astronomer/astro-cli/cloud/role"
-	"github.com/astronomer/astro-cli/cloud/team"
-	"github.com/astronomer/astro-cli/cloud/user"
-	"github.com/astronomer/astro-cli/cloud/workspace"
+	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	roleClient "github.com/astronomer/astro-cli/internal/platform/astro/role"
+	"github.com/astronomer/astro-cli/internal/platform/astro/team"
+	"github.com/astronomer/astro-cli/internal/platform/astro/user"
+	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"

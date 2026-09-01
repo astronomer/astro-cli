@@ -15,8 +15,8 @@ import (
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
-	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

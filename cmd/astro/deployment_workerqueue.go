@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
 )
 
 var (

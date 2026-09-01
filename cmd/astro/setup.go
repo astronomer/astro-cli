@@ -16,10 +16,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/auth"
-	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"

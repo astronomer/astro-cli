@@ -70,11 +70,12 @@ var v1Internal = []string{
 	"internal/otto",
 	"internal/platformversions",
 	"internal/telemetry",
-	// The whole APC platform, transport included: v1 code that prints and
-	// reads config/, moved under internal/ without being rewritten. The
-	// subtree form says "every package here is v1" in one line; a v2 package
-	// added under internal/platform (local, when it lands) has to name itself.
+	// Both control-plane platforms: v1 code that prints and reads config/,
+	// moved under internal/ without being rewritten. The subtree form says
+	// "every package here is v1" in one line; a v2 package added under
+	// internal/platform (local, when it lands) has to name itself.
 	"internal/platform/apc/...",
+	"internal/platform/astro/...",
 }
 
 // v2All lists every v2 package barred from importing config/ or the v1 cmd

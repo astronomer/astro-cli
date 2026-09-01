@@ -25,9 +25,9 @@ import (
 	"sync"
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
-	cloudenv "github.com/astronomer/astro-cli/cloud/env"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	cloudenv "github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
 // sourceLabel is the source name a workspace-resolved value reports.

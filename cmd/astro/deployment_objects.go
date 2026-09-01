@@ -10,8 +10,8 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
-	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 )
 
 var (

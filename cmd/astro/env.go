@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/cloud/env"
+	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
 // includeSecretsWarning is printed to stderr (so it doesn't pollute piped

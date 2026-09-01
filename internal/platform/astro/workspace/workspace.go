@@ -1,0 +1,400 @@
+package workspace
+
+import (
+	httpContext "context"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+
+	"github.com/pkg/errors"
+
+	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
+	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+)
+
+var (
+	errInvalidWorkspaceKey = errors.New("invalid workspace selection")
+	ErrInvalidName         = errors.New("no name provided for the workspace. Retry with a valid name")
+	ErrInvalidTokenName    = errors.New("no name provided for the workspace token. Retry with a valid name")
+	ErrWorkspaceNotFound   = errors.New("no workspace was found for the ID you provided")
+	ErrNoWorkspaceExists   = errors.New("no workspace was found in your organization")
+	ErrWrongEnforceInput   = errors.New("the input to the `--enforce-cicd` flag")
+)
+
+var workspaceTableConfig = output.BuildTableConfig(
+	[]output.Column[WorkspaceInfo]{
+		{Header: "NAME", Value: func(w WorkspaceInfo) string { return w.Name }},
+		{Header: "ID", Value: func(w WorkspaceInfo) string { return w.ID }},
+	},
+	func(d any) []WorkspaceInfo { return d.(*WorkspaceList).Workspaces },
+	output.WithColorRow(func(w WorkspaceInfo) bool { return w.IsCurrent }, [2]string{"\033[1;32m", "\033[0m"}),
+	output.WithPadding([]int{44, 50}),
+)
+
+// GetCurrentWorkspace gets the current workspace set in context config
+// Returns a string representing the current workspace and an error if it doesn't exist
+func GetCurrentWorkspace() (string, error) {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+
+	if c.Workspace == "" {
+		return "", errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+	}
+
+	return c.Workspace, nil
+}
+
+// ListData returns workspace list data for structured output
+func ListData(client astrov1.APIClient) (*WorkspaceList, error) {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return nil, err
+	}
+
+	ws, err := GetWorkspaces(client)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &WorkspaceList{
+		Workspaces: make([]WorkspaceInfo, 0, len(ws)),
+	}
+
+	for i := range ws {
+		isCurrent := c.Workspace == ws[i].Id
+		result.Workspaces = append(result.Workspaces, WorkspaceInfo{
+			Name:      ws[i].Name,
+			ID:        ws[i].Id,
+			IsCurrent: isCurrent,
+		})
+	}
+
+	return result, nil
+}
+
+// List all workspaces
+func List(client astrov1.APIClient, out io.Writer) error {
+	return ListWithFormat(client, output.FormatTable, "", out)
+}
+
+// ListWithFormat lists workspaces with the specified output format
+func ListWithFormat(client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
+	return output.PrintData(
+		func() (*WorkspaceList, error) { return ListData(client) },
+		workspaceTableConfig, format, tmpl, out,
+	)
+}
+
+var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (string, error) {
+	tab := printutil.Table{
+		Padding:        []int{5, 44, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "NAME", "ID"},
+		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	}
+
+	var c config.Context
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+
+	ws, err := GetWorkspaces(client)
+	if err != nil {
+		return "", err
+	}
+
+	deployMap := map[string]astrov1.Workspace{}
+	for i := range ws {
+		index := i + 1
+
+		color := c.Workspace == ws[i].Id
+		tab.AddRow([]string{strconv.Itoa(index), ws[i].Name, ws[i].Id}, color)
+
+		deployMap[strconv.Itoa(index)] = ws[i]
+	}
+	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
+	choice := input.Text("\n> ")
+	selected, ok := deployMap[choice]
+	if !ok {
+		return "", errInvalidWorkspaceKey
+	}
+
+	return selected.Id, nil
+}
+
+func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
+	var wsID string
+	if workspaceNameOrID == "" {
+		id, err := GetWorkspaceSelection(client, out)
+		if err != nil {
+			return err
+		}
+
+		wsID = id
+	} else {
+		ws, err := GetWorkspaces(client)
+		if err != nil {
+			return err
+		}
+		for i := range ws {
+			if ws[i].Name == workspaceNameOrID || ws[i].Id == workspaceNameOrID {
+				wsID = ws[i].Id
+			}
+		}
+
+		if wsID == "" {
+			return errors.New("workspace id/name could not be found")
+		}
+	}
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	err = c.SetContextKey("workspace", wsID)
+	if err != nil {
+		return err
+	}
+
+	err = c.SetContextKey("last_used_workspace", wsID)
+	if err != nil {
+		return err
+	}
+
+	err = c.SetOrganizationContext(c.Organization, c.OrganizationProduct)
+	if err != nil {
+		return err
+	}
+
+	err = config.PrintCurrentCloudContext(out)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateEnforceCD(enforceCD string) (bool, error) {
+	var enforce bool
+	switch {
+	case enforceCD == "OFF" || enforceCD == "":
+		enforce = false
+	case enforceCD == "ON":
+		enforce = true
+	default:
+		return false, ErrWrongEnforceInput
+	}
+	return enforce, nil
+}
+
+func Create(name, description, enforceCD string, out io.Writer, client astrov1.APIClient) error {
+	if name == "" {
+		return ErrInvalidName
+	}
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	enforce, err := validateEnforceCD(enforceCD)
+	if err != nil {
+		return err
+	}
+	workspaceCreateRequest := astrov1.CreateWorkspaceJSONRequestBody{
+		CicdEnforcedDefault: &enforce,
+		Description:         &description,
+		Name:                name,
+	}
+	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceCreateRequest)
+	if err != nil {
+		return err
+	}
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Workspace %s was successfully created\n", name)
+	return nil
+}
+
+func Update(id, name, description, enforceCD string, out io.Writer, client astrov1.APIClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	workspaces, err := GetWorkspaces(client)
+	if err != nil {
+		return err
+	}
+	var workspace astrov1.Workspace
+	if id == "" {
+		workspace, err = selectWorkspace(workspaces)
+		if workspace.Id == "" {
+			return ErrNoWorkspaceExists
+		}
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range workspaces {
+			if workspaces[i].Id == id {
+				workspace = workspaces[i]
+			}
+		}
+		if workspace.Id == "" {
+			return ErrWorkspaceNotFound
+		}
+	}
+	workspaceID := workspace.Id
+
+	workspaceUpdateRequest := astrov1.UpdateWorkspaceRequest{}
+
+	if name == "" {
+		workspaceUpdateRequest.Name = workspace.Name
+	} else {
+		workspaceUpdateRequest.Name = name
+	}
+
+	if description == "" {
+		if workspace.Description != nil {
+			workspaceUpdateRequest.Description = *workspace.Description
+		}
+	} else {
+		workspaceUpdateRequest.Description = description
+	}
+	if enforceCD == "" {
+		workspaceUpdateRequest.CicdEnforcedDefault = workspace.CicdEnforcedDefault
+	} else {
+		enforce, err := validateEnforceCD(enforceCD)
+		if err != nil {
+			return err
+		}
+		workspaceUpdateRequest.CicdEnforcedDefault = enforce
+	}
+	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID, workspaceUpdateRequest)
+	if err != nil {
+		return err
+	}
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Workspace %s was successfully updated\n", workspace.Name)
+	return nil
+}
+
+func Delete(id string, out io.Writer, client astrov1.APIClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	workspaces, err := GetWorkspaces(client)
+	if err != nil {
+		return err
+	}
+	var workspace astrov1.Workspace
+	if id == "" {
+		workspace, err = selectWorkspace(workspaces)
+		if workspace.Id == "" {
+			return ErrNoWorkspaceExists
+		}
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range workspaces {
+			if workspaces[i].Id == id {
+				workspace = workspaces[i]
+			}
+		}
+		if workspace.Id == "" {
+			return ErrWorkspaceNotFound
+		}
+	}
+	workspaceID := workspace.Id
+	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID)
+	if err != nil {
+		return err
+	}
+	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Workspace %s was successfully deleted\n", workspace.Name)
+	return nil
+}
+
+func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) {
+	if len(workspaces) == 0 {
+		return astrov1.Workspace{}, nil
+	}
+
+	if len(workspaces) == 1 {
+		fmt.Println("Only one Workspace was found. Using the following Workspace by default: \n" +
+			fmt.Sprintf("\n Workspace Name: %s", ansi.Bold(workspaces[0].Name)) +
+			fmt.Sprintf("\n Workspace ID: %s\n", ansi.Bold(workspaces[0].Id)))
+
+		return workspaces[0], nil
+	}
+
+	table := printutil.Table{
+		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
+		DynamicPadding: true,
+		Header:         []string{"#", "WORKSPACENAME", "ID", "CICD ENFORCEMENT"},
+	}
+
+	fmt.Println("\nPlease select the workspace you would like to update:")
+
+	workspaceMap := map[string]astrov1.Workspace{}
+	for i := range workspaces {
+		index := i + 1
+		table.AddRow([]string{
+			strconv.Itoa(index),
+			workspaces[i].Name,
+			workspaces[i].Id,
+			strconv.FormatBool(workspaces[i].CicdEnforcedDefault),
+		}, false)
+		workspaceMap[strconv.Itoa(index)] = workspaces[i]
+	}
+
+	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
+	choice := input.Text("\n> ")
+	selected, ok := workspaceMap[choice]
+	if !ok {
+		return astrov1.Workspace{}, errInvalidWorkspaceKey
+	}
+	return selected, nil
+}
+
+// GetWorkspaces returns every Workspace in the current Organization, paging
+// through the API as needed.
+func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return []astrov1.Workspace{}, err
+	}
+
+	sorts := []astrov1.ListWorkspacesParamsSorts{"name:asc"}
+	return pagination.Collect("workspaces", func(offset int) ([]astrov1.Workspace, int, error) {
+		pageSize := 1000
+		params := &astrov1.ListWorkspacesParams{Limit: &pageSize, Offset: &offset, Sorts: &sorts}
+		resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, params)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
+		}
+		return resp.JSON200.Workspaces, resp.JSON200.TotalCount, nil
+	})
+}
