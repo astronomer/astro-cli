@@ -79,7 +79,7 @@ func TestEmitTextRendersSameValue(t *testing.T) {
 	}
 }
 
-func TestWarnStandalonePackages(t *testing.T) {
+func TestWarnStandaloneOmissionsPackages(t *testing.T) {
 	packages := []string{"libpq-dev"}
 	cases := []struct {
 		name     string
@@ -95,7 +95,7 @@ func TestWarnStandalonePackages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Text mode: a warning line, or nothing.
 			text := &bytes.Buffer{}
-			warnStandalonePackages(Renderer{Format: FormatText, Out: text}, tc.plan)
+			warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, tc.plan)
 			if tc.wantWarn {
 				if !strings.Contains(text.String(), "warning: this project declares OS packages") {
 					t.Errorf("text output missing the warning: %q", text.String())
@@ -106,7 +106,7 @@ func TestWarnStandalonePackages(t *testing.T) {
 
 			// JSON mode: a single warning event line, or nothing.
 			jsonOut := &bytes.Buffer{}
-			warnStandalonePackages(Renderer{Format: FormatJSON, Out: jsonOut}, tc.plan)
+			warnStandaloneOmissions(Renderer{Format: FormatJSON, Out: jsonOut}, tc.plan)
 			if !tc.wantWarn {
 				if jsonOut.Len() != 0 {
 					t.Errorf("expected no JSON warning, got %q", jsonOut.String())
@@ -232,5 +232,71 @@ func TestConfirmEOFIsAnErrorNotANo(t *testing.T) {
 	c = &cli{d: d}
 	if err := c.confirm("wipe?"); err == nil {
 		t.Error("explicit no should abort")
+	}
+}
+
+// Standalone says so when it is ignoring a declared Dockerfile.
+//
+// This was the larger of the two omissions and the one with no warning. OS
+// packages are a line in the manifest; a declared Dockerfile IS the build. So
+// `astro local start` on a project whose Dockerfile does `RUN apt-get install -y
+// unixodbc-dev` provisioned an environment with none of it and said nothing —
+// and standalone is the DEFAULT, so that is what a user gets from the shortest
+// command. rt.Plan's doc records that standalone ignores the field; nothing said
+// it to the person it happens to.
+func TestWarnStandaloneDockerfile(t *testing.T) {
+	const declared = "docker/Dockerfile"
+	cases := []struct {
+		name     string
+		plan     localrt.Plan
+		wantWarn bool
+	}{
+		{"standalone with a declared Dockerfile warns", localrt.Plan{Dockerfile: declared}, true},
+		{"explicit standalone warns", localrt.Plan{Mode: localrt.ModeStandalone, Dockerfile: declared}, true},
+		{"docker mode is silent, because it builds the file", localrt.Plan{Mode: localrt.ModeDocker, Dockerfile: declared}, false},
+		{"no declaration is silent", localrt.Plan{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			text := &bytes.Buffer{}
+			warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, tc.plan)
+			if !tc.wantWarn {
+				if text.Len() != 0 {
+					t.Errorf("expected no warning, got %q", text.String())
+				}
+				return
+			}
+			got := text.String()
+			if !strings.Contains(got, "declares its own Dockerfile") {
+				t.Errorf("output missing the Dockerfile warning: %q", got)
+			}
+			// The path, because "a Dockerfile" is not actionable when the
+			// manifest may name one in a subdirectory.
+			if !strings.Contains(got, declared) {
+				t.Errorf("output does not name the declared path: %q", got)
+			}
+			if !strings.Contains(got, "--docker") {
+				t.Errorf("output does not say what to do about it: %q", got)
+			}
+		})
+	}
+}
+
+// A project declaring both gets both warnings, and the Dockerfile leads: it is
+// the one that changes what the user should do.
+func TestWarnStandaloneReportsBothOmissions(t *testing.T) {
+	text := &bytes.Buffer{}
+	warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, localrt.Plan{
+		Dockerfile: "Dockerfile",
+		Packages:   []string{"libpq-dev"},
+	})
+	got := text.String()
+	dockerfileAt := strings.Index(got, "declares its own Dockerfile")
+	packagesAt := strings.Index(got, "declares OS packages")
+	if dockerfileAt < 0 || packagesAt < 0 {
+		t.Fatalf("expected both warnings, got %q", got)
+	}
+	if dockerfileAt > packagesAt {
+		t.Errorf("the Dockerfile warning should lead; got %q", got)
 	}
 }

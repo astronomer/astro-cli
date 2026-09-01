@@ -100,7 +100,10 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 
 	deps := req.Manifest.Project.Dependencies
 	packages := req.Manifest.Astro.Packages
-	hash, err := contentHash(base, req.Platform, deps, packages, req.Manifest.Astro.Dockerfile, declared)
+	hash, err := contentHash(base, req.Platform, deps, packages, declaredDockerfile{
+		rel: req.Manifest.Astro.Dockerfile,
+		abs: declared,
+	})
 	if err != nil {
 		return Result{}, err
 	}
@@ -146,12 +149,53 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		defer t.untag(ctx, workingTag)
 	}
 
-	// The exact runtime version comes off the built image's label, the same
-	// value the deploy path validates against; fall back to the manifest pin if
-	// the label is absent.
-	runtimeVersion := t.readRuntimeVersion(ctx, built)
+	// The exact runtime version comes off the built image's label, the same value
+	// the deploy path validates against.
+	//
+	// A DECLARED Dockerfile with no label is a hard error, because the artifact
+	// this produces cannot be deployed. cloud/deploy refuses exactly this image
+	// on exactly this label, in both its build and its --image-name arm — so
+	// falling back to the manifest pin here produced a tag asserting an Astro
+	// Runtime version the image does not have, handed the user an artifact whose
+	// "whole purpose is to be the thing that ships", and let them discover it at
+	// deploy time. The two paths agree now, and this one fails first.
+	//
+	// The fallback stays for a GENERATED build, where it is defensive rather than
+	// load-bearing: that base is an Astro runtime by construction, so a missing
+	// label means something odd about the image rather than a choice the user made.
+	runtimeV, airflowLabel, inspected := t.readVersionLabels(ctx, built)
+	runtimeVersion := runtimeV
+	if runtimeVersion == "" {
+		runtimeVersion = airflowLabel
+	}
 	if runtimeVersion == "" {
 		runtimeVersion = airflowVersion
+	}
+	// A declared Dockerfile that did not produce an Astro Runtime image is
+	// REPORTED, not refused.
+	//
+	// The gap was silence: the tag took the manifest pin and asserted an Astro
+	// Runtime version the image does not have, and cloud/deploy then refused it
+	// on this label — so the artifact whose purpose is to ship could not, and
+	// nothing said so until deploy. A hard error closed that and closed a real
+	// workflow with it: a Dockerfile on a plain python base, packaged with --tag
+	// and --save for a self-hosted Airflow, worked before, and the `oss` target
+	// that ought to serve it is still a stub. Warning keeps both.
+	//
+	// Gated on the RUNTIME label alone, which is the test deploy applies, and on
+	// the inspect having actually succeeded — a daemon that failed to answer says
+	// nothing about the image's base.
+	if declared != "" && inspected && runtimeV == "" {
+		// The same shape this target's other lines use (see emit below), rather
+		// than a second mechanism for one message.
+		if cb.OnLine != nil {
+			cb.OnLine(localrt.LogLine{
+				Component: "package",
+				Time:      time.Now(),
+				Text: fmt.Sprintf("warning: the image built from %s carries no %s label, so it is not based on Astro Runtime. It cannot be deployed with astro deploy; build it FROM an Astro Runtime image if that is the goal",
+					req.Manifest.Astro.Dockerfile, runtimeVersionLabel),
+			})
+		}
 	}
 
 	finalTag := req.Tag
@@ -194,21 +238,27 @@ func (t *AstroTarget) probeDocker(ctx context.Context) error {
 	return t.docker.Run(ctx, t.env, localrt.Stdio{}, t.bin, "version")
 }
 
-// readRuntimeVersion reads the runtime-version label off an image, dropping to
-// the older airflow-version label the way the v1 deploy path does. A missing
-// label or a failed inspect returns "" — the caller falls back to the manifest
-// pin — so a non-runtime base never breaks the build.
-func (t *AstroTarget) readRuntimeVersion(ctx context.Context, image string) string {
+// readVersionLabels reads both version labels off an image, keeping them apart.
+//
+// Apart, because they answer different questions and one caller needs the
+// difference. The tag may fall back to the airflow label — an older Astro image
+// carries it and no runtime label — but "is this deployable to Astro" is about
+// the RUNTIME label alone, which is the only one cloud/deploy reads. A check
+// built on a combined runtime-or-airflow answer passes a
+// `FROM astronomerinc/ap-airflow:...-onbuild` image that deploy then refuses.
+//
+// The third return distinguishes "the label is absent" from "the inspect
+// failed", which the combined form flattens into "". A daemon restart mid-build
+// is not a statement about the image's base, and reporting it as one is a
+// confident wrong diagnosis.
+func (t *AstroTarget) readVersionLabels(ctx context.Context, image string) (runtimeV, airflowV string, ok bool) {
 	var out bytes.Buffer
 	format := fmt.Sprintf("{{ index .Config.Labels %q }}\t{{ index .Config.Labels %q }}", runtimeVersionLabel, airflowVersionLabel)
 	if err := t.docker.Run(ctx, t.env, localrt.Stdio{Out: &out}, t.bin, "image", "inspect", "--format", format, image); err != nil {
-		return ""
+		return "", "", false
 	}
-	runtimeV, airflowV, _ := strings.Cut(strings.TrimSpace(out.String()), "\t")
-	if v := cleanLabel(runtimeV); v != "" {
-		return v
-	}
-	return cleanLabel(airflowV)
+	rawRuntime, rawAirflow, _ := strings.Cut(strings.TrimSpace(out.String()), "\t")
+	return cleanLabel(rawRuntime), cleanLabel(rawAirflow), true
 }
 
 // cleanLabel normalizes one label value: docker prints "<no value>" for an
@@ -286,6 +336,25 @@ func (t *AstroTarget) save(ctx context.Context, image, path string, cb localrt.C
 // gave two different images the same content-addressed tag, and editing the
 // Dockerfile republished under the tag the previous image already held.
 //
+// NOT the build CONTEXT, which the Dockerfile can also COPY from, so this
+// address is incomplete and knowingly so. A first attempt hashed the whole
+// project directory and had to be withdrawn: `astro init` writes no
+// .dockerignore, standalone provisions <project>/.venv, and AIRFLOW_HOME is
+// <project>/.astro/standalone — so the walk read a virtualenv full of
+// host-absolute symlinks, a .git directory full of timestamps, and a live SQLite
+// database. The tag then differed between a laptop and CI for a byte-identical
+// image, moved every time the scheduler wrote a heartbeat, and failed outright
+// when a WAL file vanished mid-walk. Closing a collision in an uncommon shape is
+// not worth non-determinism and intermittent failure in the common one.
+//
+// Doing it properly means honoring .dockerignore, which this repo already
+// implements in cloud/deploy's dockerignoreSkipFunc over the vendored
+// moby/patternmatcher — plus file modes (docker's context carries the executable
+// bit, so `chmod +x` changes the image), symlink targets recorded relative to the
+// context, streaming reads, and a context.Context to cancel on. That is its own
+// change, not a rider on this one. Until then a project whose Dockerfile COPYs
+// its own files can reuse a tag after editing them.
+//
 // The DECLARED path, meaning the manifest's own slash-separated value, not the
 // absolute path it resolves to. Hashing the absolute path would make the content
 // address depend on where the project happens to sit, so the same commit built
@@ -296,7 +365,22 @@ func (t *AstroTarget) save(ctx context.Context, image, path string, cb localrt.C
 // Reading the file makes this fallible, which is the honest signature: a
 // declaration naming something unreadable cannot be content-addressed, and
 // imagebuild.Build refuses it a moment later anyway.
-func contentHash(base, platform string, deps, packages []string, declaredRel, declaredAbs string) (string, error) {
+// declaredDockerfile pairs the manifest's own slash-separated value with the
+// absolute path it resolves to.
+//
+// A struct rather than two adjacent string parameters, because the two are
+// interchangeable to the compiler and are NOT interchangeable to the hash: the
+// relative value is hashed (so the address does not depend on where the checkout
+// sits) and the absolute one is read. Transposed, contentHash would put an
+// absolute path into the field kept relative on purpose and try to read a
+// project-relative path — the first fails silently into a wrong hash, and no test
+// could see it.
+type declaredDockerfile struct {
+	rel string // the manifest value, slash-separated; "" when none is declared
+	abs string // rel resolved against the project; "" when none is declared
+}
+
+func contentHash(base, platform string, deps, packages []string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -309,11 +393,11 @@ func contentHash(base, platform string, deps, packages []string, declaredRel, de
 	for _, p := range sortedCopy(packages) {
 		writeField("pkg", p)
 	}
-	if declaredAbs != "" {
-		writeField("dockerfile", filepath.ToSlash(declaredRel))
-		body, err := os.ReadFile(declaredAbs)
+	if df.abs != "" {
+		writeField("dockerfile", filepath.ToSlash(df.rel))
+		body, err := os.ReadFile(df.abs)
 		if err != nil {
-			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", declaredRel, err)
+			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}

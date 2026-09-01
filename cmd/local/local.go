@@ -188,7 +188,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	if err != nil {
 		return c.reportBuildError(r, err)
 	}
-	warnStandalonePackages(r, built.Plan)
+	warnStandaloneOmissions(r, built.Plan)
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return err
@@ -211,20 +211,55 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	})
 }
 
-// warnStandalonePackages warns once, at start, when a project declares OS
-// packages but is starting in standalone mode, which has no image to bake them
-// into. Docker mode installs them, so it says nothing. The warning routes
-// through the renderer, so json mode keeps one JSON object per line.
-func warnStandalonePackages(r Renderer, p localrt.Plan) {
-	if len(p.Packages) == 0 || p.Mode == localrt.ModeDocker {
+// warnStandaloneOmissions warns, at start, about everything a project declares
+// that standalone mode cannot honor: its own Dockerfile, and its OS packages.
+// Docker mode does both, so it says nothing there. Warnings route through the
+// renderer, so json mode keeps one JSON object per line.
+//
+// Named for what it does rather than for one of the two keys. It was
+// warnStandalonePackages when packages were the only case, and the name outlived
+// that by exactly one commit — the reader checking whether the Dockerfile case is
+// handled would have found a function and a comment both saying it is not.
+//
+// Both callers reach it: runStart and runRestart. `astro local restart` has no
+// --docker flag of its own, so the messages name Docker mode as the thing to run
+// in rather than a flag to add to the command in hand.
+func warnStandaloneOmissions(r Renderer, p localrt.Plan) {
+	if p.Mode == localrt.ModeDocker {
 		return
 	}
-	e := event{Event: "warning", Text: "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself"}
-	//nolint:errcheck // a warning write failure surfaces on the command's own output
-	r.Emit(e, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
-		return werr
-	})
+	for _, text := range standaloneOmissions(p) {
+		e := event{Event: "warning", Text: text}
+		//nolint:errcheck // a warning write failure surfaces on the command's own output
+		r.Emit(e, func(w io.Writer) error {
+			_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
+			return werr
+		})
+	}
+}
+
+// standaloneOmissions lists what this plan declares that standalone mode cannot
+// honor, in the order it matters.
+//
+// The Dockerfile warning is the one that was missing, and it is the larger of
+// the two by a distance: OS packages are a line in the manifest, while a declared
+// Dockerfile IS the build. `astro local start` on a project whose Dockerfile does
+// `RUN apt-get install -y unixodbc-dev` and `COPY vendored/ /opt/vendored`
+// provisions an environment with none of it — and standalone is the DEFAULT, so
+// this is what a user gets by typing the shortest command. rt.Plan's own doc says
+// standalone ignores the field; nothing said it to the person it happens to.
+//
+// Both, and in this order, because a project can declare both and the Dockerfile
+// is the one that changes what they should do about it.
+func standaloneOmissions(p localrt.Plan) []string {
+	var out []string
+	if p.Dockerfile != "" {
+		out = append(out, "this project declares its own Dockerfile ("+p.Dockerfile+"); standalone mode builds no image, so nothing that file installs or copies is applied. Run in Docker mode (--docker) to build it")
+	}
+	if len(p.Packages) > 0 {
+		out = append(out, "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself")
+	}
+	return out
 }
 
 // reportBuildError renders a plan-build failure. A *plan.MissingEnvError in
@@ -329,7 +364,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	if err != nil {
 		return err
 	}
-	warnStandalonePackages(r, built.Plan)
+	warnStandaloneOmissions(r, built.Plan)
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
 	}

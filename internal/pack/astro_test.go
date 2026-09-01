@@ -347,3 +347,51 @@ func TestAstroBuildRefusesAnUnreadableDeclaration(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "docker/Dockerfile")
 }
+
+// A declared Dockerfile on a non-Astro base is REPORTED, not refused.
+//
+// The gap was silence: package tagged the image with the manifest pin, asserting
+// an Astro Runtime version the image does not have, and cloud/deploy then refused
+// it on the label. A hard error here closed the silence and closed a legitimate
+// workflow with it — a Dockerfile on a plain python base, packaged with --tag and
+// --save for a self-hosted Airflow, which worked before and which the `oss` target
+// that should serve it is still a stub for. So this warns and carries on.
+func TestAstroBuildWarnsWhenADeclaredBuildHasNoRuntimeLabel(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM python:3.12-slim\nRUN echo hi\n")
+	var lines []string
+	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: ""}).Build(context.Background(), req, cb)
+	require.NoError(t, err, "a self-hosted image is a real thing to package")
+	assert.Contains(t, strings.Join(lines, "\n"), "not based on Astro Runtime",
+		"the artifact cannot be deployed to Astro and the user has to hear that here, not at deploy time")
+	assert.NotEmpty(t, res.Image)
+}
+
+// The warning is about the RUNTIME label specifically, which is the one deploy
+// reads. readVersionLabels also surfaces the older airflow-version label, so a
+// `FROM astronomerinc/ap-airflow:...-onbuild` image satisfies it and would have
+// passed a check built on that helper — then been refused by deploy anyway.
+func TestAstroBuildWarnsForAnAirflowLabelledImageToo(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM astronomerinc/ap-airflow:2.7.1-onbuild\n")
+	var lines []string
+	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+
+	// One inspect returns both labels, tab-separated: no runtime label, and the
+	// airflow label answering in its place.
+	docker := &fakeDocker{inspectOut: "<no value>\t2.7.1"}
+	_, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), req, cb)
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(lines, "\n"), "not based on Astro Runtime",
+		"deploy reads only the runtime label, so this has to warn on the same test deploy applies")
+}
+
+// A generated build never warns: its base is an Astro runtime by construction.
+func TestAstroBuildDoesNotWarnForAGeneratedImage(t *testing.T) {
+	var lines []string
+	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: ""}).Build(context.Background(), testRequest(t), cb)
+	require.NoError(t, err)
+	assert.NotContains(t, strings.Join(lines, "\n"), "not based on Astro Runtime")
+	assert.Contains(t, res.Image, "3.1", "the manifest pin names the tag when the label is absent")
+}
