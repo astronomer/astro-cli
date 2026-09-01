@@ -137,7 +137,7 @@ func GetCommandPath(cmd *cobra.Command) string {
 // notice makes a materially different claim about what is collected, so users
 // who accepted earlier wording see the change instead of inheriting it silently.
 // v1 predates this constant and is stored as "true".
-const noticeVersion = "2"
+const noticeVersion = "3"
 
 // showFirstRunNotice prints a notice about telemetry on the first CLI invocation,
 // and again whenever noticeVersion changes.
@@ -148,6 +148,7 @@ func showFirstRunNotice() {
 	fmt.Fprintln(os.Stderr,
 		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
 			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
+			"A command or flag the CLI does not have is tracked too, so we can see what to add.\n"+
 			"While you are logged in, events are linked to your Astro organization.\n"+
 			"Logged-out usage stays anonymous.\n"+
 			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
@@ -189,25 +190,41 @@ func buildCommandProperties(cmd *cobra.Command) map[string]interface{} {
 // TrackCommand sends telemetry data for a command execution.
 // It spawns a subprocess to send the data asynchronously.
 func TrackCommand(cmd *cobra.Command) {
-	if !IsEnabled() || isTestRun() {
+	if commandPath := GetCommandPath(cmd); commandPath == "" || cmd.Hidden {
 		return
+	}
+	if !canTrack(cmd) {
+		return
+	}
+
+	track(EventCommandExecution, buildCommandProperties(cmd))
+}
+
+// canTrack reports whether an event for cmd should be sent, and shows the
+// first-run notice when it should. It runs before every event, so that a
+// command which sends nothing says nothing — notably `astro telemetry
+// disable`, which would otherwise announce collection to someone in the act of
+// opting out, and a mistyped version of it, which would report the mistake.
+func canTrack(cmd *cobra.Command) bool {
+	if !IsEnabled() || isTestRun() {
+		return false
 	}
 
 	commandPath := GetCommandPath(cmd)
-	if commandPath == "" || cmd.Hidden || strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
-		return
+	if strings.HasPrefix(commandPath, "telemetry") || strings.HasPrefix(commandPath, "_telemetry") {
+		return false
 	}
 
-	// After the filter above, so that commands which send nothing say nothing —
-	// notably `astro telemetry disable`, which otherwise announces collection to
-	// someone in the act of opting out.
 	showFirstRunNotice()
+	return true
+}
 
-	properties := buildCommandProperties(cmd)
-
+// track sends one event. It goes out in the background, unless debug mode asks
+// for it in the foreground.
+func track(event string, properties map[string]interface{}) {
 	payload := sharedtel.TelemetryPayload{
 		Source:      SourceName,
-		Event:       EventCommandExecution,
+		Event:       event,
 		AnonymousID: GetAnonymousID(),
 		Properties:  properties,
 	}

@@ -19,6 +19,7 @@ func newTelemetryCmd(out io.Writer) *cobra.Command {
 Telemetry helps us understand how the CLI is used and improve it.
 We collect usage data including:
 - Commands used (not arguments or values)
+- Commands and flags the CLI does not have, when one is typed
 - CLI version
 - Operating system
 - Invocation context (CI, interactive, etc.)
