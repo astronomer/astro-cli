@@ -26,10 +26,10 @@ import (
 	"net/http"
 	"time"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instances"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
 // Deployments is the one control-plane call this package makes.

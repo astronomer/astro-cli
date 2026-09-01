@@ -5,7 +5,7 @@ package astrov1alpha1_mocks
 import (
 	context "context"
 
-	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 
 	io "io"
 

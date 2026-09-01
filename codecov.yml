@@ -1,7 +1,7 @@
 ---
 ignore:
-  - "astro-client-v1/api.gen.go"
-  - "astro-client-v1alpha1/api.gen.go"
+  - "internal/platform/astro/clients/astrov1/api.gen.go"
+  - "internal/platform/astro/clients/astrov1alpha1/api.gen.go"
 coverage:
   range: 87..100
   round: down

@@ -1,4 +1,4 @@
-// Post-processes astro-client-v1/api.gen.go to fix an oapi-codegen bug
+// Post-processes internal/platform/astro/clients/astrov1/api.gen.go to fix an oapi-codegen bug
 // (present through at least v2.6.0).
 //
 // For each oneOf variant, oapi-codegen emits From*/Merge* setter helpers that

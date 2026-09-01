@@ -19,4 +19,4 @@ include-tags:
   - ApiToken
   - User
   - Workspace
-output: ./astro-client-v1/api.gen.go
+output: ./internal/platform/astro/clients/astrov1/api.gen.go

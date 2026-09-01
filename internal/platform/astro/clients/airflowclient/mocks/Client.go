@@ -3,7 +3,7 @@
 package airflow_mocks
 
 import (
-	airflowclient "github.com/astronomer/astro-cli/airflow-client"
+	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
 	mock "github.com/stretchr/testify/mock"
 )
 

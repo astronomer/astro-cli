@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -410,7 +410,7 @@ func (s *Suite) TestListDeploymentsPaginates() {
 	mockClient.AssertExpectations(s.T())
 }
 
-// TestListDeploymentsPaginatesOverHTTP drives a real astro-client-v1 client against
+// TestListDeploymentsPaginatesOverHTTP drives a real astrov1 client against
 // a stub API server, exercising the actual HTTP request building (offset/limit
 // query params), response parsing, and the pagination loop end-to-end.
 func (s *Suite) TestListDeploymentsPaginatesOverHTTP() {

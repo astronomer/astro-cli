@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	airflowclient "github.com/astronomer/astro-cli/airflow-client"
+	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 )

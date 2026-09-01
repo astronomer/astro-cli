@@ -24,9 +24,9 @@ import (
 	"net/http"
 	"sync"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	cloudenv "github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 

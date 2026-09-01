@@ -5,8 +5,8 @@ import (
 	httpcontext "context"
 	"errors"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
 const objectTypeAirflowVar = astrov1.AIRFLOWVARIABLE

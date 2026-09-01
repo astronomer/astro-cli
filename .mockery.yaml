@@ -20,22 +20,22 @@ packages:
       DockerComposeAPI:
       DockerRegistryAPI:
       DockerCLIClient:
-  github.com/astronomer/astro-cli/airflow-client:
+  github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient:
     config:
-      dir: airflow-client/mocks
+      dir: internal/platform/astro/clients/airflowclient/mocks
       outpkg: airflow_mocks
     interfaces:
       Client:
-  github.com/astronomer/astro-cli/astro-client-v1:
+  github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1:
     config:
-      dir: astro-client-v1/mocks
+      dir: internal/platform/astro/clients/astrov1/mocks
     interfaces:
       ClientWithResponsesInterface:
         config:
           filename: client.go
-  github.com/astronomer/astro-cli/astro-client-v1alpha1:
+  github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1:
     config:
-      dir: astro-client-v1alpha1/mocks
+      dir: internal/platform/astro/clients/astrov1alpha1/mocks
     interfaces:
       ClientWithResponsesInterface:
         config:

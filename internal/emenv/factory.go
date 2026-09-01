@@ -1,8 +1,8 @@
 package emenv
 
 import (
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
 // NewProvider builds the workspace Environment Manager provider for a run: it

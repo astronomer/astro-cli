@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 

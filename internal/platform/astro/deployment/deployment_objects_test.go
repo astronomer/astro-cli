@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	airflowclient "github.com/astronomer/astro-cli/airflow-client"
-	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
+	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
+	airflowclient_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient/mocks"
 )
 
 var (

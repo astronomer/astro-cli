@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instances"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
 // astroBaseURL reads the Deployment's web server URL from the control plane.

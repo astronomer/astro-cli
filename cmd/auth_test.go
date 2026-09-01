@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	cloudAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

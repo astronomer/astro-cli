@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	airflowclient "github.com/astronomer/astro-cli/airflow-client"
-	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
-	"github.com/astronomer/astro-cli/astro-client-v1"
-	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
+	airflowclient_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	mock "github.com/stretchr/testify/mock"
 
 	types "github.com/astronomer/astro-cli/airflow/types"
