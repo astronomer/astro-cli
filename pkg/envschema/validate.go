@@ -22,6 +22,21 @@ func Validate(s *Schema, v Values) []Violation {
 
 	check := func(section Section, names map[string]ValueSpec, present map[string]string) {
 		for key := range names {
+			// An optional declaration does not gate. This is the only thing the
+			// flag does, and the only thing this function does with any
+			// annotation: Type, Enum and ConnType are metadata for consumers,
+			// not checks performed here — see this function's own doc above,
+			// which says there is no type check.
+			//
+			// Indexed rather than ranged by value, and deliberately not because
+			// of the struct's current size: ranging by value made this loop's
+			// legality depend on ValueSpec staying under gocritic's copy
+			// threshold, so the next field added to the struct would fail lint
+			// HERE, in an unrelated change, pointing at this line instead of at
+			// the field. Indexing costs nothing and removes the tripwire.
+			if names[key].Optional {
+				continue
+			}
 			if _, ok := present[key]; !ok {
 				out = append(out, Violation{Kind: ViolationMissing, Section: section, Key: key, Reason: reasonRequired})
 			}
