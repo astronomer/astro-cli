@@ -94,16 +94,16 @@ func ParseSchema(env map[string]any) (*envschema.Schema, error) {
 		switch name {
 		case "connections":
 			s.Connections = p.specs(envRoot+".connections", raw, airflowenv.ValidConnID,
-				"not a valid connection id (letters, digits, _)", true)
+				"not a valid connection id (letters, digits, _)", envschema.SectionConnection)
 		case "airflow_variables":
 			s.AirflowVariables = p.specs(envRoot+".airflow_variables", raw, airflowenv.ValidVarKey,
-				"not a valid variable key (letters, digits, _)", false)
+				"not a valid variable key (letters, digits, _)", envschema.SectionAirflowVariable)
 		default:
 			vars[name] = raw
 		}
 	}
 	s.EnvVars = p.specs(envRoot, vars, airflowenv.ValidEnvKey,
-		"not a legal env-var name (letters, digits, _; no leading digit)", false)
+		"not a legal env-var name (letters, digits, _; no leading digit)", envschema.SectionEnvVar)
 
 	if len(p.problems) > 0 {
 		sort.SliceStable(p.problems, func(i, j int) bool { return p.problems[i].Key < p.problems[j].Key })
@@ -111,16 +111,6 @@ func ParseSchema(env map[string]any) (*envschema.Schema, error) {
 	}
 	return s, nil
 }
-
-// sensitiveDefaultRefusal is the one wording for "a value that belongs in a
-// vault must not carry a committed default", used by both paths that can reach
-// it — the table form and the string shorthand. It was written out twice, and
-// two copies of a user-facing sentence diverge the first time one is reworded.
-const sensitiveDefaultRefusal = " must not carry a default: it would be committed to the manifest and written into the environment on start"
-
-// connectionAlwaysSensitive names why a connection is refused a default without
-// the author ever having typed `sensitive`.
-const connectionAlwaysSensitive = "a connection, which is always sensitive,"
 
 type schemaParser struct {
 	problems []Problem
@@ -135,7 +125,7 @@ func (p *schemaParser) add(key, reason string) {
 // section — a plain var must itself be a legal env-var name (ValidEnvKey), an
 // Airflow Variable key may start with a digit (ValidVarKey), a connection id is
 // ValidConnID.
-func (p *schemaParser) specs(key string, raw any, validName func(string) bool, invalidReason string, isConnections bool) map[string]envschema.ValueSpec {
+func (p *schemaParser) specs(key string, raw any, validName func(string) bool, invalidReason string, section envschema.Section) map[string]envschema.ValueSpec {
 	table, ok := raw.(map[string]any)
 	if !ok {
 		p.add(key, "expected a table")
@@ -151,7 +141,7 @@ func (p *schemaParser) specs(key string, raw any, validName func(string) bool, i
 			p.add(specKey, invalidReason)
 			continue
 		}
-		if spec, ok := p.decodeSpec(specKey, specRaw, isConnections); ok {
+		if spec, ok := p.decodeSpec(specKey, specRaw, section); ok {
 			out[name] = spec
 		}
 	}
@@ -162,40 +152,40 @@ func (p *schemaParser) specs(key string, raw any, validName func(string) bool, i
 // empty string included); a table means the value lives outside the manifest,
 // with an optional `source`. ok is false when the declaration is malformed and
 // a Problem was recorded.
-func (p *schemaParser) decodeSpec(key string, raw any, isConnections bool) (envschema.ValueSpec, bool) {
+func (p *schemaParser) decodeSpec(key string, raw any, section envschema.Section) (envschema.ValueSpec, bool) {
 	switch v := raw.(type) {
 	case string:
-		// The shorthand, and now literally sugar: it sets the same Default the
+		// The shorthand, and literally sugar: it sets the same Default the
 		// table's `default` key sets, and nothing else — except that a
-		// connection is sensitive whichever spelling declared it.
-		//
-		// Which makes the shorthand a way to write a connection with a committed
-		// default, i.e. a credential in the manifest. It is refused here for the
-		// same reason the table form is: the shorthand cannot say `sensitive`,
-		// so without this it would be the way around the rule rather than sugar
-		// for it.
-		if isConnections {
-			p.add(key+".default", connectionAlwaysSensitive+sensitiveDefaultRefusal)
+		// connection is sensitive whichever spelling declared it, which makes
+		// the shorthand a way to write a connection with a committed default.
+		// Check refuses that, so the shorthand cannot be the way around a rule
+		// the table form obeys.
+		spec := envschema.ValueSpec{
+			Default:    v,
+			HasDefault: true,
+			Sensitive:  section == envschema.SectionConnection,
+		}
+		if !p.checkSpec(key, spec, section, nil) {
 			return envschema.ValueSpec{}, false
 		}
-		return envschema.ValueSpec{Default: v, HasDefault: true}, true
+		return spec, true
 	case map[string]any:
-		return p.decodeSpecTable(key, v, isConnections)
+		return p.decodeSpecTable(key, v, section)
 	default:
 		p.add(key, "expected a string default or a table")
 		return envschema.ValueSpec{}, false
 	}
 }
 
-func (p *schemaParser) decodeSpecTable(key string, table map[string]any, isConnections bool) (envschema.ValueSpec, bool) {
+func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section envschema.Section) (envschema.ValueSpec, bool) {
 	var spec envschema.ValueSpec
 	before := len(p.problems)
-	// A connection carries a credential by construction, so it is sensitive
-	// whether or not anyone said so. Per-declaration opt-in would mean every
-	// connection that forgot the flag read as plaintext-safe, which is the
-	// downgrade this grammar must not introduce: the schema it replaces treats
-	// connections as unconditionally sensitive.
-	spec.Sensitive = isConnections
+	// Connections start sensitive, so an absent key means what it should. An
+	// explicit `sensitive` still decodes over the top and Check judges the
+	// result — which is how `sensitive = false` on a connection gets told it is
+	// not allowed rather than that it "says nothing".
+	spec.Sensitive = section == envschema.SectionConnection
 	// Which fields failed to decode, so the coherence rules below do not read a
 	// zero value left by a failure and report a second, contradictory problem.
 	failed := map[string]bool{}
@@ -218,13 +208,6 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, isConne
 		case "optional":
 			spec.Optional = p.boolField(fieldKey, v)
 		case "sensitive":
-			if isConnections {
-				// Not "ignored": saying it here is either redundant or an
-				// attempt to turn it off, and the second one must not look like
-				// it worked.
-				p.add(fieldKey, "connections are always sensitive, so this says nothing")
-				continue
-			}
 			spec.Sensitive = p.boolField(fieldKey, v)
 		case "description":
 			spec.Description, _ = p.str(fieldKey, v)
@@ -236,13 +219,12 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, isConne
 			case t == "":
 				// ValidType accepts "" so that an ABSENT type is valid, not so
 				// an author can write one. An empty source and an empty
-				// conn_type are both refused; this is the same typo.
+				// conn_type are both refused; this is the same typo. Check
+				// cannot see the difference, since both arrive as "".
 				p.add(fieldKey, "expected a type, not an empty string — omit the key for a plain string")
 				failed["type"] = true
-			case !envschema.ValidType(envschema.ValueType(t)):
-				p.add(fieldKey, fmt.Sprintf("%q is not a known type (string, int, number, bool, enum, url, port, json)", t))
-				failed["type"] = true
 			default:
+				// An unknown type is Check's rule, not this loop's.
 				spec.Type = envschema.ValueType(t)
 			}
 		case "enum":
@@ -262,61 +244,78 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, isConne
 				spec.Enum = e
 			}
 		case "conn_type":
-			// Gated here rather than by the type system, because one ValueSpec
-			// is shared by all three sections on purpose. An env var with a
-			// conn_type is a mistake worth naming rather than a field to ignore.
-			if !isConnections {
-				p.add(fieldKey, "conn_type is only meaningful under connections")
-				continue
-			}
+			// Decoded in every section and judged by Check, which is where
+			// "conn_type means nothing here" belongs — one ValueSpec is shared
+			// by all three sections, so that is a property of the spec plus its
+			// section rather than of this loop.
 			ct, ok := p.str(fieldKey, v)
-			if ok && ct == "" {
+			switch {
+			case !ok:
+				failed["conn_type"] = true
+			case ct == "":
 				p.add(fieldKey, "expected a connection type, not an empty string")
-				continue
+				failed["conn_type"] = true
+			default:
+				spec.ConnType = ct
 			}
-			spec.ConnType = ct
 		default:
 			p.add(fieldKey, "unknown field")
 		}
 	}
-	p.checkCoherence(key, spec, failed, isConnections)
+	p.checkSpec(key, spec, section, failed)
 	// ok only if no field recorded a problem; map order must not matter.
 	return spec, len(p.problems) == before
 }
 
-// checkCoherence applies the rules that need a finished spec rather than a
-// single field, so map iteration order cannot decide whether a declaration is
-// well formed.
+// checkSpec runs the type's own well-formedness rules and records what they
+// find, returning whether the declaration is usable.
 //
-// failed names the fields whose own decode already recorded a problem, and each
-// rule skips when a field it reads is in there. Otherwise one authoring mistake
-// produces two problems and the second contradicts what the user wrote:
-// `{ type = 'enum', enum = ['a', 2] }` reporting the real bad element AND "needs
-// a non-empty enum", when a non-empty enum is exactly what they supplied.
-func (p *schemaParser) checkCoherence(key string, spec envschema.ValueSpec, failed map[string]bool, isConnections bool) {
-	if !failed["enum"] && !failed["type"] {
-		if len(spec.Enum) > 0 && spec.Type != envschema.TypeEnum {
-			p.add(key+".enum", "enum needs type = \"enum\"")
+// The rules live on envschema.ValueSpec rather than here, because this parser is
+// not the only thing that builds one: O19 moves Astro Desktop's declaration
+// source into the manifest, read and write together, so a spec will also be
+// constructed from UI state and serialized. A rule enforced only on the way in
+// would let that writer emit a manifest this reader refuses.
+//
+// What stays here is everything that needs the SOURCE TEXT rather than the
+// finished spec: an unknown key, an empty string where a value was required, a
+// field of the wrong TOML type. Check cannot see those — `type = ""` and an
+// absent type both arrive as "".
+//
+// failed names the fields whose own decode already recorded a problem, and their
+// findings are dropped. Otherwise one authoring mistake produces two problems
+// and the second contradicts what the user wrote: `{ type = 'enum', enum = ['a',
+// 2] }` reporting the real bad element AND "needs a non-empty enum", when a
+// non-empty enum is exactly what they supplied.
+func (p *schemaParser) checkSpec(key string, spec envschema.ValueSpec, section envschema.Section, failed map[string]bool) bool {
+	ok := true
+	for _, problem := range spec.Check(section) {
+		// Filtered on what the rule READ, not on where it points. A rule can
+		// report against one annotation while consulting another — "type = enum
+		// needs a non-empty enum" points at `type` and reads `enum` — so keying
+		// this on Field let exactly that pair through and reproduced the
+		// contradictory second message.
+		if anyFailed(problem.Reads, failed) {
+			continue
 		}
-		if spec.Type == envschema.TypeEnum && len(spec.Enum) == 0 {
-			p.add(key+".type", "type = \"enum\" needs a non-empty enum")
+		problemKey := key
+		if problem.Field != "" {
+			problemKey = key + "." + problem.Field
+		}
+		p.add(problemKey, problem.Reason)
+		ok = false
+	}
+	return ok
+}
+
+// anyFailed reports whether any of these annotations already recorded a problem
+// of its own.
+func anyFailed(fields []string, failed map[string]bool) bool {
+	for _, f := range fields {
+		if failed[f] {
+			return true
 		}
 	}
-	// A sensitive value may not carry a default. A default is committed to the
-	// manifest and injected at start — resolve.go puts it in the injected set,
-	// which becomes Plan.Env, which docker mode writes into the compose file it
-	// leaves on disk. So `{ sensitive = true, default = ... }` would put the
-	// credential in git AND on disk, which is precisely what the flag exists to
-	// prevent. This is the one combination the first version of these checks let
-	// through.
-	if !failed["default"] && spec.HasDefault && spec.Sensitive {
-		what := "a sensitive value"
-		if isConnections {
-			// The author never typed `sensitive` here, so name the real reason.
-			what = connectionAlwaysSensitive
-		}
-		p.add(key+".default", what+sensitiveDefaultRefusal)
-	}
+	return false
 }
 
 // boolField decodes a bool-valued annotation. A wrong type records a problem and

@@ -88,6 +88,8 @@
 // is the only source today.
 package envschema
 
+import "fmt"
+
 // Schema is the [tool.astro.env] section, keyed by name.
 type Schema struct {
 	EnvVars          map[string]ValueSpec
@@ -134,6 +136,111 @@ type ValueSpec struct {
 	HasDefault bool
 	Optional   bool
 	Sensitive  bool
+}
+
+// SpecProblem is one way a declaration is not well formed: the annotation at
+// fault, and why.
+//
+// Field-relative rather than fully qualified, because this package does not know
+// where the declaration came from. A TOML reader prefixes its dotted key; a
+// writer building a spec from a form can point at the input.
+type SpecProblem struct {
+	// Field is the annotation at fault — "default", "sensitive", "type",
+	// "enum", "conn_type" — or "" for the declaration as a whole.
+	Field string
+	// Reads names every annotation the rule consulted, which is not always just
+	// Field: "type = enum needs a non-empty enum" points at `type` and reads
+	// `enum`.
+	//
+	// It exists for a caller that already knows a field is broken. A TOML reader
+	// that failed to decode `enum` should not then report a rule that read the
+	// zero value it left behind, because the second message contradicts what the
+	// author actually wrote. Pointing at the field is not enough to work that
+	// out — the rule has to say what it looked at.
+	Reads []string
+	// Reason is a sentence for whoever wrote the declaration.
+	Reason string
+}
+
+// Check reports the ways this declaration is not well formed, given the section
+// it sits in. It returns nil for a valid one.
+//
+// These rules live on the TYPE rather than in the TOML reader on purpose, and
+// that purpose is a writer. The reader (internal/envresolve) is not the only
+// thing that builds a ValueSpec: O19 moves Astro Desktop's declaration source
+// into the manifest, read AND write together, so the Environment Manager will
+// construct specs from UI state and serialize them. Enforced only on the way in,
+// these rules would let it write a manifest that the next `astro local start`
+// refuses to load — a file the tool that wrote it cannot read.
+//
+// Well-formedness only. Whether a value RESOLVES is Validate's question, and
+// whether the TOML decoded at all is the reader's; this is whether the
+// declaration describes something coherent. `{ sensitive = true, default = 'x' }`
+// decodes perfectly and is not a thing anyone is allowed to mean.
+//
+// The value receiver is deliberate, and stays even as this struct grows past a
+// copy threshold: Schema holds specs as map[string]ValueSpec, and a pointer
+// method cannot be called on a map index expression, so the obvious caller —
+// walking a schema and checking each declaration — would not compile. A 112-byte
+// copy once per declaration, at parse and at write, is not worth that.
+//
+//nolint:gocritic // hugeParam: see above; by value on purpose.
+func (s ValueSpec) Check(section Section) []SpecProblem {
+	var out []SpecProblem
+	// reads defaults to the field itself, which is right for every rule that
+	// consults only what it points at.
+	add := func(field, reason string, reads ...string) {
+		if len(reads) == 0 {
+			reads = []string{field}
+		}
+		out = append(out, SpecProblem{Field: field, Reads: reads, Reason: reason})
+	}
+
+	// An unrecognized type is reported once, and stops the rules below that read
+	// it. Otherwise `{ type = 'enom', enum = ['a'] }` reports the real mistake
+	// AND "enum needs type = enum", the second contradicting a type the author
+	// plainly tried to write — the same cascade a caller filters with Reads, one
+	// level in.
+	badType := !ValidType(s.Type)
+	if badType {
+		add("type", fmt.Sprintf("%q is not a known type (string, int, number, bool, enum, url, port, json)", s.Type))
+	}
+
+	// A connection carries a credential by construction, so it may not be
+	// declared otherwise. A reader defaults this to true for an absent key; the
+	// rule is here so a constructed spec cannot skip it.
+	if section == SectionConnection && !s.Sensitive {
+		add("sensitive", "a connection always holds a credential, so it cannot be declared not sensitive")
+	}
+
+	// A sensitive value may not carry a default. A default is committed to the
+	// manifest and injected into the environment at start, so this would put the
+	// credential in version control and on disk — the one thing the flag exists
+	// to prevent.
+	if s.Sensitive && s.HasDefault {
+		what := "a sensitive value"
+		if section == SectionConnection {
+			// Nobody had to write `sensitive` for a connection, so name the
+			// reason it is one.
+			what = "a connection, which is always sensitive,"
+		}
+		add("default", what+" must not carry a default: it would be committed to the manifest and written into the environment on start", "default", "sensitive")
+	}
+
+	if s.ConnType != "" && section != SectionConnection {
+		add("conn_type", "conn_type describes a connection, so it means nothing in "+string(section))
+	}
+
+	// enum and type = 'enum' each require the other, and each rule reads both.
+	if !badType {
+		if len(s.Enum) > 0 && s.Type != TypeEnum {
+			add("enum", "enum needs type = \"enum\"", "enum", "type")
+		}
+		if s.Type == TypeEnum && len(s.Enum) == 0 {
+			add("type", "type = \"enum\" needs a non-empty enum", "type", "enum")
+		}
+	}
+	return out
 }
 
 // ValueType is the declared shape of a value. It describes what a value should
