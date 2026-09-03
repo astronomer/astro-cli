@@ -12,7 +12,7 @@ type Suite struct {
 	suite.Suite
 }
 
-func SetupSuite() {
+func (s *Suite) SetupSuite() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 }
 
