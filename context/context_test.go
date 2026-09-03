@@ -154,6 +154,10 @@ func (s *Suite) TestIsCloudDomain() {
 		"https://cloud.astronomer-perf.io",
 		"https://cloud.astronomer-perf.io/",
 		"pr1234.cloud.astronomer-dev.io",
+		"cloud.us-central1.astronomer-dev.io",
+		"cloud.us-east-1.astronomer.io",
+		"https://cloud.us-central1.astronomer-dev.io",
+		"us-central1.astronomer-dev.io", // domain as stored in context after FormatDomain strips "cloud."
 		"pr1234.astronomer-dev.io",
 		"pr12345.astronomer-dev.io",
 		"pr123456.astronomer-dev.io",
