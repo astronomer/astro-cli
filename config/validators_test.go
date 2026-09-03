@@ -22,6 +22,7 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 			"registry with spaces/repo", // contains spaces
 			"/registry/repo",            // starts with slash
 			"registry/repo/",            // ends with slash
+			"myregistry.example.com:7990/repository/path/my-image:1.0", // embedded tag on repository path
 		}
 
 		for _, endpoint := range invalidEndpoints {
