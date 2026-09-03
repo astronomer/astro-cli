@@ -55,6 +55,7 @@ var (
 	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
 	ErrRuntimeVersionNotPassedForRemoteImage = errors.New("if --image-name and --remote is passed, it's mandatory to pass --runtime-version")
+	ErrDeploymentUsesOwnRegistry             = errors.New("this Deployment pulls its images from its own registry, so it cannot be deployed to the APC registry")
 )
 
 const (
@@ -120,6 +121,12 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		}
 	}
 
+	// Refuse before building or pushing anything: without a BYO registry this command pushes to APC's
+	// own, which is the one registry a Deployment that keeps its own must not be repointed at.
+	if err := assertDeploymentAcceptsRegistryPush(deploymentInfo, deploymentID, byoRegistryEnabled); err != nil {
+		return deploymentID, err
+	}
+
 	// isImageOnlyDeploy is not valid for image-based deployments since image-based deployments inherently mean that the image itself contains dags.
 	// If we deploy only the image, the deployment will not have any dags for image-based deployments.
 	// Even on astro, image-based deployments are not allowed to be deployed with --image flag.
@@ -140,6 +147,31 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	fmt.Printf("Successfully pushed Docker image to the APC registry, it can take a few minutes to update the deployment with the new image. Navigate to the APC UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return deploymentID, nil
+}
+
+// assertDeploymentAcceptsRegistryPush refuses a deploy that would push this Deployment's image to APC's
+// own registry when the Deployment pulls from its own.
+//
+// Such a Deployment authenticates its image pulls with its own credential, which APC does not manage,
+// so an image on APC's registry is one its pods cannot pull — and repointing it loses the image
+// reference it is running on. The supported route is to push to your own registry and point the
+// Deployment at the result with --remote, which never touches APC's registry.
+//
+// Allowed when the platform pushes to a BYO registry instead: that registry has a platform credential
+// synced into the Deployment's namespace, so the push is not inherently unpullable, and Houston accepts
+// it. A platform that does not report the adoption fields reads as not adopted, which is correct too:
+// adoption is what creates Deployments with their own registry.
+func assertDeploymentAcceptsRegistryPush(deploymentInfo *houston.Deployment, deploymentID string, byoRegistryEnabled bool) error {
+	if byoRegistryEnabled || deploymentInfo == nil || !deploymentInfo.IsAdopted || deploymentInfo.AdoptionRegistryManagedByApc {
+		return nil
+	}
+	target := deploymentID
+	if target == "" {
+		target = deploymentInfo.ID
+	}
+	return fmt.Errorf(
+		"%w.\nPush the image to your own registry, then point the Deployment at it:\n  astro deploy --remote --image-name=<image> --runtime-version=<version> %s",
+		ErrDeploymentUsesOwnRegistry, target)
 }
 
 // Find deployment ID in deployments slice

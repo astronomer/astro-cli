@@ -274,7 +274,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --name value")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
-	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
+	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Deploy the adopted Deployment's images through the APC in-cluster registry with 'astro deploy'. Leave unset to keep pulling from your own registry, and deploy with 'astro deploy --remote' instead")
 	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
 	_ = cmd.MarkFlagRequired("cluster-id")
 	_ = cmd.MarkFlagRequired("name")

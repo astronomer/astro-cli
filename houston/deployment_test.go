@@ -542,6 +542,59 @@ func (s *Suite) TestGetDeployment() {
 	})
 }
 
+func (s *Suite) TestGetDeploymentAdoptionFields() {
+	testUtil.InitTestConfig("software")
+
+	// `astro deploy` reads these to decide whether the Deployment accepts a push to APC's registry.
+	newDeploymentClient := func(capturedBody *string, body string) ClientInterface {
+		return NewClient(testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			b, _ := io.ReadAll(req.Body)
+			*capturedBody = string(b)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(body)),
+				Header:     make(http.Header),
+			}
+		}))
+	}
+
+	s.Run("selects and parses them on a platform that exposes them", func() {
+		oldVersion := version
+		version = AdoptionFieldsVersion
+		defer func() { version = oldVersion }()
+
+		var capturedBody string
+		api := newDeploymentClient(&capturedBody,
+			`{"data":{"deployment":{"id":"deployment-test-id","releaseName":"prehistoric-gravity-930","isAdopted":true,"adoptionRegistryManagedByApc":false}}}`)
+
+		deployment, err := api.GetDeployment("deployment-test-id")
+		s.NoError(err)
+		s.Contains(capturedBody, "isAdopted")
+		s.Contains(capturedBody, "adoptionRegistryManagedByApc")
+		s.True(deployment.IsAdopted)
+		s.False(deployment.AdoptionRegistryManagedByApc)
+	})
+
+	s.Run("omits them on an older platform, where a Deployment reads as not adopted", func() {
+		// Selecting a field the platform's schema does not define would fail the whole query — and
+		// therefore every deploy — so older platforms get the query without them. Reading as not adopted
+		// is the right answer there: those platforms have no adopted Deployments to guard.
+		oldVersion := version
+		version = "1.0.1"
+		defer func() { version = oldVersion }()
+
+		var capturedBody string
+		api := newDeploymentClient(&capturedBody,
+			`{"data":{"deployment":{"id":"deployment-test-id","releaseName":"prehistoric-gravity-930"}}}`)
+
+		deployment, err := api.GetDeployment("deployment-test-id")
+		s.NoError(err)
+		s.NotContains(capturedBody, "isAdopted")
+		s.NotContains(capturedBody, "adoptionRegistryManagedByApc")
+		s.False(deployment.IsAdopted)
+	})
+}
+
 func (s *Suite) TestUpdateDeploymentAirflow() {
 	testUtil.InitTestConfig("software")
 

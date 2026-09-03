@@ -124,6 +124,12 @@ type Deployment struct {
 	UpdatedAt             time.Time           `json:"updatedAt"`
 	DagDeployment         DagDeploymentConfig `json:"dagDeployment"`
 	ClusterID             string              `json:"clusterId"`
+	// IsAdopted reports whether this Deployment was adopted from an existing operator-managed Airflow
+	// custom resource. AdoptionRegistryManagedByApc reports whether APC manages its image registry —
+	// false only for an adopted Deployment that keeps pulling from its own registry, which APC never
+	// pushes to. Both are absent (and so false) on platforms that predate Deployment adoption.
+	IsAdopted                    bool `json:"isAdopted"`
+	AdoptionRegistryManagedByApc bool `json:"adoptionRegistryManagedByApc"`
 }
 
 type DagDeploymentConfig struct {

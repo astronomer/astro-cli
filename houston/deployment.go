@@ -791,6 +791,36 @@ var (
 				}
 			}`,
 		},
+		// Adds the adoption fields, which let `astro deploy` refuse a push to the APC registry for a
+		// Deployment that keeps its own registry. Gated on the platform version that exposes them:
+		// GreatestLowerBound hands older platforms the query above, so a Deployment there simply reads
+		// as not adopted (there is no adoption on those platforms to guard).
+		{
+			version: AdoptionFieldsVersion,
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					runtimeVersion
+					runtimeAirflowVersion
+					releaseName
+					urls {
+						type
+						url
+					}
+					dagDeployment {
+						type
+					}
+					clusterId
+					isAdopted
+					adoptionRegistryManagedByApc
+				}
+			}`,
+		},
 	}
 
 	DeploymentDeleteRequest = `

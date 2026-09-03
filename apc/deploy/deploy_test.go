@@ -596,6 +596,92 @@ func (s *Suite) TestAirflowFailureForNoBYORegistryDomain() {
 	s.ErrorIs(err, ErrBYORegistryDomainNotSet)
 }
 
+func (s *Suite) TestAssertDeploymentAcceptsRegistryPush() {
+	tests := []struct {
+		name               string
+		deployment         *houston.Deployment
+		byoRegistryEnabled bool
+		wantErr            bool
+	}{
+		{
+			name:       "refuses an adopted Deployment that keeps its own registry",
+			deployment: &houston.Deployment{ID: "d1", IsAdopted: true, AdoptionRegistryManagedByApc: false},
+			wantErr:    true,
+		},
+		{
+			name:       "allows an adopted Deployment whose registry APC manages",
+			deployment: &houston.Deployment{ID: "d2", IsAdopted: true, AdoptionRegistryManagedByApc: true},
+		},
+		{
+			// Also the shape a platform predating adoption reports, since it selects neither field —
+			// correct, because adoption is what creates a Deployment with its own registry.
+			name:       "allows a native Deployment",
+			deployment: &houston.Deployment{ID: "d3"},
+		},
+		{
+			// A BYO registry has a platform credential synced into the namespace, so the push is not
+			// inherently unpullable and Houston accepts it too.
+			name:               "allows its own registry when the platform pushes to a BYO registry",
+			deployment:         &houston.Deployment{ID: "d5", IsAdopted: true, AdoptionRegistryManagedByApc: false},
+			byoRegistryEnabled: true,
+			wantErr:            false,
+		},
+		{
+			name:       "allows when there is no Deployment to judge",
+			deployment: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := assertDeploymentAcceptsRegistryPush(tt.deployment, "test-deployment-id", tt.byoRegistryEnabled)
+			if !tt.wantErr {
+				s.NoError(err)
+				return
+			}
+			s.ErrorIs(err, ErrDeploymentUsesOwnRegistry)
+			// The message has to leave the user somewhere to go.
+			s.Contains(err.Error(), "--remote")
+			s.Contains(err.Error(), "test-deployment-id")
+		})
+	}
+}
+
+func (s *Suite) TestAssertDeploymentAcceptsRegistryPushFallsBackToDeploymentID() {
+	// The command can be run without an ID (the CLI prompts for one), so the message names the
+	// Deployment it resolved rather than an empty string.
+	err := assertDeploymentAcceptsRegistryPush(
+		&houston.Deployment{ID: "resolved-id", IsAdopted: true, AdoptionRegistryManagedByApc: false}, "", false)
+	s.ErrorIs(err, ErrDeploymentUsesOwnRegistry)
+	s.Contains(err.Error(), "resolved-id")
+}
+
+func (s *Suite) TestAirflowFailureForDeploymentWithOwnRegistry() {
+	// A plain `astro deploy` pushes to APC's registry, which is the one registry a Deployment that
+	// keeps its own must not be repointed at. Refused before the image is built or pushed.
+	config.InitConfig(s.fsForLocalConfig)
+
+	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
+	s.houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{
+		ID:                           "test-deployment-id",
+		ClusterID:                    "test-cluster-id",
+		IsAdopted:                    true,
+		AdoptionRegistryManagedByApc: false,
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+		},
+	}, nil).Once()
+	s.houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{}, nil).Once()
+
+	_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false, description, false, "")
+
+	s.ErrorIs(err, ErrDeploymentUsesOwnRegistry)
+	// Nothing was built and nothing was pushed — the refusal costs the user no build.
+	s.mockImageHandler.AssertNotCalled(s.T(), "Build")
+	s.mockImageHandler.AssertNotCalled(s.T(), "Push")
+}
+
 func (s *Suite) TestAirflowSuccessForImageOnly() {
 	config.InitConfig(s.fsForLocalConfig)
 

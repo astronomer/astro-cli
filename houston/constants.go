@@ -33,6 +33,10 @@ const (
 	HelmDeploymentMode     = "helm"
 	OperatorDeploymentMode = "operator"
 
+	// AdoptionFieldsVersion is the earliest Houston that exposes the Deployment adoption fields
+	// (isAdopted, adoptionRegistryManagedByApc). Queries that select them are gated on it.
+	AdoptionFieldsVersion = "2.2.0"
+
 	DagDeployDocsLink    = "https://www.astronomer.io/docs/software/deploy-dags/"
 	DeployViaCLIDocsLink = "https://www.astronomer.io/docs/software/deploy-cli/"
 )
