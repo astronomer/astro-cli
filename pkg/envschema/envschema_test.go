@@ -82,6 +82,43 @@ func TestValueSpecCheck(t *testing.T) {
 			want:    []string{"type"},
 		},
 		{
+			// A connection's resolved value is its conn_type, so nothing could
+			// ever enforce a `type` here. Refused rather than ignored: an
+			// annotation accepted and never applied is worse than one rejected.
+			name:    "a type on a connection",
+			spec:    ValueSpec{Sensitive: true, Type: TypeURL},
+			section: SectionConnection,
+			want:    []string{"type"},
+		},
+		{
+			name:    "an enum on a connection",
+			spec:    ValueSpec{Sensitive: true, Enum: []string{"a", "b"}},
+			section: SectionConnection,
+			want:    []string{"enum"},
+		},
+		{
+			// One mistake, one message, and it is not the spelling: the problem
+			// is that a connection declared a type at all.
+			name:    "an unknown type on a connection",
+			spec:    ValueSpec{Sensitive: true, Type: "enom"},
+			section: SectionConnection,
+			want:    []string{"type"},
+		},
+		{
+			// Both refused on their own terms, and crucially the coherence rule
+			// does NOT also fire telling it to add `type = "enum"` — the one
+			// thing a connection may not do.
+			name:    "a type and an enum on a connection",
+			spec:    ValueSpec{Sensitive: true, Type: TypeEnum, Enum: []string{"a"}},
+			section: SectionConnection,
+			want:    []string{"type", "enum"},
+		},
+		{
+			name:    "a connection declaring neither is fine",
+			spec:    ValueSpec{Sensitive: true, ConnType: "postgres"},
+			section: SectionConnection,
+		},
+		{
 			// One mistake, one problem: the enum rules read a type already
 			// rejected, so they stay quiet.
 			name:    "an unknown type beside an enum",

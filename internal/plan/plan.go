@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -47,6 +48,15 @@ type Options struct {
 type Built struct {
 	Plan    localrt.Plan
 	Project *project.Project
+	// EnvWarnings are the value-level findings a start does NOT refuse over: a
+	// value present but not the shape its declaration promised, or a connection
+	// that resolved to a different conn_type. Missing values are not in here —
+	// those are *MissingEnvError and stop the run.
+	//
+	// Carried out rather than printed in this package: cmd/ prints, internal/
+	// does not, and the caller also decides between text and json. Nil when
+	// everything conformed.
+	EnvWarnings []envschema.Violation
 }
 
 // Build discovers the project containing workingDir, loads and validates its
@@ -67,7 +77,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, secretEnv, passEnv, err := resolveEnv(m, proj, opts)
+	env, secretEnv, passEnv, envWarnings, err := resolveEnv(m, proj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +87,8 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	}
 
 	return &Built{
-		Project: proj,
+		Project:     proj,
+		EnvWarnings: envWarnings,
 		Plan: localrt.Plan{
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
@@ -172,14 +183,14 @@ func PersistPort(projectPath string, chosen int) error {
 // same shape one tier down: the project's own secrets wholesale, the
 // machine-wide ones only where the schema declares them
 // (vaultenv.SecretInjection).
-func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env, secretEnv map[string]string, passthrough []string, err error) {
+func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env, secretEnv map[string]string, passthrough []string, warnings []envschema.Violation, err error) {
 	schema, err := envresolve.ParseSchema(m.Astro.Env)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	src, err := localenv.LoadSources(os.Environ(), proj.Dir)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	// The vault shared with Astro Desktop. Opened here rather than inside
 	// localenv because this is the composition root and that package holds the
@@ -201,16 +212,23 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	// The start gate is missing-required only: a value with no source blocks
-	// the run (the clone-and-run message). Value-level problems on values
-	// that are present — a wrong type, a corrupt connection JSON — are left
-	// in res.Violations for `astro local check`, the command whose
-	// whole job is validating without starting. Gating start on them too
-	// would split that responsibility across two commands.
+	// The start GATE is missing-required only: a value with no source blocks
+	// the run (the clone-and-run message). Value-level problems on values that
+	// are present — a wrong type, a connection of the wrong kind, a corrupt
+	// connection JSON — do not stop a start. Refusing over them would be the
+	// worse failure: the value may well work, and a project that cannot start
+	// because a port is declared `type = "port"` and set to 99999 is a tool
+	// arguing with its user.
+	//
+	// They are REPORTED, though, which they were not before — they sat in
+	// res.Violations waiting for an `astro local check` that does not
+	// validate the environment yet, so nothing surfaced them at all and a
+	// declared type was enforced by nobody on this side. Warning is the whole
+	// value of the annotation until that command exists.
 	if len(res.Missing) > 0 {
-		return nil, nil, nil, &MissingEnvError{
+		return nil, nil, nil, nil, &MissingEnvError{
 			Project: proj.Dir,
 			Missing: res.Missing,
 		}
@@ -265,7 +283,30 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 		}
 		delete(inj, k)
 	}
-	return inj, secretInj, passthroughKeys(res.Resolved, inj), nil
+	return inj, secretInj, passthroughKeys(res.Resolved, inj), valueWarnings(res.Violations), nil
+}
+
+// valueWarnings is the violations a start reports without refusing: everything
+// except the missing ones, which reached the caller as *MissingEnvError.
+//
+// Today the exclusion never fires, and that is worth writing down rather than
+// discovering. missingReport maps every ViolationMissing to a Missing entry
+// one-for-one, so a non-empty res.Missing means the gate above already
+// returned — reaching here implies there are no missing violations to filter.
+//
+// Kept anyway, and unit-tested directly rather than left to be exercised
+// through Build, because the invariant lives in a different function than the
+// assumption. A start that one day proceeds despite missing values (a --force,
+// a warn-only mode) would otherwise hand the user an error and a duplicate
+// warning for the same name, and the failure would look like a rendering bug.
+func valueWarnings(all []envschema.Violation) []envschema.Violation {
+	var out []envschema.Violation
+	for _, v := range all {
+		if v.Kind != envschema.ViolationMissing {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // passthroughKeys is the Airflow env-var names for declared values the shell

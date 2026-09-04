@@ -14,6 +14,7 @@ import (
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -189,6 +190,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 		return c.reportBuildError(r, err)
 	}
 	warnStandaloneOmissions(r, built.Plan)
+	warnEnvValues(r, built.EnvWarnings)
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return err
@@ -229,12 +231,7 @@ func warnStandaloneOmissions(r Renderer, p localrt.Plan) {
 		return
 	}
 	for _, text := range standaloneOmissions(p) {
-		e := event{Event: "warning", Text: text}
-		//nolint:errcheck // a warning write failure surfaces on the command's own output
-		r.Emit(e, func(w io.Writer) error {
-			_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
-			return werr
-		})
+		emitWarning(r, event{Event: "warning", Text: text})
 	}
 }
 
@@ -260,6 +257,68 @@ func standaloneOmissions(p localrt.Plan) []string {
 		out = append(out, "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself")
 	}
 	return out
+}
+
+// warnEnvValues reports values that resolved to something other than what their
+// declaration promised — a value failing its `type`, a connection of a
+// different `conn_type` — without refusing to start.
+//
+// Warning rather than blocking is the decision, not a compromise. The value may
+// well work: `type` is documentation the author wrote for their own team, and a
+// tool that refuses to start a project because a port is declared
+// `type = "port"` and set to 99999 is arguing with its user over their own
+// annotation. Missing values are the opposite case and do block — they reach
+// the caller as *MissingEnvError, and Airflow genuinely cannot run without them.
+//
+// Reporting them at all is the point. Before this these findings were computed
+// and dropped: `type`, `enum` and `conn_type` were parsed, checked for
+// coherence, and then enforced by nothing on this side, while Astro Desktop
+// reading the same manifest called them violations. One contract, two answers,
+// and the annotation only looked enforced.
+//
+// Not gated on mode, unlike warnStandaloneOmissions: a value of the wrong shape
+// is the wrong shape in Docker too.
+func warnEnvValues(r Renderer, warnings []envschema.Violation) {
+	for _, v := range warnings {
+		// The section, key and reason ride as their own fields as well as in
+		// the prose. Text alone would make every machine consumer — the
+		// Environment Manager among them, which is the surface this reporting
+		// exists to align with — regex sectionLabel's human strings back into a
+		// Section, and break silently on any rewording.
+		emitWarning(r, event{
+			Event:   "warning",
+			Text:    fmt.Sprintf("%s %s: %s", sectionLabel(v.Section), v.Key, v.Reason),
+			Section: string(v.Section),
+			Key:     v.Key,
+			Reason:  v.Reason,
+		})
+	}
+}
+
+// sectionLabel names a section the way a person would, since the wire values
+// are snake_case and these strings are read by one. The machine-readable form
+// travels in the event's own Section field, so rewording these is safe.
+func sectionLabel(s envschema.Section) string {
+	switch s {
+	case envschema.SectionEnvVar:
+		return "env var"
+	case envschema.SectionAirflowVariable:
+		return "Airflow variable"
+	case envschema.SectionConnection:
+		return "connection"
+	}
+	return string(s)
+}
+
+// emitWarning is the one definition of what a warning looks like on the wire,
+// in both modes. Both warning sources reach it; a third would otherwise paste a
+// third copy of this loop and the two could drift.
+func emitWarning(r Renderer, e event) {
+	//nolint:errcheck // a warning write failure surfaces on the command's own output
+	r.Emit(e, func(w io.Writer) error {
+		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
+		return werr
+	})
 }
 
 // reportBuildError renders a plan-build failure. A *plan.MissingEnvError in
@@ -365,6 +424,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 		return err
 	}
 	warnStandaloneOmissions(r, built.Plan)
+	warnEnvValues(r, built.EnvWarnings)
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
 	}

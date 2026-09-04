@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -298,5 +299,141 @@ func TestWarnStandaloneReportsBothOmissions(t *testing.T) {
 	}
 	if dockerfileAt > packagesAt {
 		t.Errorf("the Dockerfile warning should lead; got %q", got)
+	}
+}
+
+// envWarningCase is one warning-reporting expectation, shared by the text and
+// JSON tests below. One table, two renderings — a second copy would drift.
+type envWarningCase struct {
+	name     string
+	warnings []envschema.Violation
+	wantText []string
+}
+
+func envWarningCases() []envWarningCase {
+	return []envWarningCase{
+		{
+			name:     "nothing to report is silent",
+			warnings: nil,
+		},
+		{
+			name: "an env var names its section, key and reason",
+			warnings: []envschema.Violation{{
+				Kind:    envschema.ViolationWrongType,
+				Section: envschema.SectionEnvVar,
+				Key:     "PORT",
+				Reason:  `expected a port between 1 and 65535, got "99999"`,
+			}},
+			wantText: []string{`warning: env var PORT: expected a port between 1 and 65535, got "99999"`},
+		},
+		{
+			// The wire value is snake_case; a person reads this.
+			name: "an Airflow variable is named the way a person would",
+			warnings: []envschema.Violation{{
+				Kind:    envschema.ViolationWrongType,
+				Section: envschema.SectionAirflowVariable,
+				Key:     "mode",
+				Reason:  `expected one of "a", "b", got "c"`,
+			}},
+			wantText: []string{`warning: Airflow variable mode:`},
+		},
+		{
+			name: "a connection of the wrong kind",
+			warnings: []envschema.Violation{{
+				Kind:    envschema.ViolationWrongType,
+				Section: envschema.SectionConnection,
+				Key:     "warehouse",
+				Reason:  `declared conn_type "snowflake" but resolved to "postgres"`,
+			}},
+			wantText: []string{`warning: connection warehouse: declared conn_type "snowflake" but resolved to "postgres"`},
+		},
+		{
+			// One line each: a project with several is a list, not a summary.
+			name: "every finding gets its own line",
+			warnings: []envschema.Violation{
+				{Kind: envschema.ViolationWrongType, Section: envschema.SectionEnvVar, Key: "A", Reason: "one"},
+				{Kind: envschema.ViolationWrongType, Section: envschema.SectionEnvVar, Key: "B", Reason: "two"},
+			},
+			wantText: []string{"warning: env var A: one", "warning: env var B: two"},
+		},
+	}
+}
+
+// warnEnvValues reports value-level findings without refusing the start.
+//
+// Reporting is the whole point: before this, `type`, `enum` and `conn_type`
+// were parsed and coherence-checked and then enforced by nothing on this side,
+// so a declared type only looked enforced.
+func TestWarnEnvValuesText(t *testing.T) {
+	for _, tc := range envWarningCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			warnEnvValues(Renderer{Format: FormatText, Out: out}, tc.warnings)
+			if len(tc.wantText) == 0 {
+				if out.Len() != 0 {
+					t.Fatalf("expected no output, got %q", out.String())
+				}
+				return
+			}
+			for _, want := range tc.wantText {
+				if !strings.Contains(out.String(), want) {
+					t.Errorf("output missing %q, got %q", want, out.String())
+				}
+			}
+			if got := strings.Count(out.String(), "warning:"); got != len(tc.warnings) {
+				t.Errorf("got %d warning lines, want %d: %q", got, len(tc.warnings), out.String())
+			}
+		})
+	}
+}
+
+// One warning event per finding, each parseable on its own line so a consumer
+// can stream them.
+func TestWarnEnvValuesJSON(t *testing.T) {
+	for _, tc := range envWarningCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			warnEnvValues(Renderer{Format: FormatJSON, Out: out}, tc.warnings)
+			if len(tc.warnings) == 0 {
+				if out.Len() != 0 {
+					t.Fatalf("expected no output, got %q", out.String())
+				}
+				return
+			}
+			lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+			if len(lines) != len(tc.warnings) {
+				t.Fatalf("got %d JSON lines, want %d: %q", len(lines), len(tc.warnings), out.String())
+			}
+			for i, line := range lines {
+				assertWarningEvent(t, line, tc.warnings[i])
+			}
+		})
+	}
+}
+
+// assertWarningEvent checks one JSON warning line against the violation it came
+// from. Extracted so the JSON test stays under the complexity limit, and so the
+// structured-field expectations live in one place.
+//
+// The section, key and reason must survive as their own fields: a consumer
+// regexing sectionLabel's human strings back out of Text is exactly what they
+// exist to avoid, and that would break silently on any rewording.
+func assertWarningEvent(t *testing.T, line string, want envschema.Violation) {
+	t.Helper()
+	var e event
+	if err := json.Unmarshal([]byte(line), &e); err != nil {
+		t.Fatalf("warning is not valid JSON: %v: %q", err, line)
+	}
+	if e.Event != "warning" {
+		t.Errorf("event = %q, want %q", e.Event, "warning")
+	}
+	if e.Section != string(want.Section) {
+		t.Errorf("section = %q, want %q", e.Section, want.Section)
+	}
+	if e.Key != want.Key {
+		t.Errorf("key = %q, want %q", e.Key, want.Key)
+	}
+	if e.Reason != want.Reason {
+		t.Errorf("reason = %q, want %q", e.Reason, want.Reason)
 	}
 }

@@ -106,17 +106,22 @@ type ValueSpec struct {
 	// Source is where a table declaration resolves from when it is not set
 	// locally. Empty is local-only. See the package doc.
 	Source Source
-	// Type is the value's shape. It is metadata for consumers — Validate does
-	// not check it, see that function's doc. Empty means TypeString.
+	// Type is the value's shape. Validate does not check it — presence is its
+	// only question — but CheckValues and CheckValue do, against the resolved
+	// value. Empty means TypeString, which constrains nothing.
 	Type ValueType
 	// Description is prose for whoever has to supply the value.
 	Description string
 	// ConnType is the expected Airflow connection type, and is meaningful only
-	// under the connections section. The parser refuses it elsewhere. Like Type,
-	// it is metadata: nothing here compares it to the resolved connection.
+	// under the connections section; Check refuses it elsewhere. CheckValues
+	// compares it, case-insensitively, against the kind the connection actually
+	// resolved to — but only when that kind is known. See CheckValues' doc for
+	// the encodings where it is not, which are not rare.
 	ConnType string
 	// Enum is the allowed set when Type is TypeEnum, and is empty otherwise.
-	// Metadata, as above.
+	// CheckValue tests membership. Check refuses one without the other, so an
+	// empty Enum beside TypeEnum is an incomplete declaration rather than a set
+	// admitting nothing — CheckValue treats it as unconstrained on that basis.
 	Enum []string
 	// The flags sit together at the end because interleaving them between the
 	// strings costs 16 bytes of alignment padding — 128 rather than 112. That is
@@ -196,14 +201,43 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 		out = append(out, SpecProblem{Field: field, Reads: reads, Reason: reason})
 	}
 
-	// An unrecognized type is reported once, and stops the rules below that read
-	// it. Otherwise `{ type = 'enom', enum = ['a'] }` reports the real mistake
-	// AND "enum needs type = enum", the second contradicting a type the author
-	// plainly tried to write — the same cascade a caller filters with Reads, one
-	// level in.
-	badType := !ValidType(s.Type)
-	if badType {
+	// skipTypeCoherence silences the enum/type pair at the bottom of this
+	// function. Those two rules READ the type, so once the type has been
+	// reported — or ruled out entirely — whatever they conclude from it is a
+	// second message about one mistake.
+	skipTypeCoherence := false
+
+	if section == SectionConnection {
+		// A connection declares its KIND with conn_type, not its shape with
+		// type. What resolves for one is a URI or a JSON blob, and the resolver
+		// reduces it to a conn_type before anything judges it — so `type` and
+		// `enum` on a connection could not be enforced by CheckValues even in
+		// principle. Refused rather than ignored for the reason this grammar
+		// keeps running into: an annotation accepted and never applied is worse
+		// than one rejected, because the author believes it took effect.
+		//
+		// Both are reported on their own terms, which is why the pair rules are
+		// skipped wholesale here rather than per-field: a connection with an
+		// enum and no type would otherwise also be told to add `type = "enum"`,
+		// the one thing it may not do.
+		skipTypeCoherence = true
+		if s.Type != "" {
+			// Instead of, not as well as, "not a known type": a connection
+			// writing `type = 'enom'` has one mistake worth naming and it is
+			// not the spelling.
+			add("type", "type describes an env var or an Airflow variable, so it means nothing on a connection — conn_type is how a connection declares its kind")
+		}
+		if len(s.Enum) > 0 {
+			add("enum", "enum needs type = \"enum\", which a connection cannot declare", "enum", "type")
+		}
+	} else if !ValidType(s.Type) {
+		// An unrecognized type is reported once. Otherwise
+		// `{ type = 'enom', enum = ['a'] }` reports the real mistake AND "enum
+		// needs type = enum", the second contradicting a type the author plainly
+		// tried to write — the same cascade a caller filters with Reads, one
+		// level in.
 		add("type", fmt.Sprintf("%q is not a known type (string, int, number, bool, enum, url, port, json)", s.Type))
+		skipTypeCoherence = true
 	}
 
 	// A connection carries a credential by construction, so it may not be
@@ -232,7 +266,7 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 	}
 
 	// enum and type = 'enum' each require the other, and each rule reads both.
-	if !badType {
+	if !skipTypeCoherence {
 		if len(s.Enum) > 0 && s.Type != TypeEnum {
 			add("enum", "enum needs type = \"enum\"", "enum", "type")
 		}
@@ -286,9 +320,20 @@ const (
 // inspect. The caller owns layering and resolution order; this package only
 // judges the result.
 type Values struct {
+	// EnvVars and AirflowVariables map a declared name to its resolved value.
 	EnvVars          map[string]string
 	AirflowVariables map[string]string
-	Connections      map[string]string
+	// Connections maps a connection id to the connection's TYPE — "postgres",
+	// "snowflake" — and never to the connection itself.
+	//
+	// Spelled out because it is easy to get wrong and no longer harmless. It
+	// used to be: Validate asked only whether the string was non-empty, so a
+	// caller passing the whole AIRFLOW_CONN_ payload got the same answer.
+	// CheckValues now formats this string into a message a caller prints, so a
+	// payload here produces both a false mismatch and a dump of the connection
+	// — password included. The empty string means the kind could not be
+	// determined, which is not a mismatch and is skipped.
+	Connections map[string]string
 }
 
 // ViolationKind classifies a validation finding.
@@ -297,8 +342,10 @@ type ViolationKind string
 const (
 	// ViolationMissing: a declared value resolved from nowhere.
 	ViolationMissing ViolationKind = "missing"
-	// ViolationWrongType: a value is present but malformed (a corrupt
-	// connection JSON is the only case today).
+	// ViolationWrongType: a value is present but is not what its declaration
+	// said — a value that fails its `type`, a connection that resolved to a
+	// different `conn_type`, or a corrupt connection JSON. The first two come
+	// from CheckValues; the last from the resolver, since only it can decode.
 	ViolationWrongType ViolationKind = "type"
 )
 

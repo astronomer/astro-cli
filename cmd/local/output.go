@@ -138,6 +138,13 @@ type event struct {
 	Time      string        `json:"time,omitempty"`
 	Text      string        `json:"text,omitempty"`
 	Error     string        `json:"error,omitempty"`
+	// Section, Key and Reason carry an env-schema warning in machine-readable
+	// form beside the prose in Text. Without them a consumer has to regex the
+	// human labels ("env var", "Airflow variable") back into a section, and any
+	// rewording of that prose breaks it silently. Empty for every other event.
+	Section string `json:"section,omitempty"`
+	Key     string `json:"key,omitempty"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 // callbacks bridges localrt progress into the renderer. Write errors are

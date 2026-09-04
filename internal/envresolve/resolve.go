@@ -104,8 +104,20 @@ func Resolve(in Inputs) (*Result, error) {
 
 	sortResolved(r.resolved)
 	res.Resolved = r.resolved
-	res.Violations = append(envschema.Validate(in.Schema, res.Values), r.extraViolations...)
-	sortViolations(res.Violations)
+	// Three sources, and they answer three different questions. Validate: is
+	// anything missing. CheckValues: is what resolved the shape it was declared
+	// to be — the annotations were parsed and coherence-checked and then
+	// enforced by nothing on this side, so `type = "port"` with PORT=99999
+	// started clean here while the desktop called it a violation. extraViolations:
+	// what only this resolver could find, a connection whose JSON would not
+	// decode.
+	//
+	// Concatenated rather than folded into Validate because callers gate on
+	// different subsets: `astro local start` refuses on missing and reports the
+	// rest, which is why Missing is derived separately below.
+	res.Violations = append(envschema.Validate(in.Schema, res.Values), envschema.CheckValues(in.Schema, res.Values)...)
+	res.Violations = append(res.Violations, r.extraViolations...)
+	envschema.SortViolations(res.Violations)
 	res.Missing = r.missingReport(res.Violations)
 	res.Injected = r.injected
 	return res, nil
@@ -282,15 +294,6 @@ func (r *resolver) missingReport(violations []envschema.Violation) []Missing {
 	}
 	// Violations arrive sorted, so Missing inherits the order.
 	return out
-}
-
-func sortViolations(vs []envschema.Violation) {
-	sort.SliceStable(vs, func(i, j int) bool {
-		if vs[i].Section != vs[j].Section {
-			return vs[i].Section < vs[j].Section
-		}
-		return vs[i].Key < vs[j].Key
-	})
 }
 
 func sortResolved(rs []ResolvedName) {

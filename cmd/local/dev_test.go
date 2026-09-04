@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -174,4 +175,157 @@ func TestDevStubTextMatchesJSONData(t *testing.T) {
 	if !strings.Contains(text, p.Error) || !strings.Contains(text, p.Replacement) {
 		t.Errorf("text rendering dropped payload data:\n%s", text)
 	}
+}
+
+// The call site, not just the function: `astro local start` actually reports
+// value warnings.
+//
+// Testing warnEnvValues directly cannot catch a missing call, and a missing
+// call is the whole failure mode this port exists to fix — the findings were
+// already being computed before, and dropped. So this drives the real command.
+//
+// fakeRuntime.Start returns ErrNotImplemented, so the command fails; that is
+// fine and load-bearing. The warning is emitted before the runtime is asked to
+// do anything, so its presence on stdout proves the report happens on the way
+// to starting rather than after a successful start.
+func TestStartReportsEnvValueWarnings(t *testing.T) {
+	d, stdout := testDeps(t)
+	dir := t.TempDir()
+	m := `[project]
+name = 'demo'
+requires-python = '>=3.10'
+
+[tool.astro]
+airflow = '3.1'
+
+[tool.astro.env]
+ASTRO_TEST_PORT = { type = 'port', default = '99999' }
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	isolateEnvSources(t, "ASTRO_TEST_PORT")
+
+	// The error is the fake runtime refusing to start, not a rejected project:
+	// a wrong-typed value must not gate.
+	_ = execute(t, d, "local", "start")
+
+	if !strings.Contains(stdout.String(), "warning: env var ASTRO_TEST_PORT:") {
+		t.Errorf("start did not report the value warning; stdout was %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "99999") {
+		t.Errorf("the warning does not name the offending value; stdout was %q", stdout.String())
+	}
+}
+
+// The mirror: a conforming project prints no value warnings, so the common case
+// stays quiet.
+func TestStartReportsNothingWhenValuesConform(t *testing.T) {
+	d, stdout := testDeps(t)
+	dir := t.TempDir()
+	m := `[project]
+name = 'demo'
+requires-python = '>=3.10'
+
+[tool.astro]
+airflow = '3.1'
+
+[tool.astro.env]
+ASTRO_TEST_PORT = { type = 'port', default = '8080' }
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	isolateEnvSources(t, "ASTRO_TEST_PORT")
+
+	_ = execute(t, d, "local", "start")
+
+	if strings.Contains(stdout.String(), "warning: env var") {
+		t.Errorf("expected no value warning, got %q", stdout.String())
+	}
+}
+
+// fakeAirflow is attachable and stoppable, which fakeRuntime's Airflow is not.
+// runRestart attaches before it reports anything, so without this the restart
+// path bails at attach and the warnings are unreachable — which is exactly how
+// mutation testing found the restart call site untested.
+type fakeAirflow struct{}
+
+func (fakeAirflow) Stop(context.Context, localrt.StopOptions) error    { return nil }
+func (fakeAirflow) Status() (localrt.Status, error)                    { return localrt.Status{}, nil }
+func (fakeAirflow) Logs(context.Context, localrt.LogOptions) error     { return nil }
+func (fakeAirflow) Run(context.Context, []string, localrt.Stdio) error { return nil }
+func (fakeAirflow) Shell(context.Context, localrt.Stdio) error         { return nil }
+
+// attachableRuntime is fakeRuntime with a working Attach and a running status.
+// Both are needed to reach the reporting in runRestart: it reads the status
+// first and falls back to a plain start when nothing is running, then attaches
+// before it reports. Start still fails, which is fine — the warnings are
+// emitted before the restart tries to start anything.
+type attachableRuntime struct{ fakeRuntime }
+
+func (attachableRuntime) Attach(string) (localrt.Airflow, error) { return fakeAirflow{}, nil }
+
+func (attachableRuntime) ReadStatus(string) (localrt.Status, error) {
+	return localrt.Status{State: localrt.StateRunning, Mode: localrt.ModeStandalone}, nil
+}
+
+// `astro local restart` reports value warnings too.
+//
+// Not a copy of the start test for symmetry's sake: warnEnvValues has two call
+// sites, and a test of one says nothing about the other. Mutation testing
+// removed this call and every test still passed.
+func TestRestartReportsEnvValueWarnings(t *testing.T) {
+	d, stdout := testDeps(t)
+	d.Runtime = attachableRuntime{}
+	dir := t.TempDir()
+	m := `[project]
+name = 'demo'
+requires-python = '>=3.10'
+
+[tool.astro]
+airflow = '3.1'
+
+[tool.astro.env]
+ASTRO_TEST_PORT = { type = 'port', default = '99999' }
+`
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	isolateEnvSources(t, "ASTRO_TEST_PORT")
+
+	_ = execute(t, d, "local", "restart")
+
+	if !strings.Contains(stdout.String(), "warning: env var ASTRO_TEST_PORT:") {
+		t.Errorf("restart did not report the value warning; stdout was %q", stdout.String())
+	}
+}
+
+// isolateEnvSources cuts every ambient source the resolver consults above a
+// manifest default: HOME and USERPROFILE for `~/.astro/env`, XDG_CACHE_HOME for
+// user state. testDeps sets none of them.
+//
+// It also clears the fixture names outright. Renaming them away from PORT —
+// which many shells and CI runners export, and shell env sits above the
+// manifest default, so `PORT=not-a-port go test` failed these with the
+// developer's own environment — lowered the odds of a collision. Clearing
+// removes them: any name a test relies on defaulting has to be unset, not just
+// an unlucky one. t.Setenv cannot unset, and setting "" is not absence.
+func isolateEnvSources(t *testing.T, declared ...string) {
+	t.Helper()
+	for _, n := range declared {
+		if old, ok := os.LookupEnv(n); ok {
+			t.Setenv(n, old) // registers the restore
+		}
+		if err := os.Unsetenv(n); err != nil {
+			t.Fatal(err)
+		}
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 }
