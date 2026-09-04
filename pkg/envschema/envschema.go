@@ -2,8 +2,14 @@
 // expects: env vars, Airflow variables, and connections. The manifest carries
 // non-secret defaults; environments carry the overrides; secrets never go
 // inline. The schema lives in the manifest ([tool.astro.env]); this package
-// does no I/O. pkg/manifest parses, this validates, and the composition
-// happens in each consumer (sub-modules do not import each other).
+// does no I/O.
+//
+// pkg/manifest decodes the file and hands [tool.astro.env] over as plain
+// untyped data; ParseSchema here turns that into a Schema, and Validate and
+// CheckValues judge it. Composition happens in each consumer. This module is a
+// declared exception to the no-sibling-imports rule — it imports pkg/airflowenv
+// for the three name predicates the parser validates against — see
+// docs/v2-architecture.md.
 //
 // # The grammar
 //
@@ -231,7 +237,10 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 	// manifest and injected into the environment at start, so this would put the
 	// credential in version control and on disk — the one thing the flag exists
 	// to prevent.
-	if s.Sensitive && s.HasDefault {
+	// Keyed on the section as well as the flag: a connection is sensitive by
+	// definition, so a constructed spec carrying a default must be told about
+	// the credential even when nothing set Sensitive.
+	if (s.Sensitive || section == SectionConnection) && s.HasDefault {
 		what := "a sensitive value"
 		if section == SectionConnection {
 			// Nobody had to write `sensitive` for a connection, so name the

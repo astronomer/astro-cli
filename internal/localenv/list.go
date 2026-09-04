@@ -224,7 +224,7 @@ func kindFromKey(key string) (kind Kind, name string) {
 
 func declaredKeySet(schema *envschema.Schema) map[string]bool {
 	set := map[string]bool{}
-	for _, k := range envresolve.DeclaredEnvKeys(schema) {
+	for _, k := range envschema.DeclaredEnvKeys(schema) {
 		set[k] = true
 	}
 	return set

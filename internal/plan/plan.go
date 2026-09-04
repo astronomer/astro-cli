@@ -184,7 +184,7 @@ func PersistPort(projectPath string, chosen int) error {
 // machine-wide ones only where the schema declares them
 // (vaultenv.SecretInjection).
 func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env, secretEnv map[string]string, passthrough []string, warnings []envschema.Violation, err error) {
-	schema, err := envresolve.ParseSchema(m.Astro.Env)
+	schema, err := envschema.ParseSchema(m.Astro.Env)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

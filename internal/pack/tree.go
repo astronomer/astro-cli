@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
@@ -250,7 +249,7 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 	if len(env) == 0 {
 		return "", nil
 	}
-	schema, err := envresolve.ParseSchema(env)
+	schema, err := envschema.ParseSchema(env)
 	if err != nil {
 		return "", err
 	}

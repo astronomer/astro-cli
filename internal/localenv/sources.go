@@ -116,7 +116,7 @@ func (s Sources) Injection(schema *envschema.Schema) map[string]string {
 	inj := map[string]string{}
 	// Global: only the keys the schema declares. A stray global entry never
 	// leaks into a project that did not ask for it.
-	for _, key := range envresolve.DeclaredEnvKeys(schema) {
+	for _, key := range envschema.DeclaredEnvKeys(schema) {
 		if v, ok := s.global[key]; ok {
 			inj[key] = v
 		}

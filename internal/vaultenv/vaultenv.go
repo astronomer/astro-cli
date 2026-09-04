@@ -340,7 +340,7 @@ func (s *Source) SecretInjection(schema *envschema.Schema) map[string]string {
 	// Global second so a project secret of the same name is not overwritten by
 	// it. Both maps are keyed by the same env-var name, so this ordering IS the
 	// precedence.
-	for _, envKey := range envresolve.DeclaredEnvKeys(schema) {
+	for _, envKey := range envschema.DeclaredEnvKeys(schema) {
 		if _, taken := out[envKey]; taken {
 			continue
 		}

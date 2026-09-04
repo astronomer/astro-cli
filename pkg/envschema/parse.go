@@ -1,4 +1,4 @@
-package envresolve
+package envschema
 
 import (
 	"fmt"
@@ -6,33 +6,7 @@ import (
 	"strconv"
 
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
-	"github.com/astronomer/astro-cli/pkg/envschema"
 )
-
-// DeclaredEnvKeys is every Airflow env-var name a schema declares, sorted.
-//
-// It lives here because it is a property of the schema rather than of any one
-// source, and because both places that gate a global tier on "did this project
-// ask for it?" need exactly this list: the plain global file (internal/localenv)
-// and the global vault tier (internal/vaultenv). Two copies of it would be two
-// answers to that question.
-func DeclaredEnvKeys(schema *envschema.Schema) []string {
-	if schema == nil {
-		return nil
-	}
-	keys := make([]string, 0, len(schema.EnvVars)+len(schema.AirflowVariables)+len(schema.Connections))
-	for name := range schema.EnvVars {
-		keys = append(keys, name)
-	}
-	for key := range schema.AirflowVariables {
-		keys = append(keys, airflowenv.EnvKeyForVarKey(key))
-	}
-	for id := range schema.Connections {
-		keys = append(keys, airflowenv.EnvKeyForConnID(id))
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 // Problem is one schema-decoding finding, addressed by the dotted TOML key
 // it concerns (mirroring manifest.Problem).
@@ -84,9 +58,9 @@ const envRoot = "tool.astro.env"
 // Problems — because this is authored config and a typo silently dropping a
 // declaration would defeat the clone-and-run check. A nil/empty map yields an
 // empty schema.
-func ParseSchema(env map[string]any) (*envschema.Schema, error) {
+func ParseSchema(env map[string]any) (*Schema, error) {
 	p := &schemaParser{}
-	s := &envschema.Schema{}
+	s := &Schema{}
 	// Plain env vars sit directly under [tool.astro.env]; the two sub-sections
 	// are reserved keys within it. Everything else is a plain env var.
 	vars := map[string]any{}
@@ -94,16 +68,16 @@ func ParseSchema(env map[string]any) (*envschema.Schema, error) {
 		switch name {
 		case "connections":
 			s.Connections = p.specs(envRoot+".connections", raw, airflowenv.ValidConnID,
-				"not a valid connection id (letters, digits, _)", envschema.SectionConnection)
+				"not a valid connection id (letters, digits, _)", SectionConnection)
 		case "airflow_variables":
 			s.AirflowVariables = p.specs(envRoot+".airflow_variables", raw, airflowenv.ValidVarKey,
-				"not a valid variable key (letters, digits, _)", envschema.SectionAirflowVariable)
+				"not a valid variable key (letters, digits, _)", SectionAirflowVariable)
 		default:
 			vars[name] = raw
 		}
 	}
 	s.EnvVars = p.specs(envRoot, vars, airflowenv.ValidEnvKey,
-		"not a legal env-var name (letters, digits, _; no leading digit)", envschema.SectionEnvVar)
+		"not a legal env-var name (letters, digits, _; no leading digit)", SectionEnvVar)
 
 	if len(p.problems) > 0 {
 		sort.SliceStable(p.problems, func(i, j int) bool { return p.problems[i].Key < p.problems[j].Key })
@@ -125,7 +99,7 @@ func (p *schemaParser) add(key, reason string) {
 // section — a plain var must itself be a legal env-var name (ValidEnvKey), an
 // Airflow Variable key may start with a digit (ValidVarKey), a connection id is
 // ValidConnID.
-func (p *schemaParser) specs(key string, raw any, validName func(string) bool, invalidReason string, section envschema.Section) map[string]envschema.ValueSpec {
+func (p *schemaParser) specs(key string, raw any, validName func(string) bool, invalidReason string, section Section) map[string]ValueSpec {
 	table, ok := raw.(map[string]any)
 	if !ok {
 		p.add(key, "expected a table")
@@ -134,7 +108,7 @@ func (p *schemaParser) specs(key string, raw any, validName func(string) bool, i
 	if len(table) == 0 {
 		return nil
 	}
-	out := make(map[string]envschema.ValueSpec, len(table))
+	out := make(map[string]ValueSpec, len(table))
 	for name, specRaw := range table {
 		specKey := key + "." + name
 		if !validName(name) {
@@ -152,7 +126,7 @@ func (p *schemaParser) specs(key string, raw any, validName func(string) bool, i
 // empty string included); a table means the value lives outside the manifest,
 // with an optional `source`. ok is false when the declaration is malformed and
 // a Problem was recorded.
-func (p *schemaParser) decodeSpec(key string, raw any, section envschema.Section) (envschema.ValueSpec, bool) {
+func (p *schemaParser) decodeSpec(key string, raw any, section Section) (ValueSpec, bool) {
 	switch v := raw.(type) {
 	case string:
 		// The shorthand, and literally sugar: it sets the same Default the
@@ -161,31 +135,31 @@ func (p *schemaParser) decodeSpec(key string, raw any, section envschema.Section
 		// the shorthand a way to write a connection with a committed default.
 		// Check refuses that, so the shorthand cannot be the way around a rule
 		// the table form obeys.
-		spec := envschema.ValueSpec{
+		spec := ValueSpec{
 			Default:    v,
 			HasDefault: true,
-			Sensitive:  section == envschema.SectionConnection,
+			Sensitive:  section == SectionConnection,
 		}
 		if !p.checkSpec(key, spec, section, nil) {
-			return envschema.ValueSpec{}, false
+			return ValueSpec{}, false
 		}
 		return spec, true
 	case map[string]any:
 		return p.decodeSpecTable(key, v, section)
 	default:
 		p.add(key, "expected a string default or a table")
-		return envschema.ValueSpec{}, false
+		return ValueSpec{}, false
 	}
 }
 
-func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section envschema.Section) (envschema.ValueSpec, bool) {
-	var spec envschema.ValueSpec
+func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section Section) (ValueSpec, bool) {
+	var spec ValueSpec
 	before := len(p.problems)
 	// Connections start sensitive, so an absent key means what it should. An
 	// explicit `sensitive` still decodes over the top and Check judges the
 	// result — which is how `sensitive = false` on a connection gets told it is
 	// not allowed rather than that it "says nothing".
-	spec.Sensitive = section == envschema.SectionConnection
+	spec.Sensitive = section == SectionConnection
 	// Which fields failed to decode, so the coherence rules below do not read a
 	// zero value left by a failure and report a second, contradictory problem.
 	failed := map[string]bool{}
@@ -206,9 +180,27 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				failed["default"] = true
 			}
 		case "optional":
-			spec.Optional = p.boolField(fieldKey, v)
+			// Recorded the same way as sensitive below, though no Check
+			// rule reads Optional today, so nothing can observe it: a
+			// mutant that drops this line passes every test. Kept for
+			// symmetry rather than effect — the two bool annotations are
+			// handled identically, and the first rule to read Optional
+			// would otherwise silently reacquire the double-problem the
+			// sensitive case had.
+			if b, ok := p.boolField(fieldKey, v); ok {
+				spec.Optional = b
+			} else {
+				failed["optional"] = true
+			}
 		case "sensitive":
-			spec.Sensitive = p.boolField(fieldKey, v)
+			// Left at its default when the decode failed: for a
+			// connection that default is true, and overwriting it would
+			// invite a second, contradictory problem from Check.
+			if b, ok := p.boolField(fieldKey, v); ok {
+				spec.Sensitive = b
+			} else {
+				failed["sensitive"] = true
+			}
 		case "description":
 			spec.Description, _ = p.str(fieldKey, v)
 		case "type":
@@ -225,7 +217,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				failed["type"] = true
 			default:
 				// An unknown type is Check's rule, not this loop's.
-				spec.Type = envschema.ValueType(t)
+				spec.Type = ValueType(t)
 			}
 		case "enum":
 			e, ok := p.strList(fieldKey, v)
@@ -270,7 +262,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 // checkSpec runs the type's own well-formedness rules and records what they
 // find, returning whether the declaration is usable.
 //
-// The rules live on envschema.ValueSpec rather than here because this parser is
+// The rules live on ValueSpec rather than here because this parser is
 // not the only thing that builds one: a writer constructing a spec from UI
 // state must obey them too.
 //
@@ -283,7 +275,11 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 // their findings are dropped, so one authoring mistake does not produce a
 // second contradictory message: `{ type = 'enum', enum = ['a', 2] }` reports the
 // bad element, not also "needs a non-empty enum".
-func (p *schemaParser) checkSpec(key string, spec envschema.ValueSpec, section envschema.Section, failed map[string]bool) bool {
+// take a value receiver — a pointer here is dereferenced and copied by
+// spec.Check below, so it silences the finding without avoiding the copy.
+//
+//nolint:gocritic // hugeParam: by value to match Check and CheckValue, which
+func (p *schemaParser) checkSpec(key string, spec ValueSpec, section Section, failed map[string]bool) bool {
 	ok := true
 	for _, problem := range spec.Check(section) {
 		// Filtered on what the rule READ, not on where it points: a rule can
@@ -314,17 +310,22 @@ func anyFailed(fields []string, failed map[string]bool) bool {
 	return false
 }
 
-// boolField decodes a bool-valued annotation. A wrong type records a problem and
-// yields false; there is no second return, because the problem list is already
-// how a caller learns the declaration is malformed and no caller wanted to
-// branch on it.
-func (p *schemaParser) boolField(key string, raw any) bool {
-	v, ok := raw.(bool)
-	if !ok {
+// boolField decodes a bool-valued annotation, reporting whether it decoded so
+// the caller can record the field in failed. A wrong type records a problem and
+// yields false.
+//
+// The second return matters for `sensitive` on a connection, which defaults to
+// true: without it a failed decode overwrote that default with false and Check
+// then added "cannot be declared not sensitive", so one mistake produced two
+// problems and the second contradicted an author who wrote `sensitive = 'yes'`
+// meaning true.
+func (p *schemaParser) boolField(key string, raw any) (value, ok bool) {
+	v, isBool := raw.(bool)
+	if !isBool {
 		p.add(key, "expected true or false")
-		return false
+		return false, false
 	}
-	return v
+	return v, true
 }
 
 // strList decodes an array-of-strings annotation, naming every offending index
@@ -386,13 +387,13 @@ func (p *schemaParser) scalar(key string, raw any) (string, bool) {
 // source decodes a declaration's `source` field. The only value today is
 // "workspace"; anything else is a schema problem, per the package's strict
 // parse. An empty string is rejected too — omit it for local-only.
-func (p *schemaParser) source(key string, raw any) (envschema.Source, bool) {
+func (p *schemaParser) source(key string, raw any) (Source, bool) {
 	s, ok := p.str(key, raw)
 	if !ok {
 		return "", false
 	}
-	src := envschema.Source(s)
-	if src != envschema.SourceWorkspace {
+	src := Source(s)
+	if src != SourceWorkspace {
 		p.add(key, fmt.Sprintf("%q is not a source (workspace)", s))
 		return "", false
 	}
@@ -405,4 +406,29 @@ func (p *schemaParser) str(key string, v any) (string, bool) {
 		p.add(key, "expected a string")
 	}
 	return s, ok
+}
+
+// DeclaredEnvKeys is every Airflow env-var name a schema declares, sorted.
+//
+// A property of the schema rather than of any one source, so every consumer
+// gating a tier on "did this project ask for this name?" gets the same list:
+// the CLI's plain global file and global vault tier, and the desktop's global
+// Environment Manager. The AIRFLOW_VAR_/AIRFLOW_CONN_ encoding is applied here
+// so no consumer re-derives it.
+func DeclaredEnvKeys(schema *Schema) []string {
+	if schema == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(schema.EnvVars)+len(schema.AirflowVariables)+len(schema.Connections))
+	for name := range schema.EnvVars {
+		keys = append(keys, name)
+	}
+	for key := range schema.AirflowVariables {
+		keys = append(keys, airflowenv.EnvKeyForVarKey(key))
+	}
+	for id := range schema.Connections {
+		keys = append(keys, airflowenv.EnvKeyForConnID(id))
+	}
+	sort.Strings(keys)
+	return keys
 }

@@ -6,10 +6,9 @@
 // manifest as its project definition, so the leaf rules apply. Two sections
 // are deliberately exposed raw rather than typed here:
 //
-//   - [tool.astro.env] is typed and validated by pkg/envschema, and
-//     sub-modules do not import each other, so Astro.Env carries the decoded
-//     section as plain data and each consumer composes the two packages one
-//     layer up.
+//   - [tool.astro.env] is parsed and validated by pkg/envschema, which this
+//     module does not import, so Astro.Env carries the decoded section as
+//     plain data and each consumer composes the two packages one layer up.
 //   - [tool.astro.targets.*] is backend-specific by design — a target section
 //     is meaningless to other targets — so Astro.Targets stays plain data and
 //     each backend types its own section.

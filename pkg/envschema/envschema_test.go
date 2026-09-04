@@ -40,10 +40,14 @@ func TestValueSpecCheck(t *testing.T) {
 			section: SectionConnection,
 		},
 		{
+			// Both fire and both are true: it is not marked sensitive, AND the
+			// default it carries would be committed either way. The credential
+			// rule keys on the section as well as the flag, so a spec built by
+			// hand cannot carry one past it by leaving Sensitive unset.
 			name:    "a connection with a default and no flag",
 			spec:    ValueSpec{Default: "postgres://u:p@h/db", HasDefault: true},
 			section: SectionConnection,
-			want:    []string{"sensitive"},
+			want:    []string{"sensitive", "default"},
 		},
 		{
 			name:    "a sensitive connection with a default",

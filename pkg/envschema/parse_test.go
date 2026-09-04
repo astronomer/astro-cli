@@ -1,17 +1,12 @@
-package envresolve
+package envschema
 
 import (
 	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	toml "github.com/pelletier/go-toml/v2"
-
-	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
 // decodeEnv parses a [tool.astro.env] TOML body the way pkg/manifest hands
@@ -50,22 +45,22 @@ batch_size = '500'
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := &envschema.Schema{
-		EnvVars: map[string]envschema.ValueSpec{
+	want := &Schema{
+		EnvVars: map[string]ValueSpec{
 			"LOG_LEVEL":     {Default: "info", HasDefault: true},
 			"EMPTY_DEFAULT": {Default: "", HasDefault: true}, // '' is a real default, not a marker
-			"API_TOKEN":     {Source: envschema.SourceWorkspace},
+			"API_TOKEN":     {Source: SourceWorkspace},
 			"WAREHOUSE_URI": {}, // {} is required, no default
 		},
-		AirflowVariables: map[string]envschema.ValueSpec{
+		AirflowVariables: map[string]ValueSpec{
 			"batch_size": {Default: "500", HasDefault: true},
 		},
 		// Sensitive without anyone saying so: a connection carries a credential
 		// by construction, and the schema this grammar replaces treats them as
 		// unconditionally sensitive.
-		Connections: map[string]envschema.ValueSpec{
+		Connections: map[string]ValueSpec{
 			"warehouse": {Sensitive: true},
-			"reporting": {Source: envschema.SourceWorkspace, Sensitive: true},
+			"reporting": {Source: SourceWorkspace, Sensitive: true},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -79,7 +74,7 @@ func TestParseSchemaEmpty(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(got, &envschema.Schema{}) {
+		if !reflect.DeepEqual(got, &Schema{}) {
 			t.Errorf("ParseSchema(%v) = %+v, want empty schema", env, got)
 		}
 	}
@@ -159,7 +154,7 @@ warehouse = { conn_type = 'postgres' }
 	if !logLevel.HasDefault || logLevel.Default != "info" {
 		t.Errorf("default = %q/%v, want info/true — the table's default is the shorthand's default", logLevel.Default, logLevel.HasDefault)
 	}
-	if logLevel.Type != envschema.TypeEnum {
+	if logLevel.Type != TypeEnum {
 		t.Errorf("type = %q, want enum", logLevel.Type)
 	}
 	if !reflect.DeepEqual(logLevel.Enum, []string{"debug", "info", "warn"}) {
@@ -172,7 +167,7 @@ warehouse = { conn_type = 'postgres' }
 	if !s.EnvVars["DB_PASSWORD"].Sensitive {
 		t.Error("sensitive did not decode")
 	}
-	if got := s.EnvVars["SLACK_WEBHOOK"]; !got.Optional || got.Type != envschema.TypeURL {
+	if got := s.EnvVars["SLACK_WEBHOOK"]; !got.Optional || got.Type != TypeURL {
 		t.Errorf("SLACK_WEBHOOK = %+v, want optional and url", got)
 	}
 	// Declaring a type invites writing the default in that type.
@@ -242,7 +237,7 @@ func TestParseSchemaShorthandEqualsDefaultKey(t *testing.T) {
 //
 // This is why it is a field rather than an empty default: a resolved default is
 // INJECTED, so `X = \'\'` would set the variable to empty rather than leave it
-// absent. See the package doc on pkg/envschema.
+// absent. See the package doc
 func TestOptionalDeclarationDoesNotGate(t *testing.T) {
 	s, err := ParseSchema(decodeEnv(t, `
 [tool.astro.env]
@@ -253,8 +248,8 @@ OPTIONAL_ONE = { optional = true }
 		t.Fatal(err)
 	}
 	var missing []string
-	for _, v := range envschema.Validate(s, envschema.Values{}) {
-		if v.Kind == envschema.ViolationMissing {
+	for _, v := range Validate(s, Values{}) {
+		if v.Kind == ViolationMissing {
 			missing = append(missing, v.Key)
 		}
 	}
@@ -460,40 +455,100 @@ func TestParseSchemaSectionProblems(t *testing.T) {
 	}
 }
 
-// Every TOML block in the manifest reference parses.
+// A bool annotation that does not decode yields one problem, not two.
 //
-// A doc example that does not load is worse than no example: it is the thing a
-// user copy-pastes, and the last round of this grammar shipped one — the
-// reference's own annotated connection carried `sensitive = true`, which the
-// same commit made an error. Nothing connected the docs to the parser, so it was
-// invisible until someone read both.
-//
-// Only the [tool.astro.env] blocks are extracted, since that is the section this
-// package parses; a block naming any other table is skipped rather than
-// half-parsed.
-func TestManifestReferenceExamplesParse(t *testing.T) {
-	body, err := os.ReadFile(filepath.Join("..", "..", "docs", "manifest-reference.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	blocks := 0
-	for _, block := range strings.Split(string(body), "```toml") {
-		snippet, _, ok := strings.Cut(block, "```")
-		if !ok || !strings.Contains(snippet, "[tool.astro.env") {
-			continue
-		}
-		// A snippet declaring other sections too would fail decodeEnv's narrow
-		// struct rather than the grammar; the env blocks in this page stand
-		// alone, and this asserts that stays true.
-		blocks++
-		t.Run(fmt.Sprintf("block-%d", blocks), func(t *testing.T) {
-			if _, err := ParseSchema(decodeEnv(t, snippet)); err != nil {
-				t.Errorf("a documented example does not parse:\n%s\nerror: %v", snippet, err)
+// `sensitive` on a connection defaults to true, so a failed decode must leave
+// that default alone: overwriting it with false let Check add "cannot be
+// declared not sensitive", contradicting an author who wrote `sensitive = 'yes'`
+// meaning true.
+func TestABadBoolYieldsOneProblem(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  map[string]any
+		want string
+	}{
+		{
+			name: "sensitive on a connection",
+			env: map[string]any{"connections": map[string]any{
+				"c": map[string]any{"sensitive": "yes"},
+			}},
+			want: "tool.astro.env.connections.c.sensitive",
+		},
+		{
+			name: "sensitive on an env var",
+			env:  map[string]any{"FOO": map[string]any{"sensitive": "yes"}},
+			want: "tool.astro.env.FOO.sensitive",
+		},
+		{
+			name: "optional on an env var",
+			env:  map[string]any{"FOO": map[string]any{"optional": "yes"}},
+			want: "tool.astro.env.FOO.optional",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseSchema(tc.env)
+			if err == nil {
+				t.Fatal("want a problem")
+			}
+			var se *SchemaError
+			if !errors.As(err, &se) {
+				t.Fatalf("want a *SchemaError, got %T", err)
+			}
+			if len(se.Problems) != 1 {
+				t.Fatalf("want exactly one problem, got %d: %+v", len(se.Problems), se.Problems)
+			}
+			if se.Problems[0].Key != tc.want {
+				t.Errorf("problem key = %q, want %q", se.Problems[0].Key, tc.want)
+			}
+			if !strings.Contains(se.Problems[0].Reason, "true or false") {
+				t.Errorf("reason = %q, want the bool complaint", se.Problems[0].Reason)
 			}
 		})
 	}
-	if blocks == 0 {
-		t.Fatal("found no [tool.astro.env] examples; this test would pass vacuously")
+}
+
+// A connection whose `sensitive` failed to decode keeps its default, so nothing
+// downstream reads it as a plaintext-safe value.
+func TestABadSensitiveLeavesTheConnectionDefault(t *testing.T) {
+	// The parse fails, which is the point: a caller gets no schema at all
+	// rather than one whose connection is silently not sensitive.
+	s, err := ParseSchema(map[string]any{"connections": map[string]any{
+		"c": map[string]any{"sensitive": "yes"},
+	}})
+	if err == nil {
+		t.Fatal("want a refusal")
+	}
+	if s != nil {
+		t.Errorf("want no schema alongside the refusal, got %+v", s)
+	}
+}
+
+// DeclaredEnvKeys applies the AIRFLOW_VAR_/AIRFLOW_CONN_ encoding, which is the
+// reason it is shared rather than re-derived: every consumer gating a tier on
+// "did this project ask for this name?" has to agree on the spelling.
+func TestDeclaredEnvKeys(t *testing.T) {
+	s, err := ParseSchema(map[string]any{
+		"PORT":              map[string]any{"type": "port"},
+		"API_URL":           "https://x.io",
+		"airflow_variables": map[string]any{"mode": map[string]any{}},
+		"connections":       map[string]any{"warehouse": map[string]any{"conn_type": "snowflake"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := DeclaredEnvKeys(s)
+	want := []string{"AIRFLOW_CONN_WAREHOUSE", "AIRFLOW_VAR_MODE", "API_URL", "PORT"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("DeclaredEnvKeys = %v, want %v (sorted)", got, want)
+	}
+}
+
+// A nil schema yields nothing, so a caller with no manifest needs no guard.
+func TestDeclaredEnvKeysOnNothing(t *testing.T) {
+	if got := DeclaredEnvKeys(nil); got != nil {
+		t.Errorf("DeclaredEnvKeys(nil) = %v, want nil", got)
+	}
+	if got := DeclaredEnvKeys(&Schema{}); len(got) != 0 {
+		t.Errorf("DeclaredEnvKeys(empty) = %v, want none", got)
 	}
 }

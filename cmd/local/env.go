@@ -531,7 +531,7 @@ func (c *cli) loadManifestSchema(projectDir string) (*manifest.Manifest, *envsch
 	if err != nil {
 		return nil, nil, err
 	}
-	schema, err := envresolve.ParseSchema(m.Astro.Env)
+	schema, err := envschema.ParseSchema(m.Astro.Env)
 	if err != nil {
 		return nil, nil, err
 	}
