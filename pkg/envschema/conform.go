@@ -12,43 +12,31 @@ import (
 // declarations said they would be. It returns nil when every present value
 // conforms, and judges only names the schema declares.
 //
-// Separate from Validate on purpose, and the split is the whole point of this
-// file. Validate answers "is anything missing" and is what `astro local start`
-// gates on; a start that refuses an unusual-but-working value is a worse failure
-// than one that runs. This answers "is what resolved the shape it was declared
-// to be", which a caller can report without refusing to proceed. Two questions,
-// two functions, so a caller picks rather than inherits.
+// Distinct from Validate, which asks only whether anything is MISSING and is
+// what `astro local start` gates on. This asks whether what resolved is the
+// shape it was declared to be, and a caller can report it without refusing to
+// proceed. Callers wanting both call both.
 //
-// Why it exists at all: `type`, `enum` and `conn_type` were parsed, validated
-// for coherence, and then enforced by nothing on this side — the desktop
-// type-checked resolved values and the CLI did not, so a project declaring
-// `type = "port"` with `PORT=99999` got a clean start here and a violation
-// there. One contract, two answers. A declared type that nothing enforces is
-// worse than no type, because the author believes it is enforced.
-//
-// A value that is present but empty is NOT checked. An empty string satisfies
-// Validate (present is present), and type-checking it would refuse a value the
-// gate above deliberately allowed — an inconsistency between the two functions
-// rather than a finding about the project.
+// A value that is present but empty is not checked: an empty string satisfies
+// Validate, so refusing it here would have the two functions disagree about a
+// value the gate allows.
 //
 // # What the conn_type check does not reach
 //
-// A connection is compared only when the resolver could determine its kind, and
-// today that means one encoding. airflowenv.DecodeConnEnv is JSON-only, so:
+// A connection is compared only when the resolver determined its kind, which
+// means a JSON value carrying a conn_type field. airflowenv.DecodeConnEnv is
+// JSON-only, so:
 //
 //   - A URI value — AIRFLOW_CONN_X=snowflake://u:p@acct/db, Airflow's own
 //     documented form — does not decode. The resolver reports "not valid
 //     connection JSON" and leaves the kind empty, which the empty-value skip
-//     passes over, so conn_type is never compared.
-//   - A JSON blob that omits conn_type decodes to an empty kind and is
-//     accepted against any declaration, even though the resolver DID read the
-//     value and there simply is no kind in it.
+//     passes over.
+//   - A JSON blob omitting conn_type decodes to an empty kind and is accepted
+//     against any declaration.
 //
-// Both are silent rather than wrong: nothing is falsely reported. Closing them
-// needs a signal the resolver does not pass today — "decoded, no kind" has to
-// be distinguishable from "could not decode" — so it is a change on that side
-// rather than here. Documented so a reader does not conclude from a passing
-// start that their conn_type was checked.
+// Neither reports a false mismatch. Comparing them needs the resolver to
+// distinguish "decoded, no kind" from "could not decode", so it is a change on
+// that side. A clean start is therefore not proof that a conn_type matched.
 func CheckValues(s *Schema, v Values) []Violation {
 	if s == nil {
 		return nil
@@ -61,21 +49,17 @@ func CheckValues(s *Schema, v Values) []Violation {
 			if !ok || value == "" {
 				continue
 			}
-			// Indexed rather than ranged by value, for the reason
-			// validate.go's own loop records: ranging by value would make this
+			// Indexed rather than ranged by value: ranging would make this
 			// loop's legality depend on ValueSpec staying under a lint copy
-			// threshold, so the next field added to the struct fails lint here,
-			// in an unrelated change.
+			// threshold.
 			spec := names[key]
 			var reason string
 			if section == SectionConnection {
-				// A connection's "value" here is its conn_type, not its
-				// contents — the resolver reduces it to that before handing it
-				// over. So the question is whether it is the KIND of connection
-				// declared, which is not the question CheckValue answers, and
-				// running CheckValue on it would type-check the string
-				// "postgres" against `type`. Check refuses `type` and `enum` on
-				// a connection for the same reason.
+				// A connection's value here is its conn_type, not its contents,
+				// so the question is whether it is the declared KIND. Running
+				// CheckValue on it would type-check the string "postgres"
+				// against `type`, which is why Check refuses `type` and `enum`
+				// on a connection.
 				reason = connTypeMismatch(spec.ConnType, value)
 			} else {
 				reason = spec.CheckValue(value)
@@ -101,19 +85,13 @@ func CheckValues(s *Schema, v Values) []Violation {
 // connTypeMismatch reports a connection that resolved to a different kind than
 // it declared. An undeclared conn_type accepts anything.
 //
-// It deliberately does NOT test resolved for "" — the resolver failing to
-// determine a kind is not the same as the wrong kind and must not be reported as
-// one. CheckValues' empty-value skip already covers that, and a second guard
-// here was unreachable: mutation testing found removing it changed no test,
-// because nothing can reach this function with an empty resolved value. The skip
-// is what holds the behavior, and it has a test of its own.
+// It does not test resolved for "" — a kind the resolver could not determine is
+// not the wrong kind. CheckValues' empty-value skip covers that case, and is
+// where the behavior lives.
 func connTypeMismatch(declared, resolved string) string {
-	// Case-folded. DecodeConnEnv lowercases the connection ID but passes
-	// conn_type through verbatim, and the manifest side is verbatim TOML, so
-	// neither end normalizes: a stored "Postgres" against a declared "postgres"
-	// is the same working connection and was reported as the wrong kind on
-	// every start. That is the false-positive class this file's own rationale
-	// exists to avoid.
+	// Case-folded: DecodeConnEnv passes conn_type through verbatim and the
+	// manifest side is verbatim TOML, so neither end normalizes, and a stored
+	// "Postgres" against a declared "postgres" is the same connection.
 	if declared == "" || strings.EqualFold(resolved, declared) {
 		return ""
 	}
@@ -125,28 +103,19 @@ func connTypeMismatch(declared, resolved string) string {
 // caller holding one declaration and one value — a form field, an editor
 // annotation — can ask without assembling a whole schema.
 //
-// TypeString and TypeJSON accept anything. String is the absence of a
-// constraint; JSON is deliberate rather than an omission — these values are
-// routinely templated (`{{ var.value.x }}`), so a value that is not valid JSON
-// at rest is normal and refusing it would fail the common case.
+// TypeString and TypeJSON accept anything.
 //
 //nolint:gocritic // hugeParam: by value on purpose, see Check.
 func (s ValueSpec) CheckValue(value string) string {
-	// The offending value is quoted back for everything EXCEPT a sensitive
-	// declaration, whose contents must not appear in a reason at all.
+	// The offending value is quoted back, except for a sensitive declaration,
+	// whose contents must never appear in a reason: callers put Reason on
+	// stdout and into their JSON event stream, and embedded in prose it cannot
+	// be redacted downstream. `{ sensitive = true, type = 'url' }` is legal —
+	// only sensitive+default is refused — so this arm is reachable.
 	//
-	// This is not a hypothetical. `{ sensitive = true, type = 'url' }` is a
-	// legal declaration — only sensitive+default is refused — and the value
-	// resolves from a vault or the shell. Callers put Reason straight on stdout
-	// and into their JSON event stream, so quoting it there wrote a live
-	// credential into the terminal, into CI logs, and into anything consuming
-	// the stream. Embedded in prose it could not even be redacted downstream.
-	//
-	// Naming the value is worth real usability, which is why it is kept for the
-	// rest: "expected an integer" against a schema of forty names does not say
-	// which value, and the caller reports these with no value to hand. For a
-	// sensitive one the type alone has to do, and the author knows what they
-	// set.
+	// It is quoted for everything else because "expected an integer" against a
+	// schema of forty names does not say which value, and the caller reports
+	// these with no value to hand.
 	got := func() string {
 		if s.Sensitive {
 			return ""
@@ -156,33 +125,24 @@ func (s ValueSpec) CheckValue(value string) string {
 
 	switch s.Type {
 	case "", TypeString, TypeJSON:
-		// Nothing to check, and for two different reasons. An absent type and
-		// `string` are the absence of a constraint. JSON is a deliberate
-		// non-check: these values are routinely templated
-		// (`{{ var.value.x }}`), so a value that is not valid JSON at rest is
-		// normal, and refusing it would fail the common case.
-		//
-		// Behaviourally redundant with the return at the bottom, and kept
-		// anyway: falling out of a switch reads as an oversight, and it is the
-		// difference the `exhaustive` linter asks for. No test can distinguish
-		// this arm from its absence — do not go looking for one.
+		// Nothing to check. An absent type and `string` are the absence of a
+		// constraint; JSON is a deliberate non-check, since these values are
+		// routinely templated (`{{ var.value.x }}`) and are not valid JSON at
+		// rest. Redundant with the return at the bottom, and explicit because
+		// falling out of a switch reads as an oversight.
 		return ""
 	case TypeInt:
-		// ParseInt with an explicit 64, not Atoi, whose width is the platform's
-		// int. .goreleaser.yml ships a linux/386 build, where Atoi makes
-		// "3000000000" out of range — so the same manifest was clean on
-		// amd64 and warned on 386. A type check whose verdict depends on which
-		// release artifact you downloaded is the "one contract, two answers"
-		// split this file exists to close.
+		// An explicit 64, not Atoi, whose width is the platform's int:
+		// .goreleaser.yml ships a linux/386 build, and the verdict must not
+		// depend on which artifact is running.
 		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
 			return "expected an integer" + got()
 		}
 	case TypeNumber:
-		// ParseFloat accepts NaN, Inf, +Inf and infinity. Those are refused
-		// rather than inherited: a NaN reaching Airflow makes every comparison
-		// against it false, silently, which is a worse outcome than the warning
-		// this returns. Contrast the bool arm below, which keeps ParseBool's
-		// wider set deliberately.
+		// Non-finite values are refused, though ParseFloat accepts NaN, Inf,
+		// +Inf and infinity: a NaN reaching Airflow makes every comparison
+		// against it silently false. Contrast the bool arm, which keeps
+		// ParseBool's wider set.
 		f, err := strconv.ParseFloat(value, 64)
 		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 			return "expected a finite number" + got()
@@ -208,12 +168,10 @@ func (s ValueSpec) CheckValue(value string) string {
 		}
 	case TypeEnum:
 		if len(s.Enum) == 0 {
-			// An incomplete declaration, not a set that admits nothing. Check
-			// refuses this pairing, so a manifest cannot reach here — but
-			// CheckValue is advertised for a caller holding one declaration
-			// mid-edit (a form field), where `enum` selected and the values not
-			// yet typed is a normal intermediate state. Refusing every value
-			// with "expected one of , got …" would fire on every keystroke.
+			// An incomplete declaration, not a set admitting nothing. Check
+			// refuses the pairing so a manifest cannot reach here, but a caller
+			// holding a declaration mid-edit can, where `enum` chosen and the
+			// values not yet typed is a normal intermediate state.
 			return ""
 		}
 		for _, allowed := range s.Enum {

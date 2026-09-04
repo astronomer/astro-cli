@@ -5,14 +5,10 @@ import (
 	"testing"
 )
 
-// Check is callable without a TOML reader, which is the entire reason it exists.
-//
-// O19 moves Astro Desktop's declaration source into the manifest, read AND
-// write together, so a ValueSpec will be built from UI state and serialized.
-// These rules used to live in the reader, where that writer could not reach
-// them — it would have been able to emit a manifest the next `astro local start`
-// refuses to load, a file the tool that wrote it cannot read. So every case here
-// constructs a spec directly, the way a writer does.
+// Check is callable without a TOML reader, which is the reason it exists: a
+// writer building a ValueSpec from UI state and serializing it must obey the
+// same rules, or it can emit a manifest the next `astro local start` refuses to
+// load. Every case here constructs a spec directly, the way a writer does.
 func TestValueSpecCheck(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -32,8 +28,7 @@ func TestValueSpecCheck(t *testing.T) {
 			want:    []string{"default"},
 		},
 		{
-			// The rule a writer is most likely to trip: it built a connection
-			// and never thought about the flag.
+			// The rule a writer is most likely to trip.
 			name:    "a connection that is not sensitive",
 			spec:    ValueSpec{},
 			section: SectionConnection,
@@ -45,8 +40,6 @@ func TestValueSpecCheck(t *testing.T) {
 			section: SectionConnection,
 		},
 		{
-			// Both rules fire, and both are true: it is not sensitive AND the
-			// default it carries would be committed either way.
 			name:    "a connection with a default and no flag",
 			spec:    ValueSpec{Default: "postgres://u:p@h/db", HasDefault: true},
 			section: SectionConnection,
@@ -82,9 +75,8 @@ func TestValueSpecCheck(t *testing.T) {
 			want:    []string{"type"},
 		},
 		{
-			// A connection's resolved value is its conn_type, so nothing could
-			// ever enforce a `type` here. Refused rather than ignored: an
-			// annotation accepted and never applied is worse than one rejected.
+			// A connection's resolved value is its conn_type, so nothing can
+			// enforce a `type` here.
 			name:    "a type on a connection",
 			spec:    ValueSpec{Sensitive: true, Type: TypeURL},
 			section: SectionConnection,
@@ -97,17 +89,16 @@ func TestValueSpecCheck(t *testing.T) {
 			want:    []string{"enum"},
 		},
 		{
-			// One mistake, one message, and it is not the spelling: the problem
-			// is that a connection declared a type at all.
+			// One message, and it is not the spelling: the problem is that a
+			// connection declared a type at all.
 			name:    "an unknown type on a connection",
 			spec:    ValueSpec{Sensitive: true, Type: "enom"},
 			section: SectionConnection,
 			want:    []string{"type"},
 		},
 		{
-			// Both refused on their own terms, and crucially the coherence rule
-			// does NOT also fire telling it to add `type = "enum"` — the one
-			// thing a connection may not do.
+			// Both refused on their own terms, and the coherence rule does not
+			// also fire telling it to add `type = "enum"`.
 			name:    "a type and an enum on a connection",
 			spec:    ValueSpec{Sensitive: true, Type: TypeEnum, Enum: []string{"a"}},
 			section: SectionConnection,
@@ -119,8 +110,7 @@ func TestValueSpecCheck(t *testing.T) {
 			section: SectionConnection,
 		},
 		{
-			// One mistake, one problem: the enum rules read a type already
-			// rejected, so they stay quiet.
+			// The enum rules read a type already rejected, so they stay quiet.
 			name:    "an unknown type beside an enum",
 			spec:    ValueSpec{Type: "enom", Enum: []string{"a"}},
 			section: SectionEnvVar,
@@ -162,12 +152,9 @@ func TestValueSpecCheck(t *testing.T) {
 }
 
 // Every problem names what it read, so a caller that already knows a field is
-// broken can drop the rules that consulted it.
-//
-// Without this the reader cannot tell "type = enum needs a non-empty enum" —
-// which points at type and reads enum — from a rule about type alone, and a
-// failed enum decode produces a second message contradicting the enum the author
-// wrote.
+// broken can drop the rules that consulted it. Without it, a reader cannot tell
+// "type = enum needs a non-empty enum" — which points at type and reads enum —
+// from a rule about type alone.
 func TestSpecProblemNamesWhatItRead(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

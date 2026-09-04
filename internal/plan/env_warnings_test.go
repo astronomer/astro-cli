@@ -13,12 +13,11 @@ import (
 )
 
 // A value that resolved to something its declaration did not promise is
-// reported, and does NOT stop the start.
+// reported, and does not stop the start.
 //
-// The manifest is self-contained on purpose: the default resolves the name, so
-// the value is present (nothing is missing, so no gate fires) and wrong (99999
-// is not a port). That is precisely the combination the old behavior dropped on
-// the floor — computed into res.Violations and surfaced nowhere.
+// The manifest is self-contained: the default resolves the name, so the value is
+// present — nothing missing, so no gate fires — and wrong, since 99999 is not a
+// port.
 func TestBuildReportsAValueWarningWithoutRefusing(t *testing.T) {
 	dir := isolatedProject(t, `[project]
 name = 'demo'
@@ -43,7 +42,7 @@ ASTRO_TEST_FINE = { type = 'int', default = '3' }
 	if w.Key != "ASTRO_TEST_PORT" || w.Kind != envschema.ViolationWrongType || w.Section != envschema.SectionEnvVar {
 		t.Errorf("unexpected warning: %+v", w)
 	}
-	// The message has to name the offending value: the caller prints this
+	// The message names the offending value, since the caller prints this
 	// without the value to hand.
 	if !strings.Contains(w.Reason, "99999") {
 		t.Errorf("reason %q does not name the offending value", w.Reason)
@@ -72,13 +71,10 @@ ASTRO_TEST_PORT = { type = 'port', default = '8080' }
 	}
 }
 
-// valueWarnings' exclusion, tested at its own level.
-//
-// Build cannot currently reach it with a missing violation — the Missing gate
-// returns first — so exercising it through Build is impossible and this is the
-// only place the behavior is pinned. It matters for the day a start proceeds
-// despite missing values: without the filter the user would get an error and a
-// duplicate warning naming the same value.
+// valueWarnings' exclusion, tested at its own level: Build cannot reach it with
+// a missing violation, because the Missing gate returns first. It matters if a
+// start ever proceeds despite missing values, where the filter is what stops an
+// error and a duplicate warning naming the same value.
 func TestValueWarningsExcludesMissing(t *testing.T) {
 	in := []envschema.Violation{
 		{Kind: envschema.ViolationMissing, Section: envschema.SectionEnvVar, Key: "GONE"},
@@ -105,15 +101,14 @@ func TestValueWarningsOnNothing(t *testing.T) {
 }
 
 // isolatedProject writes a manifest into a fresh dir and cuts every ambient
-// source the resolver would otherwise consult, following plan_test.go's
-// pattern: HOME and USERPROFILE so `~/.astro/env` cannot contribute, and
-// XDG_CACHE_HOME so real user state cannot.
+// source the resolver would otherwise consult: HOME and USERPROFILE so
+// `~/.astro/env` cannot contribute, XDG_CACHE_HOME so real user state cannot,
+// and the declared names themselves, which shell env would otherwise satisfy
+// above the manifest default.
 //
-// The fixture names are ASTRO_TEST_-prefixed for the same reason. These tests
-// first used PORT, which many dev shells and CI runners export — and the chain
-// puts shell env above the manifest default, so `PORT=not-a-port go test`
-// failed them with the developer's own environment. A test that depends on what
-// is NOT set in your shell is not a test.
+// The fixtures are ASTRO_TEST_-prefixed for the same reason: a name a shell is
+// likely to export, PORT among them, makes the result depend on the developer's
+// environment.
 func isolatedProject(t *testing.T, manifest string, declared ...string) string {
 	t.Helper()
 	clearEnv(t, declared...)
@@ -131,15 +126,13 @@ func isolatedProject(t *testing.T, manifest string, declared ...string) string {
 // clearEnv removes names from the process environment for the duration of the
 // test, restoring whatever was there afterwards.
 //
-// t.Setenv can only set, and setting a fixture name to "" is not the same as
-// its being absent — an empty value still resolves, which is "present" to the
-// gate and skipped by the type check. So the original is registered for
-// restoration via t.Setenv and then unset outright.
+// t.Setenv can only set, and setting a name to "" is not absence — an empty
+// value still resolves, which is "present" to the gate and skipped by the type
+// check. So the original is registered for restoration via t.Setenv and then
+// unset outright.
 //
-// Renaming the fixtures away from PORT lowered the odds of a collision; this
-// removes them. Shell env legitimately outranks a manifest default, so ANY
-// fixture name a test relies on defaulting must be cleared, not just an
-// unlucky one.
+// Shell env outranks a manifest default, so any name a test relies on
+// defaulting has to be cleared.
 func clearEnv(t *testing.T, names ...string) {
 	t.Helper()
 	for _, n := range names {

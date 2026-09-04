@@ -23,23 +23,18 @@ func TestCheckValue(t *testing.T) {
 		{name: "int accepts a negative", spec: ValueSpec{Type: TypeInt}, value: "-3", ok: true},
 		{name: "int refuses a word", spec: ValueSpec{Type: TypeInt}, value: "abc"},
 		{name: "int refuses a float", spec: ValueSpec{Type: TypeInt}, value: "3.5"},
-		// Wider than a 32-bit int on purpose: with strconv.Atoi this was out of
-		// range on the linux/386 build .goreleaser.yml ships, so the same
-		// manifest warned there and passed on amd64.
-		//
-		// Honest about what this case can prove: on a 64-bit host Atoi accepts
-		// it too, so it does NOT discriminate the fix here — it documents the
-		// intent, and only a 386 run distinguishes them. The 64-bit boundary
-		// below is the part that holds everywhere: it pins the explicit width,
-		// so narrowing ParseInt's bitSize fails it.
+		// Wider than a 32-bit int, which the linux/386 build .goreleaser.yml
+		// ships would reject under strconv.Atoi. On a 64-bit host this case
+		// passes either way, so the 64-bit boundary below is the one that pins
+		// the explicit width everywhere.
 		{name: "int accepts a value wider than a 32-bit int", spec: ValueSpec{Type: TypeInt}, value: "3000000000", ok: true},
 		{name: "int refuses a value wider than 64 bits", spec: ValueSpec{Type: TypeInt}, value: "99999999999999999999"},
 
 		{name: "number accepts a float", spec: ValueSpec{Type: TypeNumber}, value: "3.5", ok: true},
 		{name: "number accepts an integer", spec: ValueSpec{Type: TypeNumber}, value: "3", ok: true},
 		{name: "number refuses a word", spec: ValueSpec{Type: TypeNumber}, value: "abc"},
-		// ParseFloat accepts all of these; a NaN reaching Airflow makes every
-		// comparison against it silently false, which is worse than a warning.
+		// ParseFloat accepts all of these, and a NaN reaching Airflow makes
+		// every comparison against it silently false.
 		{name: "number refuses NaN", spec: ValueSpec{Type: TypeNumber}, value: "NaN"},
 		{name: "number refuses Inf", spec: ValueSpec{Type: TypeNumber}, value: "Inf"},
 		{name: "number refuses +Inf", spec: ValueSpec{Type: TypeNumber}, value: "+Inf"},
@@ -62,24 +57,20 @@ func TestCheckValue(t *testing.T) {
 
 		{name: "url accepts an https url", spec: ValueSpec{Type: TypeURL}, value: "https://x.io/y", ok: true},
 		{name: "url accepts a postgres url", spec: ValueSpec{Type: TypeURL}, value: "postgres://u:p@h:5432/db", ok: true},
-		// The reason scheme AND host are both required: url.Parse alone accepts
-		// a bare host as a relative path and returns no error, so checking only
-		// err would pass nearly everything.
+		// Scheme AND host are both required: url.Parse alone accepts a bare
+		// host as a relative path and returns no error.
 		{name: "url refuses a bare host", spec: ValueSpec{Type: TypeURL}, value: "example.com"},
 		{name: "url refuses a path", spec: ValueSpec{Type: TypeURL}, value: "/just/a/path"},
 		{name: "url refuses a scheme with no host", spec: ValueSpec{Type: TypeURL}, value: "https://"},
-		// The mirror of the case above, and the one that was missing: a host
-		// with no scheme. Mutation testing found the scheme half of the check
-		// untested, because every other refused fixture lacked a host too.
+		// A host with no scheme, the mirror of the case above.
 		{name: "url refuses a protocol-relative url", spec: ValueSpec{Type: TypeURL}, value: "//example.com/x"},
 
 		{name: "enum accepts a member", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a", "b"}}, value: "a", ok: true},
 		{name: "enum refuses a non-member", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a", "b"}}, value: "c"},
 		{name: "enum is case sensitive", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a"}}, value: "A"},
 		// An incomplete declaration, not a set admitting nothing. Check refuses
-		// the pairing, so a manifest cannot reach it — but CheckValue is
-		// advertised for a caller holding a declaration mid-edit, where `enum`
-		// chosen and the values not yet typed is a normal intermediate state.
+		// the pairing so a manifest cannot reach it, but a caller holding a
+		// declaration mid-edit can.
 		{name: "the enum type with no values constrains nothing", spec: ValueSpec{Type: TypeEnum}, value: "anything", ok: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,21 +90,19 @@ func TestCheckValue(t *testing.T) {
 					t.Errorf("reason %q does not quote the offending value %q", reason, tc.value)
 				}
 
-				// ...unless the declaration is sensitive, and this asserts it
-				// for EVERY refusing type rather than one sample, because the
-				// leak it guards was systemic: the value was formatted into
-				// every arm's message.
+				// ...unless the declaration is sensitive. Asserted for every
+				// refusing type, since every arm formats a value.
 				sens := tc.spec
 				sens.Sensitive = true
 				sreason := sens.CheckValue(tc.value)
 				if sreason == "" {
 					t.Errorf("a sensitive declaration still has to refuse %q", tc.value)
 				}
-				// Asserted on the mechanism rather than on the value: a
-				// substring test cannot be used here, because a one-character
+				// Asserted on the mechanism, not the value: a one-character
 				// fixture like the enum's "c" appears inside the word
-				// "expected" and reports a leak that is not one. The invariant
-				// is that no `, got "…"` clause is appended at all.
+				// "expected", so a substring test would report a leak that is
+				// not one. The invariant is that no `, got "…"` clause is
+				// appended.
 				if strings.Contains(sreason, ", got ") {
 					t.Errorf("LEAK: sensitive reason %q still appends the value clause", sreason)
 				}
@@ -125,11 +114,10 @@ func TestCheckValue(t *testing.T) {
 // A sensitive value's contents never reach a Violation, which is what a caller
 // prints and streams as JSON.
 //
-// `{ sensitive = true, type = 'url' }` is a legal declaration — only
-// sensitive+default is refused — and the value resolves from a vault or the
-// shell. Quoting it into Reason put a live credential on stdout, in CI logs, and
-// in the --output json stream, where being embedded in prose meant no consumer
-// could redact it either.
+// `{ sensitive = true, type = 'url' }` is legal — only sensitive+default is
+// refused — and the value resolves from a vault or the shell, so a reason
+// carrying it would put a credential on stdout and in CI logs, unredactable
+// because it sits inside prose.
 func TestASensitiveValueNeverReachesAReason(t *testing.T) {
 	const secret = "hooks.slack.com/services/T00000/B00000/SuperSecretToken123"
 	spec := ValueSpec{Sensitive: true, Type: TypeURL}
@@ -173,8 +161,7 @@ func TestEnumReasonNamesTheAllowedValues(t *testing.T) {
 	}
 
 	// The allowed set comes from the manifest, so it is not secret and stays
-	// even when the value must be withheld — otherwise a sensitive enum's
-	// message would say nothing actionable at all.
+	// even when the value is withheld.
 	spec.Sensitive = true
 	sreason := spec.CheckValue("staging")
 	for _, want := range []string{"dev", "prod"} {
@@ -239,17 +226,16 @@ func TestCheckValues(t *testing.T) {
 	})
 
 	t.Run("a declared name with no value is not this function's business", func(t *testing.T) {
-		// Absence is Validate's finding. Reporting it here too would double
-		// every missing value for a caller that runs both.
+		// Absence is Validate's finding; reporting it here would double every
+		// missing value for a caller that runs both.
 		if got := CheckValues(schema, Values{}); len(got) != 0 {
 			t.Fatalf("want no violations for absent values, got %+v", got)
 		}
 	})
 
 	t.Run("a present but empty value is not checked", func(t *testing.T) {
-		// An empty string satisfies Validate — present is present — so
-		// refusing it here would make the two functions disagree about a value
-		// the gate deliberately allowed.
+		// An empty string satisfies Validate, so refusing it here would have
+		// the two functions disagree about a value the gate allows.
 		got := CheckValues(schema, Values{EnvVars: map[string]string{"PORT": "", "COUNT": ""}})
 		if len(got) != 0 {
 			t.Fatalf("want no violations for empty values, got %+v", got)
@@ -278,17 +264,14 @@ func TestConnTypeMismatch(t *testing.T) {
 		flagged  bool
 	}{
 		{name: "matching", declared: "postgres", resolved: "postgres"},
-		// DecodeConnEnv lowercases the connection id but passes conn_type
-		// through verbatim, and the manifest side is verbatim TOML, so neither
-		// end normalizes. A stored "Postgres" is the same working connection.
+		// Neither end normalizes: DecodeConnEnv passes conn_type through
+		// verbatim and the manifest side is verbatim TOML.
 		{name: "case differences are the same kind", declared: "postgres", resolved: "Postgres"},
 		{name: "case differences the other way", declared: "Snowflake", resolved: "snowflake"},
 		{name: "mismatched", declared: "snowflake", resolved: "postgres", flagged: true},
 		// No conn_type declared means any kind satisfies it.
 		{name: "undeclared accepts anything", declared: "", resolved: "postgres"},
-		// The resolver could not determine a kind. Not the same as the wrong
-		// kind, and reporting it as a mismatch would blame the project for
-		// something the resolver did not know.
+		// A kind the resolver could not determine is not the wrong kind.
 		{name: "unknown resolved type is not a mismatch", declared: "postgres", resolved: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -313,13 +296,9 @@ func TestConnTypeMismatch(t *testing.T) {
 	}
 }
 
-// The split O29 settled, pinned: the two functions answer different questions,
-// and neither answers the other's.
-//
-// This is the test that would fail if someone "simplified" the two into one, or
-// moved the type check inside Validate — which would make `astro local start`
-// refuse a project over an unusual-but-working value, the failure the split
-// exists to avoid.
+// The two functions answer different questions, and neither answers the
+// other's. Folding them together, or moving the type check inside Validate,
+// would make `astro local start` refuse a project over a working value.
 func TestValidateAndCheckValuesAnswerDifferentQuestions(t *testing.T) {
 	schema := &Schema{EnvVars: map[string]ValueSpec{
 		"MISSING": {},

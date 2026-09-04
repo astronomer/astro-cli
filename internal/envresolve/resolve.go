@@ -104,17 +104,14 @@ func Resolve(in Inputs) (*Result, error) {
 
 	sortResolved(r.resolved)
 	res.Resolved = r.resolved
-	// Three sources, and they answer three different questions. Validate: is
-	// anything missing. CheckValues: is what resolved the shape it was declared
-	// to be — the annotations were parsed and coherence-checked and then
-	// enforced by nothing on this side, so `type = "port"` with PORT=99999
-	// started clean here while the desktop called it a violation. extraViolations:
-	// what only this resolver could find, a connection whose JSON would not
-	// decode.
+	// Three sources, three questions. Validate: is anything missing.
+	// CheckValues: is what resolved the shape it was declared to be.
+	// extraViolations: what only this resolver can find, a connection whose
+	// JSON will not decode.
 	//
-	// Concatenated rather than folded into Validate because callers gate on
-	// different subsets: `astro local start` refuses on missing and reports the
-	// rest, which is why Missing is derived separately below.
+	// Concatenated rather than folded together because callers gate on
+	// different subsets — `astro local start` refuses on missing and reports
+	// the rest — which is why Missing is derived separately below.
 	res.Violations = append(envschema.Validate(in.Schema, res.Values), envschema.CheckValues(in.Schema, res.Values)...)
 	res.Violations = append(res.Violations, r.extraViolations...)
 	envschema.SortViolations(res.Violations)

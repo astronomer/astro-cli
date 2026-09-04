@@ -124,12 +124,9 @@ type ValueSpec struct {
 	// admitting nothing — CheckValue treats it as unconstrained on that basis.
 	Enum []string
 	// The flags sit together at the end because interleaving them between the
-	// strings costs 16 bytes of alignment padding — 128 rather than 112. That is
-	// tidiness rather than a constraint: no code depends on the size, since the
-	// loops over map[string]ValueSpec index rather than copying. An earlier
-	// version of this comment said the order was load-bearing for a lint
-	// threshold, which was true at the time and was a tripwire for whoever added
-	// the next field.
+	// strings costs 16 bytes of alignment padding. That is tidiness rather than
+	// a constraint: no code depends on the size, since the loops over
+	// map[string]ValueSpec index rather than copying.
 	//
 	// HasDefault distinguishes a string declaration from a table one; see
 	// Default. Optional exempts this declaration from the missing-value gate,
@@ -157,11 +154,10 @@ type SpecProblem struct {
 	// Field: "type = enum needs a non-empty enum" points at `type` and reads
 	// `enum`.
 	//
-	// It exists for a caller that already knows a field is broken. A TOML reader
-	// that failed to decode `enum` should not then report a rule that read the
-	// zero value it left behind, because the second message contradicts what the
-	// author actually wrote. Pointing at the field is not enough to work that
-	// out — the rule has to say what it looked at.
+	// It is for a caller that already knows a field is broken — a reader whose
+	// `enum` decode failed should not report a rule that read the zero value it
+	// left behind, since that message contradicts what the author wrote. Field
+	// alone is not enough to decide, so the rule states what it looked at.
 	Reads []string
 	// Reason is a sentence for whoever wrote the declaration.
 	Reason string
@@ -170,24 +166,20 @@ type SpecProblem struct {
 // Check reports the ways this declaration is not well formed, given the section
 // it sits in. It returns nil for a valid one.
 //
-// These rules live on the TYPE rather than in the TOML reader on purpose, and
-// that purpose is a writer. The reader (internal/envresolve) is not the only
-// thing that builds a ValueSpec: O19 moves Astro Desktop's declaration source
-// into the manifest, read AND write together, so the Environment Manager will
-// construct specs from UI state and serialize them. Enforced only on the way in,
-// these rules would let it write a manifest that the next `astro local start`
-// refuses to load — a file the tool that wrote it cannot read.
+// The rules live on the type rather than in the TOML reader because the reader
+// is not the only thing that builds a ValueSpec: a writer constructing one from
+// UI state and serializing it must obey them too, or it can emit a manifest the
+// next `astro local start` refuses to load.
 //
 // Well-formedness only. Whether a value RESOLVES is Validate's question, and
-// whether the TOML decoded at all is the reader's; this is whether the
-// declaration describes something coherent. `{ sensitive = true, default = 'x' }`
-// decodes perfectly and is not a thing anyone is allowed to mean.
+// whether the TOML decoded at all is the reader's. `{ sensitive = true,
+// default = 'x' }` decodes perfectly and is still not something anyone may
+// mean.
 //
-// The value receiver is deliberate, and stays even as this struct grows past a
-// copy threshold: Schema holds specs as map[string]ValueSpec, and a pointer
-// method cannot be called on a map index expression, so the obvious caller —
-// walking a schema and checking each declaration — would not compile. A 112-byte
-// copy once per declaration, at parse and at write, is not worth that.
+// The value receiver is deliberate: Schema holds specs as
+// map[string]ValueSpec, and a pointer method cannot be called on a map index
+// expression, so walking a schema and checking each declaration would not
+// compile.
 //
 //nolint:gocritic // hugeParam: see above; by value on purpose.
 func (s ValueSpec) Check(section Section) []SpecProblem {
@@ -201,41 +193,29 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 		out = append(out, SpecProblem{Field: field, Reads: reads, Reason: reason})
 	}
 
-	// skipTypeCoherence silences the enum/type pair at the bottom of this
-	// function. Those two rules READ the type, so once the type has been
-	// reported — or ruled out entirely — whatever they conclude from it is a
-	// second message about one mistake.
 	skipTypeCoherence := false
 
 	if section == SectionConnection {
 		// A connection declares its KIND with conn_type, not its shape with
-		// type. What resolves for one is a URI or a JSON blob, and the resolver
-		// reduces it to a conn_type before anything judges it — so `type` and
-		// `enum` on a connection could not be enforced by CheckValues even in
-		// principle. Refused rather than ignored for the reason this grammar
-		// keeps running into: an annotation accepted and never applied is worse
-		// than one rejected, because the author believes it took effect.
+		// type. What resolves for one is reduced to a conn_type before anything
+		// judges it, so `type` and `enum` here could not be enforced even in
+		// principle, and are refused rather than accepted and ignored.
 		//
-		// Both are reported on their own terms, which is why the pair rules are
-		// skipped wholesale here rather than per-field: a connection with an
-		// enum and no type would otherwise also be told to add `type = "enum"`,
-		// the one thing it may not do.
+		// Both are reported on their own terms, so the pair rules are skipped
+		// wholesale: a connection with an enum and no type would otherwise also
+		// be told to add `type = "enum"`, the one thing it may not do.
 		skipTypeCoherence = true
 		if s.Type != "" {
-			// Instead of, not as well as, "not a known type": a connection
-			// writing `type = 'enom'` has one mistake worth naming and it is
-			// not the spelling.
+			// Instead of, not as well as, "not a known type": one mistake, and
+			// it is not the spelling.
 			add("type", "type describes an env var or an Airflow variable, so it means nothing on a connection — conn_type is how a connection declares its kind")
 		}
 		if len(s.Enum) > 0 {
 			add("enum", "enum needs type = \"enum\", which a connection cannot declare", "enum", "type")
 		}
 	} else if !ValidType(s.Type) {
-		// An unrecognized type is reported once. Otherwise
-		// `{ type = 'enom', enum = ['a'] }` reports the real mistake AND "enum
-		// needs type = enum", the second contradicting a type the author plainly
-		// tried to write — the same cascade a caller filters with Reads, one
-		// level in.
+		// Reported once: otherwise `{ type = 'enom', enum = ['a'] }` also gets
+		// "enum needs type = enum", contradicting the type the author wrote.
 		add("type", fmt.Sprintf("%q is not a known type (string, int, number, bool, enum, url, port, json)", s.Type))
 		skipTypeCoherence = true
 	}
@@ -324,15 +304,13 @@ type Values struct {
 	EnvVars          map[string]string
 	AirflowVariables map[string]string
 	// Connections maps a connection id to the connection's TYPE — "postgres",
-	// "snowflake" — and never to the connection itself.
+	// "snowflake" — and never to the connection itself. CheckValues formats
+	// this string into a message a caller prints, so a whole AIRFLOW_CONN_
+	// payload here produces a false mismatch and dumps the connection,
+	// password included.
 	//
-	// Spelled out because it is easy to get wrong and no longer harmless. It
-	// used to be: Validate asked only whether the string was non-empty, so a
-	// caller passing the whole AIRFLOW_CONN_ payload got the same answer.
-	// CheckValues now formats this string into a message a caller prints, so a
-	// payload here produces both a false mismatch and a dump of the connection
-	// — password included. The empty string means the kind could not be
-	// determined, which is not a mismatch and is skipped.
+	// The empty string means the kind could not be determined, which is not a
+	// mismatch and is skipped.
 	Connections map[string]string
 }
 

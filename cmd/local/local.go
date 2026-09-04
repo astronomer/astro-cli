@@ -263,28 +263,20 @@ func standaloneOmissions(p localrt.Plan) []string {
 // declaration promised — a value failing its `type`, a connection of a
 // different `conn_type` — without refusing to start.
 //
-// Warning rather than blocking is the decision, not a compromise. The value may
-// well work: `type` is documentation the author wrote for their own team, and a
-// tool that refuses to start a project because a port is declared
-// `type = "port"` and set to 99999 is arguing with its user over their own
-// annotation. Missing values are the opposite case and do block — they reach
-// the caller as *MissingEnvError, and Airflow genuinely cannot run without them.
-//
-// Reporting them at all is the point. Before this these findings were computed
-// and dropped: `type`, `enum` and `conn_type` were parsed, checked for
-// coherence, and then enforced by nothing on this side, while Astro Desktop
-// reading the same manifest called them violations. One contract, two answers,
-// and the annotation only looked enforced.
+// Warning rather than blocking, because the value may well work: `type` is
+// documentation the author wrote for their own team, and refusing to start a
+// project over its own annotation is a tool arguing with its user. Missing
+// values are the opposite case and do block — they reach the caller as
+// *MissingEnvError, and Airflow cannot run without them.
 //
 // Not gated on mode, unlike warnStandaloneOmissions: a value of the wrong shape
 // is the wrong shape in Docker too.
 func warnEnvValues(r Renderer, warnings []envschema.Violation) {
 	for _, v := range warnings {
 		// The section, key and reason ride as their own fields as well as in
-		// the prose. Text alone would make every machine consumer — the
-		// Environment Manager among them, which is the surface this reporting
-		// exists to align with — regex sectionLabel's human strings back into a
-		// Section, and break silently on any rewording.
+		// the prose, so a machine consumer does not have to regex
+		// sectionLabel's human strings back into a Section and break on any
+		// rewording.
 		emitWarning(r, event{
 			Event:   "warning",
 			Text:    fmt.Sprintf("%s %s: %s", sectionLabel(v.Section), v.Key, v.Reason),
@@ -311,8 +303,8 @@ func sectionLabel(s envschema.Section) string {
 }
 
 // emitWarning is the one definition of what a warning looks like on the wire,
-// in both modes. Both warning sources reach it; a third would otherwise paste a
-// third copy of this loop and the two could drift.
+// in both modes. Every warning source goes through it, so the shape cannot
+// drift between them.
 func emitWarning(r Renderer, e event) {
 	//nolint:errcheck // a warning write failure surfaces on the command's own output
 	r.Emit(e, func(w io.Writer) error {

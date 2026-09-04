@@ -303,7 +303,7 @@ func TestWarnStandaloneReportsBothOmissions(t *testing.T) {
 }
 
 // envWarningCase is one warning-reporting expectation, shared by the text and
-// JSON tests below. One table, two renderings — a second copy would drift.
+// JSON tests below: one table, two renderings.
 type envWarningCase struct {
 	name     string
 	warnings []envschema.Violation
@@ -360,10 +360,6 @@ func envWarningCases() []envWarningCase {
 }
 
 // warnEnvValues reports value-level findings without refusing the start.
-//
-// Reporting is the whole point: before this, `type`, `enum` and `conn_type`
-// were parsed and coherence-checked and then enforced by nothing on this side,
-// so a declared type only looked enforced.
 func TestWarnEnvValuesText(t *testing.T) {
 	for _, tc := range envWarningCases() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -412,12 +408,10 @@ func TestWarnEnvValuesJSON(t *testing.T) {
 }
 
 // assertWarningEvent checks one JSON warning line against the violation it came
-// from. Extracted so the JSON test stays under the complexity limit, and so the
-// structured-field expectations live in one place.
+// from, so the structured-field expectations live in one place.
 //
-// The section, key and reason must survive as their own fields: a consumer
-// regexing sectionLabel's human strings back out of Text is exactly what they
-// exist to avoid, and that would break silently on any rewording.
+// The section, key and reason must survive as their own fields, so a consumer
+// does not have to regex sectionLabel's human strings back out of Text.
 func assertWarningEvent(t *testing.T, line string, want envschema.Violation) {
 	t.Helper()
 	var e event

@@ -270,30 +270,26 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 // checkSpec runs the type's own well-formedness rules and records what they
 // find, returning whether the declaration is usable.
 //
-// The rules live on envschema.ValueSpec rather than here, because this parser is
-// not the only thing that builds one: O19 moves Astro Desktop's declaration
-// source into the manifest, read and write together, so a spec will also be
-// constructed from UI state and serialized. A rule enforced only on the way in
-// would let that writer emit a manifest this reader refuses.
+// The rules live on envschema.ValueSpec rather than here because this parser is
+// not the only thing that builds one: a writer constructing a spec from UI
+// state must obey them too.
 //
-// What stays here is everything that needs the SOURCE TEXT rather than the
+// What stays here is everything needing the SOURCE TEXT rather than the
 // finished spec: an unknown key, an empty string where a value was required, a
 // field of the wrong TOML type. Check cannot see those — `type = ""` and an
 // absent type both arrive as "".
 //
-// failed names the fields whose own decode already recorded a problem, and their
-// findings are dropped. Otherwise one authoring mistake produces two problems
-// and the second contradicts what the user wrote: `{ type = 'enum', enum = ['a',
-// 2] }` reporting the real bad element AND "needs a non-empty enum", when a
-// non-empty enum is exactly what they supplied.
+// failed names the fields whose own decode already recorded a problem, and
+// their findings are dropped, so one authoring mistake does not produce a
+// second contradictory message: `{ type = 'enum', enum = ['a', 2] }` reports the
+// bad element, not also "needs a non-empty enum".
 func (p *schemaParser) checkSpec(key string, spec envschema.ValueSpec, section envschema.Section, failed map[string]bool) bool {
 	ok := true
 	for _, problem := range spec.Check(section) {
-		// Filtered on what the rule READ, not on where it points. A rule can
-		// report against one annotation while consulting another — "type = enum
-		// needs a non-empty enum" points at `type` and reads `enum` — so keying
-		// this on Field let exactly that pair through and reproduced the
-		// contradictory second message.
+		// Filtered on what the rule READ, not on where it points: a rule can
+		// report against one annotation while consulting another, as
+		// "type = enum needs a non-empty enum" points at `type` and reads
+		// `enum`.
 		if anyFailed(problem.Reads, failed) {
 			continue
 		}

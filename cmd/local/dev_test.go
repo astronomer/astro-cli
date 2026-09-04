@@ -177,17 +177,13 @@ func TestDevStubTextMatchesJSONData(t *testing.T) {
 	}
 }
 
-// The call site, not just the function: `astro local start` actually reports
-// value warnings.
+// The call site, not just the function: testing warnEnvValues directly cannot
+// catch a missing call, so this drives the real command.
 //
-// Testing warnEnvValues directly cannot catch a missing call, and a missing
-// call is the whole failure mode this port exists to fix — the findings were
-// already being computed before, and dropped. So this drives the real command.
-//
-// fakeRuntime.Start returns ErrNotImplemented, so the command fails; that is
-// fine and load-bearing. The warning is emitted before the runtime is asked to
-// do anything, so its presence on stdout proves the report happens on the way
-// to starting rather than after a successful start.
+// fakeRuntime.Start returns ErrNotImplemented, so the command fails, and that
+// is load-bearing: the warning is emitted before the runtime is asked for
+// anything, so its presence on stdout shows the report happens on the way to
+// starting rather than after a successful start.
 func TestStartReportsEnvValueWarnings(t *testing.T) {
 	d, stdout := testDeps(t)
 	dir := t.TempDir()
@@ -207,8 +203,7 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 	d.WorkingDir = func() (string, error) { return dir, nil }
 	isolateEnvSources(t, "ASTRO_TEST_PORT")
 
-	// The error is the fake runtime refusing to start, not a rejected project:
-	// a wrong-typed value must not gate.
+	// The error is the fake runtime refusing to start, not a rejected project.
 	_ = execute(t, d, "local", "start")
 
 	if !strings.Contains(stdout.String(), "warning: env var ASTRO_TEST_PORT:") {
@@ -249,8 +244,7 @@ ASTRO_TEST_PORT = { type = 'port', default = '8080' }
 
 // fakeAirflow is attachable and stoppable, which fakeRuntime's Airflow is not.
 // runRestart attaches before it reports anything, so without this the restart
-// path bails at attach and the warnings are unreachable — which is exactly how
-// mutation testing found the restart call site untested.
+// path bails at attach and never reaches the warnings.
 type fakeAirflow struct{}
 
 func (fakeAirflow) Stop(context.Context, localrt.StopOptions) error    { return nil }
@@ -272,11 +266,8 @@ func (attachableRuntime) ReadStatus(string) (localrt.Status, error) {
 	return localrt.Status{State: localrt.StateRunning, Mode: localrt.ModeStandalone}, nil
 }
 
-// `astro local restart` reports value warnings too.
-//
-// Not a copy of the start test for symmetry's sake: warnEnvValues has two call
-// sites, and a test of one says nothing about the other. Mutation testing
-// removed this call and every test still passed.
+// `astro local restart` reports value warnings too. warnEnvValues has two call
+// sites, and a test of one says nothing about the other.
 func TestRestartReportsEnvValueWarnings(t *testing.T) {
 	d, stdout := testDeps(t)
 	d.Runtime = attachableRuntime{}
@@ -306,14 +297,11 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 
 // isolateEnvSources cuts every ambient source the resolver consults above a
 // manifest default: HOME and USERPROFILE for `~/.astro/env`, XDG_CACHE_HOME for
-// user state. testDeps sets none of them.
+// user state, and the declared names themselves. testDeps sets none of them.
 //
-// It also clears the fixture names outright. Renaming them away from PORT —
-// which many shells and CI runners export, and shell env sits above the
-// manifest default, so `PORT=not-a-port go test` failed these with the
-// developer's own environment — lowered the odds of a collision. Clearing
-// removes them: any name a test relies on defaulting has to be unset, not just
-// an unlucky one. t.Setenv cannot unset, and setting "" is not absence.
+// Shell env outranks a manifest default, so any name a test relies on
+// defaulting has to be unset. t.Setenv cannot unset, and setting "" is not
+// absence, so the original is registered for restoration and then removed.
 func isolateEnvSources(t *testing.T, declared ...string) {
 	t.Helper()
 	for _, n := range declared {

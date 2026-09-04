@@ -11,17 +11,16 @@ const reasonRequired = "required but not set"
 // nowhere — no file, no workspace, no default — is a missing violation. A nil
 // schema yields no violations.
 //
-// A value that is present (even the empty string) satisfies THIS function: it
-// asks only whether anything is missing, because it is what `astro local start`
-// gates on and a start that refuses an unusual-but-working value is a worse
-// failure than one that runs.
+// A value that is present, even the empty string, satisfies this function: it
+// asks only whether anything is missing, and it is what `astro local start`
+// gates on.
 //
 // Whether a present value is the SHAPE it was declared to be is CheckValues'
-// question, in conform.go — deliberately a second function rather than a flag
-// here, so a caller chooses which it wants instead of inheriting both. Callers
-// wanting everything call both and concatenate; internal/envresolve does.
-// The other present-but-wrong case, a corrupt connection JSON, is a violation
-// the resolver adds directly, since only it can decode.
+// question, in conform.go. A second function rather than a flag here, so a
+// caller chooses; callers wanting both call both and concatenate, as
+// internal/envresolve does. The other present-but-wrong case, a corrupt
+// connection JSON, is a violation the resolver adds directly, since only it can
+// decode.
 func Validate(s *Schema, v Values) []Violation {
 	if s == nil {
 		return nil
@@ -30,10 +29,9 @@ func Validate(s *Schema, v Values) []Violation {
 
 	check := func(section Section, names map[string]ValueSpec, present map[string]string) {
 		for key := range names {
-			// An optional declaration does not gate. This is the only thing
-			// the flag does, and the only annotation this function reads:
-			// Type, Enum and ConnType are CheckValues' business, not a
-			// presence question.
+			// An optional declaration does not gate, and this is the only
+			// annotation this function reads: Type, Enum and ConnType are
+			// CheckValues' business.
 			//
 			// Indexed rather than ranged by value, and deliberately not because
 			// of the struct's current size: ranging by value made this loop's
@@ -58,16 +56,12 @@ func Validate(s *Schema, v Values) []Violation {
 }
 
 // SortViolations orders findings by section then key, in place. Map iteration
-// made the order random, and every producer needs it stable: golden tests
-// compare whole slices.
+// leaves the order random and every producer needs it stable.
 //
-// Exported because a caller that concatenates Validate and CheckValues has to
-// re-sort the result — concatenating two sorted slices does not give a sorted
-// one — and internal/envresolve, which does exactly that, previously carried a
-// byte-identical copy of this comparator. Its missing-value report depends on
-// the order ("Violations arrive sorted, so Missing inherits the order"), so two
-// definitions that drifted would silently reorder that report, and golden tests
-// in only one package would notice.
+// Exported because a caller concatenating Validate and CheckValues has to
+// re-sort the result — joining two sorted slices does not give a sorted one —
+// and internal/envresolve's missing-value report depends on that order. One
+// definition, so the two cannot drift.
 func SortViolations(out []Violation) {
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Section != out[j].Section {
