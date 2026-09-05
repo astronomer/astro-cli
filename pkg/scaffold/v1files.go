@@ -8,13 +8,21 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
-// A v1 Astro project states its shape in three files v2 replaces:
-// requirements.txt (Python dependencies), packages.txt (OS packages), and a
-// Dockerfile whose image tag names the runtime it runs on. Reading them is what
-// makes init in an existing project a CONVERSION rather than a scaffold beside
-// files nobody looked at.
+// A v1 Astro project states its shape in four files v2 replaces:
+// requirements.txt (Python dependencies), packages.txt (OS packages), a
+// Dockerfile whose image tag names the runtime it runs on, and
+// .astro/env.schema.yaml (the environment the project expects). Reading them is
+// what makes init in an existing project a CONVERSION rather than a scaffold
+// beside files nobody looked at.
+//
+// The fourth is the desktop app's: the CLI has never written one. It is read
+// here anyway, because a conversion run from a terminal and one run from the
+// app have to produce the same project — and a file left behind by one of them
+// is a second source for something the manifest now owns.
 //
 // Everything here reads. Nothing in this file writes or deletes — the decision
 // to retire one of these files is planRetirements' in scaffold.go, and it is
@@ -50,6 +58,9 @@ type v1Project struct {
 	// from "this project said and we could not read it" when warning about a
 	// defaulted pin.
 	statedVersion bool
+	// envSchema is what .astro/env.schema.yaml declared, split into what the
+	// manifest grammar accepts and what it does not.
+	envSchema carriedEnvSchema
 	// notes is what could not be carried, with the reason.
 	notes []string
 	// present names the v1 files this directory actually has, in read order.
@@ -102,6 +113,14 @@ func readV1Project(dir string) (*v1Project, error) {
 	} else if data != nil {
 		v1.packages = parsePackages(data)
 		v1.present = append(v1.present, "packages.txt")
+	}
+
+	if data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(envschema.LegacyRelPath))); err != nil {
+		return nil, err
+	} else if data != nil {
+		v1.envSchema = readEnvSchema(data)
+		v1.notes = append(v1.notes, v1.envSchema.blockers...)
+		v1.present = append(v1.present, envschema.LegacyRelPath)
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {

@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -69,6 +70,17 @@ type Result struct {
 	// Notes lists the files init found but did not read, and where their
 	// contents belong. It is the work left to do by hand.
 	Notes []string `json:"notes,omitempty"`
+	// Advisories describe something this run DID carry that now behaves
+	// differently, which is the opposite of Notes: nothing is left to do, and
+	// the project has changed anyway.
+	//
+	// Separate rather than mixed in because the two need opposite framing and a
+	// caller cannot tell them apart from the text. A UI that renders Notes as
+	// "your remaining work" and puts one of these in it is telling someone to
+	// go and do something that has already happened; one that hides Notes
+	// pending classification — as the desktop's preview does — hides this too,
+	// and this is the half that describes a change the user did not ask for.
+	Advisories []string `json:"advisories,omitempty"`
 }
 
 // ErrAlreadyAstroProject reports a directory whose pyproject.toml already
@@ -350,6 +362,13 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		})
 	}
 
+	// Not in Notes, and not merely because planRetirements matches filenames
+	// against that slice — though it does, so an env var called "Dockerfile"
+	// would keep the project's Dockerfile alive if these went there. They are
+	// the opposite KIND of statement: Notes is work outstanding, an advisory is
+	// a change already made.
+	cs.Advisories = append(cs.Advisories, v1.envSchema.advisories...)
+
 	// Created, Updated and Deleted are derived from the changes rather than
 	// appended beside them, so a change that is performed but unreported — or
 	// reported but not performed — cannot be constructed.
@@ -524,6 +543,9 @@ func migratedLabels(v1 *v1Project) []string {
 	if len(v1.packages) > 0 {
 		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
 	}
+	if v1.envSchema.declares() {
+		out = append(out, manifest.Marker+" (migrated "+envschema.LegacyRelPath+" into [tool.astro.env])")
+	}
 	if v1.airflow != "" {
 		out = append(out, manifest.Marker+" (read airflow = "+v1.airflow+" from the Dockerfile)")
 	}
@@ -657,6 +679,9 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 		}
 	}
 	if err := setDockerfileDeclaration(ed, v1); err != nil {
+		return nil, nil, err
+	}
+	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
 		return nil, nil, err
 	}
 	data, err := ed.Bytes()

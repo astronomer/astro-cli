@@ -16,7 +16,7 @@ require (
 	github.com/docker/compose/v2 v2.40.3
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
-	github.com/iancoleman/strcase v0.3.0
+	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/lucsky/cuid v1.2.1
 	github.com/mattn/go-isatty v0.0.20

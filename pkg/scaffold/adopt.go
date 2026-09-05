@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -101,6 +102,9 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if err := setDockerfileDeclaration(ed, v1); err != nil {
 		return nil, nil, pin, err
 	}
+	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
+		return nil, nil, pin, err
+	}
 	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
 		return nil, nil, pin, err
 	}
@@ -134,6 +138,9 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// without it hides the most consequential thing the run did.
 	if declaresDockerfile(v1) {
 		labels = append(labels, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
+	}
+	if v1.envSchema.declares() {
+		labels = append(labels, manifest.Marker+" (migrated "+envschema.LegacyRelPath+" into [tool.astro.env])")
 	}
 	return out, labels, pin, nil
 }

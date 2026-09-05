@@ -140,6 +140,7 @@ func (cs *Changeset) result() *Result {
 	res.Skipped = append([]string(nil), cs.Skipped...)
 	res.Updated = append([]string(nil), cs.Updated...)
 	res.Notes = append([]string(nil), cs.Notes...)
+	res.Advisories = append([]string(nil), cs.Advisories...)
 	return &res
 }
 
