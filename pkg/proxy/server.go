@@ -3,11 +3,13 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +37,59 @@ type Proxy struct {
 	// ModifyResponse hooks run in order on every proxied response.
 	// Set them before calling Start.
 	ModifyResponse []func(*http.Response) error
+
+	// ModifyRequest hooks run in order on every proxied request, after the
+	// URL and the forwarding headers are set. Set them before calling Start.
+	//
+	// This is where a host authenticates. It does NOT belong in a Transport:
+	// http.RoundTripper's contract says RoundTrip "should not modify the
+	// request" and "should not attempt to handle higher-level protocol details
+	// such as ... authentication, or cookies", so a transport that injects
+	// credentials is working against the interface it implements.
+	ModifyRequest []func(*httputil.ProxyRequest)
+
+	// Transport supplies the RoundTripper for one backend. Nil, or a nil
+	// return, uses the shared default. Set it before calling Start.
+	//
+	// Per backend rather than one value for the proxy, because a host's
+	// transport may hold state for a particular backend — a session to renew, a
+	// connection pool to keep separate — which it cannot do without knowing
+	// which backend it is for.
+	//
+	// Called once per backend, under the lock that caches that backend's
+	// reverse proxy, so a burst of first requests yields one transport.
+	Transport func(backendPort string) http.RoundTripper
+
+	// ErrorHandler writes the response when a proxied request fails. Nil serves
+	// a plain 502. Set it before calling Start.
+	//
+	// A host with somewhere better to send people wants this: the desktop
+	// serves a page explaining that the project is not running, which is a more
+	// useful answer than "Bad Gateway" to someone who has an app in front of
+	// them.
+	//
+	// "Fails" is wider than "the backend is down". httputil routes three things
+	// here: a transport error, a ModifyResponse hook returning an error, and its
+	// own Director/Rewrite misconfiguration. A host that renders "the project is
+	// not running" for all three will say that about a project which is running
+	// fine, and hide its own bug. The error is passed through so the host can
+	// tell them apart.
+	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+
+	// RenderLanding and RenderNotFound write the BODY of the pages the proxy
+	// generates itself. Nil uses the built-in templates. Set them before
+	// calling Start.
+	//
+	// The body only, and the writer they are handed cannot be turned back into
+	// the ResponseWriter. Status and headers are committed before either runs,
+	// because one of those headers is the proxy's signature — how a daemon
+	// decides whether the process holding a recorded port is really a proxy
+	// (airflow/proxy's probeProxySignature GETs the landing page for exactly
+	// this). A hook that reached the headers could drop it, and the failure
+	// would surface as an unrelated tool concluding the proxy is not running
+	// and starting a second one.
+	RenderLanding  func(w io.Writer, routes []LandingRoute)
+	RenderNotFound func(w io.Writer, hostname, port string)
 
 	store     *Store
 	mu        sync.RWMutex
@@ -166,8 +221,26 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 	}
 
 	target, _ := url.Parse("http://127.0.0.1:" + backendPort)
-	rp = httputil.NewSingleHostReverseProxy(target)
-	rp.Transport = p.transport
+	rp = &httputil.ReverseProxy{}
+
+	// Rewrite rather than Director, and not only for the hook.
+	//
+	// httputil strips client-supplied Forwarded / X-Forwarded-* headers ONLY on
+	// the Rewrite path. Under Director they pass through untouched, so anything
+	// that can reach this proxy — a local process, an embedded page — can tell
+	// the backend where it came from and be believed. SetXForwarded replaces
+	// them with the real values.
+	//
+	// The two are also mutually exclusive: httputil errors out if both are set,
+	// which is why a host cannot supply its own Rewrite from outside and why
+	// ModifyRequest exists.
+	rp.Rewrite = func(pr *httputil.ProxyRequest) {
+		pr.SetURL(target)
+		pr.SetXForwarded()
+		for _, hook := range p.ModifyRequest {
+			hook(pr)
+		}
+	}
 	rp.ModifyResponse = func(resp *http.Response) error {
 		for _, hook := range p.ModifyResponse {
 			if err := hook(resp); err != nil {
@@ -178,6 +251,10 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 	}
 	rp.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
 		slog.Debug("proxy error", "host", req.Host, "error", proxyErr)
+		if p.ErrorHandler != nil {
+			p.ErrorHandler(rw, req, proxyErr)
+			return
+		}
 		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
 	}
 
@@ -187,10 +264,61 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		p.mu.Unlock()
 		return existing
 	}
+	// The transport is built HERE, under the lock, rather than beside the
+	// reverse proxy above: a burst of first requests for one backend races to
+	// build a proxy and all but one are discarded, and a discarded transport may
+	// have opened a session or a pool that nothing will ever close.
+	rp.Transport = p.transportFor(backendPort)
 	p.proxies[backendPort] = rp
 	p.mu.Unlock()
 	return rp
 }
+
+// LandingRoute is one row of the landing page, as RenderLanding receives it.
+// Exported because a host that renders its own page needs the shape.
+type LandingRoute struct {
+	Name       string
+	URL        string
+	Port       string
+	ProjectDir string
+}
+
+// transportFor is the RoundTripper for one backend: the host's, when it supplies
+// one, and the shared default otherwise.
+//
+// A typed nil counts as "none". A factory that returns a nil *T boxed in the
+// interface produces a value that is not == nil, so a plain check would install
+// it and every request through that backend would panic inside RoundTrip
+// instead of falling back — a shape that is easy to write by accident:
+//
+//	var t *authTransport
+//	if hasSession(port) { t = newAuth(port) }
+//	return t
+func (p *Proxy) transportFor(backendPort string) http.RoundTripper {
+	if p.Transport == nil {
+		return p.transport
+	}
+	rt := p.Transport(backendPort)
+	if rt == nil || isNilPointer(rt) {
+		return p.transport
+	}
+	return rt
+}
+
+// isNilPointer reports whether v is an interface holding a nil pointer.
+func isNilPointer(v any) bool {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer, reflect.Interface:
+		return rv.IsNil()
+	default:
+		return false
+	}
+}
+
+// bodyOnly hides everything but Write, so a render hook cannot reach the
+// ResponseWriter it came from. See RenderLanding.
+func bodyOnly(w io.Writer) io.Writer { return struct{ io.Writer }{w} }
 
 // handler routes requests based on the Host header.
 func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
@@ -215,15 +343,12 @@ func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rp := p.getOrCreateProxy(route.Port)
-
-	r.Header.Set("X-Forwarded-Host", r.Host)
-	r.Header.Set("X-Forwarded-Proto", "http")
-	if r.Header.Get("X-Forwarded-For") == "" {
-		r.Header.Set("X-Forwarded-For", r.RemoteAddr)
-	}
-
-	rp.ServeHTTP(w, r)
+	// The forwarding headers are SetXForwarded's now, in the Rewrite above.
+	// Setting them here as well was both redundant and worse: it preserved an
+	// inbound X-Forwarded-For rather than replacing it, so a client could name
+	// its own origin, and the value it did set was RemoteAddr — "ip:port",
+	// where the header takes a bare address.
+	p.getOrCreateProxy(route.Port).ServeHTTP(w, r)
 }
 
 // landingPage shows a table of active routes.
@@ -234,11 +359,9 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 		return
 	}
 
-	data := landingData{
-		Routes: make([]landingRoute, len(routes)),
-	}
+	listed := make([]LandingRoute, len(routes))
 	for i, r := range routes {
-		data.Routes[i] = landingRoute{
+		listed[i] = LandingRoute{
 			Name:       strings.TrimSuffix(r.Hostname, LocalhostSuffix),
 			URL:        fmt.Sprintf("http://%s:%s", r.Hostname, p.Port()),
 			Port:       r.Port,
@@ -248,7 +371,17 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set(SignatureHeader, SignatureValue)
-	if err := landingTmpl.Execute(w, data); err != nil {
+	if p.RenderLanding != nil {
+		// WriteHeader first, so the headers above are committed before the hook
+		// runs; and bodyOnly, so the hook cannot assert its way back to the
+		// ResponseWriter and change them. Handing over the ResponseWriter as an
+		// io.Writer looks equivalent and is not — the assertion succeeds, and
+		// this is the page a daemon probes for the signature.
+		w.WriteHeader(http.StatusOK)
+		p.RenderLanding(bodyOnly(w), listed)
+		return
+	}
+	if err := landingTmpl.Execute(w, landingData{Routes: listed}); err != nil {
 		slog.Debug("landing page template", "error", err)
 	}
 }
@@ -258,6 +391,10 @@ func (p *Proxy) notFoundPage(w http.ResponseWriter, hostname string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set(SignatureHeader, SignatureValue)
 	w.WriteHeader(http.StatusNotFound)
+	if p.RenderNotFound != nil {
+		p.RenderNotFound(bodyOnly(w), hostname, p.Port())
+		return
+	}
 	if err := notFoundTmpl.Execute(w, notFoundData{
 		Hostname: hostname,
 		Port:     p.Port(),

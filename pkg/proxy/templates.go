@@ -13,15 +13,8 @@ var (
 	notFoundTmpl = template.Must(template.ParseFS(templateFS, "templates/notfound.html"))
 )
 
-type landingRoute struct {
-	Name       string
-	URL        string
-	Port       string
-	ProjectDir string
-}
-
 type landingData struct {
-	Routes []landingRoute
+	Routes []LandingRoute
 }
 
 type notFoundData struct {
