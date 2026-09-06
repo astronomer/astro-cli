@@ -49,70 +49,51 @@ func portFilePath() string {
 	return filepath.Join(Routes().Dir(), portFileName)
 }
 
-// parsePIDFile reads the PID file and returns the PID, version, and bound port.
-// The format is "<pid> <version> <port>" — version and port may be absent
-// (older daemons wrote fewer fields).
-func parsePIDFile() (pid int, ver, port string, err error) {
-	data, err := os.ReadFile(pidFilePath())
-	if err != nil {
-		return 0, "", "", err
-	}
-
-	fields := strings.Fields(strings.TrimSpace(string(data)))
-	if len(fields) == 0 {
-		return 0, "", "", fmt.Errorf("empty PID file")
-	}
-
-	pid, err = strconv.Atoi(fields[0])
-	if err != nil || pid <= 0 {
-		return 0, "", "", fmt.Errorf("invalid PID in PID file")
-	}
-
-	rest := fields[1:]
-	if len(rest) > 0 && rest[0] != "-" {
-		ver = rest[0]
-	}
-	if len(rest) > 1 {
-		port = rest[1]
-	}
-	return pid, ver, port, nil
+// parsePIDFile reads this daemon's record.
+//
+// The format is pkg/proxy's, because it is a contract between this daemon and
+// whoever else needs to find a running proxy — the desktop publishes a record
+// of its own in the same shape. Parsing it here as well is how the two come to
+// disagree about a field.
+//
+// It returns the record rather than its fields: unpacking three values here
+// only to thread them through every caller means each field the contract gains
+// costs another return value and an edit at each one.
+func parsePIDFile() (pkgproxy.Record, error) {
+	return pkgproxy.ReadRecord(pidFilePath())
 }
 
-// writePIDFile records "<pid> <version> <port>". Old CLIs read the first two
-// fields and ignore the rest, so the port field is additive. "-" stands in
-// for an empty version to keep the port in field three for every reader.
+// writePIDFile publishes this daemon's record. See pkg/proxy.WriteRecord for
+// the format and why it lives there.
 func writePIDFile(pid int, port string) error {
-	ver := version.CurrVersion
-	if ver == "" {
-		ver = "-"
-	}
-	content := fmt.Sprintf("%d %s %s", pid, ver, port)
-	return os.WriteFile(pidFilePath(), []byte(content), pkgproxy.FilePermRW)
+	return pkgproxy.WriteRecord(pidFilePath(), pkgproxy.Record{
+		PID:     pid,
+		Version: version.CurrVersion,
+		Port:    port,
+	})
 }
 
 // IsRunning checks if the proxy daemon is running by reading the PID file
 // and verifying the process is alive.
 func IsRunning() (int, bool) {
-	pid, _, _, err := parsePIDFile()
+	r, err := parsePIDFile()
 	if err != nil {
 		return 0, false
 	}
-
-	if !isPIDAlive(pid) {
-		return pid, false
-	}
-	return pid, true
+	// Not LiveRecord: this reports the PID it found even when that process is
+	// gone, which is what a caller cleaning up a stale record needs.
+	return r.PID, pkgproxy.IsPIDAlive(r.PID)
 }
 
 // BoundPort returns the port the running daemon reported at bind time, or ""
 // when unknown (daemon not running, or started by an older CLI that didn't
 // record it).
 func BoundPort() string {
-	pid, _, port, err := parsePIDFile()
-	if err != nil || !isPIDAlive(pid) {
+	r, ok := pkgproxy.LiveRecord(pidFilePath())
+	if !ok {
 		return ""
 	}
-	return port
+	return r.Port
 }
 
 // EnsureRunning starts the proxy daemon if it's not already running.
@@ -132,8 +113,9 @@ func EnsureRunning(port string) (string, error) {
 	}
 	defer pkgproxy.ReleaseLock(lockFile)
 
-	pid, ver, bound, err := parsePIDFile()
-	if err == nil && isPIDAlive(pid) {
+	rec, err := parsePIDFile()
+	pid, ver, bound := rec.PID, rec.Version, rec.Port
+	if err == nil && pkgproxy.IsPIDAlive(pid) {
 		switch {
 		case ver == version.CurrVersion || version.CurrVersion == "":
 			// kill-0 only proves *some* process owns this PID. A SIGKILL'd
@@ -326,7 +308,7 @@ func StopDaemon() error {
 	deadline := time.Now().Add(stopTimeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(stopPollWait)
-		if !isPIDAlive(pid) {
+		if !pkgproxy.IsPIDAlive(pid) {
 			removeDaemonFiles()
 			return nil
 		}

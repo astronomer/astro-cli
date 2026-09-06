@@ -22,7 +22,3 @@ const ServeSubcommand = "__proxy-serve"
 func Routes() *pkgproxy.Store {
 	return pkgproxy.NewStore(filepath.Join(config.HomeConfigPath, proxyDir))
 }
-
-// isPIDAlive wraps pkgproxy.IsPIDAlive so test overrides of that variable
-// take effect here too.
-var isPIDAlive = func(pid int) bool { return pkgproxy.IsPIDAlive(pid) }

@@ -89,12 +89,12 @@ func TestParsePIDFile_WithPort(t *testing.T) {
 	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
 	require.NoError(t, writePIDFile(pid, "16123"))
 
-	gotPid, ver, port, err := parsePIDFile()
+	rec, err := parsePIDFile()
 	require.NoError(t, err)
-	assert.Equal(t, pid, gotPid)
+	assert.Equal(t, pid, rec.PID)
 	// Test builds have no version; writePIDFile stores "-" which reads back empty.
-	assert.Equal(t, "", ver)
-	assert.Equal(t, "16123", port)
+	assert.Equal(t, "", rec.Version)
+	assert.Equal(t, "16123", rec.Port)
 
 	assert.Equal(t, "16123", BoundPort())
 }
