@@ -11,9 +11,11 @@ import (
 // Kind is what Apply does for one change.
 //
 // Delete is produced by planRetirements, for the v1 files whose entire contents
-// reached the manifest. airflow_settings.yaml is NOT among them: its values go
-// to a vault and its shape to an env schema, neither of which this package
-// knows about, so it is still handed off in a note.
+// reached the manifest. airflow_settings.yaml is NOT among them, and no longer
+// because this package cannot read it — it can, into the vault and the env
+// schema both. Pools are why: neither tool stores them, so the file is the only
+// record of a project's pools that survives, and planRetirements skips it by
+// name rather than by whether some note happens to mention it.
 type Kind string
 
 const (
@@ -27,6 +29,10 @@ const (
 // ErrChangedOnDisk reports that the project no longer matches what Plan saw, so
 // Apply refused rather than doing something the preview did not describe.
 var ErrChangedOnDisk = errors.New("the project changed since it was planned")
+
+// ErrNoSecretWriter reports that the changeset carries values for the vault and
+// no Options.SecretWriter was given to store them with.
+var ErrNoSecretWriter = errors.New("no secret writer for a conversion that carries values")
 
 // Change is one operation Apply performs on the project directory.
 //
@@ -77,6 +83,14 @@ type Changeset struct {
 	// and put nothing in their place. Failing the other way round leaves the
 	// project carrying both, which a person can sort out.
 	Changes []Change `json:"changes"`
+	// Secrets are the values that go to the shared vault rather than into the
+	// project. Separate from Changes because they are neither a path nor bytes
+	// a preview may show — see SecretWrite.
+	Secrets []SecretWrite `json:"secrets,omitempty"`
+
+	// secrets is the writer Apply stores them through, from
+	// Options.SecretWriter.
+	secrets SecretWriter
 }
 
 // report fills Created, Updated and Deleted from Changes, so the lists a person
@@ -122,6 +136,13 @@ func (cs *Changeset) Apply() (*Result, error) {
 	if err := os.MkdirAll(cs.Dir, dirPerm); err != nil {
 		return nil, err
 	}
+	// Values first, files after. See applySecrets: a manifest that declares
+	// connections whose values did not land leaves a project that will not
+	// start, while a store that succeeded and a manifest that did not leaves a
+	// vault holding values nothing yet declares, which the next run overwrites.
+	if err := cs.applySecrets(); err != nil {
+		return nil, err
+	}
 	for i := range cs.Changes {
 		if err := cs.Changes[i].apply(cs.Dir); err != nil {
 			return nil, err
@@ -139,6 +160,7 @@ func (cs *Changeset) result() *Result {
 	res.Created = append([]string(nil), cs.Created...)
 	res.Skipped = append([]string(nil), cs.Skipped...)
 	res.Updated = append([]string(nil), cs.Updated...)
+	res.Deleted = append([]string(nil), cs.Deleted...)
 	res.Notes = append([]string(nil), cs.Notes...)
 	res.Advisories = append([]string(nil), cs.Advisories...)
 	return &res

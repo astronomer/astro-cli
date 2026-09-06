@@ -2,12 +2,8 @@ package localenv
 
 import (
 	"fmt"
-	"net/url"
-	"strconv"
-	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
-	"github.com/astronomer/astro-cli/pkg/connmodel"
 )
 
 // Kind is what a stored value is: a plain env var, a connection, or an
@@ -116,69 +112,11 @@ func InvalidName(kind Kind, name string) error {
 // the AIRFLOW_CONN_* JSON — into the canonical single-line JSON the codec
 // produces, so `check` and `list` can always decode it. It stores credentials
 // in plaintext, which is the whole posture of this feature.
+//
+// The rule itself lives in pkg/airflowenv, beside the codec whose output it
+// names as canonical, because the conversion that carries a v1
+// airflow_settings.yaml into the vault has to write the same shape and cannot
+// reach an internal package.
 func NormalizeConn(connID, raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", fmt.Errorf("connection %q: empty value", connID)
-	}
-	var conn connmodel.Connection
-	if strings.HasPrefix(trimmed, "{") {
-		decoded, ok := airflowenv.DecodeConnEnv(airflowenv.EnvKeyForConnID(connID), trimmed)
-		if !ok {
-			return "", fmt.Errorf("connection %q: value is not valid connection JSON", connID)
-		}
-		conn = decoded
-	} else {
-		c, err := connFromURI(connID, trimmed)
-		if err != nil {
-			return "", err
-		}
-		conn = c
-	}
-	_, val, ok := airflowenv.EncodeConnEnv(conn)
-	if !ok {
-		return "", fmt.Errorf("connection %q: could not encode value", connID)
-	}
-	return val, nil
-}
-
-// connFromURI parses an Airflow connection URI into a Connection. The scheme
-// is the conn type, userinfo the login/password, host/port the endpoint, the
-// path the schema, and the query the extra map.
-func connFromURI(connID, uri string) (connmodel.Connection, error) {
-	u, err := url.Parse(uri)
-	if err != nil || u.Scheme == "" {
-		return connmodel.Connection{}, fmt.Errorf("connection %q: value is neither JSON nor a URI (expected conn_type://... or {\"conn_type\":...})", connID)
-	}
-	conn := connmodel.Connection{
-		ConnID:     connID,
-		ConnType:   u.Scheme,
-		ConnHost:   u.Hostname(),
-		ConnSchema: strings.TrimPrefix(u.Path, "/"),
-	}
-	if p := u.Port(); p != "" {
-		port, perr := strconv.Atoi(p)
-		if perr != nil {
-			return connmodel.Connection{}, fmt.Errorf("connection %q: port %q is not a number", connID, p)
-		}
-		conn.ConnPort = port
-	}
-	if u.User != nil {
-		conn.ConnLogin = u.User.Username()
-		if pw, hasPw := u.User.Password(); hasPw {
-			conn.ConnPassword = pw
-		}
-	}
-	if q := u.Query(); len(q) > 0 {
-		extra := make(map[string]any, len(q))
-		for k, vs := range q {
-			if len(vs) == 1 {
-				extra[k] = vs[0]
-			} else {
-				extra[k] = vs
-			}
-		}
-		conn.ConnExtra = extra
-	}
-	return conn, nil
+	return airflowenv.NormalizeConn(connID, raw)
 }

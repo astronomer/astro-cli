@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -140,7 +139,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 		labels = append(labels, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
 	}
 	if v1.envSchema.declares() {
-		labels = append(labels, manifest.Marker+" (migrated "+envschema.LegacyRelPath+" into [tool.astro.env])")
+		labels = append(labels, manifest.Marker+" (migrated "+migratedFrom(v1)+" into [tool.astro.env])")
 	}
 	return out, labels, pin, nil
 }

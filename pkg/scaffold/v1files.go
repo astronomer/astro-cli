@@ -58,6 +58,9 @@ type v1Project struct {
 	// from "this project said and we could not read it" when warning about a
 	// defaulted pin.
 	statedVersion bool
+	// settings is what airflow_settings.yaml yielded: declarations that join
+	// envSchema's, and the connection values that go to the vault.
+	settings carriedSettings
 	// envSchema is what .astro/env.schema.yaml declared, split into what the
 	// manifest grammar accepts and what it does not.
 	envSchema carriedEnvSchema
@@ -123,6 +126,15 @@ func readV1Project(dir string) (*v1Project, error) {
 		v1.present = append(v1.present, envschema.LegacyRelPath)
 	}
 
+	if data, err := readIfPresent(filepath.Join(dir, SettingsRelPath)); err != nil {
+		return nil, err
+	} else if data != nil {
+		v1.settings = readAirflowSettings(data)
+		v1.notes = append(v1.notes, v1.settings.blockers...)
+		v1.notes = append(v1.notes, v1.settings.notes()...)
+		v1.present = append(v1.present, SettingsRelPath)
+	}
+
 	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {
 		return nil, err
 	} else if data != nil {
@@ -170,6 +182,7 @@ func readV1Project(dir string) (*v1Project, error) {
 		}
 	}
 
+	v1.mergeDeclarationSources()
 	return v1, nil
 }
 
@@ -587,4 +600,86 @@ func allImages(stages [][]string) []string {
 		}
 	}
 	return out
+}
+
+// mergeDeclarationSources folds airflow_settings.yaml's declarations into the
+// env schema's, so [tool.astro.env] has one producer no matter how many files
+// fed it.
+//
+// A name both files declare is a BLOCKER for both, not a merge with a winner.
+// The two spell different things — .astro/env.schema.yaml describes a value,
+// airflow_settings.yaml supplies one — so a rule picking a winner would be this
+// package deciding which of the user's two answers it prefers, silently, about
+// a connection. Neither file is carried, both are kept and still authoritative,
+// and the note names the collision so one pass fixes it.
+//
+// All-or-nothing per file survives this: a blocker from either side already
+// emptied that side's schema before it got here.
+func (v1 *v1Project) mergeDeclarationSources() {
+	if v1.settings.schema == nil {
+		return
+	}
+	if v1.envSchema.schema == nil {
+		// Either there was no env schema file, or it was blocked. Blocked means
+		// the manifest must not gain declarations that file also holds, so this
+		// file cannot be carried either — and its VALUES must not be stored,
+		// which is the half that is easy to miss. Storing them anyway writes a
+		// project's credentials to the shared vault while the manifest declares
+		// none of them: the inverse of what applySecrets exists to guarantee,
+		// and silent.
+		if len(v1.envSchema.blockers) > 0 {
+			v1.dropSettingsCarry(SettingsRelPath + " was not carried either, and is kept as it is: " +
+				envschema.LegacyRelPath + " has to be fixed first, because the two share [tool.astro.env]")
+			return
+		}
+		v1.envSchema.schema = &envschema.Schema{}
+	}
+	dst := v1.envSchema.schema
+	if dst.AirflowVariables == nil {
+		dst.AirflowVariables = map[string]envschema.ValueSpec{}
+	}
+	if dst.Connections == nil {
+		dst.Connections = map[string]envschema.ValueSpec{}
+	}
+
+	var clashes []string
+	for _, sec := range []struct {
+		what string
+		src  map[string]envschema.ValueSpec
+		dst  map[string]envschema.ValueSpec
+	}{
+		{"Airflow variable", v1.settings.schema.AirflowVariables, dst.AirflowVariables},
+		{"connection", v1.settings.schema.Connections, dst.Connections},
+	} {
+		for _, name := range sortedSpecNames(sec.src) {
+			if _, taken := sec.dst[name]; taken {
+				clashes = append(clashes, sec.what+" "+name)
+				continue
+			}
+			sec.dst[name] = sec.src[name]
+		}
+	}
+	if len(clashes) > 0 {
+		v1.envSchema = carriedEnvSchema{blockers: []string{
+			SettingsRelPath + " and " + envschema.LegacyRelPath + " both declare " +
+				strings.Join(clashes, ", ") + ". Neither file was carried, and both are kept as they are. " +
+				"Remove the duplicate from one of them and convert again",
+		}}
+		v1.dropSettingsCarry(v1.envSchema.blockers[0])
+		return
+	}
+	v1.envSchema.advisories = append(v1.envSchema.advisories, v1.settings.advisories...)
+}
+
+// dropSettingsCarry abandons airflow_settings.yaml entirely: no declarations,
+// and no values.
+//
+// Both halves together, always. A path that clears one and not the other either
+// writes credentials to the vault that nothing declares, or declares required
+// connections whose values were never stored — and each leaves a project that
+// cannot start for a reason nothing on screen explains. The pools survive
+// because the note about them is about the file, which is being kept.
+func (v1 *v1Project) dropSettingsCarry(reason string) {
+	v1.settings = carriedSettings{blockers: []string{reason}, pools: v1.settings.pools}
+	v1.notes = append(v1.notes, reason)
 }

@@ -369,9 +369,13 @@ func TestRunConvertsAV1ProjectAndListsOnlyWhatIsLeft(t *testing.T) {
 	// is the point of the change: naming a file it already carried would be
 	// telling the user to do work that is done.
 	joined := strings.Join(res.Notes, "\n")
-	assert.Contains(t, joined, "airflow_settings.yaml")
 	assert.NotContains(t, joined, "requirements.txt: move")
 	assert.NotContains(t, joined, "packages.txt: move")
+	// airflow_settings.yaml joined them: it is read now, so the hand-off note
+	// telling the user to move its contents by hand would be describing work
+	// this run already did. This fixture's file declares nothing, so it draws
+	// no note at all — a file with pools still does, because those stay behind.
+	assert.NotContains(t, joined, "airflow_settings.yaml: move")
 }
 
 func TestRunKeepsExistingFiles(t *testing.T) {

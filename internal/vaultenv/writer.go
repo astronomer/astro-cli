@@ -196,3 +196,43 @@ func refusal(err error) error {
 		return err
 	}
 }
+
+// SetSecret stores a converted value under this writer's scope, which is what
+// pkg/scaffold's SecretWriter asks for.
+//
+// It takes the vault's own kind rather than localenv's, because the caller is a
+// conversion reading a v1 file and not a command parsing a flag — there is no
+// localenv.Kind anywhere in that path, and translating one into the other just
+// to translate it back is a round trip through a vocabulary neither side uses.
+//
+// Set's normalization is deliberately not repeated: the conversion writes
+// values that already came out of airflowenv, which is the canonical form Set
+// normalizes TO. Re-normalizing would decode and re-encode a value this process
+// just encoded.
+func (w *Writer) SetSecret(kind secrets.Kind, name, value string) error {
+	key, err := secrets.Key(kind, w.scope, name)
+	if err != nil {
+		return err
+	}
+	if err := w.store.Set(key, value); err != nil {
+		return refusal(err)
+	}
+	return nil
+}
+
+// HasSecret reports whether this scope already holds a value for (kind, name),
+// which is what pkg/scaffold's SecretWriter asks so a conversion can decline to
+// overwrite a credential the user set deliberately.
+func (w *Writer) HasSecret(kind secrets.Kind, name string) (bool, error) {
+	key, err := secrets.Key(kind, w.scope, name)
+	if err != nil {
+		return false, err
+	}
+	if _, err := w.store.Get(key); err != nil {
+		if errors.Is(err, secrets.ErrNotFound) {
+			return false, nil
+		}
+		return false, refusal(err)
+	}
+	return true, nil
+}

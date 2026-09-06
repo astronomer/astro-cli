@@ -114,12 +114,16 @@ func TestInitRefusesAnAstroProject(t *testing.T) {
 
 func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	d, dir, stdout := initDeps(t)
-	// airflow_settings.yaml is the file init still does not read.
-	// requirements.txt, packages.txt and the Dockerfile pin are carried now, so
-	// listing them would be telling the user to redo work init just did.
+	// Every one of these is READ now, so the hand-off list is what is left over
+	// rather than the files themselves — listing a carried file would be
+	// telling the user to redo work init just did.
+	//
+	// airflow_settings.yaml is here for its POOLS, the one thing in it that
+	// cannot move: neither tool stores them, so they stay in the file and the
+	// file stays. Its connections and Variables no longer appear.
 	for name, body := range map[string]string{
 		"requirements.txt":      "flask==2.0\n",
-		"airflow_settings.yaml": "airflow:\n",
+		"airflow_settings.yaml": "airflow:\n  pools:\n    - pool_name: heavy\n      pool_slot: 4\n",
 		"Dockerfile":            "FROM quay.io/astronomer/astro-runtime:9\n",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
@@ -134,8 +138,13 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	if !found {
 		t.Fatalf("no hand-off list:\n%s", out)
 	}
-	if !strings.Contains(handoff, "airflow_settings.yaml") {
-		t.Errorf("airflow_settings.yaml not listed:\n%s", out)
+	if !strings.Contains(handoff, "heavy") {
+		t.Errorf("the pool that stays behind was not named:\n%s", out)
+	}
+	// And not the old instruction to move the whole file by hand, which now
+	// contradicts the same run's report of what it carried.
+	if strings.Contains(handoff, "airflow_settings.yaml: move") {
+		t.Errorf("still asking for work the conversion did:\n%s", out)
 	}
 	// The Dockerfile still appears, but saying something different: its runtime
 	// 9 tag names Airflow 2 without a minor, so the pin is the coarse "2".

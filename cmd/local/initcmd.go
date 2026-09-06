@@ -7,7 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
 // NewInitCmd builds the root-level `astro init`. The same constructor backs
@@ -52,6 +54,11 @@ func (c *cli) runInit(dir string, opts scaffold.Options) error {
 	if err != nil {
 		return err
 	}
+	// A v1 airflow_settings.yaml's connections are credentials, and they go to
+	// the shared vault at this project's scope rather than into the manifest.
+	// The writer is what knows that scope; see scaffold.SecretWriter.
+	opts.SecretWriter = &lazyVaultWriter{dir: dir}
+
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {
 		return err
@@ -108,6 +115,9 @@ func renderInit(w io.Writer, res *scaffold.Result) error {
 			return err
 		}
 	}
+	if err := renderChanged(w, res.Advisories); err != nil {
+		return err
+	}
 	if err := renderLeftToDo(w, res.Notes); err != nil {
 		return err
 	}
@@ -117,6 +127,27 @@ func renderInit(w io.Writer, res *scaffold.Result) error {
 
 // renderLeftToDo prints what init could not carry over, under a heading. Each
 // line names a file and where its contents belong.
+// renderChanged prints the advisories: things this run DID that now behave
+// differently. They are not "left to do" and must not be rendered as it — a
+// carried default is applied at start now, and a connection declared with no
+// value will stop the project starting until it is set. Nothing else on screen
+// says either, and until this existed the CLI computed them and dropped them,
+// so the only reader was --json.
+func renderChanged(w io.Writer, advisories []string) error {
+	if len(advisories) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\nWhat changed:\n"); err != nil {
+		return err
+	}
+	for _, a := range advisories {
+		if _, err := fmt.Fprintf(w, "  %s\n", a); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func renderLeftToDo(w io.Writer, notes []string) error {
 	if len(notes) == 0 {
 		return nil
@@ -130,4 +161,46 @@ func renderLeftToDo(w io.Writer, notes []string) error {
 		}
 	}
 	return nil
+}
+
+// lazyVaultWriter opens the vault on the first value it is asked to store,
+// rather than when init starts.
+//
+// `astro init pipelines` scaffolds a directory that does not exist yet, and a
+// vault scope is the CANONICAL path of the project directory — which cannot be
+// resolved until there is a directory to resolve. Opening eagerly turned every
+// init-into-a-new-directory into a failure about symlinks.
+//
+// By the time a value is stored, Apply has created the directory. A project
+// with nothing to carry never opens the vault at all, which is most of them.
+type lazyVaultWriter struct {
+	dir string
+	w   *vaultenv.Writer
+}
+
+func (l *lazyVaultWriter) SetSecret(kind secrets.Kind, name, value string) error {
+	w, err := l.writer()
+	if err != nil {
+		return err
+	}
+	return w.SetSecret(kind, name, value)
+}
+
+func (l *lazyVaultWriter) HasSecret(kind secrets.Kind, name string) (bool, error) {
+	w, err := l.writer()
+	if err != nil {
+		return false, err
+	}
+	return w.HasSecret(kind, name)
+}
+
+func (l *lazyVaultWriter) writer() (*vaultenv.Writer, error) {
+	if l.w == nil {
+		w, err := vaultenv.NewWriter(l.dir)
+		if err != nil {
+			return nil, err
+		}
+		l.w = w
+	}
+	return l.w, nil
 }

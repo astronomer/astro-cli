@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -46,6 +45,10 @@ type Options struct {
 	// GOOS overrides runtime.GOOS, so tests can check the Windows layout
 	// (no CLAUDE.md symlink) from any host.
 	GOOS string
+	// SecretWriter stores the connection values a v1 airflow_settings.yaml
+	// carries, at the project scope the writer itself decides. Required only
+	// when that file holds values: Apply refuses rather than dropping them.
+	SecretWriter SecretWriter
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -369,10 +372,43 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// a change already made.
 	cs.Advisories = append(cs.Advisories, v1.envSchema.advisories...)
 
+	// The connection values airflow_settings.yaml supplied. They ride the
+	// changeset rather than being written here because Plan writes nothing, and
+	// they are a separate list rather than Changes because a vault write is
+	// neither a path in the project nor bytes a preview may show.
+	cs.Secrets = v1.settings.secrets
+	cs.secrets = opts.SecretWriter
+
+	// Refused here, not at Apply. Both facts are known on the two lines above,
+	// and a changeset that cannot be applied must not first be rendered as a
+	// preview and approved — the preview being binding is the property the
+	// Plan/Apply split exists to provide. This makes a missing writer a
+	// programming error the caller meets immediately, rather than a conversion
+	// that fails after the user has clicked Convert.
+	if len(cs.Secrets) > 0 && cs.secrets == nil {
+		return nil, fmt.Errorf("%w: %s carries %s to store", ErrNoSecretWriter,
+			SettingsRelPath, plural(len(cs.Secrets), "value", "values"))
+	}
+
 	// Created, Updated and Deleted are derived from the changes rather than
 	// appended beside them, so a change that is performed but unreported — or
 	// reported but not performed — cannot be constructed.
 	cs.report()
+
+	// After report(), which rebuilds these three from Changes and would
+	// otherwise discard this line.
+	//
+	// The one thing appended beside the changes rather than derived from them,
+	// because it is the one thing a conversion does OUTSIDE the project: a
+	// vault write is not a Change and cannot come from that list. Reporting it
+	// is not optional — a preview showing only file changes shows a manifest
+	// full of required connections and says nothing about where their values
+	// went. Here rather than in migratedLabels, which runs on the greenfield
+	// arm only, while an adopted project stores credentials just the same.
+	if n := len(cs.Secrets); n > 0 {
+		cs.Updated = append(cs.Updated, plural(n, "connection", "connections")+
+			" from "+SettingsRelPath+" (stored in the shared vault for this project)")
+	}
 	return cs, nil
 }
 
@@ -398,6 +434,16 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 			continue
 		}
 		if name == "Dockerfile" && !dockerfileIsSpent(v1, pinned) {
+			continue
+		}
+		// airflow_settings.yaml is never retired, carried or not. Pools have
+		// nowhere to go — neither tool stores them — so the file is the only
+		// record of them that survives a conversion.
+		//
+		// Explicit, and not left to the note that used to mention it: this
+		// deletes files, the note is prose, and "is that string still in the
+		// list" is not what should stand between a project's pools and rm.
+		if name == SettingsRelPath {
 			continue
 		}
 		out = append(out, name)
@@ -544,8 +590,9 @@ func migratedLabels(v1 *v1Project) []string {
 		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
 	}
 	if v1.envSchema.declares() {
-		out = append(out, manifest.Marker+" (migrated "+envschema.LegacyRelPath+" into [tool.astro.env])")
+		out = append(out, manifest.Marker+" (migrated "+migratedFrom(v1)+" into [tool.astro.env])")
 	}
+
 	if v1.airflow != "" {
 		out = append(out, manifest.Marker+" (read airflow = "+v1.airflow+" from the Dockerfile)")
 	}
@@ -803,12 +850,13 @@ func deriveName(dir string) string {
 // what its RUN lines were for, so init names it and stops there. The list is
 // the hand-off: what a person, or the agent working with them, does next.
 func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string {
-	// requirements.txt, packages.txt and the Dockerfile are READ now, so they
-	// are gone from this list: whatever they could not carry is a note from the
-	// reader that says which line and why, which is strictly better than
-	// "move its pins" about a file that was mostly carried.
+	// requirements.txt, packages.txt, the Dockerfile and airflow_settings.yaml
+	// are READ now, so they are gone from this list: whatever they could not
+	// carry is a note from the reader that says which line and why, which is
+	// strictly better than "move its pins" about a file that was mostly
+	// carried. Leaving the settings entry here told a user to hand-move
+	// connections the same run had just carried for them.
 	checks := []struct{ file, note string }{
-		{"airflow_settings.yaml", "move its connections, variables, and pools into [tool.astro]"},
 		{filepath.Join(".astro", "config.yaml"), "move the Deployments it names into deployments under [tool.astro]"},
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
