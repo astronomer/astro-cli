@@ -182,7 +182,33 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 			continue
 		}
 
-		spec := envschema.ValueSpec{ConnType: strings.TrimSpace(sc.ConnType), Sensitive: true}
+		// The value first, because a conn_uri is where the conn_type comes from
+		// when the entry does not spell one out — and the declaration has to say
+		// what the connection actually is.
+		value, connType, err := connValue(sc)
+		if err != nil {
+			c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be carried. "+err.Error())
+			continue
+		}
+
+		// A connection with no conn_type at all is refused rather than carried.
+		//
+		// Airflow chooses the provider from it, so a record without one is not
+		// a connection it can resolve: carrying it stores something unusable and
+		// declares it required, which stops the project starting over a value
+		// that would not have worked.
+		//
+		// It is also where the two codecs disagree — this package's encoder is
+		// happy with an empty conn_type and the app's decoder is not, so one
+		// that gets through converts from the CLI and fails in the app. Refusing
+		// it where the connection is authored settles that for both.
+		if connType == "" {
+			c.blockers = append(c.blockers, SettingsRelPath+": "+id+
+				" has no conn_type, so Airflow cannot tell what kind of connection it is")
+			continue
+		}
+
+		spec := envschema.ValueSpec{ConnType: connType, Sensitive: true}
 		if problems := spec.Check(envschema.SectionConnection); len(problems) > 0 {
 			for _, p := range problems {
 				c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be carried. "+p.Reason)
@@ -191,11 +217,6 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 		}
 		c.schema.Connections[id] = spec
 
-		value, err := connValue(sc)
-		if err != nil {
-			c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be carried. "+err.Error())
-			continue
-		}
 		if value == "" {
 			// Nothing to store. The declaration still goes in, so the project
 			// says the connection is expected and refuses to start until it is
@@ -259,17 +280,31 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 // conn_uri wins over the broken-out fields when both are set, because that is
 // how the v1 file spells a connection whose parts it did not enumerate — and
 // merging the two would invent a connection the user never wrote.
-func connValue(sc *settingsConn) (string, error) {
+//
+// It also reports the conn_type it resolved, which for a URI is its scheme and
+// is otherwise the field. The caller declares that rather than the raw field,
+// so a connection written as a URI is declared as the kind it actually is.
+func connValue(sc *settingsConn) (value, connType string, err error) {
 	if uri := strings.TrimSpace(sc.ConnURI); uri != "" {
-		return airflowenv.NormalizeConn(strings.TrimSpace(sc.ConnID), uri)
+		id := strings.TrimSpace(sc.ConnID)
+		parsed, perr := airflowenv.ConnFromURI(id, uri)
+		if perr != nil {
+			return "", "", perr
+		}
+		normalized, nerr := airflowenv.NormalizeConn(id, uri)
+		if nerr != nil {
+			return "", "", nerr
+		}
+		return normalized, parsed.ConnType, nil
 	}
-	port, err := connPort(sc.ConnPort)
-	if err != nil {
-		return "", err
+	connType = strings.TrimSpace(sc.ConnType)
+	port, perr := connPort(sc.ConnPort)
+	if perr != nil {
+		return "", "", perr
 	}
-	extra, err := connExtra(sc.ConnExtra)
-	if err != nil {
-		return "", err
+	extra, xerr := connExtra(sc.ConnExtra)
+	if xerr != nil {
+		return "", "", xerr
 	}
 	c := connmodel.Connection{
 		ConnID:       strings.TrimSpace(sc.ConnID),
@@ -282,13 +317,13 @@ func connValue(sc *settingsConn) (string, error) {
 		ConnExtra:    extra,
 	}
 	if !hasConnValue(&c) {
-		return "", nil
+		return "", connType, nil
 	}
 	_, encoded, ok := airflowenv.EncodeConnEnv(c)
 	if !ok {
-		return "", fmt.Errorf("connection %q: could not encode value", c.ConnID)
+		return "", "", fmt.Errorf("connection %q: could not encode value", c.ConnID)
 	}
-	return encoded, nil
+	return encoded, connType, nil
 }
 
 // connPort accepts what v1 accepted: an integer, or a string holding one.

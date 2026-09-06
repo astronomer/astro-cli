@@ -492,3 +492,54 @@ func TestThePreviewSaysCredentialsGoToTheVault(t *testing.T) {
 	require.True(t, anyContains(res.Advisories, "encrypted vault"),
 		"the outcome does not say credentials were stored: %v", res.Advisories)
 }
+
+// Airflow chooses a connection's provider from its conn_type, so a record
+// without one is not a connection it can resolve. Carrying it stores something
+// unusable and declares it required, which stops the project starting over a
+// value that would not have worked.
+//
+// It is also the one place the two codecs disagree: this package's encoder
+// accepts an empty conn_type and the app's decoder does not, so one that gets
+// through converts from the CLI and fails in the app after the preview was
+// approved. Refusing it where the connection is authored settles it for both.
+func TestAConnectionWithNoTypeIsRefused(t *testing.T) {
+	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id: warehouse
+      conn_host: acct.example.com
+      conn_login: dbt
+      conn_password: hunter2
+`)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.Empty(t, writer.stored, "stored a connection Airflow cannot resolve")
+	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	require.NotContains(t, string(manifest), "warehouse")
+	require.True(t, anyContains(res.Notes, "no conn_type"), "the fault was not named: %v", res.Notes)
+}
+
+// A connection written as a URI declares the kind the URI says it is. The type
+// lives in the scheme there, so reading only the conn_type field would declare
+// an empty one beside a value that is a perfectly good postgres connection.
+func TestAURIConnectionIsDeclaredAsItsScheme(t *testing.T) {
+	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id: pg
+      conn_uri: postgres://user:pw@db.example.com:5432/analytics
+`)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	_, err = cs.Apply()
+	require.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	require.Contains(t, string(manifest), "pg = {conn_type = 'postgres'}")
+	require.Contains(t, writer.stored, "pg")
+}
