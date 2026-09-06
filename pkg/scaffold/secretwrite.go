@@ -59,16 +59,12 @@ type SecretWriter interface {
 // full of required connections and then fails to store their values has left a
 // project that will not start, with nothing on screen saying why.
 //
-// A changeset with values and no writer is refused rather than skipped. Silently
-// dropping them would produce exactly the state above — a converted project
-// declaring connections nothing supplies — from a run that reported success.
+// Values with no writer cannot reach here: Plan clears them and says so in a
+// note, because a caller without one is declining the carry rather than
+// forgetting it. The nil check remains as an assertion of that.
 func (cs *Changeset) applySecrets() error {
-	if len(cs.Secrets) == 0 {
+	if len(cs.Secrets) == 0 || cs.secrets == nil {
 		return nil
-	}
-	if cs.secrets == nil {
-		return fmt.Errorf("%w: %s carries %s to store", ErrNoSecretWriter,
-			SettingsRelPath, plural(len(cs.Secrets), "value", "values"))
 	}
 	for i := range cs.Secrets {
 		w := &cs.Secrets[i]

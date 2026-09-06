@@ -170,14 +170,36 @@ func TestAFailedVaultWriteWritesNoManifest(t *testing.T) {
 	require.NoFileExists(t, filepath.Join(dir, "pyproject.toml"))
 }
 
-// And a conversion that carries values with nowhere to put them is refused,
-// not quietly stripped of them — at PLAN, so a preview a user approves is one
-// that can actually be applied.
-func TestCarriedValuesWithNoWriterAreRefused(t *testing.T) {
+// A caller with no writer is DECLINING to move credentials, not forgetting to.
+//
+// The declarations still carry — those are not secrets — and the values stay in
+// the file, with a note saying where to move them. `astro init` over an
+// existing directory is the caller that needs this: making a directory a
+// project is not the reviewed, previewed operation that moving someone's
+// credentials into a keychain has to be. Failing would make a v1 directory
+// unopenable; carrying silently would move credentials nobody was shown.
+func TestNoWriterLeavesTheValuesInTheFileAndSaysSo(t *testing.T) {
 	dir := v1WithSettings(t, settingsWithEverything)
-	_, err := Plan(dir, Options{})
-	require.ErrorIs(t, err, ErrNoSecretWriter)
-	require.NoFileExists(t, filepath.Join(dir, "pyproject.toml"))
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+	require.Empty(t, cs.Secrets, "values were kept for a caller that supplied nowhere to put them")
+
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	// The declarations carried: a connection is still declared and required, so
+	// the project says what it needs.
+	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	require.Contains(t, string(manifest), "warehouse = {conn_type = 'snowflake'}")
+	require.NotContains(t, string(manifest), "hunter2")
+
+	// The file keeps its values, and the note says how to move them.
+	settings, err := os.ReadFile(filepath.Join(dir, SettingsRelPath))
+	require.NoError(t, err)
+	require.Contains(t, string(settings), "hunter2")
+	require.True(t, anyContains(res.Notes, "left in the file"),
+		"nothing said the credentials were not moved: %v", res.Notes)
 }
 
 // A project with no connections needs no writer, so the common case does not
@@ -448,4 +470,25 @@ func TestAChangesetThatLostItsValuesIsRefused(t *testing.T) {
 	_, err = roundTripped.Apply()
 	require.ErrorIs(t, err, ErrChangedOnDisk)
 	require.Empty(t, writer.stored, "an empty value was written over the vault")
+}
+
+// A preview must say that credentials leave the project for a keychain.
+//
+// It has to reach a list consumers actually render. Updated is derived from
+// Changes by report(), a vault write is not a Change, and nothing in the app
+// read that field — so the disclosure a conversion is approved on was invisible
+// wherever it mattered.
+func TestThePreviewSaysCredentialsGoToTheVault(t *testing.T) {
+	dir := v1WithSettings(t, settingsWithEverything)
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+
+	require.True(t, anyContains(cs.Advisories, "encrypted vault"),
+		"the preview does not say credentials are stored: %v", cs.Advisories)
+
+	// And it survives Apply, which is what the app renders after converting.
+	res, err := cs.Apply()
+	require.NoError(t, err)
+	require.True(t, anyContains(res.Advisories, "encrypted vault"),
+		"the outcome does not say credentials were stored: %v", res.Advisories)
 }

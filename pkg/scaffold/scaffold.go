@@ -379,15 +379,27 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	cs.Secrets = v1.settings.secrets
 	cs.secrets = opts.SecretWriter
 
-	// Refused here, not at Apply. Both facts are known on the two lines above,
-	// and a changeset that cannot be applied must not first be rendered as a
-	// preview and approved — the preview being binding is the property the
-	// Plan/Apply split exists to provide. This makes a missing writer a
-	// programming error the caller meets immediately, rather than a conversion
-	// that fails after the user has clicked Convert.
+	// No writer is a caller declining to move credentials, not a caller who
+	// forgot. It carries the declarations and leaves the values in the file,
+	// with a note saying so.
+	//
+	// This used to be an error, on the reasoning that a changeset which cannot
+	// be applied must not first be approved. The reasoning assumed every caller
+	// intends the carry. `astro init` over an existing directory does not: it
+	// makes a directory a project, which is not the reviewed, previewed
+	// operation that moving someone's credentials into a keychain has to be.
+	// Failing there would make a v1 directory unopenable; carrying silently
+	// would move credentials nobody was shown.
+	//
+	// So the writer IS the consent, and its absence is a decision the note
+	// reports rather than a fault.
 	if len(cs.Secrets) > 0 && cs.secrets == nil {
-		return nil, fmt.Errorf("%w: %s carries %s to store", ErrNoSecretWriter,
-			SettingsRelPath, plural(len(cs.Secrets), "value", "values"))
+		cs.Notes = append(cs.Notes, SettingsRelPath+": its "+
+			plural(len(cs.Secrets), "connection was", "connections were")+
+			" left in the file. Convert this project in Astro Desktop, or run "+
+			"`astro local env set --secret`, to move "+
+			pronoun(len(cs.Secrets))+" into the encrypted vault")
+		cs.Secrets = nil
 	}
 
 	// Created, Updated and Deleted are derived from the changes rather than
@@ -395,19 +407,23 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// reported but not performed — cannot be constructed.
 	cs.report()
 
-	// After report(), which rebuilds these three from Changes and would
-	// otherwise discard this line.
+	// An ADVISORY, not an entry in Updated.
 	//
-	// The one thing appended beside the changes rather than derived from them,
-	// because it is the one thing a conversion does OUTSIDE the project: a
-	// vault write is not a Change and cannot come from that list. Reporting it
-	// is not optional — a preview showing only file changes shows a manifest
-	// full of required connections and says nothing about where their values
-	// went. Here rather than in migratedLabels, which runs on the greenfield
-	// arm only, while an adopted project stores credentials just the same.
+	// Reporting it is not optional: a preview showing only file changes shows a
+	// manifest full of required connections and says nothing about where their
+	// values went, and what this describes is a credential leaving the project
+	// for a keychain. Advisories are the list for "something this run did that
+	// you would not otherwise see", and they are the list every consumer
+	// renders — `astro init` prints them, and the app's conversion preview
+	// shows them beside the file changes.
+	//
+	// Updated is the wrong home twice over: it is derived from Changes by
+	// report(), so an appended line has to dodge that rebuild, and a vault write
+	// is not a Change and never appears there. Nothing in the app read it.
 	if n := len(cs.Secrets); n > 0 {
-		cs.Updated = append(cs.Updated, plural(n, "connection", "connections")+
-			" from "+SettingsRelPath+" (stored in the shared vault for this project)")
+		cs.Advisories = append(cs.Advisories, plural(n, "connection", "connections")+
+			" from "+SettingsRelPath+": stored in this machine's encrypted vault, "+
+			"scoped to this project, and no longer read from the file")
 	}
 	return cs, nil
 }
@@ -899,4 +915,13 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 		}
 	}
 	return out
+}
+
+// pronoun keeps the left-in-the-file note grammatical for one connection or
+// several, which is the only place this package needs one.
+func pronoun(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
 }

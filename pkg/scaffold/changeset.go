@@ -30,10 +30,6 @@ const (
 // Apply refused rather than doing something the preview did not describe.
 var ErrChangedOnDisk = errors.New("the project changed since it was planned")
 
-// ErrNoSecretWriter reports that the changeset carries values for the vault and
-// no Options.SecretWriter was given to store them with.
-var ErrNoSecretWriter = errors.New("no secret writer for a conversion that carries values")
-
 // Change is one operation Apply performs on the project directory.
 //
 // Content is the FINAL bytes, not a description of an edit, and that is what
