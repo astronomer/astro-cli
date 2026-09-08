@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -17,16 +15,14 @@ import (
 // Every field is a seam, so the logic stays testable and the layer rules hold
 // (docs/v2-architecture.md).
 //
-// The seams are not all the same kind of thing. Astro's session and the
-// coordinate lookups live behind a seam because reading them touches config/
-// and the cloud clients, which this layer may not import — the implementations
-// sit in internal/astrosession and internal/instancelocate. The AWS and Google
-// chains are different: their SDKs touch nothing this layer is barred from, so
-// nil means "ask the SDK", and the seam exists only so a test can answer
-// without an account.
+// Astro's session and the coordinate lookups live behind a seam because
+// reading them touches config/ and the cloud clients, which this layer may not
+// import — the implementations sit in internal/astrosession and
+// internal/instancelocate.
 //
-// Those two are also the only methods that need a Provider before any of this
-// is consulted: a build carrying neither refuses them by name instead. See
+// The AWS and Google chains are not here at all any more. They are the two
+// methods that need a Provider, their own seams moved to the door packages that
+// read them, and a build carrying neither refuses those methods by name. See
 // providers.go.
 type Deps struct {
 	// Session hands back the current Astro login's bearer token for the astro
@@ -39,21 +35,13 @@ type Deps struct {
 	// up — an astro deployment's web server, a Composer environment's Airflow
 	// URI. nil means no lookup is wired, which only a coordinate link needs.
 	Locator Locator
-	// HTTPClient carries every request, including the local token mint. nil
-	// uses the transport's own client.
+	// HTTPClient carries every request this layer makes, including the local
+	// token mint. nil uses the transport's own client.
+	//
+	// A door may need a client of its own — MWAA's web-login exchange wants a
+	// cookie jar the airflowapi options cannot install — and takes this one
+	// unless its own options override it.
 	HTTPClient *http.Client
-	// AWSConfig loads the AWS SDK's configuration for a region: the credential
-	// chain, and the region itself when the manifest names none. nil uses the
-	// SDK's own loader, which is the whole chain — environment, profile, SSO,
-	// credential_process, instance role. It is a seam so the MWAA door can be
-	// driven against a stub without an AWS account.
-	AWSConfig func(ctx context.Context, region string) (aws.Config, error)
-	// GoogleToken hands back an Application Default Credentials access token,
-	// and GoogleAccount names the principal it speaks for — the fact that turns
-	// a Composer 403 from a shrug into a fix. nil on either asks the Google
-	// SDK's own chain, which is what a real run wants.
-	GoogleToken   func(ctx context.Context) (string, error)
-	GoogleAccount func(ctx context.Context) string
 	// Providers is which auth methods this build can perform beyond the six
 	// that need nothing. The zero value performs only those six, which is
 	// right for a build that talks to neither platform; see providers.go for
@@ -86,16 +74,6 @@ func (d Deps) httpOptions() []airflowapi.HTTPOption {
 		return nil
 	}
 	return []airflowapi.HTTPOption{airflowapi.WithHTTPClient(d.HTTPClient)}
-}
-
-// baseHTTPClient is the client to build on when this package needs one of its
-// own — the MWAA web session, which needs a cookie jar the airflowapi options
-// cannot install.
-func (d Deps) baseHTTPClient() *http.Client {
-	if d.HTTPClient != nil {
-		return d.HTTPClient
-	}
-	return airflowapi.DefaultHTTPClient()
 }
 
 // TargetString reads one string field of this instance's
@@ -203,12 +181,16 @@ var ErrNotHTTP = errors.New("this deployment is not reached over HTTP: its reque
 // short enough that a token minted at the start is still good at the end.
 func (i Instance) HTTPDoorFor(ctx context.Context, d Deps) (HTTPDoor, error) {
 	method := i.authMethod()
-	if method == manifest.AuthAWS {
-		return HTTPDoor{}, ErrNotHTTP
-	}
-	// Before the lookup, for the same reason Transport does it there.
+	// Whether this build carries the method comes first, before the answer
+	// that it is not an HTTP door at all. A build with no aws provider asked
+	// about an mwaa link should hear that it cannot reach it, not that the door
+	// is the wrong shape — the second is true of every build and says nothing
+	// about this one.
 	if err := d.checkProvider(i.Name, method); err != nil {
 		return HTTPDoor{}, err
+	}
+	if method == manifest.AuthAWS {
+		return HTTPDoor{}, ErrNotHTTP
 	}
 	baseURL, err := i.baseURL(ctx, d)
 	if err != nil {

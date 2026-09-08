@@ -166,37 +166,6 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	}
 }
 
-func TestGoogleMethodCarriesTheADCToken(t *testing.T) {
-	i := link(t, "\n[tool.astro.deployments.legacy]\nurl = 'https://airflow.internal.corp'\nauth = { method = 'google' }\n")
-	src, _, err := credentials(context.Background(), i, i.URL, Deps{
-		LookupEnv:   env(nil),
-		GoogleToken: func(context.Context) (string, error) { return "ya29.token", nil },
-		Providers:   CloudProviders(),
-	})
-	if err != nil {
-		t.Fatalf("credentials: %v", err)
-	}
-	if got := header(t, src); got != "Bearer ya29.token" {
-		t.Fatalf("header = %q", got)
-	}
-}
-
-func TestGoogleMethodNamesTheMissingChain(t *testing.T) {
-	i := link(t, "\n[tool.astro.deployments.prod]\ntarget = 'composer'\nenvironment = 'orders-prod'\n")
-	src, _, err := credentials(context.Background(), i, "https://composer.example", Deps{
-		LookupEnv:   env(nil),
-		GoogleToken: func(context.Context) (string, error) { return "", ErrNoGoogleCredentials },
-		Providers:   CloudProviders(),
-	})
-	if err != nil {
-		t.Fatalf("credentials: %v", err)
-	}
-	_, _, err = src(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "gcloud auth application-default login") {
-		t.Fatalf("err = %v, want the ADC message", err)
-	}
-}
-
 func TestURLTargetTakesItsCredentialFromTheEnvironment(t *testing.T) {
 	i := URLInstance("https://airflow.corp.dev")
 

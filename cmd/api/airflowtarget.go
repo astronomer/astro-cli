@@ -12,6 +12,8 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/awsauth"
+	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
@@ -256,16 +258,21 @@ func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.I
 // credentials.
 func (o *AirflowOptions) instanceDeps() instances.Deps {
 	locator := instancelocate.New(astrov1.NewV1Client(httputil.NewHTTPClient()))
-	deps := instances.Deps{
+	var google googleauth.Options
+	if chain, ok := locator.(instancelocate.GoogleChain); ok {
+		google.Token, google.Account = chain.Google()
+	}
+	return instances.Deps{
 		Session:    astrosession.Bearer,
 		Locator:    locator,
 		HTTPClient: o.GetHTTPClient(),
-		Providers:  instances.CloudProviders(),
+		Providers: instances.Providers{
+			manifest.AuthGoogle: googleauth.Provider(google),
+			// No HTTPClient here: the door takes it from Deps above, so the
+			// one the caller wired carries the web-login exchange too.
+			manifest.AuthAWS: awsauth.Provider(awsauth.Options{}),
+		},
 	}
-	if chain, ok := locator.(instancelocate.GoogleChain); ok {
-		deps.GoogleToken, deps.GoogleAccount = chain.Google()
-	}
-	return deps
 }
 
 // urlTarget opens a bare Airflow URL: the localhost default and --url. Neither

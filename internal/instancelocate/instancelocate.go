@@ -29,6 +29,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
@@ -85,8 +86,8 @@ func New(deployments Deployments) instances.Locator {
 		session:          astrosession.Bearer,
 		organization:     currentOrganization,
 		httpClient:       &http.Client{Timeout: lookupTimeout},
-		googleToken:      instances.GoogleAccessToken,
-		googleAccount:    instances.GoogleAccount,
+		googleToken:      googleauth.AccessToken,
+		googleAccount:    googleauth.Account,
 		composerEndpoint: composerAPI,
 	}
 }

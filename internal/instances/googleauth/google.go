@@ -1,4 +1,25 @@
-package instances
+// Package googleauth performs the google auth method, which reaches a Composer
+// Airflow with an Application Default Credentials token.
+//
+// Separate from awsauth, and that is the point rather than tidiness. Bundling
+// both doors in one package made anything that wanted only this one link the
+// AWS SDK as well: internal/instancelocate needs exactly the three helpers
+// below to look up a Composer environment's URL, and it was paying 88 AWS
+// packages for them.
+//
+// Measured against the same base, a program importing the core and one door:
+// the core alone links 5.1MB, adding googleauth makes it 7.0MB, and adding
+// awsauth makes it 12.0MB. So Google costs about 1.9MB and AWS about 6.9MB, and
+// they are separate packages because they are separate decisions.
+//
+// Measure by INVOKING a door, not by constructing its provider. A probe that
+// only builds the provider value reports 7.3MB for both doors, because the
+// linker drops the credential chain behind a closure nothing calls — which
+// under-reports AWS by two thirds.
+//
+// A build that never imports this package still reads manifests naming the
+// method, and refuses them by name — see instances.Providers.
+package googleauth
 
 import (
 	"context"
@@ -19,12 +40,12 @@ import (
 // working machine needs re-consenting.
 const googleScope = "https://www.googleapis.com/auth/cloud-platform"
 
-// ErrNoGoogleCredentials reports a machine with no Application Default
+// ErrNoCredentials reports a machine with no Application Default
 // Credentials: no gcloud ADC file, no GOOGLE_APPLICATION_CREDENTIALS, no
 // metadata server. One fix covers the laptop case, which is the case a person
 // is in when they read this. It is exported so the Composer URL lookup, which
 // needs the same credentials, reports the same outage.
-var ErrNoGoogleCredentials = errors.New("no Google credentials — run `gcloud auth application-default login`")
+var ErrNoCredentials = errors.New("no Google credentials — run `gcloud auth application-default login`")
 
 // maxComposerAccountLength is the longest service-account email an Airflow that
 // registers Google callers on its own can store. The token carries the full
@@ -48,7 +69,7 @@ const maxComposerAccountLength = 64
 // many. An impersonated or workload-identity credential whose ADC document
 // names no account at all is invisible to this, and reads as nothing to warn
 // about.
-func GoogleAccountAdvice(account string) string {
+func AccountAdvice(account string) string {
 	if len(account) <= maxComposerAccountLength {
 		return ""
 	}
@@ -69,16 +90,16 @@ func GoogleAccountAdvice(account string) string {
 // visible in the credentials. The hook runs on exactly the 401 and 403 that
 // mean "these credentials did not work", so it is the one place an Airflow
 // status and the identity behind it are both in hand.
-func googleCredentials(d Deps) (source airflowapi.CredentialSource, refresh func(context.Context) error) {
+func googleCredentials(o Options) (source airflowapi.CredentialSource, refresh func(context.Context) error) {
 	source = func(ctx context.Context) (string, string, error) {
-		token, err := d.googleToken(ctx)
+		token, err := o.googleToken(ctx)
 		if err != nil {
 			return "", "", err
 		}
 		return airflowapi.BearerToken(token)(ctx)
 	}
 	refresh = func(ctx context.Context) error {
-		if advice := GoogleAccountAdvice(d.googleAccount(ctx)); advice != "" {
+		if advice := AccountAdvice(o.googleAccount(ctx)); advice != "" {
 			return errors.New(advice)
 		}
 		// Nothing to add. The ADC token source renews on its own, so the retry
@@ -90,18 +111,18 @@ func googleCredentials(d Deps) (source airflowapi.CredentialSource, refresh func
 
 // googleToken hands back an ADC access token, through the seam when one is
 // wired and from the SDK's own chain otherwise.
-func (d Deps) googleToken(ctx context.Context) (string, error) {
-	if d.GoogleToken != nil {
-		return d.GoogleToken(ctx)
+func (o Options) googleToken(ctx context.Context) (string, error) {
+	if o.Token != nil {
+		return o.Token(ctx)
 	}
 	return defaultADC.token(ctx)
 }
 
 // googleAccount names the principal those credentials speak for, through the
 // same seam.
-func (d Deps) googleAccount(ctx context.Context) string {
-	if d.GoogleAccount != nil {
-		return d.GoogleAccount(ctx)
+func (o Options) googleAccount(ctx context.Context) string {
+	if o.Account != nil {
+		return o.Account(ctx)
 	}
 	return defaultADC.account(ctx)
 }
@@ -110,7 +131,7 @@ func (d Deps) googleAccount(ctx context.Context) string {
 // the machine's own chain. It is exported because the Composer URL lookup
 // needs the same token the Airflow calls after it carry, and one
 // implementation means one place a missing chain is named.
-func GoogleAccessToken(ctx context.Context) (string, error) {
+func AccessToken(ctx context.Context) (string, error) {
 	return defaultADC.token(ctx)
 }
 
@@ -118,7 +139,7 @@ func GoogleAccessToken(ctx context.Context) (string, error) {
 // speak for — a service account's email when the credentials name one, empty
 // for a user login, which has no such limit to run into. It is what makes the
 // over-long-service-account failure identifiable rather than guessed at.
-func GoogleAccount(ctx context.Context) string {
+func Account(ctx context.Context) string {
 	return defaultADC.account(ctx)
 }
 
@@ -155,7 +176,7 @@ func (a *adc) find(ctx context.Context) (*google.Credentials, error) {
 	// metadata probe carries its own short timeout.
 	creds, err := google.FindDefaultCredentials(context.WithoutCancel(ctx), googleScope)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrNoGoogleCredentials, err)
+		return nil, fmt.Errorf("%w: %w", ErrNoCredentials, err)
 	}
 	a.creds, a.looked = creds, true
 	return creds, nil

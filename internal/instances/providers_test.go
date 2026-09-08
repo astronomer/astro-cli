@@ -73,17 +73,20 @@ func TestAnUnsupportedMethodIsRefusedBeforeAnyLookup(t *testing.T) {
 func TestTheRefusalNamesTheMethodNotJustTheDeployment(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.orders-pipeline]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
 
-	// With the provider, this exact instance resolves: so the refusal below is
-	// the only thing the assertion can be reading.
-	stub := newAWSStub(t)
-	if _, err := i.Transport(context.Background(), Deps{
-		AWSConfig: stubAWSConfig(t, stub.URL),
-		Providers: CloudProviders(),
-	}); err != nil {
-		t.Fatalf("the supported build could not resolve it: %v", err)
+	// With a provider, this exact instance resolves — so the refusal below is
+	// the only thing the assertion can be reading. A stand-in rather than the
+	// real AWS door: what this package owes a consumer is the dispatch, and the
+	// door lives in a package that imports this one.
+	carrying := Providers{manifest.AuthAWS: {
+		Transport: func(context.Context, Instance, Deps) (airflowapi.Transport, error) {
+			return stubTransport{}, nil
+		},
+	}}
+	if _, err := i.Transport(context.Background(), Deps{Providers: carrying}); err != nil {
+		t.Fatalf("the carrying build could not resolve it: %v", err)
 	}
 
-	_, err := i.Transport(context.Background(), Deps{AWSConfig: stubAWSConfig(t, stub.URL)})
+	_, err := i.Transport(context.Background(), Deps{})
 	if err == nil {
 		t.Fatal("resolved without a provider")
 	}
@@ -174,15 +177,22 @@ func TestAProviderThatOffersNoCredentialIsRefused(t *testing.T) {
 func TestTwoBuildsCanDisagreeInOneProcess(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.gcp-prod]\nurl = 'https://composer.example.com'\nauth = { method = 'google' }\n")
 
-	with := Deps{
-		LookupEnv:   env(nil),
-		GoogleToken: func(context.Context) (string, error) { return "ya29.token", nil },
-		Providers:   CloudProviders(),
-	}
-	if _, _, err := credentials(context.Background(), i, i.URL, with); err != nil {
+	carrying := Providers{manifest.AuthGoogle: {
+		Credentials: func(context.Context, Instance, string, Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
+			return func(context.Context) (string, string, error) { return "Bearer", "ya29.token", nil }, nil, nil
+		},
+	}}
+	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil), Providers: carrying}); err != nil {
 		t.Fatalf("the carrying build failed: %v", err)
 	}
 	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)}); err == nil {
 		t.Error("the build carrying nothing resolved it anyway")
 	}
+}
+
+// stubTransport stands in for a door, so a dispatch test needs no vendor SDK.
+type stubTransport struct{}
+
+func (stubTransport) Do(context.Context, airflowapi.Request) (airflowapi.Response, error) {
+	return airflowapi.Response{}, nil
 }

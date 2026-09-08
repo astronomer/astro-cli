@@ -1,4 +1,18 @@
-package instances
+// Package awsauth performs the aws auth method, which reaches an MWAA
+// environment through the AWS API rather than through an Airflow URL.
+//
+// It is the expensive one: about +6.9MB over the core, nearly all of the cost
+// the provider seam exists to make optional. Separate from googleauth so a
+// consumer that wants Composer does not buy MWAA with it — see that package for
+// the numbers and for how to measure them without under-reporting.
+//
+// Two doors, discovered by asking rather than configured: InvokeRestApi carries
+// an Airflow REST call inside a SigV4-signed request and is preferred, and the
+// older web-login-token exchange is built the first time it is refused.
+//
+// A build that never imports this package still reads manifests naming the
+// method, and refuses them by name — see instances.Providers.
+package awsauth
 
 import (
 	"context"
@@ -18,6 +32,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/mwaa/document"
 	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 
+	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -79,7 +94,7 @@ func awsCredentialFailure(err error, environment, region string) error {
 // The credential chain is resolved here rather than at the first request so a
 // machine with no AWS identity is told so plainly, once, instead of receiving
 // the SDK's own wording wrapped around whichever provider failed last.
-func (i Instance) mwaaTransport(ctx context.Context, d Deps) (airflowapi.Transport, error) {
+func mwaaTransport(ctx context.Context, i instances.Instance, o Options) (airflowapi.Transport, error) {
 	environment := i.Link.Environment
 	if environment == "" {
 		return nil, fmt.Errorf("deployment %q names no MWAA environment: set environment = '<environment name>' on the link", i.Name)
@@ -88,7 +103,7 @@ func (i Instance) mwaaTransport(ctx context.Context, d Deps) (airflowapi.Transpo
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := d.awsConfig(ctx, region)
+	cfg, err := o.awsConfig(ctx, region)
 	if err != nil {
 		return nil, fmt.Errorf("read the AWS configuration for %q: %w", i.Name, err)
 	}
@@ -113,15 +128,15 @@ func (i Instance) mwaaTransport(ctx context.Context, d Deps) (airflowapi.Transpo
 		api:         mwaa.NewFromConfig(cfg),
 		environment: environment,
 		region:      cfg.Region,
-		base:        d.baseHTTPClient(),
+		base:        o.httpClient(),
 	}, nil
 }
 
 // awsConfig loads the AWS SDK configuration, honoring the region the manifest
 // named and otherwise letting the SDK's own chain decide.
-func (d Deps) awsConfig(ctx context.Context, region string) (aws.Config, error) {
-	if d.AWSConfig != nil {
-		return d.AWSConfig(ctx, region)
+func (o Options) awsConfig(ctx context.Context, region string) (aws.Config, error) {
+	if o.Config != nil {
+		return o.Config(ctx, region)
 	}
 	var opts []func(*awsconfig.LoadOptions) error
 	if region != "" {

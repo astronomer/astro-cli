@@ -17,6 +17,7 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -303,6 +304,85 @@ func TestV2PackagesNeverImportConfigOrV1Cmd(t *testing.T) {
 			}
 		})
 	}
+}
+
+// authDoors are the packages that carry an expensive auth chain. Each exists so
+// a consumer can decline it.
+var authDoors = []string{
+	modulePrefix + "internal/instances/awsauth",
+	modulePrefix + "internal/instances/googleauth",
+}
+
+// expensiveSDKs are the chains the doors exist to make optional, by import
+// prefix — a direct import would bypass the door rule above.
+//
+// Deliberately not "anything outside this module": internal/instances
+// legitimately reaches a TOML parser through pkg/manifest, so a purity rule
+// would be false here on day one. This is a cost guard, and these are the cost:
+// against a core that links 5.1MB, Google's chain adds about 1.9MB and AWS's
+// about 6.9MB.
+var expensiveSDKs = []string{
+	"github.com/aws/",
+	"golang.org/x/oauth2/google",
+	"cloud.google.com/",
+	// Google's generated client, which internal/instancelocate deliberately
+	// declined; it is the one a future Composer feature is likeliest to reach
+	// for, and it brings grpc and protobuf with it.
+	"google.golang.org/api/",
+}
+
+// TestTheAuthDoorsStayOptional keeps the expensive chains out of everything
+// that is not a door.
+//
+// Go links what is imported, so this property IS the saving. Two things about
+// how it is checked, both learned by getting them wrong first.
+//
+// It asks `go list -deps` rather than reading import blocks, because the
+// property is transitive and a one-hop reacquisition is invisible to a direct
+// check. internal/instancelocate imported one small package for three Google
+// helpers and inherited eighty-eight AWS packages through it, while every
+// import block in that tree named no SDK at all.
+//
+// And the primary rule is "reaches no door", which needs no list to maintain:
+// a new door is a new package and is covered by the same sentence. The SDK
+// prefixes below are the backstop for a direct import that skips the doors.
+func TestTheAuthDoorsStayOptional(t *testing.T) {
+	// The core reaches no door and no chain: it is what a consumer imports to
+	// read links, and reading links must cost nothing.
+	for _, dep := range deps(t, modulePrefix+"internal/instances") {
+		for _, door := range authDoors {
+			if dep == door {
+				t.Errorf("internal/instances reaches %s: every consumer of the core would carry that door's SDK", dep)
+			}
+		}
+		for _, sdk := range expensiveSDKs {
+			if strings.HasPrefix(dep, sdk) {
+				t.Errorf("internal/instances reaches %s: that chain belongs behind an auth door", dep)
+			}
+		}
+	}
+
+	// instancelocate reaches the Google door on purpose — a Composer URL lookup
+	// speaks to Google's own API — so only AWS is out of bounds here. This is
+	// the case that split the doors apart: it wanted three Google helpers and
+	// was linking eighty-eight AWS packages to get them.
+	for _, dep := range deps(t, modulePrefix+"internal/instancelocate") {
+		if dep == modulePrefix+"internal/instances/awsauth" || strings.HasPrefix(dep, "github.com/aws/") {
+			t.Errorf("internal/instancelocate reaches %s: the Composer lookup must not carry MWAA's SDK", dep)
+		}
+	}
+}
+
+// deps lists everything a package links, transitively.
+func deps(t *testing.T, pkg string) []string {
+	t.Helper()
+	cmd := exec.Command("go", "list", "-deps", pkg)
+	cmd.Dir = repoRoot(t)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -deps %s: %v", pkg, err)
+	}
+	return strings.Fields(string(out))
 }
 
 // forbiddenCalls maps package selector to forbidden functions below cmd/.

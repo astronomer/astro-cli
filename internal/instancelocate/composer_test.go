@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -86,7 +87,7 @@ func TestComposerLinkNeedsItsProjectAndLocation(t *testing.T) {
 func TestComposerLinkNamesTheMissingGoogleChain(t *testing.T) {
 	l := composerLocator("http://unused")
 	l.googleToken = func(context.Context) (string, error) {
-		return "", instances.ErrNoGoogleCredentials
+		return "", googleauth.ErrNoCredentials
 	}
 	_, err := l.BaseURL(context.Background(), composerInstance())
 	if err == nil || !strings.Contains(err.Error(), "gcloud auth application-default login") {

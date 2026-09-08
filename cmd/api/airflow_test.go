@@ -17,6 +17,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/awsauth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
@@ -648,7 +649,11 @@ region = "us-east-1"
 
 	instance, ok := instances.Build(m).Lookup("prod")
 	require.True(t, ok)
-	_, err = instance.HTTPDoorFor(context.Background(), instances.Deps{})
+	// With the door wired, because that is what this asserts: an mwaa link has
+	// no HTTP address even in a build that can reach it. A build carrying no
+	// aws provider is refused earlier and for a different reason.
+	d := instances.Deps{Providers: instances.Providers{manifest.AuthAWS: awsauth.Provider(awsauth.Options{})}}
+	_, err = instance.HTTPDoorFor(context.Background(), d)
 	require.ErrorIs(t, err, instances.ErrNotHTTP)
 }
 

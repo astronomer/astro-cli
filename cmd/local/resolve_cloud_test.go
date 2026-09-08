@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -150,7 +151,7 @@ func TestComposerLinkCarriesTheLookupsFailure(t *testing.T) {
 	dir := instanceProject(t, cloudManifest)
 	d, _, _ := instanceDeps(t, dir)
 	d.Locator = locatorFunc(func(context.Context, instances.Instance) (string, error) {
-		return "", instances.ErrNoGoogleCredentials
+		return "", googleauth.ErrNoCredentials
 	})
 
 	c := &cli{d: d}

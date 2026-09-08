@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // decodeJSON reads a request body into v, for the stub Airflows the tests run.
@@ -76,7 +77,6 @@ func TestTransportAsksTheLocatorForACoordinateLink(t *testing.T) {
 
 	asked := ""
 	transport, err := i.Transport(context.Background(), Deps{
-		Providers:  CloudProviders(),
 		LookupEnv:  env(map[string]string{EnvAPIToken: "ci-token"}),
 		HTTPClient: server.Client(),
 		Locator: locatorFunc(func(_ context.Context, in Instance) (string, error) {
@@ -98,17 +98,22 @@ func TestTransportAsksTheLocatorForACoordinateLink(t *testing.T) {
 	}
 }
 
-// TestTransportDispatchesOnTheAuthMethod: MWAA is not an Airflow URL behind a
-// credential, it is a different door entirely, so the method picks the
-// transport before any URL lookup is attempted.
+// TestTransportDispatchesOnTheAuthMethod: a method whose provider supplies the
+// whole transport is not an Airflow URL behind a credential, so the URL lookup
+// never runs. Which transport MWAA in particular yields belongs to the package
+// that has the door; what this package owes is the dispatch.
 func TestTransportDispatchesOnTheAuthMethod(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod-mwaa]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
 	// A locator is wired and still never asked: there is no URL in this door.
 	asked := false
+	door := stubTransport{}
 	transport, err := i.Transport(context.Background(), Deps{
-		Providers: CloudProviders(),
+		Providers: Providers{manifest.AuthAWS: {
+			Transport: func(context.Context, Instance, Deps) (airflowapi.Transport, error) {
+				return door, nil
+			},
+		}},
 		LookupEnv: env(nil),
-		AWSConfig: stubAWSConfig(t, "https://unused"),
 		Locator: locatorFunc(func(context.Context, Instance) (string, error) {
 			asked = true
 			return "https://never", nil
@@ -117,8 +122,8 @@ func TestTransportDispatchesOnTheAuthMethod(t *testing.T) {
 	if err != nil {
 		t.Fatalf("transport: %v", err)
 	}
-	if _, ok := transport.(*awsTransport); !ok {
-		t.Fatalf("transport = %T, want the AWS door", transport)
+	if transport != airflowapi.Transport(door) {
+		t.Fatalf("transport = %T, want the provider's door", transport)
 	}
 	if asked {
 		t.Error("the URL locator was asked about an MWAA environment")
@@ -165,7 +170,18 @@ func TestHTTPDoorForSendsNothingWhenNothingIsNeeded(t *testing.T) {
 // that can only speak HTTP has to hear it rather than get an empty string.
 func TestHTTPDoorForRefusesTheAWSDoor(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod-mwaa]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
-	if _, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: env(nil)}); !errors.Is(err, ErrNotHTTP) {
+	// Carrying the door, so the answer is about its shape. A build without it
+	// hears that it cannot reach the deployment at all, which is the more
+	// useful thing and is covered in providers_test.go.
+	d := Deps{
+		LookupEnv: env(nil),
+		Providers: Providers{manifest.AuthAWS: {
+			Transport: func(context.Context, Instance, Deps) (airflowapi.Transport, error) {
+				return stubTransport{}, nil
+			},
+		}},
+	}
+	if _, err := i.HTTPDoorFor(context.Background(), d); !errors.Is(err, ErrNotHTTP) {
 		t.Fatalf("err = %v, want ErrNotHTTP", err)
 	}
 }

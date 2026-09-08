@@ -1,4 +1,4 @@
-package instances
+package awsauth
 
 import (
 	"context"
@@ -149,19 +149,13 @@ func (h *hostRewriter) Do(req *http.Request) (*http.Response, error) {
 // mwaaLink is the manifest a team with an MWAA environment commits.
 const mwaaLink = "\n[tool.astro.deployments.prod]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n\n[tool.astro.targets.mwaa]\nregion = 'us-west-2'\nbucket = 's3://acme-airflow-orders'\n"
 
-func mwaaTransportFor(t *testing.T, stub *awsStub, d Deps) airflowapi.Transport {
+func mwaaTransportFor(t *testing.T, stub *awsStub, o Options) airflowapi.Transport {
 	t.Helper()
 	i := link(t, mwaaLink)
-	if d.AWSConfig == nil {
-		d.AWSConfig = stubAWSConfig(t, stub.URL)
+	if o.Config == nil {
+		o.Config = stubAWSConfig(t, stub.URL)
 	}
-	// These tests are about the door itself, so they carry the build that has
-	// it. A Deps with no providers is refused before the door is reached, which
-	// is the behavior TestAnUnsupportedMethodIsRefusedBeforeAnyLookup covers.
-	if d.Providers == nil {
-		d.Providers = CloudProviders()
-	}
-	transport, err := i.Transport(context.Background(), d)
+	transport, err := mwaaTransport(context.Background(), i, o)
 	if err != nil {
 		t.Fatalf("transport: %v", err)
 	}
@@ -179,7 +173,7 @@ func TestMWAACarriesTheRequestThroughInvokeRestApi(t *testing.T) {
 			"RestApiResponse":   map[string]any{"total_entries": 3},
 		})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	resp, err := transport.Do(context.Background(), airflowapi.Request{
 		Generation: airflowapi.Airflow3,
@@ -238,7 +232,7 @@ func TestMWAAReportsAirflowsOwnStatusAsAStatus(t *testing.T) {
 				"RestApiResponse":   map[string]any{"detail": "DAG not found"},
 			})
 		}
-		transport := mwaaTransportFor(t, stub, Deps{})
+		transport := mwaaTransportFor(t, stub, Options{})
 
 		resp, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags/gone"})
 		if err != nil {
@@ -258,7 +252,7 @@ func TestMWAAReportsAirflowsOwnStatusAsAStatus(t *testing.T) {
 // health probing falls back instead of failing.
 func TestMWAAAnswersAServerRootRequestWith404(t *testing.T) {
 	stub := newAWSStub(t)
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	resp, err := transport.Do(context.Background(), airflowapi.Request{Path: "/health"})
 	if err != nil {
@@ -307,7 +301,7 @@ func TestMWAAFallsBackToTheWebLoginDoor(t *testing.T) {
 			"WebServerHostname": strings.TrimPrefix(web.URL, "https://"),
 		})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{HTTPClient: web.Client()})
+	transport := mwaaTransportFor(t, stub, Options{HTTPClient: web.Client()})
 
 	resp, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow2, Path: "/dags"})
 	if err != nil {
@@ -342,7 +336,7 @@ func TestMWAAReportsBothDoorsWhenBothAreShut(t *testing.T) {
 	stub.webToken = func(w http.ResponseWriter) {
 		awsError(w, http.StatusForbidden, "AccessDeniedException", map[string]any{"message": "no airflow:CreateWebLoginToken"})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	_, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags"})
 	if err == nil {
@@ -362,7 +356,7 @@ func TestMWAAPassesOnAnErrorThatIsNotARefusal(t *testing.T) {
 	stub.invoke = func(w http.ResponseWriter, _ map[string]any) {
 		awsError(w, http.StatusInternalServerError, "InternalServerException", map[string]any{"message": "boom"})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	_, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags"})
 	if err == nil {
@@ -378,9 +372,8 @@ func TestMWAAPassesOnAnErrorThatIsNotARefusal(t *testing.T) {
 
 func TestMWAANamesAMissingCredentialChain(t *testing.T) {
 	i := link(t, mwaaLink)
-	_, err := i.Transport(context.Background(), Deps{
-		Providers: CloudProviders(),
-		AWSConfig: func(context.Context, string) (aws.Config, error) {
+	_, err := transportVia(context.Background(), i, Options{
+		Config: func(context.Context, string) (aws.Config, error) {
 			return aws.Config{
 				Region:      "us-west-2",
 				Credentials: failingCredentials{},
@@ -410,9 +403,8 @@ func TestMWAANamesAMissingRegion(t *testing.T) {
 	// The link declares no [tool.astro.targets.mwaa], so the region can only
 	// come from the AWS chain — and here it does not.
 	i := link(t, "\n[tool.astro.deployments.prod]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
-	_, err := i.Transport(context.Background(), Deps{
-		Providers: CloudProviders(),
-		AWSConfig: func(context.Context, string) (aws.Config, error) { return aws.Config{}, nil },
+	_, err := transportVia(context.Background(), i, Options{
+		Config: func(context.Context, string) (aws.Config, error) { return aws.Config{}, nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "AWS_REGION") {
 		t.Fatalf("err = %v, want the region message", err)
@@ -427,9 +419,8 @@ func TestMWAANamesAMissingRegion(t *testing.T) {
 func TestMWAATakesTheRegionFromTheManifest(t *testing.T) {
 	asked := ""
 	i := link(t, mwaaLink)
-	if _, err := i.Transport(context.Background(), Deps{
-		Providers: CloudProviders(),
-		AWSConfig: func(_ context.Context, region string) (aws.Config, error) {
+	if _, err := transportVia(context.Background(), i, Options{
+		Config: func(_ context.Context, region string) (aws.Config, error) {
 			asked = region
 			return aws.Config{Region: region, Credentials: awscreds.NewStaticCredentialsProvider("A", "B", "")}, nil
 		},
@@ -443,7 +434,7 @@ func TestMWAATakesTheRegionFromTheManifest(t *testing.T) {
 
 func TestMWAARefusesAMethodTheDoorCannotCarry(t *testing.T) {
 	stub := newAWSStub(t)
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 	_, err := transport.Do(context.Background(), airflowapi.Request{
 		Generation: airflowapi.Airflow3, Method: http.MethodHead, Path: "/dags",
 	})

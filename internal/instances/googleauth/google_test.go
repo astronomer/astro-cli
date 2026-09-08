@@ -1,4 +1,4 @@
-package instances
+package googleauth
 
 import (
 	"context"
@@ -53,9 +53,9 @@ func TestAccountFromADCReadsEveryShapeItCan(t *testing.T) {
 // identity behind it are both in hand, so it is where the fix gets named.
 func TestGoogleRefreshHookNamesTheLongAccount(t *testing.T) {
 	long := strings.Repeat("o", 45) + "@acme-data.iam.gserviceaccount.com"
-	_, refresh := googleCredentials(Deps{
-		GoogleToken:   func(context.Context) (string, error) { return "ya29.token", nil },
-		GoogleAccount: func(context.Context) string { return long },
+	_, refresh := googleCredentials(Options{
+		Token:   func(context.Context) (string, error) { return "ya29.token", nil },
+		Account: func(context.Context) string { return long },
 	})
 	err := refresh(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "numeric account id") {
@@ -65,9 +65,9 @@ func TestGoogleRefreshHookNamesTheLongAccount(t *testing.T) {
 	// A short account, and a user login: nothing to add, so the retry goes
 	// ahead and Airflow's own refusal stands.
 	for _, fine := range []string{"short@acme-data.iam.gserviceaccount.com", ""} {
-		_, refresh := googleCredentials(Deps{
-			GoogleToken:   func(context.Context) (string, error) { return "ya29.token", nil },
-			GoogleAccount: func(context.Context) string { return fine },
+		_, refresh := googleCredentials(Options{
+			Token:   func(context.Context) (string, error) { return "ya29.token", nil },
+			Account: func(context.Context) string { return fine },
 		})
 		if err := refresh(context.Background()); err != nil {
 			t.Errorf("%q: refresh = %v, want it to let the retry through", fine, err)
@@ -77,17 +77,45 @@ func TestGoogleRefreshHookNamesTheLongAccount(t *testing.T) {
 
 func TestGoogleAccountAdviceOnlyFiresOnALongAccount(t *testing.T) {
 	short := "orders@acme-data.iam.gserviceaccount.com"
-	if advice := GoogleAccountAdvice(short); advice != "" {
+	if advice := AccountAdvice(short); advice != "" {
 		t.Errorf("a %d-character account got advice: %s", len(short), advice)
 	}
-	if advice := GoogleAccountAdvice(""); advice != "" {
+	if advice := AccountAdvice(""); advice != "" {
 		t.Errorf("a user login got advice: %s", advice)
 	}
 	long := strings.Repeat("o", 40) + "@acme-data.iam.gserviceaccount.com"
-	advice := GoogleAccountAdvice(long)
+	advice := AccountAdvice(long)
 	for _, want := range []string{long, "numeric account id", "pre-register"} {
 		if !strings.Contains(advice, want) {
 			t.Errorf("advice does not name %s: %s", want, advice)
 		}
+	}
+}
+
+// The ADC token becomes the Authorization header.
+//
+// Against googleCredentials directly rather than through the core's dispatch:
+// the dispatch is unexported there, and what this package is responsible for is
+// turning a chain into a credential.
+func TestTheADCTokenBecomesTheHeader(t *testing.T) {
+	src, _ := googleCredentials(Options{
+		Token: func(context.Context) (string, error) { return "ya29.token", nil },
+	})
+	if got := header(t, src); got != "Bearer ya29.token" {
+		t.Fatalf("header = %q, want the ADC token as a bearer", got)
+	}
+}
+
+// A machine with no chain is named, with the command that fixes it.
+func TestAMissingChainIsNamed(t *testing.T) {
+	src, _ := googleCredentials(Options{
+		Token: func(context.Context) (string, error) { return "", ErrNoCredentials },
+	})
+	_, _, err := src(context.Background())
+	if err == nil {
+		t.Fatal("a missing chain produced a credential")
+	}
+	if !strings.Contains(err.Error(), "gcloud auth application-default login") {
+		t.Fatalf("err = %v, want the ADC message", err)
 	}
 }

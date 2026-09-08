@@ -1,4 +1,4 @@
-package instances
+package awsauth
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 // would have carried anyway.
 func TestMWAACarriesABodyWithATime(t *testing.T) {
 	stub := newAWSStub(t)
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	logical := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
 	if _, err := transport.Do(context.Background(), airflowapi.Request{
@@ -64,7 +64,7 @@ func TestMWAAExplainsAnExceptionWithNoBody(t *testing.T) {
 		awsError(w, http.StatusBadRequest, "RestApiClientException",
 			map[string]any{"message": "Airflow said: dag_id is required", "RestApiStatusCode": 400})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	resp, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags"})
 	if err != nil {
@@ -118,7 +118,7 @@ func TestMWAADefaultsAnAbsentStatusPerCallSite(t *testing.T) {
 	for _, tc := range cases {
 		stub := newAWSStub(t)
 		stub.invoke = func(w http.ResponseWriter, _ map[string]any) { tc.answer(w) }
-		transport := mwaaTransportFor(t, stub, Deps{})
+		transport := mwaaTransportFor(t, stub, Options{})
 		resp, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags"})
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
@@ -138,7 +138,7 @@ func TestMWAAReadsANullDocumentAsNoPayload(t *testing.T) {
 	stub.invoke = func(w http.ResponseWriter, _ map[string]any) {
 		awsJSON(w, http.StatusOK, map[string]any{"RestApiStatusCode": 204, "RestApiResponse": nil})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	resp, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Method: http.MethodDelete, Path: "/dags/orders"})
 	if err != nil {
@@ -167,7 +167,7 @@ func TestMWAAKeepsNumbersAndTextExact(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"RestApiStatusCode":200,"RestApiResponse":{"id":9007199254740993,"ratio":0.30000000000000004,"note":"héllo ☃"}}`))
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	resp, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags"})
 	if err != nil {
@@ -191,7 +191,7 @@ func TestMWAAKeepsNumbersAndTextExact(t *testing.T) {
 // Sending the request as somebody else instead is worse than saying no.
 func TestMWAARefusesRequestHeaders(t *testing.T) {
 	stub := newAWSStub(t)
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	_, err := transport.Do(context.Background(), airflowapi.Request{
 		Generation: airflowapi.Airflow3,
@@ -217,7 +217,7 @@ func TestMWAANamesAMissingEnvironment(t *testing.T) {
 	stub.invoke = func(w http.ResponseWriter, _ map[string]any) {
 		awsError(w, http.StatusNotFound, "ResourceNotFoundException", map[string]any{"message": "not found"})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{})
+	transport := mwaaTransportFor(t, stub, Options{})
 
 	_, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow3, Path: "/dags"})
 	if err == nil {
@@ -253,7 +253,7 @@ func TestMWAATellsASlowChainFromAnEmptyOne(t *testing.T) {
 	i := link(t, mwaaLink)
 	shortCredentialTimeout(t)
 	slow := &slowPreflight{delay: 2 * awsCredentialTimeout}
-	_, err := i.Transport(context.Background(), Deps{AWSConfig: slow.config, Providers: CloudProviders()})
+	_, err := mwaaTransport(context.Background(), i, Options{Config: slow.config})
 	if err == nil {
 		t.Fatal("a chain that never answered resolved")
 	}
@@ -303,7 +303,7 @@ func TestMWAAFallbackOpensOnceUnderConcurrentCallers(t *testing.T) {
 	stub.webToken = func(w http.ResponseWriter) {
 		awsJSON(w, http.StatusOK, map[string]any{"WebToken": "web-token", "WebServerHostname": strings.TrimPrefix(web.URL, "https://")})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{HTTPClient: web.Client()})
+	transport := mwaaTransportFor(t, stub, Options{HTTPClient: web.Client()})
 
 	var wg sync.WaitGroup
 	for range 8 {
@@ -346,7 +346,7 @@ func TestMWAARefusesASessionThatCannotReachTheAPI(t *testing.T) {
 	stub.webToken = func(w http.ResponseWriter) {
 		awsJSON(w, http.StatusOK, map[string]any{"WebToken": "web-token", "WebServerHostname": strings.TrimPrefix(web.URL, "https://")})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{HTTPClient: web.Client()})
+	transport := mwaaTransportFor(t, stub, Options{HTTPClient: web.Client()})
 
 	_, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow2, Path: "/dags"})
 	if err == nil {
@@ -387,7 +387,7 @@ func TestMWAAWebSessionIsReMintedWhenItExpires(t *testing.T) {
 	stub.webToken = func(w http.ResponseWriter) {
 		awsJSON(w, http.StatusOK, map[string]any{"WebToken": "web-token", "WebServerHostname": strings.TrimPrefix(web.URL, "https://")})
 	}
-	transport := mwaaTransportFor(t, stub, Deps{HTTPClient: web.Client()})
+	transport := mwaaTransportFor(t, stub, Options{HTTPClient: web.Client()})
 
 	if _, err := transport.Do(context.Background(), airflowapi.Request{Generation: airflowapi.Airflow2, Path: "/dags"}); err != nil {
 		t.Fatalf("first call: %v", err)

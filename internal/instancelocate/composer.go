@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 )
 
 // The Composer API is called over plain REST rather than through
@@ -142,7 +143,7 @@ func (l *locator) composerOutage(ctx context.Context, name string, at composerCo
 	case http.StatusForbidden:
 		msg := fmt.Sprintf("not allowed to read Composer environment %s in project %s — the account needs roles/composer.user",
 			at.environment, at.project)
-		if advice := instances.GoogleAccountAdvice(l.googleAccount(ctx)); advice != "" {
+		if advice := googleauth.AccountAdvice(l.googleAccount(ctx)); advice != "" {
 			msg += ".\n      " + advice
 		}
 		return errors.New(msg)

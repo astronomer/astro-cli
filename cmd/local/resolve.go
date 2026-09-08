@@ -15,6 +15,8 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/internal/instances/awsauth"
+	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
@@ -199,16 +201,18 @@ func (c *cli) machineInstance() (instances.Instance, error) {
 // credentials. Two chains would mean a run that finds an environment it cannot
 // then talk to.
 func (c *cli) instanceDeps() instances.Deps {
-	// The CLI talks to every platform, so it carries both cloud providers.
-	deps := instances.Deps{
-		Session:   c.d.Session,
-		Locator:   c.d.Locator,
-		Providers: instances.CloudProviders(),
-	}
+	var google googleauth.Options
 	if chain, ok := c.d.Locator.(instancelocate.GoogleChain); ok {
-		deps.GoogleToken, deps.GoogleAccount = chain.Google()
+		google.Token, google.Account = chain.Google()
 	}
-	return deps
+	return instances.Deps{
+		Session: c.d.Session,
+		Locator: c.d.Locator,
+		Providers: instances.Providers{
+			manifest.AuthGoogle: googleauth.Provider(google),
+			manifest.AuthAWS:    awsauth.Provider(awsauth.Options{}),
+		},
+	}
 }
 
 // resolveDeployment applies the rule, and when nothing selects it asks — once —

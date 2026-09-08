@@ -12,10 +12,10 @@ import (
 //
 // aws reaches MWAA through the AWS SDK's signed API and the whole credential
 // chain behind LoadDefaultConfig; google reaches Composer through the
-// application-default chain. Measured on their own, the two add about 7.7MB and
-// seventeen modules to a binary. The other six are a bearer token, a username
-// and password, a token exchange, a command to run, the Astro session, and
-// nothing at all — stdlib and this repo.
+// application-default chain. Against a core that links 5.1MB, the first adds
+// about 6.9MB and the second about 1.9MB. The other six are a bearer token, a
+// username and password, a token exchange, a command to run, the Astro session,
+// and nothing at all — stdlib and this repo.
 //
 // A second consumer is coming that talks to neither: Astro Desktop stores mwaa
 // and composer links but never calls them, and ships a signed, notarized app to
@@ -31,17 +31,20 @@ import (
 // resolution reads is a data race waiting for the first caller that registers
 // outside init().
 //
-// # This is the dispatch, not yet the saving
+// # Where the implementations live
 //
-// The implementations still live in this package, so both SDK chains are
-// compiled and linked here today and leaving a provider unwired drops nothing.
-// Two things still hold the dependency in: Deps.AWSConfig names aws.Config, so
-// constructing a Deps at all pulls the SDK in; and google.go exports the ADC
-// helpers that internal/instancelocate wires into the Composer lookup, which is
-// a second door into the same chain. Moving those is the next change. What this
-// one buys is that the decision has somewhere to live, and that a build without
-// a provider refuses by name instead of behaving as though it had one.
-
+// In internal/instances/awsauth and internal/instances/googleauth, one door
+// each, and this package names neither. That is the saving: a program that
+// imports the core to read links carries no vendor chain, and the two doors are
+// separate packages so wanting Composer does not buy MWAA.
+//
+// TestTheAuthDoorsStayOptional in internal/archlint holds it, transitively.
+// The property is invisible when broken — a core type that merely mentions
+// aws.Config puts the whole chain back with nothing failing — so it is asserted
+// rather than described. It has been broken twice already: once by
+// Deps.AWSConfig, and once by internal/instancelocate reaching three Google
+// helpers through a package that also held MWAA.
+//
 // A CredentialProvider builds the credential source for one auth method, plus
 // the refresh hook to install alongside it (nil when the credential cannot go
 // stale mid-run).
