@@ -155,6 +155,12 @@ func mwaaTransportFor(t *testing.T, stub *awsStub, d Deps) airflowapi.Transport 
 	if d.AWSConfig == nil {
 		d.AWSConfig = stubAWSConfig(t, stub.URL)
 	}
+	// These tests are about the door itself, so they carry the build that has
+	// it. A Deps with no providers is refused before the door is reached, which
+	// is the behavior TestAnUnsupportedMethodIsRefusedBeforeAnyLookup covers.
+	if d.Providers == nil {
+		d.Providers = CloudProviders()
+	}
 	transport, err := i.Transport(context.Background(), d)
 	if err != nil {
 		t.Fatalf("transport: %v", err)
@@ -373,6 +379,7 @@ func TestMWAAPassesOnAnErrorThatIsNotARefusal(t *testing.T) {
 func TestMWAANamesAMissingCredentialChain(t *testing.T) {
 	i := link(t, mwaaLink)
 	_, err := i.Transport(context.Background(), Deps{
+		Providers: CloudProviders(),
 		AWSConfig: func(context.Context, string) (aws.Config, error) {
 			return aws.Config{
 				Region:      "us-west-2",
@@ -404,6 +411,7 @@ func TestMWAANamesAMissingRegion(t *testing.T) {
 	// come from the AWS chain — and here it does not.
 	i := link(t, "\n[tool.astro.deployments.prod]\ntarget = 'mwaa'\nenvironment = 'orders-prod'\n")
 	_, err := i.Transport(context.Background(), Deps{
+		Providers: CloudProviders(),
 		AWSConfig: func(context.Context, string) (aws.Config, error) { return aws.Config{}, nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "AWS_REGION") {
@@ -420,6 +428,7 @@ func TestMWAATakesTheRegionFromTheManifest(t *testing.T) {
 	asked := ""
 	i := link(t, mwaaLink)
 	if _, err := i.Transport(context.Background(), Deps{
+		Providers: CloudProviders(),
 		AWSConfig: func(_ context.Context, region string) (aws.Config, error) {
 			asked = region
 			return aws.Config{Region: region, Credentials: awscreds.NewStaticCredentialsProvider("A", "B", "")}, nil

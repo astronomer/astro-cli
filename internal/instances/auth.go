@@ -24,7 +24,7 @@ const EnvAPIToken = "ASTRO_API_TOKEN" //nolint:gosec // the name of a variable, 
 // credentials builds the credential source for an instance, and the refresh
 // hook to install with it (nil when the credential cannot go stale mid-run).
 // baseURL is the resolved location, which the local mint needs.
-func credentials(i Instance, baseURL string, d Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
+func credentials(ctx context.Context, i Instance, baseURL string, d Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
 	if i.Kind == KindLocal {
 		return localCredentials(i, baseURL, d)
 	}
@@ -53,16 +53,16 @@ func credentials(i Instance, baseURL string, d Deps) (airflowapi.CredentialSourc
 		}
 		return airflowapi.BasicAuth(username, password), nil, nil
 	case manifest.AuthGoogle:
-		source, refresh := googleCredentials(d)
-		return source, refresh, nil
+		return d.viaProvider(ctx, i, baseURL, manifest.AuthGoogle)
 	case manifest.AuthAirflowToken:
 		return airflowTokenCredentials(i, baseURL, d)
 	case manifest.AuthExec:
 		return execCredentials(i)
 	case manifest.AuthAWS:
-		// The AWS door is not a credential on an HTTP request at all, so it
-		// never reaches here: Instance.Transport dispatches on the method
-		// before any credential is built.
+		// Not a credential on an HTTP request at all, so it never reaches
+		// here: Transport dispatches on the method before a credential is
+		// built. Kept as a refusal rather than a fallthrough so the two paths
+		// cannot quietly disagree about which door a method uses.
 		return nil, nil, fmt.Errorf("deployment %q proves itself to the AWS API rather than to an Airflow URL", i.Name)
 	}
 	return nil, nil, fmt.Errorf("deployment %q declares no auth method", i.Name)

@@ -76,6 +76,7 @@ func TestTransportAsksTheLocatorForACoordinateLink(t *testing.T) {
 
 	asked := ""
 	transport, err := i.Transport(context.Background(), Deps{
+		Providers:  CloudProviders(),
 		LookupEnv:  env(map[string]string{EnvAPIToken: "ci-token"}),
 		HTTPClient: server.Client(),
 		Locator: locatorFunc(func(_ context.Context, in Instance) (string, error) {
@@ -105,6 +106,7 @@ func TestTransportDispatchesOnTheAuthMethod(t *testing.T) {
 	// A locator is wired and still never asked: there is no URL in this door.
 	asked := false
 	transport, err := i.Transport(context.Background(), Deps{
+		Providers: CloudProviders(),
 		LookupEnv: env(nil),
 		AWSConfig: stubAWSConfig(t, "https://unused"),
 		Locator: locatorFunc(func(context.Context, Instance) (string, error) {

@@ -253,7 +253,7 @@ func TestMWAATellsASlowChainFromAnEmptyOne(t *testing.T) {
 	i := link(t, mwaaLink)
 	shortCredentialTimeout(t)
 	slow := &slowPreflight{delay: 2 * awsCredentialTimeout}
-	_, err := i.Transport(context.Background(), Deps{AWSConfig: slow.config})
+	_, err := i.Transport(context.Background(), Deps{AWSConfig: slow.config, Providers: CloudProviders()})
 	if err == nil {
 		t.Fatal("a chain that never answered resolved")
 	}

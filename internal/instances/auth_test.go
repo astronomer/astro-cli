@@ -55,7 +55,7 @@ func header(t *testing.T, src airflowapi.CredentialSource) string {
 
 func TestTokenMethodReadsItsEnvVar(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }\n")
-	src, _, err := credentials(i, i.URL, Deps{LookupEnv: env(map[string]string{"STAGING_AIRFLOW_TOKEN": "s3cr3t"})})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"STAGING_AIRFLOW_TOKEN": "s3cr3t"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestTokenMethodReadsItsEnvVar(t *testing.T) {
 
 func TestMissingCredentialNamesTheVariableAndTheFix(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }\n")
-	_, _, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+	_, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 	if err == nil {
 		t.Fatal("a missing credential resolved")
 	}
@@ -78,14 +78,14 @@ func TestMissingCredentialNamesTheVariableAndTheFix(t *testing.T) {
 
 	// Exported but empty is the same miss: sending an empty credential would
 	// only turn a half-finished setup into an unexplained 401.
-	if _, _, err := credentials(i, i.URL, Deps{LookupEnv: env(map[string]string{"STAGING_AIRFLOW_TOKEN": ""})}); err == nil {
+	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"STAGING_AIRFLOW_TOKEN": ""})}); err == nil {
 		t.Fatal("an empty credential resolved")
 	}
 }
 
 func TestBasicMethodReadsBothVariables(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.legacy]\nurl = 'https://airflow.corp.dev'\nauth = { method = 'basic', username-env = 'AF_USER', password-env = 'AF_PASS' }\n")
-	src, _, err := credentials(i, i.URL, Deps{LookupEnv: env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"})})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestBasicMethodReadsBothVariables(t *testing.T) {
 
 	// Half the pair set is the same missing-value report, naming the half that
 	// is absent.
-	_, _, err = credentials(i, i.URL, Deps{LookupEnv: env(map[string]string{"AF_USER": "ada"})})
+	_, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"AF_USER": "ada"})})
 	if err == nil || !strings.Contains(err.Error(), "AF_PASS") {
 		t.Fatalf("err = %v, want one naming AF_PASS", err)
 	}
@@ -104,7 +104,7 @@ func TestBasicMethodReadsBothVariables(t *testing.T) {
 
 func TestNoneMethodSendsNothing(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.open]\nurl = 'http://airflow.dev.corp'\nauth = { method = 'none' }\n")
-	src, _, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestAstroMethodPrefersTheAPITokenThenTheSession(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
 
 	// CI: the API token stands in for a login on the machine.
-	src, _, err := credentials(i, "", Deps{LookupEnv: env(map[string]string{EnvAPIToken: "ci-token"})})
+	src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: env(map[string]string{EnvAPIToken: "ci-token"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestAstroMethodPrefersTheAPITokenThenTheSession(t *testing.T) {
 	}
 
 	// A machine with a login: the session's bearer.
-	src, _, err = credentials(i, "", Deps{
+	src, _, err = credentials(context.Background(), i, "", Deps{
 		LookupEnv: env(nil),
 		Session:   func(context.Context) (string, error) { return "session-token", nil },
 	})
@@ -142,7 +142,7 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
 
 	// No session wired at all reads as logged out, and says how to fix it.
-	src, _, err := credentials(i, "", Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	}
 
 	// A session that fails travels as its own named cause, not a stack trace.
-	src, _, err = credentials(i, "", Deps{
+	src, _, err = credentials(context.Background(), i, "", Deps{
 		LookupEnv: env(nil),
 		Session: func(context.Context) (string, error) {
 			return "", errors.New("your session expired — log in again with `astro login`")
@@ -168,9 +168,10 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 
 func TestGoogleMethodCarriesTheADCToken(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.legacy]\nurl = 'https://airflow.internal.corp'\nauth = { method = 'google' }\n")
-	src, _, err := credentials(i, i.URL, Deps{
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{
 		LookupEnv:   env(nil),
 		GoogleToken: func(context.Context) (string, error) { return "ya29.token", nil },
+		Providers:   CloudProviders(),
 	})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
@@ -182,9 +183,10 @@ func TestGoogleMethodCarriesTheADCToken(t *testing.T) {
 
 func TestGoogleMethodNamesTheMissingChain(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ntarget = 'composer'\nenvironment = 'orders-prod'\n")
-	src, _, err := credentials(i, "https://composer.example", Deps{
+	src, _, err := credentials(context.Background(), i, "https://composer.example", Deps{
 		LookupEnv:   env(nil),
 		GoogleToken: func(context.Context) (string, error) { return "", ErrNoGoogleCredentials },
+		Providers:   CloudProviders(),
 	})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
@@ -199,12 +201,12 @@ func TestURLTargetTakesItsCredentialFromTheEnvironment(t *testing.T) {
 	i := URLInstance("https://airflow.corp.dev")
 
 	// Nothing set: nothing sent, so an open dev server just works.
-	src, _, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 	if err != nil || src != nil {
 		t.Fatalf("credentials = %v, %v; want no credential and no error", src, err)
 	}
 
-	src, _, err = credentials(i, i.URL, Deps{LookupEnv: env(map[string]string{EnvToken: "t0k"})})
+	src, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{EnvToken: "t0k"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -213,7 +215,7 @@ func TestURLTargetTakesItsCredentialFromTheEnvironment(t *testing.T) {
 	}
 
 	// Half a username/password pair is always a mistake.
-	_, _, err = credentials(i, i.URL, Deps{LookupEnv: env(map[string]string{EnvUsername: "ada"})})
+	_, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{EnvUsername: "ada"})})
 	if err == nil || !strings.Contains(err.Error(), EnvPassword) {
 		t.Fatalf("err = %v, want one naming %s", err, EnvPassword)
 	}
@@ -270,7 +272,7 @@ func TestLocalMintsWithoutCredentialsOnAirflow3(t *testing.T) {
 
 	project := localProject(t, "3.1")
 	i := Instance{Name: LocalName, Kind: KindLocal, Source: SourceRunning, URL: server.URL, Project: project, AirflowMajor: "3"}
-	src, refresh, err := credentials(i, server.URL, Deps{HTTPClient: server.Client()})
+	src, refresh, err := credentials(context.Background(), i, server.URL, Deps{HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -297,7 +299,7 @@ func TestLocalMintsWithTheAdminAccountOnAirflow2(t *testing.T) {
 
 	project := localProject(t, "2.10.5")
 	i := Instance{Name: LocalName, Kind: KindLocal, Source: SourceRunning, URL: server.URL, Project: project, AirflowMajor: airflow2}
-	src, _, err := credentials(i, server.URL, Deps{HTTPClient: server.Client()})
+	src, _, err := credentials(context.Background(), i, server.URL, Deps{HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -418,7 +420,7 @@ func TestLocalFallsBackToBasicOnAirflow2(t *testing.T) {
 
 	project := localProject(t, "2.10.5")
 	i := Instance{Name: LocalName, Kind: KindLocal, Source: SourceRunning, URL: server.URL, Project: project, AirflowMajor: airflow2}
-	src, _, err := credentials(i, server.URL, Deps{HTTPClient: server.Client()})
+	src, _, err := credentials(context.Background(), i, server.URL, Deps{HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}

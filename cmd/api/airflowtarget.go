@@ -260,6 +260,7 @@ func (o *AirflowOptions) instanceDeps() instances.Deps {
 		Session:    astrosession.Bearer,
 		Locator:    locator,
 		HTTPClient: o.GetHTTPClient(),
+		Providers:  instances.CloudProviders(),
 	}
 	if chain, ok := locator.(instancelocate.GoogleChain); ok {
 		deps.GoogleToken, deps.GoogleAccount = chain.Google()

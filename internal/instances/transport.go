@@ -24,6 +24,10 @@ import (
 // chains are different: their SDKs touch nothing this layer is barred from, so
 // nil means "ask the SDK", and the seam exists only so a test can answer
 // without an account.
+//
+// Those two are also the only methods that need a Provider before any of this
+// is consulted: a build carrying neither refuses them by name instead. See
+// providers.go.
 type Deps struct {
 	// Session hands back the current Astro login's bearer token for the astro
 	// auth method, or an error naming why it cannot — logged out, expired,
@@ -50,6 +54,11 @@ type Deps struct {
 	// SDK's own chain, which is what a real run wants.
 	GoogleToken   func(ctx context.Context) (string, error)
 	GoogleAccount func(ctx context.Context) string
+	// Providers is which auth methods this build can perform beyond the six
+	// that need nothing. The zero value performs only those six, which is
+	// right for a build that talks to neither platform; see providers.go for
+	// why this is a field rather than a registry.
+	Providers Providers
 }
 
 // Locator turns a link's coordinates into an Airflow base URL — an astro
@@ -119,17 +128,21 @@ func (i Instance) TargetString(field string) (string, error) {
 // the request in a signed AWS call with no URL in sight, so it is dispatched
 // before anything looks a URL up.
 func (i Instance) Transport(ctx context.Context, d Deps) (airflowapi.Transport, error) {
-	switch i.authMethod() {
-	case manifest.AuthAWS:
-		return i.mwaaTransport(ctx, d)
-	case manifest.AuthAstro, manifest.AuthGoogle, manifest.AuthBasic, manifest.AuthToken,
-		manifest.AuthAirflowToken, manifest.AuthExec, manifest.AuthNone:
-		return i.httpTransport(ctx, d)
-	default:
-		// The empty method: a local Airflow or a --url target, neither of which
-		// a manifest declares. Both speak HTTP.
-		return i.httpTransport(ctx, d)
+	method := i.authMethod()
+	// Before anything else, including the coordinate lookup below. A build that
+	// cannot perform this method should say so, not fail at whatever the
+	// Locator reaches first — which for a Composer link is a network call, and
+	// which is how an earlier draft of this made the refusal unreachable for
+	// every real Composer deployment.
+	if err := d.checkProvider(i.Name, method); err != nil {
+		return nil, err
 	}
+	if p, ok := d.provider(method); ok && p.Transport != nil {
+		return p.Transport(ctx, i, d)
+	}
+	// Everything else speaks HTTP to an Airflow URL, including the two
+	// instances no manifest declares: a local Airflow and a --url target.
+	return i.httpTransport(ctx, d)
 }
 
 // authMethod is how this instance proves itself: the link's method, or — for
@@ -149,7 +162,7 @@ func (i Instance) httpTransport(ctx context.Context, d Deps) (airflowapi.Transpo
 	if err != nil {
 		return nil, err
 	}
-	creds, refresh, err := credentials(i, baseURL, d)
+	creds, refresh, err := credentials(ctx, i, baseURL, d)
 	if err != nil {
 		return nil, err
 	}
@@ -189,14 +202,19 @@ var ErrNotHTTP = errors.New("this deployment is not reached over HTTP: its reque
 // request, which is the cost of handing it over as a string; one command run is
 // short enough that a token minted at the start is still good at the end.
 func (i Instance) HTTPDoorFor(ctx context.Context, d Deps) (HTTPDoor, error) {
-	if i.authMethod() == manifest.AuthAWS {
+	method := i.authMethod()
+	if method == manifest.AuthAWS {
 		return HTTPDoor{}, ErrNotHTTP
+	}
+	// Before the lookup, for the same reason Transport does it there.
+	if err := d.checkProvider(i.Name, method); err != nil {
+		return HTTPDoor{}, err
 	}
 	baseURL, err := i.baseURL(ctx, d)
 	if err != nil {
 		return HTTPDoor{}, err
 	}
-	creds, _, err := credentials(i, baseURL, d)
+	creds, _, err := credentials(ctx, i, baseURL, d)
 	if err != nil {
 		return HTTPDoor{}, err
 	}

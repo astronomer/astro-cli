@@ -79,7 +79,7 @@ func execInstance(t *testing.T, behavior string, extra ...string) Instance {
 
 func TestExecMethodReadsTheTokenFromStdout(t *testing.T) {
 	i := execInstance(t, "token")
-	src, refresh, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestExecMethodReadsTheTokenFromStdout(t *testing.T) {
 // runs directly, so its arguments arrive as written and no shell touches them.
 func TestExecMethodPassesItsArgumentsThrough(t *testing.T) {
 	i := execInstance(t, "args", "--profile", "prod one")
-	src, _, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestExecMethodNamesEveryWayItCanFail(t *testing.T) {
 	}
 	for _, tc := range cases {
 		i := execInstance(t, tc.behavior)
-		src, _, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+		src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 		if err != nil {
 			t.Fatalf("%s: credentials: %v", tc.behavior, err)
 		}
@@ -146,7 +146,7 @@ func TestExecMethodBoundsAHelperThatHangs(t *testing.T) {
 
 func TestExecMethodHoldsTheTokenUntilRefreshed(t *testing.T) {
 	i := execInstance(t, "token")
-	src, refresh, err := credentials(i, i.URL, Deps{LookupEnv: env(nil)})
+	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestExecMethodHoldsTheTokenUntilRefreshed(t *testing.T) {
 
 func TestExecMethodRefusesAnEmptyCommand(t *testing.T) {
 	i := Instance{Name: "bespoke", Source: SourceManifest, URL: "https://af.corp", Link: execLink(nil)}
-	if _, _, err := credentials(i, i.URL, Deps{}); err == nil {
+	if _, _, err := credentials(context.Background(), i, i.URL, Deps{}); err == nil {
 		t.Fatal("an exec link with no command resolved")
 	}
 }

@@ -1,7 +1,7 @@
 // Package instances answers "which deployment am I acting on?" for every
 // Airflow-facing command. It builds the project's named deployment set from
 // the manifest's links, applies one precedence rule to pick a winner, and
-// opens a pkg/airflowapi transport to it (docs/v2-instances.md).
+// opens a pkg/airflowapi transport to it.
 //
 // The machine's own Airflow is not in that set. It is not a deployment and it
 // never competes for a name: `astro local af dags list` acts on it, spelled that

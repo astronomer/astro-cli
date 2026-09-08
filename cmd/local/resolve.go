@@ -199,7 +199,12 @@ func (c *cli) machineInstance() (instances.Instance, error) {
 // credentials. Two chains would mean a run that finds an environment it cannot
 // then talk to.
 func (c *cli) instanceDeps() instances.Deps {
-	deps := instances.Deps{Session: c.d.Session, Locator: c.d.Locator}
+	// The CLI talks to every platform, so it carries both cloud providers.
+	deps := instances.Deps{
+		Session:   c.d.Session,
+		Locator:   c.d.Locator,
+		Providers: instances.CloudProviders(),
+	}
 	if chain, ok := c.d.Locator.(instancelocate.GoogleChain); ok {
 		deps.GoogleToken, deps.GoogleAccount = chain.Google()
 	}
