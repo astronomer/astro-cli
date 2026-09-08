@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -161,7 +162,7 @@ func TestSymlinkedProjectKeepsItsMachine(t *testing.T) {
 		t.Skipf("no symlinks here: %v", err)
 	}
 	dir := filepath.Join(link, "orders")
-	body := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_abc123'\n" + twoLinkManifest
+	body := instancestest.Preamble + twoLinkManifest
 	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

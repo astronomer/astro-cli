@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -33,7 +34,7 @@ func TestTransportCarriesTheCredentialToTheEndpoint(t *testing.T) {
 	}))
 	defer server.Close()
 
-	m := parseManifest(t, "\n[tool.astro.deployments.staging]\nurl = '"+server.URL+"'\nauth = { method = 'token', token-env = 'AF_TOKEN' }\n")
+	m := instancestest.Manifest(t, "\n[tool.astro.deployments.staging]\nurl = '"+server.URL+"'\nauth = { method = 'token', token-env = 'AF_TOKEN' }\n")
 	set := Build(m)
 	sel, err := set.Select(Request{})
 	if err != nil {
@@ -43,7 +44,7 @@ func TestTransportCarriesTheCredentialToTheEndpoint(t *testing.T) {
 		t.Fatalf("selected %s from %s, want staging from the default link", sel.Instance.Name, sel.From)
 	}
 	transport, err := sel.Instance.Transport(context.Background(),
-		Deps{LookupEnv: env(map[string]string{"AF_TOKEN": "s3cr3t"}), HTTPClient: server.Client()})
+		Deps{LookupEnv: instancestest.Env(map[string]string{"AF_TOKEN": "s3cr3t"}), HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatalf("transport: %v", err)
 	}
@@ -60,7 +61,7 @@ func TestTransportAsksTheLocatorForACoordinateLink(t *testing.T) {
 
 	// Nothing wired: the message names the missing lookup rather than failing
 	// obscurely.
-	_, err := i.Transport(context.Background(), Deps{LookupEnv: env(nil)})
+	_, err := i.Transport(context.Background(), Deps{LookupEnv: instancestest.Env(nil)})
 	if err == nil || !strings.Contains(err.Error(), "no lookup is wired") {
 		t.Fatalf("err = %v, want the unwired-lookup message", err)
 	}
@@ -77,7 +78,7 @@ func TestTransportAsksTheLocatorForACoordinateLink(t *testing.T) {
 
 	asked := ""
 	transport, err := i.Transport(context.Background(), Deps{
-		LookupEnv:  env(map[string]string{EnvAPIToken: "ci-token"}),
+		LookupEnv:  instancestest.Env(map[string]string{EnvAPIToken: "ci-token"}),
 		HTTPClient: server.Client(),
 		Locator: locatorFunc(func(_ context.Context, in Instance) (string, error) {
 			asked = in.Link.Deployment
@@ -113,7 +114,7 @@ func TestTransportDispatchesOnTheAuthMethod(t *testing.T) {
 				return door, nil
 			},
 		}},
-		LookupEnv: env(nil),
+		LookupEnv: instancestest.Env(nil),
 		Locator: locatorFunc(func(context.Context, Instance) (string, error) {
 			asked = true
 			return "https://never", nil
@@ -142,7 +143,7 @@ func TestTransportRefusesALocalRecordWithNoPort(t *testing.T) {
 // own requests, so it needs the two things a Transport hides.
 func TestHTTPDoorForHandsBackTheURLAndTheCredential(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'STAGING_TOKEN' }\n")
-	door, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: env(map[string]string{"STAGING_TOKEN": "abc123"})})
+	door, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: instancestest.Env(map[string]string{"STAGING_TOKEN": "abc123"})})
 	if err != nil {
 		t.Fatalf("door: %v", err)
 	}
@@ -157,7 +158,7 @@ func TestHTTPDoorForHandsBackTheURLAndTheCredential(t *testing.T) {
 // An Airflow that wants no credential is a real answer, not a missing one.
 func TestHTTPDoorForSendsNothingWhenNothingIsNeeded(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.open]\nurl = 'https://airflow.corp.dev'\nauth = { method = 'none' }\n")
-	door, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: env(nil)})
+	door, err := i.HTTPDoorFor(context.Background(), Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil {
 		t.Fatalf("door: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestHTTPDoorForRefusesTheAWSDoor(t *testing.T) {
 	// hears that it cannot reach the deployment at all, which is the more
 	// useful thing and is covered in providers_test.go.
 	d := Deps{
-		LookupEnv: env(nil),
+		LookupEnv: instancestest.Env(nil),
 		Providers: Providers{manifest.AuthAWS: {
 			Transport: func(context.Context, Instance, Deps) (airflowapi.Transport, error) {
 				return stubTransport{}, nil

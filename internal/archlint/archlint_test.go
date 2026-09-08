@@ -351,15 +351,18 @@ var expensiveSDKs = []string{
 func TestTheAuthDoorsStayOptional(t *testing.T) {
 	// The core reaches no door and no chain: it is what a consumer imports to
 	// read links, and reading links must cost nothing.
-	for _, dep := range deps(t, modulePrefix+"pkg/instances") {
+	// The whole module, not the one package: instancestest is a non-test
+	// package in it and is the obvious home for a future shared helper, so a
+	// door import from there has to be caught by this rule too.
+	for _, dep := range deps(t, modulePrefix+"pkg/instances/...") {
 		for _, door := range authDoors {
 			if dep == door {
-				t.Errorf("pkg/instances reaches %s: every consumer of the core would carry that door's SDK", dep)
+				t.Errorf("the pkg/instances module reaches %s: every consumer of the core would carry that door's SDK", dep)
 			}
 		}
 		for _, sdk := range expensiveSDKs {
 			if strings.HasPrefix(dep, sdk) {
-				t.Errorf("pkg/instances reaches %s: that chain belongs behind an auth door", dep)
+				t.Errorf("the pkg/instances module reaches %s: that chain belongs behind an auth door", dep)
 			}
 		}
 	}

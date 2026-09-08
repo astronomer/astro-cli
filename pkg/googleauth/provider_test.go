@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -66,31 +66,6 @@ func TestAMissingChainReachesTheCaller(t *testing.T) {
 // as the manifest a user would write.
 func link(t *testing.T, body string) instances.Instance {
 	t.Helper()
-	m, err := manifest.Parse([]byte("[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_abc123'\n" + body))
-	if err != nil {
-		t.Fatalf("parse manifest: %v", err)
-	}
-	set := instances.Build(m)
-	all := set.All()
-	if len(all) != 1 {
-		t.Fatalf("expected one link, got %v", set.Names())
-	}
-	return all[0]
-}
-
-// header runs a credential source and returns the Authorization header it would
-// produce, which is what actually matters about it.
-func header(t *testing.T, src airflowapi.CredentialSource) string {
-	t.Helper()
-	if src == nil {
-		return ""
-	}
-	scheme, value, err := src(context.Background())
-	if err != nil {
-		t.Fatalf("credentials: %v", err)
-	}
-	if scheme == "" {
-		return ""
-	}
-	return scheme + " " + value
+	set := instances.Build(instancestest.Manifest(t, body))
+	return instancestest.OneLink(t, set.All(), set.Names())
 }

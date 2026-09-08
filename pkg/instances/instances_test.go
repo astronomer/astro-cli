@@ -4,20 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
-
-// parseManifest builds a manifest from its real TOML, so the tests see the
-// links exactly as a user's pyproject.toml produces them — kinds and auth
-// defaults included.
-func parseManifest(t *testing.T, body string) *manifest.Manifest {
-	t.Helper()
-	m, err := manifest.Parse([]byte("[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_abc123'\n" + body))
-	if err != nil {
-		t.Fatalf("parse manifest: %v", err)
-	}
-	return m
-}
 
 // fourKinds is one link of every kind the manifest can carry.
 const fourKinds = `
@@ -39,7 +28,7 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 `
 
 func TestBuildCoversEveryLinkKind(t *testing.T) {
-	set := Build(parseManifest(t, fourKinds))
+	set := Build(instancestest.Manifest(t, fourKinds))
 
 	want := map[string]struct {
 		kind  Kind
@@ -76,7 +65,7 @@ func TestBuildCoversEveryLinkKind(t *testing.T) {
 // machine never enters the set, so nothing a top-level command resolves can
 // point at localhost.
 func TestBuildHoldsDeploymentsOnly(t *testing.T) {
-	set := Build(parseManifest(t, twoLinks))
+	set := Build(instancestest.Manifest(t, twoLinks))
 	if _, ok := set.Lookup(LocalName); ok {
 		t.Error("the machine is in the deployment set")
 	}
@@ -110,7 +99,8 @@ func TestLocalInstanceIsBuiltNotResolved(t *testing.T) {
 // package, so the test builds the link from LocalName — if the two ever
 // disagree, this fails rather than leaving a link nobody can address.
 func TestManifestRefusesTheReservedName(t *testing.T) {
-	_, err := manifest.Parse([]byte("[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_abc123'\n\n[tool.astro.deployments." + LocalName + "]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"))
+	_, err := manifest.Parse([]byte(instancestest.Preamble +
+		"\n[tool.astro.deployments." + LocalName + "]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"))
 	if err == nil || !strings.Contains(err.Error(), "reserved") {
 		t.Fatalf("err = %v, want the reserved-name refusal", err)
 	}

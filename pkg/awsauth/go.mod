@@ -5,8 +5,10 @@ go 1.26.1
 // Declared exceptions to the sibling rule (docs/v2-architecture.md): a door
 // implements pkg/instances' Provider, so it names that package's Instance,
 // Deps and Provider types; it returns pkg/airflowapi's Transport and
-// CredentialSource; and its tests use pkg/manifest to build an instance from
-// the TOML a user would write. The dependency runs one way and the core never
+// CredentialSource; and — test-only — it names pkg/manifest's auth method to
+// key itself into a Providers map, and builds its instances through
+// pkg/instances/instancestest, the shared preamble in the module it already
+// requires. The dependency runs one way and the core never
 // imports a door — which is the whole point, since importing this module is
 // what puts the AWS SDK in a binary.
 require (

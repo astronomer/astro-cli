@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 )
 
 // mintStub stands in for an Airflow 3's own /auth/token, recording the body it
@@ -43,13 +45,13 @@ func TestAirflowTokenMintsWithAUsernamePair(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.af3]\nurl = '"+stub.URL+"'\nauth = { method = 'airflow-token', username-env = 'AF_USER', password-env = 'AF_PASS' }\n")
 
 	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{
-		LookupEnv:  env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"}),
+		LookupEnv:  instancestest.Env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"}),
 		HTTPClient: stub.Client(),
 	})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer minted-fab" {
+	if got := instancestest.Header(t, src); got != "Bearer minted-fab" {
 		t.Fatalf("header = %q", got)
 	}
 	if stub.asked["username"] != "ada" || stub.asked["password"] != "hunter2" {
@@ -67,13 +69,13 @@ func TestAirflowTokenMintsWithAClientPair(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.af3]\nurl = '"+stub.URL+"'\nauth = { method = 'airflow-token', client-id-env = 'AF_ID', client-secret-env = 'AF_SECRET' }\n")
 
 	src, _, err := credentials(context.Background(), i, i.URL, Deps{
-		LookupEnv:  env(map[string]string{"AF_ID": "cli", "AF_SECRET": "s3cr3t"}),
+		LookupEnv:  instancestest.Env(map[string]string{"AF_ID": "cli", "AF_SECRET": "s3cr3t"}),
 		HTTPClient: stub.Client(),
 	})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer minted-kc" {
+	if got := instancestest.Header(t, src); got != "Bearer minted-kc" {
 		t.Fatalf("header = %q", got)
 	}
 	if stub.asked["client_id"] != "cli" || stub.asked["client_secret"] != "s3cr3t" {
@@ -86,7 +88,7 @@ func TestAirflowTokenNamesAMissingCredentialVariable(t *testing.T) {
 	for _, missing := range []string{"AF_ID", "AF_SECRET"} {
 		set := map[string]string{"AF_ID": "cli", "AF_SECRET": "s3cr3t"}
 		delete(set, missing)
-		_, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(set)})
+		_, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(set)})
 		if err == nil || !strings.Contains(err.Error(), missing) {
 			t.Errorf("err = %v, want one naming %s", err, missing)
 		}
@@ -99,7 +101,7 @@ func TestAirflowTokenIsHeldForTheRun(t *testing.T) {
 	stub := tokenEndpoint(t, "held")
 	i := link(t, "\n[tool.astro.deployments.af3]\nurl = '"+stub.URL+"'\nauth = { method = 'airflow-token', username-env = 'AF_USER', password-env = 'AF_PASS' }\n")
 	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{
-		LookupEnv:  env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"}),
+		LookupEnv:  instancestest.Env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"}),
 		HTTPClient: stub.Client(),
 	})
 	if err != nil {

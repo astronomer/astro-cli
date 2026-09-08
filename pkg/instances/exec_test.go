@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -85,11 +86,11 @@ func execInstance(t *testing.T, behavior string, extra ...string) Instance {
 
 func TestExecMethodReadsTheTokenFromStdout(t *testing.T) {
 	i := execInstance(t, "token")
-	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer s3cr3t-token" {
+	if got := instancestest.Header(t, src); got != "Bearer s3cr3t-token" {
 		t.Fatalf("header = %q, want the trimmed token", got)
 	}
 	if refresh == nil {
@@ -101,11 +102,11 @@ func TestExecMethodReadsTheTokenFromStdout(t *testing.T) {
 // runs directly, so its arguments arrive as written and no shell touches them.
 func TestExecMethodPassesItsArgumentsThrough(t *testing.T) {
 	i := execInstance(t, "args", "--profile", "prod one")
-	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer --profile|prod one" {
+	if got := instancestest.Header(t, src); got != "Bearer --profile|prod one" {
 		t.Fatalf("header = %q, want the arguments unsplit", got)
 	}
 }
@@ -122,7 +123,7 @@ func TestExecMethodNamesEveryWayItCanFail(t *testing.T) {
 	}
 	for _, tc := range cases {
 		i := execInstance(t, tc.behavior)
-		src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+		src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 		if err != nil {
 			t.Fatalf("%s: credentials: %v", tc.behavior, err)
 		}
@@ -152,7 +153,7 @@ func TestExecMethodBoundsAHelperThatHangs(t *testing.T) {
 
 func TestExecMethodHoldsTheTokenUntilRefreshed(t *testing.T) {
 	i := execInstance(t, "token")
-	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}

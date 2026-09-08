@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 )
 
 // twoLinks is the shape that reaches every layer: a default link and a second
@@ -21,7 +23,7 @@ deployment = 'clm2xk9dq000108l7a2b3c4d6'
 // precedence test only has to say what it passes.
 func fullSet(t *testing.T) Set {
 	t.Helper()
-	return Build(parseManifest(t, twoLinks))
+	return Build(instancestest.Manifest(t, twoLinks))
 }
 
 // TestPrecedence walks the rule one step at a time: each case supplies one
@@ -70,7 +72,7 @@ func TestLocalIsNotASelectableName(t *testing.T) {
 }
 
 func TestLoneLinkIsItsOwnDefault(t *testing.T) {
-	set := Build(parseManifest(t, "\n[tool.astro.deployments.only]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"))
+	set := Build(instancestest.Manifest(t, "\n[tool.astro.deployments.only]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n"))
 	sel, err := set.Select(Request{})
 	if err != nil {
 		t.Fatalf("select: %v", err)
@@ -111,7 +113,7 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 
 func TestAmbiguousNamesEveryWayToDecide(t *testing.T) {
 	// Two links, neither marked default: the fall-through.
-	set := Build(parseManifest(t, `
+	set := Build(instancestest.Manifest(t, `
 [tool.astro.deployments.dev]
 deployment = 'clm2xk9dq000108l7a2b3c4d5'
 
@@ -141,7 +143,7 @@ deployment = 'clm2xk9dq000108l7a2b3c4d6'
 // deployment one — the split's whole promise is that neither world is reached
 // by accident, so neither may be hidden either.
 func TestNothingToActOnNamesBothSpellings(t *testing.T) {
-	set := Build(parseManifest(t, ""))
+	set := Build(instancestest.Manifest(t, ""))
 	_, err := set.Select(Request{})
 	if !errors.Is(err, ErrNone) {
 		t.Fatalf("select: %v, want ErrNone", err)

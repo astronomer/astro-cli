@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 )
 
 // TestAccountFromADCReadsEveryShapeItCan: the over-long-service-account advice
@@ -101,7 +103,7 @@ func TestTheADCTokenBecomesTheHeader(t *testing.T) {
 	src, _ := googleCredentials(Options{
 		Token: func(context.Context) (string, error) { return "ya29.token", nil },
 	})
-	if got := header(t, src); got != "Bearer ya29.token" {
+	if got := instancestest.Header(t, src); got != "Bearer ya29.token" {
 		t.Fatalf("header = %q, want the ADC token as a bearer", got)
 	}
 }

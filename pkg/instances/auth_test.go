@@ -11,62 +11,32 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 )
-
-// env builds a LookupEnv over a fixed map, so no test touches the process
-// environment.
-func env(pairs map[string]string) func(string) (string, bool) {
-	return func(name string) (string, bool) {
-		v, ok := pairs[name]
-		return v, ok
-	}
-}
 
 // link builds a one-link set and returns that link's instance, so an auth test
 // reads as the manifest a user would write.
 func link(t *testing.T, body string) Instance {
 	t.Helper()
-	set := Build(parseManifest(t, body))
-	all := set.All()
-	if len(all) != 1 {
-		t.Fatalf("expected one link, got %v", set.Names())
-	}
-	return all[0]
-}
-
-// header runs a credential source and returns the Authorization header it
-// would produce, which is what actually matters about it.
-func header(t *testing.T, src airflowapi.CredentialSource) string {
-	t.Helper()
-	if src == nil {
-		return ""
-	}
-	scheme, value, err := src(context.Background())
-	if err != nil {
-		t.Fatalf("credentials: %v", err)
-	}
-	if scheme == "" {
-		return ""
-	}
-	return scheme + " " + value
+	set := Build(instancestest.Manifest(t, body))
+	return instancestest.OneLink(t, set.All(), set.Names())
 }
 
 func TestTokenMethodReadsItsEnvVar(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }\n")
-	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"STAGING_AIRFLOW_TOKEN": "s3cr3t"})})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(map[string]string{"STAGING_AIRFLOW_TOKEN": "s3cr3t"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer s3cr3t" {
+	if got := instancestest.Header(t, src); got != "Bearer s3cr3t" {
 		t.Fatalf("header = %q", got)
 	}
 }
 
 func TestMissingCredentialNamesTheVariableAndTheFix(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.staging]\nurl = 'https://airflow.staging.corp.dev'\nauth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }\n")
-	_, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+	_, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 	if err == nil {
 		t.Fatal("a missing credential resolved")
 	}
@@ -78,25 +48,25 @@ func TestMissingCredentialNamesTheVariableAndTheFix(t *testing.T) {
 
 	// Exported but empty is the same miss: sending an empty credential would
 	// only turn a half-finished setup into an unexplained 401.
-	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"STAGING_AIRFLOW_TOKEN": ""})}); err == nil {
+	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(map[string]string{"STAGING_AIRFLOW_TOKEN": ""})}); err == nil {
 		t.Fatal("an empty credential resolved")
 	}
 }
 
 func TestBasicMethodReadsBothVariables(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.legacy]\nurl = 'https://airflow.corp.dev'\nauth = { method = 'basic', username-env = 'AF_USER', password-env = 'AF_PASS' }\n")
-	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"})})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(map[string]string{"AF_USER": "ada", "AF_PASS": "hunter2"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
 	want := "Basic " + base64.StdEncoding.EncodeToString([]byte("ada:hunter2"))
-	if got := header(t, src); got != want {
+	if got := instancestest.Header(t, src); got != want {
 		t.Fatalf("header = %q, want %q", got, want)
 	}
 
 	// Half the pair set is the same missing-value report, naming the half that
 	// is absent.
-	_, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{"AF_USER": "ada"})})
+	_, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(map[string]string{"AF_USER": "ada"})})
 	if err == nil || !strings.Contains(err.Error(), "AF_PASS") {
 		t.Fatalf("err = %v, want one naming AF_PASS", err)
 	}
@@ -104,7 +74,7 @@ func TestBasicMethodReadsBothVariables(t *testing.T) {
 
 func TestNoneMethodSendsNothing(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.open]\nurl = 'http://airflow.dev.corp'\nauth = { method = 'none' }\n")
-	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -117,23 +87,23 @@ func TestAstroMethodPrefersTheAPITokenThenTheSession(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
 
 	// CI: the API token stands in for a login on the machine.
-	src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: env(map[string]string{EnvAPIToken: "ci-token"})})
+	src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: instancestest.Env(map[string]string{EnvAPIToken: "ci-token"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer ci-token" {
+	if got := instancestest.Header(t, src); got != "Bearer ci-token" {
 		t.Fatalf("header = %q", got)
 	}
 
 	// A machine with a login: the session's bearer.
 	src, _, err = credentials(context.Background(), i, "", Deps{
-		LookupEnv: env(nil),
+		LookupEnv: instancestest.Env(nil),
 		Session:   func(context.Context) (string, error) { return "session-token", nil },
 	})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer session-token" {
+	if got := instancestest.Header(t, src); got != "Bearer session-token" {
 		t.Fatalf("header = %q", got)
 	}
 }
@@ -142,7 +112,7 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
 
 	// No session wired at all reads as logged out, and says how to fix it.
-	src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
@@ -153,7 +123,7 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 
 	// A session that fails travels as its own named cause, not a stack trace.
 	src, _, err = credentials(context.Background(), i, "", Deps{
-		LookupEnv: env(nil),
+		LookupEnv: instancestest.Env(nil),
 		Session: func(context.Context) (string, error) {
 			return "", errors.New("your session expired — log in again with `astro login`")
 		},
@@ -170,21 +140,21 @@ func TestURLTargetTakesItsCredentialFromTheEnvironment(t *testing.T) {
 	i := URLInstance("https://airflow.corp.dev")
 
 	// Nothing set: nothing sent, so an open dev server just works.
-	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)})
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)})
 	if err != nil || src != nil {
 		t.Fatalf("credentials = %v, %v; want no credential and no error", src, err)
 	}
 
-	src, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{EnvToken: "t0k"})})
+	src, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(map[string]string{EnvToken: "t0k"})})
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if got := header(t, src); got != "Bearer t0k" {
+	if got := instancestest.Header(t, src); got != "Bearer t0k" {
 		t.Fatalf("header = %q", got)
 	}
 
 	// Half a username/password pair is always a mistake.
-	_, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(map[string]string{EnvUsername: "ada"})})
+	_, _, err = credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(map[string]string{EnvUsername: "ada"})})
 	if err == nil || !strings.Contains(err.Error(), EnvPassword) {
 		t.Fatalf("err = %v, want one naming %s", err, EnvPassword)
 	}
@@ -195,7 +165,7 @@ func TestURLTargetTakesItsCredentialFromTheEnvironment(t *testing.T) {
 func localProject(t *testing.T, airflowVersion string) string {
 	t.Helper()
 	dir := t.TempDir()
-	body := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '" + airflowVersion + "'\n"
+	body := instancestest.PreambleFor(airflowVersion)
 	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -245,8 +215,8 @@ func TestLocalMintsWithoutCredentialsOnAirflow3(t *testing.T) {
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if header(t, src) != "Bearer minted" {
-		t.Fatalf("header = %q, want the minted token", header(t, src))
+	if got := instancestest.Header(t, src); got != "Bearer minted" {
+		t.Fatalf("header = %q, want the minted token", got)
 	}
 	if got.method != http.MethodGet || got.username != "" {
 		t.Fatalf("minted with %s %s/%s, want a credential-less GET", got.method, got.username, got.password)
@@ -272,8 +242,8 @@ func TestLocalMintsWithTheAdminAccountOnAirflow2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("credentials: %v", err)
 	}
-	if header(t, src) != "Bearer minted" {
-		t.Fatalf("header = %q", header(t, src))
+	if got := instancestest.Header(t, src); got != "Bearer minted" {
+		t.Fatalf("header = %q", got)
 	}
 	if got.method != http.MethodPost || got.username != localUsername || got.password != localPassword {
 		t.Fatalf("minted with %s %s/%s, want a POST as %s", got.method, got.username, got.password, localUsername)
@@ -394,7 +364,7 @@ func TestLocalFallsBackToBasicOnAirflow2(t *testing.T) {
 		t.Fatalf("credentials: %v", err)
 	}
 	want := "Basic " + base64.StdEncoding.EncodeToString([]byte(localUsername+":"+localPassword))
-	if got := header(t, src); got != want {
+	if got := instancestest.Header(t, src); got != want {
 		t.Fatalf("header = %q, want %q", got, want)
 	}
 }

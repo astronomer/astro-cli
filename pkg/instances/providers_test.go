@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -137,7 +138,7 @@ func TestTheSixCheapMethodsNeedNoProvider(t *testing.T) {
 		t.Run(string(tc.method), func(t *testing.T) {
 			i := link(t, "\n[tool.astro.deployments.oss]\nurl = '"+url+"'\nauth = "+tc.auth+"\n")
 			d := tc.deps
-			d.LookupEnv = env(tc.env)
+			d.LookupEnv = instancestest.Env(tc.env)
 			// Deliberately no Providers.
 			if _, _, err := credentials(context.Background(), i, url, d); err != nil {
 				t.Errorf("%s needed a provider: %v", tc.method, err)
@@ -160,7 +161,7 @@ func TestAProviderThatOffersNoCredentialIsRefused(t *testing.T) {
 			return nil, nil, nil
 		},
 	}}
-	_, _, err := credentials(context.Background(), i, i.URL, Deps{Providers: empty, LookupEnv: env(nil)})
+	_, _, err := credentials(context.Background(), i, i.URL, Deps{Providers: empty, LookupEnv: instancestest.Env(nil)})
 	if err == nil {
 		t.Fatal("accepted a provider that offered no credential")
 	}
@@ -182,10 +183,10 @@ func TestTwoBuildsCanDisagreeInOneProcess(t *testing.T) {
 			return func(context.Context) (string, string, error) { return "Bearer", "ya29.token", nil }, nil, nil
 		},
 	}}
-	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil), Providers: carrying}); err != nil {
+	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil), Providers: carrying}); err != nil {
 		t.Fatalf("the carrying build failed: %v", err)
 	}
-	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: env(nil)}); err == nil {
+	if _, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: instancestest.Env(nil)}); err == nil {
 		t.Error("the build carrying nothing resolved it anyway")
 	}
 }
