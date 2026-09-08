@@ -33,7 +33,7 @@ import (
 //
 // # Where the implementations live
 //
-// In internal/instances/awsauth and internal/instances/googleauth, one door
+// In pkg/awsauth and pkg/googleauth, one door
 // each, and this package names neither. That is the saving: a program that
 // imports the core to read links carries no vendor chain, and the two doors are
 // separate packages so wanting Composer does not buy MWAA.

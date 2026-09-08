@@ -14,12 +14,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/instancelocate"
-	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/instances/awsauth"
-	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/awsauth"
+	"github.com/astronomer/astro-cli/pkg/googleauth"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -52,7 +52,7 @@ func (c *cli) deploymentSet() (projectDir string, set instances.Set, err error) 
 //
 // Every path is canonicalized here, at the boundary, because identity is a
 // filesystem question: a record written from /private/tmp/x and a command run
-// from /tmp/x are the same project, and internal/instances compares the strings
+// from /tmp/x are the same project, and pkg/instances compares the strings
 // it is given rather than touching the disk itself.
 func (c *cli) runningLocals() ([]instances.Local, error) {
 	statuses, err := c.d.Runtime.List()

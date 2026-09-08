@@ -58,7 +58,7 @@ var ErrNoCredentials = errors.New("no Google credentials — run `gcloud auth ap
 // wall, and Composer is only where it turns up most.
 const maxComposerAccountLength = 64
 
-// GoogleAccountAdvice is the fix for a service account whose email is too long
+// AccountAdvice is the fix for a service account whose email is too long
 // for Composer's Airflow to register, or the empty string when the account is
 // not one. It reads as a sentence continuing a 403: the caller supplies the
 // refusal, this supplies the cause.
@@ -127,7 +127,7 @@ func (o Options) googleAccount(ctx context.Context) string {
 	return defaultADC.account(ctx)
 }
 
-// GoogleAccessToken is an Application Default Credentials access token from
+// AccessToken is an Application Default Credentials access token from
 // the machine's own chain. It is exported because the Composer URL lookup
 // needs the same token the Airflow calls after it carry, and one
 // implementation means one place a missing chain is named.
@@ -135,7 +135,7 @@ func AccessToken(ctx context.Context) (string, error) {
 	return defaultADC.token(ctx)
 }
 
-// GoogleAccount is the principal the machine's Application Default Credentials
+// Account is the principal the machine's Application Default Credentials
 // speak for — a service account's email when the credentials name one, empty
 // for a user login, which has no such limit to run into. It is what makes the
 // over-long-service-account failure identifiable rather than guessed at.

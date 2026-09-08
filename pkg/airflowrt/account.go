@@ -17,7 +17,7 @@ package airflowrt
 //
 // Standalone anywhere else is NOT a writer: `airflow standalone` generates its
 // own password into standalone_admin_password.txt. A reader may fall back to
-// this pair when that file is missing or blank (internal/instances), which is a
+// this pair when that file is missing or blank (pkg/instances), which is a
 // fallback and not a guarantee — code that sends this pair unconditionally to a
 // non-macOS standalone Airflow 2 will 401. An earlier version of this comment
 // called that third case a writer, which is exactly the mistake that produces

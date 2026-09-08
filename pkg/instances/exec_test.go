@@ -38,13 +38,19 @@ func TestExecHelperProcess(t *testing.T) {
 		fmt.Fprintln(os.Stdout, "warning: your session expires soon")
 	case "fail":
 		fmt.Fprintln(os.Stderr, "acme-airflow-token: no SSO session")
-		os.Exit(3) //nolint:forbidigo // the helper is a program, not a test: it exits with the code the case is about
+		// The helper is a program, not a test: it exits with the code the case
+		// is about. forbidigo does not reach a pkg/* module's own lint run —
+		// archlint walks the tree and is the guard for these — so this needs no
+		// directive, and one here would be reported as unused.
+		os.Exit(3)
 	case "hang":
 		time.Sleep(time.Minute)
 	case "args":
 		fmt.Fprintln(os.Stdout, strings.Join(flag.Args(), "|"))
 	}
-	os.Exit(0) //nolint:forbidigo // exiting here is what keeps the testing package from printing over the helper's stdout
+	// Exiting here is what keeps the testing package from printing over the
+	// helper's stdout. See the note above on why no directive.
+	os.Exit(0)
 }
 
 // helperArgv is the argv that runs this test binary as the auth helper. The

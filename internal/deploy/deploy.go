@@ -459,7 +459,7 @@ const (
 	// deploymentEnvVar is the ephemeral layer of the query commands' rule,
 	// named here so the non-interactive refusal tells the reader what deploy is
 	// deliberately ignoring. It is spelled out rather than imported because
-	// internal/instances is the resolver deploy does not use.
+	// pkg/instances is the resolver deploy does not use.
 	deploymentEnvVar = "ASTRO_DEPLOYMENT"
 )
 

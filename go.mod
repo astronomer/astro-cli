@@ -48,10 +48,6 @@ require (
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/secrets v0.0.0
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
-	github.com/aws/aws-sdk-go-v2 v1.42.1
-	github.com/aws/aws-sdk-go-v2/config v1.32.17
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.16
-	github.com/aws/aws-sdk-go-v2/service/mwaa v1.41.7
 	github.com/compose-spec/compose-go/v2 v2.9.1
 	github.com/distribution/reference v0.6.0
 	github.com/fatih/camelcase v1.0.0
@@ -73,7 +69,6 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/mod v0.35.0
-	golang.org/x/oauth2 v0.36.0
 	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -85,12 +80,16 @@ require (
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.42.1 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.16 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.24 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.23 // indirect
+	github.com/aws/aws-sdk-go-v2/service/mwaa v1.41.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.11 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.21 // indirect
@@ -217,6 +216,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260406210006-6f92a3bedf2d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d // indirect
@@ -236,6 +236,9 @@ require (
 	github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29 // indirect
 	github.com/Microsoft/hcsshim v0.14.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/astronomer/astro-cli/pkg/awsauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/googleauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/instances v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/scaffold v0.0.0-00010101000000-000000000000
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -346,3 +349,9 @@ replace github.com/astronomer/astro-cli/pkg/airflowenv => ./pkg/airflowenv
 replace github.com/astronomer/astro-cli/pkg/airflowapi => ./pkg/airflowapi
 
 replace github.com/astronomer/astro-cli/pkg/scaffold => ./pkg/scaffold
+
+replace github.com/astronomer/astro-cli/pkg/instances => ./pkg/instances
+
+replace github.com/astronomer/astro-cli/pkg/awsauth => ./pkg/awsauth
+
+replace github.com/astronomer/astro-cli/pkg/googleauth => ./pkg/googleauth

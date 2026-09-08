@@ -1,4 +1,4 @@
-// Package instancelocate answers the one question internal/instances cannot
+// Package instancelocate answers the one question pkg/instances cannot
 // answer for itself: where does a link's Airflow actually live?
 //
 // A link carries coordinates, not an address. An astro link names a Deployment
@@ -9,10 +9,10 @@
 // the other.
 //
 // It is its own package because of the layer rules (docs/v2-architecture.md):
-// internal/instances and cmd/local may not import config/ or the cloud
+// pkg/instances and cmd/local may not import config/ or the cloud
 // clients, and this does both. internal/astrosession and internal/emenv sit
 // outside the same list for the same reason. The command tree wires this into
-// instances.Deps at its composition root; internal/instances sees only the
+// instances.Deps at its composition root; pkg/instances sees only the
 // Locator interface.
 //
 // Nothing here prints. Every failure is a named outage — logged out, expired,
@@ -28,9 +28,9 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
-	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/googleauth"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // Deployments is the one control-plane call this package makes.
@@ -70,7 +70,7 @@ type locator struct {
 	// for the Composer lookup, and googleAccount names the principal those
 	// credentials speak for — which is what makes Composer's
 	// over-long-service-account refusal identifiable rather than guessed at.
-	// Both are handed on to internal/instances as its own seams, so the lookup
+	// Both are handed on to pkg/instances as its own seams, so the lookup
 	// and the Airflow calls after it are answered by the same chain.
 	googleToken   func(ctx context.Context) (string, error)
 	googleAccount func(ctx context.Context) string
@@ -94,7 +94,7 @@ func New(deployments Deployments) instances.Locator {
 
 // GoogleChain is implemented by a locator that resolves Application Default
 // Credentials. The composition root asks for it so it can hand
-// internal/instances the same chain the Composer lookup used, rather than
+// pkg/instances the same chain the Composer lookup used, rather than
 // letting the two halves of one command ask two different ones — a run that
 // finds an environment it then cannot talk to is the failure that would cause.
 //

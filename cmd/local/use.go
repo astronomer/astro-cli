@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // NewUseCmd builds `astro use` for the root, wired with its own deps.

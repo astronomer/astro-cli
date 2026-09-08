@@ -114,7 +114,7 @@ linters:
       # Keep this list in sync with v2BelowCmd and v2ConfigReaders in
       # internal/archlint/archlint_test.go when a new internal/ v2 package lands.
       - linters: [forbidigo]
-        path-except: ^internal/(astrosession|checks|deploy|emenv|envresolve|instancelocate|instances|localenv|pack|plan|project|userstate|vaultenv)/
+        path-except: ^internal/(astrosession|checks|deploy|emenv|envresolve|instancelocate|localenv|pack|plan|project|userstate|vaultenv)/
       - linters:
           - dupl
           - errcheck
@@ -139,7 +139,7 @@ linters:
       # v2 composition root; the name now holds the v1 Astro
       # tree, which gets no v2 exemption.
       - linters: [gocritic]
-        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack)|pkg/airflowapi)
+        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack)|pkg/(airflowapi|instances|awsauth|googleauth))
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

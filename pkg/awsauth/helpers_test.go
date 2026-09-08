@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// The two helpers this package's tests share with internal/instances'.
+// The helper this package's tests share with pkg/instances'.
 //
 // Copied rather than shared: a helper package existing only so two test suites
 // can build an Instance from TOML would be a third thing to keep in step with
@@ -30,23 +30,6 @@ func link(t *testing.T, body string) instances.Instance {
 		t.Fatalf("expected one link, got %v", set.Names())
 	}
 	return all[0]
-}
-
-// header runs a credential source and returns the Authorization header it would
-// produce, which is what actually matters about it.
-func header(t *testing.T, src airflowapi.CredentialSource) string {
-	t.Helper()
-	if src == nil {
-		return ""
-	}
-	scheme, value, err := src(context.Background())
-	if err != nil {
-		t.Fatalf("credentials: %v", err)
-	}
-	if scheme == "" {
-		return ""
-	}
-	return scheme + " " + value
 }
 
 // transportVia resolves through the core's dispatch with this door wired, which

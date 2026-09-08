@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/googleauth"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // cloudManifest is the inventory a team on three clouds commits: an Astro

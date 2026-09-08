@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/instances/googleauth"
+	"github.com/astronomer/astro-cli/pkg/googleauth"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // The Composer API is called over plain REST rather than through

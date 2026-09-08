@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/instances"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 

@@ -11,13 +11,13 @@ import (
 	astrocontext "github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
-	"github.com/astronomer/astro-cli/internal/instances"
-	"github.com/astronomer/astro-cli/internal/instances/awsauth"
-	"github.com/astronomer/astro-cli/internal/instances/googleauth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/awsauth"
+	"github.com/astronomer/astro-cli/pkg/googleauth"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -28,7 +28,7 @@ import (
 // version probe and token mint. It now shares the one the query commands use
 // (docs/v2-instances.md): -d/--deployment names a deployment link the project's
 // manifest declares, --url reaches an Airflow no project declares, and both
-// resolve through internal/instances, so an MWAA, Composer, or token-minting
+// resolve through pkg/instances, so an MWAA, Composer, or token-minting
 // Airflow is reachable here for free. The old flags stay as deprecated aliases
 // for one release.
 //
@@ -215,7 +215,7 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 // bearerHeader makes a whole Authorization header value out of the session
 // token, which the config stores with its scheme on some machines and without
 // it on others. Astro takes a bearer either way — this is the same normalizing
-// internal/instances does for the same token.
+// pkg/instances does for the same token.
 func bearerHeader(token string) string {
 	if token == "" || strings.Contains(token, " ") {
 		return token

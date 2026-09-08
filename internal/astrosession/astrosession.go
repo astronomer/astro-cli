@@ -51,7 +51,7 @@ func Credential(stored string) string {
 // Bearer returns the current identity's token exactly as it is stored, scheme
 // and all: airflowapi.BearerToken normalizes that away, and a second
 // implementation of the same trimming here is one more place for the two to
-// disagree. It matches the seam internal/instances takes for the astro auth
+// disagree. It matches the seam pkg/instances takes for the astro auth
 // method, context and all, though nothing about reading the local config
 // blocks.
 //

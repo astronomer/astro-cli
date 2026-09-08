@@ -80,13 +80,19 @@ type Instance struct {
 	// table. Zero for the machine's Airflow.
 	Link manifest.Link
 	// TargetConfig is the link's [tool.astro.targets.<target>] section, plain
-	// data as the manifest carries it. It travels with the instance because a
+	// data as the manifest carries it, copied rather than shared. It travels with the instance because a
 	// link names only its environment: which region that MWAA environment is
 	// in, and which project and location that Composer environment is in, are
 	// facts about the backend rather than the link, and the resolver needs
 	// both halves to reach the Airflow. Read it through TargetString. Nil for a
-	// link whose target declares no section, and read-only — it is the
-	// manifest's own map rather than a copy of it.
+	// link whose target declares no section.
+	//
+	// A copy, not the manifest's own map. It used to be the map itself, with a
+	// doc comment asking callers not to write to it — a convention this repo's
+	// review could hold when the package was internal. Published, the consumer
+	// is another repo: one write would reach every other reader of a manifest
+	// that a long-lived process parses once and shares, and every instance
+	// built from the same target.
 	TargetConfig map[string]any
 	// Project is the project root of a local Airflow, empty for a manifest
 	// link.
@@ -170,7 +176,7 @@ func Build(m *manifest.Manifest) Set {
 			Where:        linkWhere(link),
 			URL:          link.URL,
 			Link:         link,
-			TargetConfig: m.Astro.Targets[link.Target],
+			TargetConfig: copyTarget(m.Astro.Targets[link.Target]),
 		})
 	}
 	// Sorted, because a map's order is not one, and every rendering below is
@@ -224,4 +230,17 @@ func linkWhere(d manifest.Link) string {
 		return d.URL
 	}
 	return ""
+}
+
+// copyTarget copies a target section so an instance cannot reach back into the
+// parsed manifest. Nil in, nil out: a target declaring no section has none.
+func copyTarget(section map[string]any) map[string]any {
+	if section == nil {
+		return nil
+	}
+	out := make(map[string]any, len(section))
+	for k, v := range section {
+		out[k] = v
+	}
+	return out
 }

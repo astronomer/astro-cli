@@ -16,10 +16,10 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
-	"github.com/astronomer/astro-cli/internal/instances"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 

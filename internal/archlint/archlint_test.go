@@ -34,7 +34,6 @@ var v2BelowCmd = []string{
 	"internal/checks",
 	"internal/deploy",
 	"internal/envresolve",
-	"internal/instances",
 	"internal/localenv",
 	"internal/pack",
 	"internal/plan",
@@ -42,11 +41,14 @@ var v2BelowCmd = []string{
 	"internal/userstate",
 	"internal/vaultenv",
 	"pkg/airflowapi",
+	"pkg/awsauth",
 	"pkg/airflowenv",
 	"pkg/connmodel",
 	"pkg/envschema",
+	"pkg/googleauth",
 	"pkg/fsatomic",
 	"pkg/imagebuild",
+	"pkg/instances",
 	"pkg/localrt",
 	"pkg/manifest",
 	"pkg/scaffold",
@@ -309,14 +311,14 @@ func TestV2PackagesNeverImportConfigOrV1Cmd(t *testing.T) {
 // authDoors are the packages that carry an expensive auth chain. Each exists so
 // a consumer can decline it.
 var authDoors = []string{
-	modulePrefix + "internal/instances/awsauth",
-	modulePrefix + "internal/instances/googleauth",
+	modulePrefix + "pkg/awsauth",
+	modulePrefix + "pkg/googleauth",
 }
 
 // expensiveSDKs are the chains the doors exist to make optional, by import
 // prefix — a direct import would bypass the door rule above.
 //
-// Deliberately not "anything outside this module": internal/instances
+// Deliberately not "anything outside this module": pkg/instances
 // legitimately reaches a TOML parser through pkg/manifest, so a purity rule
 // would be false here on day one. This is a cost guard, and these are the cost:
 // against a core that links 5.1MB, Google's chain adds about 1.9MB and AWS's
@@ -349,15 +351,15 @@ var expensiveSDKs = []string{
 func TestTheAuthDoorsStayOptional(t *testing.T) {
 	// The core reaches no door and no chain: it is what a consumer imports to
 	// read links, and reading links must cost nothing.
-	for _, dep := range deps(t, modulePrefix+"internal/instances") {
+	for _, dep := range deps(t, modulePrefix+"pkg/instances") {
 		for _, door := range authDoors {
 			if dep == door {
-				t.Errorf("internal/instances reaches %s: every consumer of the core would carry that door's SDK", dep)
+				t.Errorf("pkg/instances reaches %s: every consumer of the core would carry that door's SDK", dep)
 			}
 		}
 		for _, sdk := range expensiveSDKs {
 			if strings.HasPrefix(dep, sdk) {
-				t.Errorf("internal/instances reaches %s: that chain belongs behind an auth door", dep)
+				t.Errorf("pkg/instances reaches %s: that chain belongs behind an auth door", dep)
 			}
 		}
 	}
@@ -367,7 +369,7 @@ func TestTheAuthDoorsStayOptional(t *testing.T) {
 	// the case that split the doors apart: it wanted three Google helpers and
 	// was linking eighty-eight AWS packages to get them.
 	for _, dep := range deps(t, modulePrefix+"internal/instancelocate") {
-		if dep == modulePrefix+"internal/instances/awsauth" || strings.HasPrefix(dep, "github.com/aws/") {
+		if dep == modulePrefix+"pkg/awsauth" || strings.HasPrefix(dep, "github.com/aws/") {
 			t.Errorf("internal/instancelocate reaches %s: the Composer lookup must not carry MWAA's SDK", dep)
 		}
 	}

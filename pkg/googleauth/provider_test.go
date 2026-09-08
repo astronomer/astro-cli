@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 

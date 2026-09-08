@@ -6,8 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 
-	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // Options are the seams the door resolves through. The zero value asks the AWS
@@ -37,13 +37,20 @@ type Options struct {
 func Provider(o Options) instances.Provider {
 	return instances.Provider{
 		Transport: func(ctx context.Context, i instances.Instance, d instances.Deps) (airflowapi.Transport, error) {
+			// A copy per call, never the captured value. A closure captures the
+			// variable rather than a snapshot, so assigning to o here would
+			// latch the first caller's client for the life of this Provider and
+			// race between concurrent calls — invisible in a CLI that rebuilds
+			// Deps per command, and exactly wrong in a long-lived process that
+			// builds one provider set and serves concurrent requests from it.
+			opts := o
 			// The caller's client, when this option does not override it. The
 			// door used to read it straight off Deps, and dropping that made
 			// Deps.HTTPClient silently stop reaching the web-login exchange.
-			if o.HTTPClient == nil {
-				o.HTTPClient = d.HTTPClient
+			if opts.HTTPClient == nil {
+				opts.HTTPClient = d.HTTPClient
 			}
-			return mwaaTransport(ctx, i, o)
+			return mwaaTransport(ctx, i, opts)
 		},
 	}
 }

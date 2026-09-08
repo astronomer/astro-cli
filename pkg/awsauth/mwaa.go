@@ -32,8 +32,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/mwaa/document"
 	mwaatypes "github.com/aws/aws-sdk-go-v2/service/mwaa/types"
 
-	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // There are two ways into an MWAA environment. This file takes the first:

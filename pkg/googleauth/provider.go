@@ -3,8 +3,8 @@ package googleauth
 import (
 	"context"
 
-	"github.com/astronomer/astro-cli/internal/instances"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // Options are the seams the door resolves through. The zero value asks Google's
