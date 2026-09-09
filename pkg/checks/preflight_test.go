@@ -225,3 +225,23 @@ func TestRequirementSetDropsProjectAirflow(t *testing.T) {
 		t.Errorf("providers must survive dropAirflow: %q", joined)
 	}
 }
+
+// A consumer with nowhere to stream notes passes nil progress, and Preflight
+// promises never to return an error — so it must not panic on one either.
+// Astro Desktop is the first such caller: it has no text renderer.
+//
+// The MWAA path is the one that matters: mwaaConstraints calls progress
+// unconditionally, so this reaches the deref rather than short-circuiting.
+func TestPreflightToleratesANilProgress(t *testing.T) {
+	prov := &fakeProvisioner{python: "scratch-python"}
+	parser := &fakeTargetParser{}
+	rep := Preflight(context.Background(), TargetMWAA, PreflightInput{
+		ProjectPath: "proj", Pin: "2.10.5", Deps: []string{"requests"},
+	}, prov, parser, false, nil)
+	if rep.Target != TargetMWAA {
+		t.Errorf("target = %q, want %q", rep.Target, TargetMWAA)
+	}
+	if rep.OpError != "" {
+		t.Errorf("OpError = %q, want none", rep.OpError)
+	}
+}

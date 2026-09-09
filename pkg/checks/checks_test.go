@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -107,12 +108,60 @@ func TestRunPassesDagsDirToParser(t *testing.T) {
 		got = in
 		return ParseReport{}, nil
 	})
-	_, err := Run(context.Background(), Options{ProjectPath: "/proj"}, capture)
+	// A relative project path with no separator in it. The assertion below has
+	// to build the expected dags dir with filepath.Join — Run derives it that
+	// way, so a hardcoded "/proj/dags" asserts a separator only Unix uses — and
+	// a Join argument that already contains one is its own lint finding.
+	// Nothing here needs the path to be absolute.
+	_, err := Run(context.Background(), Options{ProjectPath: "proj"}, capture)
 	require.NoError(t, err)
-	assert.Equal(t, "/proj", got.ProjectPath)
-	assert.Equal(t, "/proj/dags", got.DagsDir)
+	assert.Equal(t, "proj", got.ProjectPath)
+	// Stdlib rather than DefaultDagsDir, so the expectation restates the intent
+	// — the project path plus a dags child — instead of re-running the code
+	// under test.
+	assert.Equal(t, filepath.Join("proj", "dags"), got.DagsDir)
 }
 
 type parserFunc func(context.Context, ParseInput) (ParseReport, error)
 
 func (f parserFunc) Parse(ctx context.Context, in ParseInput) (ParseReport, error) { return f(ctx, in) }
+
+// A run that could not perform a check does not report clean.
+//
+// dagbag_stats is an Airflow implementation detail and two checks derive from
+// it. Without this signal an empty Files slice is indistinguishable from a
+// project with nothing wrong, so a checker that stopped checking passes.
+func TestFilesUnavailableIsReportedRatherThanPassingClean(t *testing.T) {
+	res, err := Run(context.Background(), Options{ProjectPath: "proj"}, &fakeParser{
+		report: ParseReport{
+			Dags:             []ReportDag{{DagID: "a", File: "dags/a.py"}},
+			FilesUnavailable: true,
+		},
+	})
+	require.NoError(t, err)
+
+	require.Len(t, res.Findings, 1)
+	assert.Equal(t, KindChecksIncomplete, res.Findings[0].Kind)
+	assert.Equal(t, SeverityWarning, res.Findings[0].Severity)
+	assert.Contains(t, res.Findings[0].Message, "did not run")
+	assert.Equal(t, 1, res.Warnings)
+	assert.Equal(t, 0, res.Errors)
+
+	// A warning, so an ordinary run still passes — nothing is known to be
+	// wrong. Under --strict it fails, which is what strict is for.
+	assert.True(t, res.Passed(false))
+	assert.False(t, res.Passed(true))
+}
+
+// The ordinary case stays silent: a project with per-file stats and nothing
+// wrong reports no findings at all.
+func TestFilesAvailableAddsNoIncompleteFinding(t *testing.T) {
+	res, err := Run(context.Background(), Options{ProjectPath: "proj"}, &fakeParser{
+		report: ParseReport{
+			Dags:  []ReportDag{{DagID: "a", File: "dags/a.py"}},
+			Files: []ReportFile{{File: "dags/a.py", ParseSeconds: 0.2, DagIDs: []string{"a"}}},
+		},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, res.Findings)
+}

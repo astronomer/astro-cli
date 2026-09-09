@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/internal/checks"
 	projectpkg "github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -268,6 +268,11 @@ func findingDetail(f checks.Finding) string {
 		return "defined in " + strings.Join(f.Files, ", ")
 	case checks.KindSlowParse:
 		return fmt.Sprintf("parsed in %.1fs (threshold %.0fs)", f.ParseSeconds, f.ThresholdSeconds)
+	case checks.KindChecksIncomplete:
+		// The whole finding is its message: it names checks that did not run,
+		// so there is no file or dag_id to point at and the LOCATION column
+		// stays empty.
+		return f.Message
 	default:
 		return f.Message
 	}

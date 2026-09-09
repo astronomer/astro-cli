@@ -74,8 +74,8 @@ func pinsAirflow(deps []string) bool {
 
 // distName extracts and normalizes the distribution name from a PEP 508
 // requirement: the leading name, before any extras, version, marker, or URL.
-// Mirrors internal/checks.distName, internal/pack.distName and
-// internal/imagebuild.distName; the four stay separate rather than couple
+// Mirrors pkg/checks.distName, internal/pack.distName and
+// pkg/imagebuild.distName; the four stay separate rather than couple
 // these packages over one small helper.
 func distName(req string) string {
 	s := strings.TrimSpace(req)

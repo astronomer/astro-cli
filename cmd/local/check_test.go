@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/internal/checks"
+	"github.com/astronomer/astro-cli/pkg/checks"
 )
 
 // stubParser is the check seam under test: it returns a canned report (or

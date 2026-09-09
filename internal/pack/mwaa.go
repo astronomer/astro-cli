@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/internal/platformversions"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/platformversions"
 )
 
 // MWAATarget builds the artifact Amazon MWAA consumes: a directory laid out as

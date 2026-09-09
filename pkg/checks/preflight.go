@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/astronomer/astro-cli/internal/platformversions"
+	"github.com/astronomer/astro-cli/pkg/platformversions"
 )
 
 // Target names a platform a pre-flight check can run against. astro is the
@@ -23,6 +23,11 @@ const (
 )
 
 // KnownTarget reports whether name is a target this package checks.
+// Astro is a known target and is NOT checked by Preflight: it has no platform
+// version table to check a pin against, so Run is what validates it. A caller
+// routing on this has to send TargetAstro to Run and the rest to Preflight,
+// which is what cmd/local/check.go does. Preflight refuses TargetAstro by name
+// rather than reporting it as unknown.
 func KnownTarget(name string) bool {
 	switch name {
 	case TargetAstro, TargetMWAA, TargetComposer:
@@ -156,8 +161,20 @@ func (r *TargetReport) ExitCode(strict bool) int {
 // reports each target and still picks a single exit code. progress receives
 // human notes for the text renderer to stream.
 func Preflight(ctx context.Context, target string, in PreflightInput, prov Provisioner, parser TargetParser, strict bool, progress func(string)) TargetReport {
+	// A consumer with nowhere to stream notes passes nil, and this function
+	// promises never to return an error — so it must not panic on one either.
+	// Astro Desktop is the first such caller: it has no text renderer.
+	if progress == nil {
+		progress = func(string) {}
+	}
 	rep := TargetReport{Target: target}
 
+	// Named separately from an unknown target: astro IS known (KnownTarget says
+	// so) and is checked by Run instead, so reporting it as unknown would send
+	// a caller looking for a typo that is not there.
+	if target == TargetAstro {
+		return TargetReport{Target: target, OpError: fmt.Sprintf("target %q is checked by Run, not Preflight: it has no platform version table to check a pin against", target)}
+	}
 	supported, ok := supportedVersions(target)
 	if !ok {
 		rep.OpError = fmt.Sprintf("unknown target %q", target)
@@ -286,8 +303,9 @@ func dropAirflow(deps []string) []string {
 
 // distName extracts and normalizes the distribution name from a PEP 508
 // requirement: the leading name, before any extras, version, marker, or URL.
-// Mirrors internal/pack.distName and internal/imagebuild.distName; the three
-// stay separate rather than couple these packages over one small helper.
+// Mirrors internal/pack.distName, pkg/scaffold.distName and
+// pkg/imagebuild.distName; the four stay separate rather than couple these
+// packages over one small helper.
 func distName(req string) string {
 	s := strings.TrimSpace(req)
 	if i := strings.IndexAny(s, "[ \t<>=!~;@("); i >= 0 {

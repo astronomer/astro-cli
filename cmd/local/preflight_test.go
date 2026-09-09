@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/internal/checks"
+	"github.com/astronomer/astro-cli/pkg/checks"
 )
 
 func TestProvisionerKeyIsStableAndSpecific(t *testing.T) {

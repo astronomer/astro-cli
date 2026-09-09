@@ -13,7 +13,7 @@
 # source file has "\n".
 *.tmpl                          text eol=lf
 airflow/include/**              text eol=lf
-internal/checks/**.py           text eol=lf
+pkg/checks/**.py                text eol=lf
 pkg/airflowrt/include/**        text eol=lf
 pkg/airflowrt/standalone_scripts/** text eol=lf
 pkg/localrt/internal/localdocker/*.tmpl text eol=lf

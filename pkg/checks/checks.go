@@ -62,6 +62,10 @@ const (
 	KindImportError    Kind = "import_error"
 	KindDuplicateDagID Kind = "duplicate_dag_id"
 	KindSlowParse      Kind = "slow_parse"
+	// KindChecksIncomplete reports that a check could not run, as opposed to
+	// running and finding nothing. Without it a checker that stopped checking
+	// is indistinguishable from a clean project.
+	KindChecksIncomplete Kind = "checks_incomplete"
 )
 
 // Finding is one thing the check noticed about one DAG or file. It is the unit
@@ -156,6 +160,17 @@ func evaluate(report ParseReport) Result {
 			Severity: SeverityError,
 			File:     ie.File,
 			Message:  ie.Message,
+		})
+	}
+
+	// Reported before the checks that depend on it, so the reason their
+	// findings are absent reads ahead of their absence. A warning, not an
+	// error: nothing is known to be wrong, which is exactly the problem.
+	if report.FilesUnavailable {
+		res.Findings = append(res.Findings, Finding{
+			Kind:     KindChecksIncomplete,
+			Severity: SeverityWarning,
+			Message:  "Airflow reported no per-file statistics, so the duplicate dag_id and slow-parse checks did not run",
 		})
 	}
 

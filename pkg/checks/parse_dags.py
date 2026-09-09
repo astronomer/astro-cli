@@ -1,4 +1,4 @@
-# Embedded by internal/checks and run with the project's own .venv Python
+# Embedded by pkg/checks and run with the project's own .venv Python
 # (`python - <project_root> <dags_dir>`, program on stdin). It builds one
 # Airflow DagBag and writes a single JSON object with the result: per-DAG
 # import errors, the loaded DAG inventory, and per-file parse times. No
@@ -147,7 +147,7 @@ def main():
         if path and path not in sys.path:
             sys.path.insert(0, path)
 
-    result = {"schema_version": 1, "dags": [], "import_errors": [], "files": []}
+    result = {"schema_version": 1, "dags": [], "import_errors": [], "files": [], "files_unavailable": False}
 
     logging.disable(logging.CRITICAL)
     try:
@@ -172,7 +172,19 @@ def main():
     for dag_id, dag in dagbag.dags.items():
         result["dags"].append({"dag_id": dag_id, "file": rel(getattr(dag, "fileloc", ""))})
 
-    for stat in getattr(dagbag, "dagbag_stats", None) or []:
+    # dagbag_stats is an Airflow implementation detail, not API, and two of the
+    # three checks are derived from it: duplicate dag_ids and slow parses. If it
+    # ever goes away, `getattr(..., None) or []` would report an empty list,
+    # both checks would find nothing, and the run would pass as clean — a
+    # checker reporting success because it stopped checking.
+    #
+    # So say which happened. Absent means unavailable outright; empty while DAGs
+    # loaded means it stopped reporting, since a DagBag with dags has files.
+    # Empty with no dags is a project with no DAGs, which is not a fault.
+    stats = getattr(dagbag, "dagbag_stats", None)
+    if stats is None or (not stats and dagbag.dags):
+        result["files_unavailable"] = True
+    for stat in stats or []:
         result["files"].append(
             {
                 "file": rel(getattr(stat, "file", "")),

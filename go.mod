@@ -39,6 +39,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/airflowenv v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/checks v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/container v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/envschema v0.0.0-00010101000000-000000000000
@@ -241,6 +242,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/instancelocate v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/instances v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/platformversions v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/scaffold v0.0.0-00010101000000-000000000000
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
@@ -343,7 +345,11 @@ replace github.com/astronomer/astro-cli/pkg/envschema => ./pkg/envschema
 
 replace github.com/astronomer/astro-cli/pkg/secrets => ./pkg/secrets
 
+replace github.com/astronomer/astro-cli/pkg/checks => ./pkg/checks
+
 replace github.com/astronomer/astro-cli/pkg/connmodel => ./pkg/connmodel
+
+replace github.com/astronomer/astro-cli/pkg/platformversions => ./pkg/platformversions
 
 replace github.com/astronomer/astro-cli/pkg/airflowenv => ./pkg/airflowenv
 

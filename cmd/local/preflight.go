@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/checks"
+	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )

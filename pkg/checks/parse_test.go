@@ -170,3 +170,22 @@ func hasEnvPrefix(env []string, prefix string) bool {
 	}
 	return false
 }
+
+// The script's files_unavailable reaches the report. It is the only way the Go
+// side can tell "no per-file stats" from "no DAG files".
+func TestParseDecodesFilesUnavailable(t *testing.T) {
+	ex := &fakeExec{stdout: []byte(`{"schema_version":1,"dags":[{"dag_id":"a","file":"dags/a.py"}],"import_errors":[],"files":[],"files_unavailable":true}`)}
+	r := runnerWithPython(t, ex)
+
+	report, err := r.Parse(context.Background(), ParseInput{ProjectPath: "proj", DagsDir: "dags"})
+	require.NoError(t, err)
+	assert.True(t, report.FilesUnavailable)
+	assert.Empty(t, report.Files)
+
+	// And absent means false rather than unknown, so an older-shaped payload
+	// reads as "stats were fine".
+	ex2 := &fakeExec{stdout: []byte(`{"schema_version":1,"dags":[],"import_errors":[],"files":[]}`)}
+	report2, err := runnerWithPython(t, ex2).Parse(context.Background(), ParseInput{ProjectPath: "proj", DagsDir: "dags"})
+	require.NoError(t, err)
+	assert.False(t, report2.FilesUnavailable)
+}

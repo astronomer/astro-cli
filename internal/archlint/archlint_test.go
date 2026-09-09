@@ -32,7 +32,6 @@ const modulePrefix = "github.com/astronomer/astro-cli/"
 // exiting are review-blocking. Extend as v2 packages land (internal/plan,
 // ...).
 var v2BelowCmd = []string{
-	"internal/checks",
 	"internal/deploy",
 	"internal/envresolve",
 	"internal/localenv",
@@ -44,6 +43,7 @@ var v2BelowCmd = []string{
 	"pkg/airflowapi",
 	"pkg/awsauth",
 	"pkg/airflowenv",
+	"pkg/checks",
 	"pkg/connmodel",
 	"pkg/envschema",
 	"pkg/googleauth",
@@ -53,6 +53,7 @@ var v2BelowCmd = []string{
 	"pkg/instances",
 	"pkg/localrt",
 	"pkg/manifest",
+	"pkg/platformversions",
 	"pkg/scaffold",
 	"pkg/secrets",
 }
@@ -74,7 +75,6 @@ var v2ConfigReaders = []string{
 var v1Internal = []string{
 	"internal/archlint",
 	"internal/otto",
-	"internal/platformversions",
 	"internal/telemetry",
 	// Both control-plane platforms: v1 code that prints and reads config/,
 	// moved under internal/ without being rewritten. The subtree form says
@@ -395,6 +395,57 @@ func TestTheAuthDoorsStayOptional(t *testing.T) {
 				t.Errorf("%s reaches %s: one GET for one field does not earn a generated client, "+
 					"which brings grpc and protobuf with it", pkg, dep)
 			}
+		}
+	}
+}
+
+// Every module we lint to v2 standards is also held to the no-print rule.
+//
+// The gap this closes: accountablePackages walks `internal` only, so while this
+// package lived at internal/checks, deleting its v2BelowCmd entry failed
+// TestEveryInternalPackageIsAccountedFor. Promoted to pkg/checks, deleting the
+// entry silently disabled TestV2PackagesBelowCmdNeverPrintOrExit for it and no
+// test objected — and forbidigo cannot backstop it, since .golangci.yml anchors
+// that rule at ^internal/.
+//
+// LINT_SUBMODULES is the right set to tie this to: it is exactly the list of
+// sub-modules we have decided to hold to v2 lint standards, so a module joining
+// it and not the no-print rule is an oversight rather than a decision.
+//
+// Deliberately NOT "every pkg/ directory": there are twenty-one that name no
+// rule, most of them v1 helpers that print by design (ansi, printutil,
+// spinner). Classifying those is worth doing and is its own change — six real
+// v2 sub-modules are among them (airflowrt, astroauth, container, proxy,
+// telemetry, uv).
+func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
+	root := repoRoot(t)
+	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatalf("read Makefile: %v", err)
+	}
+	var line string
+	for _, l := range strings.Split(string(makefile), "\n") {
+		if strings.HasPrefix(l, "LINT_SUBMODULES=") {
+			line = strings.TrimPrefix(l, "LINT_SUBMODULES=")
+			break
+		}
+	}
+	if line == "" {
+		t.Fatal("no LINT_SUBMODULES in the Makefile: this test reads it to know which modules are held to v2 lint standards")
+	}
+	registered := make(map[string]bool, len(v2BelowCmd))
+	for _, p := range v2BelowCmd {
+		registered[p] = true
+	}
+	mods := strings.Fields(line)
+	if len(mods) == 0 {
+		t.Fatal("LINT_SUBMODULES is empty")
+	}
+	for _, m := range mods {
+		if !registered[m] {
+			t.Errorf("%s is in LINT_SUBMODULES but not in v2BelowCmd, so nothing enforces that it does not print "+
+				"or exit: a root golangci-lint run does not descend into a sub-module, and forbidigo is anchored "+
+				"at ^internal/. Add it to v2BelowCmd", m)
 		}
 	}
 }

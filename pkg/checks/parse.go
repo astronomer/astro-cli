@@ -32,6 +32,10 @@ type ParseReport struct {
 	Dags         []ReportDag       `json:"dags"`
 	ImportErrors []ReportImportErr `json:"import_errors"`
 	Files        []ReportFile      `json:"files"`
+	// FilesUnavailable reports that Airflow gave no per-file statistics, so
+	// the checks derived from them did not run. Distinct from Files being
+	// empty, which is a project with no DAG files.
+	FilesUnavailable bool `json:"files_unavailable"`
 }
 
 // ReportDag is one DAG that loaded without an import error.
