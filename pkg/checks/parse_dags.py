@@ -166,6 +166,26 @@ def main():
         except (ValueError, TypeError):
             return path
 
+    def stat_file(raw):
+        # dagbag_stats reports each file relative to the DAGs FOLDER, and some
+        # Airflow versions prefix that with a separator. dag.fileloc, which the
+        # inventory above uses, is absolute — so only this one needs rebuilding.
+        #
+        # Without it relpath resolves a relative path against this process's
+        # working directory, which is not the project: the reported path then
+        # depends on who invoked the check and escapes the project entirely from
+        # anywhere else. Even from the project root it silently drops the DAGs
+        # folder, naming a file that is not there.
+        if not raw:
+            return raw
+        if os.path.isabs(raw):
+            # Already absolute, or dags-relative with a leading separator.
+            # Inside the project means it is the real path.
+            if raw.startswith(dags_dir) or raw.startswith(project_root):
+                return raw
+            return os.path.join(dags_dir, raw.lstrip("/\\"))
+        return os.path.join(dags_dir, raw)
+
     for path, message in dagbag.import_errors.items():
         result["import_errors"].append({"file": rel(path), "message": str(message).strip()})
 
@@ -187,7 +207,7 @@ def main():
     for stat in stats or []:
         result["files"].append(
             {
-                "file": rel(getattr(stat, "file", "")),
+                "file": rel(stat_file(getattr(stat, "file", ""))),
                 "parse_time_seconds": parse_seconds(stat),
                 "dag_ids": file_dag_ids(stat),
             }
