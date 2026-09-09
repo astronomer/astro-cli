@@ -8,6 +8,13 @@
 // elsewhere — the login session for one, Application Default Credentials for
 // the other.
 //
+// The Composer lookup itself lives in pkg/instancelocate now, because
+// Astro Desktop needs that half and has its own Deployment lookup for the
+// other. What stays here is the astro half, which reads the control plane
+// through the generated client and the login context — both under internal/,
+// so neither can cross a module boundary — and the switch that routes a kind
+// to its lookup.
+//
 // It is its own package because of the layer rules (docs/v2-architecture.md):
 // pkg/instances and cmd/local may not import config/ or the cloud
 // clients, and this does both. internal/astrosession and internal/emenv sit
@@ -24,12 +31,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/googleauth"
+	pkglocate "github.com/astronomer/astro-cli/pkg/instancelocate"
 	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
@@ -44,10 +51,6 @@ import (
 type Deployments interface {
 	GetDeploymentWithResponse(ctx context.Context, organizationID, deploymentID string, reqEditors ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error)
 }
-
-// lookupTimeout bounds one coordinate lookup. It is a single small GET against
-// a cloud API, and a command should not sit on it.
-const lookupTimeout = 30 * time.Second
 
 // locator resolves a coordinate link's Airflow base URL. Every field is a
 // seam, so the lookups can be driven against stubs with no Astro login and no
@@ -64,7 +67,9 @@ type locator struct {
 	// organization is the org the session is scoped to. Deployments are read
 	// under it, so a session without one cannot look anything up.
 	organization func() (string, error)
-	// httpClient carries the Composer lookup.
+	// httpClient carries the Composer lookup. nil in production, where
+	// pkg/instancelocate supplies one with its own timeout; a test hands in
+	// its stub server's.
 	httpClient *http.Client
 	// googleToken hands back an Application Default Credentials access token
 	// for the Composer lookup, and googleAccount names the principal those
@@ -74,7 +79,9 @@ type locator struct {
 	// and the Airflow calls after it are answered by the same chain.
 	googleToken   func(ctx context.Context) (string, error)
 	googleAccount func(ctx context.Context) string
-	// composerEndpoint is the Composer API base URL.
+	// composerEndpoint points the Composer lookup at a test's own server.
+	// Always empty in production, where pkg/instancelocate supplies the public
+	// API and the timeout that goes with it.
 	composerEndpoint string
 }
 
@@ -82,13 +89,11 @@ type locator struct {
 // holds. It does no I/O: every lookup happens when a command asks for one.
 func New(deployments Deployments) instances.Locator {
 	return &locator{
-		deployments:      deployments,
-		session:          astrosession.Bearer,
-		organization:     currentOrganization,
-		httpClient:       &http.Client{Timeout: lookupTimeout},
-		googleToken:      googleauth.AccessToken,
-		googleAccount:    googleauth.Account,
-		composerEndpoint: composerAPI,
+		deployments:   deployments,
+		session:       astrosession.Bearer,
+		organization:  currentOrganization,
+		googleToken:   googleauth.AccessToken,
+		googleAccount: googleauth.Account,
 	}
 }
 
@@ -117,7 +122,16 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 	case instances.KindAstro:
 		return l.astroBaseURL(ctx, i)
 	case instances.KindComposer:
-		return l.composerBaseURL(ctx, i)
+		// The same chain this hands pkg/instances, so the lookup and the
+		// Airflow calls after it are answered by one set of credentials.
+		return pkglocate.ComposerBaseURL(ctx, i, pkglocate.Options{
+			Google: googleauth.Options{
+				Token:   l.googleToken,
+				Account: l.googleAccount,
+			},
+			HTTPClient: l.httpClient,
+			Endpoint:   l.composerEndpoint,
+		})
 	case instances.KindMWAA:
 		// The AWS API carries the request; there is no URL in that door.
 		return "", fmt.Errorf("an MWAA environment has no Airflow URL to look up: it is reached through the AWS API")

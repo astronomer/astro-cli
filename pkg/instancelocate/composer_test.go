@@ -2,6 +2,7 @@ package instancelocate
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,19 +10,24 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/googleauth"
 	"github.com/astronomer/astro-cli/pkg/instances"
-	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 )
 
-// composerInstance is the link and target section a Composer team commits.
-func composerInstance() instances.Instance {
-	return instances.Instance{
-		Name:         "prod",
-		Kind:         instances.KindComposer,
-		Source:       instances.SourceManifest,
-		Where:        "environment orders-prod",
-		Link:         manifest.Link{Target: "composer", Environment: "orders-prod"},
-		TargetConfig: map[string]any{"project": "acme-data", "location": "us-central1"},
-	}
+// composerInstance is the link and target section a Composer team commits, read
+// through the real parser rather than hand-built, so a test sees exactly what a
+// user's pyproject.toml produces — kinds derived and target section attached.
+func composerInstance(t *testing.T) instances.Instance {
+	t.Helper()
+	set := instances.Build(instancestest.Manifest(t, `
+[tool.astro.targets.composer]
+project = 'acme-data'
+location = 'us-central1'
+
+[tool.astro.deployments.prod]
+environment = 'orders-prod'
+target = 'composer'
+`))
+	return instancestest.OneLink(t, set.All(), set.Names())
 }
 
 // composerStub stands in for the Composer API, recording the request it was
@@ -33,13 +39,21 @@ func composerStub(t *testing.T, handler func(w http.ResponseWriter, r *http.Requ
 	return server
 }
 
-func composerLocator(endpoint string) *locator {
-	return &locator{
-		composerEndpoint: endpoint,
-		httpClient:       &http.Client{Timeout: lookupTimeout},
-		googleToken:      func(context.Context) (string, error) { return "ya29.token", nil },
-		googleAccount:    func(context.Context) string { return "" },
+// composerOptions is the seam set a test resolves through: its own endpoint
+// and a chain that answers without a Google account.
+func composerOptions(endpoint string) Options {
+	return Options{
+		Endpoint: endpoint,
+		Google: googleauth.Options{
+			Token:   func(context.Context) (string, error) { return "ya29.token", nil },
+			Account: func(context.Context) string { return "" },
+		},
 	}
+}
+
+// lookup is the call under test, so a case reads as the one thing it varies.
+func lookup(o Options, i instances.Instance) (string, error) {
+	return ComposerBaseURL(context.Background(), i, o)
 }
 
 func TestComposerLinkResolvesItsAirflowURI(t *testing.T) {
@@ -50,7 +64,7 @@ func TestComposerLinkResolvesItsAirflowURI(t *testing.T) {
 		w.Write([]byte(`{"config":{"airflowUri":"https://abc123-dot-us-central1.composer.googleusercontent.com"}}`))
 	})
 
-	url, err := composerLocator(server.URL).BaseURL(context.Background(), composerInstance())
+	url, err := lookup(composerOptions(server.URL), composerInstance(t))
 	if err != nil {
 		t.Fatalf("BaseURL: %v", err)
 	}
@@ -70,9 +84,9 @@ func TestComposerLinkResolvesItsAirflowURI(t *testing.T) {
 
 func TestComposerLinkNeedsItsProjectAndLocation(t *testing.T) {
 	for _, missing := range []string{"project", "location"} {
-		i := composerInstance()
+		i := composerInstance(t)
 		delete(i.TargetConfig, missing)
-		_, err := composerLocator("http://unused").BaseURL(context.Background(), i)
+		_, err := lookup(composerOptions("http://unused"), i)
 		if err == nil {
 			t.Fatalf("%s missing and the lookup went ahead", missing)
 		}
@@ -85,11 +99,9 @@ func TestComposerLinkNeedsItsProjectAndLocation(t *testing.T) {
 }
 
 func TestComposerLinkNamesTheMissingGoogleChain(t *testing.T) {
-	l := composerLocator("http://unused")
-	l.googleToken = func(context.Context) (string, error) {
-		return "", googleauth.ErrNoCredentials
-	}
-	_, err := l.BaseURL(context.Background(), composerInstance())
+	o := composerOptions("http://unused")
+	o.Google.Token = func(context.Context) (string, error) { return "", googleauth.ErrNoCredentials }
+	_, err := lookup(o, composerInstance(t))
 	if err == nil || !strings.Contains(err.Error(), "gcloud auth application-default login") {
 		t.Fatalf("err = %v, want the ADC message", err)
 	}
@@ -110,7 +122,7 @@ func TestComposerLinkNamesEveryOutage(t *testing.T) {
 			w.WriteHeader(tc.status)
 			w.Write([]byte(`{"error":{"message":"the sky fell"}}`))
 		})
-		_, err := composerLocator(server.URL).BaseURL(context.Background(), composerInstance())
+		_, err := lookup(composerOptions(server.URL), composerInstance(t))
 		if err == nil {
 			t.Fatalf("%d resolved", tc.status)
 		}
@@ -132,9 +144,9 @@ func TestComposerAddsTheLongServiceAccountFixToA403(t *testing.T) {
 	})
 	long := strings.Repeat("o", 45) + "@acme-data.iam.gserviceaccount.com"
 
-	l := composerLocator(server.URL)
-	l.googleAccount = func(context.Context) string { return long }
-	_, err := l.BaseURL(context.Background(), composerInstance())
+	o := composerOptions(server.URL)
+	o.Google.Account = func(context.Context) string { return long }
+	_, err := lookup(o, composerInstance(t))
 	for _, want := range []string{long, "numeric account id", "pre-register"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("err = %v, want the pre-registration fix naming %q", err, want)
@@ -143,11 +155,64 @@ func TestComposerAddsTheLongServiceAccountFixToA403(t *testing.T) {
 
 	// A short service account, and a user login, which has no account at all.
 	for _, fine := range []string{"short@acme-data.iam.gserviceaccount.com", ""} {
-		l.googleAccount = func(context.Context) string { return fine }
-		_, err = l.BaseURL(context.Background(), composerInstance())
+		o.Google.Account = func(context.Context) string { return fine }
+		_, err = lookup(o, composerInstance(t))
 		if err == nil || strings.Contains(err.Error(), "numeric account id") {
 			t.Fatalf("%q: err = %v, want no advice about a length that is fine", fine, err)
 		}
+	}
+}
+
+// The HTTPClient seam is actually used, which nothing asserted: the endpoint
+// and the token seams are both observable through a stub server, so a client
+// that was quietly ignored still produced a passing test. A consumer handing in
+// an instrumented or proxy-bound transport has to know it carries the request.
+func TestTheSuppliedHTTPClientCarriesTheLookup(t *testing.T) {
+	var used int
+	o := composerOptions("http://composer.invalid")
+	o.HTTPClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		used++
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"config":{"airflowUri":"https://from-the-supplied-client"}}`)),
+			Request:    r,
+		}, nil
+	})}
+
+	url, err := lookup(o, composerInstance(t))
+	if err != nil {
+		t.Fatalf("ComposerBaseURL: %v", err)
+	}
+	if used != 1 {
+		t.Errorf("the supplied client carried %d requests, want 1: the lookup used a client of its own", used)
+	}
+	if url != "https://from-the-supplied-client" {
+		t.Errorf("url = %q, want the answer the supplied client gave", url)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A kind this lookup cannot address is refused by name. Without the guard an
+// astro link earns advice about setting `environment` and about a
+// [tool.astro.targets.composer] section it does not have, which reads as the
+// user's mistake rather than the caller's.
+func TestANonComposerKindIsRefusedByName(t *testing.T) {
+	astro := instances.Instance{Name: "prod", Kind: instances.KindAstro}
+	_, err := lookup(composerOptions("http://composer.invalid"), astro)
+	if err == nil {
+		t.Fatal("an astro instance was accepted by the Composer lookup")
+	}
+	for _, want := range []string{"prod", "astro", "Composer"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %v, want it to name %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "tool.astro.targets.composer") {
+		t.Errorf("err = %v: a caller's routing bug must not read as advice to edit the manifest", err)
 	}
 }
 
@@ -156,7 +221,7 @@ func TestComposerReportsAnEnvironmentWithNoURIYet(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"config":{}}`))
 	})
-	_, err := composerLocator(server.URL).BaseURL(context.Background(), composerInstance())
+	_, err := lookup(composerOptions(server.URL), composerInstance(t))
 	if err == nil || !strings.Contains(err.Error(), "still be starting") {
 		t.Fatalf("err = %v, want the not-ready cause", err)
 	}
@@ -164,7 +229,7 @@ func TestComposerReportsAnEnvironmentWithNoURIYet(t *testing.T) {
 
 func TestComposerReportsBeingOffline(t *testing.T) {
 	// A port nothing listens on stands in for a machine with no route out.
-	_, err := composerLocator("http://127.0.0.1:1").BaseURL(context.Background(), composerInstance())
+	_, err := lookup(composerOptions("http://127.0.0.1:1"), composerInstance(t))
 	if err == nil || !strings.Contains(err.Error(), "check your connection") {
 		t.Fatalf("err = %v, want the offline cause", err)
 	}

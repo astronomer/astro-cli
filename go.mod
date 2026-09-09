@@ -238,6 +238,7 @@ require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/astronomer/astro-cli/pkg/awsauth v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/googleauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/instancelocate v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/instances v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/scaffold v0.0.0-00010101000000-000000000000
@@ -349,6 +350,8 @@ replace github.com/astronomer/astro-cli/pkg/airflowenv => ./pkg/airflowenv
 replace github.com/astronomer/astro-cli/pkg/airflowapi => ./pkg/airflowapi
 
 replace github.com/astronomer/astro-cli/pkg/scaffold => ./pkg/scaffold
+
+replace github.com/astronomer/astro-cli/pkg/instancelocate => ./pkg/instancelocate
 
 replace github.com/astronomer/astro-cli/pkg/instances => ./pkg/instances
 

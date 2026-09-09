@@ -1,6 +1,8 @@
 package instances_test
 
 import (
+	"bytes"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -20,9 +22,24 @@ import (
 // its Dependabot alert surface. Asserted here rather than in archlint because
 // archlint lives in the root module and `go list -m all` answers per module.
 func TestTheModuleGraphCarriesNoVendorAuthChain(t *testing.T) {
-	out, err := exec.Command("go", "list", "-m", "all").Output()
+	// GOWORK=off, because `go list -m all` in workspace mode reports the union
+	// of every module in the workspace: with a go.work covering the sibling
+	// sub-modules this reads pkg/awsauth's requires as this module's own and
+	// fails naming the exact regression it exists to prevent. A go.work at the
+	// repo root is an ordinary thing to have in a repo of twenty sub-modules,
+	// and it is not gitignored.
+	//
+	// Stderr is captured, not discarded. An unresolvable require, a missing
+	// go.sum entry and a proxy outage all exit 1, and `%v` on the ExitError
+	// alone renders every one of them as "exit status 1" — which cost a
+	// debugging cycle when this test was first mutated.
+	cmd := exec.Command("go", "list", "-m", "all")
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("go list -m all: %v", err)
+		t.Fatalf("go list -m all: %v: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	forbidden := []string{
 		"github.com/aws/",

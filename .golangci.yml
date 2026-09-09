@@ -137,15 +137,16 @@ linters:
       # v2 tree: Deps and the contract structs (localrt, envresolve Inputs,
       # airflowapi's per-call options, instances.Instance) are passed by value
       # on purpose (docs/v2-architecture.md), so hugeParam does not apply.
-      # `instance` is a prefix: it covers instances and instancelocate. Do not
-      # "fix" it to a plural. `local` used to be one too, covering
+      # `instance` is a prefix in BOTH groups: it covers instances and
+      # instancelocate. Do not "fix" either to a plural.
+      # `local` used to be one too, covering
       # localdocker/localstate/…; those moved into pkg/localrt (its own module,
       # which a root run does not descend into), leaving localenv as the only
       # internal/local* package. cmd/astro was listed here for the short-lived
       # v2 composition root; the name now holds the v1 Astro
       # tree, which gets no v2 exemption.
       - linters: [gocritic]
-        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack)|pkg/(airflowapi|instances|awsauth|googleauth))
+        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack)|pkg/(airflowapi|instance|awsauth|googleauth))
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

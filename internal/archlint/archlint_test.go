@@ -12,6 +12,7 @@
 package archlint
 
 import (
+	"bytes"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -48,6 +49,7 @@ var v2BelowCmd = []string{
 	"pkg/googleauth",
 	"pkg/fsatomic",
 	"pkg/imagebuild",
+	"pkg/instancelocate",
 	"pkg/instances",
 	"pkg/localrt",
 	"pkg/manifest",
@@ -367,25 +369,49 @@ func TestTheAuthDoorsStayOptional(t *testing.T) {
 		}
 	}
 
-	// instancelocate reaches the Google door on purpose — a Composer URL lookup
-	// speaks to Google's own API — so only AWS is out of bounds here. This is
-	// the case that split the doors apart: it wanted three Google helpers and
-	// was linking eighty-eight AWS packages to get them.
-	for _, dep := range deps(t, modulePrefix+"internal/instancelocate") {
-		if dep == modulePrefix+"pkg/awsauth" || strings.HasPrefix(dep, "github.com/aws/") {
-			t.Errorf("internal/instancelocate reaches %s: the Composer lookup must not carry MWAA's SDK", dep)
+	// Both halves of the coordinate lookup reach the Google door on purpose — a
+	// Composer URL lookup speaks to Google's own API — so only AWS is out of
+	// bounds here. This is the case that split the doors apart: it wanted three
+	// Google helpers and was linking eighty-eight AWS packages to get them.
+	//
+	// pkg/instancelocate is the half a consumer outside this repo imports, so it
+	// carries the same rule: Astro Desktop adopts it for Composer and must not
+	// inherit MWAA's SDK by doing so.
+	// The whole module in each case, not the one package: a sub-package is
+	// where a future shared helper lands (pkg/instances grew instancestest
+	// exactly so), and an import from there has to be caught too.
+	//
+	// google.golang.org/api is banned alongside AWS. cloud.google.com and
+	// oauth2/google cannot be — they arrive with the Google door, which is the
+	// declared exception — but the generated client is the one a future
+	// Composer feature is likeliest to reach for, and composer.go's own
+	// comment records declining it. It brings grpc and protobuf with it.
+	for _, pkg := range []string{"internal/instancelocate/...", "pkg/instancelocate/..."} {
+		for _, dep := range deps(t, modulePrefix+pkg) {
+			if dep == modulePrefix+"pkg/awsauth" || strings.HasPrefix(dep, "github.com/aws/") {
+				t.Errorf("%s reaches %s: the Composer lookup must not carry MWAA's SDK", pkg, dep)
+			}
+			if strings.HasPrefix(dep, "google.golang.org/api/") {
+				t.Errorf("%s reaches %s: one GET for one field does not earn a generated client, "+
+					"which brings grpc and protobuf with it", pkg, dep)
+			}
 		}
 	}
 }
 
 // deps lists everything a package links, transitively.
+//
+// Stderr is captured rather than discarded: every way this can fail exits 1,
+// and the ExitError on its own renders all of them as "exit status 1".
 func deps(t *testing.T, pkg string) []string {
 	t.Helper()
 	cmd := exec.Command("go", "list", "-deps", pkg)
 	cmd.Dir = repoRoot(t)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("go list -deps %s: %v", pkg, err)
+		t.Fatalf("go list -deps %s: %v: %s", pkg, err, strings.TrimSpace(stderr.String()))
 	}
 	return strings.Fields(string(out))
 }

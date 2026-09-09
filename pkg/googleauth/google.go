@@ -92,14 +92,14 @@ func AccountAdvice(account string) string {
 // status and the identity behind it are both in hand.
 func googleCredentials(o Options) (source airflowapi.CredentialSource, refresh func(context.Context) error) {
 	source = func(ctx context.Context) (string, string, error) {
-		token, err := o.googleToken(ctx)
+		token, err := o.ResolveToken(ctx)
 		if err != nil {
 			return "", "", err
 		}
 		return airflowapi.BearerToken(token)(ctx)
 	}
 	refresh = func(ctx context.Context) error {
-		if advice := AccountAdvice(o.googleAccount(ctx)); advice != "" {
+		if advice := AccountAdvice(o.ResolveAccount(ctx)); advice != "" {
 			return errors.New(advice)
 		}
 		// Nothing to add. The ADC token source renews on its own, so the retry
@@ -109,18 +109,23 @@ func googleCredentials(o Options) (source airflowapi.CredentialSource, refresh f
 	return source, refresh
 }
 
-// googleToken hands back an ADC access token, through the seam when one is
+// ResolveToken hands back an ADC access token, through the seam when one is
 // wired and from the SDK's own chain otherwise.
-func (o Options) googleToken(ctx context.Context) (string, error) {
+//
+// Exported because a Composer address lookup needs the same answer this door
+// gives, from the same Options value: pkg/instancelocate takes one of these
+// rather than restating its fields, so the lookup and the Airflow calls after
+// it cannot end up on two different chains.
+func (o Options) ResolveToken(ctx context.Context) (string, error) {
 	if o.Token != nil {
 		return o.Token(ctx)
 	}
 	return defaultADC.token(ctx)
 }
 
-// googleAccount names the principal those credentials speak for, through the
+// ResolveAccount names the principal those credentials speak for, through the
 // same seam.
-func (o Options) googleAccount(ctx context.Context) string {
+func (o Options) ResolveAccount(ctx context.Context) string {
 	if o.Account != nil {
 		return o.Account(ctx)
 	}

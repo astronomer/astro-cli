@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -159,6 +160,54 @@ func TestAstroLinkReportsADeploymentWithNoURLYet(t *testing.T) {
 	_, err := l.BaseURL(context.Background(), astroInstance())
 	if err == nil || !strings.Contains(err.Error(), "still be starting") {
 		t.Fatalf("err = %v, want the not-ready cause", err)
+	}
+}
+
+// A Composer link reaches pkg/instancelocate, carrying this locator's seams.
+//
+// The lookup itself moved to that module and its tests went with it, which
+// left this switch's Composer case covered by nothing: delete the case and
+// BaseURL falls through to "cannot look up a composer deployment" with no test
+// objecting. This asserts the routing and that the chain and the endpoint are
+// handed on, which is the part that has to stay true — the lookup and the
+// Airflow calls after it must be answered by one set of credentials.
+func TestComposerLinkReachesThePromotedLookup(t *testing.T) {
+	var gotAuth, gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth, gotPath = r.Header.Get("Authorization"), r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"config":{"airflowUri":"https://composer.example.com"}}`))
+	}))
+	defer server.Close()
+
+	l := &locator{
+		composerEndpoint: server.URL,
+		httpClient:       server.Client(),
+		googleToken:      func(context.Context) (string, error) { return "ya29.from-this-locator", nil },
+		googleAccount:    func(context.Context) string { return "" },
+	}
+	url, err := l.BaseURL(context.Background(), instances.Instance{
+		Name:         "gcp",
+		Kind:         instances.KindComposer,
+		Source:       instances.SourceManifest,
+		Link:         manifest.Link{Target: "composer", Environment: "orders-prod"},
+		TargetConfig: map[string]any{"project": "acme-data", "location": "us-central1"},
+	})
+	if err != nil {
+		t.Fatalf("BaseURL: %v", err)
+	}
+	if url != "https://composer.example.com" {
+		t.Errorf("url = %q, want the Airflow URI the Composer API reported", url)
+	}
+	// Compared, never printed. If the seam stops being handed on, the module
+	// falls back to the machine's real ADC chain, and echoing gotAuth would
+	// write a live access token into the test log.
+	if gotAuth != "Bearer ya29.from-this-locator" {
+		t.Errorf("authorization (%d bytes) is not the chain this locator holds: the lookup and the "+
+			"Airflow calls after it have to be answered by the same credentials", len(gotAuth))
+	}
+	if !strings.Contains(gotPath, "orders-prod") {
+		t.Errorf("path = %q, want the environment the link names", gotPath)
 	}
 }
 
