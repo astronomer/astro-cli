@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,12 +14,24 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 const (
 	CloudPlatform    = "cloud"
 	SoftwarePlatform = "software"
 	PrPreview        = "prprievew"
+
+	// configVersionKey records which schema migrations a config file has been through.
+	// Its absence means the file was written before the CLI stopped serializing its
+	// defaults, and is what licenses the one-time cleanup in migrateHomeConfig.
+	configVersionKey     = "config_version"
+	currentConfigVersion = 1
+
+	// PostgresTagDefault is the postgres image tag new projects are created with, and
+	// PostgresRepositoryDefault the image it is a tag of.
+	PostgresTagDefault        = "15"
+	PostgresRepositoryDefault = "docker.io/postgres"
 
 	localhostDomain = "localhost"
 	cloudDomain     = "cloud"
@@ -68,8 +81,8 @@ var (
 		PostgresPassword:        newCfg("postgres.password", "postgres"),
 		PostgresHost:            newCfg("postgres.host", "postgres"),
 		PostgresPort:            newCfg("postgres.port", "5432"),
-		PostgresRepository:      newCfg("postgres.repository", "docker.io/postgres"),
-		PostgresTag:             newCfg("postgres.tag", "12.6"),
+		PostgresRepository:      newCfg("postgres.repository", PostgresRepositoryDefault),
+		PostgresTag:             newCfg("postgres.tag", PostgresTagDefault),
 		ProjectDeployment:       newCfg("project.deployment", ""),
 		ProjectName:             newCfg("project.name", ""),
 		ProjectWorkspace:        newCfg("project.workspace", ""),
@@ -137,15 +150,11 @@ func initHome(fs afero.Fs) {
 	}
 	viperHome.SetConfigFile(HomeConfigFile)
 
-	for _, cfg := range CFGStrMap {
-		if cfg.Default != "" {
-			viperHome.SetDefault(cfg.Path, cfg.Default)
-		}
-	}
-
 	// If home config does not exist, create it
 	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs)
 	if !homeConfigExists {
+		// Stamped on creation, so a file this version wrote is never rescanned.
+		viperHome.Set(configVersionKey, currentConfigVersion)
 		err := CreateConfig(viperHome, fs, HomeConfigPath, HomeConfigFile)
 		if err != nil {
 			fmt.Printf(configCreateHomeErrorMsg, err)
@@ -158,6 +167,80 @@ func initHome(fs afero.Fs) {
 	if err != nil {
 		fmt.Printf(configReadErrorMsg, err)
 		return
+	}
+
+	migrateHomeConfig(fs)
+}
+
+// supersededDefaults lists values a setting shipped as its default before the current
+// one. A config file written by an older CLI carries the default of its day, so the
+// current value alone is not enough to recognize one.
+var supersededDefaults = map[string][]string{
+	CFG.PostgresTag.Path: {"12.6"},
+}
+
+// migrateHomeConfig runs once against a config file written before the CLI stopped
+// handing its defaults to viper, which serialized them into every file it created.
+// Those entries are indistinguishable from a deliberate choice, so they freeze whatever
+// the default was on the day the file appeared and no later change to a default ever
+// reaches the user.
+//
+// Removing an entry that still matches a shipped default changes nothing about what the
+// CLI does today — the same value comes back from the default — and lets that setting
+// follow the default again. The file is then stamped so this never runs against it a
+// second time, and anything the user sets from here on is theirs for good.
+func migrateHomeConfig(fs afero.Fs) {
+	if !configExists(viperHome) || viperHome.GetInt(configVersionKey) >= currentConfigVersion {
+		return
+	}
+
+	settings := viperHome.AllSettings()
+	for _, cfg := range CFGStrMap {
+		// Only defaults viper was given could have been written out, and it was only
+		// given the non-empty ones.
+		if cfg.Default == "" || !viperHome.IsSet(cfg.Path) {
+			continue
+		}
+		current := viperHome.GetString(cfg.Path)
+		if current == cfg.Default || slices.Contains(supersededDefaults[cfg.Path], current) {
+			deleteNested(settings, cfg.Path)
+		}
+	}
+	settings[configVersionKey] = currentConfigVersion
+
+	stamped := viper.New()
+	stamped.SetFs(fs)
+	if err := stamped.MergeConfigMap(settings); err != nil {
+		logger.Debugf("could not migrate the config file: %s", err)
+		return
+	}
+	if err := saveConfig(stamped, HomeConfigFile); err != nil {
+		// An unwritable config is not worth interrupting the command for; the only
+		// cost is that the migration is attempted again next time.
+		logger.Debugf("could not write the migrated config file: %s", err)
+		return
+	}
+	if err := viperHome.ReadInConfig(); err != nil {
+		logger.Debugf("could not re-read the migrated config file: %s", err)
+	}
+}
+
+// deleteNested removes a dotted key from a settings map, along with any parent left
+// empty by the removal.
+func deleteNested(settings map[string]any, path string) {
+	keys := strings.Split(path, ".")
+	if len(keys) == 1 {
+		delete(settings, keys[0])
+		return
+	}
+
+	child, ok := settings[keys[0]].(map[string]any)
+	if !ok {
+		return
+	}
+	deleteNested(child, strings.Join(keys[1:], "."))
+	if len(child) == 0 {
+		delete(settings, keys[0])
 	}
 }
 

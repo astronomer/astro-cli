@@ -282,7 +282,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	}
 
 	// Determine ports: allocate random ports when proxy is enabled, use config defaults otherwise
-	var portOvr *PortOverrides
+	var ovr *ComposeOverrides
 	var proxyHostname, proxyPort string
 	if useProxy {
 		proxyPort = config.CFG.ProxyPort.GetString()
@@ -319,7 +319,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 				}
 			}
 
-			portOvr = &PortOverrides{
+			ovr = &ComposeOverrides{
 				PostgresPort:  pgPort,
 				WebserverPort: webPort,
 				APIServerPort: webPort,
@@ -335,9 +335,24 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	// Create a compose project (with port overrides if proxy is enabled)
 	var project *composetypes.Project
-	if useProxy && composeFile == "" {
-		project, err = createDockerProjectWithPorts(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels, portOvr)
+	if composeFile == "" {
+		// Settle which postgres version this project runs before compose takes hold of
+		// the volume: an existing data directory keeps its own version, a new one
+		// follows config. Only matters when we generate the compose file ourselves.
+		pgTagOvr, pgErr := d.resolvePostgresTag(context.Background())
+		if pgErr != nil {
+			return pgErr
+		}
+		if pgTagOvr != "" {
+			if ovr == nil {
+				ovr = &ComposeOverrides{}
+			}
+			ovr.PostgresTag = pgTagOvr
+		}
+
+		project, err = createDockerProjectWithOverrides(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels, ovr)
 	} else {
+		// A user-supplied compose file is theirs to control; nothing is overridden.
 		project, err = createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, composeFile, imageLabels)
 	}
 	if err != nil {
@@ -372,15 +387,15 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	switch airflowMajorVersion {
 	case "3":
 		apiPort := config.CFG.APIServerPort.GetString()
-		if portOvr != nil && portOvr.APIServerPort != "" {
-			apiPort = portOvr.APIServerPort
+		if ovr != nil && ovr.APIServerPort != "" {
+			apiPort = ovr.APIServerPort
 		}
 		healthURL = fmt.Sprintf("http://localhost:%s/api/v2/monitor/health", apiPort)
 		healthComponent = "api-server"
 	case "2":
 		wsPort := config.CFG.WebserverPort.GetString()
-		if portOvr != nil && portOvr.WebserverPort != "" {
-			wsPort = portOvr.WebserverPort
+		if ovr != nil && ovr.WebserverPort != "" {
+			wsPort = ovr.WebserverPort
 		}
 		healthURL = fmt.Sprintf("http://localhost:%s/health", wsPort)
 		healthComponent = WebserverDockerContainerName
@@ -401,12 +416,12 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	proxyActive := useProxy && proxyHostname != ""
 	if proxyActive {
 		services := map[string]string{}
-		if portOvr != nil && portOvr.PostgresPort != "" {
-			services["postgres"] = portOvr.PostgresPort
+		if ovr != nil && ovr.PostgresPort != "" {
+			services["postgres"] = ovr.PostgresPort
 		}
 		route := proxy.Route{
 			Hostname:   proxyHostname,
-			Port:       portOvr.WebserverPort,
+			Port:       ovr.WebserverPort,
 			ProjectDir: d.airflowHome,
 			PID:        0, // Docker routes don't track PID — CLI exits after start
 			Services:   services,
@@ -423,9 +438,9 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	// Print the status
 	if proxyActive {
-		err = printProxyStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, portOvr)
+		err = printProxyStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, ovr)
 	} else {
-		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, portOvr)
+		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, ovr)
 	}
 	if err != nil {
 		return err
@@ -449,8 +464,19 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 		return err
 	}
 
+	// Export the postgres version this project actually runs, not the configured one,
+	// so the exported file starts the same database `astro dev start` would.
+	pgTagOvr, err := d.resolvePostgresTag(context.Background())
+	if err != nil {
+		return err
+	}
+	var ovr *ComposeOverrides
+	if pgTagOvr != "" {
+		ovr = &ComposeOverrides{PostgresTag: pgTagOvr}
+	}
+
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
+	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels, ovr)
 	if err != nil {
 		return errors.Wrap(err, "failed to create Compose file")
 	}
@@ -1463,16 +1489,16 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 
 	// If proxy mode allocated a random port, the actual port is stored in
 	// the proxy route registered during Start. Fall back to config default.
-	var portOvr *PortOverrides
+	var ovr *ComposeOverrides
 	if route, rerr := proxy.GetRouteByProject(d.airflowHome); rerr == nil && route != nil && route.Port != "" {
-		portOvr = &PortOverrides{
+		ovr = &ComposeOverrides{
 			WebserverPort: route.Port,
 			APIServerPort: route.Port,
 		}
 	}
 
-	apiURL := airflowAPIURL(airflowDockerVersion, portOvr)
-	authHeader := airflowAuthHeader(airflowDockerVersion, portOvr)
+	apiURL := airflowAPIURL(airflowDockerVersion, ovr)
+	authHeader := airflowAuthHeader(airflowDockerVersion, ovr)
 
 	err = initSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
@@ -1667,9 +1693,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	return project, nil
 }
 
-// createDockerProjectWithPorts creates a Docker Compose project with port overrides for proxy mode.
-var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, portOvr *PortOverrides) (*composetypes.Project, error) {
-	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels, portOvr)
+// createDockerProjectWithOverrides creates a Docker Compose project with port overrides for proxy mode.
+var createDockerProjectWithOverrides = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, ovr *ComposeOverrides) (*composetypes.Project, error) {
+	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels, ovr)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
@@ -1708,6 +1734,9 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load project")
 	}
+	if project == nil {
+		return nil, errors.New("failed to load compose project: parsed project is nil")
+	}
 
 	for name, s := range project.Services {
 		s.CustomLabels = map[string]string{
@@ -1724,19 +1753,19 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 }
 
 // airflowAPIURL returns the base API URL for the local Airflow instance.
-func airflowAPIURL(airflowMajorVersion uint64, portOvr *PortOverrides) string {
+func airflowAPIURL(airflowMajorVersion uint64, ovr *ComposeOverrides) string {
 	var port, apiPrefix string
 	switch airflowMajorVersion {
 	case airflowMajorVersion3:
 		port = config.CFG.APIServerPort.GetString()
-		if portOvr != nil && portOvr.APIServerPort != "" {
-			port = portOvr.APIServerPort
+		if ovr != nil && ovr.APIServerPort != "" {
+			port = ovr.APIServerPort
 		}
 		apiPrefix = "/api/v2"
 	default:
 		port = config.CFG.WebserverPort.GetString()
-		if portOvr != nil && portOvr.WebserverPort != "" {
-			port = portOvr.WebserverPort
+		if ovr != nil && ovr.WebserverPort != "" {
+			port = ovr.WebserverPort
 		}
 		apiPrefix = "/api/v1"
 	}
@@ -1745,13 +1774,13 @@ func airflowAPIURL(airflowMajorVersion uint64, portOvr *PortOverrides) string {
 }
 
 // airflowAuthHeader returns the Authorization header for the local Airflow instance.
-func airflowAuthHeader(airflowMajorVersion uint64, portOvr *PortOverrides) string {
+func airflowAuthHeader(airflowMajorVersion uint64, ovr *ComposeOverrides) string {
 	if airflowMajorVersion == airflowMajorVersion2 {
 		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
 	}
 	// Airflow 3 uses JWT auth via /auth/token endpoint.
 	// With SimpleAuthManager + ALL_ADMINS=True, any credentials work.
-	token, err := fetchLocalAirflowToken(airflowMajorVersion, portOvr)
+	token, err := fetchLocalAirflowToken(airflowMajorVersion, ovr)
 	if err != nil {
 		logger.Debugf("Unable to fetch Airflow auth token: %s", err)
 		return ""
@@ -1760,8 +1789,8 @@ func airflowAuthHeader(airflowMajorVersion uint64, portOvr *PortOverrides) strin
 }
 
 // fetchLocalAirflowToken gets a JWT token from the local Airflow 3 instance.
-func fetchLocalAirflowToken(airflowMajorVersion uint64, portOvr *PortOverrides) (string, error) {
-	apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
+func fetchLocalAirflowToken(airflowMajorVersion uint64, ovr *ComposeOverrides) (string, error) {
+	apiURL := airflowAPIURL(airflowMajorVersion, ovr)
 	root := strings.TrimSuffix(apiURL, "/api/v2")
 	return fetchAirflowJWTToken(root)
 }
@@ -1796,14 +1825,14 @@ func fetchAirflowJWTToken(baseURL string) (string, error) {
 }
 
 // printProxyStatus prints status information when the proxy is active.
-func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
+func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, ovr *ComposeOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
-		authHeader := airflowAuthHeader(airflowMajorVersion, portOvr)
+		apiURL := airflowAPIURL(airflowMajorVersion, ovr)
+		authHeader := airflowAuthHeader(airflowMajorVersion, ovr)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
@@ -1815,8 +1844,8 @@ func printProxyStatus(settingsFile string, envConns map[string]astrov1.Environme
 	fmt.Printf(bullet+composeLinkUIMsg+"\n", ansi.Bold(uiURL))
 
 	pgPort := config.CFG.PostgresPort.GetString()
-	if portOvr != nil && portOvr.PostgresPort != "" {
-		pgPort = portOvr.PostgresPort
+	if ovr != nil && ovr.PostgresPort != "" {
+		pgPort = ovr.PostgresPort
 	}
 	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+pgPort+"/postgres"))
 
@@ -1834,14 +1863,14 @@ func printProxyStatus(settingsFile string, envConns map[string]astrov1.Environme
 	return nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, portOvr *PortOverrides) error {
+func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, ovr *ComposeOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
-		authHeader := airflowAuthHeader(airflowMajorVersion, portOvr)
+		apiURL := airflowAPIURL(airflowMajorVersion, ovr)
+		authHeader := airflowAuthHeader(airflowMajorVersion, ovr)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
@@ -1852,20 +1881,20 @@ func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObj
 	switch airflowMajorVersion {
 	case airflowMajorVersion2:
 		port = config.CFG.WebserverPort.GetString()
-		if portOvr != nil && portOvr.WebserverPort != "" {
-			port = portOvr.WebserverPort
+		if ovr != nil && ovr.WebserverPort != "" {
+			port = ovr.WebserverPort
 		}
 	case airflowMajorVersion3:
 		port = config.CFG.APIServerPort.GetString()
-		if portOvr != nil && portOvr.APIServerPort != "" {
-			port = portOvr.APIServerPort
+		if ovr != nil && ovr.APIServerPort != "" {
+			port = ovr.APIServerPort
 		}
 	}
 	parts := strings.Split(port, ":")
 	uiURL := "http://localhost:" + parts[len(parts)-1]
 	pgPort := config.CFG.PostgresPort.GetString()
-	if portOvr != nil && portOvr.PostgresPort != "" {
-		pgPort = portOvr.PostgresPort
+	if ovr != nil && ovr.PostgresPort != "" {
+		pgPort = ovr.PostgresPort
 	}
 	bullet := ansi.Cyan("\u27A4") + " "
 	fmt.Printf(bullet+composeLinkUIMsg+"\n", ansi.Bold(uiURL))
