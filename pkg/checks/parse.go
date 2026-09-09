@@ -22,6 +22,23 @@ var parseScript []byte
 type ParseInput struct {
 	ProjectPath string
 	DagsDir     string
+	// Env is the environment the DAGs are imported under, in os.Environ form.
+	// Empty inherits this process's, which is what the CLI wants: it runs from
+	// the project directory and its own environment is the user's shell.
+	//
+	// A caller whose environment is NOT the user's shell has to supply it, or
+	// the parse and the real Airflow disagree. A DAG that reads a variable at
+	// module scope — `os.environ["SNOWFLAKE_ACCOUNT"]`, a Variable.get default
+	// — imports fine under an Airflow started with the project's environment
+	// and raises here without it, which reports a working DAG as broken. A GUI
+	// that composes the environment itself (project .env, a vault, declared
+	// defaults) is exactly that caller.
+	//
+	// AIRFLOW_HOME, the DAGs folder, the examples switch and the result-file
+	// path are appended after this and win: they are what makes the parse
+	// side-effect-free, so a caller cannot accidentally point it at a real
+	// Airflow home.
+	Env []string
 }
 
 // ParseReport is the decoded output of parse_dags.py. Fatal is set when the
@@ -136,8 +153,15 @@ func (r *VenvRunner) parseWith(ctx context.Context, python string, in ParseInput
 	// kept clean for the result. A private file in the scratch home can be.
 	resultFile := filepath.Join(home, "parse-result.json")
 
+	base := in.Env
+	if len(base) == 0 {
+		base = os.Environ()
+	}
+	// Appended last so they win over anything the caller supplied: these four
+	// are what keep the parse from touching a real Airflow home or the
+	// project tree.
 	env := append(
-		os.Environ(),
+		append([]string(nil), base...),
 		"AIRFLOW_HOME="+home,
 		"AIRFLOW__CORE__DAGS_FOLDER="+in.DagsDir,
 		"AIRFLOW__CORE__LOAD_EXAMPLES=False",
