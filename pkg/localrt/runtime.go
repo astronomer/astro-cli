@@ -109,6 +109,21 @@ func (r *Runtime) refuseLiveStart(p Plan) error {
 	return fmt.Errorf("local Airflow is already running for this project; use `astro local restart` to restart it or `astro local stop` to stop it")
 }
 
+// RunInImage runs one command in a docker-mode project's image, with no
+// Airflow running and without starting any.
+//
+// It dispatches to the docker engine unconditionally rather than on a state
+// record's mode, because the case it serves is a project that has no record:
+// a stop removes it. The caller knows the project is docker mode from its
+// manifest, which is the same thing Start dispatches on.
+//
+// Standalone mode has no image and no counterpart here. Its offline equivalent
+// is to run the project's own .venv interpreter directly, which a caller can do
+// without going through a runtime at all.
+func (r *Runtime) RunInImage(ctx context.Context, projectPath string, req ImageRun) error {
+	return r.docker.RunInImage(ctx, projectPath, req)
+}
+
 func (r *Runtime) Attach(projectPath string) (Airflow, error) {
 	rec, err := localstate.Load(projectPath)
 	if err != nil {

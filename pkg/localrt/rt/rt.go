@@ -214,6 +214,43 @@ type Stdio struct {
 	Out, Err io.Writer
 }
 
+// ProjectDirInImage is where a project's directories are mounted inside its
+// image: AIRFLOW_HOME in the runtime image, so dags/, include/, plugins/ and
+// tests/ appear beneath it.
+//
+// A RunInImage caller needs it because the command's arguments are paths the
+// container will resolve, not host paths. Declared here so that caller does not
+// hardcode a second copy of the mount layout.
+const ProjectDirInImage = "/usr/local/airflow"
+
+// ImageRun is one command to run in a project's own image with no Airflow
+// running: the offline counterpart to Airflow.Run, which execs into a live
+// container and so needs one.
+//
+// It exists because a stopped project still has everything needed to inspect
+// itself. Checking a project's DAGs is the first caller: it imports them with
+// the same interpreter and the same dependencies the real Airflow would, which
+// is the only way to get an answer a running Airflow would agree with.
+type ImageRun struct {
+	// Argv is the program and its arguments.
+	//
+	// The image's ENTRYPOINT is bypassed. The runtime image's entrypoint waits
+	// for the metadata database and prints to stdout while it waits, so an
+	// offline command would hang forever and have its output corrupted.
+	Argv []string
+	// Env is extra environment for the command, layered over what the
+	// project's own configuration already supplies.
+	Env map[string]string
+	// Stdio wires the command's streams. Out and Err stay separate, so a
+	// caller parsing one is not reading the other's noise.
+	Stdio Stdio
+}
+
+// ErrImageNotBuilt reports that a project has no image to run a command in,
+// because it has never been started or was stopped with --clean. Distinct from
+// a project that is merely not running, which still has one.
+var ErrImageNotBuilt = errors.New("this project has no image yet")
+
 // Airflow is a handle to a running local Airflow, obtained from Start or
 // Attach — so every method on it is always valid.
 type Airflow interface {

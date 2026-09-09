@@ -37,6 +37,7 @@ type (
 	Stdio       = rt.Stdio
 	Airflow     = rt.Airflow
 	LineWriter  = rt.LineWriter
+	ImageRun    = rt.ImageRun
 
 	// ProxyDaemon and the image-builder seam are supplied by the consumer; see
 	// Config.
@@ -44,6 +45,10 @@ type (
 	ImageBuilder = rt.ImageBuilder
 	BuildRequest = rt.BuildRequest
 )
+
+// ProjectDirInImage is where a project's directories are mounted inside its
+// image, for a RunInImage caller building container-side arguments.
+const ProjectDirInImage = rt.ProjectDirInImage
 
 const (
 	ModeStandalone = rt.ModeStandalone
@@ -60,6 +65,9 @@ const (
 // exported: `astro dev` reports it, and it is what a consumer checks while the
 // remaining modes land.
 var ErrNotImplemented = rt.ErrNotImplemented
+
+// ErrImageNotBuilt reports that a project has no image to run a command in.
+var ErrImageNotBuilt = rt.ErrImageNotBuilt
 
 // OnState reports a state transition if the caller asked for one.
 func OnState(cb Callbacks, s State, err error) { rt.OnState(cb, s, err) }

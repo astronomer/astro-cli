@@ -771,40 +771,56 @@ type composeLine struct {
 	extraEnv []string
 }
 
-// runCompose runs one compose command, forwarding its output line by line
-// to cb.OnLine (component "compose") so frontends can render engine
-// progress; without a callback the output is dropped, never printed.
-// --project-directory pins the working_dir label to the project path,
-// which is what findProject discovers by.
-func (e *Engine) runCompose(ctx context.Context, l composeLine, cb rt.Callbacks, args ...string) error {
+// argv is the compose command line for this invocation.
+//
+// --project-name and --project-directory are not optional decorations. The
+// name is what every other command addresses the project by, so a command
+// that omits it creates containers and networks under a name compose derives
+// from the file's own directory — which no teardown ever sweeps. The directory
+// pins the working_dir label findProject discovers by, and is where compose
+// looks for the project's .env to resolve the valueless entries passEnv wrote.
+func (l composeLine) argv(args ...string) []string {
 	full := []string{"compose"}
 	if l.file != "" {
 		full = append(full, "--file", l.file, "--project-directory", l.projectDir)
 	}
-	full = append(append(full, "--project-name", l.name), args...)
+	return append(append(full, "--project-name", l.name), args...)
+}
+
+// env is the compose process's environment.
+//
+// A fresh slice rather than append onto conn.env: that slice is shared with
+// every other compose line built from the same engine connection, and appending
+// into spare capacity would leak one project's secrets into the next command
+// that reused it.
+//
+// The connection goes LAST, and that ordering is load-bearing. os/exec keeps
+// the last duplicate of a key, so anything in extraEnv that collides with
+// DOCKER_HOST, CONTAINER_HOST or DOCKER_CONFIG would otherwise retarget this
+// very compose invocation — a project's Airflow env is caller-supplied and can
+// name anything, so a plan carrying DOCKER_HOST for a DockerOperator DAG would
+// silently point the start at a different daemon while Stop, which uses
+// conn.env untouched, still looked at the right one. A secret that loses to
+// the engine connection simply does not reach the container; a compose command
+// talking to the wrong daemon is unrecoverable from the UI.
+func (l composeLine) env() []string {
+	out := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
+	out = append(out, l.extraEnv...)
+	out = append(out, l.conn.env...)
+	return out
+}
+
+// runCompose runs one compose command, forwarding its output line by line
+// to cb.OnLine (component "compose") so frontends can render engine
+// progress; without a callback the output is dropped, never printed.
+func (e *Engine) runCompose(ctx context.Context, l composeLine, cb rt.Callbacks, args ...string) error {
+	full := l.argv(args...)
 	w := &rt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(rt.LogLine{Component: "compose", Time: e.now(), Text: line})
 		}
 	}}
-	// A fresh slice rather than append onto conn.env: that slice is shared with
-	// every other compose line built from the same engine connection, and
-	// appending into spare capacity would leak one project's secrets into the
-	// next command that reused it.
-	//
-	// The connection goes LAST, and that ordering is load-bearing. os/exec keeps
-	// the last duplicate of a key, so anything in extraEnv that collides with
-	// DOCKER_HOST, CONTAINER_HOST or DOCKER_CONFIG would otherwise retarget this
-	// very compose invocation — a project's Airflow env is caller-supplied and can
-	// name anything, so a plan carrying DOCKER_HOST for a DockerOperator DAG would
-	// silently point the start at a different daemon while Stop, which uses
-	// conn.env untouched, still looked at the right one. A secret that loses to
-	// the engine connection simply does not reach the container; a compose command
-	// talking to the wrong daemon is unrecoverable from the UI.
-	cmdEnv := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
-	cmdEnv = append(cmdEnv, l.extraEnv...)
-	cmdEnv = append(cmdEnv, l.conn.env...)
-	err := e.cmd.Run(ctx, cmdEnv, rt.Stdio{Out: w, Err: w}, l.conn.bin, full...)
+	err := e.cmd.Run(ctx, l.env(), rt.Stdio{Out: w, Err: w}, l.conn.bin, full...)
 	w.Flush()
 	return err
 }

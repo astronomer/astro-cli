@@ -33,8 +33,11 @@ var composeTemplate string
 const (
 	// postgresImage matches v1's default metadata database image.
 	postgresImage = "docker.io/postgres:12.6"
-	// airflowHomeInImage is where the runtime image keeps AIRFLOW_HOME.
-	airflowHomeInImage = "/usr/local/airflow"
+	// airflowHomeInImage is where the runtime image keeps AIRFLOW_HOME. It is
+	// rt's exported constant because a RunInImage caller builds container-side
+	// paths from it, and two spellings of the mount root would put a caller's
+	// arguments somewhere the mounts are not.
+	airflowHomeInImage = rt.ProjectDirInImage
 	// devFernetKey is the fixed development-only Fernet key v1 ships in its
 	// compose template. Local Airflow is loopback-only and single-user.
 	devFernetKey = "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="

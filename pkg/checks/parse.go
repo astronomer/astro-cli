@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 )
 
 // parseScript is the DAG-parse program, run with the project's own venv
@@ -73,6 +75,67 @@ type ReportFile struct {
 	File         string   `json:"file"`
 	ParseSeconds float64  `json:"parse_time_seconds"`
 	DagIDs       []string `json:"dag_ids"`
+}
+
+// ParseProgram is the DAG-parse program itself, for a caller that has to run
+// it somewhere this process cannot reach.
+//
+// VenvRunner hands it to a local interpreter on stdin. A caller whose Python
+// lives inside a container does the same through its own engine, and needs the
+// program, its arguments, its environment and its decoder as separate pieces.
+// These four exports are what parseWith itself uses, so there is one definition
+// of each instead of a copy per runner — the JSON contract and the environment
+// that makes the parse side-effect-free cannot drift between them.
+func ParseProgram() []byte { return bytes.Clone(parseScript) }
+
+// ParseArgs are the program's arguments. It takes the project root and the DAGs
+// directory and puts both on sys.path, the way a running Airflow does, so
+// `include`- and `plugins`-style imports resolve.
+//
+// The paths are the ones the INTERPRETER will see. A container caller passes
+// container paths; the program reports every file relative to projectRoot, so
+// its report needs no translation on the way back.
+func ParseArgs(projectRoot, dagsDir string) []string {
+	return []string{"-", projectRoot, dagsDir}
+}
+
+// ParseEnvironment is the environment that keeps the parse side-effect-free:
+// a throwaway AIRFLOW_HOME, an explicit DAGs folder, and no examples. These
+// must win over anything a caller supplies, so they are applied last.
+//
+// A map rather than os.Environ's KEY=VALUE pairs, because a caller that has to
+// deliver these somewhere else — as container flags, say — would otherwise
+// split them apart again, and the obvious spelling of that split is wrong: a
+// value may legitimately contain "=", so splitting on anything but the first
+// one truncates it. Nothing here holds an "=" today, which is exactly what
+// would make the bug wait for the first caller that layers project env through
+// the same path. parseWith renders the pairs it needs.
+//
+// resultFile names the file the program writes its JSON to. Empty means it
+// writes to stdout instead, which it keeps clean for the purpose — it moves the
+// real stdout aside before importing Airflow and points fd 1 at stderr, so log
+// lines (including from a signal handler on an import timeout) cannot reach the
+// result. A caller reading stdout must therefore keep the two streams apart:
+// one pseudo-terminal for both would merge them and corrupt the JSON.
+func ParseEnvironment(airflowHome, dagsDir, resultFile string) map[string]string {
+	env := map[string]string{
+		"AIRFLOW_HOME":                 airflowHome,
+		"AIRFLOW__CORE__DAGS_FOLDER":   dagsDir,
+		"AIRFLOW__CORE__LOAD_EXAMPLES": "False",
+	}
+	if resultFile != "" {
+		env["ASTRO_PARSE_RESULT_FILE"] = resultFile
+	}
+	return env
+}
+
+// DecodeParseReport decodes the program's output.
+func DecodeParseReport(raw []byte) (ParseReport, error) {
+	var report ParseReport
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &report); err != nil {
+		return ParseReport{}, fmt.Errorf("decoding the DAG parse output: %w", err)
+	}
+	return report, nil
 }
 
 // Executor runs the parse program and returns its stdout. It is a seam so
@@ -157,34 +220,29 @@ func (r *VenvRunner) parseWith(ctx context.Context, python string, in ParseInput
 	if len(base) == 0 {
 		base = os.Environ()
 	}
-	// Appended last so they win over anything the caller supplied: these four
-	// are what keep the parse from touching a real Airflow home or the
-	// project tree.
-	env := append(
-		append([]string(nil), base...),
-		"AIRFLOW_HOME="+home,
-		"AIRFLOW__CORE__DAGS_FOLDER="+in.DagsDir,
-		"AIRFLOW__CORE__LOAD_EXAMPLES=False",
-		"ASTRO_PARSE_RESULT_FILE="+resultFile,
-	)
-	args := []string{"-", in.ProjectPath, in.DagsDir}
-	stdout, err := r.Exec.Run(ctx, in.ProjectPath, env, python, args, parseScript)
+	// Appended last so they win over anything the caller supplied: they are what
+	// keep the parse from touching a real Airflow home or the project tree.
+	// os/exec keeps the last duplicate of a key, so order is the mechanism.
+	env := append([]string(nil), base...)
+	owned := ParseEnvironment(home, in.DagsDir, resultFile)
+	for _, k := range slices.Sorted(maps.Keys(owned)) {
+		env = append(env, k+"="+owned[k])
+	}
+	args := ParseArgs(in.ProjectPath, in.DagsDir)
+	stdout, err := r.Exec.Run(ctx, in.ProjectPath, env, python, args, ParseProgram())
 	if err != nil {
 		return ParseReport{}, fmt.Errorf("running the DAG parse: %w", err)
 	}
 
 	// Prefer the result file; fall back to stdout for a script that ignored the
 	// env var (older embed, or a test's fake executor).
-	raw := bytes.TrimSpace(stdout)
+	// DecodeParseReport trims, so neither branch needs to.
+	raw := stdout
 	if fromFile, ferr := os.ReadFile(resultFile); ferr == nil && len(bytes.TrimSpace(fromFile)) > 0 {
-		raw = bytes.TrimSpace(fromFile)
+		raw = fromFile
 	}
 
-	var report ParseReport
-	if err := json.Unmarshal(raw, &report); err != nil {
-		return ParseReport{}, fmt.Errorf("decoding the DAG parse output: %w", err)
-	}
-	return report, nil
+	return DecodeParseReport(raw)
 }
 
 // execExecutor is the production Executor, backed by os/exec.
