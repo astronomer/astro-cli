@@ -1159,6 +1159,7 @@ func (s *Standalone) ExportSettings(settingsFile, envFile string, connections, v
 	}
 
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
+	//nolint:staticcheck // SA9010: the return value is the command being replaced, deliberately discarded; this call is the restore.
 	defer settings.SetExecAirflowCommand(origExec)
 
 	afVersion := s.airflowMajorVersionUint()
