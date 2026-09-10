@@ -7,8 +7,13 @@ PWD=$(shell pwd)
 generate:
 	go generate -x
 
-lint:
+lint: lint-go lint-deadcode
+
+lint-go:
 	prek run golangci-lint --all-files
+
+lint-deadcode:
+	prek run deadcode --all-files
 
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
