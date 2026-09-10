@@ -1,5 +1,7 @@
 package config
 
+import "strconv"
+
 // ValidatorFunc is a function that validates a configuration value
 type ValidatorFunc func(value string) error
 
@@ -115,7 +117,11 @@ func (c cfg) GetBool() bool {
 	if configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return viperProject.GetBool(c.Path)
 	}
-	return viperHome.GetBool(c.Path)
+	if viperHome.IsSet(c.Path) {
+		return viperHome.GetBool(c.Path)
+	}
+	b, _ := strconv.ParseBool(c.Default)
+	return b
 }
 
 // GetInt will return the integer value of requested config, check working dir and fallback to home
@@ -123,7 +129,11 @@ func (c cfg) GetInt() int {
 	if configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return viperProject.GetInt(c.Path)
 	}
-	return viperHome.GetInt(c.Path)
+	if viperHome.IsSet(c.Path) {
+		return viperHome.GetInt(c.Path)
+	}
+	n, _ := strconv.Atoi(c.Default)
+	return n
 }
 
 // GetProjectString will return a project config
@@ -131,8 +141,14 @@ func (c cfg) GetProjectString() string {
 	return viperProject.GetString(c.Path)
 }
 
-// GetHomeString will return config from home string
+// GetHomeString will return the config from the home file, or this setting's default
+// when the file does not set it. Defaults are resolved here rather than being handed
+// to viper, because viper serializes its defaults into the file it writes — which
+// would freeze today's default on disk and stop the CLI ever changing it.
 func (c cfg) GetHomeString() string {
+	if !viperHome.IsSet(c.Path) {
+		return c.Default
+	}
 	return viperHome.GetString(c.Path)
 }
 

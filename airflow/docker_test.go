@@ -15,6 +15,8 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
@@ -114,7 +116,7 @@ volumes:
 
 services:
   postgres:
-    image: docker.io/postgres:12.6
+    image: docker.io/postgres:15
     restart: unless-stopped
     networks:
       - airflow
@@ -246,7 +248,7 @@ volumes:
 
 services:
   postgres:
-    image: docker.io/postgres:12.6
+    image: docker.io/postgres:15
     restart: unless-stopped
     networks:
       - airflow
@@ -381,7 +383,7 @@ volumes:
 
 services:
   postgres:
-    image: docker.io/postgres:12.6
+    image: docker.io/postgres:15
     restart: unless-stopped
     networks:
       - airflow
@@ -524,6 +526,75 @@ services:
 	})
 }
 
+func (s *Suite) TestDockerComposeKillClearsStaleProbes() {
+	// A probe left behind by an interrupted start holds the data volume, and compose
+	// will not remove a volume in use — it reports that and exits zero, leaving the
+	// project pinned to its old postgres with no way to move it.
+	composeMock := new(mocks.DockerComposeAPI)
+	composeMock.On("Down", mock.Anything, "test", api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+
+	cli := new(mocks.DockerCLIClient)
+	cli.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{{ID: "stale-id"}}, nil).Once()
+	cli.On("ContainerRemove", mock.Anything, "stale-id", container.RemoveOptions{Force: true}).Return(nil).Once()
+
+	d := DockerCompose{projectName: "test", composeService: composeMock, cliClient: cli}
+	s.NoError(d.Kill())
+
+	cli.AssertExpectations(s.T())
+	composeMock.AssertExpectations(s.T())
+}
+
+func (s *Suite) TestComposeExportUsesTheVersionTheProjectRuns() {
+	// An export that names the configured version rather than the one the project
+	// actually runs produces a compose file that puts a new postgres on old data.
+	out := filepath.Join(s.T().TempDir(), "docker-compose.yaml")
+
+	imageHandler := new(mocks.ImageHandler)
+	imageHandler.On("ListLabels").Return(labels, nil).Once()
+	composeMock := new(mocks.DockerComposeAPI)
+	composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+	cli := new(mocks.DockerCLIClient)
+	cli.On("VolumeList", mock.Anything, mock.Anything).
+		Return(volume.ListResponse{Volumes: []*volume.Volume{{Name: "vol"}}}, nil).Once()
+	cli.On("ImageInspect", mock.Anything, mock.Anything).Return(image.InspectResponse{}, nil).Once()
+	cli.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{}, nil).Once()
+	cli.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(container.CreateResponse{ID: "probe-id"}, nil).Once()
+	cli.On("CopyFromContainer", mock.Anything, "probe-id", pgDataDir+"/"+pgVersionFile).
+		Return(pgVersionTar(s.T(), "12\n"), container.PathStat{}, nil).Once()
+	cli.On("ContainerRemove", mock.Anything, "probe-id", mock.Anything).Return(nil).Once()
+
+	d := DockerCompose{
+		projectName: "test", airflowHome: "/home/airflow", envFile: "/home/airflow/.env",
+		composeService: composeMock, imageHandler: imageHandler, cliClient: cli,
+	}
+	s.NoError(d.ComposeExport("settings.yaml", out))
+
+	exported, err := os.ReadFile(out)
+	s.NoError(err)
+	s.Contains(string(exported), "image: "+config.CFG.PostgresRepository.GetString()+":12")
+	s.NotContains(string(exported), "image: "+config.CFG.PostgresRepository.GetString()+":"+config.CFG.PostgresTag.GetString())
+}
+
+func (s *Suite) TestGenerateConfigPostgresTagOverride() {
+	af3Labels := map[string]string{runtimeVersionLabelName: "3.0-1"}
+
+	s.Run("uses the configured tag when nothing overrides it", func() {
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", af3Labels)
+		s.NoError(err)
+		s.Contains(cfg, "image: "+config.CFG.PostgresRepository.GetString()+":"+config.CFG.PostgresTag.GetString())
+	})
+
+	s.Run("an override reaches the postgres image in the compose file", func() {
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", af3Labels,
+			&ComposeOverrides{PostgresTag: "12"})
+		s.NoError(err)
+		s.Contains(cfg, "image: "+config.CFG.PostgresRepository.GetString()+":12")
+		s.NotContains(cfg, "image: "+config.CFG.PostgresRepository.GetString()+":"+config.CFG.PostgresTag.GetString())
+	})
+}
+
 func (s *Suite) TestCheckTriggererEnabled() {
 	s.Run("astro-runtime supported version", func() {
 		triggererEnabled, err := CheckTriggererEnabled(map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
@@ -557,6 +628,11 @@ func (s *Suite) TestDockerComposeInit() {
 
 func (s *Suite) TestDockerComposeStart() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
+	// Start checks the project's postgres data volume before bringing anything up.
+	// These cases are about the compose flow, so report a project that has none.
+	noVolumesClient := new(mocks.DockerCLIClient)
+	noVolumesClient.On("VolumeList", mock.Anything, mock.Anything).Return(volume.ListResponse{}, nil)
+	mockDockerCompose.cliClient = noVolumesClient
 	waitTime := 1 * time.Second
 	s.Run("success", func() {
 		noCache := false
@@ -779,6 +855,11 @@ func (s *Suite) TestDockerComposeStart() {
 
 func (s *Suite) TestDockerComposeExport() {
 	mockDockerCompose := DockerCompose{projectName: "test", airflowHome: "/home/airflow", envFile: "/home/airflow/.env"}
+	// The export resolves the project's postgres version the same way a start does.
+	// These cases are about the export itself, so report a project with no volume.
+	exportVolumesClient := new(mocks.DockerCLIClient)
+	exportVolumesClient.On("VolumeList", mock.Anything, mock.Anything).Return(volume.ListResponse{}, nil)
+	mockDockerCompose.cliClient = exportVolumesClient
 
 	s.Run("success", func() {
 		imageHandler := new(mocks.ImageHandler)
@@ -1003,6 +1084,11 @@ func (s *Suite) TestDockerComposePS() {
 
 func (s *Suite) TestDockerComposeKill() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
+	// Kill clears any version probe still holding the data volume before compose
+	// removes it. These cases are about the kill itself, so report none outstanding.
+	noProbesClient := new(mocks.DockerCLIClient)
+	noProbesClient.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{}, nil)
+	mockDockerCompose.cliClient = noProbesClient
 	s.Run("success", func() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Down", mock.Anything, mockDockerCompose.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
@@ -2114,7 +2200,7 @@ func (s *Suite) TestPrintStatusURL() {
 	})
 
 	s.Run("uses webserver port override (Airflow 2)", func() {
-		ovr := &PortOverrides{
+		ovr := &ComposeOverrides{
 			PostgresPort:  "55432",
 			WebserverPort: "58080",
 			APIServerPort: "58080",
@@ -2130,7 +2216,7 @@ func (s *Suite) TestPrintStatusURL() {
 	})
 
 	s.Run("uses api-server port override (Airflow 3)", func() {
-		ovr := &PortOverrides{
+		ovr := &ComposeOverrides{
 			PostgresPort:  "55432",
 			WebserverPort: "58080",
 			APIServerPort: "58080",
