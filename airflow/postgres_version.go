@@ -137,7 +137,7 @@ func (d *DockerCompose) volumeExists(ctx context.Context, name string) (bool, er
 func (d *DockerCompose) readVolumePGVersion(ctx context.Context, volName string) int {
 	img, err := d.probeImage(ctx)
 	if err != nil {
-		logger.Debugf("skipping postgres version check: %s", err)
+		warnVersionCheckFailed(err)
 		return 0
 	}
 
@@ -151,7 +151,7 @@ func (d *DockerCompose) readVolumePGVersion(ctx context.Context, volName string)
 		&container.HostConfig{Mounts: []mount.Mount{{Type: mount.TypeVolume, Source: volName, Target: pgDataDir}}},
 		nil, nil, "")
 	if err != nil {
-		logger.Debugf("skipping postgres version check, could not create the probe container: %s", err)
+		warnVersionCheckFailed(err)
 		return 0
 	}
 	defer func() {
@@ -162,13 +162,12 @@ func (d *DockerCompose) readVolumePGVersion(ctx context.Context, volName string)
 
 	rc, _, err := d.cliClient.CopyFromContainer(ctx, created.ID, pgDataDir+"/"+pgVersionFile)
 	if err != nil {
-		// Either way the configured tag is used, so a docker failure here can still
-		// put a new postgres on an old data directory. The two are logged apart
-		// because only the second is worth investigating.
+		// A missing file is the ordinary case of an empty data directory and says
+		// nothing is wrong. Any other failure means the version went unchecked.
 		if errdefs.IsNotFound(err) {
 			logger.Debugf("no %s in volume %s", pgVersionFile, volName)
 		} else {
-			logger.Debugf("could not read %s from volume %s: %s", pgVersionFile, volName, err)
+			warnVersionCheckFailed(err)
 		}
 		return 0
 	}
@@ -176,16 +175,28 @@ func (d *DockerCompose) readVolumePGVersion(ctx context.Context, volName string)
 
 	contents, err := readSingleFileFromTar(rc)
 	if err != nil {
-		logger.Debugf("could not read %s from volume %s: %s", pgVersionFile, volName, err)
+		warnVersionCheckFailed(err)
 		return 0
 	}
 
 	major, err := majorVersion(contents)
 	if err != nil {
-		logger.Debugf("unreadable %s in volume %s: %s", pgVersionFile, volName, err)
+		warnVersionCheckFailed(fmt.Errorf("unreadable %s in volume %s: %w", pgVersionFile, volName, err))
 		return 0
 	}
 	return major
+}
+
+// warnVersionCheckFailed reports that the project's postgres version could not be
+// established. The start continues on the configured tag, which is right when the
+// versions happen to agree and fatal when they do not — and the failure the user would
+// otherwise see is the api-server health check timing out, which says nothing about
+// the database. Naming it here is the only chance to explain that.
+func warnVersionCheckFailed(err error) {
+	fmt.Printf("Could not read the PostgreSQL version of this project's database: %s\n"+
+		"Starting it with postgres.tag (%s). If the database was created with a different "+
+		"version, PostgreSQL will refuse to start on it.\n\n",
+		err, config.CFG.PostgresTag.GetString())
 }
 
 // removeStaleProbes deletes probe containers left behind by an earlier run. They are

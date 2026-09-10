@@ -606,6 +606,11 @@ func (d *DockerCompose) Kill() error {
 	originalLevel := logrus.GetLevel()
 	logrus.SetLevel(logrus.ErrorLevel)
 
+	// A version probe left behind by an interrupted start still holds the data volume,
+	// and compose will not remove a volume that is in use — it says so and exits zero,
+	// leaving the project pinned to its old postgres for good.
+	d.removeStaleProbes(context.Background())
+
 	// Shut down our project
 	err := d.composeService.Down(context.Background(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {

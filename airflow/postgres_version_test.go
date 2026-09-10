@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"reflect"
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -298,6 +300,51 @@ func TestResolvePostgresTagLeavesCustomRepositoriesAlone(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got)
 	cli.AssertNotCalled(t, "VolumeList", mock.Anything, mock.Anything)
+}
+
+func TestReadVolumePGVersionWarnsOnlyOnRealFailures(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	capture := func(fn func()) string {
+		orig := os.Stdout
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		os.Stdout = w
+		fn()
+		require.NoError(t, w.Close())
+		os.Stdout = orig
+		out, err := io.ReadAll(r)
+		require.NoError(t, err)
+		return string(out)
+	}
+
+	t.Run("an empty data directory says nothing", func(t *testing.T) {
+		cli := new(mocks.DockerCLIClient)
+		cli.On("ImageInspect", mock.Anything, mock.Anything).Return(image.InspectResponse{}, nil).Once()
+		cli.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{}, nil).Once()
+		cli.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(container.CreateResponse{ID: "probe-id"}, nil).Once()
+		cli.On("CopyFromContainer", mock.Anything, "probe-id", pgDataDir+"/"+pgVersionFile).
+			Return(io.NopCloser(bytes.NewReader(nil)), container.PathStat{}, errdefs.ErrNotFound).Once()
+		cli.On("ContainerRemove", mock.Anything, "probe-id", mock.Anything).Return(nil).Once()
+
+		out := capture(func() { newPGTestCompose(cli).readVolumePGVersion(context.Background(), "vol") })
+		assert.Empty(t, out)
+	})
+
+	t.Run("a docker failure is reported, since the start may fail because of it", func(t *testing.T) {
+		// Without this the only symptom is the api-server health check timing out,
+		// which says nothing about the database.
+		cli := new(mocks.DockerCLIClient)
+		cli.On("ImageInspect", mock.Anything, mock.Anything).Return(image.InspectResponse{}, nil).Once()
+		cli.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{}, nil).Once()
+		cli.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(container.CreateResponse{}, errMockDocker).Once()
+
+		out := capture(func() { newPGTestCompose(cli).readVolumePGVersion(context.Background(), "vol") })
+		assert.Contains(t, out, "Could not read the PostgreSQL version")
+		assert.Contains(t, out, config.CFG.PostgresTag.GetString())
+	})
 }
 
 func TestRemoveStaleProbes(t *testing.T) {

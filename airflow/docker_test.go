@@ -526,6 +526,24 @@ services:
 	})
 }
 
+func (s *Suite) TestDockerComposeKillClearsStaleProbes() {
+	// A probe left behind by an interrupted start holds the data volume, and compose
+	// will not remove a volume in use — it reports that and exits zero, leaving the
+	// project pinned to its old postgres with no way to move it.
+	composeMock := new(mocks.DockerComposeAPI)
+	composeMock.On("Down", mock.Anything, "test", api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+
+	cli := new(mocks.DockerCLIClient)
+	cli.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{{ID: "stale-id"}}, nil).Once()
+	cli.On("ContainerRemove", mock.Anything, "stale-id", container.RemoveOptions{Force: true}).Return(nil).Once()
+
+	d := DockerCompose{projectName: "test", composeService: composeMock, cliClient: cli}
+	s.NoError(d.Kill())
+
+	cli.AssertExpectations(s.T())
+	composeMock.AssertExpectations(s.T())
+}
+
 func (s *Suite) TestComposeExportUsesTheVersionTheProjectRuns() {
 	// An export that names the configured version rather than the one the project
 	// actually runs produces a compose file that puts a new postgres on old data.
@@ -1066,6 +1084,11 @@ func (s *Suite) TestDockerComposePS() {
 
 func (s *Suite) TestDockerComposeKill() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
+	// Kill clears any version probe still holding the data volume before compose
+	// removes it. These cases are about the kill itself, so report none outstanding.
+	noProbesClient := new(mocks.DockerCLIClient)
+	noProbesClient.On("ContainerList", mock.Anything, mock.Anything).Return([]container.Summary{}, nil)
+	mockDockerCompose.cliClient = noProbesClient
 	s.Run("success", func() {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Down", mock.Anything, mockDockerCompose.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
