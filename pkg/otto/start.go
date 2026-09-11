@@ -41,6 +41,14 @@ func Start(args []string) error {
 		return ErrNotLoggedIn
 	}
 
+	// Fail fast when the signed-in user isn't a member of the org Otto would run
+	// against, instead of spawning Otto and letting the mismatch surface later as
+	// a confusing skills 403. Only a definitive 403/404 blocks; anything else is
+	// inconclusive and lets the launch proceed.
+	if err := verifyOrgMembership(cfg, newV1Client(), os.Stderr); err != nil {
+		return err
+	}
+
 	if err := EnsureBinary(); err != nil {
 		return fmt.Errorf("setting up otto: %w", err)
 	}
