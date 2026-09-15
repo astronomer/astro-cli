@@ -50,3 +50,13 @@ func (e *Engine) ReadStatus(_ string) (rt.Status, error) {
 func (e *Engine) StatusOf(rec localstate.Record) rt.Status {
 	return rec.Status(false)
 }
+
+// Clean succeeds having done nothing, rather than returning
+// ErrWindowsUnsupported like the rest of this stub.
+//
+// The others are asked to DO something standalone, and refusing is the answer.
+// This one is asked whether any standalone leftovers need removing, and on
+// Windows the answer is no — standalone never ran, so it left nothing. Failing
+// here would break `astro local reset` on Windows for a docker-mode project,
+// which is the only kind Windows has.
+func (e *Engine) Clean(_ string) error { return nil }

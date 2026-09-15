@@ -124,6 +124,97 @@ func (r *Runtime) RunInImage(ctx context.Context, projectPath string, req ImageR
 	return r.docker.RunInImage(ctx, projectPath, req)
 }
 
+// ResetReport says what a reset actually did, so a caller can tell the user
+// when part of it could not be reached.
+// The bools carry no omitempty: they are status a json consumer reads, and a
+// key that vanishes when false makes "did not happen" indistinguishable from
+// "this version does not report it".
+type ResetReport struct {
+	// Stopped reports that a live Airflow was stopped as part of this.
+	Stopped bool `json:"stopped"`
+	// ComposeProject names the compose project taken down, empty when none was.
+	ComposeProject string `json:"compose_project,omitempty"`
+	// DockerUnreachable reports that no container engine answered, so a
+	// docker-mode leftover could neither be removed nor ruled out.
+	DockerUnreachable bool `json:"docker_unreachable"`
+}
+
+// Reset stops this project's Airflow if it is running and removes the state a
+// run derives — the metadata database, the venv, the logs, the compose project
+// and its volumes. The project's own files are untouched.
+//
+// It works on a project that is already STOPPED, which is the whole reason it
+// exists rather than being Stop with a flag. A stop removes the state record,
+// and every other entry point here goes through Attach, which needs one — so
+// the case where someone most wants to wipe a corrupt database (they stopped,
+// it misbehaved, they want to start clean) was the one case with nothing to
+// attach to. Both engines can clean from the project path alone; only the
+// plumbing assumed otherwise.
+//
+// Both engines are always cleaned from the path, whether or not there is a
+// record. A record names only the mode that ran last, so a project moved
+// between modes leaves the other one's state behind, and with no record at all
+// nothing says which mode that was. Each engine acts only on evidence that its
+// own mode ran here, so the one that did not is a no-op rather than a guess.
+func (r *Runtime) Reset(ctx context.Context, projectPath string) (ResetReport, error) {
+	var report ResetReport
+
+	// The lock Start takes, for the same reason. A reset racing a start would
+	// delete the venv out from under its uv sync, or tear down containers the
+	// other half is still writing a record for. Neither Stop nor the engines'
+	// Clean takes it, so holding it across the whole reset cannot deadlock.
+	unlock, err := localstate.Lock(projectPath)
+	if err != nil {
+		return report, err
+	}
+	defer unlock()
+
+	rec, err := localstate.Load(projectPath)
+	switch {
+	case err == nil:
+		// Recorded, and possibly live: the engine that owns it knows how to
+		// take it down and clean up after itself.
+		//
+		// Whether it was live has to be read before the stop, not after.
+		// statusOf probes for real — a signal to the process group, a query to
+		// the container engine — and the stop is precisely what makes those
+		// stop answering, so asking afterwards always says "stopped" and the
+		// report would never once be true.
+		wasRunning := r.statusOf(rec).State == StateRunning
+		af, aerr := r.Attach(projectPath)
+		if aerr != nil {
+			return report, aerr
+		}
+		if serr := af.Stop(ctx, StopOptions{Clean: true}); serr != nil {
+			return report, serr
+		}
+		report.Stopped = wasRunning
+		if rec.Mode == ModeDocker {
+			report.ComposeProject = rec.ComposeProject
+		}
+	case !errors.Is(err, localstate.ErrNotRunning):
+		return report, err
+	}
+
+	// Then clean both engines from the path alone. After a stop this is a
+	// no-op for the mode that just went down — its own clean already removed
+	// the evidence each of these gates on — and it is how the other mode's
+	// leftovers go too.
+	var errs []error
+	if cerr := r.standalone.Clean(projectPath); cerr != nil {
+		errs = append(errs, cerr)
+	}
+	name, reached, derr := r.docker.Clean(ctx, projectPath)
+	if derr != nil {
+		errs = append(errs, derr)
+	}
+	if name != "" {
+		report.ComposeProject = name
+	}
+	report.DockerUnreachable = !reached
+	return report, errors.Join(errs...)
+}
+
 func (r *Runtime) Attach(projectPath string) (Airflow, error) {
 	rec, err := localstate.Load(projectPath)
 	if err != nil {

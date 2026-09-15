@@ -27,6 +27,9 @@ func (fakeRuntime) ReadStatus(string) (localrt.Status, error) {
 }
 func (fakeRuntime) List() ([]localrt.Status, error)       { return nil, localrt.ErrNotImplemented }
 func (fakeRuntime) PruneStale() ([]localrt.Status, error) { return nil, localrt.ErrNotImplemented }
+func (fakeRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
+	return localrt.ResetReport{}, localrt.ErrNotImplemented
+}
 
 func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 	t.Helper()

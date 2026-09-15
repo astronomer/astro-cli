@@ -839,11 +839,48 @@ func newResetCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runReset(ctx context.Context, yes bool) error {
-	if _, err := c.renderer(); err != nil {
+	r, err := c.renderer()
+	if err != nil {
 		return err
 	}
 	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
 		return err
 	}
-	return c.runStop(ctx, localrt.StopOptions{Clean: true})
+	dir, err := c.projectPath()
+	if err != nil {
+		return err
+	}
+	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,
+	// which needs a state record, and a stop removes one — so reset refused on
+	// exactly the projects it is for, the ones already stopped.
+	report, err := c.d.Runtime.Reset(ctx, dir)
+	if err != nil {
+		return err
+	}
+	return r.Emit(report, func(w io.Writer) error { return renderReset(w, report) })
+}
+
+func renderReset(w io.Writer, report localrt.ResetReport) error {
+	if report.Stopped {
+		if _, err := fmt.Fprintln(w, "airflow: stopped"); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprintln(w, "state: wiped"); err != nil {
+		return err
+	}
+	if report.ComposeProject != "" {
+		if _, err := fmt.Fprintf(w, "removed compose project %s and its volumes\n", report.ComposeProject); err != nil {
+			return err
+		}
+	}
+	if report.DockerUnreachable {
+		// Said rather than swallowed: a docker-mode project keeps its metadata
+		// database in a volume, so "wiped" would be a lie if the engine that
+		// holds it never answered.
+		_, err := fmt.Fprintln(w,
+			"note: no container engine answered, so any docker-mode volume for this project is still there — start the engine and run this again to remove it")
+		return err
+	}
+	return nil
 }

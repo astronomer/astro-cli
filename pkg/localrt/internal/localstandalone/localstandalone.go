@@ -490,24 +490,57 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 
 // clean removes the derived state this engine owns: AIRFLOW_HOME (metadata
 // database included), the venv, and the runtime files in the state dir. The
-// project's own files are untouched. AIRFLOW_HOME is removed at its default
-// location; a plan-supplied override is not recorded, so a custom home is
-// the plan builder's to clean once one exists.
+// project's own files are untouched.
 func (a *airflow) clean() error {
+	return a.eng.Clean(a.rec.ProjectPath)
+}
+
+// Clean removes the derived state this engine owns for a project, taking the
+// path rather than a record.
+//
+// The path is all it ever needed — the record was only ever read for
+// ProjectPath — and taking it directly is what lets `astro local reset` work on
+// a project that is already stopped. A stop removes the record, so the case
+// where someone most wants to wipe a corrupt database is exactly the case that
+// used to have nothing to attach to.
+//
+// AIRFLOW_HOME is the evidence that standalone ever ran here, and without it
+// nothing is removed — the same gate the docker engine puts on its generated
+// compose file, for the same reason. Start writes AIRFLOW_HOME and only a clean
+// removes it, so a plain stop leaves it behind, which is exactly the state this
+// is for. The .venv is why the gate has to be there: `astro local check` parses
+// DAGs with the project's own .venv interpreter whatever mode Airflow runs in,
+// so deleting it for a docker-mode project would break a command that has
+// nothing to do with standalone.
+//
+// AIRFLOW_HOME is removed at its default location; a plan-supplied override is
+// not recorded, so a custom home is the plan builder's to clean once one exists.
+func (e *Engine) Clean(projectPath string) error {
+	projectPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return fmt.Errorf("resolving %s: %w", projectPath, err)
+	}
+	airflowHome := filepath.Join(projectPath, airflowrt.StandaloneDir)
+	if _, serr := os.Stat(airflowHome); serr != nil {
+		if errors.Is(serr, os.ErrNotExist) {
+			return nil
+		}
+		return serr
+	}
+
 	var errs []error
-	for _, p := range []string{
-		filepath.Join(a.rec.ProjectPath, airflowrt.StandaloneDir),
-		filepath.Join(a.rec.ProjectPath, ".venv"),
-	} {
-		if err := os.RemoveAll(p); err != nil {
-			errs = append(errs, err)
+	for _, p := range []string{airflowHome, filepath.Join(projectPath, ".venv")} {
+		if rerr := os.RemoveAll(p); rerr != nil {
+			errs = append(errs, rerr)
 		}
 	}
-	if dir, err := rt.StateDir(a.rec.ProjectPath); err == nil {
-		for _, f := range []string{logFileName, jwtSecretFile} {
-			if err := os.Remove(filepath.Join(dir, f)); err != nil && !errors.Is(err, os.ErrNotExist) {
-				errs = append(errs, err)
-			}
+	dir, err := rt.StateDir(projectPath)
+	if err != nil {
+		return errors.Join(append(errs, err)...)
+	}
+	for _, f := range []string{logFileName, jwtSecretFile} {
+		if rerr := os.Remove(filepath.Join(dir, f)); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
+			errs = append(errs, rerr)
 		}
 	}
 	return errors.Join(errs...)

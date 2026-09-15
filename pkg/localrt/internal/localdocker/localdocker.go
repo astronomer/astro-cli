@@ -543,8 +543,87 @@ func (e *Engine) downProject(ctx context.Context, conn engineConn, name string, 
 	return e.runCompose(ctx, line, cb, args...)
 }
 
+// Clean takes down whatever a docker-mode run of this project left behind,
+// without a state record to read, and reports whether it could tell.
+//
+// Volumes go too, which is the point: a stop leaves the metadata database
+// behind by design, so a database someone wants to be rid of is precisely what
+// survives into the state where there is no record to attach to.
+//
+// The compose project is discovered by path, and where discovery finds nothing
+// the name is derived — composeProjectName is a pure function of the project
+// path, so this is the same name the engine published under rather than a
+// guess. Deriving it matters for the case that motivated this: containers
+// already down, volume still there, nothing running to find.
+//
+// dockerReached distinguishes "no docker-mode leftovers" from "could not ask".
+// Without it a machine with the engine stopped would report a complete reset
+// while a volume full of the old database sat on disk.
+func (e *Engine) Clean(ctx context.Context, projectPath string) (composeProject string, dockerReached bool, err error) {
+	// The generated compose file is the evidence that this project has ever run
+	// in docker mode: Start writes it and only a Clean removes it, so a plain
+	// stop leaves it behind — which is exactly the state a stopped docker
+	// project is in, containers gone and volume still there.
+	//
+	// Without this check a standalone-only project paid for a container-engine
+	// probe it had no use for, and a no-op `down` under a derived name was
+	// reported as "removed compose project X and its volumes" — a removal of
+	// something that never existed.
+	//
+	// Every path out of here that could not read that evidence, or could not
+	// act on it, reports dockerReached false. Saying "nothing to do" when the
+	// truth is "could not tell" is the one answer that turns into a lie in the
+	// caller's output.
+	dir, err := rt.StateDir(projectPath)
+	if err != nil {
+		return "", false, err
+	}
+	composeFile := filepath.Join(dir, composeFileName)
+	if _, serr := os.Stat(composeFile); serr != nil {
+		if errors.Is(serr, os.ErrNotExist) {
+			return "", true, nil
+		}
+		return "", false, serr
+	}
+
+	conn, name, reached := e.probeEngines(ctx, projectPath)
+	if !reached {
+		return "", false, nil
+	}
+	if name == "" {
+		// The engine answered and knows nothing of this project, which is what
+		// a stopped one looks like — its containers are gone. The volume is
+		// not, so it is taken down under the name it was published as.
+		// composeProjectName is a pure function of the path, so this is that
+		// name rather than a guess.
+		conn, err = e.preferred()
+		if err != nil {
+			return "", false, err
+		}
+		if name, err = composeProjectName(projectPath); err != nil {
+			return "", false, err
+		}
+	}
+	// The same graceful window Stop gives containers. A reset with no record
+	// still finds a live project when the record was lost rather than removed,
+	// and there is no reason for that one to be killed harder than a stop.
+	if derr := e.downProject(ctx, conn, name, gracefulStopTimeout, rt.Callbacks{}, "--volumes", "--remove-orphans"); derr != nil {
+		// The compose file stays. It is the only evidence this project runs in
+		// docker mode, and removing it after a failed teardown would make every
+		// later reset skip the volume entirely while still reporting a wipe —
+		// the database the user is trying to be rid of, silently kept forever.
+		return "", true, fmt.Errorf("taking down %s: %w", name, derr)
+	}
+	e.removeBuiltImage(ctx, conn, name)
+	if rerr := os.Remove(composeFile); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
+		return name, true, rerr
+	}
+	return name, true, nil
+}
+
 // Attach returns a handle to a running docker-mode Airflow from its state
 // record alone.
+
 func (e *Engine) Attach(projectPath string) (rt.Airflow, error) {
 	rec, err := localstate.Load(projectPath)
 	if err != nil {

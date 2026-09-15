@@ -101,6 +101,11 @@ type Runtime interface {
 	// PruneStale removes the records (and their routes) whose runtime is
 	// gone, returning what it removed. It backs `astro local list --clean`.
 	PruneStale() ([]localrt.Status, error)
+	// Reset stops a project's Airflow if it is running and wipes the state a
+	// run derives. Unlike Stop it does not go through Attach, so it serves a
+	// project that is already stopped — which is the state its record is
+	// removed in, and the one someone resetting a bad database is usually in.
+	Reset(ctx context.Context, projectPath string) (localrt.ResetReport, error)
 }
 
 // NewDeps builds the production Deps. Call it once, from main.
