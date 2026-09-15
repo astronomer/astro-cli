@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
-	projectpkg "github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -56,34 +56,24 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	}
 	project, err := c.projectPath()
 	if err != nil {
-		return err
+		// Not in a project directory. No verdict was reached, so it takes the
+		// same door as every other outcome of that kind rather than falling
+		// through to cobra and exiting 1.
+		return blocked(r, err)
 	}
 
-	// Validate the manifest before touching the environment. Two reasons, and
-	// the second is why this is not merely a nicety:
-	//
-	// A manifest problem is certain, cheap, and offline; a missing venv is
-	// expensive to fix and may not be the user's real problem. Reporting the
-	// venv first sent someone off to build an environment for a project that
-	// cannot load, and the five manifest errors waiting for them were never
-	// mentioned.
-	//
-	// And `--target astro` is documented as an alias for a plain check, but it
-	// goes through runTargetCheck, which loads the manifest — so the two
-	// spellings of the same check disagreed on the same project, one naming the
-	// manifest errors and the other the venv. Loading here is what makes the
-	// alias true.
-	if _, err := manifest.Load(filepath.Join(project, projectpkg.Marker)); err != nil {
-		return err
+	// The manifest is validated before the environment is touched: a manifest
+	// problem is certain, cheap and offline, while a missing venv is expensive
+	// to fix and may not be the real problem. It also makes `--target astro` a
+	// true alias for a plain check, since that path loads the manifest too.
+	if _, err := manifest.Load(filepath.Join(project, manifest.Marker)); err != nil {
+		return blocked(r, err)
 	}
 
 	res, err := checks.Run(ctx, checks.Options{ProjectPath: project, Strict: strict}, c.d.Checks)
 	if err != nil {
 		if errors.Is(err, checks.ErrEnvNotReady) {
-			if rerr := renderEnvNotReady(r, err); rerr != nil {
-				return rerr
-			}
-			return &ExitError{Code: checks.ExitEnvNotReady}
+			return blocked(r, err)
 		}
 		return err
 	}
@@ -107,16 +97,16 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	}
 	for _, t := range targets {
 		if !checks.KnownTarget(t) {
-			return fmt.Errorf("unknown target %q (supported: astro, mwaa, composer)", t)
+			return blocked(r, fmt.Errorf("unknown target %q (supported: astro, mwaa, composer)", t))
 		}
 	}
 	project, err := c.projectPath()
 	if err != nil {
-		return err
+		return blocked(r, err)
 	}
-	m, err := manifest.Load(filepath.Join(project, projectpkg.Marker))
+	m, err := manifest.Load(filepath.Join(project, manifest.Marker))
 	if err != nil {
-		return err
+		return blocked(r, err)
 	}
 
 	reports := make([]checks.TargetReport, 0, len(targets))
@@ -252,27 +242,50 @@ func renderCheck(r Renderer, res checks.Result, strict bool) error {
 		}
 		return enc.Encode(summary)
 	}
-	if err := renderFindingsTable(r.Out, res.Findings); err != nil {
+	budget := maxTracebacks
+	if err := renderFindingsTable(r.Out, res.Findings, &budget); err != nil {
 		return err
+	}
+	// The blank line before the verdict is the caller's, not the findings
+	// block's. Emitting it from whichever part happened to print last made the
+	// spacing depend on the KIND of finding — an import error with frames got a
+	// gap, a duplicate dag id butted straight up against the verdict.
+	if len(res.Findings) > 0 {
+		if _, err := fmt.Fprintln(r.Out); err != nil {
+			return err
+		}
 	}
 	_, err := fmt.Fprintln(r.Out, checkSummaryLine(summary))
 	return err
 }
 
-func renderFindingsTable(w io.Writer, findings []checks.Finding) error {
+func renderFindingsTable(w io.Writer, findings []checks.Finding, budget *int) error {
 	if len(findings) == 0 {
 		return nil
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "SEVERITY\tCHECK\tLOCATION\tDETAIL")
 	for _, f := range findings {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", f.Severity, f.Kind, findingLocation(f), findingDetail(f))
+		// Both text columns are sanitized, not just DETAIL: a dag_id comes from
+		// somebody's Python and a filename may legally contain a tab, and either
+		// one opens a phantom column that shifts every row below it.
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", f.Severity, f.Kind, cell(findingLocation(f)), cell(findingDetail(f)))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
 	}
-	return renderTracebacks(w, findings)
+	return renderTracebacks(w, findings, budget)
 }
+
+// cellReplacer collapses what would break a tabwriter row: a tab opens a new
+// column and shifts every row below, a newline splits the row in half. Built
+// once — a Replacer compiles a trie, and this runs per column per finding.
+var cellReplacer = strings.NewReplacer("\t", " ", "\r", "", "\n", " ")
+
+// cell makes arbitrary text safe to put in a tabwriter column. Reachable text:
+// an exception message is somebody's traceback, and findingDetail's default
+// branch passes a message through whole.
+func cell(s string) string { return cellReplacer.Replace(s) }
 
 // renderTracebacks prints each import error's full traceback under the table,
 // the way a compiler prints the source line under its summary.
@@ -282,29 +295,56 @@ func renderFindingsTable(w io.Writer, findings []checks.Finding) error {
 // WHAT broke, and the frames say WHERE, which is the half you act on. Both
 // belong in text output; --output json was carrying the whole message all along
 // and is unchanged.
-func renderTracebacks(w io.Writer, findings []checks.Finding) error {
-	printed := false
+// maxTracebacks caps how many frame blocks print per command run.
+//
+// One missing dependency makes EVERY dag file an import error with the same
+// traceback, so an uncapped dump turned a 50-dag project's report into several
+// hundred identical lines with the verdict scrolled off the top. The budget is
+// per RUN rather than per table because renderFindingsTable is shared: a
+// per-table cap would let --target mwaa,composer print five blocks, a
+// suppression count, then five more and a second count.
+//
+// Only the frames are capped. The table still lists every finding, and
+// --output json carries every traceback regardless.
+const maxTracebacks = 5
+
+// renderTracebacks prints each import error's frames under the table, the way a
+// compiler prints the source line under its summary, drawing from a budget the
+// caller owns for the whole run.
+func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error {
+	suppressed := 0
 	for _, f := range findings {
-		if f.Kind != checks.KindImportError || !strings.Contains(f.Message, "\n") {
+		// Trimmed before the test, not just inside the loop below: a message
+		// with one trailing newline has nothing to show under the table, and
+		// printing it anyway produced a "traceback" block that was a verbatim
+		// copy of the row above it.
+		body := strings.TrimRight(f.Message, "\n\r \t")
+		if f.Kind != checks.KindImportError || !strings.Contains(body, "\n") {
 			continue
 		}
-		if _, err := fmt.Fprintf(w, "\n%s:\n", findingLocation(f)); err != nil {
+		if *budget == 0 {
+			suppressed++
+			continue
+		}
+		if _, err := fmt.Fprintf(w, "\n%s:\n", cell(findingLocation(f))); err != nil {
 			return err
 		}
-		for _, line := range strings.Split(strings.TrimRight(f.Message, "\n"), "\n") {
-			if _, err := fmt.Fprintf(w, "  %s\n", line); err != nil {
+		for _, line := range strings.Split(body, "\n") {
+			if _, err := fmt.Fprintf(w, "  %s\n", strings.TrimRight(line, "\r")); err != nil {
 				return err
 			}
 		}
-		printed = true
+		*budget--
 	}
-	if !printed {
-		return nil
+	if suppressed > 0 {
+		// "traceback(s)", not "import error(s)": every one of them is still in
+		// the table above, and saying otherwise tells the reader the table they
+		// are looking at is incomplete.
+		if _, err := fmt.Fprintf(w, "\n%d more traceback(s) not shown; --output json carries every one\n", suppressed); err != nil {
+			return err
+		}
 	}
-	// Keep the caller's summary line off the last frame, so the verdict does
-	// not read as part of the traceback.
-	_, err := fmt.Fprintln(w)
-	return err
+	return nil
 }
 
 func findingLocation(f checks.Finding) string {
@@ -341,28 +381,96 @@ func firstLine(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// exceptionLine reduces a Python traceback to the line worth putting in a
-// table cell or a summary row: the last one, which is the exception type and
-// its message.
+// exceptionLine reduces a Python traceback to the one line worth putting in a
+// table cell or a summary row: the exception type and its message.
 //
-// Both callers used to take the FIRST line, which for every traceback Python
-// produces is the literal "Traceback (most recent call last):" — so check's
-// DETAIL column and health's import-error rows said the same nine words on
-// every row and told the reader nothing about any of them. The last line is the
-// part a person scans for. In check the frames then follow the table (see
-// renderTracebacks); health stays a one-line-per-item summary and does not
-// print them.
+// Finding it is not "the last line", which is what this did first and is wrong
+// for a whole class of ordinary Airflow errors. Python's exception line closes
+// the last frame block, and anything printed AFTER it is a continuation — which
+// several widely used libraries add:
 //
-// A single-line message is returned as-is, which covers an import error that
-// arrived without a traceback.
+//	sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not connect
+//	(Background on this error at: https://sqlalche.me/e/20/e3q8)
+//
+// SQLAlchemy appends that note every time, and a DAG that touches a Connection
+// at parse time is ordinary, so the most common database import error showed a
+// documentation URL where the exception belonged. pydantic ends with a "For
+// further information visit …" line, and an ExceptionGroup ends in a rule of
+// dashes. Taking the last line reported those as the diagnosis — worse than the
+// banner it replaced, which was useless but never misleading. Worst in
+// `af health`, which prints one line per import error and no frames, so the
+// exception was not merely buried there but absent.
+//
+// So the line is found by what it IS rather than by where it sits. A Python
+// exception line is a dotted type name followed by a colon —
+// "ModuleNotFoundError:", "sqlalchemy.exc.OperationalError:", "ExceptionGroup:"
+// — and the last such line is the exception being reported. Nothing else in a
+// traceback takes that shape: a frame is `File "x.py", line 2, in <module>`, a
+// source echo is a statement, the banner has a space before its colon, and
+// SQLAlchemy's note and pydantic's URL both start with something other than an
+// identifier.
+//
+// Position was tried first and is not good enough. "The last unindented line
+// whose predecessor is indented" reads the exception correctly for a plain
+// traceback but returns:
+//
+//   - "db_url" — a bare field name — for a pydantic error with TWO invalid
+//     fields, because the second field name follows the first field's indented
+//     detail block;
+//   - the banner for an ExceptionGroup, because Python 3.11+ prefixes every
+//     line of one with a "  | " margin, so no line is unindented;
+//   - the banner whenever a blank line separates the last frame from the
+//     exception, because the predecessor is then empty rather than indented.
+//
+// The margin is why gutter is stripped before matching: inside an
+// ExceptionGroup the exception line is "  | ExceptionGroup: eg (1
+// sub-exception)". Indented lines that have NO gutter are skipped, so an echoed
+// source line carrying an annotation ("    x: int = 1") cannot be mistaken for
+// an exception.
+//
+// When nothing matches, the message is not a traceback — an import error that
+// arrived without one, or Airflow's own "SyntaxError\n  line 3" shape, where
+// the type name has no colon after it. Then the FIRST non-empty line is the
+// headline; taking the last would return the indented detail under it.
 func exceptionLine(s string) string {
-	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(s, "\n\r \t"), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
-		if line := strings.TrimSpace(lines[i]); line != "" {
-			return line
+		line := strings.TrimRight(lines[i], "\r")
+		body, gutter := stripGutter(line)
+		if !gutter && isIndented(line) {
+			continue
+		}
+		if exceptionTypeRe.MatchString(body) {
+			return body
+		}
+	}
+	for _, line := range lines {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
 		}
 	}
 	return ""
+}
+
+// exceptionTypeRe matches a Python exception line: a dotted type name, then a
+// colon. Anchored, so it cannot match a colon later in a sentence.
+var exceptionTypeRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.]*:`)
+
+// stripGutter removes the margin Python 3.11+ draws down the left of an
+// ExceptionGroup traceback ("  | ", "  +-+--- 1 ---"), reporting whether one
+// was there. A line with a gutter is a traceback line however deeply it is
+// indented; a line without one is judged on its own indentation.
+func stripGutter(line string) (body string, gutter bool) {
+	t := strings.TrimLeft(line, " \t")
+	if t == "" || (t[0] != '|' && t[0] != '+') {
+		return strings.TrimSpace(line), false
+	}
+	return strings.TrimSpace(strings.TrimLeft(t[1:], " \t-+|")), true
+}
+
+// isIndented reports whether a line is indented at all.
+func isIndented(line string) bool {
+	return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
 }
 
 func checkSummaryLine(s checkSummary) string {
@@ -377,9 +485,26 @@ func checkSummaryLine(s checkSummary) string {
 	return fmt.Sprintf("checks %s%s: %d DAGs, %d errors, %d warnings", verdict, tail, s.Dags, s.Errors, s.Warnings)
 }
 
-// renderEnvNotReady reports that the environment could not be inspected. In
+// blocked reports an outcome where check reached no verdict at all — not in a
+// project, a manifest that will not load, an unusable environment, an unknown
+// target — and exits 2.
+//
+// One door for all of them, because the three contracts they share are easy to
+// break one site at a time: the diagnosis goes to stdout (docs/install.md tells
+// an agent to read it), json mode gets {"event":"error"} rather than cobra's
+// generic object, and the code is 2 rather than 1. Exit 1 means the DAGs failed
+// a check, so a CI job branching on the two must never see it for "you are not
+// in a project directory".
+func blocked(r Renderer, err error) error {
+	if rerr := renderCheckBlocked(r, err); rerr != nil {
+		return rerr
+	}
+	return &ExitError{Code: checks.ExitEnvNotReady}
+}
+
+// renderCheckBlocked writes the reason check could not reach a verdict. In
 // json mode it is a single structured line; in text mode, the guidance.
-func renderEnvNotReady(r Renderer, err error) error {
+func renderCheckBlocked(r Renderer, err error) error {
 	msg := err.Error()
 	if r.Format == FormatJSON {
 		return json.NewEncoder(r.Out).Encode(struct {
@@ -405,20 +530,23 @@ func renderTargetChecks(r Renderer, reports []checks.TargetReport, strict bool) 
 		}
 		return nil
 	}
+	// One budget across every target, so the same traceback is not dumped once
+	// per report.
+	budget := maxTracebacks
 	for i := range reports {
 		if i > 0 {
 			if _, err := fmt.Fprintln(r.Out); err != nil {
 				return err
 			}
 		}
-		if err := renderTargetReport(r.Out, &reports[i], strict); err != nil {
+		if err := renderTargetReport(r.Out, &reports[i], strict, &budget); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func renderTargetReport(w io.Writer, rep *checks.TargetReport, strict bool) error {
+func renderTargetReport(w io.Writer, rep *checks.TargetReport, strict bool, budget *int) error {
 	if _, err := fmt.Fprintf(w, "== %s ==\n", rep.Target); err != nil {
 		return err
 	}
@@ -444,8 +572,17 @@ func renderTargetReport(w io.Writer, rep *checks.TargetReport, strict bool) erro
 		if _, err := fmt.Fprintln(w, "no DAG findings"); err != nil {
 			return err
 		}
-	} else if err := renderFindingsTable(w, rep.Findings); err != nil {
-		return err
+	} else {
+		if err := renderFindingsTable(w, rep.Findings, budget); err != nil {
+			return err
+		}
+		// The same separator renderCheck emits. Both callers of
+		// renderFindingsTable need it, and owning it here rather than inside
+		// the findings block is what stops the spacing depending on which kind
+		// of finding printed last.
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
 	}
 	if err := renderConstraintOutcome(w, rep.Constraints); err != nil {
 		return err

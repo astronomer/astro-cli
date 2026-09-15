@@ -29,8 +29,17 @@ const (
 	// ExitChecksFailed means at least one DAG failed a check (or, under
 	// --strict, raised a warning).
 	ExitChecksFailed = 1
-	// ExitEnvNotReady means the project environment could not be inspected —
-	// no .venv, or no Airflow in it — so no verdict was reached.
+	// ExitEnvNotReady means no verdict was reached, so nothing is known about
+	// the DAGs either way.
+	//
+	// The environment is the case it is named for and the one this package
+	// raises: no .venv, or no Airflow in it. A caller signals the same code for
+	// anything else that stops a check before it can judge — not being in a
+	// project directory, a manifest that will not load, an unknown target — and
+	// should, because the distinction CI needs is "the DAGs are bad" (1) versus
+	// "I could not tell" (2), not which of the second kind it was. The name is
+	// narrower than the meaning for compatibility: it is public API in a
+	// sub-module other tools build against.
 	ExitEnvNotReady = 2
 )
 

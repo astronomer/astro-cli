@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,6 +92,10 @@ func (p stubTargetParser) ParseWith(context.Context, string, checks.ParseInput) 
 // a project the check can report on.
 const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\nairflow = '3.1'\n"
 
+// brokenManifest fails manifest.Load on an unknown [tool.astro] key. Named
+// beside its valid counterpart so a change to Load's strictness is one edit.
+const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nairflow = '3.1'\nbogus_key = 'x'\n"
+
 func TestTargetComposerPassesCleanly(t *testing.T) {
 	d, out := targetDeps(t)
 	if err := execute(t, d, "local", "check", "--target", "composer"); err != nil {
@@ -142,10 +147,19 @@ func TestTargetCheckJSONEmitsPerTargetNDJSON(t *testing.T) {
 }
 
 func TestTargetCheckUnknownTargetErrors(t *testing.T) {
-	d, _ := targetDeps(t)
+	d, out := targetDeps(t)
 	err := execute(t, d, "local", "check", "--target", "gcp")
-	if err == nil || !strings.Contains(err.Error(), "unknown target") {
-		t.Errorf("an unknown target should error clearly, got %v", err)
+	// No verdict was reached, so it takes the same door as every other outcome
+	// of that kind: message on stdout, exit 2 rather than the DAG-failure 1.
+	var exit *ExitError
+	if !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+	if exit.Code != checks.ExitEnvNotReady {
+		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
+	}
+	if !strings.Contains(out.String(), "unknown target") {
+		t.Errorf("stdout should name the problem, got %q", out.String())
 	}
 }
 
@@ -203,8 +217,16 @@ func TestCheckImportErrorFailsWithCode1(t *testing.T) {
 	if exit.Code != checks.ExitChecksFailed {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitChecksFailed)
 	}
-	if !strings.Contains(out.String(), "dags/bad.py") || !strings.Contains(out.String(), "boom") {
-		t.Errorf("table missing the import error: %q", out.String())
+	// Asserted against the ROW, not the whole output. Checking the output as a
+	// whole stopped testing anything once the frames began printing under the
+	// table: the substring matched the traceback block whatever the row said,
+	// so a regression that emptied the DETAIL column would have passed.
+	row, ok := lineContaining(out.String(), "import_error")
+	if !ok {
+		t.Fatalf("no import_error row: %q", out.String())
+	}
+	if !strings.Contains(row, "dags/bad.py") || !strings.Contains(row, "boom") {
+		t.Errorf("row missing the file or the message: %q", row)
 	}
 }
 
@@ -236,8 +258,7 @@ func TestCheckStrictTurnsWarningIntoFailure(t *testing.T) {
 func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
 	d, out := testDeps(t)
 	dir := t.TempDir()
-	broken := "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nairflow = '3.1'\nbogus_key = 'x'\n"
-	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(broken), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(brokenManifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return dir, nil }
@@ -245,14 +266,54 @@ func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
 	d.Checks = stubParser{err: wrapNotReady()}
 
 	err := execute(t, d, "local", "check")
-	if err == nil {
-		t.Fatal("a check on an invalid manifest must fail")
+	var exit *ExitError
+	if !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "bogus_key") {
-		t.Errorf("error should name the manifest key, got %v", err)
+	// Exit 2, not 1: no verdict was reached. 1 means the DAGs failed a check,
+	// and a CI job branching on the two must not read a manifest typo as one.
+	if exit.Code != checks.ExitEnvNotReady {
+		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
+	}
+	// On stdout, where docs/install.md tells an agent to read it.
+	if !strings.Contains(out.String(), "bogus_key") {
+		t.Errorf("stdout should name the manifest key, got %q", out.String())
 	}
 	if strings.Contains(out.String(), "astro local start") {
 		t.Errorf("should not send the user to build an environment: %q", out.String())
+	}
+}
+
+// The manifest problem reaches a json consumer in the shape it switches on,
+// rather than cobra's generic error object.
+func TestCheckManifestProblemJSONCarriesAnErrorEvent(t *testing.T) {
+	d, out := testDeps(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(brokenManifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	// Set even though the manifest should fail first: without it, a regression
+	// that reordered the two would dereference a nil parser and report a panic
+	// instead of "the manifest was not reported first".
+	d.Checks = stubParser{err: wrapNotReady()}
+
+	var exit *ExitError
+	if err := execute(t, d, "local", "check", "--output", "json"); !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+	var got struct {
+		Event   string `json:"event"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out.String())), &got); err != nil {
+		t.Fatalf("stdout is not one json object: %v: %q", err, out.String())
+	}
+	if got.Event != "error" {
+		t.Errorf("event = %q, want \"error\"", got.Event)
+	}
+	if !strings.Contains(got.Message, "bogus_key") {
+		t.Errorf("message should name the key, got %q", got.Message)
 	}
 }
 
@@ -261,23 +322,32 @@ func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
 // path loaded the manifest and the plain path did not, so the same project
 // reported its manifest errors one way and a missing venv the other.
 func TestCheckAndTargetAstroAgreeOnAnInvalidManifest(t *testing.T) {
-	broken := "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nairflow = '3.1'\nbogus_key = 'x'\n"
 	for _, args := range [][]string{
 		{"local", "check"},
 		{"local", "check", "--target", "astro"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			d, _ := testDeps(t)
+			d, out := testDeps(t)
 			dir := t.TempDir()
-			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(broken), 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(brokenManifest), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			d.WorkingDir = func() (string, error) { return dir, nil }
 			d.Checks = stubParser{err: wrapNotReady()}
 
+			// Both spellings agree on all three: the problem on stdout, the
+			// key named, and exit 2 — "no verdict reached" — rather than 1,
+			// which means the DAGs failed a check.
 			err := execute(t, d, args...)
-			if err == nil || !strings.Contains(err.Error(), "bogus_key") {
-				t.Errorf("want the manifest error, got %v", err)
+			var exit *ExitError
+			if !errors.As(err, &exit) {
+				t.Fatalf("want ExitError, got %v", err)
+			}
+			if exit.Code != checks.ExitEnvNotReady {
+				t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
+			}
+			if !strings.Contains(out.String(), "bogus_key") {
+				t.Errorf("stdout should name the manifest key, got %q", out.String())
 			}
 		})
 	}
@@ -316,6 +386,222 @@ func TestCheckImportErrorShowsTheExceptionThenTheFrames(t *testing.T) {
 	// The frames are the half that says WHERE, so they have to survive.
 	if !strings.Contains(got, "line 2, in <module>") {
 		t.Errorf("frames missing from the output: %q", got)
+	}
+}
+
+// Every traceback shape the review of #177 turned up, plus the degenerate
+// ones. The rule is "the line closing the final frame block", not "the last
+// line" — see exceptionLine.
+func TestExceptionLine(t *testing.T) {
+	const frames = "Traceback (most recent call last):\n" +
+		"  File \"/p/dags/bad.py\", line 2, in <module>\n" +
+		"    boom()\n"
+
+	for _, tc := range []struct{ name, in, want string }{
+		{
+			"plain traceback",
+			frames + "ModuleNotFoundError: No module named 'nope'",
+			"ModuleNotFoundError: No module named 'nope'",
+		},
+		{
+			// SQLAlchemy appends this on every error it raises.
+			"exception with a trailing note",
+			frames + "sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not connect\n" +
+				"(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+			"sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not connect",
+		},
+		{
+			// pydantic's per-field detail, whose own last line is a URL.
+			"exception with an indented detail block",
+			frames + "pydantic_core.ValidationError: 1 validation error for Settings\n" +
+				"api_key\n" +
+				"  Field required [type=missing]\n" +
+				"    For further information visit https://errors.pydantic.dev/2.6/v/missing",
+			"pydantic_core.ValidationError: 1 validation error for Settings",
+		},
+		{
+			// The OUTER exception is the one to report.
+			"chained traceback",
+			frames + "ValueError: inner\n\n" +
+				"The above exception was the direct cause of the following exception:\n\n" +
+				"Traceback (most recent call last):\n" +
+				"  File \"/p/dags/bad.py\", line 9, in <module>\n" +
+				"    outer()\n" +
+				"RuntimeError: outer",
+			"RuntimeError: outer",
+		},
+		{
+			// No frames: Airflow's own import-error shape in health_test.
+			"headline with an indented detail and no frames",
+			"SyntaxError\n  line 3",
+			"SyntaxError",
+		},
+		{
+			// TWO invalid fields. The second field name follows the first
+			// field's indented detail, so a positional rule reads it as the
+			// exception and reports a bare "db_url".
+			"pydantic with two invalid fields",
+			frames + "pydantic_core.ValidationError: 2 validation errors for Settings\n" +
+				"api_key\n  Field required [type=missing]\n    For further information visit https://x\n" +
+				"db_url\n  Field required [type=missing]\n    For further information visit https://x",
+			"pydantic_core.ValidationError: 2 validation errors for Settings",
+		},
+		{
+			// Python 3.11+ draws a margin down the left of an ExceptionGroup, so
+			// EVERY line is indented. The sub-exception is reported rather than
+			// the group header: "ExceptionGroup: eg (1 sub-exception)" names a
+			// container, "ValueError: 1" names what actually broke, and on
+			// `af health` — one line, no frames — that is the whole diagnosis.
+			"exception group reports the sub-exception",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 5, in <module>\n" +
+				"  |     raise ExceptionGroup(\"eg\", [ValueError(1)])\n" +
+				"  | ExceptionGroup: eg (1 sub-exception)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +------------------------------------",
+			"ValueError: 1",
+		},
+		{
+			// A blank line between the last frame and the exception leaves a
+			// positional rule with an empty predecessor.
+			"blank line before the exception",
+			"Traceback (most recent call last):\n  File \"x.py\", line 1\n\nValueError: bad",
+			"ValueError: bad",
+		},
+		{
+			// An echoed source line carrying an annotation looks like an
+			// exception once trimmed, so indentation without a gutter is skipped.
+			"annotated source line is not an exception",
+			"Traceback (most recent call last):\n  File \"x.py\", line 2, in <module>\n    x: int = 1\nTypeError: nope",
+			"TypeError: nope",
+		},
+		{"single line", "boom", "boom"},
+		{"single line with trailing newline", "boom\n", "boom"},
+		{"empty", "", ""},
+		{"whitespace only", "   \n\t\n", ""},
+		{
+			"crlf line endings",
+			"Traceback (most recent call last):\r\n  File \"x.py\", line 1\r\nValueError: bad\r\n",
+			"ValueError: bad",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := exceptionLine(tc.in); got != tc.want {
+				t.Errorf("exceptionLine:\n got  %q\n want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// One missing dependency makes every dag file an import error with the same
+// traceback, so the frames are capped. The table still lists them all.
+func TestCheckCapsTheTracebackDump(t *testing.T) {
+	traceback := "Traceback (most recent call last):\n  File \"x.py\", line 1\nModuleNotFoundError: No module named 'nope'"
+	report := checks.ParseReport{}
+	for i := range maxTracebacks + 3 {
+		report.ImportErrors = append(report.ImportErrors, checks.ReportImportErr{
+			File:    fmt.Sprintf("dags/d%d.py", i),
+			Message: traceback,
+		})
+	}
+	d, out := checkDeps(t)
+	d.Checks = stubParser{report: report}
+
+	var exit *ExitError
+	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+
+	got := out.String()
+	if n := strings.Count(got, "Traceback (most recent call last)"); n != maxTracebacks {
+		t.Errorf("printed %d frame blocks, want %d", n, maxTracebacks)
+	}
+	// "traceback(s)", not "import error(s)": every import error is still listed
+	// in the table, and only the frames were suppressed.
+	if !strings.Contains(got, "3 more traceback(s) not shown") {
+		t.Errorf("nothing said how many tracebacks were suppressed: %q", got)
+	}
+	if strings.Contains(got, "import error(s) not shown") {
+		t.Errorf("suppression line claims findings are missing from the table: %q", got)
+	}
+	// Every finding is still in the table, capped frames or not.
+	for i := range maxTracebacks + 3 {
+		if _, ok := lineContaining(got, fmt.Sprintf("dags/d%d.py", i)); !ok {
+			t.Errorf("dags/d%d.py missing from the table", i)
+		}
+	}
+}
+
+// The budget is per RUN, not per report: two targets sharing one traceback must
+// not print five blocks each with two contradictory suppression counts.
+func TestCheckTracebackBudgetIsSharedAcrossTargets(t *testing.T) {
+	traceback := "Traceback (most recent call last):\n  File \"x.py\", line 1\nModuleNotFoundError: No module named 'nope'"
+	report := checks.ParseReport{}
+	for i := range maxTracebacks {
+		report.ImportErrors = append(report.ImportErrors, checks.ReportImportErr{
+			File:    fmt.Sprintf("dags/d%d.py", i),
+			Message: traceback,
+		})
+	}
+	d, out := targetDeps(t)
+	d.CheckVenv = stubTargetParser{report: report}
+
+	var exit *ExitError
+	if err := execute(t, d, "local", "check", "--target", "composer,mwaa"); !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+
+	got := out.String()
+	if n := strings.Count(got, "Traceback (most recent call last)"); n != maxTracebacks {
+		t.Errorf("printed %d frame blocks across both targets, want %d", n, maxTracebacks)
+	}
+	if n := strings.Count(got, "traceback(s) not shown"); n != 1 {
+		t.Errorf("printed %d suppression lines, want 1", n)
+	}
+}
+
+// A message that is one line plus a trailing newline has nothing to show under
+// the table, and printing it anyway repeated the row verbatim.
+func TestCheckPrintsNoTracebackForASingleLineMessage(t *testing.T) {
+	d, out := checkDeps(t)
+	d.Checks = stubParser{report: checks.ParseReport{
+		ImportErrors: []checks.ReportImportErr{{File: "dags/bad.py", Message: "ModuleNotFoundError: no module\n"}},
+	}}
+
+	var exit *ExitError
+	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+	if n := strings.Count(out.String(), "ModuleNotFoundError"); n != 1 {
+		t.Errorf("message appears %d times, want once (in the row): %q", n, out.String())
+	}
+}
+
+// A tab in an exception message would open a new tabwriter column and shift
+// every row under it.
+func TestCheckKeepsTheTableAlignedAroundATab(t *testing.T) {
+	d, out := checkDeps(t)
+	d.Checks = stubParser{report: checks.ParseReport{
+		ImportErrors: []checks.ReportImportErr{
+			{File: "dags/a.py", Message: "ValueError: bad\tvalue here"},
+			{File: "dags/b.py", Message: "ValueError: plain"},
+		},
+	}}
+
+	var exit *ExitError
+	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+	rowA, ok := lineContaining(out.String(), "dags/a.py")
+	if !ok {
+		t.Fatalf("no row for dags/a.py: %q", out.String())
+	}
+	if strings.Contains(rowA, "\t") {
+		t.Errorf("row carries a tab, which shifts the table: %q", rowA)
+	}
+	if !strings.Contains(rowA, "bad value here") {
+		t.Errorf("the tab should become a space, got %q", rowA)
 	}
 }
 
