@@ -70,8 +70,9 @@ func copyDags(projectDir, outDir string) error {
 	return copyDir(src, dst)
 }
 
-// copyDir copies the tree at src to dst, recreating directories and files. It
-// skips nothing: the whole dags/ folder ships as-is.
+// copyDir copies the tree at src to dst, recreating directories and files.
+// Everything the user wrote ships as-is; Python's own cache directory does not
+// — see skipCache.
 func copyDir(src, dst string) error {
 	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -83,6 +84,9 @@ func copyDir(src, dst string) error {
 		}
 		target := filepath.Join(dst, rel)
 		if d.IsDir() {
+			if skipCache(d, path, src) {
+				return filepath.SkipDir
+			}
 			return os.MkdirAll(target, treeDirPerm)
 		}
 		if !d.Type().IsRegular() {
@@ -90,6 +94,44 @@ func copyDir(src, dst string) error {
 		}
 		return copyFile(path, target)
 	})
+}
+
+const pycacheDir = "__pycache__"
+
+// skipCache reports whether a walked directory is Python's bytecode cache, and
+// is the ONE rule the three walks over a project share — copyDir, zipDir and
+// dirHasFiles. They have to share it: dirHasFiles decides whether MWAA gets a
+// plugins.zip at all, and when it answered that question by a different rule
+// than the walk it authorizes, a plugins/ holding only a __pycache__ with one
+// non-.pyc file in it (Cython's .so, or the temp file CPython leaves when a
+// parse is killed mid-write) produced a 22-byte, zero-entry plugins.zip — and
+// the artifact's next-steps text still told the user to point a live MWAA
+// environment at it. Worse than the junk it replaced, which was at least inert.
+//
+// It is deliberately a DIRECTORY rule and nothing more. An earlier version also
+// dropped any file named *.pyc or *.pyo, which was wrong twice:
+//
+//   - A loose sourceless .pyc, with no .py beside it, IS importable — that is
+//     PEP 3147's legacy layout, and a project may legitimately vendor a
+//     compiled-only module. Dropping it silently broke the DAG that imported
+//     it. The rationale for dropping it ("Python will not load a sourceless
+//     .pyc") is true only INSIDE __pycache__, which this rule already covers,
+//     so the suffix check bought nothing and cost that.
+//   - .pyo has not been produced by any CPython since 3.5 (PEP 488 replaced it
+//     with .opt-N.pyc inside __pycache__), so that arm could only ever have
+//     matched a user's own file.
+//
+// Nor is this the same rule pkg/scaffold applies when it decides whether a
+// project has DAGs: that one also treats dotfiles as bookkeeping, and here a
+// dotfile must ship, because dags/.airflowignore is a real file Airflow reads
+// out of the bucket (pkg/airflowrt scaffolds one). The two look alike and must
+// not be merged.
+//
+// The walk root is never skipped: WalkDir calls back for src itself, and
+// returning SkipDir there would silently produce an empty artifact for
+// `--out-dir __pycache__`.
+func skipCache(d os.DirEntry, path, root string) bool {
+	return d.Name() == pycacheDir && path != root
 }
 
 func copyFile(src, dst string) error {
@@ -120,14 +162,30 @@ func writeFile(dir, name, content string) error {
 // dirHasFiles reports whether dir holds at least one regular, non-hidden file.
 // A folder carrying only a .gitkeep placeholder reads as empty, so an untouched
 // plugins/ or include/ does not produce an empty plugins.zip or a stray warning.
+//
+// It must answer by the SAME rule the walk it gates uses, which is what
+// skipCache is for: this predicate decides whether MWAA is told to upload a
+// plugins.zip, and zipDir decides what goes in it. Any disagreement between the
+// two is an empty zip with an upload instruction attached.
+//
+// The doc above has always said "regular", and now the code does too. Without
+// that check a plugins/ whose only entry is a symlink answered true here and
+// then produced an empty zip in zipDir, which drops irregular entries — the
+// same failure as the cache mismatch, by a different route.
 func dirHasFiles(dir string) bool {
 	found := false
 	//nolint:errcheck // a walk error just leaves found false
-	filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
 			return nil
 		}
-		if strings.HasPrefix(d.Name(), ".") {
+		if d.IsDir() {
+			if skipCache(d, path, dir) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") || !d.Type().IsRegular() {
 			return nil
 		}
 		found = true
@@ -162,7 +220,13 @@ func zipDir(root, path string) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if d.IsDir() || !d.Type().IsRegular() {
+		if d.IsDir() {
+			if skipCache(d, p, root) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		rel, err := filepath.Rel(root, p)

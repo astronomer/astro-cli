@@ -119,6 +119,150 @@ func TestTreeTargetsCopyDags(t *testing.T) {
 	}
 }
 
+// A local run leaves __pycache__ behind, and the artifact used to carry it into
+// the bucket — including bytecode for DAGs that had since been deleted, which
+// leaks the names of files no longer in the project, and bytecode built by
+// whichever interpreter happened to run locally.
+func TestTreeTargetsSkipBytecode(t *testing.T) {
+	for _, target := range []Target{NewMWAATarget(), NewComposerTarget()} {
+		req := newProject(t, withPlugin("p.py", "p = 1\n"))
+		// What a local parse leaves behind, at every level the walk reaches.
+		writeInto(t, req.ProjectDir, filepath.Join("dags", "__pycache__", "one.cpython-313.pyc"), "bytecode\n")
+		writeInto(t, req.ProjectDir, filepath.Join("dags", "__pycache__", "deleted.cpython-312.pyc"), "bytecode\n")
+		writeInto(t, req.ProjectDir, filepath.Join("dags", "sub", "__pycache__", "two.cpython-313.pyc"), "bytecode\n")
+		writeInto(t, req.ProjectDir, filepath.Join("plugins", "__pycache__", "p.cpython-313.pyc"), "bytecode\n")
+		// A stray .pyc outside __pycache__ is still not source.
+		writeInto(t, req.ProjectDir, filepath.Join("dags", "loose.pyc"), "bytecode\n")
+
+		_, err := target.Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err, target.Name())
+
+		// The source still ships.
+		assert.Equal(t, "one = 1\n", readArtifact(t, req.OutDir, filepath.Join("dags", "one.py")), target.Name())
+		assert.Equal(t, "two = 2\n", readArtifact(t, req.OutDir, filepath.Join("dags", "sub", "two.py")), target.Name())
+
+		// A loose .pyc with no source beside it DOES ship: it is importable
+		// (PEP 3147's legacy layout), so a project may be vendoring a
+		// compiled-only module and dropping it would break the DAG that
+		// imports it.
+		assert.Equal(t, "bytecode\n", readArtifact(t, req.OutDir, filepath.Join("dags", "loose.pyc")), target.Name())
+
+		// No cache directory survives, anywhere in the artifact. Checked by
+		// path COMPONENT, not substring: a directory the user named
+		// something.pyc is their file and ships.
+		require.NoError(t, filepath.WalkDir(req.OutDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				assert.NotEqual(t, pycacheDir, d.Name(), "%s: %s", target.Name(), path)
+			}
+			return nil
+		}), target.Name())
+
+		// MWAA zips its plugins rather than copying them, so walking the tree
+		// would not see inside. Look in the zip too.
+		if target.Name() == TargetMWAA {
+			zr, err := zip.OpenReader(filepath.Join(req.OutDir, "plugins.zip"))
+			require.NoError(t, err)
+			// Assert the zip has contents BEFORE asserting what is absent: a
+			// loop over an empty zip runs no assertions at all, which is how an
+			// empty plugins.zip passed this test before.
+			require.NotEmpty(t, zr.File, "plugins.zip is empty")
+			var names []string
+			for _, f := range zr.File {
+				names = append(names, f.Name)
+				assert.NotContains(t, strings.Split(f.Name, "/"), pycacheDir,
+					"plugins.zip carries a cache dir: %s", f.Name)
+			}
+			assert.Contains(t, names, "p.py", "the real plugin did not ship")
+			zr.Close()
+		}
+	}
+}
+
+// The gate that decides whether MWAA is told to upload a plugins.zip has to use
+// the same rule as the walk that fills it. It did not: it asked "is there a file
+// that is not named *.pyc", while the walk skipped the whole __pycache__
+// directory. So one non-.pyc file inside that directory — Cython's .so, or the
+// temp file CPython leaves when a parse is killed mid-write — produced a
+// 22-byte, zero-entry zip, with the next-steps text still telling the user to
+// point a live MWAA environment at it.
+func TestMWAAPluginsZipIsNeverEmptyWhenAdvertised(t *testing.T) {
+	for _, tc := range []struct{ name, rel string }{
+		{"cython artifact in the cache", filepath.Join("plugins", pycacheDir, "fast.cpython-313-darwin.so")},
+		{"interrupted write in the cache", filepath.Join("plugins", pycacheDir, "p.cpython-313.pyc.918273")},
+		{"only bytecode in the cache", filepath.Join("plugins", pycacheDir, "p.cpython-313.pyc")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newProject(t)
+			writeInto(t, req.ProjectDir, tc.rel, "not source\n")
+
+			res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
+			require.NoError(t, err)
+
+			zipPath := filepath.Join(req.OutDir, "plugins.zip")
+			if _, statErr := os.Stat(zipPath); statErr == nil {
+				zr, openErr := zip.OpenReader(zipPath)
+				require.NoError(t, openErr)
+				defer zr.Close()
+				require.NotEmpty(t, zr.File, "an advertised plugins.zip must not be empty")
+			}
+			// And if there is no zip, nothing may tell the user to upload one.
+			for _, step := range res.NextSteps {
+				assert.NotContains(t, step, "plugins.zip",
+					"next steps advertise a plugins.zip that was not written")
+			}
+		})
+	}
+}
+
+// A symlink is not a regular file, so zipDir drops it — which means a plugins/
+// whose only entry is one must not be advertised either. Same failure as the
+// cache mismatch, by a different route.
+func TestMWAASymlinkOnlyPluginsMakesNoZip(t *testing.T) {
+	req := newProject(t)
+	realFile := filepath.Join(req.ProjectDir, "include", "real.py")
+	writeInto(t, req.ProjectDir, filepath.Join("include", "real.py"), "x = 1\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, "plugins"), 0o755))
+	if err := os.Symlink(realFile, filepath.Join(req.ProjectDir, "plugins", "link.py")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NoFileExists(t, filepath.Join(req.OutDir, "plugins.zip"))
+	for _, step := range res.NextSteps {
+		assert.NotContains(t, step, "plugins.zip")
+	}
+}
+
+// dirHasFiles also gates the include/ warning, so the rule it uses must not
+// quietly change what gets warned about. An include/ holding a real module —
+// even a compiled one — still warns, because include/ is never shipped and the
+// DAG importing from it breaks at runtime.
+func TestIncludeWarningSurvivesCompiledOnlyModules(t *testing.T) {
+	req := newProject(t)
+	writeInto(t, req.ProjectDir, filepath.Join("include", "shared.pyc"), "bytecode\n")
+
+	res, err := NewComposerTarget().Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.True(t, hasWarning(res.Warnings, "include"),
+		"include/ with a compiled module produced no warning: %v", res.Warnings)
+}
+
+// A plugins/ holding nothing but a local run's __pycache__ has no plugins in
+// it, so it must not yield a plugins.zip the next-steps text then tells the
+// user to upload.
+func TestMWAABytecodeOnlyPluginsMakesNoZip(t *testing.T) {
+	req := newProject(t)
+	writeInto(t, req.ProjectDir, filepath.Join("plugins", "__pycache__", "p.cpython-313.pyc"), "bytecode\n")
+
+	_, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NoFileExists(t, filepath.Join(req.OutDir, "plugins.zip"))
+}
+
 func TestTreeTargetsDefaultOutDir(t *testing.T) {
 	for _, target := range []Target{NewMWAATarget(), NewComposerTarget()} {
 		req := newProject(t)
