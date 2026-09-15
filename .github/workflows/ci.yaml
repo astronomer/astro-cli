@@ -138,12 +138,35 @@ jobs:
 
   integration-test:
     needs: [lint, test, test-windows, detect-changes]
+    # Deliberately no branch name here. `on: push: branches:` above already
+    # decides which branches get a push build, so every push event that reaches
+    # this workflow is a push to a trunk branch by construction — testing
+    # `github.event_name == 'push'` says "a push to trunk" without naming one.
+    #
+    # This condition used to read `github.ref == 'refs/heads/main'`, written
+    # when main was the default branch. The default branch became v2 and the
+    # push trigger moved with it, but this line did not, so the first clause
+    # could never be true and the integration tests were skipped on every merge
+    # to v2 for the life of the branch. Naming the branch in two places is what
+    # allowed the two to disagree; one place cannot.
+    #
+    # It also survives the move back: when v2 is promoted and the default
+    # branch is main again, the `on:` trigger is the only edit, and a branch
+    # added there (a release branch, say) is covered automatically rather than
+    # silently skipped. `github.event.repository.default_branch` would also be
+    # name-agnostic, but it can disagree with the trigger; this cannot.
+    #
+    # detect-changes is skipped on anything but a pull_request, and a skipped
+    # dependency would skip this job too, which is what the always() guard is
+    # for. !failure() && !cancelled() keeps the real gating: don't run the slow
+    # job if lint or the unit tests failed.
     if: >-
       always() &&
       !failure() &&
       !cancelled() &&
       (
-        github.ref == 'refs/heads/main' ||
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'pull_request' && needs.detect-changes.outputs.src == 'true')
       )
     runs-on: ubuntu-latest
