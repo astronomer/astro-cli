@@ -115,7 +115,8 @@ func Load(projectPath string) (State, error) {
 		return State{}, err
 	}
 	path := filepath.Join(dir, stateFile)
-	raw, err := os.ReadFile(path)
+	// fsatomic, to match the write: two processes share this file.
+	raw, err := fsatomic.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return State{}, nil
 	}

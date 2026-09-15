@@ -2,7 +2,10 @@ module github.com/astronomer/astro-cli/pkg/proxy
 
 go 1.26.1
 
-require github.com/stretchr/testify v1.11.1
+require (
+	github.com/astronomer/astro-cli/pkg/fsatomic v0.0.0-00010101000000-000000000000
+	github.com/stretchr/testify v1.11.1
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -12,3 +15,5 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/astronomer/astro-cli/pkg/fsatomic => ../fsatomic

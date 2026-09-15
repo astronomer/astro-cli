@@ -120,7 +120,10 @@ func Load(projectPath string) (Record, error) {
 }
 
 func loadFrom(path string) (Record, error) {
-	raw, err := os.ReadFile(path)
+	// fsatomic, to match the write: a record being republished is briefly
+	// unopenable on Windows, and a reader arriving then is asking about a
+	// project that is very much running.
+	raw, err := fsatomic.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return Record{}, ErrNotRunning
 	}

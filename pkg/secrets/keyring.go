@@ -228,7 +228,11 @@ func (s *keyringStore) path(key string) string {
 
 func readValueFile(path string) (valueFile, error) {
 	var vf valueFile
-	raw, err := os.ReadFile(path)
+	// fsatomic, not os: the vault is written by the CLI and by Astro Desktop,
+	// and on Windows a value being republished is briefly unopenable. A Get
+	// racing the other tool's Set on the same key should wait that out rather
+	// than report the secret unreadable.
+	raw, err := fsatomic.ReadFile(path)
 	if err != nil {
 		return vf, err
 	}

@@ -2,11 +2,10 @@ package proxy
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 // A running proxy publishes what it is and where it listens, so a tool that did
@@ -61,88 +60,7 @@ func WriteRecord(path string, r Record) error {
 	if strings.ContainsAny(ver, " \t\n") || strings.ContainsAny(r.Port, " \t\n") {
 		return fmt.Errorf("proxy record fields cannot contain whitespace: version %q, port %q", ver, r.Port)
 	}
-	return writeFileAtomic(path, []byte(fmt.Sprintf("%d %s %s", r.PID, ver, r.Port)))
-}
-
-// writeFileAtomic publishes data at path via a temp file and a rename, so a
-// reader sees either the previous content or the new one and never a partial
-// write. The explicit chmod is because CreateTemp's 0o600 is not what a
-// pre-existing file's mode would have been.
-func writeFileAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
-	if err != nil {
-		return fmt.Errorf("creating temp file for %s: %w", path, err)
-	}
-	tmpPath := tmp.Name()
-	_, werr := tmp.Write(data)
-	if cerr := tmp.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr == nil {
-		werr = os.Chmod(tmpPath, FilePermRW)
-	}
-	if werr == nil {
-		werr = renameOver(tmpPath, path)
-	}
-	if werr != nil {
-		os.Remove(tmpPath) //nolint:errcheck // best-effort cleanup of our own temp
-		return fmt.Errorf("writing %s: %w", path, werr)
-	}
-	return nil
-}
-
-// renameRetries and renameRetryWait bound the waits below, on both sides of the
-// same contention: a publish that cannot replace a record someone is reading,
-// and a read that cannot open one being replaced. Either window is the length
-// of one small file operation, so a few milliseconds covers it.
-const (
-	renameRetries   = 20
-	renameRetryWait = 2 * time.Millisecond
-)
-
-// readFileContended reads path, retrying briefly while it cannot be opened for
-// a reason other than not being there.
-//
-// The mirror of renameOver's problem. On Windows a file being renamed onto
-// cannot be opened at that instant — "used by another process" — so a reader
-// arriving during a publish fails for a reason that is neither "no proxy is
-// running" nor anything about the record.
-//
-// A missing file is NOT retried: that is the ordinary answer when nothing has
-// published, and waiting on it would turn the common case into a delay.
-func readFileContended(path string) ([]byte, error) {
-	var err error
-	for i := 0; i < renameRetries; i++ {
-		var data []byte
-		data, err = os.ReadFile(path) //nolint:gosec // G304: the caller owns this path; it is a well-known state file
-		if err == nil || os.IsNotExist(err) {
-			return data, err
-		}
-		time.Sleep(renameRetryWait)
-	}
-	return nil, err
-}
-
-// renameOver replaces path with tmpPath, retrying briefly.
-//
-// On Windows a rename onto a file another process has OPEN fails outright —
-// POSIX replaces it, Windows refuses — so a publish landing while someone reads
-// the record errors for a reason that has nothing to do with either. Nothing
-// holds a lock here by design, so the reader is expected and the collision is
-// ordinary rather than exceptional.
-//
-// A bounded retry rather than a lock: the contended window is one small read,
-// and a writer that gives up after it leaves the previous record in place,
-// which is a correct outcome rather than a corrupt one.
-func renameOver(tmpPath, path string) error {
-	var err error
-	for i := 0; i < renameRetries; i++ {
-		if err = os.Rename(tmpPath, path); err == nil {
-			return nil
-		}
-		time.Sleep(renameRetryWait)
-	}
-	return err
+	return fsatomic.WriteFile(path, []byte(fmt.Sprintf("%d %s %s", r.PID, ver, r.Port)), FilePermRW)
 }
 
 // ReadRecord parses the record at path.
@@ -151,7 +69,7 @@ func renameOver(tmpPath, path string) error {
 // fewer fields — and are returned empty rather than as an error, because a
 // reader that can still learn the PID should not be denied it.
 func ReadRecord(path string) (Record, error) {
-	data, err := readFileContended(path)
+	data, err := fsatomic.ReadFile(path)
 	if err != nil {
 		return Record{}, err
 	}

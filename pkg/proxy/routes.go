@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 const (
@@ -147,7 +149,12 @@ func (s *Store) ReadRoutes() ([]Route, error) {
 		return routes, nil
 	}
 
-	data, err := os.ReadFile(path)
+	// Through fsatomic for the same reason the write is: the other proxy
+	// publishes this file by renaming onto it, and on Windows that makes it
+	// briefly unopenable. This read is on the request path — GetRoute calls it
+	// to route a proxied request — so failing it turns a publish on one side
+	// into a failed request on the other.
+	data, err := fsatomic.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			s.cacheInvalidate()
@@ -180,26 +187,13 @@ func (s *Store) WriteRoutes(routes []Route) error {
 		return fmt.Errorf("marshaling routes: %w", err)
 	}
 
-	tmp, err := os.CreateTemp(s.dir, "."+routesFileName+".*")
-	if err != nil {
-		return fmt.Errorf("creating routes temp file: %w", err)
-	}
-	tmpPath := tmp.Name()
-	_, werr := tmp.Write(data)
-	cerr := tmp.Close()
-	if werr == nil {
-		werr = cerr
-	}
-	if werr == nil {
-		// CreateTemp creates 0o600; keep the published file's mode explicit.
-		werr = os.Chmod(tmpPath, FilePermRW)
-	}
-	if werr == nil {
-		werr = os.Rename(tmpPath, s.routesFilePath())
-	}
-	if werr != nil {
-		os.Remove(tmpPath) //nolint:errcheck
-		return fmt.Errorf("writing routes file: %w", werr)
+	// Through fsatomic rather than an inline temp-and-rename: this file has two
+	// writers by design — the CLI's proxy on 6563 and Astro Desktop's on 6564 —
+	// and on Windows a rename onto a file the other one has open fails outright.
+	// The copy this replaced did not retry at all, so that collision simply lost
+	// a route.
+	if err := fsatomic.WriteFile(s.routesFilePath(), data, FilePermRW); err != nil {
+		return err
 	}
 	// Refresh the cache from the file just published, so writers through
 	// the Store keep readers current without another parse.
