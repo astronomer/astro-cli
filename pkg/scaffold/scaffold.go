@@ -421,9 +421,45 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// report(), so an appended line has to dodge that rebuild, and a vault write
 	// is not a Change and never appears there. Nothing in the app read it.
 	if n := len(cs.Secrets); n > 0 {
-		cs.Advisories = append(cs.Advisories, plural(n, "connection", "connections")+
-			" from "+SettingsRelPath+": stored in this machine's encrypted vault, "+
-			"scoped to this project, and no longer read from the file")
+		// Two halves of one disclosure: where the value went, and what stayed
+		// behind. The first on its own reads as though the value MOVED. It was
+		// copied — the plaintext original is still on disk, in a file this run
+		// deliberately keeps (planRetirements: pools have nowhere else to go, so
+		// the file is their only surviving record).
+		//
+		// Both state a fact and stop. Neither tells the reader to delete the
+		// entries, for three reasons:
+		//
+		//   - Apply may decline to overwrite a name the vault already holds, and
+		//     says so in an advisory of its own. There the file's copy is the
+		//     ONLY copy, and deleting it loses the value. This runs at Plan
+		//     time, before that decision exists, so it cannot know which case it
+		//     is in.
+		//   - The projects most likely to be converted already ignore this file
+		//     — pkg/airflowrt's v1 .gitignore lists it, and a conversion
+		//     preserves an existing .gitignore — so advice to keep it out of
+		//     version control is advice to do what is done.
+		//   - A connection is carried whenever it has a host, schema, login,
+		//     port or extra, not only a password. A warning that fires on a
+		//     hostname is one people stop reading before the run where it means
+		//     a credential.
+		//
+		// Advisories is also the wrong home for an instruction: its contract
+		// (see Result) is "something this run DID that now behaves differently",
+		// and cmd/local/initcmd renders it under "What changed" rather than
+		// "Left to do".
+		//
+		// The connections are named rather than pronouned for the same contract
+		// reason: every consumer renders this list its own way, so a line whose
+		// "it" resolves against a neighboring advisory dangles wherever the two
+		// are shown apart.
+		cs.Advisories = append(cs.Advisories,
+			plural(n, "connection", "connections")+
+				" from "+SettingsRelPath+": stored in this machine's encrypted vault, "+
+				"scoped to this project, and no longer read from the file",
+			SettingsRelPath+" still contains "+carriedNames(cs.Secrets)+
+				" in plaintext, and is kept rather than retired because it can "+
+				"carry pools, which neither the manifest nor the vault stores")
 	}
 	return cs, nil
 }
@@ -924,4 +960,23 @@ func pronoun(n int) string {
 		return "it"
 	}
 	return "them"
+}
+
+// carriedNames lists the connection ids a run stored, as prose: "warehouse",
+// "warehouse and orders", "billing, orders and warehouse". Sorted, because the
+// ids come from a map walk and an advisory that reorders itself between runs
+// looks like a change.
+func carriedNames(writes []SecretWrite) string {
+	names := make([]string, 0, len(writes))
+	for _, w := range writes {
+		names = append(names, w.Name)
+	}
+	slices.Sort(names)
+	switch len(names) {
+	case 0:
+		return ""
+	case 1:
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }

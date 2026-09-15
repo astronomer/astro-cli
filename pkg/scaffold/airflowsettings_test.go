@@ -493,6 +493,118 @@ func TestThePreviewSaysCredentialsGoToTheVault(t *testing.T) {
 		"the outcome does not say credentials were stored: %v", res.Advisories)
 }
 
+// "No longer read from the file" reads like the value moved. It was copied: the
+// plaintext is still in a file this run deliberately keeps, and no other list
+// mentions it — Removed does not name this file, and Left to do is about what
+// failed to carry. So the run has to say the original is still there.
+// findAdvisory returns the one advisory containing substr, failing if none or
+// several do.
+//
+// It exists so assertions compare one whole string. Checking substrings against
+// the union of the list cannot catch a sentence that is cut short, because each
+// substring is free to match a different member and the missing words match
+// nothing anyone asked for.
+func findAdvisory(t *testing.T, advisories []string, substr string) string {
+	t.Helper()
+	var found []string
+	for _, a := range advisories {
+		if strings.Contains(a, substr) {
+			found = append(found, a)
+		}
+	}
+	require.Len(t, found, 1, "want exactly one advisory containing %q, got %v", substr, advisories)
+	return found[0]
+}
+
+func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
+	dir := v1WithSettings(t, settingsWithEverything)
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+
+	// One advisory, compared whole: it names the file, names the connection left
+	// behind rather than saying "it", and says why the file stays.
+	got := findAdvisory(t, cs.Advisories, "plaintext")
+	require.Equal(t,
+		SettingsRelPath+" still contains warehouse in plaintext, and is kept "+
+			"rather than retired because it can carry pools, which neither the "+
+			"manifest nor the vault stores",
+		got)
+
+	// It does NOT instruct a deletion. Apply may decline to overwrite a name
+	// the vault already holds, which would make the file's copy the only one —
+	// so an instruction written here, before that decision, can send someone to
+	// destroy it.
+	require.NotContains(t, got, "Delete")
+	require.NotContains(t, got, "git")
+
+	res, err := cs.Apply()
+	require.NoError(t, err)
+	require.Equal(t, got, findAdvisory(t, res.Advisories, "plaintext"),
+		"the advisory must survive Apply unchanged")
+
+	// The claim has to stay true: the file must actually still be there, since
+	// it is the only surviving record of any pools it carried. Deleted holds
+	// decorated labels, not bare paths, so an equality check against the path
+	// would pass whatever happened — use the substring helper.
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.False(t, anyContains(res.Deleted, SettingsRelPath),
+		"the file the advisory describes was retired: %v", res.Deleted)
+}
+
+// Two carried connections read as prose and stay in a stable order, because the
+// ids come from a map walk.
+func TestThePlaintextAdvisoryNamesEveryConnection(t *testing.T) {
+	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id: warehouse
+      conn_type: postgres
+      conn_password: hunter2
+    - conn_id: billing
+      conn_type: mysql
+      conn_host: billing.example.com
+`)
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+
+	got := findAdvisory(t, cs.Advisories, "plaintext")
+	require.Contains(t, got, "billing and warehouse")
+}
+
+// A settings file with no connections has no carried value to describe, so the
+// advisory would be noise on every project that only ever declared pools. The
+// neighboring case — a caller that supplies no writer at all — is below.
+func TestPoolsOnlySettingsGetNoPlaintextAdvisory(t *testing.T) {
+	dir := v1WithSettings(t, "airflow:\n  pools:\n    - pool_name: p\n      pool_slot: 1\n")
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+
+	require.False(t, anyContains(cs.Advisories, "plaintext"),
+		"described a plaintext value with nothing carried: %v", cs.Advisories)
+}
+
+// A caller that supplies no SecretWriter is DECLINING to move credentials, so
+// nothing reaches the vault and the earlier branch clears cs.Secrets. This
+// advisory must not fire — its subject is a value that was copied, and here
+// nothing was.
+//
+// The file's own copy is then the only one, which is the case where saying
+// "delete the entries" would have been actively destructive. The existing Note
+// covers it (TestNoWriterLeavesTheValuesInTheFileAndSaysSo); what is pinned
+// here is that this advisory stays out of it.
+func TestNoWriterMeansNoPlaintextAdvisory(t *testing.T) {
+	dir := v1WithSettings(t, settingsWithEverything)
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+	require.Empty(t, cs.Secrets, "nothing may be queued for a caller with nowhere to put it")
+
+	require.False(t, anyContains(cs.Advisories, "plaintext"),
+		"claimed a value was copied when none was: %v", cs.Advisories)
+
+	res, err := cs.Apply()
+	require.NoError(t, err)
+	require.False(t, anyContains(res.Advisories, "plaintext"), "%v", res.Advisories)
+}
+
 // Airflow chooses a connection's provider from its conn_type, so a record
 // without one is not a connection it can resolve. Carrying it stores something
 // unusable and declares it required, which stops the project starting over a
