@@ -117,13 +117,40 @@ NOTVALUE = 5                          # not a string or table
 	if !reflect.DeepEqual(gotKeys, wantKeys) {
 		t.Errorf("problem keys mismatch\n got: %v\nwant: %v", gotKeys, wantKeys)
 	}
+
+	// Collecting them is only half the promise: the rendered error is what the
+	// author of the manifest actually sees. It used to say "7 problems, first is
+	// …" and name one, so this section was the one place a manifest could not be
+	// fixed in a single pass.
+	//
+	// Built line by line rather than asserted with Contains. A Contains-per-key
+	// version of this passed a mutant that comma-joined all seven onto one
+	// unreadable line — every key was present, nothing pinned the shape. The
+	// readable shape IS the fix, so it is what gets compared.
+	want := "invalid [tool.astro.env]: 7 problems"
+	for _, p := range se.Problems {
+		want += "\n  " + p.Key + ": " + p.Reason
+	}
+	if got := se.Error(); got != want {
+		t.Errorf("rendered error mismatch\n got:\n%s\nwant:\n%s", got, want)
+	}
 }
 
+// One problem stays on one line: the count and the indented list would be
+// ceremony around a single finding.
 func TestParseSchemaNonTableSection(t *testing.T) {
 	_, err := ParseSchema(map[string]any{"connections": "nope"})
 	var se *SchemaError
 	if !errors.As(err, &se) || len(se.Problems) != 1 || se.Problems[0].Reason != "expected a table" {
 		t.Fatalf("want one 'expected a table' problem, got %v", err)
+	}
+	// One problem stays on one line: a count and an indented list of one would
+	// be ceremony. Asserted here rather than in a test of its own, which
+	// duplicated this fixture and reached for err.Error() without the errors.As
+	// above — so if this input ever stopped erroring, the package's test binary
+	// would have panicked instead of reporting a failure.
+	if got, want := se.Error(), "invalid [tool.astro.env]: tool.astro.env.connections: expected a table"; got != want {
+		t.Errorf("rendered error = %q, want %q", got, want)
 	}
 }
 

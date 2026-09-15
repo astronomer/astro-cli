@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 )
@@ -21,12 +22,25 @@ type SchemaError struct {
 	Problems []Problem
 }
 
+// Error lists every problem, one keyed line each, the way
+// manifest.ValidationError renders its own.
+//
+// It used to print "%d problems, first is …" and stop, which contradicted the
+// type's own promise directly above and made this section the one place a
+// manifest could not be fixed in one pass: the author corrected the named key,
+// re-ran, and met the next one. The findings were all collected already —
+// ParseSchema walks the whole section — so only the rendering was throwing them
+// away.
 func (e *SchemaError) Error() string {
 	if len(e.Problems) == 1 {
 		return fmt.Sprintf("invalid [tool.astro.env]: %s: %s", e.Problems[0].Key, e.Problems[0].Reason)
 	}
-	return fmt.Sprintf("invalid [tool.astro.env]: %d problems, first is %s: %s",
-		len(e.Problems), e.Problems[0].Key, e.Problems[0].Reason)
+	var b strings.Builder
+	fmt.Fprintf(&b, "invalid [tool.astro.env]: %d problems", len(e.Problems))
+	for _, p := range e.Problems {
+		fmt.Fprintf(&b, "\n  %s: %s", p.Key, p.Reason)
+	}
+	return b.String()
 }
 
 // envRoot prefixes every Problem key: the section the plain data came from.
