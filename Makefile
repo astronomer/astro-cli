@@ -40,6 +40,26 @@ lint-submodules:
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
+# Phony, build included: a stray ./build file would otherwise let `make install`
+# skip the rebuild and ship a stale binary under this commit's version.
+.PHONY: install uninstall build
+
+# scripts/install.sh chooses the directory -- see its header for the rule and the
+# reasoning. Both targets take:
+#
+#   make install INSTALL_DIR=/usr/local/bin
+#   make install NAME=astro-dev        # sit beside a released astro
+#
+# NAME is := rather than ?= so that an exported NAME, common in CI images, cannot
+# rename the install. A command-line NAME= still wins.
+NAME := astro
+
+install: build
+	@INSTALL_DIR="${INSTALL_DIR}" NAME="${NAME}" OUTPUT="${OUTPUT}" VERSION="${VERSION}" bash scripts/install.sh install
+
+uninstall:
+	@INSTALL_DIR="${INSTALL_DIR}" NAME="${NAME}" bash scripts/install.sh uninstall
+
 # GORACE=atexit_sleep_ms=0: a -race binary sleeps one second before it exits,
 # to catch races with C atexit() handlers that Go does not have
 # (golang/go#20364). One second per package over ~90 packages was most of this
