@@ -31,7 +31,7 @@ func checkDeps(t *testing.T) (Deps, *bytes.Buffer) {
 	t.Helper()
 	d, out := testDeps(t)
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return dir, nil }
@@ -45,7 +45,7 @@ func targetDeps(t *testing.T) (Deps, *bytes.Buffer) {
 	t.Helper()
 	d, out := testDeps(t)
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(composerManifest), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return dir, nil }
@@ -85,7 +85,11 @@ func (p stubTargetParser) ParseWith(context.Context, string, checks.ParseInput) 
 	return p.report, p.err
 }
 
-const composerManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\nairflow = '3.1'\n"
+// validManifest is the smallest manifest that loads. Both helpers write it,
+// because every spelling of check now validates the manifest before it looks at
+// the environment — an empty pyproject.toml marks a project directory but is not
+// a project the check can report on.
+const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\nairflow = '3.1'\n"
 
 func TestTargetComposerPassesCleanly(t *testing.T) {
 	d, out := targetDeps(t)
@@ -222,6 +226,107 @@ func TestCheckStrictTurnsWarningIntoFailure(t *testing.T) {
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("strict slow parse must fail with code 1, got %v", err)
 	}
+}
+
+// A manifest problem is cheap, certain, and offline; a missing environment is
+// expensive to fix and may not be the real problem. So when both are true the
+// manifest is what the user hears about — otherwise they go and build an
+// environment for a project that cannot load, and nothing mentions the key that
+// is actually wrong.
+func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
+	d, out := testDeps(t)
+	dir := t.TempDir()
+	broken := "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nairflow = '3.1'\nbogus_key = 'x'\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(broken), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	// The environment is ALSO not ready. The manifest still wins.
+	d.Checks = stubParser{err: wrapNotReady()}
+
+	err := execute(t, d, "local", "check")
+	if err == nil {
+		t.Fatal("a check on an invalid manifest must fail")
+	}
+	if !strings.Contains(err.Error(), "bogus_key") {
+		t.Errorf("error should name the manifest key, got %v", err)
+	}
+	if strings.Contains(out.String(), "astro local start") {
+		t.Errorf("should not send the user to build an environment: %q", out.String())
+	}
+}
+
+// `--target astro` is documented as an alias for a plain check, so the two
+// spellings have to agree about an invalid manifest. They did not: the target
+// path loaded the manifest and the plain path did not, so the same project
+// reported its manifest errors one way and a missing venv the other.
+func TestCheckAndTargetAstroAgreeOnAnInvalidManifest(t *testing.T) {
+	broken := "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nairflow = '3.1'\nbogus_key = 'x'\n"
+	for _, args := range [][]string{
+		{"local", "check"},
+		{"local", "check", "--target", "astro"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			d, _ := testDeps(t)
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(broken), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			d.WorkingDir = func() (string, error) { return dir, nil }
+			d.Checks = stubParser{err: wrapNotReady()}
+
+			err := execute(t, d, args...)
+			if err == nil || !strings.Contains(err.Error(), "bogus_key") {
+				t.Errorf("want the manifest error, got %v", err)
+			}
+		})
+	}
+}
+
+// The DETAIL column used to show a traceback's first line, which is the literal
+// "Traceback (most recent call last):" on every traceback Python produces — the
+// same nine words on every row, saying nothing about any of them. The row now
+// carries the exception, and the frames print under the table.
+func TestCheckImportErrorShowsTheExceptionThenTheFrames(t *testing.T) {
+	d, out := checkDeps(t)
+	traceback := "Traceback (most recent call last):\n" +
+		"  File \"/p/dags/bad.py\", line 2, in <module>\n" +
+		"    import nonexistent_module_xyz\n" +
+		"ModuleNotFoundError: No module named 'nonexistent_module_xyz'"
+	d.Checks = stubParser{report: checks.ParseReport{
+		ImportErrors: []checks.ReportImportErr{{File: "dags/bad.py", Message: traceback}},
+	}}
+
+	var exit *ExitError
+	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
+		t.Fatalf("want ExitError, got %v", err)
+	}
+
+	got := out.String()
+	row, ok := lineContaining(got, "import_error")
+	if !ok {
+		t.Fatalf("no import_error row: %q", got)
+	}
+	if !strings.Contains(row, "ModuleNotFoundError") {
+		t.Errorf("the row should carry the exception, got %q", row)
+	}
+	if strings.Contains(row, "Traceback (most recent call last)") {
+		t.Errorf("the row should not be the traceback banner, got %q", row)
+	}
+	// The frames are the half that says WHERE, so they have to survive.
+	if !strings.Contains(got, "line 2, in <module>") {
+		t.Errorf("frames missing from the output: %q", got)
+	}
+}
+
+// lineContaining returns the first line of s holding substr.
+func lineContaining(s, substr string) (string, bool) {
+	for _, line := range strings.Split(s, "\n") {
+		if strings.Contains(line, substr) {
+			return line, true
+		}
+	}
+	return "", false
 }
 
 func TestCheckEnvNotReadyExitsCode2(t *testing.T) {

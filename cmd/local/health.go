@@ -361,7 +361,7 @@ func renderHealth(w io.Writer, report healthReport) error {
 		count:   imports.Count,
 		failure: imports.Error,
 		items: mapRows(imports.Errors, func(e importErrorRow) string {
-			return e.Filename + ": " + firstLine(e.StackTrace)
+			return e.Filename + ": " + exceptionLine(e.StackTrace)
 		}),
 	}); err != nil {
 		return err

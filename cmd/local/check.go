@@ -59,6 +59,24 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		return err
 	}
 
+	// Validate the manifest before touching the environment. Two reasons, and
+	// the second is why this is not merely a nicety:
+	//
+	// A manifest problem is certain, cheap, and offline; a missing venv is
+	// expensive to fix and may not be the user's real problem. Reporting the
+	// venv first sent someone off to build an environment for a project that
+	// cannot load, and the five manifest errors waiting for them were never
+	// mentioned.
+	//
+	// And `--target astro` is documented as an alias for a plain check, but it
+	// goes through runTargetCheck, which loads the manifest — so the two
+	// spellings of the same check disagreed on the same project, one naming the
+	// manifest errors and the other the venv. Loading here is what makes the
+	// alias true.
+	if _, err := manifest.Load(filepath.Join(project, projectpkg.Marker)); err != nil {
+		return err
+	}
+
 	res, err := checks.Run(ctx, checks.Options{ProjectPath: project, Strict: strict}, c.d.Checks)
 	if err != nil {
 		if errors.Is(err, checks.ErrEnvNotReady) {
@@ -250,7 +268,43 @@ func renderFindingsTable(w io.Writer, findings []checks.Finding) error {
 	for _, f := range findings {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", f.Severity, f.Kind, findingLocation(f), findingDetail(f))
 	}
-	return tw.Flush()
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	return renderTracebacks(w, findings)
+}
+
+// renderTracebacks prints each import error's full traceback under the table,
+// the way a compiler prints the source line under its summary.
+//
+// The table row cannot carry it: a row is one line, and a traceback is not. But
+// the table alone was not enough either — a row shows the exception, which says
+// WHAT broke, and the frames say WHERE, which is the half you act on. Both
+// belong in text output; --output json was carrying the whole message all along
+// and is unchanged.
+func renderTracebacks(w io.Writer, findings []checks.Finding) error {
+	printed := false
+	for _, f := range findings {
+		if f.Kind != checks.KindImportError || !strings.Contains(f.Message, "\n") {
+			continue
+		}
+		if _, err := fmt.Fprintf(w, "\n%s:\n", findingLocation(f)); err != nil {
+			return err
+		}
+		for _, line := range strings.Split(strings.TrimRight(f.Message, "\n"), "\n") {
+			if _, err := fmt.Fprintf(w, "  %s\n", line); err != nil {
+				return err
+			}
+		}
+		printed = true
+	}
+	if !printed {
+		return nil
+	}
+	// Keep the caller's summary line off the last frame, so the verdict does
+	// not read as part of the traceback.
+	_, err := fmt.Fprintln(w)
+	return err
 }
 
 func findingLocation(f checks.Finding) string {
@@ -263,7 +317,7 @@ func findingLocation(f checks.Finding) string {
 func findingDetail(f checks.Finding) string {
 	switch f.Kind {
 	case checks.KindImportError:
-		return firstLine(f.Message)
+		return exceptionLine(f.Message)
 	case checks.KindDuplicateDagID:
 		return "defined in " + strings.Join(f.Files, ", ")
 	case checks.KindSlowParse:
@@ -278,13 +332,37 @@ func findingDetail(f checks.Finding) string {
 	}
 }
 
-// firstLine keeps a table row to one line; an import error's full traceback
-// stays available in --output json.
+// firstLine keeps a one-line message to one line. It suits a value that is
+// already a sentence — a DAG warning — and NOT a traceback; see exceptionLine.
 func firstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return strings.TrimSpace(s[:i])
 	}
 	return strings.TrimSpace(s)
+}
+
+// exceptionLine reduces a Python traceback to the line worth putting in a
+// table cell or a summary row: the last one, which is the exception type and
+// its message.
+//
+// Both callers used to take the FIRST line, which for every traceback Python
+// produces is the literal "Traceback (most recent call last):" — so check's
+// DETAIL column and health's import-error rows said the same nine words on
+// every row and told the reader nothing about any of them. The last line is the
+// part a person scans for. In check the frames then follow the table (see
+// renderTracebacks); health stays a one-line-per-item summary and does not
+// print them.
+//
+// A single-line message is returned as-is, which covers an import error that
+// arrived without a traceback.
+func exceptionLine(s string) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if line := strings.TrimSpace(lines[i]); line != "" {
+			return line
+		}
+	}
+	return ""
 }
 
 func checkSummaryLine(s checkSummary) string {
