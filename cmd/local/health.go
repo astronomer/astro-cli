@@ -419,9 +419,18 @@ func renderHealthDAGStats(w io.Writer, section healthDAGStats) error {
 	for _, state := range states {
 		parts = append(parts, fmt.Sprintf("%s=%d", state, totals[state]))
 	}
+	// section.DAGs is the DAGs the stats endpoint returned, which is the DAGs
+	// that HAVE runs — not the DAGs on the instance. Reporting it as "%d DAG(s)"
+	// read as the latter, so a fresh project printed "dag stats: 0 DAG(s), no
+	// runs" while `af dags list` right beside it showed one: two lines of the
+	// same report apparently disagreeing about whether a DAG existed.
+	//
+	// With nothing to count, the count is not worth printing at all — "no runs"
+	// says everything, and "0 DAG(s) with runs, no runs" would say it twice.
 	if len(parts) == 0 {
-		parts = append(parts, "no runs")
+		_, err := fmt.Fprintln(w, "dag stats: no runs")
+		return err
 	}
-	_, err := fmt.Fprintf(w, "dag stats: %d DAG(s), %s\n", len(section.DAGs), strings.Join(parts, " "))
+	_, err := fmt.Fprintf(w, "dag stats: %d DAG(s) with runs, %s\n", len(section.DAGs), strings.Join(parts, " "))
 	return err
 }

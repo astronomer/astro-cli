@@ -1,10 +1,53 @@
 package local
 
 import (
+	"bytes"
 	"net/http"
 	"strings"
 	"testing"
 )
+
+// The stats endpoint returns the DAGs that HAVE runs, so printing that count as
+// "%d DAG(s)" read as the number of DAGs on the instance — and a fresh project
+// showed "0 DAG(s), no runs" directly above an `af dags list` listing one.
+func TestHealthDAGStatsCountsDAGsWithRuns(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		section healthDAGStats
+		want    string
+		absent  string
+	}{
+		{
+			name:    "no runs anywhere says so and counts nothing",
+			section: healthDAGStats{Available: true},
+			want:    "dag stats: no runs",
+			// The count is what misled; with nothing to count, do not print one.
+			absent: "DAG(s)",
+		},
+		{
+			name: "with runs, the count says what it counts",
+			section: healthDAGStats{Available: true, DAGs: []dagStatRow{
+				{DAGID: "a", Stats: map[string]int{"success": 2}},
+				{DAGID: "b", Stats: map[string]int{"failed": 1}},
+			}},
+			want: "dag stats: 2 DAG(s) with runs, failed=1 success=2",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := renderHealthDAGStats(&buf, tc.section); err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			got := buf.String()
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("got %q, want it to contain %q", got, tc.want)
+			}
+			if tc.absent != "" && strings.Contains(got, tc.absent) {
+				t.Errorf("got %q, should not contain %q", got, tc.absent)
+			}
+		})
+	}
+}
 
 // health reads four things and each one stands or falls alone: an Airflow
 // serving three of them still answers with three.
