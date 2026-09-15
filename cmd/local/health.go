@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -114,7 +115,25 @@ type healthDAGStats struct {
 	Available bool         `json:"available"`
 	Note      string       `json:"note,omitempty"`
 	DAGs      []dagStatRow `json:"dags,omitempty"`
-	Error     string       `json:"error,omitempty"`
+	// Runs is every run in DAGs, summed across states and DAGs. It is the
+	// honest answer to "has anything run here", which len(DAGs) is not.
+	Runs int `json:"runs"`
+	// DAGsWithRuns counts the rows in DAGs whose own counts sum above zero.
+	//
+	// It exists because len(DAGs) means different things per generation, so
+	// neither reading of it is reportable. Airflow 3 builds its response from
+	// the rows of a DagRun query, so a DAG with no runs never appears. Airflow
+	// 2 builds it from the REQUESTED ids, and pkg/airflowapi asks that
+	// generation for every DAG on the instance (dags.go: DAGStats with no ids
+	// lists them and joins the lot), so every DAG comes back whether it has run
+	// or not. Both then zero-fill every DagRunState, so a row proves nothing by
+	// existing.
+	//
+	// Counted here rather than in the renderer so the text and the json agree:
+	// reporting len(DAGs) as "DAGs with runs" in one and shipping an array of
+	// all-zero rows in the other described the same data two contradictory ways.
+	DAGsWithRuns int    `json:"dags_with_runs"`
+	Error        string `json:"error,omitempty"`
 }
 
 // importErrorRow is a DAG file the scheduler could not parse.
@@ -251,7 +270,18 @@ func readHealthDAGStats(ctx context.Context, client *airflowapi.Client) healthDA
 	if err != nil {
 		return healthDAGStats{Error: sectionFailure(err)}
 	}
-	return healthDAGStats{Available: true, DAGs: dagStatRows(stats)}
+	section := healthDAGStats{Available: true, DAGs: dagStatRows(stats)}
+	for _, row := range section.DAGs {
+		runs := 0
+		for _, n := range row.Stats {
+			runs += n
+		}
+		section.Runs += runs
+		if runs > 0 {
+			section.DAGsWithRuns++
+		}
+	}
+	return section
 }
 
 // verdict reduces the sections to one word and the sentence behind it: import
@@ -393,44 +423,50 @@ func renderHealthVersion(w io.Writer, section healthVersion) error {
 	return err
 }
 
+// renderHealthDAGStats writes the one line the report gives to run statistics.
+//
+// One write site and one prefix, so a branch cannot be added that forgets the
+// "dag stats: " or emits a second line.
 func renderHealthDAGStats(w io.Writer, section healthDAGStats) error {
+	_, err := fmt.Fprintf(w, "dag stats: %s\n", dagStatsDetail(section))
+	return err
+}
+
+func dagStatsDetail(section healthDAGStats) string {
 	switch {
 	case section.Error != "":
-		_, err := fmt.Fprintf(w, "dag stats: could not be read (%s)\n", section.Error)
-		return err
+		return fmt.Sprintf("could not be read (%s)", section.Error)
 	case !section.Available:
-		_, err := fmt.Fprintf(w, "dag stats: %s\n", section.Note)
-		return err
+		if section.Note == "" {
+			// Unreachable from readHealthDAGStats, which always pairs
+			// Available: false with a Note or an Error — but a bare
+			// "dag stats: " is a worse thing to print than a dull sentence.
+			return "not available"
+		}
+		return section.Note
+	// Runs, not "did any state key appear". Both Airflow generations zero-fill
+	// every DagRunState on every row they return, so a state key proves only
+	// that a row came back — which on Airflow 2 is true of every DAG on the
+	// instance, run or not. Keyed off the count it means, a fresh project reads
+	// "no runs" on both generations instead of claiming one DAG has runs and
+	// then printing four zeros.
+	case section.Runs == 0:
+		return "no runs"
 	}
 	// One line per state across every DAG: the health question is "how are runs
-	// going here", which is a total, not a per-DAG table.
+	// going here", which is a total, not a per-DAG table. Zero states stay in —
+	// failed=0 is an answer, and cmd/local/query.go makes the same call.
 	totals := map[string]int{}
 	for _, row := range section.DAGs {
 		for state, n := range row.Stats {
 			totals[state] += n
 		}
 	}
-	states := make([]string, 0, len(totals))
-	for state := range totals {
-		states = append(states, state)
-	}
-	sort.Strings(states)
-	parts := make([]string, 0, len(states))
-	for _, state := range states {
+	parts := make([]string, 0, len(totals))
+	for _, state := range slices.Sorted(maps.Keys(totals)) {
 		parts = append(parts, fmt.Sprintf("%s=%d", state, totals[state]))
 	}
-	// section.DAGs is the DAGs the stats endpoint returned, which is the DAGs
-	// that HAVE runs — not the DAGs on the instance. Reporting it as "%d DAG(s)"
-	// read as the latter, so a fresh project printed "dag stats: 0 DAG(s), no
-	// runs" while `af dags list` right beside it showed one: two lines of the
-	// same report apparently disagreeing about whether a DAG existed.
-	//
-	// With nothing to count, the count is not worth printing at all — "no runs"
-	// says everything, and "0 DAG(s) with runs, no runs" would say it twice.
-	if len(parts) == 0 {
-		_, err := fmt.Fprintln(w, "dag stats: no runs")
-		return err
-	}
-	_, err := fmt.Fprintf(w, "dag stats: %d DAG(s) with runs, %s\n", len(section.DAGs), strings.Join(parts, " "))
-	return err
+	// DAGsWithRuns rather than len(section.DAGs): see the field's comment for
+	// why the length is not reportable as either reading.
+	return fmt.Sprintf("%d DAG(s) with runs, %s", section.DAGsWithRuns, strings.Join(parts, " "))
 }

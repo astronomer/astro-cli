@@ -1,51 +1,132 @@
 package local
 
 import (
-	"bytes"
 	"net/http"
 	"strings"
 	"testing"
 )
 
-// The stats endpoint returns the DAGs that HAVE runs, so printing that count as
-// "%d DAG(s)" read as the number of DAGs on the instance — and a fresh project
-// showed "0 DAG(s), no runs" directly above an `af dags list` listing one.
-func TestHealthDAGStatsCountsDAGsWithRuns(t *testing.T) {
+// The two generations answer this endpoint differently and the report has to be
+// true of both.
+//
+// Airflow 3 builds its response from the rows of a DagRun query, so only DAGs
+// with runs come back. Airflow 2 builds it from the REQUESTED ids, and
+// pkg/airflowapi asks it for every DAG on the instance — so every DAG comes
+// back, run or not. Both zero-fill every state on every row they return, which
+// is why neither len(DAGs) nor "did a state key appear" answers "has anything
+// run here".
+//
+// Driven through the real command against wire-shaped payloads, because the
+// original bug was invisible to a test that built healthDAGStats by hand: no
+// hand-written fixture carries the zero-filled states the endpoint always
+// sends, and every other health test stubs this endpoint as `{"dags":[]}`.
+func TestHealthDAGStatsIsTrueOnBothGenerations(t *testing.T) {
+	// One DAG, never run — what a fresh project looks like. Airflow 2 returns
+	// the row anyway, zero-filled.
+	const af2NoRuns = `{"dags":[{"dag_id":"example_dag","stats":[
+		{"state":"queued","count":0},{"state":"running","count":0},
+		{"state":"success","count":0},{"state":"failed","count":0}]}],"total_entries":1}`
+	// Ten DAGs, two of which have ever run.
+	const af2SomeRuns = `{"dags":[
+		{"dag_id":"a","stats":[{"state":"success","count":3},{"state":"failed","count":0}]},
+		{"dag_id":"b","stats":[{"state":"success","count":2},{"state":"failed","count":1}]},
+		{"dag_id":"c","stats":[{"state":"success","count":0},{"state":"failed","count":0}]},
+		{"dag_id":"d","stats":[{"state":"success","count":0},{"state":"failed","count":0}]}],"total_entries":4}`
+
 	for _, tc := range []struct {
 		name    string
-		section healthDAGStats
+		af2     bool
+		dags    string
+		payload string
 		want    string
 		absent  string
 	}{
 		{
-			name:    "no runs anywhere says so and counts nothing",
-			section: healthDAGStats{Available: true},
-			want:    "dag stats: no runs",
-			// The count is what misled; with nothing to count, do not print one.
-			absent: "DAG(s)",
+			// Before: "1 DAG(s) with runs, failed=0 queued=0 running=0
+			// success=0" — a claim that a DAG has runs, with four zeros
+			// disproving it.
+			name: "airflow 2, one DAG, never run", af2: true,
+			dags:    `{"dags":[{"dag_id":"example_dag"}],"total_entries":1}`,
+			payload: af2NoRuns,
+			want:    "dag stats: no runs", absent: "DAG(s)",
 		},
 		{
-			name: "with runs, the count says what it counts",
-			section: healthDAGStats{Available: true, DAGs: []dagStatRow{
-				{DAGID: "a", Stats: map[string]int{"success": 2}},
-				{DAGID: "b", Stats: map[string]int{"failed": 1}},
-			}},
+			// Before: "4 DAG(s) with runs" — two of them never ran.
+			name: "airflow 2, four DAGs, two with runs", af2: true,
+			dags:    `{"dags":[{"dag_id":"a"},{"dag_id":"b"},{"dag_id":"c"},{"dag_id":"d"}],"total_entries":4}`,
+			payload: af2SomeRuns,
+			want:    "dag stats: 2 DAG(s) with runs, failed=1 success=5",
+		},
+		{
+			name: "airflow 3, no DAG has runs", payload: `{"dags":[],"total_entries":0}`,
+			want: "dag stats: no runs", absent: "DAG(s)",
+		},
+		{
+			name: "airflow 3, two DAGs with runs",
+			payload: `{"dags":[
+				{"dag_id":"a","stats":[{"state":"success","count":2},{"state":"failed","count":0}]},
+				{"dag_id":"b","stats":[{"state":"success","count":0},{"state":"failed","count":1}]}],"total_entries":2}`,
 			want: "dag stats: 2 DAG(s) with runs, failed=1 success=2",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			if err := renderHealthDAGStats(&buf, tc.section); err != nil {
-				t.Fatalf("render: %v", err)
+			var stub *airflowStub
+			if tc.af2 {
+				stub = newAirflow2Stub(t)
+				stub.route(http.MethodGet, "/api/v1/importErrors", `{"import_errors":[],"total_entries":0}`)
+				stub.route(http.MethodGet, "/api/v1/dagWarnings", `{"dag_warnings":[],"total_entries":0}`)
+				stub.route(http.MethodGet, "/api/v1/dags", tc.dags)
+				stub.route(http.MethodGet, "/api/v1/dagStats", tc.payload)
+			} else {
+				stub = newAirflowStub(t)
+				stub.route(http.MethodGet, "/api/v2/importErrors", `{"import_errors":[],"total_entries":0}`)
+				stub.route(http.MethodGet, "/api/v2/dagWarnings", `{"dag_warnings":[],"total_entries":0}`)
+				stub.route(http.MethodGet, "/api/v2/dagStats", tc.payload)
 			}
-			got := buf.String()
-			if !strings.Contains(got, tc.want) {
-				t.Errorf("got %q, want it to contain %q", got, tc.want)
+
+			out, _, err := runQuery(t, stub, "health")
+			if err != nil {
+				t.Fatalf("health: %v", err)
 			}
-			if tc.absent != "" && strings.Contains(got, tc.absent) {
-				t.Errorf("got %q, should not contain %q", got, tc.absent)
+			line, ok := lineContaining(out, "dag stats:")
+			if !ok {
+				t.Fatalf("no dag stats line: %q", out)
+			}
+			if !strings.Contains(line, tc.want) {
+				t.Errorf("got %q, want it to contain %q", line, tc.want)
+			}
+			if tc.absent != "" && strings.Contains(line, tc.absent) {
+				t.Errorf("got %q, should not contain %q", line, tc.absent)
 			}
 		})
+	}
+}
+
+// The text and the json must describe the same array the same way: the old text
+// called it "DAGs with runs" while the json shipped rows of all-zero counts.
+func TestHealthDAGStatsJSONAgreesWithTheText(t *testing.T) {
+	stub := newAirflow2Stub(t)
+	stub.route(http.MethodGet, "/api/v1/importErrors", `{"import_errors":[],"total_entries":0}`)
+	stub.route(http.MethodGet, "/api/v1/dagWarnings", `{"dag_warnings":[],"total_entries":0}`)
+	stub.route(http.MethodGet, "/api/v1/dags", `{"dags":[{"dag_id":"a"},{"dag_id":"b"}],"total_entries":2}`)
+	stub.route(http.MethodGet, "/api/v1/dagStats", `{"dags":[
+		{"dag_id":"a","stats":[{"state":"success","count":3}]},
+		{"dag_id":"b","stats":[{"state":"success","count":0}]}],"total_entries":2}`)
+
+	out, _, err := runQuery(t, stub, "health", "-o", "json")
+	if err != nil {
+		t.Fatalf("health: %v", err)
+	}
+	stats, _ := decodeJSON(t, out)["dag_stats"].(map[string]any)
+	if stats["runs"] != float64(3) {
+		t.Errorf("runs = %v, want 3", stats["runs"])
+	}
+	// Two rows came back; one of them has never run.
+	if stats["dags_with_runs"] != float64(1) {
+		t.Errorf("dags_with_runs = %v, want 1", stats["dags_with_runs"])
+	}
+	if dags, _ := stats["dags"].([]any); len(dags) != 2 {
+		t.Errorf("dags = %v, want both rows kept", stats["dags"])
 	}
 }
 
