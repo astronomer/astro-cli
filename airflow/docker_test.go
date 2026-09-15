@@ -970,8 +970,46 @@ func (s *Suite) TestDockerComposeStop() {
 		composeMock.On("Stop", mock.Anything, mock.Anything, api.StopOptions{}).Return(nil).Once()
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-postgres", Name: "test-postgres", State: "running"}}, nil)
 
-		// reducing timeout: one tick fits inside it, the second does not
-		stopPostgresWaitTimeout = 11 * time.Millisecond
+		// This case needs one thing to happen before another: at least one tick
+		// has to fire (so Ps is called and the "still running" line is logged)
+		// and then the timeout has to win. The Ps expectation carries no
+		// .Once(), so any number of ticks from one upward satisfies it.
+		//
+		// It used to set this to 11ms against a 10ms ticker — racing two
+		// wall-clock timers 1ms apart. That is far inside the scheduling jitter
+		// of a loaded CI runner, and when the timeout won the tick, zero ticks
+		// fired: Ps was never called, and the "still running" assertion below
+		// failed along with the Ps mock expectation. It went red on a docs-only
+		// PR .
+		//
+		// Only that ONE assertion is jitter-sensitive. The "timed out" one
+		// cannot fail here: Ps is stubbed to answer "running" forever, so the
+		// exited-state branch in Stop is unreachable and the loop can only ever
+		// leave through the timeout arm, which logs that line unconditionally.
+		// Worth stating, because a future reader debugging this would otherwise
+		// spend time on an assertion that is structurally incapable of failing.
+		//
+		// 200ms leaves room for ~20 ticks, so losing the first several to jitter
+		// costs nothing, and the timeout is absolute — time.After still fires at
+		// 200ms however many ticks got through.
+		//
+		// There is a third option this does not take, and it is not "inject a
+		// clock". Setting the ticker to something that can never fire (an hour)
+		// and the timeout to 1ms would leave only ONE ready channel, so select
+		// has no choice to make and the test is exact rather than generous — at
+		// the cost of the property this case uniquely holds, that a tick does
+		// not RESET the timeout. Move `timeout := time.After(...)` inside Stop's
+		// loop and this version hangs; the split version passes. That property
+		// is worth the 200ms, and the ceiling below is what turns the hang into
+		// a readable failure.
+		//
+		// Restored here rather than beside the ticker at method scope: the two
+		// waiting cases above should keep the production 10s, which gives them a
+		// 1000x margin instead of this case's 20x, and leaving 200ms set would
+		// hand it to every subtest that follows.
+		origCaseTimeout := stopPostgresWaitTimeout
+		stopPostgresWaitTimeout = 200 * time.Millisecond
+		defer func() { stopPostgresWaitTimeout = origCaseTimeout }()
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
@@ -985,6 +1023,14 @@ func (s *Suite) TestDockerComposeStop() {
 
 		s.Contains(out.String(), "postgres container is still in running state, waiting for it to be in exited state")
 		s.Contains(out.String(), "timed out waiting for postgres container to be in exited state")
+		// An upper bound as well as a lower one. The old 11ms supplied a ceiling
+		// by accident; widening the timeout removed it, and without one a change
+		// that made the effective wait an order of magnitude longer than
+		// configured would show up only as a slower suite — in the one case
+		// whose whole subject is the relation between those two bounds.
+		// ~20 ticks plus the Stop call is the expected shape.
+		s.LessOrEqual(len(composeMock.Calls), 40,
+			"Stop polled far more than the timeout allows; is the timeout being reset?")
 		imageHandler.AssertExpectations(s.T())
 		composeMock.AssertExpectations(s.T())
 	})
