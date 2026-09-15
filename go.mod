@@ -414,7 +414,7 @@ require (
 	github.com/theupdateframework/notary v0.7.0 // indirect
 	github.com/tonistiigi/fsutil v0.0.0-20251211185533-a2aa163d723f // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
-	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
