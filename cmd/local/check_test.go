@@ -411,6 +411,27 @@ func TestExceptionLine(t *testing.T) {
 			"sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not connect",
 		},
 		{
+			// A message whose last line is the URL and nothing else. The two
+			// cases above survive only because their URL follows other text:
+			// "(Background on this error at: …" starts with a paren, pydantic's
+			// with a word. A bare one is a dotted name and a colon — the same
+			// shape as "ValueError:" — and this scan runs bottom-up, so the
+			// scheme was reported as the exception that stopped the run.
+			"exception whose last line is a bare url",
+			frames + "ValueError: could not reach the warehouse\n" +
+				"retrying will not help\n" +
+				"https://example.com/docs/errors#e123",
+			"ValueError: could not reach the warehouse",
+		},
+		{
+			// The same, with no path after the host, so the colon is followed
+			// by a digit rather than a slash.
+			"exception whose last line is a bare url with a port",
+			frames + "ConnectionError: refused\n" +
+				"http://localhost:8080",
+			"ConnectionError: refused",
+		},
+		{
 			// pydantic's per-field detail, whose own last line is a URL.
 			"exception with an indented detail block",
 			frames + "pydantic_core.ValidationError: 1 validation error for Settings\n" +

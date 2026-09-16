@@ -464,8 +464,17 @@ func exceptionLine(s string) string {
 }
 
 // exceptionTypeRe matches a Python exception line: a dotted type name, then a
-// colon. Anchored, so it cannot match a colon later in a sentence.
-var exceptionTypeRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.]*:`)
+// colon, then a space or the end of the line. Anchored, so it cannot match a
+// colon later in a sentence.
+//
+// The space is what keeps a URL out. "https://example.com/errors#e123" is a
+// dotted name followed by a colon too, and this scan runs bottom-up, so a
+// message whose last line is a bare URL had the URL reported as the exception
+// that stopped the run — which is a shape libraries write, and exactly the one
+// a reader needs the real name for. Python always prints "Type: message" with
+// the space, and an exception carrying no message prints its type with no
+// colon at all, which the first-non-empty-line fallback below already covers.
+var exceptionTypeRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.]*:(\s|$)`)
 
 // groupHeaderRe matches the line that opens an ExceptionGroup's own block, by
 // the count Python's traceback module appends: "ExceptionGroup: eg (2

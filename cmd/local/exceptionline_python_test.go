@@ -65,8 +65,8 @@ func TestExceptionLineAgainstRealPython(t *testing.T) {
 	}
 	// A generator that silently produced nothing would pass every assertion
 	// below, so the count is checked rather than assumed.
-	if len(cases) < 13 {
-		t.Fatalf("want at least 13 generated cases, got %d — did the generator fail quietly?\n%s",
+	if len(cases) < 14 {
+		t.Fatalf("want at least 14 generated cases, got %d — did the generator fail quietly?\n%s",
 			len(cases), stderr.String())
 	}
 
@@ -287,6 +287,10 @@ emit("multi-line message ending in a url", caught(raises(BackendError(
     "(sqlite3.OperationalError) no such table: dag\n"
     "[SQL: SELECT dag.dag_id FROM dag]\n"
     "(Background on this error at: https://sqlalche.me/e/20/e3q8)"))))
+emit("multi-line message ending in a bare url", caught(raises(BackendError(
+    "could not reach the warehouse\n"
+    "retrying will not help\n"
+    "https://example.com/docs/errors#e123"))))
 emit("message with an indented detail block", caught(raises(ValidationError(
     "2 validation errors for Settings\ndb_url\n  Field required\napi_key\n  Field required"))))
 emit("chained traceback", caught(chained))
