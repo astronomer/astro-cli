@@ -360,7 +360,14 @@ func findingDetail(f checks.Finding) string {
 	case checks.KindImportError:
 		return exceptionLine(f.Message)
 	case checks.KindDuplicateDagID:
-		return "defined in " + strings.Join(f.Files, ", ")
+		detail := "defined in " + strings.Join(f.Files, ", ")
+		// Which copy is live, when Airflow told us. Knowing a dag_id is
+		// duplicated without knowing which definition won leaves the reader
+		// unable to tell which file to delete.
+		if f.File != "" {
+			detail += "; Airflow loaded " + f.File
+		}
+		return detail
 	case checks.KindSlowParse:
 		return fmt.Sprintf("parsed in %.1fs (threshold %.0fs)", f.ParseSeconds, f.ThresholdSeconds)
 	case checks.KindChecksIncomplete:

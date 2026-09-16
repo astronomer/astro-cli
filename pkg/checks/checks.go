@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"time"
 )
@@ -207,7 +208,18 @@ func evaluate(report ParseReport) Result {
 
 	importErrs := append([]ReportImportErr(nil), report.ImportErrors...)
 	sort.Slice(importErrs, func(i, j int) bool { return importErrs[i].File < importErrs[j].File })
+	// Duplicates are collected rather than emitted here. Airflow files one
+	// import error per REFUSED FILE, so three copies of a dag_id arrive as two
+	// errors — emitting a finding each reported one problem twice, counted two
+	// errors for it, and gave each finding half the file list. They are keyed by
+	// dag_id and merged with the cross-file check below, which is also where
+	// they belong in the output: evaluate groups findings by check.
+	dupFiles := map[string][]string{}
 	for _, ie := range importErrs {
+		if id, files, ok := duplicateFromImportError(ie, report.Dags); ok {
+			dupFiles[id] = append(dupFiles[id], files...)
+			continue
+		}
 		res.Findings = append(res.Findings, Finding{
 			Kind:     KindImportError,
 			Severity: SeverityError,
@@ -227,7 +239,21 @@ func evaluate(report ParseReport) Result {
 		})
 	}
 
-	res.Findings = append(res.Findings, duplicateDagIDs(report.Files)...)
+	dups := duplicateDagIDs(report.Files, dupFiles)
+	// Name the copy Airflow actually loaded. Before these were reclassified the
+	// row carried Airflow's own sentence, which said which file it ignored, and
+	// a reader who lost that would know a dag_id is duplicated without knowing
+	// which definition is the live one — the first thing they need in order to
+	// delete the right file.
+	for i := range dups {
+		for _, d := range report.Dags {
+			if d.DagID == dups[i].DagID {
+				dups[i].File = d.File
+				break
+			}
+		}
+	}
+	res.Findings = append(res.Findings, dups...)
 
 	slow := make([]Finding, 0)
 	threshold := warnThreshold(report)
@@ -264,17 +290,29 @@ func evaluate(report ParseReport) Result {
 // is the structural backstop for the versions that keep both copies with only
 // a log line, so a duplicate never slips through as a pass. Output is sorted
 // so findings are deterministic.
-func duplicateDagIDs(files []ReportFile) []Finding {
+
+// fromImportErrors carries the duplicates Airflow reported itself, keyed by
+// dag_id, so they merge with the ones found here instead of being reported
+// twice by two code paths that noticed the same thing.
+func duplicateDagIDs(files []ReportFile, fromImportErrors map[string][]string) []Finding {
 	sources := map[string][]string{}
 	for _, file := range files {
 		for _, id := range file.DagIDs {
 			sources[id] = append(sources[id], file.File)
 		}
 	}
+	// A dag_id Airflow refused appears here even when only one file survived to
+	// list it, because the refusal is itself proof of a second definition.
+	for id, locs := range fromImportErrors {
+		sources[id] = append(sources[id], locs...)
+	}
 	var findings []Finding
 	for id, locs := range sources {
 		unique := dedupeSorted(locs)
-		if len(unique) < 2 {
+		// One file is not a duplicate — unless Airflow said so, in which case
+		// there was a second definition it declined to load and the count of
+		// surviving files understates the problem.
+		if len(unique) < 2 && len(fromImportErrors[id]) == 0 {
 			continue
 		}
 		findings = append(findings, Finding{
@@ -286,6 +324,56 @@ func duplicateDagIDs(files []ReportFile) []Finding {
 	}
 	sort.Slice(findings, func(i, j int) bool { return findings[i].DagID < findings[j].DagID })
 	return findings
+}
+
+// dupImportErrRe picks the duplicated dag_id out of the error Airflow raises
+// for one, rendered from AirflowDagDuplicatedIdException:
+//
+//	AirflowDagDuplicatedIdException: Ignoring DAG x from /p/b.py - also found in /p/a.py
+//
+// Only the id is taken. The sentence also carries both paths, but absolute and
+// as Airflow spelled them, while every path this package reports is relative to
+// the project — so they are looked up instead, which keeps the finding
+// consistent with the rest and leaves less of the wording load-bearing.
+var dupImportErrRe = regexp.MustCompile(`AirflowDagDuplicatedIdException: Ignoring DAG (\S+) `)
+
+// duplicateFromImportError reports a duplicate dag_id that reached us as an
+// import error, which is how every real one does.
+//
+// duplicateDagIDs below cannot see these, and that is not a gap in it: it
+// compares the dag_ids each file successfully registered, and a DagBag never
+// registers the same id twice. Airflow notices first, refuses the second file,
+// and files the whole thing under import_errors — so KindDuplicateDagID never
+// reached anyone, and a consumer filtering on it missed every duplicate there
+// has ever been. `astro local check --output json` is the contract
+// Astro Desktop reads, and "this kind exists but never occurs" is the worst
+// shape a contract can take.
+//
+// The text is matched because it is all Airflow hands back: import_errors is a
+// map of path to rendered string and the exception object is long gone. When
+// the wording changes the match fails and the finding stays an import error —
+// today's behavior exactly — so this can improve on the status quo and cannot
+// regress it.
+//
+// It returns the id and the files it can attribute to it, for the caller to
+// merge by id: Airflow files one import error per REFUSED file, so a dag_id in
+// three places arrives here twice and is one problem either way.
+//
+// The losing file is the one the error is filed under; the winner is whichever
+// file the DAG did load from, which the report already lists.
+func duplicateFromImportError(ie ReportImportErr, dags []ReportDag) (dagID string, files []string, ok bool) {
+	m := dupImportErrRe.FindStringSubmatch(ie.Message)
+	if m == nil {
+		return "", nil, false
+	}
+	dagID = m[1]
+	files = []string{ie.File}
+	for _, d := range dags {
+		if d.DagID == dagID && d.File != "" {
+			files = append(files, d.File)
+		}
+	}
+	return dagID, files, true
 }
 
 func dedupeSorted(in []string) []string {

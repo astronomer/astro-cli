@@ -53,6 +53,119 @@ func TestEvaluateDetectsDuplicateDagIDs(t *testing.T) {
 	assert.Equal(t, ExitChecksFailed, res.ExitCode(false))
 }
 
+// How a real duplicate arrives: as an import error, because Airflow refuses the
+// second file before our own cross-file comparison could ever see the id twice.
+//
+// Reported as an import error it was invisible to anyone filtering on
+// duplicate_dag_id — which is the whole reason that kind exists.
+//
+// The message is verbatim from `astro local check` against Airflow 3.1.8.
+func TestEvaluateReportsAirflowsOwnDuplicateAsADuplicate(t *testing.T) {
+	res := evaluate(ParseReport{
+		// The DAG loaded from dupe_copy.py; exampledag.py was refused.
+		Dags: []ReportDag{{DagID: "example_dag", File: "dags/dupe_copy.py"}},
+		ImportErrors: []ReportImportErr{{
+			File: "dags/exampledag.py",
+			Message: "AirflowDagDuplicatedIdException: Ignoring DAG example_dag from " +
+				"/proj/dags/exampledag.py - also found in /proj/dags/dupe_copy.py",
+		}},
+		Files: []ReportFile{{File: "dags/dupe_copy.py", DagIDs: []string{"example_dag"}}},
+	})
+
+	require.Len(t, res.Findings, 1, "one problem, one finding")
+	f := res.Findings[0]
+	assert.Equal(t, KindDuplicateDagID, f.Kind)
+	assert.Equal(t, SeverityError, f.Severity)
+	assert.Equal(t, "example_dag", f.DagID)
+	// Both files, relative to the project like every other path this package
+	// reports — taken from the report rather than from Airflow's sentence,
+	// which spells them absolute.
+	assert.Equal(t, []string{"dags/dupe_copy.py", "dags/exampledag.py"}, f.Files)
+	assert.Equal(t, 1, res.Errors)
+	assert.Equal(t, ExitChecksFailed, res.ExitCode(false))
+}
+
+// Three copies of a dag_id are one problem, not two.
+//
+// Airflow files an import error per REFUSED file, so it reports two here — one
+// for b.py, one for c.py. Emitting a finding each counted two errors for one
+// duplicated id and gave each finding half the file list, so neither named all
+// three places the id is defined.
+func TestEvaluateMergesRepeatedDuplicatesByDagID(t *testing.T) {
+	res := evaluate(ParseReport{
+		Dags: []ReportDag{{DagID: "shared", File: "dags/a.py"}},
+		ImportErrors: []ReportImportErr{
+			{File: "dags/b.py", Message: "AirflowDagDuplicatedIdException: Ignoring DAG shared from /p/dags/b.py - also found in /p/dags/a.py"},
+			{File: "dags/c.py", Message: "AirflowDagDuplicatedIdException: Ignoring DAG shared from /p/dags/c.py - also found in /p/dags/a.py"},
+		},
+		Files: []ReportFile{{File: "dags/a.py", DagIDs: []string{"shared"}}},
+	})
+
+	require.Len(t, res.Findings, 1, "one duplicated id is one finding")
+	f := res.Findings[0]
+	assert.Equal(t, KindDuplicateDagID, f.Kind)
+	assert.Equal(t, "shared", f.DagID)
+	assert.Equal(t, []string{"dags/a.py", "dags/b.py", "dags/c.py"}, f.Files,
+		"every file defining the id, not the half one import error knew about")
+	assert.Equal(t, "dags/a.py", f.File, "the copy Airflow actually loaded")
+	assert.Equal(t, 1, res.Errors, "one problem counts once")
+}
+
+// Both detection paths noticing the same id is still one finding: the
+// cross-file backstop and Airflow's own refusal are two ways of seeing it.
+func TestEvaluateDoesNotReportTheSameDuplicateTwice(t *testing.T) {
+	res := evaluate(ParseReport{
+		Dags: []ReportDag{{DagID: "shared", File: "dags/a.py"}},
+		ImportErrors: []ReportImportErr{
+			{File: "dags/b.py", Message: "AirflowDagDuplicatedIdException: Ignoring DAG shared from /p/b.py - also found in /p/a.py"},
+		},
+		// An Airflow that kept both copies in its per-file stats, which is the
+		// case the cross-file check exists for.
+		Files: []ReportFile{
+			{File: "dags/a.py", DagIDs: []string{"shared"}},
+			{File: "dags/b.py", DagIDs: []string{"shared"}},
+		},
+	})
+	require.Len(t, res.Findings, 1)
+	assert.Equal(t, []string{"dags/a.py", "dags/b.py"}, res.Findings[0].Files)
+	assert.Equal(t, 1, res.Errors)
+}
+
+// An import error that is not a duplicate is untouched.
+func TestEvaluateLeavesOrdinaryImportErrorsAlone(t *testing.T) {
+	res := evaluate(ParseReport{ImportErrors: []ReportImportErr{{
+		File:    "dags/bad.py",
+		Message: "Traceback (most recent call last):\nModuleNotFoundError: No module named 'x'",
+	}}})
+	require.Len(t, res.Findings, 1)
+	assert.Equal(t, KindImportError, res.Findings[0].Kind)
+}
+
+// When Airflow rewords the exception the match fails and the finding stays an
+// import error — today's behavior, so the wording cannot break the check, only
+// sharpen it.
+func TestEvaluateFallsBackWhenTheDuplicateWordingChanges(t *testing.T) {
+	res := evaluate(ParseReport{ImportErrors: []ReportImportErr{{
+		File:    "dags/exampledag.py",
+		Message: "AirflowDagDuplicatedIdException: duplicate dag_id example_dag",
+	}}})
+	require.Len(t, res.Findings, 1)
+	assert.Equal(t, KindImportError, res.Findings[0].Kind)
+	assert.Equal(t, ExitChecksFailed, res.ExitCode(false), "still an error either way")
+}
+
+// With no surviving DAG to pair it with — every copy refused — the finding still
+// names the id and the file it does know.
+func TestEvaluateDuplicateWithNoSurvivingDag(t *testing.T) {
+	res := evaluate(ParseReport{ImportErrors: []ReportImportErr{{
+		File:    "dags/exampledag.py",
+		Message: "AirflowDagDuplicatedIdException: Ignoring DAG example_dag from /p/a.py - also found in /p/b.py",
+	}}})
+	require.Len(t, res.Findings, 1)
+	assert.Equal(t, KindDuplicateDagID, res.Findings[0].Kind)
+	assert.Equal(t, []string{"dags/exampledag.py"}, res.Findings[0].Files)
+}
+
 func TestEvaluateSameDagIDTwiceInOneFileIsNotADuplicate(t *testing.T) {
 	// A dag_id listed twice for a single file is not a cross-file duplicate.
 	res := evaluate(ParseReport{
