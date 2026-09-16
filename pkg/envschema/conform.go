@@ -17,9 +17,16 @@ import (
 // shape it was declared to be, and a caller can report it without refusing to
 // proceed. Callers wanting both call both.
 //
-// A value that is present but empty is not checked: an empty string satisfies
-// Validate, so refusing it here would have the two functions disagree about a
-// value the gate allows.
+// A value that is present but empty IS checked, against the same rules as any
+// other value — so a declared `type` means something for `PORT=` as well as for
+// `PORT=abc`. That does not make the two functions disagree: Validate reads only
+// `optional` and still counts an empty value as present, so nothing here can
+// turn a project that starts into one that does not. A finding is a warning on
+// the caller's side, which is the whole reason the type check lives beside
+// Validate rather than inside it.
+//
+// The exception is a connection, whose value here is its resolved conn_type: an
+// empty one is a kind the resolver could not determine, not the wrong kind.
 //
 // # What the conn_type check does not reach
 //
@@ -46,7 +53,20 @@ func CheckValues(s *Schema, v Values) []Violation {
 	check := func(section Section, names map[string]ValueSpec, present map[string]string) {
 		for key := range names {
 			value, ok := present[key]
-			if !ok || value == "" {
+			if !ok {
+				continue
+			}
+			// An empty value is checked like any other, because CheckValue
+			// already answers correctly for one: an absent type, `string` and
+			// `json` are the absence of a constraint and accept it, while every
+			// typed arm rejects it. So `type = 'port'` with PORT= now reports
+			// what it always should have, and a name with no declared type is
+			// untouched.
+			//
+			// Connections are the exception, and it is not stylistic: their
+			// value here is the resolved conn_type, so an empty one is a kind
+			// the resolver could not determine, not the wrong kind.
+			if value == "" && section == SectionConnection {
 				continue
 			}
 			// Indexed rather than ranged by value: ranging would make this
@@ -86,8 +106,9 @@ func CheckValues(s *Schema, v Values) []Violation {
 // it declared. An undeclared conn_type accepts anything.
 //
 // It does not test resolved for "" — a kind the resolver could not determine is
-// not the wrong kind. CheckValues' empty-value skip covers that case, and is
-// where the behavior lives.
+// not the wrong kind. CheckValues skips an empty connection value for exactly
+// that reason, and is where the behavior lives; it no longer skips an empty
+// value in the other sections.
 func connTypeMismatch(declared, resolved string) string {
 	// Case-folded: DecodeConnEnv passes conn_type through verbatim and the
 	// manifest side is verbatim TOML, so neither end normalizes, and a stored

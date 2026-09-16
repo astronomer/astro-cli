@@ -233,12 +233,54 @@ func TestCheckValues(t *testing.T) {
 		}
 	})
 
-	t.Run("a present but empty value is not checked", func(t *testing.T) {
-		// An empty string satisfies Validate, so refusing it here would have
-		// the two functions disagree about a value the gate allows.
+	t.Run("a present but empty value is checked against its declared type", func(t *testing.T) {
+		// This used to be skipped, on the grounds that an empty string
+		// satisfies Validate and reporting it here would have the two
+		// functions disagree about a value the gate allows. They are meant to
+		// disagree in exactly that way: Validate gates on presence and this
+		// reports shape as a warning, which is the whole reason the type check
+		// lives beside it. Every other type violation is already a value
+		// Validate allows.
+		//
+		// So `type = 'port'` now means something for PORT= as well as for
+		// PORT=abc, which is what an author writing the annotation asked for.
 		got := CheckValues(schema, Values{EnvVars: map[string]string{"PORT": "", "COUNT": ""}})
+		if len(got) != 2 {
+			t.Fatalf("want a violation for each typed empty value, got %+v", got)
+		}
+		for _, v := range got {
+			if v.Kind != ViolationWrongType || v.Section != SectionEnvVar {
+				t.Errorf("unexpected violation shape: %+v", v)
+			}
+		}
+	})
+
+	t.Run("an empty value with no declared type is still fine", func(t *testing.T) {
+		// The narrowing has to stay narrow: an empty value only reports where
+		// the declaration says something a value has to be. CheckValue already
+		// draws that line — an absent type, `string` and `json` are the absence
+		// of a constraint — so nothing here special-cases emptiness.
+		s := &Schema{EnvVars: map[string]ValueSpec{
+			"PLAIN": {},
+			"STR":   {Type: TypeString},
+			"BLOB":  {Type: TypeJSON},
+		}}
+		got := CheckValues(s, Values{EnvVars: map[string]string{"PLAIN": "", "STR": "", "BLOB": ""}})
 		if len(got) != 0 {
-			t.Fatalf("want no violations for empty values, got %+v", got)
+			t.Fatalf("want no violations where nothing was declared about the value, got %+v", got)
+		}
+	})
+
+	t.Run("an empty connection value is still skipped", func(t *testing.T) {
+		// Load-bearing, not stylistic: a connection's value here is its
+		// resolved conn_type, so an empty one is a kind the resolver could not
+		// determine rather than the wrong kind. Reporting it would tell the
+		// user their connection is the wrong type when the truth is that its
+		// value never decoded.
+		s := &Schema{Connections: map[string]ValueSpec{"warehouse": {ConnType: "postgres"}}}
+		got := CheckValues(s, Values{Connections: map[string]string{"warehouse": ""}})
+		if len(got) != 0 {
+			t.Fatalf("want no violation for an undetermined conn_type, got %+v", got)
 		}
 	})
 
