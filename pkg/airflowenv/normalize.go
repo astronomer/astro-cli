@@ -28,7 +28,7 @@ func NormalizeConn(connID, raw string) (string, error) {
 	if strings.HasPrefix(trimmed, "{") {
 		decoded, ok := DecodeConnEnv(EnvKeyForConnID(connID), trimmed)
 		if !ok {
-			return "", fmt.Errorf("connection %q: value is not valid connection JSON", connID)
+			return "", fmt.Errorf("connection %q: value must be connection JSON carrying a conn_type", connID)
 		}
 		conn = decoded
 	} else {

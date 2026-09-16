@@ -113,13 +113,24 @@ func ConnIDForEnvKey(key string) string {
 
 // DecodeConnEnv parses an AIRFLOW_CONN_* env-var pair back into a Connection.
 // The conn id is the lowercased suffix (Airflow treats env connection ids
-// case-insensitively). ok is false for non-connection keys or invalid JSON.
+// case-insensitively). ok is false for a non-connection key, for JSON that does
+// not parse, and for JSON carrying no conn_type.
+//
+// The conn_type requirement is what makes a decoded value a connection rather
+// than a bag of fields: Airflow resolves a provider from conn_type, so without
+// one there is nothing to connect with. Returning such a value anyway only
+// moves the failure somewhere that cannot explain it — into the provider import,
+// or into a satisfied-looking declaration. A caller that needs to name the
+// connection without judging its value wants ConnIDForEnvKey.
 func DecodeConnEnv(key, value string) (connmodel.Connection, bool) {
 	if !IsConnEnvKey(key) {
 		return connmodel.Connection{}, false
 	}
 	var p connJSON
 	if err := json.Unmarshal([]byte(value), &p); err != nil {
+		return connmodel.Connection{}, false
+	}
+	if p.ConnType == "" {
 		return connmodel.Connection{}, false
 	}
 	return connmodel.Connection{

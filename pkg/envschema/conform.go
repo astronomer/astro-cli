@@ -24,19 +24,19 @@ import (
 // # What the conn_type check does not reach
 //
 // A connection is compared only when the resolver determined its kind, which
-// means a JSON value carrying a conn_type field. airflowenv.DecodeConnEnv is
-// JSON-only, so:
+// means a value airflowenv.DecodeConnEnv accepted — JSON carrying a conn_type.
+// Anything else leaves the kind empty and the empty-value skip passes over it,
+// so it is never compared here:
 //
 //   - A URI value — AIRFLOW_CONN_X=snowflake://u:p@acct/db, Airflow's own
-//     documented form — does not decode. The resolver reports "not valid
-//     connection JSON" and leaves the kind empty, which the empty-value skip
-//     passes over.
-//   - A JSON blob omitting conn_type decodes to an empty kind and is accepted
-//     against any declaration.
+//     documented form — is not JSON and does not decode.
+//   - A JSON blob omitting conn_type does not decode either, because a value
+//     with no conn_type is not a connection.
 //
-// Neither reports a false mismatch. Comparing them needs the resolver to
-// distinguish "decoded, no kind" from "could not decode", so it is a change on
-// that side. A clean start is therefore not proof that a conn_type matched.
+// Both reach the user as the resolver's wrong-type violation naming the value,
+// rather than one of them being silently accepted against any declaration. So
+// neither reports a false mismatch, and a clean start is still not proof that a
+// conn_type MATCHED — only that one was present and parsed.
 func CheckValues(s *Schema, v Values) []Violation {
 	if s == nil {
 		return nil

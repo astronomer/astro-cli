@@ -163,7 +163,7 @@ func (r *resolver) values(specs map[string]envschema.ValueSpec, section envschem
 
 // connTypes resolves the connections section down to conn id -> a present
 // marker, the shape the validator inspects for presence. A resolved value that
-// is not valid connection JSON is a wrong-type violation, not a missing value.
+// is not a usable connection is a wrong-type violation, not a missing value.
 func (r *resolver) connTypes(specs map[string]envschema.ValueSpec) map[string]string {
 	if len(specs) == 0 {
 		return nil
@@ -185,7 +185,7 @@ func (r *resolver) connTypes(specs map[string]envschema.ValueSpec) map[string]st
 				Kind:    envschema.ViolationWrongType,
 				Section: envschema.SectionConnection,
 				Key:     connID,
-				Reason:  "stored value is not valid connection JSON",
+				Reason:  "stored value is not a usable connection: expected JSON carrying a conn_type",
 			})
 			out[connID] = ""
 			continue
