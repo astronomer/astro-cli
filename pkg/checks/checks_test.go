@@ -62,6 +62,85 @@ func TestEvaluateSameDagIDTwiceInOneFileIsNotADuplicate(t *testing.T) {
 	assert.Equal(t, ExitOK, res.ExitCode(false))
 }
 
+// The warning has to arrive before the failure it warns about.
+//
+// Set equal to Airflow's import timeout — as it was — the finding is
+// unreachable: Airflow abandons the import at that same moment and reports an
+// error, so the warning never appears without one, "slow is not broken"
+// describes a state the default configuration cannot produce, and --strict's
+// effect on it cannot be observed. Every other test here feeds evaluate a
+// ParseSeconds relative to the threshold, so all of them pass either way; this
+// is the one that pins the gap.
+func TestSlowParseWarnsBeforeAirflowGivesUp(t *testing.T) {
+	assert.Less(t, ParseTimeWarnThreshold, defaultAirflowImportTimeout,
+		"a file slow enough to warn must still be one Airflow finished importing")
+
+	// A margin, not a hair: the point is to flag a file heading for the limit
+	// while there is still something to do about it.
+	margin := defaultAirflowImportTimeout - ParseTimeWarnThreshold
+	assert.GreaterOrEqual(t, margin, defaultAirflowImportTimeout/4,
+		"the gap is what makes the warning actionable")
+
+	// And the reachable band really does produce a warning and nothing else.
+	res := evaluate(ParseReport{Files: []ReportFile{{
+		File:         "dags/slow.py",
+		ParseSeconds: (ParseTimeWarnThreshold + defaultAirflowImportTimeout).Seconds() / 2,
+		DagIDs:       []string{"s"},
+	}}})
+	require.Len(t, res.Findings, 1)
+	assert.Equal(t, SeverityWarning, res.Findings[0].Severity)
+	assert.Equal(t, 0, res.Errors)
+}
+
+// The threshold tracks the timeout the run was actually subject to, because a
+// project can move it. Fixed at Airflow's default, a project that raises the
+// timeout gets warned about files nowhere near its limit, and one that lowers it
+// gets a warning it can never reach — the same defect, in both directions.
+func TestSlowParseThresholdFollowsTheReportedTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		timeout       float64
+		parseSeconds  float64
+		wantFindings  int
+		wantThreshold float64
+	}{
+		{
+			// 40s under a 120s timeout is not close to anything.
+			name:    "a raised timeout does not warn about a file well inside it",
+			timeout: 120, parseSeconds: 40, wantFindings: 0,
+		},
+		{
+			name:    "a raised timeout warns as its own limit approaches",
+			timeout: 120, parseSeconds: 100, wantFindings: 1, wantThreshold: 80,
+		},
+		{
+			// 12s would pass at the default threshold and is already most of
+			// the way to this project's limit.
+			name:    "a lowered timeout warns where the default would not",
+			timeout: 15, parseSeconds: 12, wantFindings: 1, wantThreshold: 10,
+		},
+		{
+			// No value reported: fall back to Airflow's default.
+			name:    "an unreported timeout falls back to the default",
+			timeout: 0, parseSeconds: 25, wantFindings: 1, wantThreshold: ParseTimeWarnThreshold.Seconds(),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := evaluate(ParseReport{
+				ImportTimeoutSeconds: tc.timeout,
+				Files:                []ReportFile{{File: "dags/slow.py", ParseSeconds: tc.parseSeconds, DagIDs: []string{"s"}}},
+			})
+			require.Len(t, res.Findings, tc.wantFindings)
+			if tc.wantFindings == 0 {
+				return
+			}
+			assert.Equal(t, KindSlowParse, res.Findings[0].Kind)
+			assert.InDelta(t, tc.wantThreshold, res.Findings[0].ThresholdSeconds, 0.001,
+				"the reported threshold must be the one the verdict used")
+		})
+	}
+}
+
 func TestEvaluateSlowParseIsWarningStrictMakesItFail(t *testing.T) {
 	res := evaluate(ParseReport{
 		Files: []ReportFile{

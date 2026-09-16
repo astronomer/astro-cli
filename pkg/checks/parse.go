@@ -55,6 +55,14 @@ type ParseReport struct {
 	// the checks derived from them did not run. Distinct from Files being
 	// empty, which is a project with no DAG files.
 	FilesUnavailable bool `json:"files_unavailable"`
+	// ImportTimeoutSeconds is the dagbag_import_timeout this parse ran under:
+	// the point at which Airflow abandons a slow file and reports an import
+	// error instead. Zero when the parser could not read it, and the
+	// slow-parse threshold then falls back to Airflow's documented default.
+	//
+	// Reported rather than assumed because a project can set it, and the
+	// warning is only useful relative to the value actually in force.
+	ImportTimeoutSeconds float64 `json:"import_timeout_seconds"`
 }
 
 // ReportDag is one DAG that loaded without an import error.

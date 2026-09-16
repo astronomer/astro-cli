@@ -160,6 +160,19 @@ def main():
         emit(result, real_stdout)
         return
 
+    # The timeout this DagBag actually ran under, which is the point at which a
+    # slow file stops being slow and becomes an import error. It is
+    # configurable, so the caller cannot assume Airflow's default: a project
+    # that raises it wants the slow-parse warning raised with it, and one that
+    # lowers it wants the warning lowered or it never fires. Best-effort — a
+    # missing conf leaves the key absent and the caller falls back.
+    try:
+        from airflow.configuration import conf
+
+        result["import_timeout_seconds"] = conf.getint("core", "dagbag_import_timeout")
+    except Exception:
+        pass
+
     def rel(path):
         try:
             return os.path.relpath(path, project_root)

@@ -43,11 +43,55 @@ const (
 	ExitEnvNotReady = 2
 )
 
-// ParseTimeWarnThreshold flags a DAG file whose import took longer than this.
-// It matches Airflow's own default dagbag_import_timeout: a file slower than
-// this to import risks scheduler timeouts in a real deployment. The finding
-// is a warning, not a failure — slow is not broken — unless --strict is set.
-const ParseTimeWarnThreshold = 30 * time.Second
+// defaultAirflowImportTimeout is Airflow's own default dagbag_import_timeout:
+// the point at which a slow DAG file stops being slow and becomes an error,
+// because Airflow abandons the import and reports the failure itself.
+//
+// A fallback, not an assumption. The setting is configurable and the parse
+// reports the value actually in force (ParseReport.ImportTimeoutSeconds); this
+// is what the threshold is derived from only when that is unavailable.
+const defaultAirflowImportTimeout = 30 * time.Second
+
+// warnFractionOfTimeout places the slow-parse warning below the timeout it
+// warns about. See ParseTimeWarnThreshold.
+const warnFractionOfTimeout = 2.0 / 3.0
+
+// warnThreshold is the slow-parse threshold for one run: two thirds of the
+// import timeout that run was subject to.
+//
+// Derived per run rather than fixed, because the timeout is a project's to set
+// and the warning means nothing except relative to it. A project that raises
+// dagbag_import_timeout to 120 would otherwise be warned about files nowhere
+// near its limit; one that lowers it to 15 would get a 20s warning it can never
+// reach, which is the defect a fixed threshold introduced in the first place.
+func warnThreshold(report ParseReport) float64 {
+	timeout := report.ImportTimeoutSeconds
+	if timeout <= 0 {
+		timeout = defaultAirflowImportTimeout.Seconds()
+	}
+	return timeout * warnFractionOfTimeout
+}
+
+// ParseTimeWarnThreshold flags a DAG file whose import took longer than this:
+// slow enough to risk a scheduler timeout in a real deployment, while still
+// importing. The finding is a warning, not a failure — slow is not broken —
+// unless --strict is set.
+//
+// Set BELOW airflowImportTimeout, deliberately, and that is the whole point of
+// the warning. It used to equal it, which made it unreachable: a file slow
+// enough to trip it had already been abandoned by Airflow, so the run reported
+// an import error and the warning only ever appeared alongside one. "Slow is
+// not broken" described a state the default configuration could not produce,
+// and --strict's effect on this finding could not be observed at all.
+//
+// A warning is worth having only if it arrives before the thing it warns about.
+// Two thirds leaves a real margin — ten seconds at Airflow's default — without
+// firing on projects that are merely not instant; a DAG taking twenty seconds
+// to import is already worth looking at.
+// It is the threshold for a run whose timeout is Airflow's default. A run
+// reporting a different one is judged against that instead — see warnThreshold.
+// This stays exported because other tools build against this sub-module.
+const ParseTimeWarnThreshold = time.Duration(float64(defaultAirflowImportTimeout) * warnFractionOfTimeout)
 
 // ErrEnvNotReady reports that the project environment is not in a state the
 // check can inspect: the .venv is missing, or Airflow is not installed in it.
@@ -186,14 +230,18 @@ func evaluate(report ParseReport) Result {
 	res.Findings = append(res.Findings, duplicateDagIDs(report.Files)...)
 
 	slow := make([]Finding, 0)
+	threshold := warnThreshold(report)
 	for _, file := range report.Files {
-		if file.ParseSeconds > ParseTimeWarnThreshold.Seconds() {
+		if file.ParseSeconds > threshold {
 			slow = append(slow, Finding{
-				Kind:             KindSlowParse,
-				Severity:         SeverityWarning,
-				File:             file.File,
-				ParseSeconds:     file.ParseSeconds,
-				ThresholdSeconds: ParseTimeWarnThreshold.Seconds(),
+				Kind:         KindSlowParse,
+				Severity:     SeverityWarning,
+				File:         file.File,
+				ParseSeconds: file.ParseSeconds,
+				// The threshold this run was judged against, so the rendered
+				// message and the json agree with the verdict even on a project
+				// that moved its import timeout.
+				ThresholdSeconds: threshold,
 			})
 		}
 	}
