@@ -729,7 +729,7 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 	tmpl := "[project]\n" +
 		"name = 'astro-project'\n" +
 		"version = '" + defaultProjectVersion + "'\n" +
-		"requires-python = '>=3.10'\n" +
+		"requires-python = '" + requiresPython(version) + "'\n" +
 		"dependencies = []\n\n" +
 		"[tool.astro]\n" +
 		"airflow = '" + DefaultAirflowVersion + "'\n"

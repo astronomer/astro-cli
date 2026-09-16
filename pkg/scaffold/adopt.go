@@ -61,7 +61,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 			return nil, nil, pin, err
 		}
 	}
-	if err := ensureProjectVersion(ed); err != nil {
+	if err := ensureProjectKeys(ed, version); err != nil {
 		return nil, nil, pin, err
 	}
 
@@ -280,6 +280,31 @@ func ensureProjectVersion(ed tomledit.Editor) error {
 		return nil
 	}
 	return ed.Set([]string{"project", "version"}, defaultProjectVersion)
+}
+
+// ensureProjectKeys fills the [project] keys this run is responsible for and
+// the manifest does not already state. Both are "fill a gap, never overwrite":
+// what the author wrote is what they meant.
+func ensureProjectKeys(ed tomledit.Editor, version string) error {
+	if err := ensureProjectVersion(ed); err != nil {
+		return err
+	}
+	return ensureRequiresPython(ed, version)
+}
+
+// ensureRequiresPython states which interpreters the project supports, when
+// the manifest does not already.
+//
+// Only when it does not. A requires-python its author wrote is their decision
+// and this run cannot overrule it — but a manifest stating none leaves uv free
+// to build the venv on the newest Python present, and for an Airflow 2 pin
+// that is one Airflow 2 cannot run under. See requiresPython for what that
+// failure looks like.
+func ensureRequiresPython(ed tomledit.Editor, version string) error {
+	if v, ok := ed.Get([]string{"project", "requires-python"}); ok && v != "" {
+		return nil
+	}
+	return ed.Set([]string{"project", "requires-python"}, requiresPython(version))
 }
 
 // withPath names the manifest in a validation or parse failure. Both error

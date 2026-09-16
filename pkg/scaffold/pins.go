@@ -66,6 +66,38 @@ func airflowExtrasNote(spec string) []string {
 		", which the generated Airflow requirement does not carry: add them to the apache-airflow entry in [project.dependencies]"}
 }
 
+// requiresPython is the [project] requires-python for a project pinned to this
+// Airflow: the interpreters that Airflow can actually run under.
+//
+// It matters because nothing else chooses the interpreter. rt.Params leaves
+// PythonVersion empty on purpose — "uv resolves the interpreter from the
+// manifest's requires-python" — so this string is the only thing standing
+// between the pin and whatever Python the machine happens to have newest.
+//
+// Airflow 2 is the case that bites. It never supported Python 3.13, and its
+// Flask stack reaches for stdlib that 3.12 removed, but its published metadata
+// carries no upper bound — so uv installs it on a 3.14 and the project fails at
+// start rather than at resolve, with:
+//
+//	AttributeError: module 'ast' has no attribute 'Str'
+//
+// from inside werkzeug, which names neither Airflow nor Python. Every v1
+// conversion lands on an Airflow 2 pin, so this is the path a migrating user
+// takes.
+//
+// Airflow 3 is deliberately left open. It tracks new interpreters, and capping
+// it here would mean editing this file every time one ships — the failure that
+// bound would cause (refusing a Python that works) is worse than the one it
+// would prevent.
+func requiresPython(airflow string) string {
+	const floor = ">=3.10"
+	major, _, _ := strings.Cut(airflow, ".")
+	if major == "2" {
+		return floor + ",<3.13"
+	}
+	return floor
+}
+
 // pinsAirflow reports whether [project.dependencies] already names
 // apache-airflow, however it is pinned.
 func pinsAirflow(deps []string) bool {
