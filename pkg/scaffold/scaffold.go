@@ -236,6 +236,13 @@ type manifestFacts struct {
 	// defaultedPin reports that nothing named an Airflow version, so the pin
 	// is the CLI's default.
 	defaultedPin bool
+	// pinUnread reports that [project.dependencies] names apache-airflow in a
+	// shape no single version reads out of, while the pin written to
+	// [tool.astro] came from somewhere else — a Dockerfile's image tag, or the
+	// --airflow-version flag. Nothing reconciles the two afterwards, so the
+	// manifest can end up declaring one Airflow and running another, and the
+	// run has to say so rather than leave it to be discovered at start.
+	pinUnread bool
 	// namesAirflow reports that the manifest names apache-airflow in a shape
 	// no version could be read out of — a range, a wildcard. With a defaulted
 	// pin that means the project may have just moved an Airflow generation.
@@ -935,6 +942,16 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 	if facts.defaultedPin && (v1.statedVersion || facts.namesAirflow) {
 		out = append([]string{"airflow = '" + DefaultAirflowVersion + "' is the default, not this project's version: " +
 			"set it from the Airflow this project already names"}, out...)
+	}
+	// The other way a manifest ends up contradicting itself: its own
+	// dependency names an Airflow this cannot pin down, so the pin came from
+	// elsewhere and may not be the same Airflow. Said here because nothing
+	// downstream compares the two — the project simply runs the [tool.astro]
+	// one and resolves the dependency one, and the disagreement surfaces as a
+	// failure with no obvious cause.
+	if facts.pinUnread {
+		out = append([]string{"[project.dependencies] names apache-airflow in a shape no single version reads out of, " +
+			"so airflow = '" + version + "' came from elsewhere: make the two agree, or set airflow explicitly"}, out...)
 	}
 	// Dependencies declared dynamic are supplied from somewhere this cannot
 	// reach, so the requirement that installs Airflow has to be put there.

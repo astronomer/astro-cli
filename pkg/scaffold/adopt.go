@@ -42,6 +42,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	version, defaulted := pickAirflowVersion(opts.AirflowVersion, deps, v1)
 	pin = manifestFacts{
 		defaultedPin: defaulted,
+		pinUnread:    pinnedPastTheManifest(deps, defaulted),
 		// A manifest naming Airflow without a clean == pin — a range, a
 		// wildcard — states a version this cannot read, so the default that
 		// lands instead may move the project a whole generation.

@@ -72,6 +72,23 @@ func pinsAirflow(deps []string) bool {
 	return slices.ContainsFunc(deps, namesAirflow)
 }
 
+// pinnedPastTheManifest reports that the manifest names Airflow in a shape no
+// single version reads out of — a range — while the pin written to
+// [tool.astro] came from another source.
+//
+// That is the one remaining way the two halves of a manifest can name
+// different Airflows, now that a series is read like any other pin. Nothing
+// downstream compares them: the CLI runs the [tool.astro] one and uv resolves
+// the dependency one, so the disagreement surfaces later as a failure with no
+// obvious cause. Saying so at adoption is the only cheap moment.
+func pinnedPastTheManifest(deps []string, defaulted bool) bool {
+	if defaulted || !pinsAirflow(deps) {
+		return false
+	}
+	_, readable := pinFromDeps(deps)
+	return !readable
+}
+
 // distName extracts and normalizes the distribution name from a PEP 508
 // requirement: the leading name, before any extras, version, marker, or URL.
 // Mirrors pkg/checks.distName, internal/pack.distName and
@@ -109,6 +126,18 @@ func pinFromSpec(spec string) (version string, ok bool) {
 		return "", false
 	}
 	v := strings.TrimSpace(rest)
+	// A trailing ".*" names a series, which is exactly what tool.astro.airflow
+	// means by "3.1": the newest 3.1. So it is read rather than refused.
+	//
+	// It is also the shape this package writes — a scaffolded project pins
+	// "apache-airflow==3.1.*" — so refusing it meant the scaffold could not
+	// read back its own output. Adopting a project pinned that way fell
+	// through to the next source, and where that source was a v1 Dockerfile
+	// the manifest ended up with a [tool.astro] pin its own dependency
+	// contradicts: airflow = '2' beside apache-airflow==3.0.*. Nothing
+	// reconciles those afterwards, and the project runs one Airflow while
+	// declaring another.
+	v = strings.TrimSuffix(v, ".*")
 	if strings.ContainsAny(v, ", *") { // more than a single exact pin
 		return "", false
 	}

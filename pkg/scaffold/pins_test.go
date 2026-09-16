@@ -29,6 +29,12 @@ func TestPinFromSpec(t *testing.T) {
 		"apache-airflow ==2.9.3":                       "2.9.3",
 		`apache-airflow==2.9.3; python_version<"3.12"`: "2.9.3",
 		"apache-airflow[celery,statsd]==2.9.3 ; sys_platform == 'linux'": "2.9.3",
+		// A series, which is what tool.astro.airflow means by "2.9", and the
+		// shape airflowRequirement writes. See TestPinReadsWhatItWrites.
+		"apache-airflow==2.9.*":                           "2.9",
+		"apache-airflow==3.*":                             "3",
+		"apache-airflow[celery]==3.1.*":                   "3.1",
+		"apache-airflow==3.1.* ; sys_platform == 'linux'": "3.1",
 	}
 	for spec, want := range pinned {
 		got, ok := pinFromSpec(spec)
@@ -40,8 +46,8 @@ func TestPinFromSpec(t *testing.T) {
 	// back to the default rather than guessing which release is meant.
 	unpinned := []string{
 		"apache-airflow>=2.9,<3",
-		"apache-airflow==2.9.*",
 		"apache-airflow~=2.9.3",
+		"apache-airflow==2.*.3",
 		"apache-airflow",
 		"apache-airflow==2.9.3,!=2.9.4",
 		"apache-airflow @ https://example.com/airflow.whl",
@@ -52,6 +58,23 @@ func TestPinFromSpec(t *testing.T) {
 	for _, spec := range unpinned {
 		_, ok := pinFromSpec(spec)
 		assert.False(t, ok, spec)
+	}
+}
+
+// Every pin this package writes, it must be able to read back.
+//
+// It could not, and the gap was the shape it writes most: airflowRequirement
+// turns "3.1" into "apache-airflow==3.1.*", and pinFromSpec refused anything
+// with a star. So adopting a project pinned the way a scaffolded project is
+// pinned fell through to the next source in the chain — and where that source
+// was a v1 Dockerfile, the result was a manifest whose [tool.astro] pin its own
+// dependency contradicted.
+func TestPinReadsWhatItWrites(t *testing.T) {
+	for _, version := range []string{"2", "2.9", "2.10", "3", "3.1", "3.1.2"} {
+		spec := airflowRequirement(version)
+		got, ok := pinFromSpec(spec)
+		assert.True(t, ok, "%s -> %s could not be read back", version, spec)
+		assert.Equal(t, version, got, "%s -> %s", version, spec)
 	}
 }
 
@@ -100,6 +123,14 @@ func TestPickAirflowVersion(t *testing.T) {
 	// the image built for one and the venv installing the other.
 	version, defaulted = pickAirflowVersion("", []string{"pandas", "apache-airflow==2.9.3"}, dockerfile)
 	assert.Equal(t, "2.9.3", version, "a pin the manifest's author wrote outranks a Dockerfile tag")
+	assert.False(t, defaulted)
+
+	// The same, pinned as a series. This is the shape a scaffolded project
+	// carries, so it is the shape a real adoption meets most often, and it
+	// went to the Dockerfile instead: airflow = "2" written beside
+	// apache-airflow==3.0.*.
+	version, defaulted = pickAirflowVersion("", []string{"apache-airflow==3.0.*"}, &v1Project{airflow: "2"})
+	assert.Equal(t, "3.0", version, "a series the manifest pins outranks a Dockerfile tag")
 	assert.False(t, defaulted)
 
 	// Then the Dockerfile, above a requirements.txt pin: the image tag is what
