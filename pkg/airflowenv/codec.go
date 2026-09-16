@@ -5,16 +5,27 @@
 // local Airflow in the MVP: a connection or variable "is just an env var", so
 // the runtime reads it with no extra wiring.
 //
-// Lifted from Astro Desktop's airflowenv package. The conn id /
-// var key in the env-var name is uppercased (Airflow's convention) and
-// treated case-insensitively: decode lowercases it back. Because the name
-// must be a legal env-var identifier, ids/keys are restricted to [A-Za-z0-9_]
-// (see ValidConnID / ValidVarKey) — connections or variables whose id can't
-// be expressed as an env var are rejected by the encoder.
+// Lifted from Astro Desktop's airflowenv package.
+//
+// There are two pairs for connections, and they obey different rules because
+// they address different things.
+//
+// EncodeConnEnv / DecodeConnEnv are the ENV-VAR form. The id is uppercased in
+// the name (Airflow's convention) and treated case-insensitively, so decode
+// lowercases it back; and because the name must be a legal env-var identifier,
+// an id that cannot be one is rejected by the encoder (see ValidConnID).
+//
+// EncodeConnValue / DecodeConnValue are the VALUE only, for a store that keys a
+// connection itself. Neither rule applies: no id is rejected, and the id the
+// caller supplies is returned verbatim rather than lowercased, because it came
+// from that store's own key and is not this package's to reinterpret. A caller
+// holding one id and reading through both doors therefore gets the id it gave
+// from one and a lowercased id from the other — deliberate, and pinned by test.
 package airflowenv
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -75,7 +86,27 @@ func EncodeConnEnv(c connmodel.Connection) (key, value string, ok bool) { //noli
 	if !ValidConnID(c.ConnID) {
 		return "", "", false
 	}
-	payload := connJSON{
+	value, err := EncodeConnValue(c)
+	if err != nil {
+		return "", "", false
+	}
+	return EnvKeyForConnID(c.ConnID), value, true
+}
+
+// EncodeConnValue renders just the value half: the single-line JSON, with no
+// env-var name and no requirement that the id could be one.
+//
+// It is separate from EncodeConnEnv because a vault stores a connection under a
+// key of its own (conn:<scope>:<id>) and needs this exact JSON as the value —
+// that encoding is the contract, since a reader builds an AIRFLOW_CONN_*
+// straight from what it holds. Going through EncodeConnEnv would impose the
+// env-var name rule on storage, so a connection whose id is legal in Airflow
+// and in that store but not as an env-var identifier ("my-db") could not be
+// saved at all. The two concerns stay separate, with one definition of the shape.
+// The JSON intentionally carries the password: that is exactly how Airflow
+// parses an env-var connection, and a form that omitted it would not be one.
+func EncodeConnValue(c connmodel.Connection) (string, error) { //nolint:gocritic // hugeParam: matches EncodeConnEnv's value-type API
+	data, err := json.Marshal(connJSON{
 		ConnType: c.ConnType,
 		Host:     c.ConnHost,
 		Login:    c.ConnLogin,
@@ -83,12 +114,11 @@ func EncodeConnEnv(c connmodel.Connection) (key, value string, ok bool) { //noli
 		Schema:   c.ConnSchema,
 		Port:     c.ConnPort,
 		Extra:    c.ConnExtra,
-	}
-	data, err := json.Marshal(payload) //nolint:gosec // G117: the AIRFLOW_CONN_ JSON form intentionally serializes the password — that is exactly how Airflow parses an env-var connection.
+	})
 	if err != nil {
-		return "", "", false
+		return "", err
 	}
-	return EnvKeyForConnID(c.ConnID), string(data), true
+	return string(data), nil
 }
 
 // IsConnEnvKey reports whether key is an AIRFLOW_CONN_* env-var key (with a
@@ -126,15 +156,44 @@ func DecodeConnEnv(key, value string) (connmodel.Connection, bool) {
 	if !IsConnEnvKey(key) {
 		return connmodel.Connection{}, false
 	}
+	c, err := DecodeConnValue(ConnIDForEnvKey(key), value)
+	if err != nil {
+		return connmodel.Connection{}, false
+	}
+	return c, true
+}
+
+// DecodeConnValue parses just the value half, for a caller that already knows
+// the connection id — a vault reading back what EncodeConnValue stored under its
+// own key. It is the one place the conn_type requirement is enforced.
+//
+// Not quite the mirror of EncodeConnValue: that encoder accepts a connection
+// with no conn_type and this refuses the result, so a caller that writes
+// without checking can store a row nothing can read. The env pair guards its
+// own write boundary in NormalizeConn; a store using this pair has to do the
+// same. Pinned by TestTheValuePairIsNotSymmetric.
+//
+// It returns an error rather than a bool because its callers can say which
+// stored record is unusable and why, where DecodeConnEnv's callers are walking
+// an environment and only need to know whether an entry is a connection. Every
+// error names the record for that reason.
+func DecodeConnValue(connID, value string) (connmodel.Connection, error) {
+	if connID == "" {
+		return connmodel.Connection{}, fmt.Errorf("connection id is required")
+	}
 	var p connJSON
 	if err := json.Unmarshal([]byte(value), &p); err != nil {
-		return connmodel.Connection{}, false
+		// Deliberately not %w. The value is decrypted connection JSON, and a
+		// json.SyntaxError quotes the byte it stopped on — which for a
+		// corrupted row can be a byte of the password. The caller gets the
+		// record and the kind of fault, never a piece of the payload.
+		return connmodel.Connection{}, fmt.Errorf("connection %q: value is not valid JSON", connID)
 	}
 	if p.ConnType == "" {
-		return connmodel.Connection{}, false
+		return connmodel.Connection{}, fmt.Errorf("connection %q has no conn_type", connID)
 	}
 	return connmodel.Connection{
-		ConnID:       ConnIDForEnvKey(key),
+		ConnID:       connID,
 		ConnType:     p.ConnType,
 		ConnHost:     p.Host,
 		ConnLogin:    p.Login,
@@ -142,7 +201,7 @@ func DecodeConnEnv(key, value string) (connmodel.Connection, bool) {
 		ConnSchema:   p.Schema,
 		ConnPort:     p.Port,
 		ConnExtra:    p.Extra,
-	}, true
+	}, nil
 }
 
 // EnvKeyForVarKey returns the AIRFLOW_VAR_* env-var key for a variable key.

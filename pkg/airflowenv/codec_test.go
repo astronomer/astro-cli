@@ -39,8 +39,8 @@ func TestConnRoundTrip(t *testing.T) {
 		},
 		{
 			name: "password_with_quotes_and_backslashes",
-			in:   connmodel.Connection{ConnID: "tricky", ConnType: "generic", ConnPassword: `a"b\c\nd`}, //nolint:gosec // G101: test fixture, not a real credential
-			want: connmodel.Connection{ConnID: "tricky", ConnType: "generic", ConnPassword: `a"b\c\nd`}, //nolint:gosec // G101: test fixture, not a real credential
+			in:   connmodel.Connection{ConnID: "tricky", ConnType: "generic", ConnPassword: `a"b\c\nd`},
+			want: connmodel.Connection{ConnID: "tricky", ConnType: "generic", ConnPassword: `a"b\c\nd`},
 		},
 	}
 	for _, tc := range cases {
