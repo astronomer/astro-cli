@@ -27,18 +27,11 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	astroenv "github.com/astronomer/astro-cli/internal/platform/astro/env"
+	"github.com/astronomer/astro-cli/pkg/emfetch"
 )
 
 // sourceLabel is the source name a workspace-resolved value reports.
 const sourceLabel = "workspace"
-
-const (
-	// listLimit is the page size for the Environment Manager list call.
-	listLimit = 1000
-	// maxPages bounds one fetch against a server that mis-reports TotalCount.
-	maxPages = 100
-)
 
 // provider resolves declared env values for one workspace from Environment
 // Manager. It fetches lazily on the first Lookup and caches the result for the
@@ -50,6 +43,10 @@ type provider struct {
 
 	once    sync.Once
 	objects map[string]objectValue
+	// secretsIncluded records whether the fetch that filled objects asked for
+	// secret values and was not refused, which is what separates "the org
+	// withheld this" from "the platform holds no value for it".
+	secretsIncluded bool
 	// down, when set, is the whole-provider failure: a short reason for the
 	// list label and a longer cause for the missing-value message.
 	down *outage
@@ -107,7 +104,10 @@ func (p *provider) Diagnose(key string) string {
 		return p.down.cause
 	}
 	if obj, ok := p.objects[key]; ok && obj.isSecret && obj.value == "" {
-		return `it lives in Environment Manager but your org disables secret fetching — ask an org admin to enable "Environment Secrets Fetching"`
+		if !p.secretsIncluded {
+			return `it lives in Environment Manager but your org disables secret fetching — ask an org admin to enable "Environment Secrets Fetching"`
+		}
+		return "Environment Manager holds it as a secret with no value to resolve"
 	}
 	return "Environment Manager holds no value for it in this workspace"
 }
@@ -125,18 +125,21 @@ func (p *provider) load() {
 			p.down = &outage{short: "logged out", cause: "you are not logged in — log in with 'astro login'"}
 			return
 		}
-		objs, err := p.fetch(ctx.Organization, p.reveal)
-		if errors.Is(err, errSecretsDisabled) {
-			// The org disallows reading secrets. Non-secret values still
-			// resolve, so retry without the secret request; a workspace secret
-			// then reads as a miss whose cause names the org toggle.
-			objs, err = p.fetch(ctx.Organization, false)
-		}
+		// When the org disallows reading secrets, non-secret values still
+		// resolve, so the fallback re-reads without the secret request and a
+		// workspace secret then reads as a miss whose cause names the org
+		// toggle. secretsIncluded is what Diagnose uses to tell that apart from
+		// a secret the platform simply holds no value for.
+		objs, secretsIncluded, err := emfetch.WithSecretsFallback(httpcontext.Background(), p.reveal,
+			func(reqCtx httpcontext.Context, showSecrets bool) (map[string]objectValue, error) {
+				return p.fetch(reqCtx, ctx.Organization, showSecrets)
+			})
 		if err != nil {
 			p.down = classify(err)
 			return
 		}
 		p.objects = objs
+		p.secretsIncluded = secretsIncluded
 	})
 }
 
@@ -158,24 +161,26 @@ var envVarKeyedTypes = []astrov1.ListEnvironmentObjectsParamsObjectType{
 // It drives the generated client directly rather than calling cloud/env's
 // ListVars/ListAirflowVars because those flatten the HTTP status into a bare
 // message (through NormalizeAPIError), and classify needs the 401/403/404 to
-// name the failure. The paging mirrors cloud/env.listObjects deliberately.
-func (p *provider) fetch(org string, showSecrets bool) (map[string]objectValue, error) {
+// name the failure. The paging itself is pkg/emfetch's, shared with every other
+// reader of the endpoint.
+func (p *provider) fetch(ctx httpcontext.Context, org string, showSecrets bool) (map[string]objectValue, error) {
 	out := map[string]objectValue{}
 	for _, objectType := range envVarKeyedTypes {
-		if err := p.fetchType(out, org, objectType, showSecrets); err != nil {
+		rows, err := p.listType(ctx, org, objectType, showSecrets)
+		if err != nil {
 			return nil, err
+		}
+		for i := range rows {
+			indexObject(out, &rows[i])
 		}
 	}
 	return out, nil
 }
 
-// fetchType pages one object type into out.
-func (p *provider) fetchType(out map[string]objectValue, org string, objectType astrov1.ListEnvironmentObjectsParamsObjectType, showSecrets bool) error {
+// listType pages one object type.
+func (p *provider) listType(ctx httpcontext.Context, org string, objectType astrov1.ListEnvironmentObjectsParamsObjectType, showSecrets bool) ([]astrov1.EnvironmentObject, error) {
 	resolveLinked := false
-	limit := listLimit
-	seen := 0
-	for page := 0; page < maxPages; page++ {
-		offset := seen
+	return emfetch.Paginate(ctx, func(reqCtx httpcontext.Context, offset, limit int) ([]astrov1.EnvironmentObject, int, error) {
 		params := &astrov1.ListEnvironmentObjectsParams{
 			ObjectType:    &objectType,
 			ResolveLinked: &resolveLinked,
@@ -184,24 +189,17 @@ func (p *provider) fetchType(out map[string]objectValue, org string, objectType 
 			Offset:        &offset,
 			WorkspaceId:   &p.workspaceID,
 		}
-		resp, err := p.client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), org, params)
+		resp, err := p.client.ListEnvironmentObjectsWithResponse(reqCtx, org, params)
 		if err != nil {
 			// A request that never reached an HTTP response — offline. classify
 			// turns any non-*httpError into the offline outage.
-			return err
+			return nil, 0, err
 		}
 		if resp.JSON200 == nil {
-			return statusError(resp)
+			return nil, 0, statusError(showSecrets, resp)
 		}
-		for i := range resp.JSON200.EnvironmentObjects {
-			indexObject(out, &resp.JSON200.EnvironmentObjects[i])
-		}
-		seen += len(resp.JSON200.EnvironmentObjects)
-		if len(resp.JSON200.EnvironmentObjects) < limit || seen >= resp.JSON200.TotalCount {
-			return nil
-		}
-	}
-	return fmt.Errorf("aborted reading the workspace after %d pages", maxPages)
+		return resp.JSON200.EnvironmentObjects, resp.JSON200.TotalCount, nil
+	})
 }
 
 // indexObject adds one env-var-keyed object to the index. Native connections
@@ -225,10 +223,6 @@ func indexObject(out map[string]objectValue, obj *astrov1.EnvironmentObject) {
 	}
 }
 
-// errSecretsDisabled marks the org-level "secrets fetching not allowed"
-// refusal, which load retries without the secret request.
-var errSecretsDisabled = errors.New("environment secrets fetching disabled")
-
 // httpError carries the HTTP status of a failed read, which NormalizeAPIError
 // otherwise flattens into a bare message.
 type httpError struct {
@@ -245,15 +239,21 @@ func (e *httpError) Error() string {
 
 // statusError classifies a non-200 list response: the org secrets refusal, or
 // an HTTP status carried for classify to turn into a named cause.
-func statusError(resp *astrov1.ListEnvironmentObjectsResponse) error {
+//
+// The refusal is read from the response rather than from the error
+// NormalizeAPIError builds out of it. That error is only the message field of a
+// JSON envelope, so a refusal arriving as a plain body, an HTML page, or an
+// envelope keyed on anything else loses the words that identify it — and losing
+// them here means the fallback never runs and the outage is reported as
+// unreachable.
+func statusError(wantSecrets bool, resp *astrov1.ListEnvironmentObjectsResponse) error {
 	if resp.HTTPResponse == nil {
 		return &httpError{err: errors.New("empty response from Environment Manager")}
 	}
-	apiErr := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if astroenv.IsSecretsFetchingNotAllowedError(apiErr) {
-		return errSecretsDisabled
+	if refusal := emfetch.RefusalFor(wantSecrets, resp.HTTPResponse.StatusCode, resp.Body); refusal != nil {
+		return refusal
 	}
-	return &httpError{code: resp.HTTPResponse.StatusCode, err: apiErr}
+	return &httpError{code: resp.HTTPResponse.StatusCode, err: astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)}
 }
 
 // classify turns a fetch error into the outage a user sees: each named failure

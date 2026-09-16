@@ -3,6 +3,7 @@ package emenv
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -11,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/emfetch"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -43,6 +45,15 @@ func errResp(status int, message string) *astrov1.ListEnvironmentObjectsResponse
 	return &astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: status},
 		Body:         []byte(`{"message":"` + message + `"}`),
+	}
+}
+
+// errRespBody is a failure whose body is not the JSON envelope the success path
+// parses, which is what a gateway or proxy answering instead of the app sends.
+func errRespBody(status int, body string) *astrov1.ListEnvironmentObjectsResponse {
+	return &astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: status},
+		Body:         []byte(body),
 	}
 }
 
@@ -267,4 +278,91 @@ func TestPresenceModeSecretResolvesWithoutValue(t *testing.T) {
 	require.True(t, ok, "list shows the source even for a secret")
 	require.Equal(t, "", v)
 	require.Equal(t, "workspace", p.Label())
+}
+
+// The refusal does not always arrive as the JSON envelope, and recognizing it
+// from the response body rather than the decoded message field is what lets the
+// fallback run at all. Read through the envelope only, this is an undecodable
+// 405: the retry never happens and the whole workspace reads as unreachable.
+func TestSecretsDisabledWhenTheRefusalIsNotAnEnvelope(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ShowSecrets != nil && *p.ShowSecrets
+		}),
+	).Return(errRespBody(http.StatusMethodNotAllowed,
+		"showSecrets is not allowed for this organization"), nil).Once()
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ShowSecrets != nil && !*p.ShowSecrets
+		}),
+	).Return(okResp(
+		envVarObj("PLAIN", "visible", false),
+		envVarObj("SECRET_TOKEN", "", true),
+	), nil)
+
+	p := NewProvider(testWorkspace, mc, true)
+
+	v, ok := p.Lookup("PLAIN")
+	require.True(t, ok, "the fallback ran, so non-secret values still resolve")
+	require.Equal(t, "visible", v)
+	require.Equal(t, "workspace", p.Label(), "the workspace is available, not unreachable")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), `enable "Environment Secrets Fetching"`)
+}
+
+// A secret the organization allowed but the platform returned empty is not the
+// org toggle. Naming the toggle here would send someone to change a setting
+// that is already on.
+func TestSecretWithNoValueWhenSecretsWereAllowed(t *testing.T) {
+	mc := mockClient(okResp(envVarObj("SECRET_TOKEN", "", true)))
+	p := loggedInProvider(t, mc, true)
+
+	_, ok := p.Lookup("SECRET_TOKEN")
+	require.False(t, ok, "a secret with no value is a miss in reveal mode")
+
+	cause := p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN")
+	require.NotContains(t, cause, `enable "Environment Secrets Fetching"`)
+	require.Contains(t, cause, "no value to resolve")
+}
+
+// A workspace larger than one window needs the offset to reach the request, or
+// the second window re-reads the first and the rest of the workspace is never
+// seen. The paging itself is pkg/emfetch's; what this holds is the wiring.
+func TestFetchPagesThroughMoreThanOneWindow(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	first := make([]astrov1.EnvironmentObject, emfetch.PageLimit)
+	for i := range first {
+		first[i] = envVarObj("KEY_"+strconv.Itoa(i), "v", false)
+	}
+	total := emfetch.PageLimit + 1
+
+	window := func(objs []astrov1.EnvironmentObject) *astrov1.ListEnvironmentObjectsResponse {
+		return &astrov1.ListEnvironmentObjectsResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1.EnvironmentObjectsPaginated{
+				EnvironmentObjects: objs,
+				TotalCount:         total,
+			},
+		}
+	}
+	atOffset := func(want int) func(*astrov1.ListEnvironmentObjectsParams) bool {
+		return func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.Offset != nil && *p.Offset == want
+		}
+	}
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(atOffset(0))).Return(window(first), nil)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(atOffset(emfetch.PageLimit))).Return(
+		window([]astrov1.EnvironmentObject{envVarObj("LAST_KEY", "found", false)}), nil)
+
+	p := NewProvider(testWorkspace, mc, false)
+
+	v, ok := p.Lookup("LAST_KEY")
+	require.True(t, ok, "a key in the second window resolves")
+	require.Equal(t, "found", v)
 }

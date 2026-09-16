@@ -11,6 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/emfetch"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -42,7 +43,7 @@ func (s *Suite) TestListVars() {
 	ctx, _ := config.GetCurrentContext()
 	deploymentID := cuid.New()
 	objType := astrov1.ENVIRONMENTVARIABLE
-	limit := defaultListLimit
+	limit := emfetch.PageLimit
 
 	s.Run("workspace scope", func() {
 		showSecrets := false
@@ -122,7 +123,7 @@ func (s *Suite) TestGetVarByKey() {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
-		}},
+		}, TotalCount: 1},
 	}, nil).Once()
 
 	got, err := GetVar("FOO", Scope{WorkspaceID: workspaceID}, false, mc)
@@ -192,7 +193,7 @@ func (s *Suite) TestUpdateVar() {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO"},
-		}},
+		}, TotalCount: 1},
 	}, nil).Once()
 	emptyLinks := []astrov1.UpdateEnvironmentObjectLinkRequest{}
 	emptyExcludes := []astrov1.ExcludeLinkEnvironmentObjectRequest{}
@@ -326,7 +327,7 @@ func (s *Suite) TestDeleteVar() {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO"},
-		}},
+		}, TotalCount: 1},
 	}, nil).Once()
 	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrov1.DeleteEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 204},

@@ -64,7 +64,7 @@ func TestEnvVarList(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
-		}},
+		}, TotalCount: 1},
 	}, nil).Once()
 	astroV1Client = mc
 
@@ -86,7 +86,7 @@ func TestEnvVarExportDotenv(t *testing.T) {
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
 			{ObjectKey: "SHH", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "secret-value", IsSecret: true}},
-		}},
+		}, TotalCount: 2},
 	}, nil).Once()
 	astroV1Client = mc
 
@@ -159,7 +159,7 @@ func TestEnvVarExportIncludeSecretsWarnsToStderr(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
-		}},
+		}, TotalCount: 1},
 	}, nil).Once()
 	astroV1Client = mc
 
@@ -260,7 +260,7 @@ func TestEnvVarUpdateFromFileUpserts(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: 200},
 		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
 			{Id: &id, ObjectKey: "EXISTS"},
-		}},
+		}, TotalCount: 1},
 	}, nil).Once()
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, id, mock.Anything).Return(&astrov1.UpdateEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},

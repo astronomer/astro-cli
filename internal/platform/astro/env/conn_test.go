@@ -55,7 +55,7 @@ func (s *Suite) TestListConnsByKey() {
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
-		// astro dev start needs both the secret values and inherited workspace conns.
+		// The local start path needs both the secret values and inherited workspace conns.
 		return p != nil && p.ShowSecrets != nil && *p.ShowSecrets && p.ResolveLinked != nil && *p.ResolveLinked
 	})).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
@@ -69,7 +69,7 @@ func (s *Suite) TestListConnsByKey() {
 			{
 				ObjectKey: "noisy_row_without_connection_payload", // defensive: skipped by ListConnsByKey
 			},
-		}},
+		}, TotalCount: 2},
 	}, nil).Once()
 
 	got, err := ListConnsByKey(Scope{WorkspaceID: workspaceID}, true, true, mc)

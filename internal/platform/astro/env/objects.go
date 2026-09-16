@@ -8,6 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/emfetch"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -17,13 +18,12 @@ var (
 	ErrNotFound          = errors.New("environment object not found")
 )
 
-const (
-	// defaultListLimit is the page size requested from list endpoints.
-	defaultListLimit = 1000
-	// maxListPages caps a single list call at maxListPages*defaultListLimit
-	// rows as a safety bound against a server that mis-reports TotalCount.
-	maxListPages = 100
-)
+// getObjectListLimit is the page size for a single-row lookup by key.
+// Multi-page reads take their page size and their bound from pkg/emfetch.
+//
+// ObjectKey filtering returns at most one row per (scope, objectType); two
+// catches a server-side anomaly without forcing pagination.
+const getObjectListLimit = 2
 
 // Scope captures the target of an env-object operation. Exactly one of
 // WorkspaceID / DeploymentID is set.
@@ -57,9 +57,13 @@ func ScopeFromIDs(workspaceID, deploymentID string) Scope {
 // resolveLinked includes inherited workspace objects when listing at deployment scope.
 // includeSecrets requests secret values from the server (subject to org policy).
 //
-// Pages through the list endpoint when the server reports more rows than fit
-// in a single response. Stops when the accumulated count reaches TotalCount,
-// when a short page is returned, or when maxListPages is hit (safety bound).
+// The paging is pkg/emfetch's, so this and every other reader of the endpoint
+// agree on how a window ends and what an exhausted bound means.
+//
+// The organization's refusal to resolve secrets is reported rather than retried
+// without them, which is where this parts company with the other readers. These
+// callers render a list and have nowhere to say the values in it were withheld,
+// so a quietly structural listing would read as a complete one.
 func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
@@ -69,29 +73,27 @@ func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObj
 		return nil, err
 	}
 
-	var (
-		all    []astrov1.EnvironmentObject
-		offset int
-	)
-	for page := 0; page < maxListPages; page++ {
-		params := buildListParams(scope, objectType, nil, resolveLinked, includeSecrets, defaultListLimit)
-		params.Offset = &offset
+	objs, err := emfetch.Paginate(httpcontext.Background(),
+		func(ctx httpcontext.Context, offset, limit int) ([]astrov1.EnvironmentObject, int, error) {
+			params := buildListParams(scope, objectType, nil, resolveLinked, includeSecrets, limit)
+			params.Offset = &offset
 
-		resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
-		if err != nil {
-			return nil, err
-		}
-		if err := normalizeListErr(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
-		}
-		batch := resp.JSON200.EnvironmentObjects
-		all = append(all, batch...)
-		if len(batch) < defaultListLimit || len(all) >= resp.JSON200.TotalCount {
-			return all, nil
-		}
-		offset = len(all)
+			resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(ctx, c.Organization, params)
+			if err != nil {
+				return nil, 0, err
+			}
+			if err := normalizeListErr(resp.HTTPResponse, resp.Body); err != nil {
+				return nil, 0, err
+			}
+			if resp.JSON200 == nil {
+				return nil, 0, fmt.Errorf("listing %s objects: the response carried no body", objectType)
+			}
+			return resp.JSON200.EnvironmentObjects, resp.JSON200.TotalCount, nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("listing %s objects: %w", objectType, err)
 	}
-	return all, fmt.Errorf("aborted listing %s objects after %d pages", objectType, maxListPages)
+	return objs, nil
 }
 
 // getObject fetches a single env-object by ID or key.
@@ -118,9 +120,7 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
-	// ObjectKey filtering returns at most one row per (scope, objectType);
-	// limit=2 catches server-side anomalies without forcing pagination.
-	params := buildListParams(scope, objectType, &idOrKey, false, includeSecrets, 2)
+	params := buildListParams(scope, objectType, &idOrKey, false, includeSecrets, getObjectListLimit)
 
 	resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
 	if err != nil {
@@ -218,13 +218,17 @@ func buildListParams(scope Scope, objectType astrov1.ListEnvironmentObjectsParam
 
 // normalizeListErr substitutes the friendlier org-level secrets-fetching
 // guidance when applicable.
+//
+// The refusal is recognized from the response rather than from the error
+// NormalizeAPIError built out of it, because that error carries only the
+// message field of a JSON envelope: a refusal arriving as anything else loses
+// the very words that identify it.
 func normalizeListErr(httpResp *http.Response, body []byte) error {
-	err := astrov1.NormalizeAPIError(httpResp, body)
-	if err == nil {
-		return nil
+	if httpResp == nil {
+		return errors.New("the environment objects API returned no response")
 	}
-	if IsSecretsFetchingNotAllowedError(err) {
+	if emfetch.IsOrgSecretsRefusal(httpResp.StatusCode, body) {
 		return errors.New(SecretsFetchingNotAllowedErrMsg)
 	}
-	return err
+	return astrov1.NormalizeAPIError(httpResp, body)
 }

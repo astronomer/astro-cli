@@ -238,6 +238,7 @@ require (
 	github.com/Microsoft/hcsshim v0.14.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/astronomer/astro-cli/pkg/awsauth v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/emfetch v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/googleauth v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/instancelocate v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/instances v0.0.0-00010101000000-000000000000
@@ -364,3 +365,5 @@ replace github.com/astronomer/astro-cli/pkg/instances => ./pkg/instances
 replace github.com/astronomer/astro-cli/pkg/awsauth => ./pkg/awsauth
 
 replace github.com/astronomer/astro-cli/pkg/googleauth => ./pkg/googleauth
+
+replace github.com/astronomer/astro-cli/pkg/emfetch => ./pkg/emfetch
