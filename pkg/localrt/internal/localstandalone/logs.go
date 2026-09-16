@@ -38,7 +38,39 @@ var (
 	reUvicorn = regexp.MustCompile(`^INFO:\s+[\d.]+:\d+\s+-\s+"(\w+)\s+(\S+)\s+HTTP/[\d.]+"\s+(\d+)\s+\w+$`)
 	// reMultiSpace collapses runs of spaces.
 	reMultiSpace = regexp.MustCompile(`\s{2,}`)
+	// reANSI matches an ANSI CSI escape sequence. `airflow standalone` colors
+	// the component name it prefixes each line with, and structlog colors the
+	// body, so a raw line begins "\x1b[33mdag-processor\x1b[0m | " rather than
+	// "dag-processor | ".
+	reANSI = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 )
+
+// stripANSI removes the CSI escape sequences from a log line — the colours
+// Airflow writes, which is the only form it emits. Other escape shapes (an OSC
+// title, a charset selector) would survive; widening the pattern for sequences
+// nothing here produces would be guessing at a problem.
+//
+// It runs before anything else reads the line, because everything else assumed
+// they were not there. The component prefix match is the visible casualty —
+// every line fell through to "system", so `astro local logs --component
+// dag-processor` matched nothing and said so by printing nothing — but the
+// escapes also reached --output json verbatim, which hands a machine consumer a
+// string full of terminal control codes.
+//
+// Airflow's colors are dropped rather than forwarded. This package already
+// rewrites these lines for display (cleanLogMessage), the CLI renders its own
+// component label, and a color chosen for somebody else's terminal is not
+// something to pass through a documented JSON field.
+// The scan is guarded because parseLogMeta promises no regex work: it runs for
+// every line of the capped log file on every `astro local logs`, and an
+// uncoloured line — every line the older fixtures carry — should not pay for a
+// full pattern match and an allocation to learn there was nothing to strip.
+func stripANSI(s string) string {
+	if !strings.ContainsRune(s, 0x1b) {
+		return s
+	}
+	return reANSI.ReplaceAllString(s, "")
+}
 
 // logComponents are the process names `airflow standalone` multiplexes;
 // anything else (uv output, tracebacks, banners) is "system".
@@ -48,6 +80,7 @@ var logComponents = []string{"scheduler", "api-server", "triggerer", "dag-proces
 // returns the component plus the rest of the line — the message body before
 // cleaning. This is the cheap half of parsing: no regex cleaning runs here.
 func parseLogMeta(line string) (component, rest string) {
+	line = stripANSI(line)
 	for _, c := range logComponents {
 		if strings.HasPrefix(line, c+" ") {
 			return c, strings.TrimPrefix(line, c+" ")
@@ -225,7 +258,12 @@ func filterLine(raw string, opts rt.LogOptions) (logEntry, bool) {
 	if !opts.Since.IsZero() && !lineTime.IsZero() && lineTime.Before(opts.Since) {
 		return logEntry{}, false
 	}
-	return logEntry{raw: raw, component: component, time: lineTime, body: body}, true
+	// raw is stripped too. Writer mode hands it straight to the caller's
+	// io.Writer, so leaving the escapes in there would forward the control
+	// codes stripANSI exists to remove — through a different door from the one
+	// the parsed path uses, which is how "escapes are dropped" becomes true of
+	// one output and not the other.
+	return logEntry{raw: stripANSI(raw), component: component, time: lineTime, body: body}, true
 }
 
 // deliverFunc builds the emit path once: cleaned lines to OnLine, raw lines

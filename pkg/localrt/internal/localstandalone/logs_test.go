@@ -37,6 +37,44 @@ func TestParseLogLine(t *testing.T) {
 	assert.True(t, l.Time.IsZero())
 }
 
+// What `airflow standalone` actually writes: the component name is colored, so
+// the line begins with an escape sequence rather than the name.
+//
+// Every fixture above is uncolored, which is why this went unnoticed — and the
+// symptom was silent. The prefix match missed, every line became "system", and
+// `astro local logs --component dag-processor` printed nothing at all rather
+// than saying the component was unknown.
+//
+// Captured from a real run: Airflow 3.1.8, `astro local logs --output json`.
+func TestParseLogLineStripsTheColorAirflowWrites(t *testing.T) {
+	t.Parallel()
+
+	const colored = "\x1b[33mdag-processor\x1b[0m | \x1b[2m2026-09-16T01:03:24.123456Z\x1b[0m " +
+		"[\x1b[32m\x1b[1minfo \x1b[0m] \x1b[1mSync 1 DAGs\x1b[0m " +
+		"[\x1b[34mairflow.serialization.serialized_objects\x1b[0m] \x1b[36mloc\x1b[0m=\x1b[35mserialized_objects.py:2949\x1b[0m"
+
+	l := parseLogLine(colored)
+	assert.Equal(t, "dag-processor", l.Component, "the colored prefix must still identify the component")
+	assert.Equal(t, "01:03:24 Sync 1 DAGs", l.Text)
+	assert.NotContains(t, l.Text, "\x1b", "an escape sequence must not reach the rendered text or --output json")
+	assert.Equal(t, time.Date(2026, 9, 16, 1, 3, 24, 123456000, time.UTC), l.Time)
+}
+
+// Every component standalone multiplexes, colored the way it arrives, so the
+// filter works on all of them rather than on whichever one a fixture used.
+func TestParseLogMetaFindsEveryColoredComponent(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range logComponents {
+		got, rest := parseLogMeta("\x1b[33m" + c + "\x1b[0m | some message")
+		assert.Equal(t, c, got)
+		assert.Equal(t, "| some message", rest)
+	}
+	// A name that is not a component is still system, colored or not.
+	got, _ := parseLogMeta("\x1b[33mpostgres\x1b[0m | some message")
+	assert.Equal(t, "system", got)
+}
+
 // writeTestLog writes a three-component log for a fake running project and
 // returns its handle.
 func logsFixture(t *testing.T, lines []string) (*airflow, *fakeProcs) {
@@ -98,6 +136,22 @@ func TestLogsTailAndSince(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 2)
 	assert.Equal(t, "10:00:03 three", got[0].Text)
+}
+
+// Writer mode hands its lines straight to the caller's io.Writer, so it has to
+// strip escapes too. Suppressing colour at the launch site keeps them out of
+// new log files; a file written before that, or by anything else, still has
+// them, and forwarding control codes through one output while stripping them
+// from the other is the kind of half-true that reads as fixed.
+func TestLogsWriterStripsEscapesToo(t *testing.T) {
+	af, _ := logsFixture(t, []string{
+		"\x1b[33mscheduler\x1b[0m  | 2026-07-21T10:00:01.000000Z \x1b[1mone\x1b[0m",
+	})
+
+	var buf bytes.Buffer
+	require.NoError(t, af.Logs(context.Background(), rt.LogOptions{Writer: &buf}))
+	assert.NotContains(t, buf.String(), "\x1b", "an escape must not reach the caller's writer")
+	assert.Contains(t, buf.String(), "scheduler  | 2026-07-21T10:00:01.000000Z one")
 }
 
 func TestLogsWriterGetsRawLines(t *testing.T) {

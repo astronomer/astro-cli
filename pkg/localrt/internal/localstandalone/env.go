@@ -108,6 +108,15 @@ var devConfigOverrides = []string{
 	"AIRFLOW__CORE__DEFAULT_TASK_RETRIES=0",
 	"AIRFLOW__API__HOST=127.0.0.1",
 	"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1",
+	// The log file is not a terminal, so nothing in it should be coloured.
+	// `airflow standalone` colours the component name it prefixes each line
+	// with and structlog colours the body, which costs about forty wasted bytes
+	// a line of a CAPPED file — roughly a third of the retained history — and
+	// leaves every reader to strip escapes back out. NO_COLOR is the
+	// cross-tool convention; the Airflow setting is the one that governs its
+	// own console handler.
+	"NO_COLOR=1",
+	"AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False",
 }
 
 const (

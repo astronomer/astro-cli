@@ -58,6 +58,15 @@ func TestBuildEnvDevOverridesAreAuthoritative(t *testing.T) {
 	_, found := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
 	assert.False(t, found)
 
+	// Colour off, because the destination is a capped file rather than a
+	// terminal. Left on, `airflow standalone` colours the component name it
+	// prefixes each line with, which spends a third of the retained history on
+	// escape sequences and leaves every reader stripping them back out.
+	noColor, _ := envValue(env, "NO_COLOR")
+	assert.Equal(t, "1", noColor)
+	colored, _ := envValue(env, "AIRFLOW__LOGGING__COLORED_CONSOLE_LOG")
+	assert.Equal(t, "False", colored)
+
 	// The plan's other values layer over the base.
 	foo, _ := envValue(env, "FOO")
 	assert.Equal(t, "bar", foo)
