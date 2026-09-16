@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"bytes"
+	"cmp"
 	httpContext "context"
 	"encoding/json"
 	"errors"
@@ -50,19 +51,22 @@ func NewRequestEditorFn(getTokenAndURL func() (token, baseURL string, err error)
 		}
 		req.URL = requestURL
 		req.Header.Add("authorization", token)
+		// The client version is this CLI's own, except under the deploy action,
+		// which ships its own and reports that instead. Its version comes from
+		// the environment, so fall back to ours when it exported none: the
+		// header has to name something, or the API cannot tell what called it.
+		identifier, clientVersion := "cli", version.Current()
 		switch {
 		case os.Getenv("DEPLOY_ACTION") == "true" && os.Getenv("GITHUB_ACTIONS") == "true":
-			req.Header.Add("x-astro-client-identifier", "deploy-action")
-			req.Header.Add("x-astro-client-version", os.Getenv("DEPLOY_ACTION_VERSION"))
+			identifier = "deploy-action"
+			clientVersion = cmp.Or(os.Getenv("DEPLOY_ACTION_VERSION"), clientVersion)
 		case os.Getenv("GITHUB_ACTIONS") == "true":
-			req.Header.Add("x-astro-client-identifier", "github-action")
-			req.Header.Add("x-astro-client-version", version.CurrVersion)
-		default:
-			req.Header.Add("x-astro-client-identifier", "cli")
-			req.Header.Add("x-astro-client-version", version.CurrVersion)
+			identifier = "github-action"
 		}
+		req.Header.Add("x-astro-client-identifier", identifier)
+		req.Header.Add("x-astro-client-version", clientVersion)
 		req.Header.Add("x-client-os-identifier", operatingSystem+"-"+arch)
-		req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.CurrVersion))
+		req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.Current()))
 		return nil
 	}
 }

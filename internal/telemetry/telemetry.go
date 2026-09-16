@@ -88,7 +88,7 @@ func buildCommandProperties(cmd *cobra.Command) map[string]interface{} {
 
 	properties := map[string]interface{}{
 		"command":      GetCommandPath(cmd),
-		"cli_version":  version.CurrVersion,
+		"cli_version":  version.Current(),
 		"os":           runtime.GOOS,
 		"os_version":   sharedtel.GetOSVersion(),
 		"go_version":   runtime.Version(),

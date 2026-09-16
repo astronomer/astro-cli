@@ -36,7 +36,7 @@ func slimManifestEnabled() bool {
 // the plugin to load in place of the full manifest at DAG-parse time.
 func PreDeploy(path string) error {
 	opts := precompute.Options{SlimManifest: slimManifestEnabled()}
-	summary, err := precompute.Run([]string{path}, version.CurrVersion, opts)
+	summary, err := precompute.Run([]string{path}, version.Current(), opts)
 	if err != nil {
 		return fmt.Errorf("running the Cosmos Boost pre-deploy step: %w", err)
 	}

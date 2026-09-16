@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/version"
 )
 
 func initTestConfig(t *testing.T) {
@@ -171,4 +172,16 @@ func TestBuildCommandProperties_DevMode(t *testing.T) {
 		_, hasDevMode := props[DevModeAnnotation]
 		assert.False(t, hasDevMode, "non-dev commands should not have dev_mode property")
 	})
+}
+
+// An unstamped build still names itself in telemetry. cli_version read the
+// linker flag directly, so any build that skipped the -ldflags reported "" —
+// an event whose most useful field is which CLI sent it.
+func TestBuildCommandPropertiesAlwaysNamesTheCLIVersion(t *testing.T) {
+	prev := version.CurrVersion
+	version.CurrVersion = ""
+	t.Cleanup(func() { version.CurrVersion = prev })
+
+	props := buildCommandProperties(&cobra.Command{Use: "version"})
+	assert.NotEmpty(t, props["cli_version"], "telemetry cannot say which build sent the event")
 }
