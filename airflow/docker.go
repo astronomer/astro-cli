@@ -732,7 +732,7 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 0 { // exit code 0 means the pytests passed
 		return "", nil
 	}
-	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
+	return exitCode, errors.New("something went wrong while Pytesting your Dags")
 }
 
 func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage string, buildSecrets []string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
@@ -828,7 +828,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage string
 		fmt.Printf("\tDependency Version Comparison Results file: %s\n", "dependency_compare.txt")
 	}
 	if dagTest {
-		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
+		fmt.Printf("\tDag Parse Test HTML Report: %s\n", "dag-test-report.html")
 	}
 	if lintTest {
 		fmt.Printf("\tRuff Linter Results: %s\n", "ruff-lint-results.txt")
@@ -899,7 +899,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymen
 }
 
 func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, customImage string, buildSecrets []string) (bool, error) {
-	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newVersion)
+	fmt.Printf("\nChecking the Dags in this project for errors against the new Airflow version %s\n", newVersion)
 
 	// build image with the new runtime version
 	err := upgradeDockerfile(d.dockerfile, newDockerFile, newVersion, customImage)
@@ -940,17 +940,17 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 	// create html report
 	htmlReportArgs := "--html=dag-test-report.html --self-contained-html"
 	// compare pip freeze files
-	fmt.Println("\nRunning DAG parse test with the new Airflow version")
+	fmt.Println("\nRunning Dag parse test with the new Airflow version")
 	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			fmt.Println("See above for errors detected in your DAGs")
+			fmt.Println("See above for errors detected in your Dags")
 			return false, nil
 		} else {
-			return false, errors.Wrap(err, "something went wrong while parsing your DAGs")
+			return false, errors.Wrap(err, "something went wrong while parsing your Dags")
 		}
 	} else {
-		fmt.Println("\n" + ansi.Green("✔") + " No errors detected in your DAGs ")
+		fmt.Println("\n" + ansi.Green("✔") + " No errors detected in your Dags ")
 	}
 	return true, nil
 }
@@ -1359,17 +1359,17 @@ func (d *DockerCompose) Parse(customImageName, deployImageName string, buildSecr
 		return err
 	}
 
-	fmt.Println("Checking your DAGs for errors…")
+	fmt.Println("Checking your Dags for errors…")
 
 	pytestFile := DefaultTestPath
 	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecrets)
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			return errors.New("See above for errors detected in your DAGs")
+			return errors.New("See above for errors detected in your Dags")
 		}
-		return errors.Wrap(err, "something went wrong while parsing your DAGs")
+		return errors.Wrap(err, "something went wrong while parsing your Dags")
 	}
-	fmt.Println(ansi.Green("✔") + " No errors detected in your DAGs ")
+	fmt.Println(ansi.Green("✔") + " No errors detected in your Dags ")
 	return err
 }
 

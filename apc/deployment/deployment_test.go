@@ -977,7 +977,7 @@ func (s *Suite) Test_meetsAirflowUpgradeReqs() {
 	err := meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	s.Error(err)
 	s.EqualError(err, "Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to 1.10.14 "+
-		"first and make sure your DAGs and configs are 2.0 compatible")
+		"first and make sure your Dags and configs are 2.0 compatible")
 
 	airflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
