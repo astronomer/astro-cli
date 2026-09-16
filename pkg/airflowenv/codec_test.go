@@ -156,3 +156,43 @@ func TestDetectionAndRejection(t *testing.T) {
 		t.Error("DecodeVarEnv should reject non-variable key")
 	}
 }
+
+// ConnIDForEnvKey reads the id from the key alone, and the value-independence is
+// the property its callers rely on: classifying a key you hold no value for, or
+// naming a connection whose value will not decode, must not depend on what the
+// value decoder happens to accept.
+func TestConnIDForEnvKeyReadsTheKeyAlone(t *testing.T) {
+	cases := map[string]string{
+		"AIRFLOW_CONN_WAREHOUSE": "warehouse",
+		"AIRFLOW_CONN_MY_CONN":   "my_conn",
+		"AIRFLOW_CONN_MixedCase": "mixedcase",
+		"AIRFLOW_CONN_1CONN":     "1conn",
+	}
+	for key, want := range cases {
+		if got := ConnIDForEnvKey(key); got != want {
+			t.Errorf("ConnIDForEnvKey(%q) = %q, want %q", key, got, want)
+		}
+	}
+
+	// It reports the same id DecodeConnEnv does, so the two cannot drift.
+	for key, want := range cases {
+		c, ok := DecodeConnEnv(key, `{"conn_type":"postgres"}`)
+		if !ok {
+			t.Fatalf("DecodeConnEnv(%q) returned ok=false", key)
+		}
+		if c.ConnID != want {
+			t.Errorf("DecodeConnEnv(%q) id = %q, want %q", key, c.ConnID, want)
+		}
+	}
+
+	// And it still answers for values that carry nothing usable, which is
+	// precisely where a caller cannot route through DecodeConnEnv.
+	for _, value := range []string{"", "{}", "not json", `{"host":"h"}`} {
+		if _, ok := DecodeConnEnv("AIRFLOW_CONN_WAREHOUSE", value); ok && value == "not json" {
+			t.Errorf("DecodeConnEnv accepted %q, so this case no longer proves anything", value)
+		}
+		if got := ConnIDForEnvKey("AIRFLOW_CONN_WAREHOUSE"); got != "warehouse" {
+			t.Errorf("ConnIDForEnvKey did not answer alongside value %q: got %q", value, got)
+		}
+	}
+}

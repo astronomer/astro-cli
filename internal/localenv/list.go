@@ -212,12 +212,19 @@ func orphanItem(key string, scope Scope, project string) ListItem {
 }
 
 // kindFromKey infers what an undeclared file entry is from its env-var name.
+//
+// The name is all this has, so it asks only about the key. It used to reach the
+// connection case through DecodeConnEnv with a placeholder "{}" value, which
+// answered correctly but for the wrong reason: it tied "is this key a
+// connection" to whatever the value decoder accepts, so a decoder that grew any
+// requirement about the value would silently reclassify every connection here
+// as a plain env var.
 func kindFromKey(key string) (kind Kind, name string) {
 	if v, _, ok := airflowenv.DecodeVarEnv(key, ""); ok {
 		return KindVar, v
 	}
-	if c, ok := airflowenv.DecodeConnEnv(key, "{}"); ok {
-		return KindConn, c.ConnID
+	if airflowenv.IsConnEnvKey(key) {
+		return KindConn, airflowenv.ConnIDForEnvKey(key)
 	}
 	return KindEnv, key
 }

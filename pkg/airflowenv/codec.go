@@ -97,6 +97,20 @@ func IsConnEnvKey(key string) bool {
 	return strings.HasPrefix(key, ConnPrefix) && len(key) > len(ConnPrefix)
 }
 
+// ConnIDForEnvKey is the connection id an AIRFLOW_CONN_* key addresses, read
+// from the key alone. The id is the lowercased suffix, because Airflow treats
+// env connection ids case-insensitively. Meaningless for a key IsConnEnvKey
+// rejects.
+//
+// Exported because a caller has to be able to name WHICH connection an entry is
+// without reading its value — to tell an unusable entry from an absent one, or
+// to classify a key it holds no value for. The alternative is routing through
+// DecodeConnEnv with a placeholder value, which couples key classification to
+// whatever the value half happens to accept.
+func ConnIDForEnvKey(key string) string {
+	return strings.ToLower(strings.TrimPrefix(key, ConnPrefix))
+}
+
 // DecodeConnEnv parses an AIRFLOW_CONN_* env-var pair back into a Connection.
 // The conn id is the lowercased suffix (Airflow treats env connection ids
 // case-insensitively). ok is false for non-connection keys or invalid JSON.
@@ -109,7 +123,7 @@ func DecodeConnEnv(key, value string) (connmodel.Connection, bool) {
 		return connmodel.Connection{}, false
 	}
 	return connmodel.Connection{
-		ConnID:       strings.ToLower(strings.TrimPrefix(key, ConnPrefix)),
+		ConnID:       ConnIDForEnvKey(key),
 		ConnType:     p.ConnType,
 		ConnHost:     p.Host,
 		ConnLogin:    p.Login,
