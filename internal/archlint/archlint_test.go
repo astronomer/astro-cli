@@ -45,6 +45,7 @@ var v2BelowCmd = []string{
 	"pkg/airflowenv",
 	"pkg/checks",
 	"pkg/connmodel",
+	"pkg/emfetch",
 	"pkg/envschema",
 	"pkg/googleauth",
 	"pkg/fsatomic",

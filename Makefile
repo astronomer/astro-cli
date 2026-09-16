@@ -29,7 +29,7 @@ GOLANGCI_VERSION=$(shell sed -n 's/.*golangci-lint@\(v[0-9.]*\).*/\1/p' prek.tom
 # exclusion the root .golangci.yml grants them re-expressed against paths inside
 # the module, which is config work, not a fix. Until then ~4,000 lines of engine
 # code is unlinted; the root suite, GOOS=windows vet, and archlint still cover it.
-LINT_SUBMODULES=pkg/airflowapi pkg/airflowenv pkg/awsauth pkg/checks pkg/connmodel pkg/envschema pkg/googleauth pkg/instancelocate pkg/instances pkg/platformversions pkg/scaffold
+LINT_SUBMODULES=pkg/airflowapi pkg/airflowenv pkg/awsauth pkg/checks pkg/connmodel pkg/emfetch pkg/envschema pkg/googleauth pkg/instancelocate pkg/instances pkg/platformversions pkg/scaffold
 
 lint-submodules:
 	@set -e; for mod in ${LINT_SUBMODULES}; do \
