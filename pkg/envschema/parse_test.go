@@ -534,6 +534,56 @@ func TestABadBoolYieldsOneProblem(t *testing.T) {
 	}
 }
 
+// `sensitive` under connections is refused whichever way it is written, which
+// is what manifest-reference.md promises: "an error rather than a no-op".
+//
+// Both values are wrong, in different ways, so each gets its own sentence —
+// and each gets exactly one problem, not one arm of the rule firing on top of
+// the other.
+func TestSensitiveUnderConnectionsIsRefusedEitherWay(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{"true adds nothing", true, "adds nothing"},
+		{"false contradicts what a connection is", false, "cannot be declared not sensitive"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseSchema(map[string]any{"connections": map[string]any{
+				"warehouse": map[string]any{"conn_type": "postgres", "sensitive": tc.value},
+			}})
+			var se *SchemaError
+			if !errors.As(err, &se) {
+				t.Fatalf("want a SchemaError, got %v", err)
+			}
+			if len(se.Problems) != 1 {
+				t.Fatalf("want exactly one problem, got %d: %+v", len(se.Problems), se.Problems)
+			}
+			if got := se.Problems[0].Key; got != "tool.astro.env.connections.warehouse.sensitive" {
+				t.Errorf("key = %q, want the sensitive key", got)
+			}
+			if !strings.Contains(se.Problems[0].Reason, tc.want) {
+				t.Errorf("reason = %q, want it to mention %q", se.Problems[0].Reason, tc.want)
+			}
+		})
+	}
+}
+
+// Omitting it is the normal case and stays silent: the rule is about an author
+// stating the flag, not about every connection ever written.
+func TestAConnectionWithoutSensitiveIsFine(t *testing.T) {
+	s, err := ParseSchema(map[string]any{"connections": map[string]any{
+		"warehouse": map[string]any{"conn_type": "postgres"},
+	}})
+	if err != nil {
+		t.Fatalf("an ordinary connection must parse: %v", err)
+	}
+	if spec := s.Connections["warehouse"]; !spec.Sensitive || spec.HasSensitive {
+		t.Errorf("want sensitive by default and not stated, got %+v", spec)
+	}
+}
+
 // A connection whose `sensitive` failed to decode keeps its default, so nothing
 // downstream reads it as a plaintext-safe value.
 func TestABadSensitiveLeavesTheConnectionDefault(t *testing.T) {

@@ -247,6 +247,36 @@ connections:
 	assert.Equal(t, want.Connections, got.Connections)
 }
 
+// The converter must never write `sensitive` under connections, because the
+// grammar refuses it there whichever value it carries — so emitting it would
+// make every converted project's own manifest unloadable.
+//
+// specTable has always omitted it; this pins that, because the cost of the
+// omission regressing is now a conversion that produces a file the next command
+// rejects, rather than one noisy key.
+func TestConversionNeverWritesSensitiveUnderConnections(t *testing.T) {
+	dir := v1ProjectDir(t)
+	writeV1EnvSchema(t, dir, `connections:
+  - { conn_id: warehouse, conn_type: snowflake, required: true }
+  - { conn_id: lake, conn_type: s3 }
+`)
+	_, err := Run(dir, Options{})
+	require.NoError(t, err)
+
+	path := filepath.Join(dir, "pyproject.toml")
+	raw := mustRead(t, path)
+	_, conns, found := strings.Cut(raw, "[tool.astro.env.connections")
+	require.True(t, found, "the conversion wrote no connections section:\n%s", raw)
+	assert.NotContains(t, conns, "sensitive",
+		"a connection is sensitive by section, and saying so is refused on the way back in")
+
+	// The real assertion: what conversion wrote, the parser accepts.
+	m, err := manifest.Load(path)
+	require.NoError(t, err)
+	_, err = envschema.ParseSchema(m.Astro.Env)
+	require.NoError(t, err, "a converted manifest must load")
+}
+
 func mustRead(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)

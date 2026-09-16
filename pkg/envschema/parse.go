@@ -210,8 +210,15 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 			// Left at its default when the decode failed: for a
 			// connection that default is true, and overwriting it would
 			// invite a second, contradictory problem from Check.
+			//
+			// HasSensitive records that the key was there at all, which is what
+			// lets Check refuse `sensitive` on a connection without also
+			// refusing every connection that simply omitted it. Not set on a
+			// failed decode: the value is unknown, the decode already reported
+			// itself, and claiming the author stated something would add a
+			// second problem about a key they may have meant either way.
 			if b, ok := p.boolField(fieldKey, v); ok {
-				spec.Sensitive = b
+				spec.Sensitive, spec.HasSensitive = b, true
 			} else {
 				failed["sensitive"] = true
 			}

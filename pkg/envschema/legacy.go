@@ -217,13 +217,23 @@ func (v *legacyValue) spec() ValueSpec {
 	return ValueSpec{
 		// HasDefault rides with Default: the v1 file has no way to say
 		// "declared with an empty default", so an empty string is no default.
-		Default:     v.Default,
-		HasDefault:  v.Default != "",
-		Optional:    !v.Required,
-		Sensitive:   v.Sensitive,
-		Type:        ValueType(v.Type),
-		Description: v.Description,
-		Enum:        v.Enum,
+		Default:    v.Default,
+		HasDefault: v.Default != "",
+		Optional:   !v.Required,
+		Sensitive:  v.Sensitive,
+		// HasSensitive rides with Sensitive for the same reason, and only here:
+		// a v1 env var or variable STATES the flag, while a v1 connection has it
+		// derived a few lines up — which is why the connection branch leaves
+		// HasSensitive false and the grammar does not then refuse every
+		// converted connection.
+		//
+		// `sensitive: false` reads as unstated, which loses nothing: no rule
+		// outside connections reads the flag, and the renderer writes it only
+		// when true, so a converted manifest still parses back to this spec.
+		HasSensitive: v.Sensitive,
+		Type:         ValueType(v.Type),
+		Description:  v.Description,
+		Enum:         v.Enum,
 	}
 }
 

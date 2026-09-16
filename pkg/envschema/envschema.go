@@ -47,9 +47,13 @@
 // would put the credential in git and in the compose file docker mode writes —
 // the exact outcome the flag exists to prevent.
 //
-// Connections are sensitive unconditionally and cannot say otherwise: a
-// connection carries a credential by construction, and a per-declaration opt-in
-// would mean every connection that forgot the flag read as plaintext-safe.
+// Connections are sensitive unconditionally, and `sensitive` under
+// [tool.astro.env.connections] is refused whichever value it carries. A
+// connection holds a credential by construction, so a per-declaration opt-in
+// would mean every connection that forgot the flag read as plaintext-safe —
+// and accepting the agreeing value would leave a key that does nothing looking
+// like a key that works, which is the same reason `type` and `enum` are refused
+// there rather than ignored.
 //
 // `default` in the table is the same default the string shorthand sets, which
 // makes `LOG_LEVEL = 'info'` sugar for `LOG_LEVEL = { default = 'info' }`. The
@@ -141,9 +145,17 @@ type ValueSpec struct {
 	// Sensitive says the value belongs in a vault rather than a plaintext file,
 	// declared rather than inferred because guessing it from the name is how a
 	// credential ends up in .env.
-	HasDefault bool
-	Optional   bool
-	Sensitive  bool
+	//
+	// HasSensitive says the key was WRITTEN, whatever its value, which Sensitive
+	// alone cannot express: a connection starts sensitive, so an absent key and
+	// `sensitive = true` both arrive as true. Check needs the difference,
+	// because under connections the two mean different things — one is the
+	// normal case, the other is an author who believes the flag is theirs to
+	// choose. Same job HasDefault does for Default.
+	HasDefault   bool
+	Optional     bool
+	Sensitive    bool
+	HasSensitive bool
 }
 
 // SpecProblem is one way a declaration is not well formed: the annotation at
@@ -226,11 +238,37 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 		skipTypeCoherence = true
 	}
 
-	// A connection carries a credential by construction, so it may not be
-	// declared otherwise. A reader defaults this to true for an absent key; the
-	// rule is here so a constructed spec cannot skip it.
-	if section == SectionConnection && !s.Sensitive {
+	// A connection carries a credential by construction, so `sensitive` is not
+	// an author's to state — either value is refused, rather than one being
+	// rejected and the other quietly ignored. That is the same rule `type` and
+	// `enum` get above, and for the same reason: a key that is accepted and
+	// does nothing reads as a key that works.
+	//
+	// The two values are wrong in different ways, so they are told apart.
+	// `sensitive = false` contradicts what a connection is. `sensitive = true`
+	// agrees with it, but writing it means believing the flag decides — and an
+	// author who believes that has a reason to think omitting it would make the
+	// connection plaintext.
+	//
+	// Refusing the agreeing value does turn a manifest that parses into one that
+	// does not, and this is the moment to do it: [tool.astro.env] is a v2
+	// section, no v2 is released, and every shipped CLI is a v1 that never reads
+	// it. The converter does not write the key either (pkg/scaffold asserts
+	// that), so the only file carrying it was hand-written against the docs that
+	// already called it an error. The same change after a release would be worth
+	// arguing about; before one it costs nothing.
+	//
+	// Keyed on HasSensitive, not on the value: a reader defaults an absent key
+	// to true for a connection, so Sensitive alone cannot tell "said so" from
+	// "said nothing". The !s.Sensitive arm needs no such guard — nothing
+	// defaults a connection to false, so reaching it means either an explicit
+	// false or a constructed spec that skipped the rule.
+	switch {
+	case section != SectionConnection:
+	case !s.Sensitive:
 		add("sensitive", "a connection always holds a credential, so it cannot be declared not sensitive")
+	case s.HasSensitive:
+		add("sensitive", "a connection is always sensitive, so sensitive = true adds nothing — remove it; the vault is chosen by the section, not by this flag")
 	}
 
 	// A sensitive value may not carry a default. A default is committed to the

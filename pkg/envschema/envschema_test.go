@@ -35,9 +35,36 @@ func TestValueSpecCheck(t *testing.T) {
 			want:    []string{"sensitive"},
 		},
 		{
+			// Absent key: the reader defaults a connection to sensitive, so
+			// this is what every ordinary connection looks like.
 			name:    "a sensitive connection is fine",
 			spec:    ValueSpec{Sensitive: true},
 			section: SectionConnection,
+		},
+		{
+			// Written rather than defaulted. Refused, not ignored: a key that
+			// does nothing reads as a key that works, and an author who thinks
+			// this flag decides has a reason to think omitting it would leave
+			// the credential in plaintext.
+			name:    "a connection that says sensitive = true",
+			spec:    ValueSpec{Sensitive: true, HasSensitive: true},
+			section: SectionConnection,
+			want:    []string{"sensitive"},
+		},
+		{
+			// The contradicting value keeps its own message, and gets exactly
+			// one problem rather than both arms firing.
+			name:    "a connection that says sensitive = false",
+			spec:    ValueSpec{HasSensitive: true},
+			section: SectionConnection,
+			want:    []string{"sensitive"},
+		},
+		{
+			// The flag is only meaningless under connections; elsewhere it is
+			// the whole point.
+			name:    "an env var that says sensitive = true",
+			spec:    ValueSpec{Sensitive: true, HasSensitive: true},
+			section: SectionEnvVar,
 		},
 		{
 			// Both fire and both are true: it is not marked sensitive, AND the
