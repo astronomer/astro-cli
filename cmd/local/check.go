@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -434,6 +435,9 @@ func firstLine(s string) string {
 // headline; taking the last would return the indented detail under it.
 func exceptionLine(s string) string {
 	lines := strings.Split(strings.TrimRight(s, "\n\r \t"), "\n")
+	if header, ok := multiGroupHeader(lines); ok {
+		return header
+	}
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimRight(lines[i], "\r")
 		body, gutter := stripGutter(line)
@@ -455,6 +459,122 @@ func exceptionLine(s string) string {
 // exceptionTypeRe matches a Python exception line: a dotted type name, then a
 // colon. Anchored, so it cannot match a colon later in a sentence.
 var exceptionTypeRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.]*:`)
+
+// groupHeaderRe matches the line that opens an ExceptionGroup's own block, by
+// the count Python's traceback module appends: "ExceptionGroup: eg (2
+// sub-exceptions)". Keyed on the suffix rather than the class name, because the
+// name is the author's — BaseExceptionGroup, or any subclass — while the count
+// is generated.
+var groupHeaderRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.]*:.*\((\d+) sub-exceptions?\)$`)
+
+// multiGroupHeader returns the header of an ExceptionGroup carrying more than
+// one sub-exception.
+//
+// A group of ONE reports that one: "ExceptionGroup: eg (1 sub-exception)" names
+// a container and "ValueError: 1" names what broke, which on `af health` — one
+// line, no frames — is the whole diagnosis.
+//
+// That reasoning stops working as soon as there are several. The scan below
+// returns the LAST exception line, which for a group of three is the third,
+// chosen for being last rather than for being the problem: it hides that the
+// other two happened, and picking any one of them would. So the header is
+// reported instead, because the count is the true summary and the frames
+// underneath carry the rest.
+//
+// The FIRST header wins, not the last: groups nest, and the outermost one
+// describes the whole failure while an inner one describes a part of it.
+//
+// A header only counts once Python has announced the block it belongs to. The
+// suffix alone is not proof: an ordinary exception whose message happens to end
+// "(3 sub-exceptions)" matches it, and in a chained traceback that line is a
+// HANDLED exception several frames above the one that actually killed the run —
+// so trusting the suffix by itself reports the wrong failure entirely.
+func multiGroupHeader(lines []string) (string, bool) {
+	// Only the last link of a chain. A group that was CAUGHT, with something
+	// else raised while handling it, is not what killed the run — reporting it
+	// would name a handled exception several frames above the real one, which
+	// is the very thing #184 set out to stop.
+	lines = lines[lastChainStart(lines):]
+
+	inGroup := false
+	for _, line := range lines {
+		body, _ := stripGutter(strings.TrimRight(line, "\r"))
+		if !inGroup {
+			inGroup = strings.Contains(body, groupBanner)
+			continue
+		}
+		m := groupHeaderRe.FindStringSubmatch(body)
+		if m == nil {
+			continue
+		}
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 1 {
+			return body, true
+		}
+		// A group of one does not summarize anything its sub-exception does not
+		// say better — but keep reading, because that sub-exception can itself
+		// be a group of several, and then the inner header is the summary.
+	}
+	return "", false
+}
+
+// lastChainStart returns the index where the final link of a chained traceback
+// begins: everything above the last "during handling" or "direct cause" line is
+// an exception that was already dealt with.
+//
+// A separator carrying a gutter is skipped, because it is inside a group block
+// describing one sub-exception's own chain rather than ending the outer one.
+// Two independent signals, and the later one wins: the separator sentences, and
+// the top-level "Traceback (most recent call last):" that opens every plain
+// link. Either alone finds the final link of an ordinary chain.
+//
+// The redundancy is deliberate, and this is the one place in this file that
+// needs it. Every other thing matched here degrades to an older, defensible
+// answer if Python rewords it — a leaf sub-exception, or the traceback banner.
+// This one degrades to reporting an exception that was HANDLED, which is not a
+// worse summary but a wrong one, so it does not rest on a single sentence.
+//
+// They fail independently: the sentences are prose, added by PEP 3134, while
+// "Traceback (most recent call last):" is the most entrenched line Python emits.
+// Taking the later position is also what makes the pair correct rather than just
+// redundant — a chain whose FINAL link is a group has no bare traceback header
+// of its own, so the sentence is the only signal there, and a chain whose
+// earlier link is a plain traceback would otherwise be re-included by it.
+func lastChainStart(lines []string) int {
+	start := 0
+	for i, line := range lines {
+		raw := strings.TrimRight(line, "\r")
+		body, gutter := stripGutter(raw)
+		if gutter {
+			continue
+		}
+		for _, sep := range chainSeparators {
+			if strings.Contains(body, sep) {
+				start = max(start, i+1)
+				break
+			}
+		}
+		// A link's own header, at column 0: the group banner is indented and
+		// carries a gutter, so it is not one of these.
+		if !isIndented(raw) && strings.HasPrefix(body, tracebackHeader) {
+			start = max(start, i)
+		}
+	}
+	return start
+}
+
+// tracebackHeader opens each plain link of a traceback.
+const tracebackHeader = "Traceback (most recent call last):"
+
+// chainSeparators are the two sentences Python puts between the links of a
+// chained traceback, oldest first.
+var chainSeparators = []string{
+	"During handling of the above exception, another exception occurred:",
+	"The above exception was the direct cause of the following exception:",
+}
+
+// groupBanner opens an ExceptionGroup's block in Python's rendering, on the
+// line above its header.
+const groupBanner = "Exception Group Traceback"
 
 // stripGutter removes the margin Python 3.11+ draws down the left of an
 // ExceptionGroup traceback ("  | ", "  +-+--- 1 ---"), reporting whether one

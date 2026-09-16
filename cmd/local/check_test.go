@@ -463,6 +463,222 @@ func TestExceptionLine(t *testing.T) {
 			"ValueError: 1",
 		},
 		{
+			// With several, that reasoning inverts. The backwards scan returns
+			// the LAST sub-exception, which is the third here only because it
+			// is last — it says nothing about the other two, and any of the
+			// three would be as arbitrary. The count is the honest summary, and
+			// the frames printed underneath carry the detail.
+			"exception group of several reports the group",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 5, in <module>\n" +
+				"  |     raise ExceptionGroup(\"eg\", [ValueError(1), TypeError(2), KeyError(3)])\n" +
+				"  | ExceptionGroup: eg (3 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | TypeError: 2\n" +
+				"    +---------------- 3 ----------------\n" +
+				"    | KeyError: 3\n" +
+				"    +------------------------------------",
+			"ExceptionGroup: eg (3 sub-exceptions)",
+		},
+		{
+			// Groups nest, and the outermost describes the whole failure; an
+			// inner one describes a part of it.
+			// Captured from CPython 3.12: a nested group repeats no banner, so
+			// the outer one is the only announcement in the message.
+			"nested groups report the outermost",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 10, in <module>\n" +
+				"  |     raise exc\n" +
+				"  | ExceptionGroup: outer (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | ExceptionGroup: inner (2 sub-exceptions)\n" +
+				"    +-+---------------- 1 ----------------\n" +
+				"      | TypeError: 2\n" +
+				"      +---------------- 2 ----------------\n" +
+				"      | KeyError: 3\n" +
+				"      +------------------------------------",
+			"ExceptionGroup: outer (2 sub-exceptions)",
+		},
+		{
+			// A group that was CAUGHT, with something else raised while
+			// handling it. Python renders chains oldest-first, so the group is
+			// the FIRST block and the exception that killed the run is the last
+			// — taking the first group reported a handled exception, which is
+			// the failure #184 exists to prevent.
+			//
+			// Captured from CPython 3.12.
+			"a handled group does not outrank what actually failed",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 6, in <module>\n" +
+				"  |     raise ExceptionGroup(\"eg\", [ValueError(1), TypeError(2)])\n" +
+				"  | ExceptionGroup: eg (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | TypeError: 2\n" +
+				"    +------------------------------------\n" +
+				"\n" +
+				"During handling of the above exception, another exception occurred:\n" +
+				"\n" +
+				"Traceback (most recent call last):\n" +
+				"  File \"/t.py\", line 8, in <module>\n" +
+				"    raise RuntimeError(\"gave up\")\n" +
+				"RuntimeError: gave up",
+			"RuntimeError: gave up",
+		},
+		{
+			// A chain whose FINAL link is the group. The earlier link's own
+			// "Traceback (most recent call last):" must not pull the window
+			// back over it — which is why the two chain signals combine by
+			// taking the later position rather than either one alone.
+			"a chain ending in a group reports that group",
+			"Traceback (most recent call last):\n" +
+				"  File \"x.py\", line 1, in <module>\n" +
+				"ValueError: handled\n" +
+				"\n" +
+				"During handling of the above exception, another exception occurred:\n" +
+				"\n" +
+				"  + Exception Group Traceback (most recent call last):\n" +
+				"  | ExceptionGroup: eg (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | TypeError: a\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | KeyError: b\n" +
+				"    +------------------------------------",
+			"ExceptionGroup: eg (2 sub-exceptions)",
+		},
+		{
+			// Two chained groups, captured from CPython 3.12. Neither link has
+			// a bare "Traceback (most recent call last):" of its own, so the
+			// separator sentence is the ONLY signal that finds the final one —
+			// the case that earns it its place beside the traceback header.
+			// Without it the first, handled group is reported.
+			"a chain of two groups reports the second",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 5, in <module>\n" +
+				"  |     raise ExceptionGroup(\"first\", [ValueError(1), TypeError(2)])\n" +
+				"  | ExceptionGroup: first (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | TypeError: 2\n" +
+				"    +------------------------------------\n" +
+				"\n" +
+				"During handling of the above exception, another exception occurred:\n" +
+				"\n" +
+				"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 7, in <module>\n" +
+				"  |     raise ExceptionGroup(\"second\", [KeyError(3), IndexError(4), OSError(5)])\n" +
+				"  | ExceptionGroup: second (3 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | KeyError: 3\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | IndexError: 4\n" +
+				"    +---------------- 3 ----------------\n" +
+				"    | OSError: 5\n" +
+				"    +------------------------------------",
+			"ExceptionGroup: second (3 sub-exceptions)",
+		},
+		{
+			// Drift insurance, and the reason the chain boundary has two
+			// signals. Every other string matched here degrades to an older,
+			// defensible answer when Python rewords it; this one degraded to
+			// naming an exception that was HANDLED, which is wrong rather than
+			// merely coarse. The invented sentence stands in for a future
+			// CPython that rewords the real one: the top-level traceback header
+			// still marks the final link.
+			"a reworded chain separator still finds the last link",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  | ExceptionGroup: eg (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | TypeError: 2\n" +
+				"    +------------------------------------\n" +
+				"\n" +
+				"While handling the above, another exception was raised:\n" +
+				"\n" +
+				"Traceback (most recent call last):\n" +
+				"  File \"y.py\", line 2, in <module>\n" +
+				"RuntimeError: gave up",
+			"RuntimeError: gave up",
+		},
+		{
+			// The same, for the other sentence Python uses to chain.
+			"a direct cause does not outrank its effect either",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  | ExceptionGroup: eg (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | TypeError: 2\n" +
+				"    +------------------------------------\n" +
+				"\n" +
+				"The above exception was the direct cause of the following exception:\n" +
+				"\n" +
+				"Traceback (most recent call last):\n" +
+				"RuntimeError: gave up",
+			"RuntimeError: gave up",
+		},
+		{
+			// An outer group of one says nothing its sub-exception does not say
+			// better — but that sub-exception is itself a group of three, and
+			// then the inner header is the summary. Returning at the outer one
+			// left the backwards scan to pick the last leaf, which is the
+			// arbitrary answer this whole rule exists to avoid.
+			//
+			// Captured from CPython 3.12.
+			"a group of one wrapping a group of several reports the inner group",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  |   File \"/t.py\", line 14, in <module>\n" +
+				"  |     raise ExceptionGroup(\"outer\", [ExceptionGroup(\"inner\", [ValueError(1), TypeError(2), KeyError(3)])])\n" +
+				"  | ExceptionGroup: outer (1 sub-exception)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ExceptionGroup: inner (3 sub-exceptions)\n" +
+				"    +-+---------------- 1 ----------------\n" +
+				"      | ValueError: 1\n" +
+				"      +---------------- 2 ----------------\n" +
+				"      | TypeError: 2\n" +
+				"      +---------------- 3 ----------------\n" +
+				"      | KeyError: 3\n" +
+				"      +------------------------------------",
+			"ExceptionGroup: inner (3 sub-exceptions)",
+		},
+		{
+			// The count comes from Python, the class name from whoever raised
+			// it, so the suffix is what identifies a group header.
+			"a BaseExceptionGroup subclass is still a group",
+			"  + Exception Group Traceback (most recent call last):\n" +
+				"  | acme.Fanout: two workers failed (2 sub-exceptions)\n" +
+				"  +-+---------------- 1 ----------------\n" +
+				"    | ValueError: 1\n" +
+				"    +---------------- 2 ----------------\n" +
+				"    | TypeError: 2\n" +
+				"    +------------------------------------",
+			"acme.Fanout: two workers failed (2 sub-exceptions)",
+		},
+		{
+			// A plain exception whose message happens to end that way is not a
+			// group header. Placed mid-chain, where the two rules disagree: the
+			// ordinary one reports what the run actually died of, and mistaking
+			// this for a group would report a handled exception instead.
+			"a message ending in the same shape is not a group",
+			"Traceback (most recent call last):\n" +
+				"  File \"x.py\", line 1\n" +
+				"ValueError: retried (3 sub-exceptions)\n" +
+				"\n" +
+				"During handling of the above exception, another exception occurred:\n" +
+				"\n" +
+				"Traceback (most recent call last):\n" +
+				"  File \"y.py\", line 2\n" +
+				"RuntimeError: gave up",
+			"RuntimeError: gave up",
+		},
+		{
 			// A blank line between the last frame and the exception leaves a
 			// positional rule with an empty predecessor.
 			"blank line before the exception",
