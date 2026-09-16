@@ -1216,7 +1216,7 @@ func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString string, _ []strin
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return fmt.Sprintf("%d", exitErr.ExitCode()), errors.New("something went wrong while Pytesting your DAGs")
+			return fmt.Sprintf("%d", exitErr.ExitCode()), errors.New("something went wrong while Pytesting your Dags")
 		}
 		return "", err
 	}
@@ -1236,16 +1236,16 @@ func (s *Standalone) Parse(_, _ string, _ []string) error {
 		return nil
 	}
 
-	fmt.Println("Checking your DAGs for errors…")
+	fmt.Println("Checking your Dags for errors…")
 
 	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", nil)
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			return errors.New("See above for errors detected in your DAGs")
+			return errors.New("See above for errors detected in your Dags")
 		}
-		return errors.Wrap(err, "something went wrong while parsing your DAGs")
+		return errors.Wrap(err, "something went wrong while parsing your Dags")
 	}
-	fmt.Println(ansi.Green("\u2714") + " No errors detected in your DAGs ")
+	fmt.Println(ansi.Green("\u2714") + " No errors detected in your Dags ")
 	return nil
 }
 

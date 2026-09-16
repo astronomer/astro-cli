@@ -1285,7 +1285,7 @@ func (s *Suite) TestDockerComposePytest() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		resp, err := mockDockerCompose.Pytest("", "", "", "", nil)
-		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 		s.Equal(mockResponse, resp)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1299,7 +1299,7 @@ func (s *Suite) TestDockerComposePytest() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		resp, err := mockDockerCompose.Pytest("", "", "", "", nil)
-		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 		s.Equal("10", resp)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1312,7 +1312,7 @@ func (s *Suite) TestDockerComposePytest() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		resp, err := mockDockerCompose.Pytest("", "", "", "", nil)
-		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 		s.Equal("130", resp)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1688,7 +1688,7 @@ func (s *Suite) TestDockerComposeParse() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.Parse("", "test", nil)
-		s.Contains(err.Error(), "See above for errors detected in your DAGs")
+		s.Contains(err.Error(), "See above for errors detected in your Dags")
 		composeMock.AssertExpectations(s.T())
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1704,7 +1704,7 @@ func (s *Suite) TestDockerComposeParse() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.Parse("", "test", nil)
-		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+		s.Contains(err.Error(), "something went wrong while parsing your Dags")
 		composeMock.AssertExpectations(s.T())
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1721,7 +1721,7 @@ func (s *Suite) TestDockerComposeParse() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.Parse("", "test", nil)
-		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+		s.Contains(err.Error(), "something went wrong while parsing your Dags")
 		composeMock.AssertExpectations(s.T())
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -1738,7 +1738,7 @@ func (s *Suite) TestDockerComposeParse() {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.Parse("", "test", nil)
-		s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+		s.Contains(err.Error(), "something went wrong while parsing your Dags")
 		composeMock.AssertExpectations(s.T())
 		imageHandler.AssertExpectations(s.T())
 	})

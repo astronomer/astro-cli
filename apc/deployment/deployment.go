@@ -25,7 +25,7 @@ import (
 var (
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
-	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
+	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your Dags and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
 	ErrKubernetesNamespaceNotSpecified = errors.New("no kubernetes namespaces specified")
 	errInvalidSSHKeyPath               = errors.New("wrong path specified, no file exists for ssh key")
 	errInvalidKnownHostsPath           = errors.New("wrong path specified, no file exists for known hosts")

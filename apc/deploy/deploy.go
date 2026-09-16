@@ -49,7 +49,7 @@ var (
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
 	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
-	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
+	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no Dags found in the dags folder. User canceled the operation")
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host") //nolint
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
 	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
@@ -569,7 +569,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 
 	// Alert the user if dags folder is empty
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+		i, _ := input.Confirm("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?")
 		if !i {
 			return ErrEmptyDagFolderUserCancelledOperation
 		}

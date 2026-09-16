@@ -1907,7 +1907,7 @@ func (s *Suite) TestStandalonePytest_Failure() {
 	exitCode, err := handler.Pytest("", "", "", "", nil)
 	s.Error(err)
 	s.Equal("1", exitCode)
-	s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+	s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 }
 
 // --- Parse tests ---
@@ -1980,7 +1980,7 @@ func (s *Suite) TestStandaloneParse_DagErrors() {
 
 	err = handler.Parse("", "", nil)
 	s.Error(err)
-	s.Contains(err.Error(), "errors detected in your DAGs")
+	s.Contains(err.Error(), "errors detected in your Dags")
 }
 
 func (s *Suite) TestStandaloneParse_Interrupted() {
@@ -2010,7 +2010,7 @@ func (s *Suite) TestStandaloneParse_Interrupted() {
 
 	err = handler.Parse("", "", nil)
 	s.Error(err)
-	s.Contains(err.Error(), "something went wrong while parsing your DAGs")
+	s.Contains(err.Error(), "something went wrong while parsing your Dags")
 }
 
 // --- resolveInEnvPath tests ---

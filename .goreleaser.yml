@@ -70,7 +70,7 @@ brews:
     directory: Formula
     skip_upload: auto
     homepage: https://astronomer.io
-    description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    description: To build and run Airflow Dags locally via docker-compose and deploy Dags to Astronomer-managed Airflow clusters and interact with the Astronomer API.
     dependencies:
       - name: podman
         type: recommended
@@ -92,7 +92,7 @@ brews:
     directory: Formula
     skip_upload: auto
     homepage: https://astronomer.io
-    description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    description: To build and run Airflow Dags locally via docker-compose and deploy Dags to Astronomer-managed Airflow clusters and interact with the Astronomer API.
     dependencies:
       - name: podman
         type: recommended

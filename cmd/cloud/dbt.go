@@ -79,7 +79,7 @@ Menu will be presented if you do not specify a deployment ID:
 `,
 	}
 
-	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Path to mount dbt project in Airflow, for reference by DAGs. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
+	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Path to mount dbt project in Airflow, for reference by Dags. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to deploy. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
@@ -164,7 +164,7 @@ func newDbtDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete DEPLOYMENT-ID",
 		Short: "Delete a dbt project from a Deployment on Astro",
-		Long:  "Delete a dbt project bundle from a Deployment. This removes the uploaded dbt project files but does not affect DAGs that were generated from the project.",
+		Long:  "Delete a dbt project bundle from a Deployment. This removes the uploaded dbt project files but does not affect Dags that were generated from the project.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  deleteDbt,
 		Example: `

@@ -76,7 +76,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image which is present on the remote registry. Can only be used with --image-name flag")
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
-		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only Dags to your Deployment")
 	}
 	return cmd
 }

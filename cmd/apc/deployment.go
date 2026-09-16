@@ -19,11 +19,11 @@ const (
 
 	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
 	cliDeploymentUnadoptPrompt                 = "\nWarning: This permanently removes the Deployment record from APC. The Airflow custom resource, its namespace, and its metadata database are left untouched, but this action cannot be undone from the CLI. Proceed with unadopt?"
-	deploymentTypeCmdMessage                   = "DAG Deployment mechanism: image, volume, git_sync, dag_deploy"
+	deploymentTypeCmdMessage                   = "Dag Deployment mechanism: image, volume, git_sync, dag_deploy"
 	continueSubMsg                             = " for more details. Do you want to continue?"
 	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
-	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a DAG-only Deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
-	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a DAG-only deployment will erase all of the currently deployed DAGs in this deployment. To keep running your DAGs, you must redeploy them to the deployment. See the APC documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
+	UpdateDeploymentTypeToDagDeployPromptMsg   = "\nthis is an experimental feature. Please use with caution. Changing to a Dag-only Deployment will erase all of the currently deployed Dags in this deployment. To keep running your Dags, you must redeploy them to the deployment. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
+	UpdateDeploymentTypeFromDagDeployPromptMsg = "\nchanging from a Dag-only deployment will erase all of the currently deployed Dags in this deployment. To keep running your Dags, you must redeploy them to the deployment. See the APC documentation at " + houston.DeployViaCLIDocsLink + continueSubMsg
 	SkipUserPromptMsgForCreateDeployment       = "Skip user confirmation prompt for creating a deployment with type: dag_deploy (experimental feature)"
 	SkipUserPromptMsgForUpdateDeployment       = "Skip user confirmation prompt for updating the deployment type to/from dag_deploy (experimental feature)"
 )
