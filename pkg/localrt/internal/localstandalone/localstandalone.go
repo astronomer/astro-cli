@@ -221,6 +221,20 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		e.killGroup(pid, syscall.SIGTERM)
 		return nil, err
 	}
+	// The route lands BEFORE the health wait, which is what docker mode does
+	// and for the same reason: the wait can be interrupted, and a project left
+	// running from an interrupted start has to be as reachable as one left
+	// running from a completed one.
+	//
+	// Registering it afterwards looked equivalent and was not. Ctrl-C a few
+	// seconds into a start — easy on a warm uv cache — and the cancellation
+	// branch below returned with Airflow running and recorded but never
+	// routed, so `astro local status` printed a <name>.localhost URL that 404s
+	// for as long as the project stays up, and `astro local start` refused to
+	// fix it because it could see a live runtime. The branch's own comment
+	// claimed it left things "the same shape as docker mode"; docker had the
+	// route by this point and standalone did not.
+	e.addRoute(rec, cb)
 
 	cfg := airflowrt.HealthCheckConfig{}
 	if major == "2" {
@@ -229,19 +243,23 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if err := e.health(ctx, strconv.Itoa(port), e.healthTimeout, cfg); err != nil {
 		if ctx.Err() != nil {
 			// Canceled, not unhealthy: leave Airflow starting in the
-			// background with its record, the same shape as docker mode —
-			// `astro local stop` can reap it.
+			// background, recorded AND routed, the same shape as docker mode —
+			// `astro local stop` reaps all of it. The daemon is not started
+			// here, so the named URL begins answering when the next command
+			// brings it up; the route it needs is already there.
 			return nil, ctx.Err()
 		}
 		e.killGroup(pid, syscall.SIGTERM)
-		if rmErr := localstate.Remove(projectPath); rmErr != nil {
+		// The route goes with the record now that it was added above. Leaving
+		// it would point the proxy at a port this engine has just killed, and
+		// the next project to take that port would answer for this hostname.
+		if rmErr := errors.Join(localshared.RemoveRoute(e.routes, rec.Hostname), localstate.Remove(projectPath)); rmErr != nil {
 			err = errors.Join(err, rmErr)
 		}
 		rt.OnState(cb, rt.StateError, err)
 		return nil, err
 	}
 
-	e.addRoute(rec, cb)
 	localshared.EnsureDaemon(e.daemon, cb, e.now(), rec.Hostname)
 	rt.OnState(cb, rt.StateRunning, nil)
 	return &airflow{eng: e, rec: rec}, nil
