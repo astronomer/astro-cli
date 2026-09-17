@@ -458,6 +458,28 @@ func TestExceptionLine(t *testing.T) {
 			"SyntaxError",
 		},
 		{
+			// An exception raised with no message renders as the bare type, so
+			// no line in the whole block carries a colon. Reported as the
+			// banner until the no-colon fallback learned to read a traceback
+			// from the bottom.
+			"exception with no message",
+			frames + "AssertionError",
+			"AssertionError",
+		},
+		{
+			// The same, dotted.
+			"dotted exception with no message",
+			frames + "airflow.exceptions.AirflowNotFoundException",
+			"airflow.exceptions.AirflowNotFoundException",
+		},
+		{
+			// Not a traceback at all — no banner — so the first line is the
+			// headline, as it was. A caller can pass any multi-line text here.
+			"multi-line text that is not a traceback",
+			"boom\nsomething else",
+			"boom",
+		},
+		{
 			// TWO invalid fields. The second field name follows the first
 			// field's indented detail, so a positional rule reads it as the
 			// exception and reports a bare "db_url".

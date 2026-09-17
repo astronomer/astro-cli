@@ -243,8 +243,15 @@ type manifestFacts struct {
 	// manifest can end up declaring one Airflow and running another, and the
 	// run has to say so rather than leave it to be discovered at start.
 	pinUnread bool
+	// loosePython reports that the manifest states a requires-python of its
+	// own that still admits an interpreter the pinned Airflow cannot run
+	// under. Left as the author wrote it — which interpreters a project
+	// supports is their call — but said out loud, because the run can see the
+	// collision and the first `astro local start` is where it otherwise
+	// surfaces, from inside a dependency that names neither.
+	loosePython bool
 	// namesAirflow reports that the manifest names apache-airflow in a shape
-	// no version could be read out of — a range, a wildcard. With a defaulted
+	// no version could be read out of — a range. With a defaulted
 	// pin that means the project may have just moved an Airflow generation.
 	namesAirflow bool
 	// dynamicDeps reports that dependencies are declared dynamic, so the
@@ -952,6 +959,11 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 	if facts.pinUnread {
 		out = append([]string{"[project.dependencies] names apache-airflow in a shape no single version reads out of, " +
 			"so airflow = '" + version + "' came from elsewhere: make the two agree, or set airflow explicitly"}, out...)
+	}
+	if facts.loosePython {
+		out = append([]string{"[project] requires-python admits a Python that Airflow " + version +
+			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
+			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
 	// Dependencies declared dynamic are supplied from somewhere this cannot
 	// reach, so the requirement that installs Airflow has to be put there.

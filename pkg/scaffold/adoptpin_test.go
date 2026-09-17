@@ -91,6 +91,22 @@ func TestAdoptSaysWhenItPinnedAnAirflowTheManifestDidNotName(t *testing.T) {
 	assert.Contains(t, found, "airflow = '2'", "the note names the pin that was written")
 }
 
+// --airflow-version is the user stating the version themselves. Telling them
+// to "set airflow explicitly" is advice to do what they just did, so the note
+// stays quiet — the manifest's unreadable range is then their business.
+func TestAdoptSaysNothingAboutAnUnreadPinWhenTheFlagSetTheVersion(t *testing.T) {
+	dir := adoptable(t, "'apache-airflow>=3.0'")
+
+	res, err := Run(dir, Options{AirflowVersion: "3.1"})
+	require.NoError(t, err)
+	require.Equal(t, "3.1", res.AirflowVersion)
+
+	for _, n := range res.Notes {
+		assert.NotContains(t, n, "no single version reads out of",
+			"the user named the version; there is nothing to advise")
+	}
+}
+
 // The quiet case: nothing to warn about when the manifest's own pin was used.
 func TestAdoptSaysNothingWhenThePinCameFromTheManifest(t *testing.T) {
 	dir := adoptable(t, "'apache-airflow==3.0.*'")

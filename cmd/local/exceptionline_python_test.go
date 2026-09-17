@@ -65,8 +65,8 @@ func TestExceptionLineAgainstRealPython(t *testing.T) {
 	}
 	// A generator that silently produced nothing would pass every assertion
 	// below, so the count is checked rather than assumed.
-	if len(cases) < 14 {
-		t.Fatalf("want at least 14 generated cases, got %d — did the generator fail quietly?\n%s",
+	if len(cases) < 16 {
+		t.Fatalf("want at least 16 generated cases, got %d — did the generator fail quietly?\n%s",
 			len(cases), stderr.String())
 	}
 
@@ -293,6 +293,8 @@ emit("multi-line message ending in a bare url", caught(raises(BackendError(
     "https://example.com/docs/errors#e123"))))
 emit("message with an indented detail block", caught(raises(ValidationError(
     "2 validation errors for Settings\ndb_url\n  Field required\napi_key\n  Field required"))))
+emit("no message at all", caught(raises(AssertionError())))
+emit("dotted type with no message", caught(raises(ProviderError())))
 emit("chained traceback", caught(chained))
 emit("explicit cause", caught(caused))
 emit("exception with a note", caught(noted))

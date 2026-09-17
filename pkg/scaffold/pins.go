@@ -3,6 +3,7 @@ package scaffold
 import (
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -91,11 +92,39 @@ func airflowExtrasNote(spec string) []string {
 // would prevent.
 func requiresPython(airflow string) string {
 	const floor = ">=3.10"
-	major, _, _ := strings.Cut(airflow, ".")
-	if major == "2" {
-		return floor + ",<3.13"
+	major, rest, _ := strings.Cut(airflow, ".")
+	if major != "2" {
+		return floor
 	}
-	return floor
+	// Python 3.12 support arrived in Airflow 2.9. Before that the ceiling is
+	// 3.11, which docs/install.md states in the same words: "Airflow 2.7 wants
+	// 3.11 or lower; later 2.x releases reach further." A flat <3.13 would let
+	// uv pick 3.12 for a 2.7 project and produce the failure this is here to
+	// prevent, one minor version along.
+	//
+	// A bare "2" means the newest Airflow 2, which is past 2.9, so it takes the
+	// wider bound — Atoi fails on the empty minor and falls through.
+	if minor, _, _ := strings.Cut(rest, "."); minor != "" {
+		if n, err := strconv.Atoi(minor); err == nil && n < 9 {
+			return floor + ",<3.12"
+		}
+	}
+	return floor + ",<3.13"
+}
+
+// onlyTheDistribution reports whether the text before a requirement's "=="
+// is the distribution name and nothing else — extras allowed, another
+// specifier not.
+func onlyTheDistribution(head string) bool {
+	h := strings.TrimSpace(head)
+	if i := strings.Index(h, "["); i >= 0 {
+		j := strings.Index(h, "]")
+		if j < i {
+			return false
+		}
+		h = strings.TrimSpace(h[:i] + h[j+1:])
+	}
+	return !strings.ContainsAny(h, "<>!~,=")
 }
 
 // pinsAirflow reports whether [project.dependencies] already names
@@ -106,15 +135,24 @@ func pinsAirflow(deps []string) bool {
 
 // pinnedPastTheManifest reports that the manifest names Airflow in a shape no
 // single version reads out of — a range — while the pin written to
-// [tool.astro] came from another source.
+// [tool.astro] came from a Dockerfile or a requirements.txt.
 //
-// That is the one remaining way the two halves of a manifest can name
-// different Airflows, now that a series is read like any other pin. Nothing
-// downstream compares them: the CLI runs the [tool.astro] one and uv resolves
-// the dependency one, so the disagreement surfaces later as a failure with no
-// obvious cause. Saying so at adoption is the only cheap moment.
-func pinnedPastTheManifest(deps []string, defaulted bool) bool {
-	if defaulted || !pinsAirflow(deps) {
+// Nothing downstream compares the two: the CLI runs the [tool.astro] one and
+// uv resolves the dependency one, so a disagreement surfaces later as a
+// failure with no obvious cause. Saying so at adoption is the only cheap
+// moment.
+//
+// Not the only way two halves can disagree, and the doc should not claim
+// otherwise: a project whose declared Dockerfile carries a different Airflow
+// generation from the pin is another, and this does not see it. What that one
+// needs is a comparison against the Dockerfile's own FROM, which belongs with
+// the Dockerfile reading rather than here.
+//
+// fromFlag suppresses it. --airflow-version is the user stating the version
+// themselves, so "make the two agree, or set airflow explicitly" would be
+// advising them to do the thing they just did.
+func pinnedPastTheManifest(deps []string, defaulted, fromFlag bool) bool {
+	if defaulted || fromFlag || !pinsAirflow(deps) {
 		return false
 	}
 	_, readable := pinFromDeps(deps)
@@ -153,8 +191,17 @@ func pinFromSpec(spec string) (version string, ok bool) {
 	if i := strings.IndexAny(s, ";@"); i >= 0 {
 		s = s[:i]
 	}
-	_, rest, found := strings.Cut(s, "==")
+	head, rest, found := strings.Cut(s, "==")
 	if !found {
+		return "", false
+	}
+	// Everything before the "==" has to be just the distribution name. Cut
+	// keeps only what follows the FIRST one, so a requirement carrying another
+	// specifier ahead of it — "apache-airflow>=2.9,==2.9.*" — arrives below as
+	// a clean "2.9.*" with the ">=2.9," already discarded. That used to be
+	// refused for the wrong reason, by the star check catching the wildcard;
+	// reading the series made the wrong reason stop working.
+	if !onlyTheDistribution(head) {
 		return "", false
 	}
 	v := strings.TrimSpace(rest)
@@ -169,8 +216,11 @@ func pinFromSpec(spec string) (version string, ok bool) {
 	// contradicts: airflow = '2' beside apache-airflow==3.0.*. Nothing
 	// reconciles those afterwards, and the project runs one Airflow while
 	// declaring another.
+	if strings.Contains(v, ",") { // another specifier after this one
+		return "", false
+	}
 	v = strings.TrimSuffix(v, ".*")
-	if strings.ContainsAny(v, ", *") { // more than a single exact pin
+	if strings.Contains(v, "*") { // a wildcard anywhere but the tail
 		return "", false
 	}
 	if !airflowPinRe.MatchString(v) {

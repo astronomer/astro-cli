@@ -455,6 +455,31 @@ func exceptionLine(s string) string {
 			return body
 		}
 	}
+	// Nothing carried a colon. In a rendered traceback that means an exception
+	// with no message, which Python prints as the bare type on a line of its
+	// own — "AssertionError" after the frames — so the answer is the last
+	// unindented line rather than the first.
+	//
+	// Taking the first returned "Traceback (most recent call last):", the
+	// banner, which is the one thing this must never report and which the
+	// generated suite fails on by name.
+	//
+	// Only when a banner is present, because only then is the shape known.
+	// Without one this is not a traceback but some other multi-line text, and
+	// there the first line is the headline — Airflow's own "SyntaxError\n  line
+	// 3" is that shape, and so is any message a caller passes through.
+	if hasTracebackBanner(lines) {
+		for i := len(lines) - 1; i >= 0; i-- {
+			line := strings.TrimRight(lines[i], "\r")
+			body, gutter := stripGutter(line)
+			if !gutter && isIndented(line) {
+				continue
+			}
+			if trimmed := strings.TrimSpace(body); trimmed != "" && !strings.HasPrefix(trimmed, tracebackHeader) {
+				return trimmed
+			}
+		}
+	}
 	for _, line := range lines {
 		if trimmed := strings.TrimSpace(line); trimmed != "" {
 			return trimmed
@@ -576,6 +601,19 @@ func lastChainStart(lines []string) int {
 		}
 	}
 	return start
+}
+
+// hasTracebackBanner reports whether these lines are a rendered traceback
+// rather than some other multi-line text, which decides where its exception
+// line is: last in a traceback, first in anything else.
+func hasTracebackBanner(lines []string) bool {
+	for _, raw := range lines {
+		body, _ := stripGutter(strings.TrimRight(raw, "\r"))
+		if strings.HasPrefix(strings.TrimSpace(body), tracebackHeader) {
+			return true
+		}
+	}
+	return false
 }
 
 // tracebackHeader opens each plain link of a traceback.

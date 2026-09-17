@@ -16,10 +16,17 @@ import (
 // manifest, and Airflow 2's own metadata carries no upper bound.
 func TestRequiresPythonBoundsAirflowTwo(t *testing.T) {
 	for _, tc := range []struct{ airflow, want string }{
+		// A bare "2" is the newest Airflow 2, which is past 2.9.
 		{"2", ">=3.10,<3.13"},
+		// Python 3.12 support arrived in 2.9. docs/install.md says the same:
+		// "Airflow 2.7 wants 3.11 or lower; later 2.x releases reach further."
+		{"2.7", ">=3.10,<3.12"},
+		{"2.8", ">=3.10,<3.12"},
+		{"2.8.4", ">=3.10,<3.12"},
 		{"2.9", ">=3.10,<3.13"},
 		{"2.10", ">=3.10,<3.13"},
 		{"2.10.5", ">=3.10,<3.13"},
+		{"2.11", ">=3.10,<3.13"},
 		// Airflow 3 tracks new interpreters, so it is left open rather than
 		// capped at whatever was current when this was written.
 		{"3", ">=3.10"},

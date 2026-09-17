@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
@@ -42,10 +43,11 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	version, defaulted := pickAirflowVersion(opts.AirflowVersion, deps, v1)
 	pin = manifestFacts{
 		defaultedPin: defaulted,
-		pinUnread:    pinnedPastTheManifest(deps, defaulted),
-		// A manifest naming Airflow without a clean == pin — a range, a
-		// wildcard — states a version this cannot read, so the default that
-		// lands instead may move the project a whole generation.
+		pinUnread:    pinnedPastTheManifest(deps, defaulted, opts.AirflowVersion != ""),
+		// A manifest naming Airflow without a clean == pin — a range —
+		// states a version this cannot read, so the default that lands
+		// instead may move the project a whole generation. A wildcard is
+		// read now, so it no longer reaches this.
 		namesAirflow: defaulted && pinsAirflow(deps),
 		dynamicDeps:  slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "dependencies"),
 	}
@@ -61,7 +63,11 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 			return nil, nil, pin, err
 		}
 	}
-	if err := ensureProjectKeys(ed, version); err != nil {
+	// Read before ensureProjectKeys, which fills a missing one: after it, an
+	// absent key and one this run just wrote look the same.
+	pin.loosePython = statedPythonTooLoose(ed, version)
+	requiresPythonLabel, err := ensureProjectKeys(ed, version)
+	if err != nil {
 		return nil, nil, pin, err
 	}
 
@@ -133,6 +139,10 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if migratedPackages {
 		labels = append(labels, manifest.Marker+" (migrated packages.txt into packages)")
 	}
+	// Reported because it constrains the project: it decides which interpreters
+	// uv may build the environment with, and a preview that leaves it out shows
+	// a review with the most restrictive key missing.
+	labels = appendLabel(labels, requiresPythonLabel)
 	// Same reason as the greenfield arm's: this is the key that decides whether
 	// the image is generated or built from the user's own file, so a preview
 	// without it hides the most consequential thing the run did.
@@ -285,11 +295,51 @@ func ensureProjectVersion(ed tomledit.Editor) error {
 // ensureProjectKeys fills the [project] keys this run is responsible for and
 // the manifest does not already state. Both are "fill a gap, never overwrite":
 // what the author wrote is what they meant.
-func ensureProjectKeys(ed tomledit.Editor, version string) error {
+//
+// It returns a label for what it wrote, empty when it wrote nothing worth
+// reporting. requires-python is reportable because it decides which
+// interpreters the project may ever use; the version placeholder has no
+// behavioral consequence, so it stays quiet.
+func ensureProjectKeys(ed tomledit.Editor, version string) (label string, err error) {
 	if err := ensureProjectVersion(ed); err != nil {
-		return err
+		return "", err
 	}
-	return ensureRequiresPython(ed, version)
+	wrote, err := ensureRequiresPython(ed, version)
+	if err != nil || !wrote {
+		return "", err
+	}
+	return manifest.Marker + " (set requires-python to " + requiresPython(version) + ")", nil
+}
+
+// statedPythonTooLoose reports that the manifest already states a
+// requires-python which still lets uv pick an interpreter the pinned Airflow
+// cannot run under.
+//
+// "No upper bound" is the whole test, deliberately. Comparing PEP 440
+// specifiers properly means implementing them, and the only case that matters
+// is the common one: an author who wrote ">=3.9" years ago, against an Airflow
+// 2 that stops at 3.11 or 3.12. A bound that is merely wrong — "<3.14" on an
+// Airflow 2 — is rare enough to leave to the reader, and saying nothing about
+// it is better than a comparison this package would get subtly wrong.
+func statedPythonTooLoose(ed tomledit.Editor, version string) bool {
+	if major, _, _ := strings.Cut(version, "."); major != "2" {
+		return false
+	}
+	v, ok := ed.Get([]string{"project", "requires-python"})
+	if !ok {
+		return false
+	}
+	stated, _ := v.(string)
+	return stated != "" && !strings.Contains(stated, "<")
+}
+
+// appendLabel adds a label unless it is empty, so a caller assembling a list
+// does not need a branch per optional entry.
+func appendLabel(labels []string, label string) []string {
+	if label == "" {
+		return labels
+	}
+	return append(labels, label)
 }
 
 // ensureRequiresPython states which interpreters the project supports, when
@@ -300,11 +350,24 @@ func ensureProjectKeys(ed tomledit.Editor, version string) error {
 // to build the venv on the newest Python present, and for an Airflow 2 pin
 // that is one Airflow 2 cannot run under. See requiresPython for what that
 // failure looks like.
-func ensureRequiresPython(ed tomledit.Editor, version string) error {
+// It reports whether it wrote, so the run can say so: this key decides which
+// interpreters the project may ever use, and a change performed but unreported
+// cannot be reviewed.
+func ensureRequiresPython(ed tomledit.Editor, version string) (wrote bool, err error) {
 	if v, ok := ed.Get([]string{"project", "requires-python"}); ok && v != "" {
-		return nil
+		return false, nil
 	}
-	return ed.Set([]string{"project", "requires-python"}, requiresPython(version))
+	// Declared dynamic means a build backend supplies it, and PEP 621 forbids
+	// stating a dynamic field statically — writing one turns a buildable
+	// project into one that errors at build time. ensureProjectVersion guards
+	// the same way for the same reason.
+	if slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "requires-python") {
+		return false, nil
+	}
+	if err := ed.Set([]string{"project", "requires-python"}, requiresPython(version)); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // withPath names the manifest in a validation or parse failure. Both error

@@ -48,6 +48,15 @@ func TestPinFromSpec(t *testing.T) {
 		"apache-airflow>=2.9,<3",
 		"apache-airflow~=2.9.3",
 		"apache-airflow==2.*.3",
+		// Another specifier BEFORE the "==". strings.Cut keeps only what
+		// follows the first one, so these reach the version check as a clean
+		// "2.9.*" with the rest discarded — refused until now only because the
+		// star check happened to catch the wildcard, which reading the series
+		// stopped doing.
+		"apache-airflow>=2.9,==2.9.*",
+		"apache-airflow<3,==2.10.*",
+		"apache-airflow!=2.9.1,==2.9.*",
+		"apache-airflow[celery]>=2.9,==2.9.*",
 		"apache-airflow",
 		"apache-airflow==2.9.3,!=2.9.4",
 		"apache-airflow @ https://example.com/airflow.whl",
