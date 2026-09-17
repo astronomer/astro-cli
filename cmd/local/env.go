@@ -95,10 +95,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"keyring, and the command refuses where there is none rather than quietly writing a credential to a plain " +
 			"file.\n\n" +
 			"Resolution order at start is shell env > project .env > project vault > global vault > global ~/.astro/env > " +
-			"the workspace's Environment Manager. A plaintext file therefore still beats a vaulted value of the same " +
-			"name, and a project value beats a machine-wide one. A name resolves from Environment Manager only when the " +
-			"schema declares source = \"workspace\" and you are logged in; a local value always wins. This is the local " +
-			"sibling of `astro env`, which manages values on the platform.",
+			"the workspace's Environment Manager.",
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
