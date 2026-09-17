@@ -43,6 +43,11 @@ const (
 	// defaultHealthTimeout bounds the wait for `airflow standalone` to come
 	// up. First runs initialize the metadata database, so this is generous.
 	defaultHealthTimeout = 5 * time.Minute
+	// exitPollInterval is how often the health wait checks that what it is
+	// waiting for still exists. Short, because the whole point is to answer as
+	// soon as the child goes rather than at the end of the timeout above, and
+	// cheap: it is a signal 0 to a process group.
+	exitPollInterval = 250 * time.Millisecond
 	// stateDirPerm is owner-only, matching the record store.
 	stateDirPerm = 0o700
 	logFileName  = "airflow.log"
@@ -190,7 +195,12 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if _, err := os.Stat(filepath.Join(projectPath, ".venv", "bin", "airflow")); err != nil {
 		return nil, errors.New("the project environment has no airflow command; add an Airflow distribution (e.g. apache-airflow) to pyproject.toml and retry")
 	}
-	bin, args, err = e.superviseArgs(bin, args, filepath.Join(stateDir, logFileName), p.StopWithSession)
+	// One value, used twice: the supervisor captures into it, and a failed
+	// start names it. Recomputing the second from rt.StateDir would ignore a
+	// plan that relocated the state directory and name a file that is not the
+	// one being written.
+	logPath := filepath.Join(stateDir, logFileName)
+	bin, args, err = e.superviseArgs(bin, args, logPath, p.StopWithSession)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +250,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if major == "2" {
 		cfg.AirflowMajorVersion = "2"
 	}
-	if err := e.health(ctx, strconv.Itoa(port), e.healthTimeout, cfg); err != nil {
+	if err := e.waitHealthy(ctx, rec, strconv.Itoa(port), cfg, logPath); err != nil {
 		if ctx.Err() != nil {
 			// Canceled, not unhealthy: leave Airflow starting in the
 			// background, recorded AND routed, the same shape as docker mode —
@@ -412,6 +422,64 @@ func (e *Engine) ReadStatus(projectPath string) (rt.Status, error) {
 // callers holding one (list, the handle) skip the disk round trip.
 func (e *Engine) StatusOf(rec localstate.Record) rt.Status {
 	return rec.Status(e.groupAlive(rec))
+}
+
+// waitHealthy waits for Airflow to answer on its port, and stops waiting if
+// the process group it is waiting on has gone.
+//
+// The health check alone cannot tell "not up yet" from "never coming up", so a
+// project whose Airflow dies on import waited out the whole timeout — five
+// minutes — and then reported that it had timed out. An Airflow 2 project on a
+// Python it cannot run does exactly that, dying in about five seconds, and the
+// only thing wrong with the report was that it arrived 295 seconds late and
+// described the wait rather than the failure.
+//
+// So this races the two. The group going is a definite answer where the
+// timeout is a guess, and it arrives as fast as the child exits.
+func (e *Engine) waitHealthy(ctx context.Context, rec localstate.Record, port string, cfg airflowrt.HealthCheckConfig, logPath string) error {
+	ctx, cancel := context.WithCancel(ctx)
+	// Stops the health check when this returns early. Buffered below so that
+	// goroutine can finish writing even when nobody is left reading.
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- e.health(ctx, port, e.healthTimeout, cfg) }()
+
+	tick := time.NewTicker(exitPollInterval)
+	defer tick.Stop()
+	for {
+		select {
+		case err := <-done:
+			if err != nil && ctx.Err() == nil {
+				// A real timeout. Say where the output is: the message it
+				// carries suggests reading the logs, and until now nothing
+				// said which ones or where, and `astro local logs` cannot
+				// reach them once the failed start clears the record.
+				return fmt.Errorf("%w%s", err, logHint(logPath))
+			}
+			return err
+		case <-tick.C:
+			if !e.groupAlive(rec) {
+				return fmt.Errorf("Airflow exited while starting%s", logHint(logPath))
+			}
+		}
+	}
+}
+
+// logHint names the file the supervisor captured the child's output into, as a
+// suffix for an error. Empty when there is no path, so a missing one never
+// replaces the failure being reported.
+//
+// It takes the path rather than deriving it. Deriving it meant calling
+// rt.StateDir, which is only planStateDir's fallback: the plan's own StateDir
+// wins when a caller sets one, and that field exists so an embedder can put the
+// state somewhere else. Such a caller would have been pointed at a file that
+// does not exist, while its real output sat where it had asked for it.
+func logHint(logPath string) string {
+	if logPath == "" {
+		return ""
+	}
+	return " — its output is in " + logPath
 }
 
 // groupAlive reports whether any process in the record's group is still
