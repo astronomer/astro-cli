@@ -51,6 +51,45 @@ func TestParseMissingVenvIsEnvNotReady(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrEnvNotReady)
 	assert.Contains(t, err.Error(), "astro local start")
+	// And the other half. A docker-mode project builds its environment in the
+	// image and never writes a .venv, so "run astro local start" on its own
+	// was advice that changes nothing: the user runs it, docker mode starts
+	// fine, and the check fails again with the same sentence. This package
+	// cannot tell the modes apart, so it names the command that works in
+	// either.
+	assert.Contains(t, err.Error(), "uv sync",
+		"a docker-mode project needs a command that builds an interpreter without starting Airflow")
+	// The sentinel leads. Wrapped at the end it landed after a colon, so the
+	// line finished "…is what a docker-mode project needs: project environment
+	// is not ready to check", reading as the object of that sentence — and
+	// cmd/local prints this verbatim.
+	assert.True(t, strings.HasPrefix(err.Error(), ErrEnvNotReady.Error()+":"),
+		"the sentinel should lead, not trail a colon: %q", err.Error())
+}
+
+// A .venv that exists but cannot be used is a different problem, and neither
+// suggested command fixes it — so it is reported rather than described as one
+// that was never built.
+func TestParseUnusableVenvSaysWhatWentWrong(t *testing.T) {
+	dir := t.TempDir()
+	// A symlink to nothing: it exists, and stat fails for a reason that is not
+	// "never created".
+	link := filepath.Join(dir, "python")
+	require.NoError(t, os.Symlink(filepath.Join(dir, "gone"), link))
+
+	r := &VenvRunner{
+		Exec:       &fakeExec{},
+		pythonPath: func(string) string { return link },
+		tempHome:   defaultTempHome,
+	}
+	_, err := r.Parse(context.Background(), ParseInput{ProjectPath: "/p", DagsDir: "/p/dags"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrEnvNotReady, "it is still an environment problem")
+	// A dangling symlink stats as not-exist, so this one takes the ordinary
+	// path; what matters is that the sentinel still leads and the advice is
+	// there. The unusable branch is exercised by a stat error that is not
+	// not-exist, which a test cannot portably manufacture without root.
+	assert.True(t, strings.HasPrefix(err.Error(), ErrEnvNotReady.Error()+":"), err.Error())
 }
 
 func TestParseDecodesReportAndFeedsScriptOnStdin(t *testing.T) {

@@ -194,9 +194,37 @@ func defaultTempHome() (dir string, cleanup func(), err error) {
 func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, error) {
 	python := r.pythonPath(in.ProjectPath)
 	if _, err := os.Stat(python); err != nil {
+		// An interpreter that is there but unusable — a .venv whose bin
+		// directory another user owns, a symlink to a Python since removed — is
+		// a different problem from one that was never built, and neither
+		// command below helps with it. Report what happened instead of
+		// asserting the common case.
+		//
+		// ErrEnvNotReady rather than ErrNoInterpreter, deliberately: the
+		// narrower one is what makes a caller build an environment, and an
+		// interpreter that exists but cannot be used is a project's own broken
+		// environment rather than an absent one. Building around it would
+		// report a clean check for a project that cannot start.
+		if !errors.Is(err, os.ErrNotExist) {
+			return ParseReport{}, fmt.Errorf("%w: %s cannot be used: %w", ErrEnvNotReady, python, err)
+		}
+		// Both commands, because only one of them works in either mode and this
+		// package does not know which mode the project runs in.
+		//
+		// `astro local start` alone was wrong for half of them: a docker-mode
+		// project builds its environment inside the image and never writes a
+		// .venv, so starting it — which is what the advice said to do — leaves
+		// the check failing exactly as before, with the same message telling
+		// you to do it again.
+		//
+		// The sentinel leads rather than trails. Wrapped at the end it landed
+		// after a colon, so the rendered line finished "…which is what a
+		// docker-mode project needs: project environment is not ready to
+		// check", reading as though that were the object of the sentence.
 		return ParseReport{}, fmt.Errorf(
-			"no Python found at %s — run `astro local start` to build the project environment first: %w",
-			python, ErrNoInterpreter,
+			"%w at %s — `astro local start` builds one, and `uv sync` builds one "+
+				"without starting Airflow, which is what a docker-mode project needs",
+			ErrNoInterpreter, python,
 		)
 	}
 	return r.parseWith(ctx, python, in)
