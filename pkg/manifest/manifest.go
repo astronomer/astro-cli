@@ -642,7 +642,7 @@ func firstNonEmpty(vals ...string) string {
 var projectNameRe = regexp.MustCompile(`^(?i:[a-z0-9]|[a-z0-9][a-z0-9._-]*[a-z0-9])$`)
 
 // airflowVersionRe accepts a full or partial version: "3", "3.1", "3.1.2".
-var airflowVersionRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+){0,2}$`)
+var airflowVersionRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
 
 // validate checks what the decode could not: the standard [project] table,
 // which is typed, and the rules that span more than one key.

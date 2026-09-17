@@ -111,7 +111,12 @@ func topInsertAt(data []byte, keys [][]string) (int, error) {
 	runStart, runEnd := -1, -1
 	for p.NextExpression() {
 		e := p.Expression()
-		switch e.Kind {
+		// Deliberately partial: an expression is a comment, a table header, an
+		// array-table header or a key-value, and the value kinds (String,
+		// Integer, Array, …) only appear nested inside one. A key-value is
+		// meant to fall through to the run reset below, which is what makes a
+		// comment above it stop annotating whatever header follows.
+		switch e.Kind { //nolint:exhaustive // see above: only four kinds reach expression level
 		case unstable.Comment:
 			start := lineStart(data, int(e.Raw.Offset))
 			if runEnd != start {

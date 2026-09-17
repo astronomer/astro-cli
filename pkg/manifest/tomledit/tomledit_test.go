@@ -88,7 +88,7 @@ func TestSurgicalRoundTripUnedited(t *testing.T) {
 // each hand-authored manifest. The surgical output must match the golden
 // file exactly (comments, order, and formatting preserved); the rewrite
 // output must carry the same data, checked by decoding both.
-func TestGoldenEdits(t *testing.T) {
+func TestGoldenEdits(t *testing.T) { //nolint:gocognit // one golden table per edit shape; splitting it would scatter the fixtures
 	cases := []struct {
 		file string
 		ops  []op
@@ -388,7 +388,7 @@ func TestGet(t *testing.T) {
 		if !isMap || table["workspace"] != "ws-abc" {
 			t.Errorf("table decode = %#v", v)
 		}
-		if _, ok := e.Get([]string{"tool", "astro", "nope"}); ok {
+		if _, found := e.Get([]string{"tool", "astro", "nope"}); found {
 			t.Error("Get of a missing key reported present")
 		}
 		// Values come back as their TOML decoding, whatever Go type went in.

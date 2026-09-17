@@ -124,7 +124,7 @@ func tableLike(v any) bool {
 // setIn writes value at key inside container c and returns the container,
 // re-allocated when an array append grew it. full is the whole path, for
 // errors.
-func setIn(c any, key, full []string, value any) (any, error) {
+func setIn(c any, key, full []string, value any) (any, error) { //nolint:gocognit // the rewrite fallback's tree walk; refactor tracked separately
 	switch container := c.(type) {
 	case map[string]any:
 		k := key[0]
