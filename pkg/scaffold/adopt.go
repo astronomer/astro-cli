@@ -224,7 +224,7 @@ func mergeDependencies(ed tomledit.Editor, reqs []string, dynamic bool, extras *
 		}
 		return len(add), nil
 	}
-	at := len(asStrings(existing))
+	at := arrayLen(existing)
 	for i, r := range add {
 		if err := ed.Set([]string{"project", "dependencies", strconv.Itoa(at + i)}, r); err != nil {
 			return 0, err
@@ -257,11 +257,14 @@ func ensureAirflowDependency(ed tomledit.Editor, version string, dynamic bool) (
 	// Re-read the array: its length is the index an append writes to, so it
 	// has to be the length as it stands now, not as it stood earlier.
 	deps, ok := ed.Get([]string{"project", "dependencies"})
-	if list := asStrings(deps); pinsAirflow(list) {
+	switch {
+	case pinsAirflow(asStrings(deps)):
 		return "", nil
-	} else if ok {
-		err = ed.Set([]string{"project", "dependencies", strconv.Itoa(len(list))}, airflowRequirement(version))
-	} else {
+	case ok:
+		// arrayLen, not the count of readable entries: an index one short
+		// overwrites the last element instead of following it.
+		err = ed.Set([]string{"project", "dependencies", strconv.Itoa(arrayLen(deps))}, airflowRequirement(version))
+	default:
 		err = ed.Set([]string{"project", "dependencies"}, []any{airflowRequirement(version)})
 	}
 	if err != nil {
@@ -390,6 +393,24 @@ func withPath(err error, path string) error {
 func mustGet(ed tomledit.Editor, key ...string) any {
 	v, _ := ed.Get(key)
 	return v
+}
+
+// arrayLen is how many elements a TOML array holds — the index an append has
+// to write to.
+//
+// Not len(asStrings(v)), which is what both append sites used. asStrings drops
+// anything that is not a string, so an array holding one non-string entry
+// reported a length one short, the "append" landed on the last element and
+// replaced it, and `astro init` silently deleted a dependency from the user's
+// manifest — no error, and nothing on the hand-off list.
+//
+// An array like that is malformed for PEP 621, which requires strings, so it
+// takes a hand-edited file to reach. That makes it rare rather than harmless:
+// the run destroys something it could not read, which is the one thing a
+// conversion must never do.
+func arrayLen(v any) int {
+	list, _ := v.([]any)
+	return len(list)
 }
 
 // asStrings returns the string members of a decoded TOML array, ignoring any
