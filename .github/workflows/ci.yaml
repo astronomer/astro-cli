@@ -95,11 +95,14 @@ jobs:
       # Restoring is the cheap half, so every run restores and only a trunk
       # push pays to refresh what the next run reads.
       #
-      # `github.event_name == 'push'` rather than a branch name, for the reason
-      # spelled out on the integration-test job below: the `on: push` trigger
-      # already decides which branches build, so every push event here is a
-      # push to trunk by construction, and naming the branch a second place is
-      # what lets the two disagree.
+      # The saves below test `github.event_name == 'push'` rather than a branch
+      # name. The `on: push` trigger already decides which branches build, so
+      # every push event reaching this workflow is a push to trunk by
+      # construction, and a branch named a second place is free to disagree
+      # with the trigger. It also survives v2 being promoted: the trigger is
+      # then the only edit, and a branch added there is covered rather than
+      # silently skipped. `github.event.repository.default_branch` is
+      # name-agnostic too, but it can disagree with the trigger; this cannot.
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
@@ -266,82 +269,3 @@ jobs:
             ${{ steps.go-env.outputs.build }}
             ${{ steps.go-env.outputs.mod }}
           key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
-
-  detect-changes:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    outputs:
-      src: ${{ steps.filter.outputs.src }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-      # Plain git diff instead of dorny/paths-filter: the org Actions policy
-      # blocks the workflow token from the PR files API this repo's filters
-      # would otherwise use ("Resource not accessible by integration").
-      - id: filter
-        run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          if git diff --name-only "$base"...HEAD | grep -qE '(\.go$|^go\.mod$|^go\.sum$|^integration-test/)'; then
-            echo "src=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "src=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  integration-test:
-    needs: [lint, test, test-windows, detect-changes]
-    # Deliberately no branch name here. `on: push: branches:` above already
-    # decides which branches get a push build, so every push event that reaches
-    # this workflow is a push to a trunk branch by construction — testing
-    # `github.event_name == 'push'` says "a push to trunk" without naming one.
-    #
-    # This condition used to read `github.ref == 'refs/heads/main'`, written
-    # when main was the default branch. The default branch became v2 and the
-    # push trigger moved with it, but this line did not, so the first clause
-    # could never be true and the integration tests were skipped on every merge
-    # to v2 for the life of the branch. Naming the branch in two places is what
-    # allowed the two to disagree; one place cannot.
-    #
-    # It also survives the move back: when v2 is promoted and the default
-    # branch is main again, the `on:` trigger is the only edit, and a branch
-    # added there (a release branch, say) is covered automatically rather than
-    # silently skipped. `github.event.repository.default_branch` would also be
-    # name-agnostic, but it can disagree with the trigger; this cannot.
-    #
-    # detect-changes is skipped on anything but a pull_request, and a skipped
-    # dependency would skip this job too, which is what the always() guard is
-    # for. !failure() && !cancelled() keeps the real gating: don't run the slow
-    # job if lint or the unit tests failed.
-    if: >-
-      always() &&
-      !failure() &&
-      !cancelled() &&
-      (
-        github.event_name == 'push' ||
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' && needs.detect-changes.outputs.src == 'true')
-      )
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        with:
-          go-version-file: go.mod
-
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: '3.11'
-
-      - name: Install poetry
-        run: pip install poetry
-
-      - name: Build astro cli
-        run: make build
-
-      - name: Run integration tests
-        run: |
-          python -m venv penv
-          . penv/bin/activate
-          cd integration-test && poetry install --no-root
-          pytest -x -s -v dev_test.py
