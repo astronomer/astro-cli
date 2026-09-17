@@ -93,8 +93,9 @@ ASTRO_E2E_MAX_TIER ?= 0
 test-e2e:
 	@ASTRO_E2E_MAX_TIER=${ASTRO_E2E_MAX_TIER} bash scripts/test-e2e.sh
 
-# Named because CI asks for it by name: the tier that needs no tools, and the
-# one a change to this repo must never break.
+# Pinned to 0 rather than left to the default above, so an exported
+# ASTRO_E2E_MAX_TIER cannot quietly turn this into a longer run. This is the
+# tier that needs no tools, and the one a change to this repo must never break.
 test-e2e-tier0:
 	@ASTRO_E2E_MAX_TIER=0 bash scripts/test-e2e.sh
 

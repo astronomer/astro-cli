@@ -118,12 +118,65 @@ jobs:
       - name: Run sub-module unit tests
         run: bash scripts/test-submodules.sh
 
-      # Tier 0 of the e2e suite: hermetic, and seconds rather than minutes. It
-      # rides in this job rather than one of its own so that it shares the Go
-      # build cache above; a job of its own would hold a cache of its own and
-      # build the tree from cold.
-      - name: Run e2e tests (tier 0)
-        run: make test-e2e-tier0
+      # The e2e suite rides in this job rather than one of its own so that it
+      # shares the Go build cache above; a job of its own would hold a cache of
+      # its own and build the tree from cold.
+      #
+      # Tier 1 builds a real Airflow environment, so it needs uv — and it needs
+      # uv's downloads to survive between runs: ~220 MB per environment, which
+      # is the difference between this tier taking seconds and taking minutes.
+      # The suite shares that cache deliberately rather than isolating it; see
+      # uvCache in e2e/harness_test.go.
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # The suite is told the cache directory below, so the action's own
+          # caching would be a second copy of the same thing under a different
+          # key.
+          enable-cache: false
+
+      # One place the uv cache directory is written down: exported here, so the
+      # e2e suite reads it from the environment and the restore and save steps
+      # below use it as their path. Guessing it in three places is how they
+      # come to disagree.
+      #
+      # A step rather than the job's `env:`, because that cannot see the runner
+      # context — and absolute rather than `~/...`, because the suite hands the
+      # value to uv as an environment variable and nothing expands a tilde for
+      # a process the way a shell does for a command.
+      - name: Point uv's cache at a path this job restores
+        shell: bash
+        run: echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
+
+      # Restore every run, save only on a trunk push — the same split as the Go
+      # cache above, for the same two reasons: a cache saved on a pull request
+      # is scoped to that request and helps nobody else, and uploading ~220 MB
+      # of wheels is not free.
+      #
+      # UV_CACHE_DIR is set rather than guessed. The suite falls back to
+      # os.UserCacheDir(), which agrees with ~/.cache/uv only while
+      # XDG_CACHE_HOME is unset on the runner — and if a runner image ever set
+      # it, this would cache an empty directory and every tier-1 case would
+      # download from cold with no failing step to say so.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          # Keyed on the file that pins the Airflow tier 1 installs, so a bump
+          # fetches rather than reusing wheels for the old one.
+          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
+          restore-keys: uv-${{ runner.os }}-
+
+      # Both tiers in one run. ASTRO_E2E_MAX_TIER is a ceiling, not a
+      # selection, so a separate tier-0 step before this one ran every tier-0
+      # case twice. That tier 0 needs no uv is still proved, by the Windows job
+      # below: it sets up none and runs tier 0 alone.
+      - name: Run e2e tests (tiers 0 and 1)
+        run: make test-e2e ASTRO_E2E_MAX_TIER=1
+
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
 
       # Last, so it holds everything the steps above built, including the
       # non-race objects the e2e binary needs.

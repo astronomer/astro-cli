@@ -19,8 +19,11 @@
 // variable, rather than failing for want of a tool.
 //
 //	0  hermetic — temp dirs only. No uv, no Docker, no network, no Airflow.
-//	   Runs on every PR, Linux and Windows.
-//	1  needs uv — a real Airflow in a venv, but no Airflow process.
+//	   Runs on every PR, Linux and Windows. `astro package` lives here: it
+//	   builds an artifact out of the project's own files and needs no
+//	   interpreter at all, which the plan had assumed otherwise.
+//	1  needs uv — a real Airflow in a venv, but no Airflow process. Runs on
+//	   every PR on Linux, where uv's download cache is restored between runs.
 //	2  runs a real Airflow — standalone start/stop, ports, readiness.
 //	3  needs Docker.
 //	4  needs cloud credentials.
@@ -40,6 +43,11 @@
 // run the CLI here is through it. Setting ASTRO_HOME alone is the tempting
 // mistake: do that and `astro local list` still lists — and writes — the
 // developer's real projects.
+//
+// One thing is shared on purpose: uv's download cache. Isolating it would have
+// every tier-1 case refill ~220 MB, and it is content-addressed and owned by
+// uv, so sharing it changes how long a case waits and nothing it observes. See
+// uvCache in harness_test.go.
 //
 // The one thing no environment variable moves is the OS keyring. Relocating
 // HOME keeps the vault's *files* in a temp dir, but a `--secret` write would

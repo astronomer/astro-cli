@@ -35,6 +35,41 @@ const commandTimeout = 90 * time.Second
 // astroBin is the binary under test, built once for the whole run.
 var astroBin string
 
+// uvCache is where uv keeps its downloads, captured before any test isolates
+// HOME.
+//
+// It is deliberately NOT isolated, and it is the one thing here that is not.
+// uv's cache lives under XDG_CACHE_HOME (or ~/Library/Caches), both of which a
+// test redirects, so leaving it alone means a case that builds a Python
+// environment refills it: measured at 2.3s and 221 MB per case against 254ms
+// with it shared. It is a content-addressed download cache that uv owns and
+// evicts, so sharing it cannot change what a test observes — only how long it
+// waits.
+//
+// This reaches the uv the SUITE runs (see sync). The uv the CLI runs ignores
+// the variable entirely and needs shareUVCache as well; the two together are
+// what make the whole of tier 1 share one cache.
+//
+// $UV_CACHE_DIR wins when set, which is how CI points it at a path it restores
+// between runs.
+var uvCache string
+
+func init() {
+	if dir := os.Getenv("UV_CACHE_DIR"); dir != "" {
+		uvCache = dir
+		return
+	}
+	// uv's default on Linux and macOS, computed from the real environment
+	// rather than the redirected one a test runs under. On Windows this is
+	// %LOCALAPPDATA%\uv, where uv itself uses %LOCALAPPDATA%\uv\cache — a
+	// cache of our own beside uv's rather than uv's, which costs a Windows
+	// developer one cold fill and nothing else. Tier 1 does not run on Windows
+	// in CI, which is why it is not worth shelling out to uv to ask.
+	if dir, err := os.UserCacheDir(); err == nil {
+		uvCache = filepath.Join(dir, "uv")
+	}
+}
+
 func TestMain(m *testing.M) {
 	code, err := runSuite(m)
 	if err != nil {
@@ -115,12 +150,6 @@ func maxTier(t *testing.T) int {
 
 // tier declares what a test costs to run, and skips it when this run is not
 // paying that much. Call it first in the test.
-//
-// Every case here is tier 0, which is the whole of what the hermetic tier
-// covers. The parameter is what a higher tier passes, and the plumbing that
-// reads it — the Makefile and both CI jobs — is in place for it.
-//
-//nolint:unparam // higher tiers arrive with the cases that need them
 func tier(t *testing.T, n int) {
 	t.Helper()
 	if got := maxTier(t); n > got {
@@ -144,12 +173,46 @@ type project struct {
 func newProject(t *testing.T) *project {
 	t.Helper()
 	base := t.TempDir()
-	return &project{
+	p := &project{
 		t:     t,
 		Dir:   mkdir(t, base, "project"),
 		home:  mkdir(t, base, "home"),
 		cache: mkdir(t, base, "cache"),
 	}
+	p.shareUVCache()
+	return p
+}
+
+// shareUVCache points the CLI's OWN uv cache at the shared one, which setting
+// UV_CACHE_DIR does not do.
+//
+// pkg/uv drops any inherited UV_CACHE_DIR and pins the variable to
+// <astro cache>/uv (see childEnv there, and newUVProvisioner in
+// cmd/local/preflight.go) — deliberately, so the CLI's cache is somewhere it
+// chose. That path is under the XDG_CACHE_HOME this project redirects, so a
+// case that lets the CLI provision an interpreter downloads Airflow into a
+// directory that goes away with the test: measured at ~10s per case, every
+// run, and the CI cache cannot help it.
+//
+// So the astro cache stays isolated and only uv's subdirectory of it is
+// shared. Same bargain as uvCache and for the same reason: uv owns a
+// content-addressed store and evicts it itself, so sharing changes how long a
+// case waits and nothing it observes.
+//
+// Best-effort. A symlink needs a privilege Windows does not grant by default,
+// and a cold cache makes a case slow rather than wrong.
+func (p *project) shareUVCache() {
+	if uvCache == "" {
+		return
+	}
+	if err := os.MkdirAll(uvCache, 0o755); err != nil {
+		return
+	}
+	astroCache := filepath.Join(p.cache, "astro")
+	if err := os.MkdirAll(astroCache, 0o755); err != nil {
+		return
+	}
+	_ = os.Symlink(uvCache, filepath.Join(astroCache, "uv"))
 }
 
 func mkdir(t *testing.T, parts ...string) string {
@@ -165,11 +228,25 @@ func mkdir(t *testing.T, parts ...string) string {
 // configuration reach a test. Dropped by prefix rather than by name, so a new
 // ASTRO_* or AIRFLOW__* setting does not quietly become a dependency of the
 // suite the first time someone exports it.
-var leaky = []string{"ASTRO_", "AIRFLOW_", "XDG_", "HOME", "USERPROFILE", "NO_COLOR"}
+//
+// UV_ and VIRTUAL_ENV are on the list because tier 1 builds a real Python
+// environment: an exported UV_PYTHON, UV_INDEX_URL, UV_NO_CACHE or
+// UV_PROJECT_ENVIRONMENT would steer the .venv six cases then assert against,
+// and an activated VIRTUAL_ENV would capture the install outright — which is
+// the same leak pkg/uv drops the variable for. The one UV_ setting this suite
+// does want, UV_CACHE_DIR, is put back in env below.
+var leaky = []string{
+	"ASTRO_", "AIRFLOW_", "XDG_", "UV_",
+	"HOME", "USERPROFILE", "NO_COLOR", "VIRTUAL_ENV",
+}
 
 // env is the whole environment a command runs with: the ambient one, minus
-// anything that could steer the CLI, plus the isolation levers.
-func (p *project) env() []string {
+// anything that could steer the CLI, plus the isolation levers and extra.
+//
+// extra is applied last, so a case can set one of the variables the list below
+// strips — AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT, say, which decides a
+// threshold a finding is judged against.
+func (p *project) env(extra map[string]string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		key, _, ok := strings.Cut(kv, "=")
@@ -178,7 +255,7 @@ func (p *project) env() []string {
 		}
 		env = append(env, kv)
 	}
-	return append(env,
+	env = append(env,
 		"ASTRO_HOME="+p.home,
 		"XDG_CACHE_HOME="+p.cache,
 		// Both spellings: os.UserHomeDir reads HOME on unix and USERPROFILE on
@@ -195,6 +272,17 @@ func (p *project) env() []string {
 		// writes to the config as a side effect.
 		"ASTRO_TELEMETRY_DISABLED=1",
 	)
+	// See uvCache: shared on purpose. Only when there is a directory to name —
+	// an explicitly empty UV_CACHE_DIR is not the same as an unset one, and uv
+	// may resolve it relative to the working directory, dropping a cache tree
+	// inside the very project `astro package` then walks.
+	if uvCache != "" {
+		env = append(env, "UV_CACHE_DIR="+uvCache)
+	}
+	for k, v := range extra {
+		env = append(env, k+"="+v)
+	}
+	return env
 }
 
 func isLeaky(key string) bool {
@@ -221,6 +309,12 @@ type result struct {
 // this suite are about how the CLI refuses something.
 func (p *project) run(args ...string) *result {
 	p.t.Helper()
+	return p.runWith(nil, args...)
+}
+
+// runWith invokes the CLI with extra environment on top of the isolated set.
+func (p *project) runWith(extra map[string]string, args ...string) *result {
+	p.t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
@@ -228,7 +322,7 @@ func (p *project) run(args ...string) *result {
 	var stdout, stderr strings.Builder
 	cmd := exec.CommandContext(ctx, astroBin, args...)
 	cmd.Dir = p.Dir
-	cmd.Env = p.env()
+	cmd.Env = p.env(extra)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
