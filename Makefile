@@ -37,6 +37,12 @@ lint-submodules:
 		(cd $$mod && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION} run --timeout 5m); \
 	done
 
+# The e2e module needs a run of its own for the same reason the pkg/* ones do,
+# plus --build-tags: every file in it is behind the `e2e` tag, and a linter that
+# cannot see a file reports success on it.
+lint-e2e:
+	cd e2e && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION} run --timeout 5m --build-tags e2e
+
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
@@ -71,6 +77,26 @@ test:
 # never descends into, so their tests need a run of their own.
 test-submodules:
 	@bash scripts/test-submodules.sh
+
+# The e2e suite drives the built binary. See scripts/test-e2e.sh for why it is
+# its own module behind a build tag, and e2e/doc.go for what each tier costs.
+#
+# The ceiling is a variable rather than a target per tier, so that tier 3
+# arriving needs no new plumbing here:
+#
+#   make test-e2e                      # hermetic only, the default
+#   make test-e2e ASTRO_E2E_MAX_TIER=2 # through to a real Airflow
+ASTRO_E2E_MAX_TIER ?= 0
+
+.PHONY: test-e2e test-e2e-tier0
+
+test-e2e:
+	@ASTRO_E2E_MAX_TIER=${ASTRO_E2E_MAX_TIER} bash scripts/test-e2e.sh
+
+# Named because CI asks for it by name: the tier that needs no tools, and the
+# one a change to this repo must never break.
+test-e2e-tier0:
+	@ASTRO_E2E_MAX_TIER=0 bash scripts/test-e2e.sh
 
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init

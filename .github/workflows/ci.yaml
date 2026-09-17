@@ -54,6 +54,9 @@ jobs:
       - name: Run golangci-lint on the sub-modules
         run: make lint-submodules
 
+      - name: Run golangci-lint on the e2e module
+        run: make lint-e2e
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -68,14 +71,44 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Cache Go build and module cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      # Paths from the toolchain rather than written out, so this block is the
+      # same on every runner: GOCACHE is ~/.cache/go-build on Linux and
+      # AppData\Local\go-build on Windows.
+      - id: go-env
+        shell: bash
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      # Restore on every run; save only on a push to trunk.
+      #
+      # The commit belongs in the key because actions/cache will not overwrite
+      # one that already exists. Keyed on go.sum alone the cache freezes at
+      # whatever the first run to populate it built, and anything a later step
+      # needs that the frozen cache does not hold is recompiled on every run
+      # after: the e2e step builds the CLI without -race while the unit tests
+      # reuse -race objects, so on this runner the difference is 228s against
+      # 7s for the e2e step and 131s against 67s for the tests.
+      #
+      # A key carrying the commit also saves on every commit, and saving costs
+      # 28s here and 507s on Windows — more than the recompile it avoids.
+      # Restoring is the cheap half, so every run restores and only a trunk
+      # push pays to refresh what the next run reads.
+      #
+      # `github.event_name == 'push'` rather than a branch name, for the reason
+      # spelled out on the integration-test job below: the `on: push` trigger
+      # already decides which branches build, so every push event here is a
+      # push to trunk by construction, and naming the branch a second place is
+      # what lets the two disagree.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: go-test-${{ runner.os }}-
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
+            go-test-${{ runner.os }}-
 
       - name: Run unit tests
         env:
@@ -84,6 +117,29 @@ jobs:
 
       - name: Run sub-module unit tests
         run: bash scripts/test-submodules.sh
+
+      # Tier 0 of the e2e suite: hermetic, and seconds rather than minutes. It
+      # rides in this job rather than one of its own so that it shares the Go
+      # build cache above; a job of its own would hold a cache of its own and
+      # build the tree from cold.
+      - name: Run e2e tests (tier 0)
+        run: make test-e2e-tier0
+
+      # Last, so it holds everything the steps above built, including the
+      # non-race objects the e2e binary needs.
+      #
+      # Runs even when a step above failed. The objects were already compiled
+      # by the time this is reached, and they are just as valid after a test
+      # failure — while discarding them means every pull request opened after a
+      # red trunk push restores the run before it and recompiles the difference,
+      # until the next green one.
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
@@ -97,9 +153,33 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # cache: false and a cache of this job's own, for the reasons written out
+      # in the `test` job above. setup-go's built-in cache has the same
+      # write-once key problem, and here it was the only cache in the job.
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
+          cache: false
+
+      - id: go-env
+        shell: bash
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      # Restore every run, save only on a trunk push — see the test job above
+      # for why, and for the numbers. Saving here costs 507s, against the 306s
+      # of recompiling it avoids, so a key that rotated on every commit would
+      # be slower than the bug it fixed.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
+            go-test-${{ runner.os }}-
 
       - name: Run unit tests
         env:
@@ -114,6 +194,25 @@ jobs:
       - name: Run sub-module unit tests
         shell: bash
         run: bash scripts/test-submodules.sh
+
+      # The CLI-level tests ran on Linux only until now, which left the
+      # scaffolding and path handling most likely to differ here unexercised
+      # end to end. bash, not make: the runner has Git Bash and no GNU make.
+      - name: Run e2e tests (tier 0)
+        shell: bash
+        run: bash scripts/test-e2e.sh
+
+      # Last, so it holds the non-race objects the e2e binary needs alongside
+      # the -race ones the tests above built. Runs after a failure too, for the
+      # reason given on the same step in the `test` job — and it matters more
+      # here, where saving costs 507s and the recompile it avoids costs 306s.
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
 
   detect-changes:
     if: github.event_name == 'pull_request'

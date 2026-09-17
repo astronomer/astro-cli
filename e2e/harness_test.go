@@ -1,0 +1,296 @@
+//go:build e2e
+
+package e2e
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+)
+
+// testVersion is stamped into the binary under test.
+//
+// A fixed value makes `astro version` assertable, but the shape is the load
+// bearing part: the CLI's pre-run hook compares its version against the release
+// list on every command, over the network, unless the version reads as a
+// snapshot. Stamp this "1.45.0" and the whole suite grows an HTTP request per
+// command, each with a three-second timeout, against a service that has nothing
+// to do with what is being tested.
+const testVersion = "SNAPSHOT-e2e"
+
+// commandTimeout bounds a single CLI invocation. A hung command should fail its
+// own test with its output, rather than run down the whole suite's -timeout and
+// take every other case's diagnosis with it.
+const commandTimeout = 90 * time.Second
+
+// astroBin is the binary under test, built once for the whole run.
+var astroBin string
+
+func TestMain(m *testing.M) {
+	code, err := runSuite(m)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e:", err)
+		os.Exit(1)
+	}
+	os.Exit(code)
+}
+
+// runSuite exists so the build's temp directory can be cleaned up with a defer,
+// which os.Exit in TestMain would otherwise skip.
+func runSuite(m *testing.M) (int, error) {
+	dir, err := os.MkdirTemp("", "astro-e2e-bin")
+	if err != nil {
+		return 0, fmt.Errorf("making a directory for the binary: %w", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := buildAstro(dir); err != nil {
+		return 0, err
+	}
+	return m.Run(), nil
+}
+
+// buildAstro builds the CLI from the repository this module sits in.
+func buildAstro(dir string) error {
+	root, err := repoRoot()
+	if err != nil {
+		return err
+	}
+	name := "astro"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	astroBin = filepath.Join(dir, name)
+
+	ldflags := "-X github.com/astronomer/astro-cli/version.CurrVersion=" + testVersion
+	// Package mode ("." rather than main.go), which is how the binary is
+	// released. File mode also disables the toolchain's VCS stamping, so a
+	// build made that way answers differently about its own version.
+	cmd := exec.Command("go", "build", "-o", astroBin, "-ldflags", ldflags, ".")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("building the CLI: %w\n%s", err, out)
+	}
+	return nil
+}
+
+// repoRoot is this module's parent directory, checked rather than assumed: a
+// wrong answer here builds nothing and reports it as a test failure.
+func repoRoot() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("resolving the working directory: %w", err)
+	}
+	root := filepath.Dir(wd)
+	if _, err := os.Stat(filepath.Join(root, "main.go")); err != nil {
+		return "", fmt.Errorf("expected the root module at %s, found no main.go: %w", root, err)
+	}
+	return root, nil
+}
+
+// maxTier is the highest tier this run executes. See the package doc.
+func maxTier(t *testing.T) int {
+	t.Helper()
+	raw := os.Getenv("ASTRO_E2E_MAX_TIER")
+	if raw == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		// Not a skip: a typo here would silently run the hermetic tier and
+		// report green for a suite the caller believed covered Docker.
+		t.Fatalf("ASTRO_E2E_MAX_TIER=%q is not a number", raw)
+	}
+	return n
+}
+
+// tier declares what a test costs to run, and skips it when this run is not
+// paying that much. Call it first in the test.
+//
+// Every case here is tier 0, which is the whole of what the hermetic tier
+// covers. The parameter is what a higher tier passes, and the plumbing that
+// reads it — the Makefile and both CI jobs — is in place for it.
+//
+//nolint:unparam // higher tiers arrive with the cases that need them
+func tier(t *testing.T, n int) {
+	t.Helper()
+	if got := maxTier(t); n > got {
+		t.Skipf("tier %d: this run stops at %d (raise it with ASTRO_E2E_MAX_TIER)", n, got)
+	}
+}
+
+// project is one isolated place to run the CLI: a working directory, plus the
+// three levers that keep the run out of the developer's real state.
+type project struct {
+	t *testing.T
+	// Dir is the working directory commands run in.
+	Dir string
+	// home backs both ASTRO_HOME and HOME, as they coincide in the real thing.
+	home  string
+	cache string
+}
+
+// newProject returns an isolated project directory. Everything it creates is
+// under the test's own temp directory, so it goes away with the test.
+func newProject(t *testing.T) *project {
+	t.Helper()
+	base := t.TempDir()
+	return &project{
+		t:     t,
+		Dir:   mkdir(t, base, "project"),
+		home:  mkdir(t, base, "home"),
+		cache: mkdir(t, base, "cache"),
+	}
+}
+
+func mkdir(t *testing.T, parts ...string) string {
+	t.Helper()
+	dir := filepath.Join(parts...)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("making %s: %v", dir, err)
+	}
+	return dir
+}
+
+// leaky names the environment variables that would let the developer's own
+// configuration reach a test. Dropped by prefix rather than by name, so a new
+// ASTRO_* or AIRFLOW__* setting does not quietly become a dependency of the
+// suite the first time someone exports it.
+var leaky = []string{"ASTRO_", "AIRFLOW_", "XDG_", "HOME", "USERPROFILE", "NO_COLOR"}
+
+// env is the whole environment a command runs with: the ambient one, minus
+// anything that could steer the CLI, plus the isolation levers.
+func (p *project) env() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		key, _, ok := strings.Cut(kv, "=")
+		if !ok || isLeaky(key) {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env,
+		"ASTRO_HOME="+p.home,
+		"XDG_CACHE_HOME="+p.cache,
+		// Both spellings: os.UserHomeDir reads HOME on unix and USERPROFILE on
+		// Windows, and it is what the vault resolves through.
+		"HOME="+p.home,
+		"USERPROFILE="+p.home,
+		// Assertions are on text and JSON, not on escape sequences.
+		"NO_COLOR=1",
+		// Not optional. The CLI's own guard against tracking its test runs
+		// recognizes a Go test binary by its ".test" suffix, and this suite
+		// drives a binary named "astro" — so without this, every case spawns a
+		// sender and posts an event to production analytics. It also suppresses
+		// the first-run notice, which is printed from the same code path and
+		// writes to the config as a side effect.
+		"ASTRO_TELEMETRY_DISABLED=1",
+	)
+}
+
+func isLeaky(key string) bool {
+	upper := strings.ToUpper(key)
+	for _, l := range leaky {
+		if upper == l || (strings.HasSuffix(l, "_") && strings.HasPrefix(upper, l)) {
+			return true
+		}
+	}
+	return false
+}
+
+// result is what one CLI invocation produced.
+type result struct {
+	t        *testing.T
+	Args     []string
+	Stdout   string
+	Stderr   string
+	ExitCode int
+}
+
+// run invokes the CLI in this project and returns what happened. A command
+// failing is data, not a test failure — most of the interesting assertions in
+// this suite are about how the CLI refuses something.
+func (p *project) run(args ...string) *result {
+	p.t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+
+	var stdout, stderr strings.Builder
+	cmd := exec.CommandContext(ctx, astroBin, args...)
+	cmd.Dir = p.Dir
+	cmd.Env = p.env()
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	r := &result{t: p.t, Args: args, Stdout: stdout.String(), Stderr: stderr.String()}
+
+	switch {
+	case err == nil:
+	case ctx.Err() != nil:
+		p.t.Fatalf("`astro %s` did not finish within %s\n%s", strings.Join(args, " "), commandTimeout, r.output())
+	default:
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
+			p.t.Fatalf("running `astro %s`: %v", strings.Join(args, " "), err)
+		}
+		r.ExitCode = exit.ExitCode()
+	}
+	return r
+}
+
+// output is both streams, labeled, for a failure message. Which stream a
+// message lands on is itself often what is being asserted, so a failure should
+// show both rather than leave the reader guessing.
+func (r *result) output() string {
+	return fmt.Sprintf("--- exit %d\n--- stdout\n%s\n--- stderr\n%s", r.ExitCode, r.Stdout, r.Stderr)
+}
+
+// requireFailure asserts the command failed, which for this CLI is the point of
+// most of the cases here.
+func (r *result) requireFailure() *result {
+	r.t.Helper()
+	if r.ExitCode == 0 {
+		r.t.Fatalf("`astro %s` succeeded; it must fail\n%s", strings.Join(r.Args, " "), r.output())
+	}
+	return r
+}
+
+// requireSuccess asserts the command succeeded.
+func (r *result) requireSuccess() *result {
+	r.t.Helper()
+	if r.ExitCode != 0 {
+		r.t.Fatalf("`astro %s` failed\n%s", strings.Join(r.Args, " "), r.output())
+	}
+	return r
+}
+
+// requireStderr asserts a message reached stderr. The stream matters: guidance
+// a script is meant to notice must not be on stdout, where `--output json`
+// consumers parse.
+func (r *result) requireStderr(want string) *result {
+	r.t.Helper()
+	if !strings.Contains(r.Stderr, want) {
+		r.t.Errorf("stderr does not contain %q\n%s", want, r.output())
+	}
+	return r
+}
+
+// requireJSON decodes stdout into v. It asserts on the way that stdout is
+// *only* the payload: a stray log line or banner is what breaks a consumer.
+func (r *result) requireJSON(v any) {
+	r.t.Helper()
+	if err := json.Unmarshal([]byte(r.Stdout), v); err != nil {
+		r.t.Fatalf("stdout is not the JSON payload it claims to be: %v\n%s", err, r.output())
+	}
+}
