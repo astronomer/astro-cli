@@ -32,6 +32,11 @@ type Runtime struct {
 	// own clock for the records they write; this is the same seam for the
 	// records Claim writes, which have no engine behind them.
 	now func() time.Time
+	// containersGone confirms a docker project's containers are really absent
+	// before --clean drops its record. A field for the same reason now is
+	// one: the answer comes from outside the process, and a test that needs
+	// no engine to be reachable cannot make the machine it runs on have none.
+	containersGone func(context.Context, string) (bool, error)
 }
 
 // Config is what a consumer supplies to build a Runtime. Nothing here is
@@ -54,11 +59,13 @@ type Config struct {
 
 // New returns a Runtime configured by cfg.
 func New(cfg Config) *Runtime {
+	docker := localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images)
 	return &Runtime{
-		docker:     localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images),
-		standalone: localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon),
-		routes:     proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
-		now:        time.Now,
+		docker:         docker,
+		standalone:     localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon),
+		routes:         proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
+		now:            time.Now,
+		containersGone: docker.ContainersGone,
 	}
 }
 
@@ -296,7 +303,26 @@ func (r *Runtime) PruneStale() ([]Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	return r.pruneAll(statuses)
+}
+
+// pruneAll is PruneStale's loop over statuses already read. Separate because
+// List reaches a container engine to judge docker liveness, and what this
+// does with a failure is worth testing without one.
+func (r *Runtime) pruneAll(statuses []Status) ([]Status, error) {
 	var removed []Status
+	// Best-effort, and deliberately so: this is the command someone reaches
+	// for when the records are already in a state nobody intended, and
+	// returning on the first failure meant one unremovable record hid every
+	// other stale one behind it. What could be pruned is pruned, and what
+	// could not is reported at the end.
+	var errs []error
+	// ContainersGone fails only when no engine is reachable at all, which is
+	// one thing wrong with the machine rather than one thing wrong per
+	// record. Asked once: the engine will not come back inside this loop, and
+	// reporting it once beats the same sentence with a different path after
+	// it, each costing another probe timeout.
+	var engineErr error
 	for i := range statuses {
 		st := &statuses[i]
 		if st.State == StateRunning {
@@ -307,24 +333,42 @@ func (r *Runtime) PruneStale() ([]Status, error) {
 		// the daemon must not wipe a running project's record. Standalone
 		// liveness is a syscall, so its stopped verdict is trusted as-is.
 		if st.Mode == ModeDocker {
-			gone, cerr := r.docker.ContainersGone(context.Background(), st.ProjectPath)
-			if cerr != nil || !gone {
+			if engineErr != nil {
+				continue
+			}
+			gone, cerr := r.containersGone(context.Background(), st.ProjectPath)
+			if cerr != nil {
+				// Not knowing is not the same as nothing to do. Unreported,
+				// --clean says "no stale records to remove" when what
+				// happened is that it could not go look.
+				engineErr = cerr
+				errs = append(errs, cerr)
+				continue
+			}
+			if !gone {
 				continue
 			}
 		}
 		// Drop the route first, while the record still backs it, then the
 		// record. Removing an absent record is not an error.
+		//
+		// A route that will not drop does not keep the record: the route
+		// already names a runtime that is not there and holding the record
+		// cannot revive it, while a routes file that always fails to write
+		// would otherwise make every record unprunable for good. Reported,
+		// and the record still goes.
 		if st.Hostname != "" {
 			if _, rerr := r.routes.RemoveRoute(st.Hostname); rerr != nil {
-				return removed, rerr
+				errs = append(errs, fmt.Errorf("removing route %s: %w", st.Hostname, rerr))
 			}
 		}
 		if rerr := localstate.Remove(st.ProjectPath); rerr != nil {
-			return removed, rerr
+			errs = append(errs, fmt.Errorf("removing record for %s: %w", st.ProjectPath, rerr))
+			continue
 		}
 		removed = append(removed, *st)
 	}
-	return removed, nil
+	return removed, errors.Join(errs...)
 }
 
 // modeLabel is how a mode is named in a message to a person.

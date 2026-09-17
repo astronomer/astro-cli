@@ -2,6 +2,7 @@ package local
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -15,10 +16,15 @@ type stubRuntime struct {
 	fakeRuntime
 	list   []localrt.Status
 	pruned []localrt.Status
+	// pruneErr rides along with pruned, because PruneStale is best-effort:
+	// what it removed and what it could not are both true at once.
+	pruneErr error
 }
 
-func (s stubRuntime) List() ([]localrt.Status, error)       { return s.list, nil }
-func (s stubRuntime) PruneStale() ([]localrt.Status, error) { return s.pruned, nil }
+func (s stubRuntime) List() ([]localrt.Status, error) { return s.list, nil }
+func (s stubRuntime) PruneStale() ([]localrt.Status, error) {
+	return s.pruned, s.pruneErr
+}
 
 // ReadStatus answers from the same records List does, so a case that says an
 // Airflow is running says it once and every reader agrees. Paths are compared
@@ -141,5 +147,34 @@ func TestListCleanReportsRemoved(t *testing.T) {
 	text := out.String()
 	if !strings.Contains(text, "Removed 1 stale record") || !strings.Contains(text, "/proj/b") {
 		t.Errorf("clean output should name what it removed:\n%s", text)
+	}
+}
+
+// A prune that partly worked says so, rather than reporting only the error.
+//
+// PruneStale is best-effort: it removes what it can and reports what it
+// cannot, so the two are not alternatives. Returning the error alone told
+// someone nothing had happened when records had in fact been removed — and
+// they would rerun --clean against records it had already cleaned and read the
+// identical error as meaning it still did nothing.
+func TestListCleanReportsWhatItRemovedAlongsideWhatItCouldNot(t *testing.T) {
+	d, out := testDeps(t)
+	d.Runtime = stubRuntime{
+		pruned: []localrt.Status{
+			{ProjectPath: "/proj/b", Mode: localrt.ModeStandalone, State: localrt.StateStopped},
+		},
+		pruneErr: errors.New("removing record for /proj/stuck: permission denied"),
+	}
+
+	err := execute(t, d, "local", "list", "--clean")
+	if err == nil {
+		t.Fatal("the record it could not remove has to reach the exit status")
+	}
+	if !strings.Contains(err.Error(), "/proj/stuck") {
+		t.Errorf("the error should name what it could not remove: %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "Removed 1 stale record") || !strings.Contains(text, "/proj/b") {
+		t.Errorf("what it did remove should still be reported:\n%s", text)
 	}
 }

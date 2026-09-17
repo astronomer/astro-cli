@@ -23,6 +23,8 @@ import (
 
 const (
 	recordFile = "runtime.json"
+	// projectsDir holds one directory per project under the cache root.
+	projectsDir = "projects"
 	// dirPerm/filePerm are owner-only, matching userstate: runtime state
 	// should not be readable by other users on the machine.
 	dirPerm  = 0o700
@@ -141,41 +143,136 @@ func loadFrom(path string) (Record, error) {
 // error, so stop paths stay idempotent.
 func Remove(projectPath string) error {
 	dir, err := rt.StateDir(projectPath)
+	switch {
+	case err == nil:
+		rerr := os.Remove(filepath.Join(dir, recordFile))
+		if rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+			return rerr
+		}
+		return nil
+
+	case errors.Is(err, fs.ErrNotExist):
+		// The project directory is gone, so it cannot say where its own record
+		// is: the state directory is keyed by the hash of the RESOLVED path
+		// (see Record.ProjectPath), and resolving symlinks needs the directory
+		// to exist.
+		//
+		// That is exactly the record most worth removing, and the one
+		// `astro local list --clean` exists to remove — a deleted worktree
+		// leaves one behind. Deriving the location failed for the one reason
+		// that means "deleted", so find the record by what it says about
+		// itself instead.
+		return removeByProjectPath(projectPath)
+
+	default:
+		// Any other failure to derive the location — a permission denial, a
+		// symlink loop — is a real problem and not this fallback's business.
+		// Scanning might still find a record, but reporting success would
+		// claim a removal we have no reason to believe happened.
+		return err
+	}
+}
+
+// removeByProjectPath deletes the record claiming projectPath, found by
+// scanning instead of by deriving its location.
+//
+// Slower than the keyed lookup and used only where that cannot work, which is
+// why a record stores the path at all. A handful of directories, each read
+// once — one per local Airflow project that has ever been started on the
+// machine.
+//
+// A prune of several gone projects repeats the scan per project, which is
+// quadratic on paper. Left that way on purpose: the set is tens of small
+// files, and sharing one read across calls would mean threading a cache
+// through a package-level function to save a few stats.
+//
+// It removes the whole state directory, not just the record. Nothing can name
+// that directory again once the project is gone — the key cannot be derived
+// and cannot be inverted — so anything still in it (an airflow.log that grew
+// for as long as the project ran) would be unreachable bytes kept forever.
+func removeByProjectPath(projectPath string) error {
+	want := canonical(projectPath)
+	var found string
+	err := eachRecord(func(file string, rec Record) bool {
+		if canonical(rec.ProjectPath) != want {
+			return true
+		}
+		found = file
+		return false
+	})
 	if err != nil {
 		return err
 	}
-	err = os.Remove(filepath.Join(dir, recordFile))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+	if found == "" {
+		// Nothing claims it, so there is nothing to remove. Consistent with
+		// the keyed path, where removing an absent record is not an error.
+		return nil
+	}
+	if rerr := os.RemoveAll(filepath.Dir(found)); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+		return rerr
 	}
 	return nil
 }
 
-// List returns every runtime record on this machine, by scanning the
-// per-project state directories under the cache root. Unparseable records
-// are skipped: a corrupt file must not hide every other project.
-func List() ([]Record, error) {
+// canonical is how two spellings of one project path are compared. Records
+// are written with the path the caller used, so the same project can be
+// recorded as /p, /p/, or a relative path from a since-changed directory.
+// Symlinks are deliberately NOT resolved: this is for paths that no longer
+// exist, where resolving is what failed in the first place.
+func canonical(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	return abs
+}
+
+// eachRecord calls fn for every record on this machine, with the file it was
+// read from, stopping early if fn returns false. It is the one walk of the
+// per-project state directories under the cache root: List reports them,
+// removeByProjectPath searches them.
+//
+// Unparseable records are skipped: a corrupt file must not hide every other
+// project.
+func eachRecord(fn func(file string, rec Record) bool) error {
 	root, err := rt.CacheRoot()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	entries, err := os.ReadDir(filepath.Join(root, "projects"))
+	projects := filepath.Join(root, projectsDir)
+	entries, err := os.ReadDir(projects)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("scanning project state: %w", err)
+		return fmt.Errorf("scanning project state: %w", err)
 	}
-	var recs []Record
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
-		rec, err := loadFrom(filepath.Join(root, "projects", e.Name(), recordFile))
-		if err != nil {
+		file := filepath.Join(projects, e.Name(), recordFile)
+		rec, lerr := loadFrom(file)
+		if lerr != nil {
 			continue
 		}
+		if !fn(file, rec) {
+			return nil
+		}
+	}
+	return nil
+}
+
+// List returns every runtime record on this machine. Unparseable records are
+// skipped, so a corrupt file never hides every other project — which means a
+// short list is not proof that nothing else is running.
+func List() ([]Record, error) {
+	var recs []Record
+	if err := eachRecord(func(_ string, rec Record) bool {
 		recs = append(recs, rec)
+		return true
+	}); err != nil {
+		return nil, err
 	}
 	return recs, nil
 }

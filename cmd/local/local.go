@@ -539,13 +539,17 @@ func (c *cli) runList(all, clean bool) error {
 }
 
 func (c *cli) runListClean(r Renderer) error {
-	removed, err := c.d.Runtime.PruneStale()
-	if err != nil {
-		return err
-	}
+	// PruneStale is best-effort, so a failure and a removal are not
+	// alternatives: report both, or someone told only "Error: ..." reruns the
+	// command against records it already cleaned and reads the same error as
+	// having done nothing.
+	removed, pruneErr := c.d.Runtime.PruneStale()
 	// Everything PruneStale returns is stale by definition; show it all.
 	rows := buildListRows(removed, true, time.Now())
-	return emitRows(r, rows, renderRemovedRows)
+	if err := emitRows(r, rows, renderRemovedRows); err != nil {
+		return errors.Join(err, pruneErr)
+	}
+	return pruneErr
 }
 
 // State labels for a list row. Stale means the record outlived its runtime.
