@@ -196,7 +196,7 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 	if _, err := os.Stat(python); err != nil {
 		return ParseReport{}, fmt.Errorf(
 			"no Python found at %s — run `astro local start` to build the project environment first: %w",
-			python, ErrEnvNotReady,
+			python, ErrNoInterpreter,
 		)
 	}
 	return r.parseWith(ctx, python, in)

@@ -64,9 +64,15 @@ func targetDeps(t *testing.T) (Deps, *bytes.Buffer) {
 type fakeProvisioner struct {
 	python     string
 	resolveErr error
+	// got records the spec it was handed, for a test that cares which
+	// environment was asked for rather than only that one was.
+	got *checks.VenvSpec
 }
 
-func (f *fakeProvisioner) EnsureVenv(_ context.Context, _ checks.VenvSpec, progress func(string)) (string, error) {
+func (f *fakeProvisioner) EnsureVenv(_ context.Context, spec checks.VenvSpec, progress func(string)) (string, error) {
+	if f.got != nil {
+		*f.got = spec
+	}
 	progress("provisioning")
 	return f.python, nil
 }

@@ -111,10 +111,15 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// thing. Same project, two tools, two different images, and the one
 			// that dropped the user's RUN steps was this one.
 			Dockerfile: m.Astro.Dockerfile,
-			// PythonVersion is left empty on purpose: uv resolves the
-			// interpreter from the manifest's requires-python, so a specifier
-			// like ">=3.10" never reaches uv's --python, which wants a
-			// concrete version.
+			// PythonVersion is left empty on purpose: the venv is built
+			// inside the project, so uv reads requires-python from the
+			// manifest itself and there is nothing to pass.
+			//
+			// Not because a specifier could not be passed — uv accepts one as
+			// an interpreter request, and checks.RunProvisioned relies on that
+			// for the venv it builds OUTSIDE a project, where uv cannot see
+			// the manifest. Here it would only restate what uv is about to
+			// read.
 			StopWithSession: opts.StopWithSession,
 			Env:             env,
 			// The vault's values, kept out of Env on purpose: docker mode

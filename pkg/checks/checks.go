@@ -18,7 +18,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -98,6 +100,19 @@ const ParseTimeWarnThreshold = time.Duration(float64(defaultAirflowImportTimeout
 // check can inspect: the .venv is missing, or Airflow is not installed in it.
 // The caller maps it to ExitEnvNotReady.
 var ErrEnvNotReady = errors.New("project environment is not ready to check")
+
+// ErrNoInterpreter is the narrower case: the project has no interpreter at
+// all, as opposed to one whose Airflow will not import.
+//
+// The two are worth telling apart because only the first is safe to answer by
+// building an environment. A project whose own .venv is broken would otherwise
+// be checked against a freshly resolved one and reported clean, while the
+// Airflow it actually runs stays broken — a green check for a project that
+// cannot start.
+//
+// It wraps ErrEnvNotReady, so a caller that only cares that no verdict was
+// reached keeps working unchanged.
+var ErrNoInterpreter = fmt.Errorf("%w: no interpreter", ErrEnvNotReady)
 
 // Severity ranks a finding. Errors fail the run; warnings fail it only under
 // --strict.
@@ -196,6 +211,101 @@ func Run(ctx context.Context, opts Options, parser Parser) (Result, error) {
 		return Result{}, fmt.Errorf("%s: %w", report.Fatal, ErrEnvNotReady)
 	}
 	return evaluate(report), nil
+}
+
+// ProvisionInput is what a provisioned check needs about the project: enough
+// to build an environment equivalent to the one the project would build for
+// itself.
+type ProvisionInput struct {
+	ProjectPath string
+	DagsDir     string
+	// Pin is the manifest's [tool.astro] airflow, used when the dependencies
+	// do not name Airflow themselves.
+	Pin string
+	// Deps is the manifest's [project] dependencies.
+	Deps []string
+	// RequiresPython is the manifest's [project] requires-python, passed to the
+	// provisioner as its interpreter request.
+	RequiresPython string
+}
+
+// RunProvisioned inspects a project's DAGs with an interpreter it builds, for
+// a project that has none of its own.
+//
+// A project has a .venv because something built one, and only `astro local
+// start` in standalone mode does: a docker-mode project keeps its dependencies
+// in the image and never writes one, so a check there had nothing to parse
+// with. The environment is the same cached scratch venv a target check uses,
+// through the same Provisioner, so uv is discovered the way every other uv in
+// this CLI is. Nothing is written into the project.
+//
+// It builds the spec here rather than taking one, so that this path and
+// Preflight cannot drift on the two decisions that matter: that Airflow is in
+// the requirement set at all, and that the set is sorted so the cache key over
+// it is stable.
+func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov Provisioner, parser TargetParser, progress func(string)) (Result, error) {
+	// A consumer with nowhere to stream notes passes nil, the way Preflight
+	// allows: Astro Desktop has no text renderer.
+	if progress == nil {
+		progress = func(string) {}
+	}
+	python, err := prov.EnsureVenv(ctx, VenvSpec{
+		Airflow: in.Pin,
+		Python:  in.RequiresPython,
+		Reqs:    projectRequirements(in.Pin, in.Deps),
+	}, progress)
+	if err != nil {
+		return Result{}, err
+	}
+	return Run(ctx, opts, withInterpreter{python: python, parser: parser})
+}
+
+// projectRequirements is what to install to reproduce the project's own
+// environment: its dependencies as written, with Airflow added when they do
+// not name it.
+//
+// As written, because the manifest already states Airflow in the shape the
+// project means — "apache-airflow==3.1.*" — and rebuilding that from the pin
+// would ask for "apache-airflow==3.1", which is not a release. Added when
+// absent, because a manifest need not name Airflow at all: a docker project
+// declaring its own Dockerfile builds the image from that file, and the
+// dependency list stops describing it. Installing nothing called Airflow would
+// spend a long download to arrive at "Airflow is not importable".
+//
+// Sorted for the same reason requirementSet sorts: the provisioner's cache key
+// hashes this slice in order, so two runs that differ only in the order of
+// pyproject.toml's lines would otherwise miss the cache and rebuild.
+func projectRequirements(pin string, deps []string) []string {
+	out := append([]string{}, deps...)
+	if !slices.ContainsFunc(out, func(d string) bool { return distName(d) == airflowDist }) {
+		out = append(out, airflowRequirement(pin))
+	}
+	sort.Strings(out)
+	return out
+}
+
+// airflowRequirement is the requirement that installs the Airflow a pin names.
+// A partial pin ("3", "3.1") is a series, so it becomes a prefix match; a full
+// one is exact. It mirrors pkg/scaffold.airflowRequirement, which writes the
+// entry this reads back — the two stay separate rather than couple a cmd-layer
+// package to the scaffold.
+func airflowRequirement(pin string) string {
+	if strings.Count(pin, ".") < 2 {
+		return airflowDist + "==" + pin + ".*"
+	}
+	return airflowDist + "==" + pin
+}
+
+// withInterpreter adapts a TargetParser and a chosen interpreter into the
+// Parser Run takes, so a provisioned check runs through the same evaluation as
+// every other one rather than a second copy of it.
+type withInterpreter struct {
+	python string
+	parser TargetParser
+}
+
+func (w withInterpreter) Parse(ctx context.Context, in ParseInput) (ParseReport, error) {
+	return w.parser.ParseWith(ctx, w.python, in)
 }
 
 // evaluate turns a raw parse report into findings and counts. It is pure so it

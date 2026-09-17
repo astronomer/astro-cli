@@ -67,11 +67,12 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	// problem is certain, cheap and offline, while a missing venv is expensive
 	// to fix and may not be the real problem. It also makes `--target astro` a
 	// true alias for a plain check, since that path loads the manifest too.
-	if _, err := manifest.Load(filepath.Join(project, manifest.Marker)); err != nil {
+	m, err := manifest.Load(filepath.Join(project, manifest.Marker))
+	if err != nil {
 		return blocked(r, err)
 	}
 
-	res, err := checks.Run(ctx, checks.Options{ProjectPath: project, Strict: strict}, c.d.Checks)
+	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict}, m)
 	if err != nil {
 		if errors.Is(err, checks.ErrEnvNotReady) {
 			return blocked(r, err)
@@ -79,7 +80,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		return err
 	}
 
-	if err := renderCheck(r, res, strict); err != nil {
+	if err := renderCheck(r, res, strict, provisioned); err != nil {
 		return err
 	}
 	if code := res.ExitCode(strict); code != checks.ExitOK {
@@ -136,7 +137,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 func (c *cli) checkTarget(ctx context.Context, target, project string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
 	progress := c.progressFn(r, target)
 	if target == checks.TargetAstro {
-		return c.checkAstroTarget(ctx, project, m, strict)
+		return c.checkAstroTarget(ctx, project, m, r, strict)
 	}
 
 	prov, err := c.provisioner(ctx)
@@ -154,16 +155,19 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, m *manife
 // checkAstroTarget runs the plain project-venv check and shapes it as a target
 // report, so --target astro reads uniformly beside the platform targets. Its
 // verdict, findings, and env-not-ready handling are today's check exactly.
-func (c *cli) checkAstroTarget(ctx context.Context, project string, m *manifest.Manifest, strict bool) checks.TargetReport {
+func (c *cli) checkAstroTarget(ctx context.Context, project string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
 	rep := checks.TargetReport{
 		Target:         checks.TargetAstro,
 		AirflowChecked: m.Astro.AirflowVersion,
 		Notes:          []string{"astro runs your project's own Airflow; this is the default `astro local check`"},
 	}
-	res, err := checks.Run(ctx, checks.Options{ProjectPath: project, Strict: strict}, c.d.Checks)
+	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict}, m)
 	if err != nil {
 		rep.OpError = err.Error()
 		return rep
+	}
+	if provisioned {
+		rep.Notes = append(rep.Notes, "checked in an environment built from the manifest; this project has none of its own")
 	}
 	rep.Findings = res.Findings
 	if rep.Findings == nil {
@@ -173,6 +177,63 @@ func (c *cli) checkAstroTarget(ctx context.Context, project string, m *manifest.
 	rep.Errors = res.Errors
 	rep.Warnings = res.Warnings
 	return rep
+}
+
+// check runs the project's DAG checks, building an interpreter first when the
+// project has none of its own.
+//
+// One function because `--target astro` is documented as an alias for the
+// plain check and has to stay one: routing only the plain path through the
+// fallback would have a docker-mode project pass here and report "environment
+// not ready" there, for the same project in the same state.
+func (c *cli) check(ctx context.Context, r Renderer, opts checks.Options, m *manifest.Manifest) (res checks.Result, provisioned bool, err error) {
+	res, err = checks.Run(ctx, opts, c.d.Checks)
+	// Only "there is no interpreter". ErrEnvNotReady also covers one whose
+	// Airflow will not import, and building a fresh environment for that would
+	// check the project against dependencies it does not have installed — a
+	// green check for a project whose own environment is broken.
+	if errors.Is(err, checks.ErrNoInterpreter) {
+		res, err = c.checkWithBuiltEnv(ctx, r, opts, m)
+		return res, true, err
+	}
+	return res, false, err
+}
+
+// checkWithBuiltEnv runs the check against an interpreter built for it.
+//
+// A provisioning failure is reported as ErrEnvNotReady joined with what went
+// wrong, and joined with the reason there was no interpreter to begin with:
+// "no uv on this machine" alone leaves out that a start would also have fixed
+// this, which for a standalone project is the shorter road.
+func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Options, m *manifest.Manifest) (checks.Result, error) {
+	prov, err := c.provisioner(ctx)
+	if err != nil {
+		return checks.Result{}, errors.Join(noInterpreter(opts.ProjectPath), err)
+	}
+	res, err := checks.RunProvisioned(ctx, opts, checks.ProvisionInput{
+		ProjectPath:    opts.ProjectPath,
+		DagsDir:        checks.DefaultDagsDir(opts.ProjectPath),
+		Pin:            m.Astro.AirflowVersion,
+		Deps:           m.Project.Dependencies,
+		RequiresPython: m.Project.RequiresPython,
+	}, prov, c.d.CheckVenv, c.progressFn(r, "check"))
+	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {
+		// An operational failure of the parse itself is not an environment
+		// problem, and relabelling it as one would give the same crash a
+		// different exit code here than it gets against a project's own venv.
+		return checks.Result{}, err
+	}
+	if err != nil {
+		return checks.Result{}, errors.Join(noInterpreter(opts.ProjectPath), err)
+	}
+	return res, nil
+}
+
+// noInterpreter is the reason the fallback ran, kept so a failure to build one
+// still says what was missing and what else would have supplied it.
+func noInterpreter(projectPath string) error {
+	return fmt.Errorf("%w: no Python at %s, and building one did not work",
+		checks.ErrNoInterpreter, checks.VenvInterpreter(filepath.Join(projectPath, ".venv")))
 }
 
 // provisioner builds the scratch-venv provisioner, honoring a test-injected
@@ -220,19 +281,29 @@ type checkSummary struct {
 	Warnings int    `json:"warnings"`
 	Strict   bool   `json:"strict"`
 	Passed   bool   `json:"passed"`
+	// Provisioned reports that the parse ran in an environment this command
+	// built, rather than the project's own.
+	//
+	// A json consumer cannot otherwise tell the two apart, and they are not
+	// equivalent: a built environment is resolved from the manifest, so it can
+	// disagree with what the project actually runs — most obviously for a
+	// docker project, whose image is the real environment. Omitted when false
+	// so the ordinary payload is unchanged.
+	Provisioned bool `json:"provisioned,omitempty"`
 }
 
 // renderCheck writes findings then a summary. In json mode each finding is one
 // NDJSON line and the summary is the last; in text mode findings form a table
 // and the summary is one sentence. Both render the same data.
-func renderCheck(r Renderer, res checks.Result, strict bool) error {
+func renderCheck(r Renderer, res checks.Result, strict, provisioned bool) error {
 	summary := checkSummary{
-		Event:    "summary",
-		Dags:     res.DagCount,
-		Errors:   res.Errors,
-		Warnings: res.Warnings,
-		Strict:   strict,
-		Passed:   res.Passed(strict),
+		Event:       "summary",
+		Provisioned: provisioned,
+		Dags:        res.DagCount,
+		Errors:      res.Errors,
+		Warnings:    res.Warnings,
+		Strict:      strict,
+		Passed:      res.Passed(strict),
 	}
 	if r.Format == FormatJSON {
 		enc := json.NewEncoder(r.Out)

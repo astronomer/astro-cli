@@ -112,7 +112,31 @@ func (p *uvProvisioner) key(spec checks.VenvSpec) string {
 	if python == "" {
 		python = "default"
 	}
-	return fmt.Sprintf("af%s-py%s-%s", spec.Airflow, python, hex.EncodeToString(h.Sum(nil))[:12])
+	return fmt.Sprintf("af%s-py%s-%s", pathSafe(spec.Airflow), pathSafe(python),
+		hex.EncodeToString(h.Sum(nil))[:12])
+}
+
+// pathSafe reduces a version or version request to characters a directory name
+// can hold on every platform this runs on.
+//
+// The readable prefix used to be pasted in verbatim, which was safe while every
+// caller passed a concrete version like "3.12". A caller now passes the
+// manifest's requires-python, so ">=3.10,<3.13" would reach a path — and "<"
+// and ">" are reserved on Windows, where the create fails with
+// ERROR_INVALID_NAME rather than anything that reads like a version problem.
+// The hash above already carries the exact value, so the prefix only has to
+// stay recognizable.
+func pathSafe(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+			return r
+		case r == '.' || r == '-' || r == '_':
+			return r
+		default:
+			return '_'
+		}
+	}, s)
 }
 
 // ResolveConstraints fetches the platform constraints file and runs uv's

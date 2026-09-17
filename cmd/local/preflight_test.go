@@ -48,3 +48,32 @@ func TestResolveConstraintsOfflineDegrades(t *testing.T) {
 		t.Errorf("an unreachable constraints file should degrade to ErrConstraintsUnavailable, got %v", err)
 	}
 }
+
+// The readable prefix of a cache directory has to be a legal directory name.
+//
+// It was pasted in verbatim, which held while every caller passed a concrete
+// version. A provisioned check passes the manifest's requires-python, so
+// ">=3.10,<3.13" would reach a path — and "<" and ">" are reserved on Windows,
+// where the create fails with ERROR_INVALID_NAME rather than with anything
+// that reads like a version problem.
+func TestCacheKeyIsALegalDirectoryName(t *testing.T) {
+	p := &uvProvisioner{}
+	for _, spec := range []checks.VenvSpec{
+		{Airflow: "3.1", Python: ">=3.10,<3.13", Reqs: []string{"apache-airflow==3.1.*"}},
+		{Airflow: "2.10", Python: ">=3.10,<3.12", Reqs: []string{"apache-airflow==2.10.*"}},
+		{Airflow: "3.1", Python: "3.12", Reqs: []string{"apache-airflow==3.1.*"}},
+		{Airflow: "3.1", Python: "", Reqs: nil},
+	} {
+		key := p.key(spec)
+		if strings.ContainsAny(key, `<>:"/\|?*`) {
+			t.Errorf("key %q contains a character a Windows path cannot hold", key)
+		}
+	}
+
+	// And it still separates: two different requests must not collide.
+	a := p.key(checks.VenvSpec{Airflow: "2.10", Python: ">=3.10,<3.12", Reqs: []string{"x"}})
+	b := p.key(checks.VenvSpec{Airflow: "2.10", Python: ">=3.10,<3.13", Reqs: []string{"x"}})
+	if a == b {
+		t.Errorf("two different interpreter requests share a cache directory: %q", a)
+	}
+}

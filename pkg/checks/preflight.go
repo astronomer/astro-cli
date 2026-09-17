@@ -62,8 +62,14 @@ type VenvSpec struct {
 	// name and progress text. The pin is also present in Reqs, so the cache key
 	// need not read it separately.
 	Airflow string
-	// Python is the interpreter version to provision, e.g. "3.12". Empty lets
-	// the provisioner pick one.
+	// Python is the interpreter to provision: a concrete version ("3.12"), or
+	// a request uv resolves (">=3.10,<3.13", a project's requires-python).
+	// Empty lets the provisioner pick one.
+	//
+	// A target check passes the platform's version, because the platform
+	// decides. A provisioned project check passes the manifest's
+	// requires-python, because the venv lives outside the project and uv
+	// cannot read the constraint from the manifest itself.
 	Python string
 	// Reqs is the requirement set to install, including the pinned
 	// apache-airflow line.
@@ -287,13 +293,16 @@ func requirementSet(airflow string, deps []string) []string {
 	return out
 }
 
+// airflowDist is the core Airflow distribution's normalized (PEP 503) name.
+const airflowDist = "apache-airflow"
+
 // dropAirflow removes any apache-airflow pin from a dependency list; the caller
 // adds the platform's own version back. It matches the base distribution only,
 // leaving apache-airflow-providers-* in place.
 func dropAirflow(deps []string) []string {
 	out := make([]string, 0, len(deps))
 	for _, d := range deps {
-		if distName(d) == "apache-airflow" {
+		if distName(d) == airflowDist {
 			continue
 		}
 		out = append(out, d)
