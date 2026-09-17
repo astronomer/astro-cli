@@ -231,3 +231,53 @@ func TestStartMissingEnvHint(t *testing.T) {
 		t.Fatalf("missing hint not in error:\n%s", err.Error())
 	}
 }
+
+// The NOTE column for the three shapes of orphan row.
+//
+// An orphan in another project (which only --all reaches) carries no remove
+// command on purpose: `astro local env delete` acts on the working directory's
+// project, so any command offered here would edit the wrong file. The note
+// printed the label anyway, so the row read "orphan in /path; remove: " and
+// trailed off — an instruction with nothing to follow.
+func TestEnvListOrphanNote(t *testing.T) {
+	var out strings.Builder
+	err := renderEnvList(&out, []localenv.ListItem{
+		{
+			Kind: localenv.KindEnv, Name: "LEFTOVER", Source: "project",
+			Orphan: true, RemoveHint: "astro local env delete LEFTOVER --project",
+		},
+		{
+			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
+			Orphan: true, Project: "/projects/other",
+		},
+		{Kind: localenv.KindEnv, Name: "DECLARED", Source: "project"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := map[string]string{}
+	for _, line := range strings.Split(out.String(), "\n") {
+		for _, name := range []string{"LEFTOVER", "ELSEWHERE", "DECLARED"} {
+			if strings.Contains(line, name) {
+				lines[name] = line
+			}
+		}
+	}
+
+	if !strings.Contains(lines["LEFTOVER"], "orphan; remove: astro local env delete LEFTOVER --project") {
+		t.Errorf("an orphan in this project should offer the command: %q", lines["LEFTOVER"])
+	}
+
+	if !strings.Contains(lines["ELSEWHERE"], "orphan in /projects/other") {
+		t.Errorf("an orphan elsewhere should name the project: %q", lines["ELSEWHERE"])
+	}
+	if strings.Contains(lines["ELSEWHERE"], "remove:") {
+		t.Errorf("an orphan elsewhere must not offer a command that would edit "+
+			"the wrong project's file: %q", lines["ELSEWHERE"])
+	}
+
+	// A declared value is not an orphan, so its note stays empty.
+	if strings.Contains(lines["DECLARED"], "orphan") {
+		t.Errorf("a declared value should carry no note: %q", lines["DECLARED"])
+	}
+}

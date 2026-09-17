@@ -450,9 +450,19 @@ func renderEnvList(w io.Writer, items []localenv.ListItem) error {
 	for _, it := range items {
 		note := ""
 		if it.Orphan {
-			note = "orphan; remove: " + it.RemoveHint
+			note = "orphan"
+			// An orphan found under --all lives in another project's file, and
+			// says which. There is no command to offer for one: delete acts on
+			// the working directory's project, so a hint would name a command
+			// that edits the wrong file, which is why ListItem leaves
+			// RemoveHint empty for these. The label follows the hint rather
+			// than being printed regardless, or the row reads "remove: " with
+			// nothing after it.
 			if it.Project != "" {
-				note = "orphan in " + it.Project + "; remove: " + it.RemoveHint
+				note += " in " + it.Project
+			}
+			if it.RemoveHint != "" {
+				note += "; remove: " + it.RemoveHint
 			}
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.Kind, it.Name, it.Source, note)
