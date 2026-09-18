@@ -46,6 +46,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/pkg/spinner"
@@ -224,17 +225,41 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	}, nil
 }
 
+// proxyDiscriminator is what AddRoute folds into this project's hostname
+// when another project already holds it: the leading characters of the
+// project's path hash, the same identity the v2 tree keys on, so the two
+// agree about which project a qualified name belongs to.
+//
+// Empty when the path has no id, which AddRoute reads as "no way to tell
+// these two apart" and refuses the duplicate, exactly as before.
+func proxyDiscriminator(projectDir string) string {
+	id, err := localrt.ProjectID(projectDir)
+	if err != nil {
+		return ""
+	}
+	return id[:pkgproxy.HostnameIDLen]
+}
+
 // removeProxyRoute deregisters the proxy route for this project and
 // stops the proxy daemon if no routes remain.
+//
+// Looked up by project directory rather than re-derived from it. Two
+// projects in directories with the same base name derive the same hostname,
+// so re-deriving here removed whichever project held that name — including a
+// running one belonging to somebody else. The route knows which project it
+// is for; ask it.
 func (d *DockerCompose) removeProxyRoute() {
-	hostname, _, err := pkgproxy.DeriveHostname(d.airflowHome)
+	route, err := proxy.Routes().GetRouteByProject(d.airflowHome)
 	if err != nil {
-		logger.Debugf("could not derive proxy hostname: %s", err)
+		logger.Debugf("could not look up the proxy route: %s", err)
 		return
 	}
-	remaining, err := proxy.Routes().RemoveRoute(hostname)
+	if route == nil {
+		return // nothing was registered for this project
+	}
+	remaining, err := proxy.Routes().RemoveRoute(route.Hostname)
 	if err != nil {
-		logger.Debugf("could not remove proxy route for %s: %s", hostname, err)
+		logger.Debugf("could not remove proxy route for %s: %s", route.Hostname, err)
 		return
 	}
 	if remaining == 0 {
@@ -413,22 +438,35 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 			services["postgres"] = portOvr.PostgresPort
 		}
 		route := pkgproxy.Route{
-			Hostname:   proxyHostname,
-			Port:       portOvr.WebserverPort,
-			ProjectDir: d.airflowHome,
-			PID:        0, // Docker routes don't track PID — CLI exits after start
-			Services:   services,
-			Mode:       pkgproxy.RouteModeDocker,
+			Hostname: proxyHostname,
+			// So a v1 project whose directory shares a base name with
+			// another project gets a name of its own rather than none at
+			// all. AddRoute folds this in only when the plain name is
+			// already taken.
+			Discriminator: proxyDiscriminator(d.airflowHome),
+			Port:          portOvr.WebserverPort,
+			ProjectDir:    d.airflowHome,
+			PID:           0, // Docker routes don't track PID — CLI exits after start
+			Services:      services,
+			Mode:          pkgproxy.RouteModeDocker,
 		}
 		if addErr := proxy.Routes().AddRoute(&route); addErr != nil {
 			fmt.Printf("Warning: could not register proxy route: %s\n", addErr.Error())
 			proxyActive = false
-		} else if boundPort, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
-			fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
-			proxyActive = false
 		} else {
-			// The daemon may be listening on a different port than requested.
-			proxyPort = boundPort
+			// AddRoute settles the name under its own lock and may have
+			// qualified it. Everything downstream — the URL printed below,
+			// and the route this project deregisters on the way out — has to
+			// be the name it registered, not the one that was asked for.
+			proxyHostname = route.Hostname
+
+			if boundPort, ensureErr := proxy.EnsureRunning(proxyPort); ensureErr != nil {
+				fmt.Printf("Warning: could not start proxy: %s\n", ensureErr.Error())
+				proxyActive = false
+			} else {
+				// The daemon may be listening on a different port than requested.
+				proxyPort = boundPort
+			}
 		}
 	}
 

@@ -244,7 +244,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	// fix it because it could see a live runtime. The branch's own comment
 	// claimed it left things "the same shape as docker mode"; docker had the
 	// route by this point and standalone did not.
-	e.addRoute(rec, cb)
+	e.recordRegisteredHostname(&rec, e.addRoute(rec, cb), cb)
 
 	cfg := airflowrt.HealthCheckConfig{}
 	if major == "2" {
@@ -500,22 +500,51 @@ func (e *Engine) killGroup(pgid int, sig syscall.Signal) {
 	}
 }
 
-// addRoute registers the project with the local proxy. Failure is reported
-// through the callback but does not fail the start: Airflow is reachable
-// on localhost either way.
-func (e *Engine) addRoute(rec localstate.Record, cb rt.Callbacks) {
+// addRoute registers the project with the local proxy and returns the
+// hostname it was registered under, which is not always the one asked for:
+// AddRoute qualifies a name another project already holds. Empty when
+// registration failed — reported through the callback but never fatal, since
+// Airflow is reachable on localhost either way.
+func (e *Engine) addRoute(rec localstate.Record, cb rt.Callbacks) string {
 	route := proxy.Route{
-		Hostname:   rec.Hostname,
-		Port:       strconv.Itoa(rec.Port),
-		ProjectDir: rec.ProjectPath,
-		PID:        rec.PID,
-		Mode:       proxy.RouteModeStandalone,
+		Hostname:      rec.Hostname,
+		Discriminator: localshared.HostnameDiscriminator(rec.ProjectPath),
+		Port:          strconv.Itoa(rec.Port),
+		ProjectDir:    rec.ProjectPath,
+		PID:           rec.PID,
+		Mode:          proxy.RouteModeStandalone,
 	}
-	if err := e.routes.AddRoute(&route); err != nil && cb.OnLine != nil {
+	if err := e.routes.AddRoute(&route); err != nil {
+		if cb.OnLine != nil {
+			cb.OnLine(rt.LogLine{
+				Component: "system",
+				Time:      e.now(),
+				Text:      fmt.Sprintf("could not register the proxy route for %s: %s", rec.Hostname, err),
+			})
+		}
+		return ""
+	}
+	return route.Hostname
+}
+
+// recordRegisteredHostname keeps the state record agreeing with the route.
+//
+// AddRoute qualifies a name another project holds, and the record is what
+// `astro local status` prints and what stop deregisters by — a record still
+// naming the plain hostname would advertise a URL serving somebody else's
+// Airflow and leave this project's route behind on the way out.
+func (e *Engine) recordRegisteredHostname(rec *localstate.Record, registered string, cb rt.Callbacks) {
+	if registered == "" || registered == rec.Hostname {
+		return
+	}
+	asked := rec.Hostname
+	rec.Hostname = registered
+	if err := localstate.Save(*rec); err != nil && cb.OnLine != nil {
 		cb.OnLine(rt.LogLine{
 			Component: "system",
 			Time:      e.now(),
-			Text:      fmt.Sprintf("could not register the proxy route for %s: %s", rec.Hostname, err),
+			Text: fmt.Sprintf("registered the proxy route as %s because %s is taken, but could not record it: %s",
+				registered, asked, err),
 		})
 	}
 }

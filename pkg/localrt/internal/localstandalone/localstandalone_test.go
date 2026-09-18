@@ -113,6 +113,59 @@ func testPlan(t *testing.T) rt.Plan {
 	}
 }
 
+// Two projects in directories with the same base name derive the same
+// hostname. The second one used to start with no proxy route at all — the
+// registration error was only a log line — while the URL went on answering
+// for the first, so opening it showed the wrong Airflow.
+//
+// This is the wiring rather than the rule: PlanHostname's own tests pass
+// whether or not Start bothers to hand it the routes store, so the store
+// could be dropped here and every one of them would stay green.
+//
+// The incumbent route is held by this test's own PID because AddRoute prunes
+// routes whose process is gone, and a pruned fixture would leave no collision
+// to disambiguate from.
+func TestStartQualifiesAHostnameAnotherProjectHolds(t *testing.T) {
+	e, _, _ := testEngine(t)
+	p := testPlan(t)
+
+	contested := filepath.Base(p.ProjectPath) + proxy.LocalhostSuffix
+	require.NoError(t, e.routes.AddRoute(&proxy.Route{
+		Hostname:   contested,
+		ProjectDir: t.TempDir(),
+		Port:       "8080",
+		PID:        os.Getpid(),
+	}))
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	rec, err := localstate.Load(p.ProjectPath)
+	require.NoError(t, err)
+	assert.NotEqual(t, contested, rec.Hostname, "that name belongs to another project")
+	assert.True(t, strings.HasPrefix(rec.Hostname, filepath.Base(p.ProjectPath)+"-"),
+		"the qualified name should still say which project it is: %q", rec.Hostname)
+
+	// And the route has to actually land under the qualified name. A name
+	// nobody registered would be no better than the bug.
+	routes, err := e.routes.ReadRoutes()
+	require.NoError(t, err)
+	var mine *proxy.Route
+	for i := range routes {
+		if routes[i].ProjectDir == p.ProjectPath {
+			mine = &routes[i]
+		}
+	}
+	require.NotNil(t, mine, "the second project must get a route of its own")
+	assert.Equal(t, rec.Hostname, mine.Hostname)
+
+	// The incumbent keeps what it had.
+	incumbent, err := e.routes.GetRoute(contested)
+	require.NoError(t, err)
+	require.NotNil(t, incumbent, "the first project must keep its name")
+	assert.NotEqual(t, p.ProjectPath, incumbent.ProjectDir)
+}
+
 func TestStartLaunchesSupervisedAirflow(t *testing.T) {
 	e, procs, launches := testEngine(t)
 	p := testPlan(t)

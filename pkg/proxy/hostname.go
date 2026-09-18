@@ -30,6 +30,55 @@ func SanitizeLabel(name string) string {
 	return name
 }
 
+// HostnameIDLen is how much of a project's path hash goes into a hostname:
+// as the discriminator that tells two projects of the same name apart, and
+// as the whole label when a directory's name has nothing DNS can use.
+//
+// Six hex characters is 16.7M values against the handful of projects one
+// machine runs at once, and short enough that the name is still something to
+// type. One constant for both uses, so "how much id goes in a hostname" is a
+// decision in one place.
+const HostnameIDLen = 6
+
+// DisambiguateHostname folds a discriminator into a hostname's leftmost
+// label: analytics.localhost with "a1b2c3" becomes analytics-a1b2c3.localhost,
+// and a worktree's wt.repo.localhost becomes wt-a1b2c3.repo.localhost.
+//
+// The leftmost label is the project's own and the rest says where it lives,
+// so that is the one to qualify. The result stays inside the DNS label limit
+// by truncating the original label rather than the discriminator, which is
+// the part carrying the uniqueness.
+//
+// An empty discriminator, or a hostname with no label to qualify, is returned
+// unchanged: the caller is no worse off than before it asked.
+func DisambiguateHostname(hostname, discriminator string) string {
+	discriminator = SanitizeLabel(discriminator)
+	if discriminator == "" {
+		return hostname
+	}
+	label, rest, found := strings.Cut(hostname, ".")
+	if !found {
+		return hostname
+	}
+	// A label is joined to the discriminator with a hyphen, so it must not
+	// already end (or begin) with one: --a1b2c3 is not a label DNS will take.
+	label = strings.Trim(label, "-")
+	if label == "" {
+		return hostname
+	}
+	room := maxLabelLen - len(discriminator) - 1
+	if room <= 0 {
+		return hostname
+	}
+	if len(label) > room {
+		label = strings.TrimRight(label[:room], "-")
+	}
+	if label == "" {
+		return hostname
+	}
+	return label + "-" + discriminator + "." + rest
+}
+
 // DeriveHostname converts a project directory path into a valid DNS hostname.
 //
 // If the project is inside a linked git worktree, the hostname includes both
@@ -37,6 +86,13 @@ func SanitizeLabel(name string) string {
 // isWorktree is true. Otherwise, it uses just the directory name,
 // <dir>.localhost. Callers wanting the worktree fact use the returned flag
 // instead of re-reading .git or inspecting the hostname's shape.
+//
+// The result is a function of the path and nothing else, which is what lets
+// callers re-derive it rather than carry it around. It is therefore not
+// unique: ~/work/analytics and ~/personal/analytics both derive
+// analytics.localhost. Whoever registers a route decides what to do about
+// that — see DisambiguateHostname, and localshared.PlanHostname, which picks
+// the name a starting project actually answers to.
 func DeriveHostname(projectDir string) (hostname string, isWorktree bool, err error) {
 	// Try worktree detection first
 	if hostname, wErr := deriveWorktreeHostname(projectDir); wErr == nil && hostname != "" {

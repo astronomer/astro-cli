@@ -127,6 +127,59 @@ func testPlan(t *testing.T) rt.Plan {
 	}
 }
 
+// The docker engine chooses its hostname through the same shared seam the
+// standalone one does, and has to hand it the routes store for the same
+// reason: two projects in directories called the same thing would otherwise
+// both ask for one name, and the second would start with no route while the
+// URL kept answering for the first.
+//
+// A separate case per engine because the wiring is per engine — the shared
+// rule's tests stay green when either call site drops the store.
+func TestStartQualifiesAHostnameAnotherProjectHolds(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+
+	// Held by this test's own PID, because AddRoute prunes routes whose
+	// process is gone and a pruned fixture leaves nothing to collide with.
+	contested := filepath.Base(p.ProjectPath) + proxy.LocalhostSuffix
+	require.NoError(t, e.routes.AddRoute(&proxy.Route{
+		Hostname:   contested,
+		ProjectDir: t.TempDir(),
+		Port:       "8080",
+		PID:        os.Getpid(),
+	}))
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	rec, err := localstate.Load(p.ProjectPath)
+	require.NoError(t, err)
+	assert.NotEqual(t, contested, rec.Hostname, "that name belongs to another project")
+	assert.True(t, strings.HasPrefix(rec.Hostname, filepath.Base(p.ProjectPath)+"-"),
+		"the qualified name should still say which project it is: %q", rec.Hostname)
+
+	routes, err := e.routes.ReadRoutes()
+	require.NoError(t, err)
+	var mine *proxy.Route
+	for i := range routes {
+		if routes[i].ProjectDir == p.ProjectPath {
+			mine = &routes[i]
+		}
+	}
+	require.NotNil(t, mine, "the second project must get a route of its own")
+	assert.Equal(t, rec.Hostname, mine.Hostname)
+
+	// The incumbent keeps what it had, the same check the standalone twin
+	// makes: a regression in which the newcomer evicts the first project
+	// rather than stepping around it would otherwise be caught by one
+	// engine's test and not the other's.
+	incumbent, err := e.routes.GetRoute(contested)
+	require.NoError(t, err)
+	require.NotNil(t, incumbent, "the first project must keep its name")
+	assert.NotEqual(t, p.ProjectPath, incumbent.ProjectDir)
+}
+
 func TestStartBringsProjectUp(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)

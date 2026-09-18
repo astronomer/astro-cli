@@ -42,6 +42,18 @@ type Route struct {
 	PID        int               `json:"pid"`
 	Services   map[string]string `json:"services,omitempty"` // e.g. {"postgres": "15432"}
 	Mode       string            `json:"mode,omitempty"`     // RouteModeDocker or RouteModeStandalone; empty treated as standalone
+
+	// Discriminator is what AddRoute folds into Hostname when another
+	// project already holds it — see DisambiguateHostname. Six hex
+	// characters of the project's path hash, from the caller that has one.
+	//
+	// An input to registration rather than part of the record, so it is not
+	// serialized: what routes.json needs is the name that was chosen, and
+	// AddRoute writes that back into Hostname.
+	//
+	// Empty means the caller has no way to tell its project apart from the
+	// holder's, and AddRoute refuses the duplicate as it always did.
+	Discriminator string `json:"-"`
 }
 
 // Store reads and writes routes.json (and its lock file) in a directory.
@@ -208,7 +220,7 @@ func (s *Store) WriteRoutes(routes []Route) error {
 // defaultRouteAlive is the prune predicate a Store uses when none is
 // injected. Docker routes are never pruned by PID because the CLI process
 // exits after starting containers; they are cleaned up explicitly.
-func defaultRouteAlive(r Route) bool {
+func defaultRouteAlive(r Route) bool { //nolint:gocritic // hugeParam: matches the public WithRouteLiveness seam, which takes Route by value
 	return r.Mode == RouteModeDocker || IsPIDAlive(r.PID)
 }
 
@@ -239,9 +251,18 @@ func (s *Store) pruneStale(routes []Route) []Route {
 	return prune(routes, alive)
 }
 
-// AddRoute registers a new route. It acquires the file lock, prunes stale routes,
-// and adds the new route. Returns an error if the hostname is already registered
-// for a different project directory.
+// AddRoute registers a route under a hostname nobody else is using.
+//
+// The caller's Hostname is a preference. If another project already holds it,
+// the route's Discriminator is folded in — analytics.localhost becomes
+// analytics-a1b2c3.localhost — and the name actually chosen is written back
+// into route.Hostname, which is what the caller should record and later
+// deregister by. A caller with no Discriminator gets the older answer: an
+// error naming the project that holds the name.
+//
+// Resolving here rather than in the caller is deliberate. This is where the
+// collision is detected and where the routes lock is held, so the name a
+// project gets and the row that claims it are decided in the same breath.
 func (s *Store) AddRoute(route *Route) error {
 	lockFile, err := s.AcquireLock()
 	if err != nil {
@@ -256,20 +277,94 @@ func (s *Store) AddRoute(route *Route) error {
 
 	routes = s.pruneStale(routes)
 
-	// Check for hostname collision
-	for i, r := range routes {
-		if r.Hostname == route.Hostname {
-			if r.ProjectDir == route.ProjectDir {
-				// Same project, update the route
-				routes[i] = *route
-				return s.WriteRoutes(routes)
-			}
-			return fmt.Errorf("hostname %q is already registered for project %s", route.Hostname, r.ProjectDir)
+	// The name is settled here, inside the lock the write already holds,
+	// and not by the caller beforehand. A caller that looked first and
+	// registered afterwards would be guessing: between the two, another
+	// project can take the name, and the whole point of this is that the
+	// loser of that race must still end up with a name of its own.
+	chosen, err := resolveHostname(routes, route)
+	if err != nil {
+		return err
+	}
+	route.Hostname = chosen
+
+	for i := range routes {
+		if routes[i].Hostname == route.Hostname {
+			// Same project, update the route. resolveHostname only returns a
+			// name held by somebody else if it returned an error, so this is
+			// the project's own row.
+			routes[i] = *route
+			return s.WriteRoutes(routes)
 		}
 	}
 
 	routes = append(routes, *route)
 	return s.WriteRoutes(routes)
+}
+
+// maxQualifiedAttempts bounds the search for a free name. The first candidate
+// is the project's own path hash, so reaching even the second means two
+// different projects whose hashes agree in six hex characters; the counter
+// exists so that a directory literally named after somebody's qualified
+// hostname cannot wedge a start, not because it is expected to be used.
+const maxQualifiedAttempts = 10
+
+// resolveHostname returns the name route should register under: its own if
+// nobody else holds it, otherwise one qualified by its discriminator.
+//
+// "Somebody else" is the test that matters. A project re-registering its own
+// route — a restart, a port change — is not colliding with anything and keeps
+// its name.
+func resolveHostname(routes []Route, route *Route) (string, error) {
+	mine := canonicalDir(route.ProjectDir)
+	holder := func(name string) (string, bool) {
+		for i := range routes {
+			if routes[i].Hostname == name && canonicalDir(routes[i].ProjectDir) != mine {
+				return routes[i].ProjectDir, true
+			}
+		}
+		return "", false
+	}
+
+	held, taken := holder(route.Hostname)
+	if !taken {
+		return route.Hostname, nil
+	}
+	if route.Discriminator == "" {
+		return "", fmt.Errorf("hostname %q is already registered for project %s", route.Hostname, held)
+	}
+
+	candidate := DisambiguateHostname(route.Hostname, route.Discriminator)
+	for n := 2; ; n++ {
+		if _, taken := holder(candidate); !taken {
+			return candidate, nil
+		}
+		if n > maxQualifiedAttempts {
+			return "", fmt.Errorf("hostname %q is already registered for project %s, and no name derived from it is free", route.Hostname, held)
+		}
+		candidate = DisambiguateHostname(route.Hostname, fmt.Sprintf("%s-%d", route.Discriminator, n))
+	}
+}
+
+// canonicalDir resolves a project directory for comparison: absolute, with
+// symlinks resolved. Two spellings of one directory have to read as one
+// project, or a project reached by a symlink would be told its own name
+// belongs to somebody else.
+//
+// Falls back to the closest thing it managed, so a directory that has since
+// been deleted still compares equal to itself. This mirrors rt.CanonicalPath,
+// which this module cannot import — pkg/localrt depends on pkg/proxy, not the
+// other way round.
+func canonicalDir(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return dir
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return abs
+	}
+	return resolved
 }
 
 // RemoveRoute deregisters a route by hostname. Returns the number of remaining routes.

@@ -95,14 +95,37 @@ func ChoosePort(requested, fallback int, portFree func(port string) bool, alloc 
 	return 0, fmt.Errorf("could not allocate a port distinct from %v", exclude)
 }
 
-// PlanHostname uses the plan's hostname, deriving one only when plan
-// building has not (the same derivation internal/project uses).
-func PlanHostname(p rt.Plan, projectPath string) (string, error) {
+// PlanHostname returns the hostname a starting project asks for: the plan's,
+// derived only when plan building has not done it (the same derivation
+// internal/project uses).
+//
+// Asks for, not gets. The derived name is the directory's base name, so two
+// projects in directories called the same thing — ~/work/analytics and
+// ~/personal/analytics — ask for the same one. Store.AddRoute settles it,
+// under the routes lock, and writes back what the project actually got; the
+// engines record that rather than this.
+func PlanHostname(p rt.Plan, projectPath string) (string, error) { //nolint:gocritic // hugeParam: rt.Plan matches the engines' own signature
 	if p.Hostname != "" {
 		return p.Hostname, nil
 	}
 	hostname, _, err := proxy.DeriveHostname(projectPath)
 	return hostname, err
+}
+
+// HostnameDiscriminator is what AddRoute folds into a hostname when another
+// project already holds it: the leading characters of the project's path
+// hash, the same identity everything else here is keyed on.
+//
+// Empty when the path has no id — a broken symlink in it, say. AddRoute reads
+// that as "no way to tell these two apart" and refuses the duplicate, which
+// is what it did before any of this existed. A display name is never worth
+// failing a start over.
+func HostnameDiscriminator(projectPath string) string {
+	id, err := rt.ProjectID(projectPath)
+	if err != nil {
+		return ""
+	}
+	return id[:proxy.HostnameIDLen]
 }
 
 // RemoveRoute deregisters a project's proxy route; an empty hostname means

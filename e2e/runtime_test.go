@@ -239,6 +239,66 @@ func TestTwoProjectsRunOnDifferentPorts(t *testing.T) {
 	}
 }
 
+// Two projects whose directories share a base name.
+//
+// The hostname comes from that base name, so both ask for alpha.localhost —
+// which is why the port case above goes out of its way to name its two
+// projects differently. The second one used to lose the draw: AddRoute
+// refused the duplicate, the refusal was a log line rather than anything the
+// start acted on, and the project came up with no name of its own while
+// alpha.localhost went on resolving to the first. Opening it showed somebody
+// else's Airflow, which is worse than showing nothing.
+//
+// Both now get a name. The holder keeps the plain one and the newcomer takes
+// alpha-<id6>.localhost, built from the path hash so it is the same name on
+// every restart.
+//
+// Tier 2 because only a real start registers a route; the rule and both
+// engines' wiring are checked in pkg/localrt, and what this adds is that the
+// two halves meet.
+func TestTwoProjectsOfTheSameNameGetDistinctHostnames(t *testing.T) {
+	tier(t, 2)
+
+	// One ASTRO_HOME and one cache, as above: two projects sharing a
+	// routes.json is the only arrangement in which they can collide at all.
+	alpha := namedAirflowProject(t, "alpha")
+	twin := alpha.sibling("alpha")
+	twin.run("init", "--name", "alpha").requireSuccess()
+	twin.sync()
+
+	if filepath.Base(alpha.Dir) != filepath.Base(twin.Dir) {
+		t.Fatalf("the fixture is not the case: %q and %q do not share a base name",
+			alpha.Dir, twin.Dir)
+	}
+	if alpha.Dir == twin.Dir {
+		t.Fatalf("both projects are the same directory %q", alpha.Dir)
+	}
+
+	first := startAndStop(t, alpha)
+	second := startAndStop(t, twin)
+
+	if first.Hostname == second.Hostname {
+		t.Fatalf("both projects took hostname %q, so one of them is unreachable by name", first.Hostname)
+	}
+	base := filepath.Base(alpha.Dir) + ".localhost"
+	if first.Hostname != base {
+		t.Errorf("the project that got there first should keep the plain name: got %q, want %q",
+			first.Hostname, base)
+	}
+	if !strings.HasPrefix(second.Hostname, filepath.Base(twin.Dir)+"-") ||
+		!strings.HasSuffix(second.Hostname, ".localhost") {
+		t.Errorf("the second name should still say which project it is: got %q", second.Hostname)
+	}
+
+	// Both are still running and still answering, which is what makes the
+	// distinct names worth anything.
+	for _, st := range []rtStatus{first, second} {
+		if code := get(t, st.Port); code != http.StatusOK {
+			t.Errorf("GET / on port %d = %d, want 200", st.Port, code)
+		}
+	}
+}
+
 // `astro local reset` wipes the derived state and leaves the project alone.
 //
 // The distinction is the whole command: the database and logs are rebuildable,
