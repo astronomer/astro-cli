@@ -29,11 +29,14 @@ func (e *ExitError) Error() string {
 	return fmt.Sprintf("exit code %d", e.Code)
 }
 
+// nameCheck is the command's name, and the label its progress notes carry.
+const nameCheck = "check"
+
 func newCheckCmd(c *cli) *cobra.Command {
 	var strict bool
 	var targets []string
 	cmd := &cobra.Command{
-		Use:   "check",
+		Use:   nameCheck,
 		Short: "Validate this project's DAGs without starting Airflow",
 		Long: "Parse the project's DAGs in its own environment and report import errors, duplicate DAG ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
 			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the DAGs inside it; mwaa also resolves the dependencies against MWAA's published constraints file (this step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
@@ -71,6 +74,13 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	if err != nil {
 		return blocked(r, err)
 	}
+
+	// Collect the cached check environments once this run is finished with
+	// them — see sweepCheckVenvs for why not from inside EnsureVenv. Deferred,
+	// so it also covers the paths that give up partway: a run that failed
+	// still used whatever it resolved, and the stamp on that one is what
+	// protects it.
+	defer sweepCheckVenvs(c.sweepProgressFn(r))
 
 	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict}, m)
 	if err != nil {
@@ -110,6 +120,11 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	if err != nil {
 		return blocked(r, err)
 	}
+
+	// Once, after every target — not per target. Each resolves its own
+	// environment, and a sweep between two of them deletes what the next is
+	// about to use. See sweepCheckVenvs.
+	defer sweepCheckVenvs(c.sweepProgressFn(r))
 
 	reports := make([]checks.TargetReport, 0, len(targets))
 	worst := checks.ExitOK
@@ -216,7 +231,7 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 		Pin:            m.Astro.AirflowVersion,
 		Deps:           m.Project.Dependencies,
 		RequiresPython: m.Project.RequiresPython,
-	}, prov, c.d.CheckVenv, c.progressFn(r, "check"))
+	}, prov, c.d.CheckVenv, c.progressFn(r, nameCheck))
 	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {
 		// An operational failure of the parse itself is not an environment
 		// problem, and relabelling it as one would give the same crash a
@@ -255,6 +270,20 @@ func (c *cli) progressFn(r Renderer, target string) func(string) {
 		// Progress is best-effort; a broken pipe surfaces on the final write.
 		fmt.Fprintf(r.Out, "[%s] %s\n", target, note)
 	}
+}
+
+// sweepProgressFn is where the cache sweep's notes go, and it differs from a
+// target's progress in one way that matters: these report a deletion, so
+// dropping them in json mode would have the command remove hundreds of
+// megabytes and record it nowhere. They go to stderr instead, which leaves the
+// report object on stdout parseable.
+func (c *cli) sweepProgressFn(r Renderer) func(string) {
+	if r.Format == FormatJSON {
+		return func(note string) {
+			fmt.Fprintf(c.d.Stderr, "[%s] %s\n", nameCheck, note)
+		}
+	}
+	return c.progressFn(r, nameCheck)
 }
 
 // dedupeTargets keeps the first occurrence of each target, so --target
