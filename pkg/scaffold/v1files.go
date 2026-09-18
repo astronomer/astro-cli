@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
@@ -88,7 +90,26 @@ type v1Project struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
+	// projectName is the name .astro/config.yaml states, before any
+	// sanitizing. Empty when the file is absent, says nothing, or will not
+	// parse.
+	//
+	// The file itself is not retired — it also names Deployments, which have
+	// somewhere else to go — so this is read from a file that stays.
+	projectName string
 }
+
+// v1ConfigName is the one field of .astro/config.yaml this reads. The rest of
+// the file is v1 CLI configuration that a v2 project does not carry, and the
+// Deployments it names get a note pointing at [tool.astro] instead.
+type v1ConfigName struct {
+	Project struct {
+		Name string `yaml:"name"`
+	} `yaml:"project"`
+}
+
+// v1ConfigRelPath is where a v1 project states its own name.
+const v1ConfigRelPath = ".astro/config.yaml"
 
 // readV1Project reads whatever v1 files dir has. A missing file is not an
 // error: most of these are optional even in a v1 project.
@@ -116,6 +137,20 @@ func readV1Project(dir string) (*v1Project, error) {
 	} else if data != nil {
 		v1.packages = parsePackages(data)
 		v1.present = append(v1.present, "packages.txt")
+	}
+
+	// The project's own name, which is the one thing in .astro/config.yaml a
+	// v2 project keeps. Not added to present: this file is not a candidate for
+	// retirement — it names Deployments too, and those get a note — so
+	// recording it there would offer it for deletion.
+	//
+	name, note, err := readV1ConfigName(dir)
+	if err != nil {
+		return nil, err
+	}
+	v1.projectName = name
+	if note != "" {
+		v1.notes = append(v1.notes, note)
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(envschema.LegacyRelPath))); err != nil {
@@ -222,6 +257,35 @@ func dockerfileIsPinOnly(data []byte) bool {
 		}
 	}
 	return seenFrom
+}
+
+// readV1ConfigName reads the project's own name out of .astro/config.yaml,
+// which is the one thing in that file a v2 project keeps.
+//
+// A malformed file is not an error. v1's own loader tolerated one, nothing
+// else in a conversion depends on this file, and failing `astro init` over
+// unparseable YAML in a file being left behind anyway would be the least
+// useful outcome available.
+//
+// It is not silent either, which is the pattern readAirflowSettings already
+// set: a file that will not parse is a blocker, not an error. The name falls
+// back to the directory and the run says why, rather than renaming somebody's
+// project without comment.
+//
+// The PROJECT's config only, never the home one, though v1 resolved this key
+// with a fallback to it. A global project.name would otherwise rename every
+// project converted on that machine to the same thing.
+func readV1ConfigName(dir string) (name, note string, err error) {
+	data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
+	if err != nil || data == nil {
+		return "", "", err
+	}
+	var cfg v1ConfigName
+	if uerr := yaml.Unmarshal(data, &cfg); uerr != nil {
+		return "", v1ConfigRelPath +
+			": could not be read, so the project is named after its directory. " + uerr.Error(), nil
+	}
+	return strings.TrimSpace(cfg.Project.Name), "", nil
 }
 
 // readIfPresent returns nil bytes and no error when the file is not there.

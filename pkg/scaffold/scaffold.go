@@ -236,6 +236,15 @@ type manifestFacts struct {
 	// defaultedPin reports that nothing named an Airflow version, so the pin
 	// is the CLI's default.
 	defaultedPin bool
+	// nameAdvisory is what to tell somebody when the project is not called
+	// what it said it was called — respelled to fit a [project] name, or
+	// discarded because nothing in it could. Empty when the name carried
+	// unchanged, which is the ordinary case.
+	//
+	// Worded by chooseName, which is where the reason is known, and carried
+	// here because both the scaffold and adopt arms have to hand it back to
+	// Plan.
+	nameAdvisory string
 	// pinUnread reports that [project.dependencies] names apache-airflow in a
 	// shape no single version reads out of, while the pin written to
 	// [tool.astro] came from somewhere else — a Dockerfile's image tag, or the
@@ -360,7 +369,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// The v1 notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, leftovers(abs, cs.AirflowVersion, pin, v1))
+	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, leftovers(abs, cs.AirflowVersion, &pin, v1))
 
 	// And the deletions go last of all. Apply walks this slice in order and
 	// stops at the first failure, so removing requirements.txt before the
@@ -385,6 +394,13 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// the opposite KIND of statement: Notes is work outstanding, an advisory is
 	// a change already made.
 	cs.Advisories = append(cs.Advisories, v1.envSchema.advisories...)
+
+	// The project said what it was called and this run did not use that. An
+	// advisory rather than a note for the usual reason: nothing is left to do,
+	// it is already named that.
+	if pin.nameAdvisory != "" {
+		cs.Advisories = append(cs.Advisories, pin.nameAdvisory)
+	}
 
 	// The connection values airflow_settings.yaml supplied. They ride the
 	// changeset rather than being written here because Plan writes nothing, and
@@ -623,10 +639,7 @@ func namedInAny(notes []string, name string) bool {
 // records on the Result what it chose. It returns the manifest rather than
 // writing it, so write puts every file on disk in one place.
 func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]byte, manifestFacts, error) {
-	name := opts.Name
-	if name == "" {
-		name = deriveName(dir)
-	}
+	name, nameAdvisory := chooseName(dir, opts, v1)
 	version, defaulted := pickAirflowVersion(opts.AirflowVersion, nil, v1)
 	pyproject, notes, err := renderPyproject(name, version, v1)
 	if err != nil {
@@ -637,6 +650,7 @@ func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]b
 		defaultedPin:   defaulted,
 		migrationNotes: notes,
 		migratedLabels: migratedLabels(v1),
+		nameAdvisory:   nameAdvisory,
 	}, nil
 }
 
@@ -881,13 +895,83 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 	return nil
 }
 
-// deriveName turns a directory basename into a valid [project] name (PEP
-// 508): letters lower, invalid runes become "-", separators neither lead,
-// trail, nor repeat.
+// chooseName resolves a project's [project] name, and words the advisory when
+// that is not the name the project gave for itself.
+//
+// Three sources, in this order: --name, because it is the only one somebody
+// typed on purpose; the name .astro/config.yaml states, because a v1 project
+// that calls itself orders-pipeline is called orders-pipeline whatever the
+// directory it sits in happens to be; and the directory, which is all a
+// greenfield scaffold has to go on.
+//
+// The middle one is the fix for a conversion that silently renamed a project.
+// [project] name is the project's identity in the manifest: it is what
+// `astro package` names its artifact after, what the env checklist reports
+// against, and what `Created Astro project X` says. It is NOT where the
+// hostname comes from — proxy.DeriveHostname reads the project DIRECTORY, and
+// no caller passes it a manifest name — so a rename here does not move the URL
+// Airflow answers on, and an advisory saying it did would send somebody
+// looking for a host that does not exist.
+//
+// The advisory is worded here rather than by the caller because this is where
+// the reason is known: respelled, or discarded entirely, are different sizes
+// of surprise.
+//
+// Only the PROJECT's config is read, never the home one, though v1 resolved
+// this key with a fallback to it. A global project.name would otherwise rename
+// every project converted on that machine to the same thing, which is a worse
+// answer than the directory in every case where the two differ.
+func chooseName(dir string, opts Options, v1 *v1Project) (name, advisory string) {
+	if opts.Name != "" {
+		return opts.Name, ""
+	}
+	if v1 == nil || v1.projectName == "" {
+		return deriveName(dir), ""
+	}
+
+	stated := v1.projectName
+	legal := sanitizeName(stated)
+	switch {
+	case legal == stated:
+		// Carried as written, which needs no comment.
+		return legal, ""
+
+	case legal != "":
+		// Respelled. The reason is whatever sanitizeName had to change, and
+		// listing the rules would be a lie for most names — it lowercases, and
+		// maps every rune a [project] name cannot hold, which is most
+		// punctuation and everything non-ASCII. So the advisory shows the two
+		// names and lets them speak.
+		return legal, "named " + legal + ", from " + stated + " in " + v1ConfigRelPath +
+			": a [project] name holds lower-case letters, digits, and - _ . only"
+
+	default:
+		// Nothing a [project] name can hold survived, so the directory is no
+		// worse — and this is the loudest case, not the quietest: the stated
+		// name was discarded rather than respelled.
+		fallback := deriveName(dir)
+		return fallback, "named " + fallback + " after the directory: " + stated +
+			" in " + v1ConfigRelPath + " has nothing a [project] name can hold, " +
+			"which is lower-case letters, digits, and - _ ."
+	}
+}
+
+// deriveName turns a directory basename into a valid [project] name, falling
+// back to a fixed one when nothing legal survives.
 func deriveName(dir string) string {
+	if name := sanitizeName(filepath.Base(dir)); name != "" {
+		return name
+	}
+	return "astro-project"
+}
+
+// sanitizeName turns a string into a valid [project] name (PEP 508): letters
+// lower, invalid runes become "-", separators neither lead, trail, nor repeat.
+// Empty when nothing legal is left, which the callers read as "no name here".
+func sanitizeName(s string) string {
 	var b strings.Builder
 	sep := true // true also strips leading separators
-	for _, r := range strings.ToLower(filepath.Base(dir)) {
+	for _, r := range strings.ToLower(s) {
 		switch {
 		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
 			b.WriteRune(r)
@@ -904,18 +988,16 @@ func deriveName(dir string) string {
 			}
 		}
 	}
-	name := strings.TrimRight(b.String(), "-_.")
-	if name == "" {
-		return "astro-project"
-	}
-	return name
+	return strings.TrimRight(b.String(), "-_.")
 }
 
 // leftovers reports the files init found, did not read, and cannot carry over
 // on its own, with where each one belongs. Reading a Dockerfile means guessing
 // what its RUN lines were for, so init names it and stops there. The list is
 // the hand-off: what a person, or the agent working with them, does next.
-func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string {
+// facts is a pointer only because the struct crossed gocritic's hugeParam
+// threshold when it gained a field; nothing here writes through it.
+func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) []string {
 	// requirements.txt, packages.txt, the Dockerfile and airflow_settings.yaml
 	// are READ now, so they are gone from this list: whatever they could not
 	// carry is a note from the reader that says which line and why, which is
@@ -929,7 +1011,7 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 	// `.astro/env.schema.yaml` in the same list — the same contract
 	// disagreeing with itself about two files in the same directory.
 	checks := []struct{ file, note string }{
-		{".astro/config.yaml", "move the Deployments it names into deployments under [tool.astro]"},
+		{v1ConfigRelPath, "move the Deployments it names into deployments under [tool.astro]"},
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
 		{"docker-compose.override.yml", "not read — move any service your dags need into your own setup"},

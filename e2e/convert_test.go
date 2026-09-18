@@ -59,6 +59,10 @@ type v1Case struct {
 
 	airflow string
 	adopted bool
+	// projectName is the [project] name the run must choose. A v1 project
+	// states one in .astro/config.yaml, and taking the directory instead
+	// renames somebody's project.
+	projectName string
 	// manifestLines must appear as whole lines, which is what pins the ORDER
 	// of a carried list: "requirements.txt lines land in dependencies, in file
 	// order" is a promise a set-wise check cannot keep. Whole lines also need
@@ -370,7 +374,13 @@ func v1Cases() []v1Case {
 				".gitignore":         ".env\n",
 			},
 			airflow: "2",
-			kept:    []string{"Dockerfile", ".astro/config.yaml"},
+			// The project keeps the name it calls itself, not the directory's.
+			// A v1 project named orders-pipeline in a directory called
+			// something else is still orders-pipeline — it is the manifest's
+			// identity, and what `astro package` names an artifact after.
+			projectName: "orders-pipeline",
+			manifestHas: []string{"name = 'orders-pipeline'"},
+			kept:        []string{"Dockerfile", ".astro/config.yaml"},
 			// Untouched, which is the point of reporting them separately from
 			// what this run wrote.
 			keptHas: map[string]string{"dags/my_dag.py": "the project's own dag"},
@@ -380,9 +390,32 @@ func v1Cases() []v1Case {
 			},
 			notes: []string{
 				// The Deployments it names have somewhere to go; the file is
-				// kept and the run says where.
+				// kept and the run says where. The name it also states needs no
+				// note — it was carried.
 				".astro/config.yaml: move the Deployments it names",
 			},
+		},
+		{
+			// A stated name that cannot be a [project] name as written is
+			// respelled, and the respelling is reported: the project said what
+			// it was called and this is not quite that.
+			name: "a v1 name that is not a legal project name",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: Orders Pipeline\n",
+				"Dockerfile":         runtime3,
+			},
+			airflow:     "3.1",
+			projectName: "orders-pipeline",
+			manifestHas: []string{"name = 'orders-pipeline'"},
+			kept:        []string{".astro/config.yaml"},
+			// An advisory, not a note: it is already named that.
+			//
+			// The Deployments note this file also earns is deliberately not
+			// asserted. leftovers fires it on the file being present, never on
+			// it naming a Deployment, and this fixture's config names none —
+			// so pinning it here would make a note that is wrong for this
+			// input into a contract.
+			advisories: []string{"from Orders Pipeline in .astro/config.yaml"},
 		},
 		{
 			// The property behind all of it: a file is retired only once
@@ -421,6 +454,9 @@ func TestInitConvertsAV1Project(t *testing.T) {
 
 			if tc.airflow != "" && res.Airflow != tc.airflow {
 				t.Errorf("airflow = %q, want %q", res.Airflow, tc.airflow)
+			}
+			if tc.projectName != "" && res.Name != tc.projectName {
+				t.Errorf("name = %q, want %q", res.Name, tc.projectName)
 			}
 			if res.Adopted != tc.adopted {
 				t.Errorf("adopted = %v, want %v (created and adopted are different events)", res.Adopted, tc.adopted)

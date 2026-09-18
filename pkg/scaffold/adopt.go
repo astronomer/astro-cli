@@ -23,6 +23,34 @@ import (
 // as its author left it. It refuses only a manifest carrying the section
 // already — that directory is an Astro project, and re-initializing it would
 // overwrite the pin.
+// setProjectName gives an adopted manifest a [project] name, and reports what
+// to tell somebody when the name it ends up with is not the one their v1
+// project stated.
+//
+// A manifest that states a name keeps it: it has already said what the project
+// is called, and --name is the only thing that overrules that. Everything else
+// goes through chooseName, so the order --name, then the v1 config, then the
+// directory is written in one place rather than half here.
+func setProjectName(ed tomledit.Editor, dir string, opts Options, v1 *v1Project) (advisory string, err error) {
+	raw, has := ed.Get([]string{"project", "name"})
+	stated, _ := raw.(string)
+	if opts.Name == "" && has && stated != "" {
+		// Said twice and differently is worth one line. The manifest wins, and
+		// somebody who has only ever seen the v1 name should not have to work
+		// out where it went.
+		if v1 != nil && v1.projectName != "" && sanitizeName(v1.projectName) != stated {
+			return "kept the name " + stated + " from " + manifest.Marker +
+				", not " + v1.projectName + " from " + v1ConfigRelPath, nil
+		}
+		return "", nil
+	}
+	chosen, advisory := chooseName(dir, opts, v1)
+	if err := ed.Set([]string{"project", "name"}, chosen); err != nil {
+		return "", err
+	}
+	return advisory, nil
+}
+
 func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
 	path := filepath.Join(dir, manifest.Marker)
 	ed, err := tomledit.NewSurgical(data)
@@ -54,15 +82,11 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 
 	// The manifest's own validation requires a [project] name, and a repo that
 	// was never a Python package often has no [project] table at all.
-	if name := opts.Name; name != "" {
-		if err := ed.Set([]string{"project", "name"}, name); err != nil {
-			return nil, nil, pin, err
-		}
-	} else if v, ok := ed.Get([]string{"project", "name"}); !ok || v == "" {
-		if err := ed.Set([]string{"project", "name"}, deriveName(dir)); err != nil {
-			return nil, nil, pin, err
-		}
+	nameAdvisory, err := setProjectName(ed, dir, opts, v1)
+	if err != nil {
+		return nil, nil, pin, err
 	}
+	pin.nameAdvisory = nameAdvisory
 	// Read before ensureProjectKeys, which fills a missing one: after it, an
 	// absent key and one this run just wrote look the same.
 	pin.loosePython = statedPythonTooLoose(ed, version)
