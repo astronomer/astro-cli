@@ -32,6 +32,19 @@ const testVersion = "SNAPSHOT-e2e"
 // take every other case's diagnosis with it.
 const commandTimeout = 90 * time.Second
 
+// slowCommandTimeout bounds a command that starts or stops a real Airflow,
+// which the ordinary bound is far too tight for. See runSlow.
+//
+// Strictly greater than what the CLI itself may spend, which is the whole
+// trick: localstandalone's defaultHealthTimeout waits five minutes for
+// Airflow to come up, and provisioning happens before that wait even starts.
+// A harness bound of five minutes would therefore kill `astro local start` at
+// the moment the CLI was about to report a clean, diagnosable failure — and
+// kill it badly, since the supervisor is in its own process group and would
+// survive to hold the port. Ten leaves room for the CLI to lose first and say
+// why.
+const slowCommandTimeout = 10 * time.Minute
+
 // astroBin is the binary under test, built once for the whole run.
 var astroBin string
 
@@ -172,15 +185,48 @@ type project struct {
 // under the test's own temp directory, so it goes away with the test.
 func newProject(t *testing.T) *project {
 	t.Helper()
+	return newNamedProject(t, "project")
+}
+
+// newNamedProject is newProject with the working directory's name chosen.
+//
+// The name is not cosmetic: the proxy derives a project's hostname from its
+// directory's base name, so two projects built by newProject are two
+// directories both called "project" and both answering to project.localhost.
+// A case about two projects at once has to name them apart to be about
+// anything else.
+func newNamedProject(t *testing.T, name string) *project {
+	t.Helper()
 	base := t.TempDir()
 	p := &project{
 		t:     t,
-		Dir:   mkdir(t, base, "project"),
+		Dir:   mkdir(t, base, name),
 		home:  mkdir(t, base, "home"),
 		cache: mkdir(t, base, "cache"),
 	}
 	p.shareUVCache()
 	return p
+}
+
+// sibling is a second project on the same machine as p: its own directory, but
+// the same ASTRO_HOME and the same cache, so the two share a record store and
+// one routes.json.
+//
+// Which is the whole point for anything about allocation. Two projects built
+// by newNamedProject are two machines as far as the CLI can tell — separate
+// caches, separate route tables — so a port or hostname collision between them
+// could only be caught by the operating system, not by the CLI's own
+// bookkeeping, and a regression in that bookkeeping would pass.
+func (p *project) sibling(name string) *project {
+	p.t.Helper()
+	s := &project{
+		t:     p.t,
+		Dir:   mkdir(p.t, p.t.TempDir(), name),
+		home:  p.home,
+		cache: p.cache,
+	}
+	s.shareUVCache()
+	return s
 }
 
 // shareUVCache points the CLI's OWN uv cache at the shared one, which setting
@@ -312,11 +358,27 @@ func (p *project) run(args ...string) *result {
 	return p.runWith(nil, args...)
 }
 
+// runSlow is run with the bound a command that drives a real Airflow needs.
+//
+// Tier 2 only. `astro local start` installs what the project is missing,
+// migrates a database and waits for the API server to answer before it
+// returns — 11s on a warm developer machine, and the case this bound exists
+// for is a loaded CI runner doing the same work from cold.
+func (p *project) runSlow(args ...string) *result {
+	p.t.Helper()
+	return p.runBounded(slowCommandTimeout, nil, args...)
+}
+
 // runWith invokes the CLI with extra environment on top of the isolated set.
 func (p *project) runWith(extra map[string]string, args ...string) *result {
 	p.t.Helper()
+	return p.runBounded(commandTimeout, extra, args...)
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+func (p *project) runBounded(bound time.Duration, extra map[string]string, args ...string) *result {
+	p.t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), bound)
 	defer cancel()
 
 	var stdout, stderr strings.Builder
@@ -332,7 +394,7 @@ func (p *project) runWith(extra map[string]string, args ...string) *result {
 	switch {
 	case err == nil:
 	case ctx.Err() != nil:
-		p.t.Fatalf("`astro %s` did not finish within %s\n%s", strings.Join(args, " "), commandTimeout, r.output())
+		p.t.Fatalf("`astro %s` did not finish within %s\n%s", strings.Join(args, " "), bound, r.output())
 	default:
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) {

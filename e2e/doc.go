@@ -24,7 +24,12 @@
 //	   interpreter at all, which the plan had assumed otherwise.
 //	1  needs uv — a real Airflow in a venv, but no Airflow process. Runs on
 //	   every PR on Linux, where uv's download cache is restored between runs.
-//	2  runs a real Airflow — standalone start/stop, ports, readiness.
+//	2  runs a real Airflow — standalone start/stop, the port actually
+//	   serving, stale records, reset. Nightly rather than per PR: measured at
+//	   ~50s on top of the tiers below, and starting a database and an API
+//	   server is the first thing here with real timing risk. A failure opens
+//	   an issue (.github/workflows/nightly-e2e.yaml), since a nightly nobody
+//	   reads is worse than no test. Unix only, and the cases say why.
 //	3  needs Docker.
 //	4  needs cloud credentials.
 //

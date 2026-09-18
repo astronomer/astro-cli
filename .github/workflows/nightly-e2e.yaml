@@ -1,0 +1,155 @@
+name: Nightly e2e
+
+# Tier 2 starts a real Airflow — a database migration, a supervisor, an API
+# server to wait for — so it runs here rather than on every pull request.
+#
+# A nightly nobody reads is worse than no test, so a failure opens an issue and
+# a later pass closes it. GitHub's own signal for a scheduled workflow emails
+# whoever last edited the cron line, which is nobody in particular.
+
+on:
+  schedule:
+    # 07:00 UTC, which is the small hours in US time zones: the run is finished
+    # and the issue is already open by the time anyone looks.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-e2e
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: Nightly e2e (tier 2) is failing
+
+jobs:
+  tier2:
+    runs-on: ubuntu-latest
+    # Measured at ~130s for all three tiers, so this is generous. It is here
+    # because a cancelled job is neither failure() nor success(): without a
+    # bound, a stalled uv download runs to GitHub's six-hour default and then
+    # reports nothing at all, which is the one outcome this workflow is built
+    # to prevent.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - id: go-env
+        shell: bash
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      # Restore only, never save. The trunk push is the single writer of these
+      # caches (see ci.yaml), and a nightly that also saved would race it for
+      # the same key and win by being later, with objects built from whatever
+      # trunk looked like hours ago.
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
+            go-test-${{ runner.os }}-
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: false
+
+      - name: Point uv's cache at a path this job restores
+        shell: bash
+        run: echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
+
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
+          restore-keys: uv-${{ runner.os }}-
+
+      # Every tier, not only tier 2: the tiers below run per pull request, but
+      # running them here too costs seconds and catches the interactions
+      # between them that a tier on its own cannot.
+      - name: Run e2e tests (tiers 0 through 2)
+        run: make test-e2e ASTRO_E2E_MAX_TIER=2
+
+      # gh rather than a scripting action, because the runner already has it
+      # and this repo pins every action by SHA — one fewer thing to pin and
+      # keep current.
+      # Matched by exact title rather than a label, so this needs no label to
+      # exist first — a workflow that depends on repository setup nobody
+      # remembers doing is a workflow that silently stops reporting.
+      - name: Report the failure where someone will see it
+        if: ${{ failure() && github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          # jq reads the title from the environment rather than having it
+          # spliced into the program text: a title with a quote in it would
+          # otherwise make an invalid program, jq would error, and the step
+          # would file a fresh duplicate issue every night while never finding
+          # the one to close. The search narrows server-side so the answer does
+          # not depend on how many other issues happen to be open.
+          find_issue() {
+            gh issue list --state open --search "in:title $ISSUE_TITLE" \
+              --json number,title \
+              --jq 'first(.[] | select(.title == env.ISSUE_TITLE) | .number) // empty'
+          }
+          existing=$(find_issue)
+          if [ -n "$existing" ]; then
+            # One issue per outage rather than one per night.
+            gh issue comment "$existing" --body "Still failing: $RUN_URL"
+            exit 0
+          fi
+          # printf rather than a quoted block, so the body carries no leading
+          # indentation — four spaces would render the whole issue as code.
+          body=$(printf '%s\n' \
+            "Tier 2 of the e2e suite failed on the nightly run." \
+            "" \
+            "$RUN_URL" \
+            "" \
+            "Tier 2 starts a real Airflow, so this is either a regression in start/stop, port allocation, stale-record cleaning or reset, or the flakiness that keeps this tier off the pull-request path. The run log says which." \
+            "" \
+            "Reproduce locally:" \
+            "" \
+            '```' \
+            "make test-e2e ASTRO_E2E_MAX_TIER=2" \
+            '```' \
+            "" \
+            "This issue closes itself when a nightly passes again.")
+          gh issue create --title "$ISSUE_TITLE" --body "$body"
+
+      # Scheduled runs only, both here and above. workflow_dispatch is how
+      # somebody tries the suite by hand, often while an outage is open, and a
+      # hand-run that happens to pass would otherwise close the outage and lose
+      # the thread the next nightly would have added to.
+      - name: Close the failure issue once it passes
+        if: ${{ success() && github.event_name == 'schedule' }}
+        # A red nightly with a green test step and no issue is the worst
+        # outcome available, so a flaky gh call must not fail the job.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          find_issue() {
+            gh issue list --state open --search "in:title $ISSUE_TITLE" \
+              --json number,title \
+              --jq 'first(.[] | select(.title == env.ISSUE_TITLE) | .number) // empty'
+          }
+          existing=$(find_issue)
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "Passing again: $RUN_URL"
+          fi

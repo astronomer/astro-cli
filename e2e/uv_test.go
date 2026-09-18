@@ -42,8 +42,15 @@ func (p *project) sync() {
 // for it, which is what every tier-1 case starts from.
 func airflowProject(t *testing.T) *project {
 	t.Helper()
+	return namedAirflowProject(t, "project")
+}
+
+// namedAirflowProject is airflowProject with the directory's name chosen, for
+// a case that runs two at once and needs them to differ. See newNamedProject.
+func namedAirflowProject(t *testing.T, name string) *project {
+	t.Helper()
 	needsUV(t)
-	p := newProject(t)
+	p := newNamedProject(t, name)
 	p.run("init", "--name", "tier1").requireSuccess()
 	p.sync()
 	return p

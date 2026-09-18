@@ -25,4 +25,15 @@ cd "$(dirname "$0")/../e2e"
 # `test` target, which made the same change for the same reason.
 export GORACE=atexit_sleep_ms=0
 
-exec go test -count=1 -race -shuffle=on -timeout=15m -tags e2e "$@" ./...
+# The suite budget scales with the tier, because the point of the per-command
+# bounds in the harness is that a hung command fails its own test with its own
+# output. That only holds while the suite outlives one of them: a -timeout
+# panic dumps goroutines instead, and does not run t.Cleanup, so tier 2 would
+# also leave a real Airflow holding a port. Tier 2's bound is ten minutes (see
+# slowCommandTimeout), so the suite gets thirty.
+timeout=15m
+if [ "${ASTRO_E2E_MAX_TIER:-0}" -ge 2 ]; then
+  timeout=30m
+fi
+
+exec go test -count=1 -race -shuffle=on -timeout="$timeout" -tags e2e "$@" ./...
