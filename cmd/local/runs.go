@@ -231,6 +231,7 @@ func renderConf(conf map[string]any) string {
 		return ""
 	}
 	//nolint:errcheck // the map came off a JSON decode, so it re-encodes
+	//astro:non-output-json // renders a conf map into a text table cell; not a published payload
 	encoded, _ := json.Marshal(conf)
 	return string(encoded)
 }

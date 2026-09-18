@@ -42,9 +42,27 @@ type Renderer struct {
 
 // Emit writes v. In text mode it calls text, which must render v and
 // nothing else.
+//
+// A nil text renderer is only legal on a streaming surface, where the
+// caller has already established it is in json mode and the human rendering
+// is a table written once at the end. Reaching text mode with nil is a
+// programming error, and it panics rather than writing nothing.
+//
+// Deliberately not a silent no-op. An earlier version of this returned nil
+// there, on the theory that it made the caller's `if r.Format == FormatJSON`
+// branch unnecessary. It does not: delete that branch from emitRows, envList
+// or renderCheck and a no-op turns `astro local list` into an empty table
+// with exit 0 — a human sees nothing and is told nothing. The branch is
+// load-bearing, and a panic is what says so when it goes missing.
 func (r Renderer) Emit(v any, text func(w io.Writer) error) error {
 	if r.Format == FormatJSON {
 		return json.NewEncoder(r.Out).Encode(v)
+	}
+	if text == nil {
+		panic("Renderer.Emit: text mode with no text renderer — this value is " +
+			"json-only, so the caller must not reach here in text mode. The " +
+			"`if r.Format == FormatJSON` branch around a streaming Emit is what " +
+			"prevents it.")
 	}
 	return text(r.Out)
 }
@@ -130,9 +148,23 @@ type jsonError struct {
 
 // emitJSONError writes the single JSON error object a failed command reports in
 // json mode.
+//
+// Through a Renderer rather than its own encoder, so that every published
+// payload leaves by one door. The door is what makes the shape observable:
+// a test can record what passes through Emit, and a payload that goes
+// around it is one nothing can see.
+//
+// The text renderer writes nothing because there is nothing to write: in
+// text mode cobra prints the error itself, and the caller only reaches here
+// having decided the format is json. Spelled out rather than passed as nil
+// so that a later caller in text mode gets silence by intent instead of a
+// panic.
 func emitJSONError(w io.Writer, err error) {
 	//nolint:errcheck // the command already failed; a write error changes nothing
-	json.NewEncoder(w).Encode(jsonError{Error: err.Error(), Code: 1})
+	Renderer{Format: FormatJSON, Out: w}.Emit(
+		jsonError{Error: err.Error(), Code: 1},
+		func(io.Writer) error { return nil },
+	)
 }
 
 // event is one progress update on a streaming surface (start, logs). In

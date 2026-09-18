@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -335,13 +334,12 @@ func renderCheck(r Renderer, res checks.Result, strict, provisioned bool) error 
 		Passed:      res.Passed(strict),
 	}
 	if r.Format == FormatJSON {
-		enc := json.NewEncoder(r.Out)
 		for _, f := range res.Findings {
-			if err := enc.Encode(f); err != nil {
+			if err := r.Emit(f, nil); err != nil {
 				return err
 			}
 		}
-		return enc.Encode(summary)
+		return r.Emit(summary, nil)
 	}
 	budget := maxTracebacks
 	if err := renderFindingsTable(r.Out, res.Findings, &budget); err != nil {
@@ -776,22 +774,21 @@ func blocked(r Renderer, err error) error {
 	return &ExitError{Code: checks.ExitEnvNotReady}
 }
 
-// renderCheckBlocked writes the reason check could not reach a verdict. In
 // checkBlocked is the line `astro local check` publishes when it cannot run
-// at all. Named so the schema pins can hold it.
+// at all. Named rather than anonymous so the schema pins can hold it.
 type checkBlocked struct {
 	Event   string `json:"event"`
 	Message string `json:"message"`
 }
 
+// renderCheckBlocked writes the reason check could not reach a verdict. In
 // json mode it is a single structured line; in text mode, the guidance.
 func renderCheckBlocked(r Renderer, err error) error {
 	msg := err.Error()
-	if r.Format == FormatJSON {
-		return json.NewEncoder(r.Out).Encode(checkBlocked{Event: "error", Message: msg})
-	}
-	_, werr := fmt.Fprintln(r.Out, msg)
-	return werr
+	return r.Emit(checkBlocked{Event: "error", Message: msg}, func(w io.Writer) error {
+		_, werr := fmt.Fprintln(w, msg)
+		return werr
+	})
 }
 
 // renderTargetChecks writes one block per target. In json mode each target is
@@ -800,9 +797,8 @@ func renderCheckBlocked(r Renderer, err error) error {
 // result, and a one-line verdict.
 func renderTargetChecks(r Renderer, reports []checks.TargetReport, strict bool) error {
 	if r.Format == FormatJSON {
-		enc := json.NewEncoder(r.Out)
 		for i := range reports {
-			if err := enc.Encode(reports[i]); err != nil {
+			if err := r.Emit(reports[i], nil); err != nil {
 				return err
 			}
 		}
