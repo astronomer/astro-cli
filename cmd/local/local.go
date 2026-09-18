@@ -802,6 +802,13 @@ func newOpenCmd(c *cli) *cobra.Command {
 	return cmd
 }
 
+// urlResult is what `astro local open --print` publishes in json mode: the
+// one URL, so a script does not have to parse the text line. Named rather
+// than anonymous so the schema pins can hold it.
+type urlResult struct {
+	URL string `json:"url"`
+}
+
 func (c *cli) runOpen(printURL bool) error {
 	r, err := c.renderer()
 	if err != nil {
@@ -816,10 +823,7 @@ func (c *cli) runOpen(printURL bool) error {
 	}
 	url := primaryURL(st)
 	if printURL {
-		v := struct {
-			URL string `json:"url"`
-		}{url}
-		return r.Emit(v, func(w io.Writer) error {
+		return r.Emit(urlResult{URL: url}, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, url)
 			return werr
 		})

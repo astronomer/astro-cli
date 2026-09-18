@@ -1,0 +1,7 @@
+{
+  "dag_id": "x",
+  "dag_run_id": "x",
+  "task_id": "x",
+  "try_number": -1,
+  "content": "x"
+}

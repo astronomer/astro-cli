@@ -1,0 +1,12 @@
+{
+  "kind": "x",
+  "severity": "x",
+  "file": "x",
+  "dag_id": "x",
+  "files": [
+    "x"
+  ],
+  "message": "x",
+  "parse_time_seconds": 1.5,
+  "threshold_seconds": 1.5
+}

@@ -119,14 +119,20 @@ type errJSONShown struct{ err error }
 func (e errJSONShown) Error() string { return e.err.Error() }
 func (e errJSONShown) Unwrap() error { return e.err }
 
+// jsonError is the object a failed command writes in json mode. Named rather
+// than anonymous so it is a declared type the schema pins can hold: this is
+// the shape every `--output json` failure publishes, and it was the one
+// payload nothing could see.
+type jsonError struct {
+	Error string `json:"error"`
+	Code  int    `json:"code"`
+}
+
 // emitJSONError writes the single JSON error object a failed command reports in
 // json mode.
 func emitJSONError(w io.Writer, err error) {
 	//nolint:errcheck // the command already failed; a write error changes nothing
-	json.NewEncoder(w).Encode(struct {
-		Error string `json:"error"`
-		Code  int    `json:"code"`
-	}{Error: err.Error(), Code: 1})
+	json.NewEncoder(w).Encode(jsonError{Error: err.Error(), Code: 1})
 }
 
 // event is one progress update on a streaming surface (start, logs). In

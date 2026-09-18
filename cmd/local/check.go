@@ -777,14 +777,18 @@ func blocked(r Renderer, err error) error {
 }
 
 // renderCheckBlocked writes the reason check could not reach a verdict. In
+// checkBlocked is the line `astro local check` publishes when it cannot run
+// at all. Named so the schema pins can hold it.
+type checkBlocked struct {
+	Event   string `json:"event"`
+	Message string `json:"message"`
+}
+
 // json mode it is a single structured line; in text mode, the guidance.
 func renderCheckBlocked(r Renderer, err error) error {
 	msg := err.Error()
 	if r.Format == FormatJSON {
-		return json.NewEncoder(r.Out).Encode(struct {
-			Event   string `json:"event"`
-			Message string `json:"message"`
-		}{Event: "error", Message: msg})
+		return json.NewEncoder(r.Out).Encode(checkBlocked{Event: "error", Message: msg})
 	}
 	_, werr := fmt.Fprintln(r.Out, msg)
 	return werr

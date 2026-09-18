@@ -1,0 +1,12 @@
+{
+  "count": -1,
+  "errors": [
+    {
+      "filename": "x",
+      "stack_trace": "x",
+      "bundle_name": "x",
+      "timestamp": "x"
+    }
+  ],
+  "error": "x"
+}

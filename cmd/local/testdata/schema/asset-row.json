@@ -1,0 +1,14 @@
+{
+  "id": -1,
+  "uri": "x",
+  "name": "x",
+  "group": "x",
+  "producing_tasks": [
+    "x"
+  ],
+  "scheduled_dags": [
+    "x"
+  ],
+  "created_at": "x",
+  "updated_at": "x"
+}

@@ -1,0 +1,17 @@
+{
+  "task_id": "x",
+  "task_display_name": "x",
+  "operator_name": "x",
+  "owner": "x",
+  "pool": "x",
+  "queue": "x",
+  "retries": -1,
+  "trigger_rule": "x",
+  "is_mapped": true,
+  "depends_on_past": true,
+  "downstream_task_ids": [
+    "x"
+  ],
+  "start_date": "x",
+  "end_date": "x"
+}

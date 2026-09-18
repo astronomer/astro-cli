@@ -32,22 +32,35 @@ func (e *MissingEnvError) Error() string {
 	return b.String()
 }
 
+// MissingValue is one unset value in a MissingPayload: what the resolver
+// looked for, plus the exact command that would supply it.
+type MissingValue struct {
+	envresolve.Missing
+	SetCommand string `json:"set_command"`
+}
+
+// MissingPayload is the --output json shape a start blocked on unset values
+// publishes: the same data the message renders, structured for a coding
+// agent to act on.
+//
+// Declared at package level rather than inside Payload so it is a type the
+// schema pins in cmd/local can hold. Its own doc says it is for an agent to
+// act on, which makes it exactly the kind of shape that must not drift
+// unnoticed.
+type MissingPayload struct {
+	Error   string         `json:"error"`
+	Project string         `json:"project"`
+	Missing []MissingValue `json:"missing"`
+}
+
 // Payload is the --output json shape: the same data the message renders, plus
 // the set command per value, structured for a coding agent to act on.
 func (e *MissingEnvError) Payload() any {
-	type missing struct {
-		envresolve.Missing
-		SetCommand string `json:"set_command"`
-	}
-	out := make([]missing, 0, len(e.Missing))
+	out := make([]MissingValue, 0, len(e.Missing))
 	for i := range e.Missing {
-		out = append(out, missing{Missing: e.Missing[i], SetCommand: setHint(&e.Missing[i])})
+		out = append(out, MissingValue{Missing: e.Missing[i], SetCommand: setHint(&e.Missing[i])})
 	}
-	return struct {
-		Error   string    `json:"error"`
-		Project string    `json:"project"`
-		Missing []missing `json:"missing"`
-	}{
+	return MissingPayload{
 		Error:   "required environment values are not set on this machine",
 		Project: e.Project,
 		Missing: out,

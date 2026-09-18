@@ -1,0 +1,17 @@
+{
+  "dag_id": "x",
+  "dag_run_id": "x",
+  "state": "x",
+  "run_type": "x",
+  "logical_date": "x",
+  "queued_at": "x",
+  "start_date": "x",
+  "end_date": "x",
+  "duration_seconds": 1.5,
+  "triggered_by": "x",
+  "note": "x",
+  "conf": {
+    "x": null
+  },
+  "unpaused": true
+}

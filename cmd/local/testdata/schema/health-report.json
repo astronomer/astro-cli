@@ -1,0 +1,52 @@
+{
+  "version": {
+    "version": "x",
+    "git_version": "x",
+    "generation": "x",
+    "error": "x"
+  },
+  "import_errors": {
+    "count": -1,
+    "errors": [
+      {
+        "filename": "x",
+        "stack_trace": "x",
+        "bundle_name": "x",
+        "timestamp": "x"
+      }
+    ],
+    "error": "x"
+  },
+  "dag_warnings": {
+    "count": -1,
+    "warnings": [
+      {
+        "dag_id": "x",
+        "warning_type": "x",
+        "message": "x",
+        "timestamp": "x"
+      }
+    ],
+    "error": "x"
+  },
+  "dag_stats": {
+    "available": true,
+    "note": "x",
+    "dags": [
+      {
+        "dag_id": "x",
+        "stats": {
+          "x": -1
+        }
+      }
+    ],
+    "runs": -1,
+    "dags_with_runs": -1,
+    "error": "x"
+  },
+  "overall_status": "x",
+  "status_reason": "x",
+  "unread": [
+    "x"
+  ]
+}

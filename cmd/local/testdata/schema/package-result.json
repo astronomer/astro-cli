@@ -1,0 +1,17 @@
+{
+  "target": "x",
+  "kind": "x",
+  "image": "x",
+  "runtime_version": "x",
+  "tree_path": "x",
+  "bundle_path": "x",
+  "saved_path": "x",
+  "size": -1,
+  "deps_file": "x",
+  "warnings": [
+    "x"
+  ],
+  "next_steps": [
+    "x"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "available": true,
+  "note": "x",
+  "dags": [
+    {
+      "dag_id": "x",
+      "stats": {
+        "x": -1
+      }
+    }
+  ],
+  "runs": -1,
+  "dags_with_runs": -1,
+  "error": "x"
+}

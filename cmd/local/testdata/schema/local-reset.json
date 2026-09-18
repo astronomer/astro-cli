@@ -1,0 +1,5 @@
+{
+  "stopped": true,
+  "compose_project": "x",
+  "docker_unreachable": true
+}

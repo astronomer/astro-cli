@@ -1,0 +1,33 @@
+{
+  "target": "x",
+  "airflow_checked": "x",
+  "mapped_from": "x",
+  "notes": [
+    "x"
+  ],
+  "constraints": {
+    "url": "x",
+    "checked": true,
+    "ok": true,
+    "conflict": "x",
+    "skipped": "x"
+  },
+  "findings": [
+    {
+      "kind": "x",
+      "severity": "x",
+      "file": "x",
+      "dag_id": "x",
+      "files": [
+        "x"
+      ],
+      "message": "x",
+      "parse_time_seconds": 1.5,
+      "threshold_seconds": 1.5
+    }
+  ],
+  "dags": -1,
+  "errors": -1,
+  "warnings": -1,
+  "error": "x"
+}

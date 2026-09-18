@@ -1,0 +1,12 @@
+{
+  "count": -1,
+  "warnings": [
+    {
+      "dag_id": "x",
+      "warning_type": "x",
+      "message": "x",
+      "timestamp": "x"
+    }
+  ],
+  "error": "x"
+}

@@ -1,0 +1,12 @@
+{
+  "name": "x",
+  "slots": -1,
+  "occupied_slots": -1,
+  "running_slots": -1,
+  "queued_slots": -1,
+  "scheduled_slots": -1,
+  "deferred_slots": -1,
+  "open_slots": -1,
+  "description": "x",
+  "include_deferred": true
+}

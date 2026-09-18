@@ -1,0 +1,9 @@
+{
+  "event": "x",
+  "dags": -1,
+  "errors": -1,
+  "warnings": -1,
+  "strict": true,
+  "passed": true,
+  "provisioned": true
+}

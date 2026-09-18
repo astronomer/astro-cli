@@ -73,6 +73,15 @@ uninstall:
 test:
 	GORACE=atexit_sleep_ms=0 go test -count=1 -race -shuffle=on -timeout=15m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
 
+# The `--output json` payloads are pinned against goldens in
+# cmd/local/testdata/schema. A deliberate change to one — a new field, a
+# rename — regenerates them; the diff then lands in the PR, which is the
+# point. Read what it writes before committing it: these shapes are what
+# scripts, agents and Astro Desktop parse.
+.PHONY: update-schemas
+update-schemas:
+	go test ./cmd/local/ -run TestPublishedJSONPayloadsKeepTheirShape -update-schemas
+
 # Each pkg/* sub-module has its own go.mod, which the root `go test ./...`
 # never descends into, so their tests need a run of their own.
 test-submodules:

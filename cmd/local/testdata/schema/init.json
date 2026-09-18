@@ -1,0 +1,24 @@
+{
+  "dir": "x",
+  "name": "x",
+  "airflow": "x",
+  "created": [
+    "x"
+  ],
+  "skipped": [
+    "x"
+  ],
+  "updated": [
+    "x"
+  ],
+  "deleted": [
+    "x"
+  ],
+  "adopted": true,
+  "notes": [
+    "x"
+  ],
+  "advisories": [
+    "x"
+  ]
+}
