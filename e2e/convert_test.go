@@ -1,0 +1,560 @@
+//go:build e2e
+
+package e2e
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// v1 conversion: `astro init` in a project that states its shape in v1 files.
+//
+// The most review-sensitive thing in the release, because it rewrites
+// somebody's repository and deletes files out of it. Also the cheapest thing
+// here to test properly: it is file in, file out, so the whole table is tier 0
+// and runs on Windows too, where the path handling differs and the conversion
+// still has to agree.
+//
+// Asserted through --output json rather than the rendered text. The prose is
+// long and will be reworded; what a conversion DID is the contract, and the
+// json names it — created, updated, skipped, deleted, adopted, notes,
+// advisories.
+//
+// The notes/advisories split is the assertion worth having. Notes are work
+// left for a person; advisories describe something already carried that now
+// behaves differently. Result's own doc explains why they are separate fields,
+// and every expected fragment here has to land in its own list AND be absent
+// from the other: a consumer that mixes them up either tells somebody to do a
+// thing that has happened, or hides a change they did not ask for.
+//
+// One shape is missing on purpose. A v1 airflow_settings.yaml with a
+// connection carries a VALUE, and values go to the vault, which opens the OS
+// keyring — the one thing no environment variable relocates, per doc.go.
+// Converting such a project does not fail, it BLOCKS on a keyring prompt, so
+// it cannot live in a tier that runs unattended on every pull request. It needs
+// a case gated on a real keyring, and the suite has none yet. Every fixture
+// below is checked against having opened the vault, so that boundary is an
+// assertion rather than a comment.
+
+// initResult is the shape `astro init --output json` publishes.
+type initResult struct {
+	Dir      string   `json:"dir"`
+	Name     string   `json:"name"`
+	Airflow  string   `json:"airflow"`
+	Created  []string `json:"created"`
+	Skipped  []string `json:"skipped"`
+	Updated  []string `json:"updated"`
+	Deleted  []string `json:"deleted"`
+	Adopted  bool     `json:"adopted"`
+	Notes    []string `json:"notes"`
+	Advisory []string `json:"advisories"`
+}
+
+// v1Case is one v1 project and what converting it has to produce.
+type v1Case struct {
+	name  string
+	files map[string]string
+
+	airflow string
+	adopted bool
+	// manifestLines must appear as whole lines, which is what pins the ORDER
+	// of a carried list: "requirements.txt lines land in dependencies, in file
+	// order" is a promise a set-wise check cannot keep. Whole lines also need
+	// no TOML parser, which this module deliberately does not depend on.
+	manifestLines []string
+	// manifestHas and manifestLacks are substrings, for everything that is
+	// about content rather than order. Substrings on purpose: a whole line
+	// would also pin the writer's quote style and inline-table key order,
+	// which are cosmetic and would break a fixture for no behavioral reason.
+	manifestHas   []string
+	manifestLacks []string
+	// retired names files the run must report deleting AND that must be gone
+	// from disk. kept is the other half: a v1 file that must survive, must not
+	// be reported as removed, and whose content must be intact — keptHas names
+	// a fragment that has to still be in it.
+	retired []string
+	kept    []string
+	keptHas map[string]string
+	// reportedUpdated and reportedSkipped are fragments the run has to file
+	// under those names. Which list a file lands in is the contract a preview
+	// renders, and Changeset.report's doc records the time an adopted manifest
+	// went into one list and not the other, blanking the most important line
+	// of a conversion preview.
+	reportedUpdated []string
+	reportedSkipped []string
+	// notes and advisories are substrings, each of which must match one entry
+	// of its own list and nothing in the other. noNotes asserts the opposite:
+	// that the run had nothing to say, which is itself a promise for a project
+	// whose files all carried.
+	notes      []string
+	advisories []string
+	noNotes    bool
+}
+
+func v1Cases() []v1Case {
+	// A pre-3 runtime tag names a runtime and not an Airflow minor, so it
+	// always earns a note — which, because a file a note names is never
+	// retired, is also what spares the Dockerfile in every fixture using it.
+	const runtime2 = "FROM quay.io/astronomer/astro-runtime:9.1.0\n"
+	// A modern tag names the Airflow version outright. No note, and so
+	// nothing to keep the Dockerfile for: this is the shape that deletes it.
+	const runtime3 = "FROM quay.io/astronomer/astro-runtime:3.1-12\n"
+
+	return []v1Case{
+		{
+			// The ordinary Airflow 2 conversion. Both v1 lists reach the
+			// manifest and go; the Dockerfile stays, because the note about
+			// its tag is also something still to be said about it.
+			name: "the whole v1 shape",
+			files: map[string]string{
+				"Dockerfile": runtime2,
+				// Deliberately NOT in alphabetical order, so the assertion
+				// below distinguishes "file order" from "sorted". With pandas
+				// before requests it could not.
+				"requirements.txt": "requests\npandas==2.1.0\n",
+				"packages.txt":     "libpq-dev\ngit\n",
+			},
+			airflow: "2",
+			manifestLines: []string{
+				"dependencies = ['apache-airflow==2.*', 'requests', 'pandas==2.1.0']",
+				"packages = ['libpq-dev', 'git']",
+			},
+			manifestHas: []string{"airflow = '2'"},
+			retired:     []string{"requirements.txt", "packages.txt"},
+			// The most destructive deletion available, so its absence is
+			// asserted rather than assumed.
+			kept:    []string{"Dockerfile"},
+			keptHas: map[string]string{"Dockerfile": "astro-runtime:9.1.0"},
+			notes:   []string{"does not name the Airflow minor"},
+		},
+		{
+			// A modern runtime tag names the Airflow version, so there is
+			// nothing left to say about the Dockerfile and it goes with the
+			// rest. The case that covers a conversion deleting a Dockerfile at
+			// all, which is the shape every Airflow 3 v1 project carries.
+			name: "a runtime tag that names the Airflow version",
+			files: map[string]string{
+				"Dockerfile":       runtime3,
+				"requirements.txt": "pandas==2.1.0\n",
+			},
+			airflow:       "3.1",
+			manifestLines: []string{"dependencies = ['apache-airflow==3.1.*', 'pandas==2.1.0']"},
+			manifestHas:   []string{"airflow = '3.1'"},
+			retired:       []string{"Dockerfile", "requirements.txt"},
+			// Everything carried, so the run has nothing to report.
+			noNotes: true,
+		},
+		{
+			// A Dockerfile that does more than pin becomes the project's
+			// declared build, which makes BOTH v1 lists load-bearing again:
+			// the base image's ONBUILD reads them during the build, so deleting
+			// either would change what the image contains.
+			//
+			// Both, because that is the bug planRetirements describes fixing —
+			// an ordinary conversion deleted the two files and left a build
+			// that either failed on the missing COPY or produced an image with
+			// none of the project's packages.
+			name: "a Dockerfile that does more than pin",
+			files: map[string]string{
+				"Dockerfile":       runtime2 + "RUN apt-get update && apt-get install -y curl\n",
+				"requirements.txt": "pandas==2.1.0\n",
+				"packages.txt":     "libpq-dev\n",
+			},
+			airflow:       "2",
+			manifestLines: []string{"dependencies = ['apache-airflow==2.*', 'pandas==2.1.0']"},
+			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = ['libpq-dev']"},
+			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt"},
+			keptHas: map[string]string{
+				"requirements.txt": "pandas==2.1.0",
+				"packages.txt":     "libpq-dev",
+			},
+			notes: []string{
+				"its RUN instructions were not read here",
+				"kept, because your Dockerfile's base image reads it during the build",
+			},
+		},
+		{
+			// Four kinds of line [project.dependencies] cannot express. Each
+			// gets a note naming the line and where it belongs, none is guessed
+			// at, and the file stays with those lines still in it.
+			name: "requirement lines a manifest cannot express",
+			files: map[string]string{
+				"Dockerfile": runtime2,
+				"requirements.txt": "pandas==2.1.0\n" +
+					"-e .\n" +
+					"https://example.com/pkg.tar.gz\n" +
+					"--index-url https://example.com/simple\n" +
+					"./local-wheel.whl\n",
+			},
+			airflow:       "2",
+			manifestLines: []string{"dependencies = ['apache-airflow==2.*', 'pandas==2.1.0']"},
+			// None of the four reached the manifest in any form.
+			manifestLacks: []string{"-e .", "example.com", "local-wheel"},
+			kept:          []string{"requirements.txt"},
+			keptHas:       map[string]string{"requirements.txt": "-e ."},
+			notes: []string{
+				"-e . is an editable install",
+				"is a bare URL",
+				"names a package index",
+				"is a local path",
+			},
+		},
+		{
+			// The desktop's env schema. Its connections are DECLARATIONS, so
+			// they reach the manifest and nothing reaches the vault — which is
+			// what keeps this case in tier 0 while a settings file with a
+			// connection value is not here at all.
+			name: "the desktop's env schema",
+			files: map[string]string{
+				"Dockerfile": runtime2,
+				".astro/env.schema.yaml": "env_vars:\n" +
+					"  - key: API_URL\n" +
+					"    required: true\n" +
+					"    description: where the orders service lives\n" +
+					"  - key: BATCH_SIZE\n" +
+					"    default: \"500\"\n" +
+					"airflow_variables:\n" +
+					"  - key: region\n" +
+					"    default: us-east-1\n" +
+					"connections:\n" +
+					"  - conn_id: warehouse\n" +
+					"    conn_type: postgres\n",
+			},
+			airflow: "2",
+			manifestHas: []string{
+				"[tool.astro.env]",
+				"API_URL",
+				"where the orders service lives",
+				"BATCH_SIZE",
+				"default = '500'",
+				"[tool.astro.env.airflow_variables]",
+				"region",
+				"default = 'us-east-1'",
+				"[tool.astro.env.connections]",
+				"warehouse",
+				"conn_type = 'postgres'",
+			},
+			retired: []string{".astro/env.schema.yaml"},
+			// Not a note: a v1 default was documentation and was never applied,
+			// and now it is composed into the environment at start. Nothing is
+			// left to do and the project behaves differently, which is the
+			// whole reason advisories are a separate list.
+			advisories: []string{
+				"BATCH_SIZE: its default is now composed into the environment at start",
+				"region: its default is now composed into the environment at start",
+			},
+		},
+		{
+			// A manifest that already pins Airflow keeps its own pin: the
+			// Dockerfile does not overrule what the project said about itself.
+			name: "a manifest that already pins Airflow",
+			files: map[string]string{
+				"Dockerfile": runtime2,
+				"pyproject.toml": "[project]\n" +
+					"name = 'already'\n" +
+					"version = '0.1.0'\n" +
+					"requires-python = '>=3.10'\n" +
+					"dependencies = ['apache-airflow==2.9.*']\n",
+			},
+			airflow: "2.9",
+			adopted: true,
+			manifestHas: []string{
+				"name = 'already'",
+				"dependencies = ['apache-airflow==2.9.*']",
+				"airflow = '2.9'",
+			},
+			kept: []string{"Dockerfile"},
+			// The manifest was there and gained a section, so it is an update.
+			// Filed as a creation it would blank the most important line of a
+			// preview, which is a thing that has happened.
+			reportedUpdated: []string{"pyproject.toml"},
+			notes: []string{
+				"admits a Python that Airflow 2.9 cannot run",
+			},
+		},
+		{
+			// An Airflow pin stated in requirements.txt itself, which is the
+			// arm of pickAirflowVersion below the Dockerfile and above the
+			// default. Three things at once: the pin is extracted, the
+			// interpreter range narrows to what that Airflow can run, and the
+			// carried list does not repeat the pin it produced.
+			name: "an Airflow pin inside requirements.txt",
+			files: map[string]string{
+				"requirements.txt": "apache-airflow==2.8.1\npandas\n",
+			},
+			airflow:       "2.8.1",
+			manifestLines: []string{"dependencies = ['apache-airflow==2.8.1', 'pandas']"},
+			manifestHas: []string{
+				"airflow = '2.8.1'",
+				"requires-python = '>=3.10,<3.12'",
+			},
+			retired: []string{"requirements.txt"},
+		},
+		{
+			// Nothing names a version, so the pin is the default, and both
+			// places that carry it agree. Deliberately quiet: a project that
+			// never expressed an opinion is not owed a warning, which is what
+			// v1Project.statedVersion separates from "said something
+			// unreadable".
+			name: "nothing names an Airflow version",
+			files: map[string]string{
+				"requirements.txt": "pandas==2.1.0\n",
+			},
+			airflow:       "3.1",
+			manifestLines: []string{"dependencies = ['apache-airflow==3.1.*', 'pandas==2.1.0']"},
+			manifestHas:   []string{"airflow = '3.1'"},
+			retired:       []string{"requirements.txt"},
+			noNotes:       true,
+		},
+		{
+			// airflow_settings.yaml is never retired, and this is the shape
+			// that proves it: variables carry in full, so nothing is left to
+			// say about the file and no note mentions it. Its survival can only
+			// be the explicit rule that keeps it.
+			//
+			// Which matters because that rule is what stands between a
+			// project's pools and rm. A file kept because prose happens to name
+			// it is kept by accident, and the case below is the one where the
+			// prose exists.
+			name: "a settings file whose contents all carry",
+			files: map[string]string{
+				"Dockerfile": runtime2,
+				"airflow_settings.yaml": "airflow:\n" +
+					"  variables:\n" +
+					"    - variable_name: region\n" +
+					"      variable_value: us-east-1\n",
+			},
+			airflow: "2",
+			manifestHas: []string{
+				"[tool.astro.env.airflow_variables]",
+				"region",
+				"default = 'us-east-1'",
+			},
+			kept:    []string{"airflow_settings.yaml"},
+			keptHas: map[string]string{"airflow_settings.yaml": "variable_name: region"},
+		},
+		{
+			// Pools have nowhere to go: neither `astro local start` nor the app
+			// stores them, so the file is the only record of them that
+			// survives. It is kept and the run says why — and the pool must NOT
+			// appear in the manifest, because a key nothing downstream reads
+			// would swallow it silently.
+			name: "a settings file with pools",
+			files: map[string]string{
+				"Dockerfile": runtime2,
+				"airflow_settings.yaml": "airflow:\n" +
+					"  pools:\n" +
+					"    - pool_name: heavy\n" +
+					"      pool_slot: 5\n",
+			},
+			airflow:       "2",
+			manifestLacks: []string{"heavy", "pool"},
+			kept:          []string{"airflow_settings.yaml"},
+			keptHas:       map[string]string{"airflow_settings.yaml": "pool_name: heavy"},
+			notes: []string{
+				"kept for its pools (heavy)",
+				"Neither `astro local start` nor the app stores pools",
+			},
+		},
+		{
+			// What `astro dev init` actually left behind: a project config, a
+			// DAG, a .gitignore. What is already there is kept and reported as
+			// skipped, rather than written over.
+			name: "a real v1 repository",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n",
+				"Dockerfile":         runtime2,
+				"dags/my_dag.py":     "# the project's own dag\n",
+				".gitignore":         ".env\n",
+			},
+			airflow: "2",
+			kept:    []string{"Dockerfile", ".astro/config.yaml"},
+			// Untouched, which is the point of reporting them separately from
+			// what this run wrote.
+			keptHas: map[string]string{"dags/my_dag.py": "the project's own dag"},
+			reportedSkipped: []string{
+				"dags/",
+				".gitignore",
+			},
+			notes: []string{
+				// The Deployments it names have somewhere to go; the file is
+				// kept and the run says where.
+				".astro/config.yaml: move the Deployments it names",
+			},
+		},
+		{
+			// The property behind all of it: a file is retired only once
+			// everything it said is in the manifest, so a line that could not
+			// be carried is also a reason to keep the file — with that line
+			// still in it.
+			name: "one file fully carried beside one that was not",
+			files: map[string]string{
+				"Dockerfile":       runtime2,
+				"requirements.txt": "pandas==2.1.0\n-e .\n",
+				"packages.txt":     "libpq-dev\n",
+			},
+			airflow: "2",
+			retired: []string{"packages.txt"},
+			kept:    []string{"requirements.txt"},
+			keptHas: map[string]string{"requirements.txt": "-e ."},
+			notes:   []string{"-e . is an editable install"},
+		},
+	}
+}
+
+func TestInitConvertsAV1Project(t *testing.T) {
+	tier(t, 0)
+
+	for _, tc := range v1Cases() {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newProject(t)
+			for path, content := range tc.files {
+				full := filepath.Join(p.Dir, path)
+				mkdir(t, filepath.Dir(full))
+				write(t, full, content)
+			}
+
+			var res initResult
+			p.run("init", "--output", "json").requireSuccess().requireJSON(&res)
+
+			if tc.airflow != "" && res.Airflow != tc.airflow {
+				t.Errorf("airflow = %q, want %q", res.Airflow, tc.airflow)
+			}
+			if res.Adopted != tc.adopted {
+				t.Errorf("adopted = %v, want %v (created and adopted are different events)", res.Adopted, tc.adopted)
+			}
+			checkManifest(t, p, &tc)
+			checkFiles(t, p, &res, &tc)
+			checkLists(t, &res, &tc)
+			// Universal, not per-case: no fixture here carries a value, so any
+			// of them reaching the vault is drift that would block the whole
+			// tier on a keyring prompt.
+			checkVaultUntouched(t, p)
+		})
+	}
+}
+
+// checkManifest requires each expected line or fragment, and the absence of
+// anything a conversion must not have written.
+func checkManifest(t *testing.T, p *project, tc *v1Case) {
+	t.Helper()
+	manifest := read(t, filepath.Join(p.Dir, "pyproject.toml"))
+	for _, line := range tc.manifestLines {
+		if !strings.Contains(manifest, line) {
+			t.Errorf("the manifest is missing the line\n\t%s\ngot:\n%s", line, manifest)
+		}
+	}
+	for _, want := range tc.manifestHas {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("the manifest is missing %q\ngot:\n%s", want, manifest)
+		}
+	}
+	for _, unwanted := range tc.manifestLacks {
+		if strings.Contains(manifest, unwanted) {
+			t.Errorf("the manifest carries %q, which it cannot express\ngot:\n%s", unwanted, manifest)
+		}
+	}
+}
+
+// checkFiles holds the conversion to both halves of every claim it makes about
+// a file: reported and actually done.
+//
+// Reporting without removing, or removing without reporting, are each their own
+// bug in a command that edits somebody's repository — and a file kept but
+// rewritten is a third, which is what keptHas is for.
+func checkFiles(t *testing.T, p *project, res *initResult, tc *v1Case) {
+	t.Helper()
+	for _, name := range tc.retired {
+		if !reports(res.Deleted, name) {
+			t.Errorf("%s reached the manifest, so the run should report removing it: %v", name, res.Deleted)
+		}
+		if _, err := os.Stat(filepath.Join(p.Dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s was reported removed but is still there (stat: %v)", name, err)
+		}
+	}
+	for _, name := range tc.kept {
+		if _, err := os.Stat(filepath.Join(p.Dir, name)); err != nil {
+			t.Errorf("%s should have survived the conversion: %v", name, err)
+		}
+		if reports(res.Deleted, name) {
+			t.Errorf("%s survived, so it must not be reported as removed: %v", name, res.Deleted)
+		}
+	}
+	for name, want := range tc.keptHas {
+		if got := read(t, filepath.Join(p.Dir, name)); !strings.Contains(got, want) {
+			t.Errorf("%s survived but no longer contains %q:\n%s", name, want, got)
+		}
+	}
+}
+
+// checkLists requires each fragment to land in the list that describes it.
+//
+// Notes are work left for a person; advisories are changes already made; and
+// which of created, updated and skipped a file lands in is what a preview
+// renders. A consumer cannot tell them apart from the text, which is why they
+// are separate fields and why this checks them separately.
+func checkLists(t *testing.T, res *initResult, tc *v1Case) {
+	t.Helper()
+	for _, want := range tc.notes {
+		if !reports(res.Notes, want) {
+			t.Errorf("no note mentions %q\nnotes: %v", want, res.Notes)
+		}
+		if reports(res.Advisory, want) {
+			t.Errorf("%q is work left to do, so it belongs in notes, not advisories", want)
+		}
+	}
+	for _, want := range tc.advisories {
+		if !reports(res.Advisory, want) {
+			t.Errorf("no advisory mentions %q\nadvisories: %v", want, res.Advisory)
+		}
+		if reports(res.Notes, want) {
+			t.Errorf("%q describes something already carried, so it belongs in advisories, not notes", want)
+		}
+	}
+	if tc.noNotes && len(res.Notes) > 0 {
+		t.Errorf("everything this project said was carried, so the run should have had nothing to add: %v", res.Notes)
+	}
+	for _, want := range tc.reportedUpdated {
+		if !reports(res.Updated, want) {
+			t.Errorf("%q was changed rather than created, so it belongs in updated: created=%v updated=%v",
+				want, res.Created, res.Updated)
+		}
+	}
+	for _, want := range tc.reportedSkipped {
+		if !reports(res.Skipped, want) {
+			t.Errorf("%q was already there and left alone, so it belongs in skipped: created=%v skipped=%v",
+				want, res.Created, res.Skipped)
+		}
+	}
+}
+
+// checkVaultUntouched requires that no conversion here opened the vault.
+//
+// The boundary this whole file depends on. A value carried to the vault opens
+// the OS keyring, which no environment variable relocates, and a keyring prompt
+// does not fail a test — it hangs it, on every pull request. So the claim that
+// these fixtures carry no values is checked rather than trusted.
+func checkVaultUntouched(t *testing.T, p *project) {
+	t.Helper()
+	// pkg/secrets keeps the vault under $HOME/.astro, and the harness points
+	// HOME at the project's own temp directory.
+	if _, err := os.Stat(filepath.Join(p.home, ".astro", "secrets")); !os.IsNotExist(err) {
+		t.Errorf("a fixture reached the vault (stat: %v); a case that carries a value needs a keyring gate, not tier 0", err)
+	}
+}
+
+// reports is true when any entry contains want.
+//
+// Entries are "<file> (<why>)" or "<file>: <what>", so a substring is the
+// honest check: the reason is prose that will be reworded, and the file and the
+// fact are what the assertion is about.
+func reports(entries []string, want string) bool {
+	for _, e := range entries {
+		if strings.Contains(e, want) {
+			return true
+		}
+	}
+	return false
+}

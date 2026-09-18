@@ -922,8 +922,14 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 	// strictly better than "move its pins" about a file that was mostly
 	// carried. Leaving the settings entry here told a user to hand-move
 	// connections the same run had just carried for them.
+	// Names are slash-form, and joined only to look for the file. The name
+	// reaches a json contract a consumer parses, so it has to read the same on
+	// every platform: filepath.Join here reported `.astro\config.yaml` on
+	// Windows while envschema.LegacyRelPath, a slash-form constant, reported
+	// `.astro/env.schema.yaml` in the same list — the same contract
+	// disagreeing with itself about two files in the same directory.
 	checks := []struct{ file, note string }{
-		{filepath.Join(".astro", "config.yaml"), "move the Deployments it names into deployments under [tool.astro]"},
+		{".astro/config.yaml", "move the Deployments it names into deployments under [tool.astro]"},
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
 		{"docker-compose.override.yml", "not read — move any service your dags need into your own setup"},
@@ -931,7 +937,7 @@ func leftovers(dir, version string, facts manifestFacts, v1 *v1Project) []string
 	}
 	var out []string
 	for _, c := range checks {
-		if _, err := os.Stat(filepath.Join(dir, c.file)); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(c.file))); err != nil {
 			continue
 		}
 		out = append(out, c.file+": "+c.note)
