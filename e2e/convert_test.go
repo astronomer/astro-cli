@@ -581,6 +581,41 @@ func checkVaultUntouched(t *testing.T, p *project) {
 	}
 }
 
+// A config this run cannot parse does not reach stdout.
+//
+// The v1 config loader prints its read errors, and printed them to stdout —
+// so `astro init --output json` in a project whose .astro/config.yaml will not
+// parse put a line of prose in front of the object and no consumer could read
+// the result. The command still succeeds: the file is v1 CLI configuration
+// that a conversion only takes a name out of.
+//
+// requireJSON unmarshals the whole of stdout, so it is the assertion: one
+// stray line and it fails.
+func TestInitKeepsStdoutParseableWhenTheV1ConfigWillNot(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+	mkdir(t, filepath.Join(p.Dir, ".astro"))
+	write(t, filepath.Join(p.Dir, ".astro", "config.yaml"), "project:\n  name: [not a string\n")
+	write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM quay.io/astronomer/astro-runtime:3.1-12\n")
+
+	var res initResult
+	r := p.run("init", "--output", "json").requireSuccess()
+	r.requireJSON(&res)
+
+	// The name falls back to the directory, since the file that states one
+	// could not be read.
+	if res.Name == "" {
+		t.Error("a project still needs a name when its v1 config will not parse")
+	}
+	// And the warning is not lost, it is on the stream prose belongs on — and
+	// names the file it is about, rather than the home directory, which is
+	// where it used to send people looking.
+	if !strings.Contains(r.Stderr, "project config") {
+		t.Errorf("the parse failure should be reported on stderr, naming the project's config:\n%s", r.output())
+	}
+}
+
 // reports is true when any entry contains want.
 //
 // Entries are "<file> (<why>)" or "<file>: <what>", so a substring is the

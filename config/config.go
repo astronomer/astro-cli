@@ -24,8 +24,24 @@ const (
 	cloudDomain     = "cloud"
 	houstonDomain   = "houston"
 
-	configCreateHomeErrorMsg = "Error creating default config in home dir: %s"
-	configReadErrorMsg       = "Error reading config in home dir: %s\n"
+	// These go to STDERR, not stdout. A command that can emit `--output json`
+	// has one parseable thing on stdout, and a config warning printed there
+	// lands in front of it: `astro init --output json` in a project whose
+	// .astro/config.yaml will not parse emitted a line of prose and then the
+	// object, which no consumer can read.
+	//
+	// There is a message per file rather than one shared. Both project sites
+	// used to report the home-dir wording, so a malformed project config was
+	// announced as a problem with a file in the user's home directory — which
+	// is somewhere they would look, and not where the file is.
+	configCreateHomeErrorMsg    = "Error creating default config in home dir: %s\n"
+	configCreateProjectErrorMsg = "Error creating project config %s: %s\n"
+	configReadHomeErrorMsg      = "Error reading config %s: %s\n"
+	configReadProjectErrorMsg   = "Error reading project config %s: %s\n"
+	// configUnwritableMsg is the refusal a write gets against a file this
+	// process could not read. viper's parse errors carry a line number and no
+	// filename, so both of these say which file.
+	configUnwritableMsg = "refusing to write %s: it could not be read at startup, and writing now would replace it with defaults — fix or remove the file"
 )
 
 var (
@@ -104,6 +120,22 @@ var (
 		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
 	}
 
+	// unreadableConfigs names config files that exist and could not be parsed.
+	//
+	// A write to one of them would destroy it. viper takes its write target
+	// from SetConfigFile, which runs BEFORE the read, so a failed read leaves
+	// the object holding nothing but registered defaults while still pointed
+	// at the user's file — and configExists, which is the only guard the
+	// setters have, tests ConfigFileUsed() and is therefore still true. The
+	// next `astro config set`, `astro login` or context switch then serialized
+	// AllSettings() over the top: contexts, tokens and workspaces replaced by
+	// defaults, reported as success.
+	//
+	// Keyed by path rather than by viper object so the check lives in
+	// saveConfig, which every write goes through, instead of at the eight
+	// call sites that would each have to remember it.
+	unreadableConfigs = map[string]bool{}
+
 	// viperHome is the viper object in the users home directory
 	viperHome *viper.Viper
 	// viperProject is the viper object in a project directory
@@ -148,7 +180,7 @@ func initHome(fs afero.Fs) {
 	if !homeConfigExists {
 		err := CreateConfig(viperHome, fs, HomeConfigPath, HomeConfigFile)
 		if err != nil {
-			fmt.Printf(configCreateHomeErrorMsg, err)
+			fmt.Fprintf(os.Stderr, configCreateHomeErrorMsg, err)
 			return
 		}
 	}
@@ -156,9 +188,11 @@ func initHome(fs afero.Fs) {
 	// Read in home config
 	err := viperHome.ReadInConfig()
 	if err != nil {
-		fmt.Printf(configReadErrorMsg, err)
+		unreadableConfigs[HomeConfigFile] = true
+		fmt.Fprintf(os.Stderr, configReadHomeErrorMsg, HomeConfigFile, err)
 		return
 	}
+	delete(unreadableConfigs, HomeConfigFile)
 }
 
 // Init viper for config file in project directory
@@ -187,8 +221,11 @@ func initProject(fs afero.Fs) {
 	// Read in project config
 	readErr := viperProject.ReadInConfig()
 	if readErr != nil {
-		fmt.Printf(configReadErrorMsg, readErr)
+		unreadableConfigs[workingConfigFile] = true
+		fmt.Fprintf(os.Stderr, configReadProjectErrorMsg, workingConfigFile, readErr)
+		return
 	}
+	delete(unreadableConfigs, workingConfigFile)
 }
 
 // CreateProjectConfig creates a project config file
@@ -198,7 +235,7 @@ func CreateProjectConfig(projectPath string) {
 
 	err := CreateConfig(viperProject, afero.NewOsFs(), projectConfigDir, projectConfigFile)
 	if err != nil {
-		fmt.Printf(configCreateHomeErrorMsg, err)
+		fmt.Fprintf(os.Stderr, configCreateProjectErrorMsg, projectConfigFile, err)
 		return
 	}
 
@@ -276,6 +313,18 @@ func IsWithinProjectDir(path string) (bool, error) {
 // the lock when the holding process exits regardless of whether the file is
 // deleted, so a stale `.lock` file on disk is never itself a problem.
 func saveConfig(v *viper.Viper, file string) error {
+	// A file this process could not read is a file it must not write. See
+	// unreadableConfigs: v holds defaults after a failed read, and writing
+	// them here replaces whatever the user had — which for the home config is
+	// their contexts and tokens.
+	//
+	// An error rather than a silent skip, because the alternative failure is
+	// somebody setting a value, being told nothing, and finding later that it
+	// never persisted.
+	if unreadableConfigs[file] {
+		return fmt.Errorf(configUnwritableMsg, file)
+	}
+
 	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
 	// dir hasn't been created yet. viper.WriteConfigAs creates the parent on
 	// its own, but we need the lock held before we write — so do it upfront.
