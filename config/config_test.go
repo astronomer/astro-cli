@@ -72,6 +72,7 @@ func (s *Suite) TestIsWithinProjectDir() {
 
 func (s *Suite) TestInitHomeDefaultCase() {
 	fs := afero.NewMemMapFs()
+	s.restoreConfigGlobals()
 	initHome(fs)
 	homeDir, err := fileutil.GetHomeDir()
 	s.NoError(err)
@@ -80,10 +81,12 @@ func (s *Suite) TestInitHomeDefaultCase() {
 
 func (s *Suite) TestInitHomeConfigOverride() {
 	fs := afero.NewMemMapFs()
-	os.Setenv("ASTRO_HOME", "test")
+	// withAstroHome rather than a bare Setenv: unsetting the variable does
+	// not undo what initHome did to HomeConfigFile and viperHome, and this
+	// test used to leave both pointing at "test/.astro".
+	s.withAstroHome("test")
 	initHome(fs)
 	s.Equal(filepath.Join("test", ".astro", "config.yaml"), viperHome.ConfigFileUsed())
-	os.Unsetenv("ASTRO_HOME")
 }
 
 func (s *Suite) TestInitProject() {

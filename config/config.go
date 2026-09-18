@@ -2,7 +2,9 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	iofs "io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +36,6 @@ const (
 	// used to report the home-dir wording, so a malformed project config was
 	// announced as a problem with a file in the user's home directory — which
 	// is somewhere they would look, and not where the file is.
-	configCreateHomeErrorMsg    = "Error creating default config in home dir: %s\n"
 	configCreateProjectErrorMsg = "Error creating project config %s: %s\n"
 	configReadHomeErrorMsg      = "Error reading config %s: %s\n"
 	configReadProjectErrorMsg   = "Error reading project config %s: %s\n"
@@ -140,6 +141,13 @@ var (
 	viperHome *viper.Viper
 	// viperProject is the viper object in a project directory
 	viperProject *viper.Viper
+	// configFs is the filesystem the viper objects above are bound to.
+	//
+	// viper has no exported accessor for its own fs, and saveConfig needs one
+	// to create a file at the right mode before viper writes it. Reaching
+	// around to the os package instead would put a real file in the
+	// developer's home every time a test wrote config through a MemMapFs.
+	configFs afero.Fs = afero.NewOsFs()
 	// createConfigPath dir path, file path
 	dirPerm  os.FileMode = 0o775
 	filePerm os.FileMode = 0o600
@@ -156,6 +164,7 @@ func InitConfig(fs afero.Fs) {
 func initHome(fs afero.Fs) {
 	viperHome = viper.New()
 	viperHome.SetFs(fs)
+	configFs = fs
 	viperHome.SetConfigName(ConfigFileName)
 	viperHome.SetConfigType(ConfigFileType)
 
@@ -175,24 +184,30 @@ func initHome(fs afero.Fs) {
 		}
 	}
 
-	// If home config does not exist, create it
-	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs) //nolint:errcheck // treated as absent on error
-	if !homeConfigExists {
-		err := CreateConfig(viperHome, fs, HomeConfigPath, HomeConfigFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, configCreateHomeErrorMsg, err)
-			return
-		}
-	}
-
-	// Read in home config
-	err := viperHome.ReadInConfig()
-	if err != nil {
+	// Reading the home config is not a reason to create one.
+	//
+	// CreateConfig wrote out AllSettings() of an object holding nothing but
+	// the defaults registered just above, so the file it left behind carried
+	// no value this process did not already have — but InitConfig runs
+	// unconditionally from main, before cobra has looked at argv. Every
+	// command that never touches v1 config paid for it: `astro init` in a
+	// home with no .astro left a 54-line config.yaml and a config.yaml.lock
+	// behind it.
+	//
+	// Nothing needs the file to exist. Its absence reads as those same
+	// defaults, the setters guard on ConfigFileUsed() which SetConfigFile
+	// above has already set, and saveConfig creates the parent directory
+	// before viper's WriteConfigAs creates the file — so the first `astro
+	// login` or `astro config set -g` still writes it.
+	switch err := viperHome.ReadInConfig(); {
+	case err == nil, errors.Is(err, iofs.ErrNotExist):
+		// A file that is not there cannot be destroyed by writing one, so a
+		// missing config is not an unreadable config.
+		delete(unreadableConfigs, HomeConfigFile)
+	default:
 		unreadableConfigs[HomeConfigFile] = true
 		fmt.Fprintf(os.Stderr, configReadHomeErrorMsg, HomeConfigFile, err)
-		return
 	}
-	delete(unreadableConfigs, HomeConfigFile)
 }
 
 // Init viper for config file in project directory
@@ -201,6 +216,7 @@ func initProject(fs afero.Fs) {
 	// Set up viper object for project config
 	viperProject = viper.New()
 	viperProject.SetFs(fs)
+	configFs = fs
 	viperProject.SetConfigName(ConfigFileName)
 	viperProject.SetConfigType(ConfigFileType)
 
@@ -212,20 +228,26 @@ func initProject(fs afero.Fs) {
 	// If path is empty or config file does not exist, just return
 	workingConfigExists, _ := fileutil.Exists(workingConfigFile, fs) //nolint:errcheck // treated as absent on error
 	if workingConfigPath == "" || workingConfigPath == HomeConfigPath || !workingConfigExists {
+		// A file that is gone is no longer a file a write could destroy, so
+		// it does not keep its place on the unreadable list. Without this a
+		// project config that failed to parse and was then deleted — by hand,
+		// or by a conversion — stayed unwritable for the life of the process.
+		delete(unreadableConfigs, workingConfigFile)
 		return
 	}
 
 	// Add the path we discovered
 	viperProject.SetConfigFile(workingConfigFile)
 
-	// Read in project config
-	readErr := viperProject.ReadInConfig()
-	if readErr != nil {
+	// Read in project config. As with the home config, a file that vanished
+	// between the check above and this read is absent rather than corrupt.
+	switch readErr := viperProject.ReadInConfig(); {
+	case readErr == nil, errors.Is(readErr, iofs.ErrNotExist):
+		delete(unreadableConfigs, workingConfigFile)
+	default:
 		unreadableConfigs[workingConfigFile] = true
 		fmt.Fprintf(os.Stderr, configReadProjectErrorMsg, workingConfigFile, readErr)
-		return
 	}
-	delete(unreadableConfigs, workingConfigFile)
 }
 
 // CreateProjectConfig creates a project config file
@@ -250,18 +272,13 @@ func configExists(v *viper.Viper) bool {
 
 // CreateConfig creates a config file in the given directory
 func CreateConfig(v *viper.Viper, fs afero.Fs, path, file string) error {
-	err := fs.MkdirAll(path, dirPerm)
-	if err != nil {
+	// No Create/Chmod here any more. It truncated the target before
+	// saveConfig's unreadableConfigs check could refuse the write, so calling
+	// this on a config that failed to parse emptied the user's file and then
+	// declined to write — the destruction that check exists to prevent.
+	// saveConfig creates the file at filePerm itself when it is absent.
+	if err := fs.MkdirAll(path, dirPerm); err != nil {
 		return fmt.Errorf("error creating config directory: %w", err)
-	}
-
-	_, err = fs.Create(file)
-	if err != nil {
-		return fmt.Errorf("error creating config file: %w", err)
-	}
-	err = fs.Chmod(file, filePerm)
-	if err != nil {
-		return fmt.Errorf("error creating config file: %w", err)
 	}
 
 	return saveConfig(v, file)
@@ -346,7 +363,36 @@ func saveConfig(v *viper.Viper, file string) error {
 	}
 	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this v1 path
 
+	// viper's WriteConfigAs creates a new file 0644. Both configs are made
+	// 0600 instead: the home one holds the API token, and the project one has
+	// been 0600 since CreateConfig chmod'd it, which is the mode this moves
+	// rather than invents. CreateConfig used to set it at startup while the
+	// file was still empty; now that the file appears on first write, the
+	// mode has to be established here.
+	//
+	// Only when the file is absent, so an existing file keeps whatever mode
+	// its owner gave it and the common path costs no extra syscall. Before
+	// the write rather than after, so a token is never momentarily
+	// world-readable.
+	created := false
+	if _, statErr := configFs.Stat(file); errors.Is(statErr, iofs.ErrNotExist) {
+		handle, oerr := configFs.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
+		if oerr != nil {
+			return fmt.Errorf("creating config file %s: %w", file, oerr)
+		}
+		if cerr := handle.Close(); cerr != nil {
+			return fmt.Errorf("creating config file %s: %w", file, cerr)
+		}
+		created = true
+	}
+
 	if err := v.WriteConfigAs(file); err != nil {
+		if created {
+			// Take the empty file back out. An empty config parses cleanly,
+			// so leaving it would make the next run read a healthy file full
+			// of nothing and say so to no one.
+			_ = configFs.Remove(file) //nolint:errcheck // the write error below is the one worth reporting
+		}
 		return fmt.Errorf("error saving config: %w", err)
 	}
 	return nil

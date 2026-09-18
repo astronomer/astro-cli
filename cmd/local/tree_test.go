@@ -20,9 +20,16 @@ func walk(cmd *cobra.Command, fn func(*cobra.Command)) {
 	}
 }
 
-// Every v2 command validates its args, carries the skip-pre-run annotation
-// (so the v1 root never runs config or network work for it), and can reach
-// an --output flag — the issue's day-one rules, checked structurally.
+// Every v2 command validates its args, carries the skip-pre-run annotation,
+// and can reach an --output flag — the issue's day-one rules, checked
+// structurally.
+//
+// The annotation stops the v1 root's PersistentPreRunE: no logging setup, no
+// platform pre-run, no telemetry hook, so no network work. It does not stop
+// the config load, which happens in main before cobra has seen argv and has
+// to, because cmd/root.go's detectRootOptions asks context.IsCloudContext()
+// which subtree to mount. That read leaves nothing behind — see
+// TestInitLeavesNoV1ConfigBehind in e2e.
 func TestTreeInvariants(t *testing.T) {
 	d, _ := testDeps(t)
 	for _, top := range AddCmds(d) {

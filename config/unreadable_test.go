@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/afero"
@@ -22,8 +21,7 @@ import (
 func (s *Suite) TestSaveRefusesAConfigItCouldNotRead() {
 	fs := afero.NewMemMapFs()
 	const dir = "unreadable-home"
-	s.NoError(os.Setenv("ASTRO_HOME", dir))
-	defer os.Unsetenv("ASTRO_HOME")
+	s.withAstroHome(dir)
 
 	file := filepath.Join(dir, ConfigDir, ConfigFileNameWithExt)
 	const original = "context: my-org\ncontexts:\n  my-org:\n    token: SECRET\nbroken: [unclosed\n"
@@ -57,6 +55,12 @@ func (s *Suite) TestSaveRefusesAProjectConfigItCouldNotRead() {
 	const original = "project:\n  deployment: prod-1\nbroken: [unclosed\n"
 	s.NoError(afero.WriteFile(fs, file, []byte(original), 0o600))
 
+	// This records the config package's own directory as unreadable, and the
+	// key is not one withAstroHome clears. Left behind, it would make any
+	// later test that writes a project config fail with the refusal instead
+	// of whatever it was actually checking.
+	s.T().Cleanup(func() { delete(unreadableConfigs, file) })
+
 	initProject(fs)
 
 	s.True(unreadableConfigs[file], "a project config that would not parse should be recorded")
@@ -73,8 +77,7 @@ func (s *Suite) TestSaveRefusesAProjectConfigItCouldNotRead() {
 func (s *Suite) TestSaveAllowsAConfigItCouldRead() {
 	fs := afero.NewMemMapFs()
 	const dir = "readable-home"
-	s.NoError(os.Setenv("ASTRO_HOME", dir))
-	defer os.Unsetenv("ASTRO_HOME")
+	s.withAstroHome(dir)
 
 	file := filepath.Join(dir, ConfigDir, ConfigFileNameWithExt)
 	s.NoError(afero.WriteFile(fs, file, []byte("broken: [unclosed\n"), 0o600))

@@ -148,9 +148,19 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	// The v2 tree (`astro local`, `astro init`, the start/stop/logs aliases,
 	// and the `astro dev` removal stub) mounts outside the cloud/software
 	// branch: local Airflow works offline with no account. Every command
-	// carries the skip-pre-run annotation, so PersistentPreRunE above returns
-	// before any config load or network call. The stub replaces the v1 dev
-	// tree in this binary.
+	// carries the skip-pre-run annotation — cmd/local's TestTreeInvariants
+	// checks that structurally — so PersistentPreRunE above returns before
+	// the logging setup, the platform pre-run and the telemetry hook, which
+	// is where the network calls are. The stub replaces the v1 dev tree in
+	// this binary.
+	//
+	// v1 config is still read, for v2 commands too: main calls
+	// config.InitConfig before this function runs, and it has to, because
+	// detectRootOptions asks context.IsCloudContext() which of the two
+	// subtrees above to mount — the shape of the tree depends on the config
+	// file before cobra has seen argv. The read creates nothing, so a v2
+	// command on a machine that never logged in leaves no v1 state behind
+	// (config.initHome, and TestInitLeavesNoV1ConfigBehind in e2e).
 	rootCmd.AddCommand(local.AddCmds(local.NewDeps())...)
 
 	groupCommands(rootCmd)
