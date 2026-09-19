@@ -114,9 +114,13 @@ type Options struct {
 	// returns instead — and never waits until the cost has already been paid.
 	//
 	// cause is the first sync's error. Its stderr has already reached
-	// Stdio.Err if one was supplied, and Error() renders only uv's last line,
-	// so a consumer wanting the whole diagnosis should read CommandError.Stderr
-	// rather than assume this is short.
+	// Stdio.Err if one was supplied. Error() renders uv's own diagnosis — the
+	// headline and the chain of causes under it, joined into one line — which
+	// is a sentence or several and is not bounded: a solver explaining a
+	// conflict between real packages runs to a paragraph. A consumer with
+	// somewhere narrow to put it, a toast or a single-line status, should
+	// elide it rather than assume it fits, and CommandError.Stderr still
+	// carries everything uv said.
 	//
 	// May be called from any goroutine, and concurrently when one Client serves
 	// several projects; an implementation has to be safe for that.

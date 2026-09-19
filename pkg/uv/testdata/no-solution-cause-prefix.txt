@@ -1,0 +1,4 @@
+Using CPython 3.12.3 interpreter at: /usr/bin/python3
+Creating virtual environment at: .venv
+error: No solution found when resolving dependencies
+  cause: Because astro-e2e-no-such-package-8f3a1c was not found in the package registry and your project depends on astro-e2e-no-such-package-8f3a1c==9.9.9, we can conclude that your project's requirements are unsatisfiable.

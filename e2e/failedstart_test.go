@@ -34,10 +34,12 @@ import (
 //
 // Deliberately network-dependent: proving a package does not exist means
 // asking the index. A malformed requirement fails offline and a second
-// faster, but uv reports that one through a build-backend traceback whose
-// last line is a generic hint, so asserting on the message would pin prose
-// that says nothing about the actual fault. A name the registry has never
-// heard of gets the message this case wants to hold the CLI to.
+// faster, and would do as a test of the cleanup — but not of the message.
+// uv reports that one through its build backend, so the CLI can name the
+// phase and the backend that refused and no more; which dependency was wrong
+// is in the streamed log rather than the error. A name the registry has never
+// heard of is refused by uv itself, which is what lets this assert that the
+// error names the package.
 func TestAFailedStartLeavesNothingBehind(t *testing.T) {
 	tier(t, 1)
 	needsUV(t)

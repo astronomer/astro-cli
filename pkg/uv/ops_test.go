@@ -386,15 +386,133 @@ exit 1`
 	}
 }
 
-func TestTailBufferKeepsTail(t *testing.T) {
-	b := &tailBuffer{max: 8}
-	for _, chunk := range []string{"0123", "4567", "89ab"} {
-		if _, err := b.Write([]byte(chunk)); err != nil {
+func TestBoundedBufferKeepsBothEnds(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		head, tail int
+		chunks     []string
+		want       string
+	}{
+		{
+			name: "under the budget, nothing is dropped",
+			head: 4, tail: 8,
+			chunks: []string{"0123", "45"},
+			want:   "012345",
+		},
+		{
+			name: "over it, the middle goes and the ends stay",
+			head: 4, tail: 4,
+			chunks: []string{"0123", "4567", "89ab", "cdef"},
+			want:   "0123" + elision + "cdef",
+		},
+		{
+			name: "a single write larger than the whole budget",
+			head: 4, tail: 4,
+			chunks: []string{"0123456789abcdef"},
+			want:   "0123" + elision + "cdef",
+		},
+		{
+			name: "no head asked for is the old tail-only behavior",
+			head: 0, tail: 8,
+			chunks: []string{"0123", "4567", "89ab"},
+			want:   elision + "456789ab",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &boundedBuffer{head: tc.head, tail: tc.tail}
+			for _, chunk := range tc.chunks {
+				// The count matters as much as the bytes. This sits under an
+				// io.MultiWriter when the caller supplied a live stderr, and
+				// a writer that reports fewer bytes than it was handed is a
+				// short write: the MultiWriter fails, the uv call reports an
+				// I/O error instead of uv's own, and the capture is truncated
+				// at the first chunk that overflowed the head.
+				n, err := b.Write([]byte(chunk))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if n != len(chunk) {
+					t.Fatalf("Write(%q) = %d, want %d — a bounded capture is not a short writer", chunk, n, len(chunk))
+				}
+			}
+			if got := b.String(); got != tc.want {
+				t.Errorf("boundedBuffer = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// The head is kept so that a summary survives a loud build.
+//
+// uv puts what failed at the TOP of its diagnostic and nests the build
+// backend's output underneath, so a tail-only capture of a package with a
+// noisy compiler keeps the traceback and drops the "×" line above it — and
+// summarize falls back to the last line, which is the wrapped tail of uv's
+// generic hint. That is the exact string the summary exists to stop printing,
+// and it came back for precisely the builds that are hardest to debug.
+func TestBoundedBufferKeepsASummarizableDiagnostic(t *testing.T) {
+	b := &boundedBuffer{head: stderrHeadLimit, tail: stderrTailLimit}
+
+	block := "  × Failed to build `pandas`\n  ╰─▶ The build backend returned an error\n\n"
+	if _, err := b.Write([]byte(block)); err != nil {
+		t.Fatal(err)
+	}
+	// A compiler with a great deal to say, then the hint uv signs off with.
+	for range 4000 {
+		if _, err := b.Write([]byte("      warning: unused variable 'x' [-Wunused-variable]\n")); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got := b.String(); got != "456789ab" {
-		t.Errorf("tailBuffer = %q, want the last 8 bytes %q", got, "456789ab")
+	if _, err := b.Write([]byte("      hint: This usually indicates a problem with the package or the build\n      environment.\n")); err != nil {
+		t.Fatal(err)
+	}
+
+	captured := b.String()
+	if !strings.Contains(captured, "truncated") {
+		t.Fatalf("the fixture did not exceed the budget, so it tests nothing (%d bytes)", len(captured))
+	}
+	if got, want := summarize(captured), "Failed to build `pandas`: The build backend returned an error"; got != want {
+		t.Errorf("summarize(captured) = %q, want %q", got, want)
+	}
+}
+
+// The capture uv actually gets keeps a head, so a loud build still has a
+// summary.
+//
+// TestBoundedBufferKeepsASummarizableDiagnostic builds the buffer itself and
+// so cannot see the construction in command() going back to tail-only; this
+// drives a real invocation whose stderr overflows the budget and asks what the
+// error says. Without the head, the "×" line is gone and the message is the
+// last line of what survived.
+func TestALoudFailureStillNamesWhatFailed(t *testing.T) {
+	c := newTestClient(t, Options{}, `
+echo "  × Failed to build pandas" >&2
+echo "  ╰─▶ The build backend returned an error" >&2
+echo "" >&2
+i=0
+while [ $i -lt 4000 ]; do
+  echo "      warning: unused variable 'x' [-Wunused-variable]" >&2
+  i=$((i+1))
+done
+echo "      hint: This usually indicates a problem with the package or the build" >&2
+echo "      environment." >&2
+exit 1
+`)
+
+	err := c.Sync(t.Context(), t.TempDir(), "", Stdio{})
+	if err == nil {
+		t.Fatal("Sync() = nil, want the build failure")
+	}
+
+	var cmdErr *CommandError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("Sync() error = %T, want *CommandError", err)
+	}
+	if !strings.Contains(cmdErr.Stderr, "truncated") {
+		t.Fatalf("the fixture did not overflow the capture, so it tests nothing (%d bytes)", len(cmdErr.Stderr))
+	}
+	if got, want := err.Error(), "Failed to build pandas: The build backend returned an error"; !strings.Contains(got, want) {
+		t.Errorf("error does not name what failed:\n  got  %s\n  want it to contain %q", got, want)
 	}
 }
 

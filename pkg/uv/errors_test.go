@@ -8,13 +8,19 @@ import (
 	"testing"
 )
 
-func TestParseResolutionRealFixture(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("testdata", "no-solution.txt"))
+// readFixture is stderr uv really wrote, captured under testdata. Shared with
+// summary_test.go, which drives the same files through the summariser.
+func readFixture(t *testing.T, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name+".txt"))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("reading the fixture: %v", err)
 	}
+	return string(b)
+}
 
-	got := parseResolution(string(data))
+func TestParseResolutionRealFixture(t *testing.T) {
+	got := parseResolution(readFixture(t, "no-solution"))
 
 	wantSummary := "Because apache-airflow==2.10.4 depends on flask>=2.2.1,<2.3 and your " +
 		"project depends on apache-airflow==2.10.4, we can conclude that your " +

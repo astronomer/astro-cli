@@ -175,6 +175,18 @@ func (c *Client) EnsureSynced(ctx context.Context, project, python string, stdio
 // error value without limit; uv's diagnostics fit comfortably.
 const stderrTailLimit = 64 << 10
 
+// stderrHeadLimit is how much of the START of stderr is kept alongside the
+// tail, within the same budget.
+//
+// A tail alone loses the part that says what failed. uv puts its diagnostic
+// headline and cause arrows FIRST and nests the build backend's output
+// underneath them, so a package whose compiler is loud pushes the "×" line out
+// of a tail-only capture and leaves the traceback that was under it — the
+// summary then falls back to the last line, which is the wrapped tail of a
+// hint, which is the exact string this capture exists to stop reporting. The
+// louder the build, the more certainly it happened.
+const stderrHeadLimit = 8 << 10
+
 // defaultWaitDelay bounds how long Wait blocks on the output pipes after uv
 // itself has exited. See command for why they can outlive the process.
 const defaultWaitDelay = 10 * time.Second
@@ -199,7 +211,7 @@ func (c *Client) command(ctx context.Context, project string, stdio Stdio, args 
 //
 // --color never keeps the captured stderr plain text: uv emits ANSI color even
 // when its output is not a terminal, so without it CommandError.Stderr — and
-// the message built from its last line — carries escape sequences into
+// the summary built from it — carries escape sequences into
 // whatever renders them next, which for an embedder is a log line or a toast.
 // A flag rather than NO_COLOR in the environment, because Run execs the
 // caller's own program through `uv run --` and that program's color is not
@@ -335,7 +347,7 @@ func (c *Client) run(ctx context.Context, project string, env []string, stdio St
 	// captures it internally, so a caller whose writer fails needs to hear
 	// about it rather than receive a truncated result and a nil error.
 	cmd.Stdout = stdio.Out
-	stderrTail := &tailBuffer{max: stderrTailLimit}
+	stderrTail := &boundedBuffer{head: stderrHeadLimit, tail: stderrTailLimit}
 	cmd.Stderr = stderrTail
 	if stdio.Err != nil {
 		cmd.Stderr = io.MultiWriter(stderrTail, quietWriter{stdio.Err})
@@ -518,17 +530,47 @@ func isOperationalEnv(key string) bool {
 }
 
 // tailBuffer keeps the last max bytes written to it.
-type tailBuffer struct {
-	max int
-	buf []byte
+// elision marks where a boundedBuffer dropped the middle of a stream.
+const elision = "\n[... truncated ...]\n"
+
+// boundedBuffer keeps the first head bytes and the last tail bytes of what is
+// written to it, and throws the middle away.
+//
+// Both ends, because both ends are load-bearing and they are not the same
+// bytes. What failed is at the top of uv's diagnostic; the reader's own
+// traceback is at the bottom. A tail-only capture had the second and not the
+// first — see stderrHeadLimit.
+type boundedBuffer struct {
+	head, tail int
+	start      []byte
+	end        []byte
+	dropped    bool
 }
 
-func (b *tailBuffer) Write(p []byte) (int, error) {
-	b.buf = append(b.buf, p...)
-	if len(b.buf) > b.max {
-		b.buf = append([]byte(nil), b.buf[len(b.buf)-b.max:]...)
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	// Every path reports the whole of p as written: this is a bounded capture,
+	// not a short writer, and an io.MultiWriter fed a count smaller than the
+	// slice it handed over treats it as a failed write.
+	written := len(p)
+	if room := b.head - len(b.start); room > 0 {
+		take := min(room, len(p))
+		b.start = append(b.start, p[:take]...)
+		p = p[take:]
 	}
-	return len(p), nil
+	if len(p) == 0 {
+		return written, nil
+	}
+	b.end = append(b.end, p...)
+	if len(b.end) > b.tail {
+		b.end = append([]byte(nil), b.end[len(b.end)-b.tail:]...)
+		b.dropped = true
+	}
+	return written, nil
 }
 
-func (b *tailBuffer) String() string { return string(b.buf) }
+func (b *boundedBuffer) String() string {
+	if !b.dropped {
+		return string(b.start) + string(b.end)
+	}
+	return string(b.start) + elision + string(b.end)
+}

@@ -1,0 +1,3 @@
+error: No interpreter found for Python >=3.99 in managed installations or search path
+
+hint: uv embeds available Python downloads and may require an update to install new versions. Consider retrying on a newer version of uv.

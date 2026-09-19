@@ -1,0 +1,97 @@
+Using CPython 3.13.13
+Creating virtual environment at: .venv
+  × Failed to build `capture @
+  │ file:///home/dev/project`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit
+      status: 1)
+
+      [stdout]
+      configuration error: `project.dependencies[0]` must be pep508
+      DESCRIPTION:
+          Project dependency specification according to PEP 508
+
+      GIVEN VALUE:
+          "not a valid !!! specifier"
+
+      OFFENDING RULE: 'format'
+
+      DEFINITION:
+          {
+              "$id": "#/definitions/dependency",
+              "title": "Dependency",
+              "type": "string",
+              "format": "pep508"
+          }
+
+      For more details about `format` see
+      https://validate-pyproject.readthedocs.io/en/latest/api/validate_pyproject.formats.html
+
+
+      [stderr]
+      Traceback (most recent call last):
+        File "<string>", line 14, in <module>
+          requires = get_requires_for_build({})
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/build_meta.py",
+      line 333, in get_requires_for_build_wheel
+          return self._get_build_requires(config_settings, requirements=[])
+                 ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/build_meta.py",
+      line 301, in _get_build_requires
+          self.run_setup()
+          ~~~~~~~~~~~~~~^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/build_meta.py",
+      line 520, in run_setup
+          super().run_setup(setup_script=setup_script)
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/build_meta.py",
+      line 317, in run_setup
+          exec(code, locals())  # noqa: S102 # exec is intentional here
+          ~~~~^^^^^^^^^^^^^^^^
+        File "<string>", line 1, in <module>
+          import sys
+      
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/__init__.py",
+      line 117, in setup
+          return distutils.core.setup(**attrs)  # type: ignore[return-value]
+                 ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/_distutils/core.py",
+      line 142, in setup
+          dist.parse_config_files()
+          ~~~~~~~~~~~~~~~~~~~~~~~^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/_virtualenv.py",
+      line 20, in parse_config_files
+          result = old_parse_config_files(self, *args, **kwargs)
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/dist.py",
+      line 762, in parse_config_files
+          pyprojecttoml.apply_configuration(self, filename,
+      ignore_option_errors)
+      
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/config/pyprojecttoml.py",
+      line 72, in apply_configuration
+          config = read_configuration(filepath, True, ignore_option_errors,
+      dist)
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/config/pyprojecttoml.py",
+      line 149, in read_configuration
+          validate(subset, filepath)
+          ~~~~~~~~^^^^^^^^^^^^^^^^^^
+        File
+      "/home/dev/.cache/uv/builds-v0/.tmpsUfM2c/lib/python3.13/site-packages/setuptools/config/pyprojecttoml.py",
+      line 61, in validate
+          raise ValueError(f"{error}\n{summary}") from None
+      ValueError: invalid pyproject.toml config: `project.dependencies[0]`.
+      configuration error: `project.dependencies[0]` must be pep508
+
+      hint: This usually indicates a problem with the package or the build
+      environment.

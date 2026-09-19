@@ -37,7 +37,7 @@ type CommandError struct {
 
 func (e *CommandError) Error() string {
 	msg := fmt.Sprintf("uv %s failed (exit %d)", e.verb(), e.ExitCode)
-	if line := lastLine(e.Stderr); line != "" {
+	if line := summarize(e.Stderr); line != "" {
 		msg += ": " + line
 	}
 	return msg
@@ -62,6 +62,194 @@ func (e *CommandError) verb() string {
 		}
 	}
 	return strings.Join(e.Args, " ")
+}
+
+// summarize picks the part of uv's stderr worth putting on one line.
+//
+// uv fails in two shapes and the last line is the wrong answer for both. A
+// build failure ends with "hint: This usually indicates a problem with the
+// package or the build environment.", wrapped — so the last line was the word
+// "environment." on its own, and the cause sat forty lines up. A missing
+// interpreter ends with a hint too, one line below the message that says what
+// was actually missing.
+//
+// The old last-line behavior stays as the floor: something is still printed
+// for stderr in a shape this does not recognize, which is what every shape
+// got before.
+//
+// uv's own "error:" line is preferred over a diagnostic block. The two never
+// appear together in uv's own output — each captured fixture has one or the
+// other — so stderr carrying both did not all come from uv. That happens: for
+// `uv run` the capture is the caller's PROGRAM's stderr (see command), and a
+// Python CLI that draws boxes emits the same glyphs a uv diagnostic does. When
+// something in the pipe claims both shapes, the "error:" line is the one uv
+// certainly wrote.
+func summarize(stderr string) string {
+	if e := errorLine(stderr); e != "" {
+		return e
+	}
+	if d := diagnostic(stderr); d != "" {
+		return d
+	}
+	return lastLine(stderr)
+}
+
+// joinCauses renders a message and what caused it as one sentence, without
+// doubling a colon a part already ends with — uv writes plenty that do, from
+// "No solution found when resolving dependencies:" to "Failed to parse
+// `pyproject.toml` during settings discovery:".
+//
+// One colon, not a run of them: a part ending "a:b::" keeps the colon that
+// belongs to its own text.
+func joinCauses(parts []string) string {
+	trimmed := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed = append(trimmed, strings.TrimSuffix(strings.TrimSpace(part), ":"))
+	}
+	return strings.Join(trimmed, ": ")
+}
+
+// diagnostic renders uv's error block — the "×" headline naming what failed
+// and the "├─▶"/"╰─▶" causes under it — as one line.
+//
+// Long lines wrap, the headline's continuations marked with "│" and a cause's
+// with plain indentation:
+//
+//	× Failed to build `capture @
+//	│ file:///home/dev/project`
+//	├─▶ The build backend returned an error
+//	╰─▶ Call to `setuptools.build_meta:__legacy__.build_wheel` failed (exit
+//	    status: 1)
+//
+// which is one sentence broken over five lines, and reads as
+// "Failed to build `capture @ file:///home/dev/project`: The build backend
+// returned an error: Call to `setuptools...` failed (exit status: 1)".
+//
+// Empty when there is no such block, which is how summarize knows to try the
+// next shape.
+func diagnostic(stderr string) string {
+	var parts, current []string
+	flush := func() {
+		if len(current) > 0 {
+			parts = append(parts, strings.Join(current, " "))
+			current = nil
+		}
+	}
+	started := false
+scan:
+	for _, line := range strings.Split(stderr, "\n") {
+		// Every line of the block is indented, the marker included. An
+		// unindented line is therefore not part of it, and is the boundary to
+		// use for prose the block never terminated: only a blank line, a hint
+		// and a help are otherwise treated as the end, and output interleaved
+		// on the same descriptor has none of those.
+		indented := line != strings.TrimLeft(line, " \t")
+		text := strings.TrimSpace(line)
+		// A nested block carries the outer one's bar down its left edge, so
+		// the bar comes off before anything else is decided. Reading it as a
+		// continuation instead would put "├─▶" in the middle of a sentence.
+		if rest, found := strings.CutPrefix(text, "│"); found {
+			text, indented = strings.TrimSpace(rest), true
+		}
+		switch {
+		case strings.HasPrefix(text, "× "):
+			flush()
+			started = true
+			current = []string{strings.TrimSpace(strings.TrimPrefix(text, "× "))}
+		case !started:
+			// Progress uv printed before it failed: "Using CPython 3.13.13",
+			// "Creating virtual environment at: .venv".
+		case strings.HasPrefix(text, "├─▶"), strings.HasPrefix(text, "╰─▶"):
+			flush()
+			_, after, _ := strings.Cut(text, "▶")
+			current = []string{strings.TrimSpace(after)}
+		case text == "", strings.HasPrefix(text, "hint:"), strings.HasPrefix(text, "help:"), !indented:
+			// The block ends at the first blank line. Everything after it is
+			// the build backend's own output — a Python traceback, in the case
+			// this was written for — which is in Stderr for whoever wants it
+			// and is not a summary of anything.
+			break scan
+		default:
+			current = append(current, text)
+		}
+	}
+	flush()
+	return joinCauses(parts)
+}
+
+// errorLine renders uv's plainer failure: an "error:" line, with the
+// "Caused by:" beneath it when there is one.
+//
+//	warning: Failed to parse `pyproject.toml` during settings discovery:
+//	error: Failed to parse: `pyproject.toml`
+//	  Caused by: TOML parse error at line 1, column 9
+//
+// A warning may say almost the same thing as the error that follows it, as
+// above, and is skipped: only "error:" opens a message.
+//
+// A cause belongs to whatever is above it, so the causes read are the ones
+// directly under the error and the run stops at the first line that is not
+// one. Collecting every cause in the capture instead read a second error's
+// cause as the first one's, and read a cause under a TRAILING warning as the
+// error's — which this comment already said it would not do, while the code
+// only avoided it for warnings that came first.
+//
+// Both spellings of a cause are read. Newer uv writes "Caused by:"; the
+// version on CI writes "cause:", and nothing makes the two agree:
+//
+//	error: No solution found when resolving dependencies
+//	  cause: Because astro-e2e-no-such-package was not found in the package
+//
+// Knowing only the newer spelling is not a smaller feature, it is a wrong
+// answer — the headline alone says a solve failed without saying what could
+// not be solved, which is the whole of what the reader needs. Found by the
+// e2e case that asserts a failed start names the package, running against an
+// older uv than the one these fixtures were captured from.
+//
+// Every cause under the error is kept, joined the same way the diagnostic
+// block joins its "╰─▶" chain: uv is a Rust program and its error chains can
+// be more than one link deep, and dropping all but one link means picking
+// between the general end of the chain and the specific end. Keeping them
+// reads as the chain it is.
+//
+// The FIRST error opens the message. No uv output captured here prints two,
+// so that is a choice rather than an observation — made this way because
+// where a tool does print several, the later ones are usually a tally
+// ("2 packages failed") and the first is the one saying what broke.
+func errorLine(stderr string) string {
+	var message string
+	var causes []string
+	for _, line := range strings.Split(stderr, "\n") {
+		text := strings.TrimSpace(line)
+		if message == "" {
+			if strings.HasPrefix(text, "error:") {
+				message = text
+			}
+			continue
+		}
+		cause, found := causeText(text)
+		if !found {
+			break
+		}
+		causes = append(causes, cause)
+	}
+	if message == "" {
+		return ""
+	}
+	return joinCauses(append([]string{message}, causes...))
+}
+
+// causeMarkers are uv's two spellings of "and the reason is", newest first.
+var causeMarkers = []string{"Caused by:", "cause:"}
+
+// causeText is the reason on this line, and whether the line carried one.
+func causeText(line string) (string, bool) {
+	for _, marker := range causeMarkers {
+		if after, found := strings.CutPrefix(line, marker); found {
+			return strings.TrimSpace(after), true
+		}
+	}
+	return "", false
 }
 
 func lastLine(s string) string {
@@ -152,6 +340,14 @@ func parseResolution(stderr string) *ResolutionError {
 // extractSummary pulls the solver's explanation — the block uv renders
 // after the "╰─▶" arrow — and joins its wrapped lines into one, stopping at
 // a blank line or a hint. Returns "" when the shape is not there.
+//
+// Deliberately narrower than diagnostic, which reads the same arrows: this
+// returns the explanation ALONE because parseResolution runs a requirement
+// regex over it to fill Packages and Constraints, and a headline folded in
+// would be scanned for requirements too. The cost is that ResolutionError's
+// message omits what diagnostic keeps — on the no-solution fixture, which
+// dependency group failed to solve ("for split (markers: ...)") — so the two
+// are not interchangeable and neither is redundant.
 func extractSummary(stderr string) string {
 	var parts []string
 	inBlock := false
