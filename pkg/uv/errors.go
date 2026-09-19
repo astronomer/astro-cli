@@ -45,11 +45,20 @@ func (e *CommandError) Error() string {
 
 func (e *CommandError) Unwrap() error { return e.Err }
 
-// verb is the uv subcommand, skipping global flags like --no-config.
+// globalFlagValues are the global flags that take a separate value, so the
+// word following one of them is not the subcommand either.
+var globalFlagValues = map[string]bool{"--color": true}
+
+// verb is the uv subcommand, skipping the global flags the runner prepends and
+// any value they carry.
 func (e *CommandError) verb() string {
-	for _, a := range e.Args {
+	for i := 0; i < len(e.Args); i++ {
+		a := e.Args[i]
 		if !strings.HasPrefix(a, "-") {
 			return a
+		}
+		if globalFlagValues[a] {
+			i++
 		}
 	}
 	return strings.Join(e.Args, " ")

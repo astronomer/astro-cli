@@ -24,8 +24,16 @@ var ErrNotStandaloneMode = errors.New("this project's local Airflow is not runni
 // Engine is the Windows stub.
 type Engine struct{}
 
+// UVOptions matches the Unix type. Standalone provisions no venv here, so
+// nothing reads it; it exists so the composition root compiles without build
+// tags, like the rest of this stub.
+type UVOptions struct {
+	HermeticEnv    bool
+	OnCertFallback func()
+}
+
 // New matches the Unix constructor.
-func New(_ string, _ rt.ProxyDaemon) *Engine { return &Engine{} }
+func New(_ string, _ rt.ProxyDaemon, _ UVOptions) *Engine { return &Engine{} }
 
 func (e *Engine) Start(_ context.Context, _ rt.Plan, _ rt.Callbacks) (rt.Airflow, error) {
 	return nil, ErrWindowsUnsupported

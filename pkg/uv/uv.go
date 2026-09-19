@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // MinVersion is the oldest uv this package accepts. uv is pre-1.0 and moves
@@ -63,6 +64,37 @@ type Options struct {
 	// invocation (desktop) set it; the CLI leaves it off so a project's
 	// [tool.uv] settings keep working.
 	NoConfig bool
+
+	// HermeticEnv strips the inherited UV_* variables that steer resolution,
+	// for an embedder that passes python, index, constraints and requirements
+	// explicitly — where an ambient variable naming any of them can only
+	// contradict what was asked for.
+	//
+	// NoConfig does not cover this. --no-config applies to configuration
+	// FILES — a project's [tool.uv] table, a parent uv.toml — and not to the
+	// environment, which still applies in full, so the exact hazard NoConfig
+	// exists to stop arrives by a second route: UV_EXCLUDE_NEWER filters out
+	// freshly published builds and resolution fails as "unsatisfiable".
+	// UV_OFFLINE, UV_NO_INDEX, UV_INDEX, UV_FIND_LINKS, UV_CONSTRAINT,
+	// UV_PYTHON and UV_NO_BINARY are load-bearing the same way. An embedder
+	// wanting a managed install to be reproducible generally wants both.
+	//
+	// Deny by default against a small allowlist (operationalEnv) rather than a
+	// denylist, so a resolution knob uv adds later is excluded until someone
+	// decides otherwise, instead of quietly becoming a new way for a managed
+	// install to fail. Nothing outside the UV_ prefix is touched, which is
+	// what keeps HTTPS_PROXY, NO_PROXY, SSL_CERT_FILE and SSL_CERT_DIR
+	// working.
+	HermeticEnv bool
+
+	// OnCertFallback, when set, is called after an invocation that only
+	// succeeded once it was retried against the platform certificate store
+	// (see command). The operation worked, so this is diagnostics rather than
+	// an error path — and diagnostics worth having, because it is the only way
+	// to tell a machine whose trust anchor is missing from uv's bundle from a
+	// healthy one. A callback rather than a log line: this package does not
+	// print.
+	OnCertFallback func()
 }
 
 // Client is a resolved, version-checked uv binary plus the options every
@@ -71,6 +103,12 @@ type Client struct {
 	bin     string
 	version string
 	opts    Options
+	// waitDelay bounds how long Wait blocks on the output pipes after uv has
+	// exited (see command). A field rather than a bare constant because the
+	// behavior it guards only happens when a descendant outlives uv, and a
+	// test that has to wait out the real delay to see it would be slow enough
+	// that nobody runs it.
+	waitDelay time.Duration
 }
 
 // New discovers uv, checks it against MinVersion, and returns a Client.
@@ -91,7 +129,7 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 	if compareVersions(version, MinVersion) < 0 {
 		return nil, &VersionError{Bin: bin, Version: version, Min: MinVersion}
 	}
-	return &Client{bin: bin, version: version, opts: opts}, nil
+	return &Client{bin: bin, version: version, opts: opts, waitDelay: defaultWaitDelay}, nil
 }
 
 // Bin returns the resolved uv binary path, for diagnostics.
@@ -161,9 +199,19 @@ func isExecutableFile(path string) bool {
 }
 
 // queryVersion runs `uv --version` and returns the bare version number.
+//
+// WaitDelay for the same reason the runner sets it: Output() assigns buffers
+// rather than files to both streams, so os/exec makes pipes and Wait blocks on
+// every writer to them closing. New is on the path a consumer takes to start
+// Airflow, and the context it is given carries no deadline of its own, so a uv
+// that stalls here — a wrapper shim, a network-mounted install, an antivirus
+// scan — would hang the start before any state was reported. The version query
+// is one line of output, so nothing legitimate needs this long.
 func queryVersion(ctx context.Context, bin string) (string, error) {
-	out, err := exec.CommandContext(ctx, bin, "--version").Output()
-	if err != nil {
+	cmd := exec.CommandContext(ctx, bin, "--version")
+	cmd.WaitDelay = defaultWaitDelay
+	out, err := cmd.Output()
+	if err != nil && !errors.Is(err, exec.ErrWaitDelay) {
 		return "", fmt.Errorf("running %s --version: %w", bin, err)
 	}
 	// Output looks like "uv 0.11.23 (3cdf50e09 2026-06-19 aarch64-apple-darwin)".

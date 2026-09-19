@@ -1,6 +1,7 @@
 package uv
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Stdio carries optional live output destinations for a uv invocation.
@@ -32,13 +34,13 @@ func (c *Client) Venv(ctx context.Context, project, python string, stdio Stdio) 
 	if python != "" {
 		args = append(args, "--python", python)
 	}
-	return c.command(ctx, project, stdio, args...)
+	return c.fetch(ctx, project, stdio, args...)
 }
 
 // Lock resolves the project's dependencies and writes <project>/uv.lock.
 // A solver failure surfaces as *ResolutionError.
 func (c *Client) Lock(ctx context.Context, project string, stdio Stdio) error {
-	return asResolution("lock", c.command(ctx, project, stdio, "lock"))
+	return asResolution("lock", c.fetch(ctx, project, stdio, "lock"))
 }
 
 // VenvAt creates a standalone venv at dir — not the <project>/.venv Venv
@@ -51,7 +53,7 @@ func (c *Client) VenvAt(ctx context.Context, dir, python string, stdio Stdio) er
 	if python != "" {
 		args = append(args, "--python", python)
 	}
-	return c.command(ctx, "", stdio, args...)
+	return c.fetch(ctx, "", stdio, args...)
 }
 
 // PipInstall installs reqs into the venv whose interpreter is pythonBin, using
@@ -65,7 +67,7 @@ func (c *Client) PipInstall(ctx context.Context, pythonBin string, reqs []string
 		args = append(args, "--constraint", constraint)
 	}
 	args = append(args, reqs...)
-	return asResolution("pip install", c.command(ctx, "", stdio, args...))
+	return asResolution("pip install", c.fetch(ctx, "", stdio, args...))
 }
 
 // PipCompile resolves reqs (read from stdio.In as a requirements list on
@@ -83,7 +85,7 @@ func (c *Client) PipCompile(ctx context.Context, constraint, pythonVersion strin
 	if pythonVersion != "" {
 		args = append(args, "--python-version", pythonVersion)
 	}
-	return asResolution("pip compile", c.command(ctx, "", stdio, args...))
+	return asResolution("pip compile", c.fetch(ctx, "", stdio, args...))
 }
 
 // Sync makes <project>/.venv match the project's lockfile, locking first
@@ -94,7 +96,7 @@ func (c *Client) Sync(ctx context.Context, project, python string, stdio Stdio) 
 	if python != "" {
 		args = append(args, "--python", python)
 	}
-	return asResolution("sync", c.command(ctx, project, stdio, args...))
+	return asResolution("sync", c.fetch(ctx, project, stdio, args...))
 }
 
 // Run executes argv inside the project environment via `uv run`, which
@@ -137,6 +139,15 @@ func (c *Client) EnsureSynced(ctx context.Context, project, python string, stdio
 			// its answer — and a canceled context is not a poisoned venv.
 			return err
 		}
+		if isTLSTrustFailure(stderrOf(err)) {
+			// Sync already tried the platform trust store and the chain was
+			// refused both ways. A wipe cannot change which roots the machine
+			// trusts, so retrying here only spends another full resolve and
+			// download to reach the same refusal — and the two retries compose,
+			// turning one provisioning attempt into four fetches on exactly the
+			// link least able to afford them.
+			return err
+		}
 		if rmErr := os.RemoveAll(venv); rmErr != nil {
 			return errors.Join(err, fmt.Errorf("removing venv for retry: %w", rmErr))
 		}
@@ -154,38 +165,243 @@ func (c *Client) EnsureSynced(ctx context.Context, project, python string, stdio
 // error value without limit; uv's diagnostics fit comfortably.
 const stderrTailLimit = 64 << 10
 
-// command runs uv with the shared environment, project as the working
-// directory, and stderr teed into a bounded capture. A non-zero exit comes
-// back as *CommandError carrying that capture.
+// defaultWaitDelay bounds how long Wait blocks on the output pipes after uv
+// itself has exited. See command for why they can outlive the process.
+const defaultWaitDelay = 10 * time.Second
+
+// command runs uv exactly once, with the shared environment, project as the
+// working directory, and stderr teed into a bounded capture. A non-zero exit
+// comes back as *CommandError carrying that capture.
+//
+// Run uses this rather than fetch, and the difference is not stylistic: its
+// argv is the caller's own program, so executing it a second time is a side
+// effect rather than a retry — `uv run -- airflow db migrate` would migrate
+// twice. The trust-failure classifier reads the child's stderr, which for Run
+// is that program's output, and "tls handshake" or "certificate verify failed"
+// are things an application logs about its own connections.
 func (c *Client) command(ctx context.Context, project string, stdio Stdio, args ...string) error {
+	args = c.globalArgs(args)
+	stderr, err := c.run(ctx, project, c.childEnv(), stdio, args)
+	return commandError(args, stderr, err)
+}
+
+// globalArgs prefixes the flags every invocation carries.
+//
+// --color never keeps the captured stderr plain text: uv emits ANSI color even
+// when its output is not a terminal, so without it CommandError.Stderr — and
+// the message built from its last line — carries escape sequences into
+// whatever renders them next, which for an embedder is a log line or a toast.
+// A flag rather than NO_COLOR in the environment, because Run execs the
+// caller's own program through `uv run --` and that program's color is not
+// this package's business.
+func (c *Client) globalArgs(args []string) []string {
+	prefix := []string{"--color", "never"}
 	if c.opts.NoConfig {
-		args = append([]string{"--no-config"}, args...)
+		prefix = append(prefix, "--no-config")
 	}
+	return append(prefix, args...)
+}
+
+// fetch runs a uv operation whose only effects are the cache, the lockfile and
+// the venv, so running it twice reaches the same state — which is what lets it
+// retry a rejected certificate chain against the platform trust store.
+//
+// That retry exists because it is the one uv failure a different environment
+// reliably fixes. uv validates against its own bundled Mozilla roots, so a
+// machine whose only anchor lives in the OS store — a corporate proxy CA pushed
+// by MDM, overwhelmingly the common case — fails while Go's own HTTPS calls to
+// the same index succeed, since Go consults the OS store on macOS and Windows
+// already. Nothing in the project explains it and it arrives as a TLS error
+// rather than a refusal, so it reads as "the index is down".
+//
+// Selecting the platform store REPLACES the bundled roots rather than adding to
+// them, which is why it is a retry and not the default: as a default it would
+// move every user onto a path that is only better on the machines that need it,
+// and worse on any box whose OS store lacks a root the Mozilla bundle carries.
+//
+// An environment that already states a certificate preference is left alone,
+// including when it deliberately chose the bundled roots.
+func (c *Client) fetch(ctx context.Context, project string, stdio Stdio, args ...string) error {
+	args = c.globalArgs(args)
+	// Buffered so a second attempt gets the same input the first one consumed.
+	// Every operation routed here takes at most a requirements list on stdin,
+	// which is small; Run, whose stdin can be a terminal or a stream, does not
+	// come through here. attempt hands each invocation its own reader over the
+	// same bytes — one shared reader would arrive at the retry already drained,
+	// which is the whole failure being avoided.
+	in, err := bufferStdin(stdio.In)
+	if err != nil {
+		return err
+	}
+	attempt := func(env []string) (string, error) {
+		perRun := stdio
+		if in != nil {
+			perRun.In = bytes.NewReader(in)
+		}
+		return c.run(ctx, project, env, perRun, args)
+	}
+
+	env := c.childEnv()
+	stderr, runErr := attempt(env)
+	if runErr != nil && ctx.Err() == nil && isTLSTrustFailure(stderr) && !systemCertsChosen(env) {
+		retryEnv := append(append([]string(nil), env...), systemCertsEnv+"=1")
+		retryStderr, retryErr := attempt(retryEnv)
+		switch {
+		case retryErr == nil:
+			if c.opts.OnCertFallback != nil {
+				c.opts.OnCertFallback()
+			}
+			return nil
+		case isTLSTrustFailure(retryStderr):
+			// The platform store was refused too. Report that attempt, since
+			// it describes the environment the caller ended up in.
+			stderr, runErr = retryStderr, retryErr
+		default:
+			// The retry failed for some unrelated reason, or produced no
+			// diagnosis at all. Keeping the first attempt's capture is what
+			// preserves the word "certificate" in the reported error — without
+			// it the report says "the index is down", which is the
+			// misdiagnosis this retry exists to prevent, and anything
+			// bucketing on that text files it under the wrong cause.
+			runErr = errors.Join(runErr, retryErr)
+		}
+	}
+	return commandError(args, stderr, runErr)
+}
+
+// stderrOf returns the captured stderr from err, or "" when err carries none.
+func stderrOf(err error) string {
+	var cmdErr *CommandError
+	if errors.As(err, &cmdErr) {
+		return cmdErr.Stderr
+	}
+	return ""
+}
+
+// commandError wraps a failed invocation, or returns nil for a successful one.
+func commandError(args []string, stderr string, err error) error {
+	if err == nil {
+		return nil
+	}
+	cmdErr := &CommandError{Args: args, ExitCode: -1, Stderr: stderr, Err: err}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		cmdErr.ExitCode = exitErr.ExitCode()
+	}
+	return cmdErr
+}
+
+// bufferStdin reads in into memory so each attempt can be handed its own
+// reader over the same bytes. A nil reader stays nil, which is the common case.
+func bufferStdin(in io.Reader) ([]byte, error) {
+	if in == nil {
+		return nil, nil
+	}
+	buf, err := io.ReadAll(in)
+	if err != nil {
+		return nil, fmt.Errorf("reading uv stdin: %w", err)
+	}
+	return buf, nil
+}
+
+// run executes uv once with the supplied environment, returning the tail of
+// its stderr alongside the outcome.
+//
+// Because stderr is a capture rather than an *os.File, os/exec creates an OS
+// pipe and Wait blocks until every writer to it has closed — not just uv. A
+// build backend's grandchild still holding fd 2 after uv exits would otherwise
+// wedge Wait indefinitely, and with it whatever the caller does with a start:
+// no error, no result, no progress. WaitDelay bounds that, and the clock only
+// starts once uv has exited, so the cost of hitting it is a stray
+// descendant's trailing output rather than any part of the install.
+func (c *Client) run(ctx context.Context, project string, env []string, stdio Stdio, args []string) (string, error) {
 	cmd := exec.CommandContext(ctx, c.bin, args...)
 	cmd.Dir = project
-	cmd.Env = c.childEnv()
+	cmd.Env = env
 	cmd.Stdin = stdio.In
+	// stdout is not wrapped. It is uv's real output — the resolved requirement
+	// set from pip compile, the program's own output from Run — and nothing
+	// captures it internally, so a caller whose writer fails needs to hear
+	// about it rather than receive a truncated result and a nil error.
 	cmd.Stdout = stdio.Out
 	stderrTail := &tailBuffer{max: stderrTailLimit}
 	cmd.Stderr = stderrTail
 	if stdio.Err != nil {
-		cmd.Stderr = io.MultiWriter(stderrTail, stdio.Err)
+		cmd.Stderr = io.MultiWriter(stderrTail, quietWriter{stdio.Err})
 	}
-	if err := cmd.Run(); err != nil {
-		cmdErr := &CommandError{Args: args, ExitCode: -1, Stderr: stderrTail.String(), Err: err}
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			cmdErr.ExitCode = exitErr.ExitCode()
+	cmd.WaitDelay = c.waitDelay
+	// Run first, read the tail second: a return statement's operands are
+	// evaluated left to right, so the tail has to be read in its own statement
+	// to hold anything.
+	err := normalizeWaitError(cmd.Run())
+	return stderrTail.String(), err
+}
+
+// isTLSTrustFailure reports whether stderr is uv refusing a certificate chain,
+// as opposed to any other network failure. Matched on uv's own wording, which
+// is not localized.
+func isTLSTrustFailure(stderr string) bool {
+	s := strings.ToLower(stderr)
+	return strings.Contains(s, "invalid peer certificate") ||
+		strings.Contains(s, "unknownissuer") ||
+		strings.Contains(s, "certificate verify failed") ||
+		strings.Contains(s, "self-signed certificate") ||
+		strings.Contains(s, "unable to get local issuer certificate") ||
+		strings.Contains(s, "tls handshake")
+}
+
+// systemCertsChosen reports whether env already states a certificate-store
+// preference, in either spelling. A deliberate choice is never overridden by
+// the retry, including a deliberate choice of the bundled roots.
+func systemCertsChosen(env []string) bool {
+	for _, kv := range env {
+		if k, _, ok := strings.Cut(kv, "="); ok &&
+			(strings.EqualFold(k, systemCertsEnv) || strings.EqualFold(k, nativeTLSEnv)) {
+			return true
 		}
-		return cmdErr
 	}
-	return nil
+	return false
+}
+
+// quietWriter forwards writes to w and always reports success. It wraps
+// Stdio.Err, which is a place to watch uv scroll by rather than a sink: the
+// bytes are already in the capture, so a failure to write there is not a
+// failure of the operation, and os/exec would otherwise surface the copy error
+// from Wait and report a uv run that exited 0 as failed. It also keeps the
+// enclosing io.MultiWriter going, which stops at the first writer that fails —
+// hence the capture is ordered first.
+//
+// Stdio.Out is deliberately not wrapped; see run.
+type quietWriter struct{ w io.Writer }
+
+func (q quietWriter) Write(p []byte) (int, error) {
+	_, _ = q.w.Write(p) //nolint:errcheck // discarding it is the whole point of this type
+	return len(p), nil
+}
+
+// normalizeWaitError discards exec.ErrWaitDelay. Wait reports it only when the
+// process itself exited successfully but left its pipes open, so the operation
+// is done and the lingering writer is somebody else's descendant — returning it
+// would fail a uv run that worked. A process that actually failed comes back as
+// its own error, which takes priority over the delay, so nothing is masked.
+func normalizeWaitError(err error) error {
+	if errors.Is(err, exec.ErrWaitDelay) {
+		return nil
+	}
+	return err
 }
 
 // childEnv is the parent environment with UV_CACHE_DIR pinned to the shared
 // cache and VIRTUAL_ENV dropped — an active parent venv must never capture
 // the install (v1 fought this leak with --python on every call; removing
 // the variable is simpler).
+//
+// UV_CACHE_DIR is dropped from the inherited set before being appended, so the
+// value here wins outright rather than relying on which duplicate the child's
+// libc happens to read.
+//
+// Options.HermeticEnv additionally strips the inherited UV_* variables that
+// steer resolution; see that field for why --no-config does not cover them.
 func (c *Client) childEnv() []string {
 	env := os.Environ()
 	out := make([]string, 0, len(env)+1)
@@ -193,9 +409,88 @@ func (c *Client) childEnv() []string {
 		if strings.HasPrefix(kv, "UV_CACHE_DIR=") || strings.HasPrefix(kv, "VIRTUAL_ENV=") {
 			continue
 		}
+		if c.opts.HermeticEnv && steersResolution(kv) {
+			continue
+		}
 		out = append(out, kv)
 	}
 	return append(out, "UV_CACHE_DIR="+c.opts.CacheDir)
+}
+
+// Certificate-store preference, in uv's two spellings. UV_NATIVE_TLS is the
+// older alias and is still honored, so the two travel together — reading one
+// and dropping the other would silently override a user who spelled their
+// choice the old way.
+const (
+	systemCertsEnv = "UV_SYSTEM_CERTS"
+	nativeTLSEnv   = "UV_NATIVE_TLS"
+)
+
+// operationalEnv are the UV_* variables Options.HermeticEnv keeps. They govern
+// how uv reaches what it was told to fetch — how patiently, how many at a
+// time, how the files land, which trust store, where an interpreter comes from
+// — without changing WHICH distribution it resolves to. Stripping them breaks
+// the constrained-network users hermeticity is meant to help, who are the same
+// people the certificate retry is for.
+//
+// Names verified against the uv binary rather than assumed, because a
+// deny-by-default rule turns a misremembered name into a silent capability
+// loss that only a constrained-network user ever hits. Three groups earn their
+// place by a failure each:
+//
+//   - UV_INSECURE_HOST is the escape hatch for a self-signed internal index.
+//     Stripping it takes the working workaround away from exactly the machines
+//     the certificate retry exists to rescue.
+//   - UV_PYTHON_INSTALL_MIRROR, UV_PYPY_INSTALL_MIRROR, UV_PYTHON_INSTALL_DIR,
+//     UV_PYTHON_INSTALL_BIN and UV_PYTHON_INSTALL_REGISTRY are where a managed
+//     interpreter comes from. On a box where github.com is blocked and an
+//     internal mirror is configured, dropping them means uv cannot provision
+//     an interpreter at all.
+//   - UV_REQUEST_TIMEOUT is uv's older spelling of UV_HTTP_TIMEOUT, and
+//     UV_CONCURRENT_INSTALLS and UV_CONCURRENT_BUILDS are "how many at a time"
+//     exactly as UV_CONCURRENT_DOWNLOADS is. Keeping one spelling or one third
+//     of a group is the same silent override the two cert-variable spellings
+//     are handled together to avoid.
+var operationalEnv = []string{
+	systemCertsEnv,
+	nativeTLSEnv,
+	"UV_INSECURE_HOST",
+	"UV_HTTP_TIMEOUT",
+	"UV_REQUEST_TIMEOUT",
+	"UV_HTTP_RETRIES",
+	"UV_CONCURRENT_DOWNLOADS",
+	"UV_CONCURRENT_INSTALLS",
+	"UV_CONCURRENT_BUILDS",
+	"UV_LINK_MODE",
+	"UV_KEYRING_PROVIDER",
+	"UV_NO_PROGRESS",
+	"UV_PYTHON_INSTALL_MIRROR",
+	"UV_PYPY_INSTALL_MIRROR",
+	"UV_PYTHON_INSTALL_DIR",
+	"UV_PYTHON_INSTALL_BIN",
+	"UV_PYTHON_INSTALL_REGISTRY",
+}
+
+// steersResolution reports whether kv is an inherited UV_* variable outside the
+// operational allowlist.
+func steersResolution(kv string) bool {
+	k, _, ok := strings.Cut(kv, "=")
+	if !ok || !strings.HasPrefix(strings.ToUpper(k), "UV_") {
+		return false
+	}
+	return !isOperationalEnv(k)
+}
+
+// isOperationalEnv reports whether key is one of the pass-through variables.
+// Matched case-insensitively: uv reads its environment that way on Windows,
+// where os.Environ can yield any spelling.
+func isOperationalEnv(key string) bool {
+	for _, allowed := range operationalEnv {
+		if strings.EqualFold(key, allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // tailBuffer keeps the last max bytes written to it.

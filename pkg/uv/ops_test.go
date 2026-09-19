@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newTestClient builds a Client over a fake uv whose non---version behavior
@@ -127,7 +128,7 @@ func TestNoConfigAndArgs(t *testing.T) {
 	if err := c.Sync(t.Context(), t.TempDir(), "3.12", Stdio{}); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := readCount(t, argsFile), "--no-config sync --python 3.12"; got != want {
+	if got, want := readCount(t, argsFile), "--color never --no-config sync --python 3.12"; got != want {
 		t.Errorf("uv args = %q, want %q", got, want)
 	}
 }
@@ -139,7 +140,7 @@ func TestRunPassesArgv(t *testing.T) {
 	if err := c.Run(t.Context(), t.TempDir(), []string{"airflow", "version"}, Stdio{}); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := readCount(t, argsFile), "run -- airflow version"; got != want {
+	if got, want := readCount(t, argsFile), "--color never run -- airflow version"; got != want {
 		t.Errorf("uv args = %q, want %q", got, want)
 	}
 }
@@ -151,7 +152,7 @@ func TestVenvArgs(t *testing.T) {
 	if err := c.Venv(t.Context(), t.TempDir(), "3.12", Stdio{}); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := readCount(t, argsFile), "venv --allow-existing --python 3.12"; got != want {
+	if got, want := readCount(t, argsFile), "--color never venv --allow-existing --python 3.12"; got != want {
 		t.Errorf("uv args = %q, want %q", got, want)
 	}
 }
@@ -351,5 +352,385 @@ func TestPipCompileConflictIsResolutionError(t *testing.T) {
 	var re *ResolutionError
 	if !errors.As(err, &re) {
 		t.Fatalf("PipCompile() error = %v, want *ResolutionError", err)
+	}
+}
+
+func TestColorIsSuppressedByFlagAndNotByTheChildEnvironment(t *testing.T) {
+	// Color is suppressed through uv's own flag, so the child's environment is
+	// left as the caller had it — Run execs the caller's program through
+	// `uv run --`, and that program's color is its own business.
+	t.Setenv("NO_COLOR", "0")
+	seen := filepath.Join(t.TempDir(), "seen")
+	c := newTestClient(t, Options{}, "echo \"nocolor=${NO_COLOR:-unset} args=$*\" > \""+seen+"\"\nexit 0")
+
+	if err := c.Lock(t.Context(), t.TempDir(), Stdio{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := readCount(t, seen), "nocolor=0 args=--color never lock"; got != want {
+		t.Errorf("child saw %q, want %q", got, want)
+	}
+}
+
+func TestVerbNamesTheSubcommandPastTheGlobalFlags(t *testing.T) {
+	// --color takes a separate value, so a verb() that only skips arguments
+	// starting with "-" would report the operation as "never" and every error
+	// message would read "uv never failed".
+	c := newTestClient(t, Options{NoConfig: true}, "echo \"error: boom\" >&2\nexit 2")
+
+	err := c.Sync(t.Context(), t.TempDir(), "", Stdio{})
+
+	if err == nil {
+		t.Fatal("Sync() error = nil, want the failure")
+	}
+	if want := "uv sync failed (exit 2): error: boom"; err.Error() != want {
+		t.Errorf("Error() = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestCommandReturnsWhenADescendantOutlivesUv(t *testing.T) {
+	// uv exits 0 but leaves a child holding the stderr pipe — a build backend
+	// that outlives the install, in the real case. Wait blocks on every writer
+	// to that pipe rather than on uv, so without a delay this call does not
+	// return until the straggler does, and the caller sees neither a result
+	// nor an error in the meantime.
+	c := newTestClient(t, Options{}, "sleep 20 &\nexit 0")
+	c.waitDelay = 200 * time.Millisecond
+
+	start := time.Now()
+	err := c.Lock(t.Context(), t.TempDir(), Stdio{})
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("Lock() error = %v, want nil — uv exited 0, so the straggler is not its failure", err)
+	}
+	// Generous against a loaded CI box, and still nowhere near the 20s the
+	// child holds the pipe for.
+	if elapsed > 5*time.Second {
+		t.Errorf("Lock() took %s, want it bounded by the wait delay", elapsed)
+	}
+}
+
+// failingWriter errors on every write, standing in for a caller's live stream
+// whose destination has gone away: a closed descriptor, a full disk, a log
+// file on an unmounted volume.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("stream gone") }
+
+func TestABrokenStderrViewDoesNotFailASuccessfulRun(t *testing.T) {
+	// Stdio.Err is a place to watch uv scroll by, teed off a capture that
+	// already has the bytes. Failing the operation over it would report a
+	// successful lock as "uv lock failed (exit -1)" on the strength of one
+	// cosmetic warning.
+	c := newTestClient(t, Options{}, "echo \"resolved 12 packages\"\necho \"warning: something cosmetic\" >&2\nexit 0")
+
+	err := c.Lock(t.Context(), t.TempDir(), Stdio{Err: failingWriter{}})
+	if err != nil {
+		t.Errorf("Lock() error = %v, want nil — only the caller's stderr view broke", err)
+	}
+}
+
+func TestABrokenStdoutSinkFailsTheRun(t *testing.T) {
+	// Stdout is the opposite case and must not be swallowed: it carries pip
+	// compile's resolved requirement set and Run's program output, and nothing
+	// captures it internally. A caller whose file went away needs the error
+	// rather than a truncated result reported as success.
+	c := newTestClient(t, Options{}, "echo \"annotated-types==0.7.0\"\nexit 0")
+
+	err := c.PipCompile(t.Context(), "", "", Stdio{In: strings.NewReader("annotated-types\n"), Out: failingWriter{}})
+	if err == nil {
+		t.Error("PipCompile() error = nil, want the lost output reported")
+	}
+}
+
+func TestABrokenLiveStreamStillLeavesTheCapturedStderr(t *testing.T) {
+	// Two writes with a gap between them, so they arrive as separate reads.
+	// The capture and the live stream share one io.MultiWriter, which returns
+	// at the first writer that fails — unguarded, that aborts the copy and the
+	// second line, the one carrying uv's actual diagnosis, never lands.
+	c := newTestClient(t, Options{}, "echo \"resolving dependencies\" >&2\nsleep 0.3\necho \"error: something broke\" >&2\nexit 3")
+
+	err := c.Lock(t.Context(), t.TempDir(), Stdio{Err: failingWriter{}})
+
+	var cmdErr *CommandError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("Lock() error = %v, want *CommandError", err)
+	}
+	if !strings.Contains(cmdErr.Stderr, "something broke") {
+		t.Errorf("Stderr = %q, want uv's own diagnosis despite the broken live stream", cmdErr.Stderr)
+	}
+}
+
+// envProbe builds a client whose fake uv records the three variables the
+// hermeticity rule has to treat differently: one that steers resolution, one
+// on the operational allowlist, and one outside the UV_ prefix entirely.
+func envProbe(t *testing.T, opts Options) (client *Client, seenFile string) {
+	t.Helper()
+	t.Setenv("UV_EXCLUDE_NEWER", "2020-01-01")
+	t.Setenv("UV_HTTP_TIMEOUT", "300")
+	t.Setenv("HTTPS_PROXY", "http://proxy.internal:3128")
+	seen := filepath.Join(t.TempDir(), "env")
+	body := "echo \"newer=${UV_EXCLUDE_NEWER:-unset} timeout=${UV_HTTP_TIMEOUT:-unset} proxy=${HTTPS_PROXY:-unset}\" > \"" + seen + "\""
+	return newTestClient(t, opts, body), seen
+}
+
+func TestHermeticEnvStripsOnlyTheResolutionSteeringVariables(t *testing.T) {
+	// UV_EXCLUDE_NEWER is the concrete hazard: it filters out freshly
+	// published builds, so an inherited one makes a managed install fail as
+	// "unsatisfiable" for reasons nothing in the project says. --no-config
+	// does not reach it, because it is not configuration in a file.
+	c, seen := envProbe(t, Options{HermeticEnv: true})
+
+	if err := c.Lock(t.Context(), t.TempDir(), Stdio{}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "newer=unset timeout=300 proxy=http://proxy.internal:3128"
+	if got := readCount(t, seen); got != want {
+		t.Errorf("child env = %q, want %q", got, want)
+	}
+}
+
+func TestWithoutHermeticEnvTheEnvironmentIsUntouched(t *testing.T) {
+	// The CLI leaves this off for the same reason it leaves NoConfig off: a
+	// user's uv settings are theirs. Opting in is what changes behavior.
+	c, seen := envProbe(t, Options{})
+
+	if err := c.Lock(t.Context(), t.TempDir(), Stdio{}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "newer=2020-01-01 timeout=300 proxy=http://proxy.internal:3128"
+	if got := readCount(t, seen); got != want {
+		t.Errorf("child env = %q, want %q", got, want)
+	}
+}
+
+// withoutAmbientCertChoice clears both spellings of the certificate-store
+// preference for the duration of a test. Without it these tests read the
+// developer's own machine: on the corporate-proxy box this feature exists for,
+// an exported UV_SYSTEM_CERTS=1 makes the fake uv succeed on the first attempt
+// and the retry assertions fail. t.Setenv cannot do it — an empty value is
+// still a value, and systemCertsChosen is about presence.
+func withoutAmbientCertChoice(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{systemCertsEnv, nativeTLSEnv} {
+		if old, ok := os.LookupEnv(key); ok {
+			t.Cleanup(func() { _ = os.Setenv(key, old) })
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// certFakeUv refuses a certificate chain in uv's own wording unless the
+// platform store has been selected, and counts its attempts so a test can tell
+// "not retried" from "retried and still failed".
+func certFakeUv(countFile string) string {
+	return `c=0
+[ -f "` + countFile + `" ] && c=$(cat "` + countFile + `")
+echo $((c+1)) > "` + countFile + `"
+if [ -n "${UV_SYSTEM_CERTS:-}" ]; then exit 0; fi
+echo "error: Failed to fetch: https://pypi.org/simple/apache-airflow/" >&2
+echo "  Caused by: invalid peer certificate: UnknownIssuer" >&2
+exit 2`
+}
+
+func TestATrustFailureIsRetriedAgainstThePlatformStore(t *testing.T) {
+	withoutAmbientCertChoice(t)
+	countFile := filepath.Join(t.TempDir(), "count")
+	fallbacks := 0
+	c := newTestClient(t, Options{OnCertFallback: func() { fallbacks++ }}, certFakeUv(countFile))
+
+	if err := c.Sync(t.Context(), t.TempDir(), "", Stdio{}); err != nil {
+		t.Fatalf("Sync() error = %v, want nil after the platform-store retry", err)
+	}
+
+	if got := readCount(t, countFile); got != "2" {
+		t.Errorf("uv invocations = %s, want 2 (the failure and the retry)", got)
+	}
+	if fallbacks != 1 {
+		t.Errorf("OnCertFallback called %d times, want 1", fallbacks)
+	}
+}
+
+func TestADeliberateCertificateChoiceIsNotOverridden(t *testing.T) {
+	// A user who turned the platform store off has decided; the retry must not
+	// decide again for them. UV_NATIVE_TLS is the older spelling, and honoring
+	// only the new one would silently override exactly the people who set this
+	// years ago.
+	t.Setenv(nativeTLSEnv, "0")
+	countFile := filepath.Join(t.TempDir(), "count")
+	fallbacks := 0
+	c := newTestClient(t, Options{OnCertFallback: func() { fallbacks++ }}, certFakeUv(countFile))
+
+	err := c.Sync(t.Context(), t.TempDir(), "", Stdio{})
+
+	var cmdErr *CommandError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("Sync() error = %v, want *CommandError", err)
+	}
+	if got := readCount(t, countFile); got != "1" {
+		t.Errorf("uv invocations = %s, want 1 — the choice was already stated", got)
+	}
+	if fallbacks != 0 {
+		t.Errorf("OnCertFallback called %d times, want 0", fallbacks)
+	}
+}
+
+func TestAFailureThatIsNotAboutTrustIsNotRetried(t *testing.T) {
+	countFile := filepath.Join(t.TempDir(), "count")
+	body := `c=0
+[ -f "` + countFile + `" ] && c=$(cat "` + countFile + `")
+echo $((c+1)) > "` + countFile + `"
+cat "` + fixturePath(t) + `" >&2
+exit 1`
+	c := newTestClient(t, Options{}, body)
+
+	var resErr *ResolutionError
+	if err := c.Sync(t.Context(), t.TempDir(), "", Stdio{}); !errors.As(err, &resErr) {
+		t.Fatalf("Sync() error = %v, want *ResolutionError", err)
+	}
+	if got := readCount(t, countFile); got != "1" {
+		t.Errorf("uv invocations = %s, want 1 — a different trust store cannot solve a conflict", got)
+	}
+}
+
+func TestTheRetryReplaysTheCallersStdin(t *testing.T) {
+	withoutAmbientCertChoice(t)
+	// pip compile is a pure network resolve and so the operation most likely to
+	// meet the MDM-CA failure, and it feeds its requirements on stdin. Each
+	// attempt gets its own reader over the buffered bytes; one shared reader
+	// would reach the retry drained and resolve an empty requirement set into a
+	// cheerful success.
+	stdinFile := filepath.Join(t.TempDir(), "stdin")
+	countFile := filepath.Join(t.TempDir(), "count")
+	body := `c=0
+[ -f "` + countFile + `" ] && c=$(cat "` + countFile + `")
+echo $((c+1)) > "` + countFile + `"
+cat >> "` + stdinFile + `"
+if [ -n "${UV_SYSTEM_CERTS:-}" ]; then exit 0; fi
+echo "error: Failed to fetch: https://pypi.org/simple/pandas/" >&2
+echo "  Caused by: invalid peer certificate: UnknownIssuer" >&2
+exit 2`
+	c := newTestClient(t, Options{}, body)
+
+	if err := c.PipCompile(t.Context(), "", "", Stdio{In: strings.NewReader("pandas\n")}); err != nil {
+		t.Fatalf("PipCompile() error = %v, want nil after the platform-store retry", err)
+	}
+
+	if got := readCount(t, countFile); got != "2" {
+		t.Errorf("uv invocations = %s, want 2", got)
+	}
+	// Both attempts must have been fed, not just the first.
+	if got, want := readCount(t, stdinFile), "pandas\npandas"; got != want {
+		t.Errorf("stdin across attempts = %q, want %q", got, want)
+	}
+}
+
+func TestRunNeverRetriesTheCallersProgram(t *testing.T) {
+	withoutAmbientCertChoice(t)
+	// Run's argv is the caller's own program, so a second execution is a side
+	// effect rather than a retry — `uv run -- airflow db migrate` would migrate
+	// twice. The classifier reads the child's stderr, which here is that
+	// program's output, and an application logging its own TLS trouble must not
+	// be mistaken for uv refusing an index.
+	countFile := filepath.Join(t.TempDir(), "count")
+	body := `c=0
+[ -f "` + countFile + `" ] && c=$(cat "` + countFile + `")
+echo $((c+1)) > "` + countFile + `"
+echo "error: could not reach the warehouse: tls handshake eof" >&2
+exit 1`
+	c := newTestClient(t, Options{}, body)
+
+	if err := c.Run(t.Context(), t.TempDir(), []string{"airflow", "db", "migrate"}, Stdio{}); err == nil {
+		t.Fatal("Run() error = nil, want the failure reported")
+	}
+
+	if got := readCount(t, countFile); got != "1" {
+		t.Errorf("program executions = %s, want 1 — a retry here runs the caller's command again", got)
+	}
+}
+
+func TestAFailedRetryKeepsTheCertificateDiagnosis(t *testing.T) {
+	// The platform store is refused too, and the second attempt says something
+	// unrelated. Reporting only that loses the word "certificate" and the user
+	// is told the index is down — the misdiagnosis the retry exists to prevent,
+	// and what anything bucketing on the text would file it under.
+	withoutAmbientCertChoice(t)
+	body := `if [ -n "${UV_SYSTEM_CERTS:-}" ]; then
+  echo "error: Failed to fetch: connection closed before message completed" >&2
+  exit 2
+fi
+echo "error: Failed to fetch: https://pypi.org/simple/apache-airflow/" >&2
+echo "  Caused by: invalid peer certificate: UnknownIssuer" >&2
+exit 2`
+	c := newTestClient(t, Options{}, body)
+
+	err := c.Sync(t.Context(), t.TempDir(), "", Stdio{})
+
+	var cmdErr *CommandError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("Sync() error = %v, want *CommandError", err)
+	}
+	if !strings.Contains(cmdErr.Stderr, "invalid peer certificate") {
+		t.Errorf("Stderr = %q, want the certificate diagnosis from the first attempt", cmdErr.Stderr)
+	}
+}
+
+func TestEnsureSyncedDoesNotWipeAndReResolveAfterATrustFailure(t *testing.T) {
+	// The cert retry lives inside Sync, so without a guard the two retries
+	// compose: sync, cert retry, wipe, sync, cert retry. Four full resolves and
+	// downloads to reach a refusal a wipe cannot affect, on exactly the link
+	// least able to afford them.
+	withoutAmbientCertChoice(t)
+	countFile := filepath.Join(t.TempDir(), "count")
+	// Refused whichever trust store is selected — the machine whose OS store
+	// lacks the root too. A fake that succeeded on the retry would let Sync
+	// return nil and never reach the branch under test.
+	body := `c=0
+[ -f "` + countFile + `" ] && c=$(cat "` + countFile + `")
+echo $((c+1)) > "` + countFile + `"
+mkdir -p .venv
+echo "error: Failed to fetch: https://pypi.org/simple/apache-airflow/" >&2
+echo "  Caused by: invalid peer certificate: UnknownIssuer" >&2
+exit 2`
+	c := newTestClient(t, Options{}, body)
+
+	err := c.EnsureSynced(t.Context(), t.TempDir(), "", Stdio{})
+
+	if err == nil {
+		t.Fatal("EnsureSynced() error = nil, want the trust failure")
+	}
+	if !strings.Contains(err.Error(), "certificate") {
+		t.Errorf("EnsureSynced() error = %v, want the certificate diagnosis", err)
+	}
+	if got := readCount(t, countFile); got != "2" {
+		t.Errorf("uv invocations = %s, want 2 (the sync and its one cert retry)", got)
+	}
+}
+
+func TestHermeticEnvKeepsTheVariablesConstrainedNetworksNeed(t *testing.T) {
+	// Deny-by-default makes a missing allowlist entry invisible until someone
+	// on a restricted network hits it, so the awkward ones are pinned here:
+	// the self-signed-index escape hatch, an internal interpreter mirror, and
+	// the older spelling of a timeout whose current spelling is already kept.
+	t.Setenv("UV_INSECURE_HOST", "index.corp.internal")
+	t.Setenv("UV_PYTHON_INSTALL_MIRROR", "https://mirror.corp.internal/python")
+	t.Setenv("UV_REQUEST_TIMEOUT", "300")
+	t.Setenv("UV_EXCLUDE_NEWER", "2020-01-01")
+	seen := filepath.Join(t.TempDir(), "env")
+	body := "echo \"host=${UV_INSECURE_HOST:-unset} mirror=${UV_PYTHON_INSTALL_MIRROR:-unset} timeout=${UV_REQUEST_TIMEOUT:-unset} newer=${UV_EXCLUDE_NEWER:-unset}\" > \"" + seen + "\""
+	c := newTestClient(t, Options{HermeticEnv: true}, body)
+
+	if err := c.Lock(t.Context(), t.TempDir(), Stdio{}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "host=index.corp.internal mirror=https://mirror.corp.internal/python timeout=300 newer=unset"
+	if got := readCount(t, seen); got != want {
+		t.Errorf("child env = %q, want %q", got, want)
 	}
 }

@@ -55,14 +55,34 @@ type Config struct {
 	// Images builds the container image docker mode runs. Required for docker
 	// mode; standalone never touches it.
 	Images ImageBuilder
+	// HermeticUVEnv strips the inherited UV_* variables that steer resolution
+	// from the venv a standalone start provisions. A consumer passing python,
+	// dependencies and constraints from the manifest can only be contradicted
+	// by an ambient one — most concretely UV_EXCLUDE_NEWER, which filters out
+	// freshly published builds until the install fails as "unsatisfiable" for a
+	// reason nothing in the project explains. See uv.Options.HermeticEnv for
+	// why --no-config does not reach these.
+	//
+	// Off by default: a uv a user configured for their own shell is theirs, and
+	// the CLI honors it for the same reason it leaves --no-config off.
+	HermeticUVEnv bool
+	// OnUVCertFallback, when set, is called after a provisioning step that only
+	// succeeded once uv was retried against the platform certificate store.
+	// The start worked, so this is diagnostics — and the only way to tell a
+	// machine whose trust anchor is missing from uv's bundle from a healthy
+	// one, because nothing else about the start looks different.
+	OnUVCertFallback func()
 }
 
 // New returns a Runtime configured by cfg.
 func New(cfg Config) *Runtime {
 	docker := localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images)
 	return &Runtime{
-		docker:         docker,
-		standalone:     localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon),
+		docker: docker,
+		standalone: localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon, localstandalone.UVOptions{
+			HermeticEnv:    cfg.HermeticUVEnv,
+			OnCertFallback: cfg.OnUVCertFallback,
+		}),
 		routes:         proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
 		now:            time.Now,
 		containersGone: docker.ContainersGone,

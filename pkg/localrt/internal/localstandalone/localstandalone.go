@@ -95,16 +95,25 @@ type Engine struct {
 	stopPoll      time.Duration
 }
 
+// UVOptions are the consumer's preferences for the venv provisioning a start
+// does. The cache directory is deliberately absent: it is shared across
+// projects and consumers so a Python toolchain downloads once, so the engine
+// owns it.
+type UVOptions struct {
+	HermeticEnv    bool
+	OnCertFallback func()
+}
+
 // New builds the production engine. routesDir is where pkg/proxy keeps
 // routes.json (~/.astro/proxy); the composition root supplies it because
 // this package must not read config.
-func New(routesDir string, daemon rt.ProxyDaemon) *Engine {
+func New(routesDir string, daemon rt.ProxyDaemon, uvOpts UVOptions) *Engine {
 	s := proxy.NewStore(routesDir, proxy.WithRouteLiveness(localprune.RouteAlive))
 	return &Engine{
 		routes:        s,
 		daemon:        daemon,
 		cmd:           execCommander{},
-		uv:            newUVClient,
+		uv:            uvClientFactory(uvOpts),
 		launch:        launchDetached,
 		prepAF2:       prepDarwinAF2,
 		health:        checkHealth,
@@ -120,16 +129,22 @@ func New(routesDir string, daemon rt.ProxyDaemon) *Engine {
 	}
 }
 
-// newUVClient discovers uv lazily — at Start, not engine construction — so
+// uvClientFactory discovers uv lazily — at Start, not engine construction — so
 // every other operation (status, stop, logs) works on a machine whose uv
 // disappeared. The cache dir is shared across projects under the astro
 // cache root, so Python toolchains and wheels download once.
-func newUVClient(ctx context.Context) (venvSyncer, error) {
-	root, err := rt.CacheRoot()
-	if err != nil {
-		return nil, err
+func uvClientFactory(opts UVOptions) func(context.Context) (venvSyncer, error) {
+	return func(ctx context.Context) (venvSyncer, error) {
+		root, err := rt.CacheRoot()
+		if err != nil {
+			return nil, err
+		}
+		return uv.New(ctx, uv.Options{
+			CacheDir:       filepath.Join(root, "uv"),
+			HermeticEnv:    opts.HermeticEnv,
+			OnCertFallback: opts.OnCertFallback,
+		})
 	}
-	return uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
 }
 
 // checkHealth adapts pkg/airflowrt's poller to the engine's seam shape.
