@@ -26,7 +26,7 @@ func FetchAuthConfig(domain string, opts ...RequestOption) (AuthConfig, error) {
 	}
 	addr := fmt.Sprintf("%s/%s", base, AuthConfigEndpoint)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, addr, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, addr, http.NoBody)
 	if err != nil {
 		return AuthConfig{}, err
 	}

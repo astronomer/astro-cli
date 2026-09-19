@@ -42,10 +42,17 @@ var (
 	// the component name it prefixes each line with, and structlog colors the
 	// body, so a raw line begins "\x1b[33mdag-processor\x1b[0m | " rather than
 	// "dag-processor | ".
-	reANSI = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
+	// `[ -/]` is ECMA-48's intermediate-byte range (0x20-0x2F) and `[@-~]` its
+	// final-byte range, so the span reads as punctuation only because that is
+	// what those code points are.
+	reANSI = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]") //nolint:gocritic // badRegexp: a deliberate code-point range, see above
 )
 
-// stripANSI removes the CSI escape sequences from a log line — the colours
+// escape is ESC, the byte every CSI sequence opens with and the cheapest
+// thing to look for before running the expression at all.
+const escape = '\x1b'
+
+// stripANSI removes the CSI escape sequences from a log line — the colors
 // Airflow writes, which is the only form it emits. Other escape shapes (an OSC
 // title, a charset selector) would survive; widening the pattern for sequences
 // nothing here produces would be guessing at a problem.
@@ -66,7 +73,7 @@ var (
 // uncoloured line — every line the older fixtures carry — should not pay for a
 // full pattern match and an allocation to learn there was nothing to strip.
 func stripANSI(s string) string {
-	if !strings.ContainsRune(s, 0x1b) {
+	if !strings.ContainsRune(s, escape) {
 		return s
 	}
 	return reANSI.ReplaceAllString(s, "")

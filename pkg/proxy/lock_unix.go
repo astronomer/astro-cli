@@ -31,15 +31,21 @@ func (s *Store) AcquireLock() (*os.File, error) {
 			f.Close()
 			return nil, fmt.Errorf("timed out waiting for routes lock")
 		}
-		time.Sleep(50 * time.Millisecond) //nolint:mnd
+		time.Sleep(lockPollInterval)
 	}
 }
+
+// lockPollInterval is how often a waiter retries the flock. Short enough that a
+// released lock is picked up promptly, long enough not to spin.
+const lockPollInterval = 50 * time.Millisecond
 
 // ReleaseLock releases the flock and closes the lock file.
 func ReleaseLock(f *os.File) {
 	if f == nil {
 		return
 	}
-	syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck
+	// The close below drops the lock whatever this returns, so a failure here
+	// changes nothing a caller could act on.
+	syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck // deliberate, for the reason above
 	f.Close()
 }

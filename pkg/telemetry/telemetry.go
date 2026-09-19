@@ -76,7 +76,7 @@ var agentEnvVars = []envMapping{
 // (microsoft/vscode aiAgentEnv.ts). gh reads it too.
 //
 // It is checked after agentEnvVars so a specific marker still wins, and only
-// prefixes we recognise are mapped. Values are not passed through: some vendors
+// prefixes we recognize are mapped. Values are not passed through: some vendors
 // put a version in theirs (claude-code_2-1-156_agent), which would spray one
 // agent across dozens of distinct values in the telemetry. A new vendor adopting
 // the convention is a one-line addition here.
@@ -87,7 +87,7 @@ var aiAgentPrefixes = []envMapping{
 }
 
 // detectAIAgent maps the AI_AGENT convention to an agent name, or "" if the
-// value is empty or not one we recognise.
+// value is empty or not one we recognize.
 func detectAIAgent() string {
 	value := strings.ToLower(os.Getenv(aiAgentEnvVar))
 	if value == "" {
@@ -192,7 +192,12 @@ func isDebugMode() bool {
 
 // sendDebug sends telemetry synchronously and prints debug output
 func sendDebug(payload TelemetryPayload, apiURL string) {
-	body, _ := json.MarshalIndent(payload, "", "  ")
+	body, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		// Send marshals the same payload and reports the same failure, so this
+		// only accounts for the echo below being empty.
+		fmt.Fprintf(os.Stderr, "[telemetry] payload could not be rendered: %v\n", err)
+	}
 	fmt.Fprintf(os.Stderr, "[telemetry] POST %s\n%s\n", apiURL, body)
 
 	status, err := Send(payload, apiURL)
@@ -219,6 +224,9 @@ func Track(payload TelemetryPayload) {
 	}
 
 	go func() {
-		_, _ = Send(payload, apiURL)
+		// Dropped on purpose: telemetry is a side effect of the real work, and
+		// nothing is watching this goroutine. Set ASTRO_TELEMETRY_DEBUG to send
+		// synchronously and see the failure.
+		_, _ = Send(payload, apiURL) //nolint:errcheck // deliberate, for the reason above
 	}()
 }

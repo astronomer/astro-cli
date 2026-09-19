@@ -5,7 +5,7 @@ package proxy
 import "syscall"
 
 // waitTimeout is what WaitForSingleObject returns for a handle that is not
-// signalled — for a process handle, one that has not exited.
+// signaled — for a process handle, one that has not exited.
 const waitTimeout = uintptr(0x00000102)
 
 // IsPIDAlive reports whether a process with the given PID is still running.

@@ -60,8 +60,8 @@ func TestBuildEnvDevOverridesAreAuthoritative(t *testing.T) {
 	assert.True(t, found, "a local start should decide this rather than inherit Airflow's deployment default")
 	assert.Equal(t, "False", paused)
 
-	// Colour off, because the destination is a capped file rather than a
-	// terminal. Left on, `airflow standalone` colours the component name it
+	// Color off, because the destination is a capped file rather than a
+	// terminal. Left on, `airflow standalone` colors the component name it
 	// prefixes each line with, which spends a third of the retained history on
 	// escape sequences and leaves every reader stripping them back out.
 	noColor, _ := envValue(env, "NO_COLOR")

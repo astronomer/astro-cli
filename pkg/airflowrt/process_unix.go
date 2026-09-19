@@ -19,10 +19,12 @@ func isProcessAlive(pid int) bool {
 
 // terminateProcess sends SIGTERM to the process group.
 func terminateProcess(pid int) {
-	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
+	// A group that is already gone is the outcome asked for, and the caller
+	// polls for exit rather than trusting this return.
+	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck // deliberate, for the reason above
 }
 
 // killProcess sends SIGKILL to the process group.
 func killProcess(pid int) {
-	syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
+	syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck // as above: this is the last resort, and there is nothing after it to tell
 }

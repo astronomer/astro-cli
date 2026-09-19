@@ -210,7 +210,11 @@ func (m *Manager) astroMachine() (*ListedMachine, error) {
 
 // otherRunningMachine returns the name of a running, non-astro machine, if any.
 func (m *Manager) otherRunningMachine() string {
-	machines, _ := m.podman.ListMachines()
+	// A machine list that cannot be read is treated as no other machine running.
+	// Podman refuses the second machine on Mac by itself, so the failure still
+	// surfaces — from the operation that could not proceed rather than from a
+	// hint that could not be gathered.
+	machines, _ := m.podman.ListMachines() //nolint:errcheck // deliberate, for the reason above
 	for _, machine := range machines {
 		if machine.Running && machine.Name != podmanMachineName {
 			return machine.Name

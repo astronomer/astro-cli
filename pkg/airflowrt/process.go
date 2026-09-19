@@ -53,8 +53,9 @@ func StopProcess(pidFilePath string) (bool, error) {
 	}
 
 	if !alive {
-		// Stale PID file — clean up
-		os.Remove(pidFilePath)
+		// Stale PID file — clean up. Already gone is the outcome we want, and a
+		// file that will not go leaves a stale pid the next ReadPID handles.
+		os.Remove(pidFilePath) //nolint:errcheck // deliberate, for the reason above
 		return false, nil
 	}
 
@@ -75,7 +76,7 @@ func StopProcess(pidFilePath string) (bool, error) {
 		time.Sleep(StopPollInterval)
 	}
 
-	os.Remove(pidFilePath)
+	os.Remove(pidFilePath) //nolint:errcheck // as above: the process is stopped whatever happens to its pid file
 	return true, nil
 }
 
@@ -103,7 +104,7 @@ func ResolveInEnvPath(binary string, env []string) string {
 // so that venv binaries like "airflow" and "pytest" are found correctly.
 func ExecWithEnv(dir string, env, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	binary := ResolveInEnvPath(args[0], env)
-	cmd := exec.Command(binary, args[1:]...) //nolint:gosec
+	cmd := exec.Command(binary, args[1:]...)
 	cmd.Dir = dir
 	cmd.Env = env
 	cmd.Stdin = stdin
@@ -120,6 +121,6 @@ var CheckPortAvailable = func(port string) error {
 	if err != nil {
 		return nil // Connection refused / timeout → port is free
 	}
-	conn.Close()
+	conn.Close() //nolint:errcheck // the dial answered the question; the close is tidiness
 	return fmt.Errorf("port %s is already in use", port)
 }

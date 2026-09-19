@@ -46,7 +46,7 @@ var CheckHealth = func(ctx context.Context, port string, timeout time.Duration, 
 			return fmt.Errorf("health check timed out after %s — Airflow may still be starting. Check logs for details", timeout)
 		case <-ticker.C:
 			for _, path := range healthPaths {
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path, nil)
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path, http.NoBody)
 				if err != nil {
 					continue
 				}

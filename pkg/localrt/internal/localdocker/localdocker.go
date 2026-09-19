@@ -106,10 +106,44 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 	return e
 }
 
+// planMajor is the Airflow generation the compose file has to describe: read
+// off the declared Dockerfile where there is one, and off the pin otherwise.
+//
+// The pin alone was wrong for exactly the projects the declared tier is for. A
+// conversion writes the declaration itself and may have DEFAULTED the pin, so a
+// Dockerfile on an Airflow 2 base can sit beside `airflow = "3.1"` — and major
+// decides the compose service set (Airflow 2 has no api-server or
+// dag-processor) and the db command. Building the AF2 file while emitting the
+// AF3 service set is a stack that cannot come up.
+//
+// Astro Desktop fixed this in its own plan builder first; this is the same bug
+// in the CLI's, and leaving it would have relocated the divergence the declared
+// tier exists to end rather than closing it.
+//
+// A file that cannot be read falls back to the pin: imagebuild.Build reports
+// that failure properly a moment later, and guessing here would put the wrong
+// services in the compose file on the way to a better message.
+func planMajor(airflowVersion, declared string) string {
+	pinned := airflowMajor(airflowVersion)
+	if declared == "" {
+		return pinned
+	}
+	from, tag, err := airflowrt.ParseDockerfileAt(declared)
+	if err != nil || !strings.Contains(from, "runtime") {
+		return pinned
+	}
+	baseTag, _ := airflowrt.ParseRuntimeTagPython(tag)
+	if airflowrt.IsRuntime3(baseTag) {
+		return "3"
+	}
+	return "2"
+}
+
 // Start brings the project's compose stack up and waits for Airflow to be
 // healthy. The state record is written and the proxy route registered as
 // soon as the containers are up, so status/stop/logs work even when the
 // health wait fails or is interrupted.
+
 func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.Airflow, err error) {
 	if p.Mode != rt.ModeDocker {
 		return nil, fmt.Errorf("localdocker got a %q plan", p.Mode)
@@ -166,33 +200,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		declared = filepath.Join(projectPath, filepath.FromSlash(p.Dockerfile))
 	}
 
-	// The generation comes from the declared Dockerfile where there is one, and
-	// from the pin otherwise.
-	//
-	// The pin alone was wrong for exactly the projects this field is for. A
-	// conversion writes the declaration itself and may have DEFAULTED the pin, so
-	// a Dockerfile on an Airflow 2 base can sit beside `airflow = "3.1"` — and
-	// major decides the compose service set (Airflow 2 has no api-server or
-	// dag-processor) and the db command. Building the AF2 file while emitting the
-	// AF3 service set is a stack that cannot come up.
-	//
-	// Astro Desktop fixed this in its own plan builder first; this is the same
-	// bug in the CLI's, and leaving it would have relocated the divergence the
-	// declared tier exists to end rather than closing it.
-	//
-	// A file that cannot be read falls back to the pin: imagebuild.Build reports
-	// that failure properly a moment later, and guessing here would put the wrong
-	// services in the compose file on the way to a better message.
-	major := airflowMajor(p.AirflowVersion)
-	if declared != "" {
-		if image, tag, err := airflowrt.ParseDockerfileAt(declared); err == nil && strings.Contains(image, "runtime") {
-			baseTag, _ := airflowrt.ParseRuntimeTagPython(tag)
-			major = "2"
-			if airflowrt.IsRuntime3(baseTag) {
-				major = "3"
-			}
-		}
-	}
+	major := planMajor(p.AirflowVersion, declared)
 	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
 		return nil, err
@@ -358,7 +366,7 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 // Its own function because Start is at the complexity limit, and because these
 // three are one idea — everything that turns containers into a project other
 // tools can find.
-func (e *Engine) publish(projectPath, name, hostname, major string, webPort, pgPort int, p rt.Plan, cb rt.Callbacks) (localstate.Record, error) { //nolint:gocritic // hugeParam: rt.Plan matches the Airflow interface's own signature
+func (e *Engine) publish(projectPath, name, hostname, major string, webPort, pgPort int, p rt.Plan, cb rt.Callbacks) (localstate.Record, error) {
 	rec := localstate.Record{
 		ProjectPath:     projectPath,
 		Mode:            rt.ModeDocker,

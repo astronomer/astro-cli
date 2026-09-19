@@ -16,9 +16,26 @@ func envVarNames(mappings []envMapping) []string {
 	return names
 }
 
+// clearEnv unsets each variable for the length of the test and puts back what
+// was there. t.Setenv cannot express "unset", and these detectors read presence
+// — so an absent variable and an empty one have to stay distinguishable.
+func clearEnv(t *testing.T, names []string) {
+	t.Helper()
+	for _, name := range names {
+		saved, had := os.LookupEnv(name)
+		os.Unsetenv(name)
+		t.Cleanup(func() {
+			if had {
+				os.Setenv(name, saved)
+				return
+			}
+			os.Unsetenv(name)
+		})
+	}
+}
+
 func TestIsDisabledByEnv(t *testing.T) {
-	origEnv := os.Getenv("ASTRO_TELEMETRY_DISABLED")
-	defer os.Setenv("ASTRO_TELEMETRY_DISABLED", origEnv)
+	clearEnv(t, []string{"ASTRO_TELEMETRY_DISABLED"})
 
 	tests := []struct {
 		name     string
@@ -44,20 +61,7 @@ func TestIsDisabledByEnv(t *testing.T) {
 
 func TestDetectAgent(t *testing.T) {
 	agentVars := append(envVarNames(agentEnvVars), aiAgentEnvVar)
-	savedVals := make(map[string]string)
-	for _, env := range agentVars {
-		savedVals[env] = os.Getenv(env)
-		os.Unsetenv(env)
-	}
-	defer func() {
-		for env, val := range savedVals {
-			if val != "" {
-				os.Setenv(env, val)
-			} else {
-				os.Unsetenv(env)
-			}
-		}
-	}()
+	clearEnv(t, agentVars)
 
 	tests := []struct {
 		name     string
@@ -77,7 +81,7 @@ func TestDetectAgent(t *testing.T) {
 		{"copilot vscode agent mode", "COPILOT_AGENT", "1", "github-copilot"},
 		{"ai_agent copilot vscode", "AI_AGENT", "github_copilot_vscode_agent", "github-copilot"},
 		{"ai_agent copilot app", "AI_AGENT", "github_copilot_app_agent", "github-copilot"},
-		{"ai_agent unrecognised vendor", "AI_AGENT", "some_other_agent", ""},
+		{"ai_agent unrecognized vendor", "AI_AGENT", "some_other_agent", ""},
 		{"no agent", "", "", ""},
 	}
 
@@ -100,15 +104,7 @@ func TestDetectAgent(t *testing.T) {
 // session started from inside another agent still carries that agent's marker.
 // Otto is the proximate caller and must win.
 func TestDetectAgentOttoWinsOverInheritedMarker(t *testing.T) {
-	for _, env := range append(envVarNames(agentEnvVars), aiAgentEnvVar) {
-		saved := os.Getenv(env)
-		os.Unsetenv(env)
-		defer func(env, saved string) {
-			if saved != "" {
-				os.Setenv(env, saved)
-			}
-		}(env, saved)
-	}
+	clearEnv(t, append(envVarNames(agentEnvVars), aiAgentEnvVar))
 
 	os.Setenv("CLAUDECODE", "1")
 	defer os.Unsetenv("CLAUDECODE")
@@ -123,15 +119,7 @@ func TestDetectAgentOttoWinsOverInheritedMarker(t *testing.T) {
 // both AI_AGENT and COPILOT_AGENT, and Otto inside a VS Code agent terminal
 // carries both plus its own.
 func TestDetectAgentSpecificMarkerBeatsAIAgent(t *testing.T) {
-	for _, env := range append(envVarNames(agentEnvVars), aiAgentEnvVar) {
-		saved := os.Getenv(env)
-		os.Unsetenv(env)
-		defer func(env, saved string) {
-			if saved != "" {
-				os.Setenv(env, saved)
-			}
-		}(env, saved)
-	}
+	clearEnv(t, append(envVarNames(agentEnvVars), aiAgentEnvVar))
 
 	os.Setenv("AI_AGENT", "github_copilot_vscode_agent")
 	defer os.Unsetenv("AI_AGENT")
@@ -144,20 +132,7 @@ func TestDetectAgentSpecificMarkerBeatsAIAgent(t *testing.T) {
 
 func TestDetectCISystem(t *testing.T) {
 	ciVars := envVarNames(ciEnvVars)
-	savedVals := make(map[string]string)
-	for _, env := range ciVars {
-		savedVals[env] = os.Getenv(env)
-		os.Unsetenv(env)
-	}
-	defer func() {
-		for env, val := range savedVals {
-			if val != "" {
-				os.Setenv(env, val)
-			} else {
-				os.Unsetenv(env)
-			}
-		}
-	}()
+	clearEnv(t, ciVars)
 
 	tests := []struct {
 		name     string
@@ -200,8 +175,7 @@ func TestIsTestRun(t *testing.T) {
 }
 
 func TestGetTelemetryAPIURL(t *testing.T) {
-	origEnv := os.Getenv("ASTRO_TELEMETRY_API_URL")
-	defer os.Setenv("ASTRO_TELEMETRY_API_URL", origEnv)
+	clearEnv(t, []string{"ASTRO_TELEMETRY_API_URL"})
 
 	t.Run("custom URL from env", func(t *testing.T) {
 		os.Setenv("ASTRO_TELEMETRY_API_URL", "http://custom:8080/v1alpha1/telemetry")

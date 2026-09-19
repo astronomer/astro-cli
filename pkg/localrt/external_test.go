@@ -298,7 +298,7 @@ func TestReserveClearsAStaleRecordSoAReservationRouteSurvives(t *testing.T) {
 	_, err = RecordedStatus(project)
 	require.True(t, IsNotRunning(err), "Reserve must clear the stale record, got %v", err)
 
-	// And the reservation route survives a prune, which is the behaviour that
+	// And the reservation route survives a prune, which is the behavior that
 	// was broken: the store is built exactly as a consumer builds it.
 	routesDir := t.TempDir()
 	store := proxy.NewStore(routesDir, proxy.WithRouteLiveness(RouteAlive))

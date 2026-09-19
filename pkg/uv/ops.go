@@ -112,6 +112,10 @@ func (c *Client) Run(ctx context.Context, project string, argv []string, stdio S
 // later syncs with metadata errors; the marker's absence is how we tell.
 const markerName = ".install-complete"
 
+// markerMode is owner-only: the marker says this venv finished installing, and
+// a reader that trusts it skips the sync that would have rebuilt it.
+const markerMode = 0o600
+
 // EnsureSynced provisions <project>/.venv from the project's pyproject and
 // lockfile, recovering from poisoned venvs: a venv without the completion
 // marker is wiped up front, and a failed sync gets one wipe-and-retry before
@@ -161,7 +165,7 @@ func (c *Client) EnsureSynced(ctx context.Context, project, python string, stdio
 			return err
 		}
 	}
-	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+	if err := os.WriteFile(marker, nil, markerMode); err != nil {
 		return fmt.Errorf("writing install marker: %w", err)
 	}
 	return nil
@@ -321,6 +325,7 @@ func bufferStdin(in io.Reader) ([]byte, error) {
 // starts once uv has exited, so the cost of hitting it is a stray
 // descendant's trailing output rather than any part of the install.
 func (c *Client) run(ctx context.Context, project string, env []string, stdio Stdio, args []string) (string, error) {
+	//nolint:gosec // G204: running uv with arguments is what this type is for. c.bin is resolved by the package, and every args slice is built by one of its own methods.
 	cmd := exec.CommandContext(ctx, c.bin, args...)
 	cmd.Dir = project
 	cmd.Env = env

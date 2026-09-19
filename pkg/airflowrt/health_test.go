@@ -48,7 +48,7 @@ func checkHealthURL(url string, timeout time.Duration) error {
 	client := &http.Client{Timeout: 2 * time.Second}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(url) //nolint:gosec,noctx
+		resp, err := client.Get(url) //nolint:noctx // a test server this test started
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {

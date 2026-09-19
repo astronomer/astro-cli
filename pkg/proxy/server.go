@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -22,6 +23,10 @@ const (
 	idleTimeout       = 120 * time.Second
 	shutdownGraceTime = 5 * time.Second
 	startFailWindow   = 100 * time.Millisecond
+
+	// maxLoggedHost caps a client-supplied Host in a log line. Long enough for
+	// any hostname this proxy routes, short enough that nothing can flood one.
+	maxLoggedHost = 253
 
 	// SignatureHeader and SignatureValue mark responses the proxy generates
 	// itself (its landing and not-found pages). A caller can probe the proxy's
@@ -207,7 +212,10 @@ func (p *Proxy) Stop() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownGraceTime)
 	defer cancel()
-	p.srv.Shutdown(ctx) //nolint:errcheck
+	// Shutdown reports only that the grace period expired with connections
+	// still open. The listener is closed either way and this returns nothing,
+	// so there is no caller to tell.
+	p.srv.Shutdown(ctx) //nolint:errcheck // deliberate, for the reason above
 }
 
 // getOrCreateProxy returns a cached reverse proxy for the given backend port,
@@ -220,7 +228,9 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		return rp
 	}
 
-	target, _ := url.Parse("http://127.0.0.1:" + backendPort)
+	// Built rather than parsed: the host is fixed and only the port varies, so
+	// there is no input that could make this fail and no error to drop.
+	target := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", backendPort)}
 	rp = &httputil.ReverseProxy{}
 
 	// Rewrite rather than Director, and not only for the hook.
@@ -250,7 +260,10 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		return nil
 	}
 	rp.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
-		slog.Debug("proxy error", "host", req.Host, "error", proxyErr)
+		// req.Host is whatever the client sent, and it is the one field here a
+		// caller controls. slog's own handlers quote a value carrying control
+		// characters, but an embedder can install one that does not.
+		slog.Debug("proxy error", "host", safeHost(req.Host), "error", proxyErr) //nolint:gosec // G706: sanitized at safeHost, which gosec cannot see through
 		if p.ErrorHandler != nil {
 			p.ErrorHandler(rw, req, proxyErr)
 			return
@@ -305,9 +318,37 @@ func (p *Proxy) transportFor(backendPort string) http.RoundTripper {
 	return rt
 }
 
+// safeHost bounds a client-supplied Host for logging: control characters are
+// dropped so it cannot forge a second line, and the length is capped so it
+// cannot flood one.
+//
+// Cleaned before it is cut, not after. A Host is bytes off the wire and need
+// not be UTF-8; Map turns each undecodable byte into a 3-byte replacement
+// character, so cutting first and cleaning second lets 253 bytes of garbage
+// come back as 759 — three times the cap, on the input most likely to be
+// hostile. The cut then lands on a rune boundary, so truncation cannot
+// manufacture a replacement character of its own.
+func safeHost(h string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if r < ' ' || r == 0x7f {
+			return -1
+		}
+		return r
+	}, h)
+	if len(cleaned) <= maxLoggedHost {
+		return cleaned
+	}
+	cut := maxLoggedHost
+	for cut > 0 && !utf8.RuneStart(cleaned[cut]) {
+		cut--
+	}
+	return cleaned[:cut]
+}
+
 // isNilPointer reports whether v is an interface holding a nil pointer.
 func isNilPointer(v any) bool {
 	rv := reflect.ValueOf(v)
+	//nolint:exhaustive // every other kind cannot be nil, which is what default answers
 	switch rv.Kind() {
 	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer, reflect.Interface:
 		return rv.IsNil()

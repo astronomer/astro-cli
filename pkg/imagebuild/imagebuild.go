@@ -257,9 +257,9 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 
 // build runs the container build for a resolved Dockerfile and context, and is
 // the one place either mode shells out. Both want the same tag, the same
-// platform rule, the same streaming, and the same "--pull"; only the file and
-// the context differ, so keeping one call site is what stops the two modes
-// drifting on flags.
+// platform rule and the same streaming; only the file, the context and whether
+// the base is pulled differ, so keeping one call site is what stops the two
+// modes drifting on flags.
 func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir string, cb rt.Callbacks) (string, error) {
 	w := &rt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
@@ -267,10 +267,15 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		}
 	}}
 	// --pull keeps the base fresh for a floating tag; the daemon still caches
-	// the install layer when the requirements file is unchanged. A pinned
-	// platform (deploy wants linux/amd64) is added only when set, so the
-	// host-platform local build keeps its exact command.
-	args := []string{"build", "--tag", req.Tag, "--file", dockerfile, "--pull"}
+	// the install layer when the requirements file is unchanged. It is not
+	// unconditional, because a declared Dockerfile's FROM may name something no
+	// registry can serve — see shouldPull. A pinned platform (deploy wants
+	// linux/amd64) is added only when set, so the host-platform local build
+	// keeps its exact command.
+	args := []string{"build", "--tag", req.Tag, "--file", dockerfile}
+	if shouldPull(req.Dockerfile, dockerfile) {
+		args = append(args, "--pull")
+	}
 	// Gated on Dockerfile mode, not just left to the caller. build() is shared,
 	// and a generated build's Dockerfile is one this package wrote — `FROM
 	// <base>`, with the install in the runtime image's ONBUILD triggers — so a
@@ -299,11 +304,6 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	return req.Tag, nil
 }
 
-// runtimeDeps drops the apache-airflow distribution from the manifest
-// dependencies. The runtime base image is Airflow already, and its install
-// script rejects apache-airflow in requirements.txt ("change the base image
-// instead"). Every other dependency — providers, pandas, and the rest —
-// installs normally.
 // shouldPull reports whether the build may force-refresh its base images.
 //
 // Always, for a generated build: the Dockerfile is one this package wrote, its
@@ -318,7 +318,7 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 //
 // The rule is v1's, deliberately: airflow/docker_image.go's shouldAddPullFlag
 // skips --pull as soon as ANY FROM names something other than an Astro base, so
-// a project moving to v2 keeps the behaviour it had. Any is the right quantifier
+// a project moving to v2 keeps the behavior it had. Any is the right quantifier
 // rather than the final stage — a builder stage on an unreachable image fails
 // the build just as hard.
 func shouldPull(declared, dockerfile string) bool {
@@ -332,16 +332,44 @@ func shouldPull(declared, dockerfile string) bool {
 		return false
 	}
 	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(strings.ToUpper(line), "FROM ") {
+		// Tokenized rather than prefix-matched. docker splits on any run of
+		// whitespace, so `FROM<tab>image` is a valid instruction that a "FROM "
+		// prefix misses — and a missed FROM is not a missed opportunity here, it
+		// silently turns a user's unreachable base into a forced pull.
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.EqualFold(fields[0], "FROM") {
 			continue
 		}
-		ref := strings.TrimSpace(line[5:])
-		if !strings.HasPrefix(ref, astroRegistryHost) && !strings.HasPrefix(ref, quayAstronomerRepo) {
+		// Per-stage flags come before the reference: `FROM --platform=$BUILDPLATFORM
+		// <image>` is common enough that treating the flag as the image would drop
+		// base freshness for Dockerfiles that are on an Astro base.
+		rest := fields[1:]
+		for len(rest) > 0 && strings.HasPrefix(rest[0], "--") {
+			rest = rest[1:]
+		}
+		if len(rest) == 0 {
+			continue
+		}
+		if !isAstroBase(rest[0]) {
 			return false
 		}
 	}
 	return true
+}
+
+// isAstroBase reports whether a FROM reference names an image published to one
+// of the registries Astro Runtime comes from.
+//
+// Matched at a path boundary, not as a bare prefix: quay.io/astronomerfake/x
+// starts with quay.io/astronomer and is somebody else's registry, and treating
+// it as ours would force a pull the user did not ask for.
+func isAstroBase(ref string) bool {
+	for _, base := range []string{astroRegistryHost, quayAstronomerRepo} {
+		if ref == base || strings.HasPrefix(ref, base+"/") || strings.HasPrefix(ref, base+":") {
+			return true
+		}
+	}
+	return false
 }
 
 // The registries an Astro Runtime base comes from. Spelled here rather than
@@ -351,6 +379,11 @@ const (
 	quayAstronomerRepo = "quay.io/astronomer"
 )
 
+// runtimeDeps drops the apache-airflow distribution from the manifest
+// dependencies. The runtime base image is Airflow already, and its install
+// script rejects apache-airflow in requirements.txt ("change the base image
+// instead"). Every other dependency — providers, pandas, and the rest —
+// installs normally.
 func runtimeDeps(deps []string) []string {
 	out := make([]string, 0, len(deps))
 	for _, d := range deps {

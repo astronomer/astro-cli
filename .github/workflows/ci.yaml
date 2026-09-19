@@ -57,6 +57,62 @@ jobs:
       - name: Run golangci-lint on the e2e module
         run: make lint-e2e
 
+  # This runner is ubuntu, so the lint job above compiles no _windows.go or
+  # _darwin.go file and therefore checks none of them. This one does.
+  #
+  # A job of its own because it was the longest step in lint and shares nothing
+  # with the rest of it — it calls golangci-lint directly rather than through
+  # prek, and it needs no prek install. In sequence it made lint, rather than
+  # test-windows, the whole run's critical path; in parallel it costs a runner
+  # instead of five minutes of everyone's time.
+  #
+  # Its own cache, for the reason `test` has one: setup-go's key is shared by
+  # every Linux job here and only the first to finish writes it. What this job
+  # builds is windows and darwin objects, which is precisely what the lint job
+  # must not find in place of its own — so it takes itself out of that key and
+  # keeps one where cross-platform objects are the point. Same restore-always,
+  # save-on-trunk shape as `test`, and the same reason for testing the event
+  # rather than a branch name.
+  lint-goos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - id: go-env
+        shell: bash
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-lint-goos-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-lint-goos-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
+            go-lint-goos-${{ runner.os }}-
+
+      - name: Run golangci-lint for the platforms this runner does not compile
+        run: make lint-goos
+
+      # Runs even when the lint above failed: the objects were compiled by the
+      # time this is reached and are no less valid for a finding having been
+      # reported against them.
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: go-lint-goos-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
+
   test:
     runs-on: ubuntu-latest
     steps:

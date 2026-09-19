@@ -42,8 +42,10 @@ func RecordedList() ([]Status, error) {
 		return nil, err
 	}
 	out := make([]Status, 0, len(recs))
-	for _, rec := range recs {
-		out = append(out, recordedStatus(rec))
+	// Indexed rather than ranged by value: a Record is big enough that copying
+	// one per iteration is worth not doing, and the copy buys nothing here.
+	for i := range recs {
+		out = append(out, recordedStatus(recs[i]))
 	}
 	return out, nil
 }

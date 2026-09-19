@@ -8,9 +8,15 @@ import (
 	"strings"
 )
 
+// pkceVerifierBytes is the entropy behind the verifier. RFC 7636 4.1 puts the
+// verifier between 43 and 128 unreserved characters, and 32 random bytes
+// base64url-encode to exactly 43 — the floor, and the sequence the RFC
+// recommends in as many words.
+const pkceVerifierBytes = 32
+
 // GeneratePKCE creates a PKCE verifier and challenge pair for the OAuth flow.
 func GeneratePKCE() (verifier, challenge string, err error) {
-	verifierBytes := make([]byte, 32)
+	verifierBytes := make([]byte, pkceVerifierBytes)
 	if _, err := rand.Read(verifierBytes); err != nil {
 		return "", "", fmt.Errorf("cannot generate PKCE verifier: %w", err)
 	}

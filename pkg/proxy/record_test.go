@@ -36,7 +36,7 @@ func TestAnUnstampedBuildKeepsThePortInPlace(t *testing.T) {
 	if err := WriteRecord(path, Record{PID: 7, Port: "6564"}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	raw, err := os.ReadFile(path) //nolint:gosec // the test owns this path
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read raw: %v", err)
 	}

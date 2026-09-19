@@ -121,9 +121,9 @@ var devConfigOverrides = []string{
 	"AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
 	"AIRFLOW__API__HOST=127.0.0.1",
 	"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1",
-	// The log file is not a terminal, so nothing in it should be coloured.
-	// `airflow standalone` colours the component name it prefixes each line
-	// with and structlog colours the body, which costs about forty wasted bytes
+	// The log file is not a terminal, so nothing in it should be colored.
+	// `airflow standalone` colors the component name it prefixes each line
+	// with and structlog colors the body, which costs about forty wasted bytes
 	// a line of a CAPPED file — roughly a third of the retained history — and
 	// leaves every reader to strip escapes back out. NO_COLOR is the
 	// cross-tool convention; the Airflow setting is the one that governs its

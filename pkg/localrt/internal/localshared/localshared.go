@@ -104,7 +104,7 @@ func ChoosePort(requested, fallback int, portFree func(port string) bool, alloc 
 // ~/personal/analytics — ask for the same one. Store.AddRoute settles it,
 // under the routes lock, and writes back what the project actually got; the
 // engines record that rather than this.
-func PlanHostname(p rt.Plan, projectPath string) (string, error) { //nolint:gocritic // hugeParam: rt.Plan matches the engines' own signature
+func PlanHostname(p rt.Plan, projectPath string) (string, error) {
 	if p.Hostname != "" {
 		return p.Hostname, nil
 	}

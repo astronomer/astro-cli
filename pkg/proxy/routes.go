@@ -221,7 +221,7 @@ func (s *Store) WriteRoutes(routes []Route) error {
 // defaultRouteAlive is the prune predicate a Store uses when none is
 // injected. Docker routes are never pruned by PID because the CLI process
 // exits after starting containers; they are cleaned up explicitly.
-func defaultRouteAlive(r Route) bool { //nolint:gocritic // hugeParam: matches the public WithRouteLiveness seam, which takes Route by value
+func defaultRouteAlive(r Route) bool {
 	return r.Mode == RouteModeDocker || IsPIDAlive(r.PID)
 }
 

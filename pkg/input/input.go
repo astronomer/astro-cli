@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/manifoldco/promptui"
 	"golang.org/x/term"
@@ -33,7 +32,7 @@ func Confirm(promptText string) (bool, error) {
 // Password requests a users passord, does not print out what they entered, and returns it
 func Password(promptText string) (string, error) {
 	fmt.Print(promptText)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin)) //nolint:unconvert // the int() is needed on Windows, where syscall.Stdin is a Handle
+	bytePassword, err := term.ReadPassword(stdinFD())
 	if err != nil {
 		return "", err
 	}

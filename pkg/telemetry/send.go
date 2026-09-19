@@ -42,7 +42,7 @@ func Send(payload TelemetryPayload, apiURL string) (int, error) {
 	defer resp.Body.Close()
 
 	// Drain body to allow connection reuse by http.DefaultClient
-	_, _ = io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body) //nolint:errcheck // a body that will not drain costs the next request a new connection, nothing this one can act on
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp.StatusCode, fmt.Errorf("telemetry API returned status %d", resp.StatusCode)

@@ -15,10 +15,10 @@ const scutilPath = "/usr/sbin/scutil"
 // by running `scutil --proxy` and looking for any `*Enable : 1` entry.
 // Returns false (no proxy) on any error so we default to setting NO_PROXY.
 var HasSystemProxy = func() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) //nolint:mnd
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	out, err := exec.CommandContext(ctx, scutilPath, "--proxy").Output() //nolint:gosec
+	out, err := exec.CommandContext(ctx, scutilPath, "--proxy").Output()
 	if err != nil {
 		return false
 	}

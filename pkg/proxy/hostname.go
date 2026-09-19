@@ -118,7 +118,7 @@ var ReadDotGit = func(projectDir string) ([]byte, bool, error) {
 	if info.IsDir() {
 		return nil, true, nil // .git is a directory → normal repo
 	}
-	data, err := os.ReadFile(dotGit) //nolint:gosec
+	data, err := os.ReadFile(dotGit)
 	if err != nil {
 		return nil, false, err
 	}

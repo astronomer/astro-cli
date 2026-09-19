@@ -30,7 +30,7 @@ func hostnames(t *testing.T, e *Engine) []string {
 
 // A start interrupted during the health wait leaves the project REACHABLE.
 //
-// Cancelling deliberately leaves Airflow running with its record, so that
+// Canceling deliberately leaves Airflow running with its record, so that
 // Ctrl-C a moment before readiness does not throw away a working instance.
 // What it must not do is leave it half-registered. Registering the route after
 // the wait did exactly that: the record said running, `astro local status`
@@ -49,7 +49,7 @@ func TestStartInterruptedDuringHealthStillRegistersTheRoute(t *testing.T) {
 	}
 
 	af, err := e.Start(ctx, p, rt.Callbacks{})
-	require.ErrorIs(t, err, context.Canceled, "a cancelled start reports the cancellation")
+	require.ErrorIs(t, err, context.Canceled, "a canceled start reports the cancellation")
 	assert.Nil(t, af)
 
 	// Left running on purpose: the record and the process stay, so a later

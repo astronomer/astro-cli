@@ -63,10 +63,12 @@ func newPodmanManager(pe PodmanEngine, h host) *Manager {
 	return &Manager{engine: Podman, cfg: Config{}, fb: NoopFeedback{}, podman: pe, host: h}
 }
 
-func astroInspected(state string) *InspectedMachine {
+// astroRunning is the astro machine as inspect reports it when it is up, which
+// is the only shape any test here needs.
+func astroRunning() *InspectedMachine {
 	return &InspectedMachine{
 		Name:           podmanMachineName,
-		State:          state,
+		State:          podmanStatusRunning,
 		ConnectionInfo: ConnectionInfo{PodmanSocket: PodmanSocket{Path: "/path/to/astro-machine.sock"}},
 	}
 }
@@ -85,7 +87,7 @@ func (s *ManagerRuntimeSuite) TestInitializeDockerHostAlreadySet() {
 
 func (s *ManagerRuntimeSuite) TestInitializeNoMachines() {
 	s.Run("No machines, initialize podman and set default", func() {
-		pe := &scriptedPodman{machines: nil, inspect: astroInspected(podmanStatusRunning)}
+		pe := &scriptedPodman{machines: nil, inspect: astroRunning()}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Equal(s.T(), 1, pe.initCalls)
@@ -99,7 +101,7 @@ func (s *ManagerRuntimeSuite) TestInitializeNoMachines() {
 
 func (s *ManagerRuntimeSuite) TestInitializeAstroMachineAlreadyRunning() {
 	s.Run("Astro machine already running, just set default", func() {
-		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: true}}, inspect: astroInspected(podmanStatusRunning)}
+		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: true}}, inspect: astroRunning()}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Equal(s.T(), 0, pe.initCalls)
@@ -111,7 +113,7 @@ func (s *ManagerRuntimeSuite) TestInitializeAstroMachineAlreadyRunning() {
 
 func (s *ManagerRuntimeSuite) TestInitializeAstroMachineStopped() {
 	s.Run("Astro machine stopped, start it and set default", func() {
-		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: false}}, inspect: astroInspected(podmanStatusRunning)}
+		pe := &scriptedPodman{machines: []ListedMachine{{Name: podmanMachineName, Running: false}}, inspect: astroRunning()}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Initialize())
 		assert.Equal(s.T(), 1, pe.startCalls)
@@ -125,7 +127,7 @@ func (s *ManagerRuntimeSuite) TestInitializeAnotherMachineRunningOnMac() {
 		pe := &scriptedPodman{
 			machines:   []ListedMachine{{Name: "other-machine", Running: true}},
 			containers: nil,
-			inspect:    astroInspected(podmanStatusRunning),
+			inspect:    astroRunning(),
 		}
 		m := newPodmanManager(pe, fakeHost{mac: true})
 		assert.NoError(s.T(), m.Initialize())
@@ -163,7 +165,7 @@ func (s *ManagerRuntimeSuite) TestConfigureAstroMachineRunning() {
 	s.Run("Astro machine running, configure it for usage", func() {
 		pe := &scriptedPodman{
 			machines: []ListedMachine{{Name: podmanMachineName, Running: true}},
-			inspect:  astroInspected(podmanStatusRunning),
+			inspect:  astroRunning(),
 		}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.Configure())
@@ -177,7 +179,7 @@ func (s *ManagerRuntimeSuite) TestConfigureWindowsOmitsContainerHost() {
 	s.Run("On windows, DOCKER_HOST uses npipe and CONTAINER_HOST is empty", func() {
 		pe := &scriptedPodman{
 			machines: []ListedMachine{{Name: podmanMachineName, Running: true}},
-			inspect:  astroInspected(podmanStatusRunning),
+			inspect:  astroRunning(),
 		}
 		m := newPodmanManager(pe, fakeHost{windows: true})
 		assert.NoError(s.T(), m.Configure())
@@ -208,7 +210,7 @@ func (s *ManagerRuntimeSuite) TestConfigureOrKillAstroMachineRunning() {
 	s.Run("Astro machine running, configure for usage", func() {
 		pe := &scriptedPodman{
 			machines: []ListedMachine{{Name: podmanMachineName, Running: true}},
-			inspect:  astroInspected(podmanStatusRunning),
+			inspect:  astroRunning(),
 		}
 		m := newPodmanManager(pe, fakeHost{})
 		assert.NoError(s.T(), m.ConfigureOrKill())

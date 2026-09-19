@@ -11,7 +11,7 @@ import (
 
 // isProcessAlive checks whether a process with the given PID is running on Windows.
 func isProcessAlive(pid int) bool {
-	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/NH") //nolint:gosec
+	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid), "/NH") //nolint:gosec // G204: a fixed system command, and pid goes through %d rather than into the command line as text
 	output, err := cmd.Output()
 	if err != nil {
 		return false
@@ -25,7 +25,9 @@ func terminateProcess(pid int) {
 	if err != nil {
 		return
 	}
-	proc.Kill() //nolint:errcheck
+	// A process that cannot be killed is one the caller polls for anyway, and
+	// a process already gone is the outcome asked for.
+	proc.Kill() //nolint:errcheck // deliberate, for the reason above
 }
 
 // killProcess force-kills the process on Windows.
@@ -34,5 +36,5 @@ func killProcess(pid int) {
 	if err != nil {
 		return
 	}
-	proc.Kill() //nolint:errcheck
+	proc.Kill() //nolint:errcheck // as above: this is the last resort, and nothing follows it to tell
 }

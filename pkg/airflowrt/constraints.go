@@ -41,7 +41,9 @@ func FetchConstraints(projectPath, tag, pythonVersion string) (*ConstraintFiles,
 	if fileExists(constraintsFile) && fileExists(freezeFile) {
 		af, err := ParsePackageVersion(constraintsFile, "apache-airflow")
 		if err == nil && af != "" {
-			sdk, _ := ParsePackageVersion(constraintsFile, "apache-airflow-task-sdk")
+			// The task SDK is a separate distribution only Airflow 3 constrains, so
+			// a miss is the common case and the empty string already says it.
+			sdk, _ := ParsePackageVersion(constraintsFile, "apache-airflow-task-sdk") //nolint:errcheck // deliberate, for the reason above
 			return &ConstraintFiles{FreezePath: freezeFile, AirflowVersion: af, TaskSDKVersion: sdk}, nil
 		}
 	}
@@ -66,14 +68,15 @@ func FetchConstraints(projectPath, tag, pythonVersion string) (*ConstraintFiles,
 	if err != nil {
 		return nil, err
 	}
-	sdk, _ := ParsePackageVersion(constraintsFile, "apache-airflow-task-sdk")
+	// Optional in the same way as above: Airflow 2 pins no task SDK.
+	sdk, _ := ParsePackageVersion(constraintsFile, "apache-airflow-task-sdk") //nolint:errcheck // deliberate, for the reason above
 
 	return &ConstraintFiles{FreezePath: freezeFile, AirflowVersion: af, TaskSDKVersion: sdk}, nil
 }
 
 // DownloadFile fetches a URL and writes the body to dest. Variable for testing.
 var DownloadFile = func(url, dest string) error {
-	resp, err := http.Get(url) //nolint:gosec,noctx
+	resp, err := http.Get(url) //nolint:gosec,noctx // G107: the URL is built by this package from a pinned Airflow version, and the seam above is what tests replace
 	if err != nil {
 		return err
 	}

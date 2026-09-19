@@ -28,7 +28,7 @@ mkdir -p .venv
 exit 0
 `
 	path := filepath.Join(t.TempDir(), "uv")
-	require.NoError(t, os.WriteFile(path, []byte(script), 0o700)) //nolint:gosec // an executable stand-in under t.TempDir
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
 	return path
 }
 
@@ -56,7 +56,7 @@ func TestUVOptionsReachTheInvocation(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, client.EnsureSynced(t.Context(), t.TempDir(), "", uv.Stdio{}))
 
-			got, err := os.ReadFile(record) //nolint:gosec // a file this test just created under t.TempDir
+			got, err := os.ReadFile(record)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, strings.TrimSpace(string(got)))
 		})
@@ -114,6 +114,6 @@ fi
 exit 0
 `
 	path := filepath.Join(t.TempDir(), "uv")
-	require.NoError(t, os.WriteFile(path, []byte(script), 0o700)) //nolint:gosec // an executable stand-in under t.TempDir
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o700))
 	return path
 }

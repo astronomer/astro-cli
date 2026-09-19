@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,7 +70,7 @@ func TestProxy_ReverseProxy(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Backend", "yes")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("hello from backend")) //nolint:errcheck
+		w.Write([]byte("hello from backend"))
 	}))
 	defer backend.Close()
 
@@ -157,4 +159,51 @@ func TestProxy_StartReportsBoundPort(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// A Host header is whatever the client typed, and it reaches a log line. A
+// newline in it would end that line and start one the reader has no way to tell
+// from something the proxy wrote.
+func TestSafeHostCannotForgeALogLine(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		host string
+		want string
+	}{
+		{"an ordinary host passes through", "my-project.localtest.me:6563", "my-project.localtest.me:6563"},
+		{"a newline cannot end the line", "host\nlevel=ERROR msg=\"database deleted\"", `hostlevel=ERROR msg="database deleted"`},
+		{"a carriage return cannot either", "host\rmsg=fake", "hostmsg=fake"},
+		{"DEL goes too", "host\x7fmsg", "hostmsg"},
+		{"an empty host stays empty", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, safeHost(tc.host))
+		})
+	}
+}
+
+// Capped so a Host cannot flood the log either. 253 is the longest a DNS name
+// can be, so nothing this proxy actually routes is truncated.
+func TestSafeHostIsBounded(t *testing.T) {
+	assert.Len(t, safeHost(strings.Repeat("a", maxLoggedHost*4)), maxLoggedHost)
+	full := strings.Repeat("b", maxLoggedHost)
+	assert.Equal(t, full, safeHost(full), "a host at the cap is not truncated")
+}
+
+// The cap has to hold for bytes that are not UTF-8, which is the input a
+// hostile client is most likely to send. Each undecodable byte becomes a 3-byte
+// replacement character, so a cap applied before that expansion is not a cap:
+// cleaning after cutting returns 759 bytes for 253 of garbage.
+func TestSafeHostIsBoundedForBytesThatAreNotText(t *testing.T) {
+	got := safeHost(strings.Repeat("\xff", maxLoggedHost*2))
+	assert.LessOrEqual(t, len(got), maxLoggedHost, "the cap counts bytes, and replacement characters are bytes")
+	assert.True(t, utf8.ValidString(got), "what reaches the log should still be text")
+}
+
+// Cutting mid-rune would put a replacement character at the end of every long
+// internationalized host — manufactured by the truncation, not sent by anyone.
+func TestSafeHostCutsOnARuneBoundary(t *testing.T) {
+	got := safeHost(strings.Repeat("a", maxLoggedHost-1) + "\u00e9tail")
+	assert.True(t, utf8.ValidString(got))
+	assert.False(t, strings.ContainsRune(got, utf8.RuneError), "truncation invented a replacement character: %q", got)
 }

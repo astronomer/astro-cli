@@ -74,7 +74,7 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 	for hop := 0; hop < len(stages); hop++ {
 		earlier := -1
 		for i, st := range stages[:len(stages)-1] {
-			if st.alias != "" && st.alias == strings.ToLower(ref) {
+			if st.alias != "" && strings.EqualFold(st.alias, ref) {
 				earlier = i
 			}
 		}

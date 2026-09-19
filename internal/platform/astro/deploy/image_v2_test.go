@@ -324,8 +324,8 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 	// The base is never resolved in this mode, so nothing is pulled for it.
 	//
 	// Matched as a `docker pull` COMMAND, not the substring "pull": imagebuild's
-	// build always passes --pull, so "pull --platform" matches the build's own
-	// flags and this assertion passed against a command it was not about.
+	// build can pass --pull of its own, so "pull --platform" matches the build's
+	// own flags and this assertion passed against a command it was not about.
 	assert.False(t, hasImageCall(cmd.calls, "docker pull"),
 		"a declared Dockerfile names its own FROM; pulling a base we do not use is a needless network dependency, got %v", cmd.calls)
 }

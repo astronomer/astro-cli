@@ -77,3 +77,31 @@ func TestAllocatePort_AllBusy(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "finding an available port")
 }
+
+// routes.json records ports that are reserved but not yet bound, and the
+// availability check cannot see those — it only dials. So a routes file that
+// cannot be read is not "no ports taken", and allocating anyway would hand a
+// second project a port the first is holding.
+func TestAllocatePortRefusesWhenTheAllocationsCannotBeRead(t *testing.T) {
+	seed := testStore(t)
+	require.NoError(t, seed.AddRoute(&Route{Hostname: "taken.localtest.me", Port: "10001"}))
+
+	// A directory standing where the file should be, rather than chmod 0o000.
+	// Windows has no Unix mode bits — a 0o000 file is still readable there, and
+	// os.Geteuid does not identify an administrator — but reading a directory
+	// as a file fails everywhere.
+	path := seed.routesFilePath()
+	require.NoError(t, os.Remove(path))
+	require.NoError(t, os.Mkdir(path, 0o750))
+
+	// A second store over the same directory, because the one that wrote the
+	// file answers from its cache and never reads it back.
+	s := NewStore(seed.dir)
+
+	origIsPortAvailable := isPortAvailable
+	t.Cleanup(func() { isPortAvailable = origIsPortAvailable })
+	isPortAvailable = func(_ string) bool { return true }
+
+	_, err := s.AllocatePort()
+	require.Error(t, err, "a port was handed out without knowing which are already held")
+}

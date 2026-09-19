@@ -16,6 +16,8 @@ func setWindowsConsoleMode(handle windows.Handle, flags uint32) {
 	var mode uint32
 	// set the console mode if not already there:
 	if err := windows.GetConsoleMode(handle, &mode); err == nil {
-		_ = windows.SetConsoleMode(handle, mode|flags)
+		// A console that will not take the mode prints escape codes instead of
+		// color, which is ugly and not worth failing anything over.
+		_ = windows.SetConsoleMode(handle, mode|flags) //nolint:errcheck // deliberate, for the reason above
 	}
 }

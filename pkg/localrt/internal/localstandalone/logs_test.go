@@ -139,7 +139,7 @@ func TestLogsTailAndSince(t *testing.T) {
 }
 
 // Writer mode hands its lines straight to the caller's io.Writer, so it has to
-// strip escapes too. Suppressing colour at the launch site keeps them out of
+// strip escapes too. Suppressing color at the launch site keeps them out of
 // new log files; a file written before that, or by anything else, still has
 // them, and forwarding control codes through one output while stripping them
 // from the other is the kind of half-true that reads as fixed.

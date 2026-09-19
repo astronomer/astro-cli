@@ -195,7 +195,7 @@ func discover(getenv func(string) string, binDir string, extraDirs []string) (st
 // Searched after PATH, so a GUI-launched embedder whose stripped launchd
 // PATH lost them still finds a user-installed uv.
 func defaultExtraDirs() []string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		// uv's Windows installers put it on the normal user PATH.
 		return nil
 	}
@@ -207,7 +207,7 @@ func defaultExtraDirs() []string {
 }
 
 func exeName() string {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		return "uv.exe"
 	}
 	return "uv"
@@ -218,7 +218,7 @@ func isExecutableFile(path string) bool {
 	if err != nil || info.IsDir() {
 		return false
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		return true
 	}
 	return info.Mode().Perm()&0o111 != 0
@@ -248,16 +248,26 @@ func queryVersion(ctx context.Context, bin string) (string, error) {
 	return fields[1], nil
 }
 
+// windowsGOOS is runtime.GOOS on Windows. Named because three lookups here
+// branch on it: where the installers put uv, what the binary is called, and
+// whether an executable bit means anything.
+const windowsGOOS = "windows"
+
+// versionSegments is how many parts of a version are compared: major, minor,
+// patch. Splitting one more than that leaves everything after the patch in a
+// final segment instead of spreading it across segments nothing reads.
+const versionSegments = 3
+
 // parseVersion parses "major.minor.patch" leniently: each segment counts
 // only its leading digits, so a pre-release like "0.9.0rc1" still orders.
-func parseVersion(v string) ([3]int, bool) {
-	var out [3]int
-	segments := strings.SplitN(v, ".", 4)
+func parseVersion(v string) ([versionSegments]int, bool) {
+	var out [versionSegments]int
+	segments := strings.SplitN(v, ".", versionSegments+1)
 	if len(segments) < 2 {
 		return out, false
 	}
 	for i, seg := range segments {
-		if i > 2 {
+		if i >= versionSegments {
 			break
 		}
 		digits := seg

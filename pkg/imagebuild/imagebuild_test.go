@@ -233,6 +233,69 @@ func TestRuntimeDepsDropsAirflowOnly(t *testing.T) {
 	}, got)
 }
 
+// --pull is how a floating base tag picks up a new patch, so a generated build
+// always wants it. A declared Dockerfile's FROM belongs to the user, and it may
+// name a locally built image or a registry this daemon cannot reach — where
+// forcing a pull fails a build that plain `docker build` completes. v1 drew the
+// line at "any FROM that is not an Astro base", and a project moving to v2 has
+// to keep the behavior it had.
+func TestPullOnlyWhenEveryBaseComesFromAstro(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		from string // "" builds the generated Dockerfile instead of a declared one
+		want bool
+	}{
+		{name: "generated build, base tag floats", want: true},
+		{name: "declared, astro registry", from: "FROM astrocrpublic.azurecr.io/runtime:3.1\n", want: true},
+		{name: "declared, quay", from: "FROM quay.io/astronomer/astro-runtime:12\n", want: true},
+		{name: "declared, an image only this machine has", from: "FROM my-own-base\n", want: false},
+		{
+			// Any stage, not the last one: a builder stage on an unreachable
+			// image fails the build just as hard as a final one would.
+			name: "declared, astro final stage over a foreign builder",
+			from: "FROM golang:1.26 AS builder\nFROM astrocrpublic.azurecr.io/runtime:3.1\n",
+			want: false,
+		},
+		{
+			// docker splits on any whitespace. Read as "no FROM at all", this
+			// base looks generated and gets the pull that breaks it.
+			name: "declared with a tab, still the user's own base",
+			from: "FROM\tmy-own-base\n",
+			want: false,
+		},
+		{
+			// The flag is not the image. Reading it as one drops base freshness
+			// from a Dockerfile that is on an Astro base after all.
+			name: "declared, astro base behind a platform flag",
+			from: "FROM --platform=$BUILDPLATFORM astrocrpublic.azurecr.io/runtime:3.1\n",
+			want: true,
+		},
+		{
+			// Somebody else's registry that happens to share our prefix.
+			name: "declared, a registry that only looks like ours",
+			from: "FROM quay.io/astronomerfake/runtime:1\n",
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &fakeCmd{}
+			var req Request
+			if tc.from == "" {
+				req = testRequest(t)
+				req.Dependencies = []string{"pandas"}
+			} else {
+				req = dockerfileRequest(t)
+				require.NoError(t, os.WriteFile(req.Dockerfile, []byte(tc.from), 0o600))
+			}
+
+			_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, hasCall(cmd.calls, "--pull"),
+				"wanted --pull=%v, got %v", tc.want, cmd.calls)
+		})
+	}
+}
+
 // dockerfileRequest is a tier-3 build: the project supplied its own Dockerfile,
 // so the file and the project context replace the generated pair. Dependencies
 // are set deliberately — a manifest carries them whichever tier it chose, and

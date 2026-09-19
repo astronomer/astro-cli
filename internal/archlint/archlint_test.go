@@ -57,6 +57,12 @@ var v2BelowCmd = []string{
 	"pkg/platformversions",
 	"pkg/scaffold",
 	"pkg/secrets",
+	"pkg/uv",
+	"pkg/astroauth",
+	"pkg/container",
+	"pkg/telemetry",
+	"pkg/proxy",
+	"pkg/airflowrt",
 }
 
 // v2ConfigReaders lists the v2 packages that read config/ on purpose. Each
@@ -400,26 +406,11 @@ func TestTheAuthDoorsStayOptional(t *testing.T) {
 	}
 }
 
-// Every module we lint to v2 standards is also held to the no-print rule.
-//
-// The gap this closes: accountablePackages walks `internal` only, so while this
-// package lived at internal/checks, deleting its v2BelowCmd entry failed
-// TestEveryInternalPackageIsAccountedFor. Promoted to pkg/checks, deleting the
-// entry silently disabled TestV2PackagesBelowCmdNeverPrintOrExit for it and no
-// test objected — and forbidigo cannot backstop it, since .golangci.yml anchors
-// that rule at ^internal/.
-//
-// LINT_SUBMODULES is the right set to tie this to: it is exactly the list of
-// sub-modules we have decided to hold to v2 lint standards, so a module joining
-// it and not the no-print rule is an oversight rather than a decision.
-//
-// Deliberately NOT "every pkg/ directory": there are twenty-one that name no
-// rule, most of them v1 helpers that print by design (ansi, printutil,
-// spinner). Classifying those is worth doing and is its own change — six real
-// v2 sub-modules are among them (airflowrt, astroauth, container, proxy,
-// telemetry, uv).
-func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
-	root := repoRoot(t)
+// lintSubmodules reads the modules `make lint-submodules` runs the linter over.
+// The Makefile is the single source: CI, the two tests below and a developer
+// typing the target all have to agree on the list, and parsing it is how they do.
+func lintSubmodules(t *testing.T, root string) []string {
+	t.Helper()
 	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
 	if err != nil {
 		t.Fatalf("read Makefile: %v", err)
@@ -434,15 +425,69 @@ func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
 	if line == "" {
 		t.Fatal("no LINT_SUBMODULES in the Makefile: this test reads it to know which modules are held to v2 lint standards")
 	}
-	registered := make(map[string]bool, len(v2BelowCmd))
-	for _, p := range v2BelowCmd {
-		registered[p] = true
-	}
 	mods := strings.Fields(line)
 	if len(mods) == 0 {
 		t.Fatal("LINT_SUBMODULES is empty")
 	}
-	for _, m := range mods {
+	return mods
+}
+
+// A pkg/* module is one golangci-lint cannot reach on its own: a root run does
+// not descend into a nested module, so being named in LINT_SUBMODULES is the
+// only thing that lints it. Ten were missing at once, long enough that the
+// Makefile grew a comment explaining the backlog — which is what a hand-kept
+// list does. An eleventh fails here instead, on the commit that adds it.
+func TestEveryPkgSubmoduleIsLinted(t *testing.T) {
+	root := repoRoot(t)
+	listed := make(map[string]bool)
+	for _, m := range lintSubmodules(t, root) {
+		listed[m] = true
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "pkg"))
+	if err != nil {
+		t.Fatalf("read pkg/: %v", err)
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		mod := "pkg/" + e.Name()
+		if _, err := os.Stat(filepath.Join(root, mod, "go.mod")); err != nil {
+			continue // not a module of its own; the root run covers it
+		}
+		if !listed[mod] {
+			t.Errorf("%s is a module of its own and is not in LINT_SUBMODULES, so nothing lints it: "+
+				"a root golangci-lint run does not descend into a nested module. Add it to LINT_SUBMODULES "+
+				"in the Makefile, and to v2BelowCmd above", mod)
+		}
+	}
+}
+
+// Every module we lint to v2 standards is also held to the no-print rule.
+//
+// The gap this closes: accountablePackages walks `internal` only, so while this
+// package lived at internal/checks, deleting its v2BelowCmd entry failed
+// TestEveryInternalPackageIsAccountedFor. Promoted to pkg/checks, deleting the
+// entry silently disabled TestV2PackagesBelowCmdNeverPrintOrExit for it and no
+// test objected — and forbidigo cannot backstop it, since .golangci.yml anchors
+// that rule at ^internal/.
+//
+// LINT_SUBMODULES is the right set to tie this to: it is exactly the list of
+// sub-modules we have decided to hold to v2 lint standards, so a module joining
+// it and not the no-print rule is an oversight rather than a decision.
+//
+// Deliberately NOT "every pkg/ directory": many name no rule at all, most of
+// them v1 helpers that print by design (ansi, printutil, spinner). Classifying
+// those is worth doing and is its own change. Every v2 sub-module is already
+// here, because TestEveryPkgSubmoduleIsLinted puts it in LINT_SUBMODULES and
+// this test then requires it here.
+func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
+	root := repoRoot(t)
+	registered := make(map[string]bool, len(v2BelowCmd))
+	for _, p := range v2BelowCmd {
+		registered[p] = true
+	}
+	for _, m := range lintSubmodules(t, root) {
 		if !registered[m] {
 			t.Errorf("%s is in LINT_SUBMODULES but not in v2BelowCmd, so nothing enforces that it does not print "+
 				"or exit: a root golangci-lint run does not descend into a sub-module, and forbidigo is anchored "+

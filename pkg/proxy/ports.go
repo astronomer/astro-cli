@@ -18,9 +18,18 @@ const (
 // It checks that the port is not already in use by another process and not
 // already allocated in routes.json.
 func (s *Store) AllocatePort() (string, error) {
-	// Read existing routes to avoid collisions
+	// Refused rather than guessed at. A missing or empty routes file reads as no
+	// routes, so an error here is a real one — and the availability check below
+	// only sees ports something is LISTENING on, while routes.json also records
+	// ports held across a provisioning run that has not bound them yet (see
+	// Reserve in pkg/localrt). Allocating without that list hands a reserved
+	// port to a second project, which is the collision the reservation exists
+	// to prevent.
+	routes, err := s.ReadRoutes()
+	if err != nil {
+		return "", fmt.Errorf("reading the ports already allocated: %w", err)
+	}
 	allocated := map[string]bool{}
-	routes, _ := s.ReadRoutes() // ignore error — best effort
 	for _, r := range routes {
 		allocated[r.Port] = true
 		for _, p := range r.Services {
@@ -29,7 +38,7 @@ func (s *Store) AllocatePort() (string, error) {
 	}
 
 	for range maxRetries {
-		port := fmt.Sprintf("%d", portRangeMin+rand.Intn(portRangeMax-portRangeMin+1)) //nolint:gosec
+		port := fmt.Sprintf("%d", portRangeMin+rand.Intn(portRangeMax-portRangeMin+1)) //nolint:gosec // G404: spreading attempts across the range, not generating a secret
 
 		// Skip if already allocated
 		if allocated[port] {
@@ -56,6 +65,6 @@ var isPortAvailable = func(port string) bool {
 	if err != nil {
 		return true // Connection refused / timeout → port is free
 	}
-	conn.Close()
+	conn.Close() //nolint:errcheck // the dial answered the question; the close is tidiness
 	return false
 }

@@ -100,7 +100,7 @@ func TestStartNamesTheLogWhenItGivesUp(t *testing.T) {
 // The log it names has to be the log it wrote.
 //
 // Plan.StateDir exists so an embedder can put the runtime state somewhere else,
-// and planStateDir honours it — so deriving the path a second time from
+// and planStateDir honors it — so deriving the path a second time from
 // rt.StateDir, which is only the fallback, named a file that does not exist
 // while the real output sat where the caller had asked for it.
 func TestStartNamesTheLogTheCallerAskedFor(t *testing.T) {
@@ -137,5 +137,5 @@ func TestStartStillReportsCancellationAsCancellation(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, context.Canceled), "got %v", err)
 	assert.False(t, strings.Contains(err.Error(), "exited while starting"),
-		"a cancelled start is not an exited one")
+		"a canceled start is not an exited one")
 }

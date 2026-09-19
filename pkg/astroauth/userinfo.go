@@ -21,7 +21,7 @@ func FetchUserInfo(authCfg AuthConfig, accessToken string, opts ...RequestOption
 	o := resolveOptions(opts)
 	addr := authCfg.DomainURL + "userinfo"
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, addr, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, addr, http.NoBody)
 	if err != nil {
 		return nil, err
 	}

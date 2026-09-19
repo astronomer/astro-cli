@@ -17,19 +17,14 @@ lint:
 # version is written down.
 GOLANGCI_VERSION=$(shell sed -n 's/.*golangci-lint@\(v[0-9.]*\).*/\1/p' prek.toml | head -1)
 
-# The sub-modules that lint clean today and must stay that way. Ten others do
-# not yet: never having been linted, they have collected unused nolint
-# directives and unchecked errors. Each joins this list when its backlog is
-# cleared, which is its own change rather than a rider on someone else's.
-#
-# pkg/localrt is a special case worth naming: its engines (localdocker,
-# localstandalone, localprune, localshared, localstate) WERE covered by the root
-# run until they moved into that module, and a root run does not descend into a
-# nested one. They are not newly dirty — a clean run needs the hugeParam
-# exclusion the root .golangci.yml grants them re-expressed against paths inside
-# the module, which is config work, not a fix. Until then ~4,000 lines of engine
-# code is unlinted; the root suite, GOOS=windows vet, and archlint still cover it.
-LINT_SUBMODULES=pkg/airflowapi pkg/airflowenv pkg/awsauth pkg/checks pkg/connmodel pkg/emfetch pkg/envschema pkg/googleauth pkg/instancelocate pkg/instances pkg/manifest pkg/platformversions pkg/scaffold
+# Every pkg/* module, because a root golangci-lint run does not descend into a
+# nested one and being named here is the only thing that lints them. Keeping the
+# list complete is not left to memory: TestEveryPkgSubmoduleIsLinted in
+# internal/archlint reads this variable and fails on a pkg/*/go.mod missing from
+# it, and its sibling fails on an entry missing from v2BelowCmd. So a new module
+# fails two tests on the commit that adds it, which is the cheapest place to
+# find out.
+LINT_SUBMODULES=pkg/airflowapi pkg/airflowenv pkg/airflowrt pkg/astroauth pkg/awsauth pkg/checks pkg/connmodel pkg/container pkg/emfetch pkg/envschema pkg/fsatomic pkg/googleauth pkg/imagebuild pkg/instancelocate pkg/instances pkg/localrt pkg/manifest pkg/platformversions pkg/proxy pkg/scaffold pkg/secrets pkg/telemetry pkg/uv
 
 lint-submodules:
 	@set -e; for mod in ${LINT_SUBMODULES}; do \
@@ -42,6 +37,69 @@ lint-submodules:
 # cannot see a file reports success on it.
 lint-e2e:
 	cd e2e && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION} run --timeout 5m --build-tags e2e
+
+# The platforms every module is linted for.
+#
+# "A linter that cannot see a file reports success on it" is the reason lint-e2e
+# passes --build-tags, and GOOS is a build tag. CI runs on ubuntu, so without
+# this every _windows.go and _darwin.go in the tree — the process groups, the
+# proxy's locking and pid checks, the machine plumbing — is checked by nobody,
+# and a file nothing lints looks exactly like one that is clean.
+LINT_GOOS=linux darwin windows
+
+# The root module gets a shorter list, and darwin is the one missing. Analyzing
+# it for darwin means typechecking github.com/fsnotify/fsevents, reached through
+# airflow/, which is cgo-only on that platform and does not resolve from a linux
+# host — which is what CI is. Every sub-module cross-analyzes for darwin fine;
+# only the root is blocked, so only the root is trimmed.
+#
+# What still covers it: a darwin developer's own `make lint` is a native darwin
+# run, and a macOS runner would cover it in CI if that is ever worth the minutes.
+LINT_GOOS_ROOT=linux windows
+
+# Two things keep this from being 24 modules times 3 platforms, and both are
+# about not paying for a conclusion that is already known.
+#
+# The host platform is skipped, because lint and lint-submodules have just
+# linted it. Together the three targets cover every platform whatever machine
+# they run on. On its own this one is therefore not a whole lint — run it after
+# the other two, the way CI does.
+#
+# And a module is only linted for a platform that changes what it compiles.
+# Nineteen of the twenty-four see a byte-identical file set on every GOOS, so a
+# second run can only reach the same answer more slowly; the five that do vary
+# are where every finding this target has ever reported came from. Derived from
+# `go list` rather than listed by hand, so the first _windows.go in a module
+# enrols it without anyone having to notice that it should.
+#
+# Installed rather than `go run`, unlike every other target here: GOOS has to
+# say what is ANALYZED, and `GOOS=windows go run` reads it as what to BUILD —
+# it cross-compiles the linter and then fails to exec it. Installing with GOOS
+# unset gives a host binary that the loop can then point at each platform. Go
+# caches the build, so it is only paid once.
+#
+# Sequential, deliberately: concurrent golangci-lint processes fail on a shared
+# lock with "parallel golangci-lint is running".
+lint-goos:
+	@set -e; \
+	host=$$(go env GOOS); \
+	bin=$$(mktemp -d); \
+	GOBIN=$$bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION}; \
+	fileset() { (cd "$$1" && GOOS=$$2 go list -f '{{.ImportPath}}:{{.GoFiles}}:{{.TestGoFiles}}' ./... 2>/dev/null | sort | tr -d ' \n'); }; \
+	for goos in ${LINT_GOOS_ROOT}; do \
+		if [ "$$goos" = "$$host" ]; then continue; fi; \
+		echo "==> . ($$goos)"; \
+		GOOS=$$goos $$bin/golangci-lint run --timeout 10m; \
+	done; \
+	for mod in ${LINT_SUBMODULES}; do \
+		base=$$(fileset $$mod $$host); \
+		for goos in ${LINT_GOOS}; do \
+			if [ "$$goos" = "$$host" ]; then continue; fi; \
+			if [ "$$(fileset $$mod $$goos)" = "$$base" ]; then continue; fi; \
+			echo "==> $$mod ($$goos)"; \
+			(cd $$mod && GOOS=$$goos $$bin/golangci-lint run --timeout 10m); \
+		done; \
+	done
 
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go

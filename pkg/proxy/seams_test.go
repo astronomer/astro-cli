@@ -50,7 +50,7 @@ func TestTransportIsBuiltOncePerBackend(t *testing.T) {
 		asked[backendPort]++
 		mu.Unlock()
 		return roundTripperFunc(func(*http.Request) (*http.Response, error) {
-			return nil, fmt.Errorf("not dialled in this test")
+			return nil, fmt.Errorf("not dialed in this test")
 		})
 	}
 

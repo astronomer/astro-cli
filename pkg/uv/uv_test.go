@@ -15,7 +15,7 @@ import (
 
 func skipOnWindows(t *testing.T) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("fake uv binaries are shell scripts")
 	}
 }
