@@ -427,34 +427,37 @@ const (
 )
 
 // operationalEnv are the UV_* variables Options.HermeticEnv keeps. They govern
-// how uv reaches what it was told to fetch — how patiently, how many at a
-// time, how the files land, which trust store, where an interpreter comes from
-// — without changing WHICH distribution it resolves to. Stripping them breaks
-// the constrained-network users hermeticity is meant to help, who are the same
+// how uv reaches what it was told to fetch — how patiently, how many at a time,
+// how the files land, which trust store — without changing WHICH distribution
+// it resolves to, or what it executes. Stripping them breaks the
+// constrained-network users hermeticity is meant to help, who are the same
 // people the certificate retry is for.
 //
-// Names verified against the uv binary rather than assumed, because a
-// deny-by-default rule turns a misremembered name into a silent capability
-// loss that only a constrained-network user ever hits. Three groups earn their
-// place by a failure each:
+// UV_REQUEST_TIMEOUT is uv's older spelling of UV_HTTP_TIMEOUT, and
+// UV_CONCURRENT_INSTALLS and UV_CONCURRENT_BUILDS are "how many at a time"
+// exactly as UV_CONCURRENT_DOWNLOADS is. Keeping one spelling, or one third of
+// a group, is the same silent override the two cert-variable spellings are
+// handled together to avoid.
 //
-//   - UV_INSECURE_HOST is the escape hatch for a self-signed internal index.
-//     Stripping it takes the working workaround away from exactly the machines
-//     the certificate retry exists to rescue.
-//   - UV_PYTHON_INSTALL_MIRROR, UV_PYPY_INSTALL_MIRROR, UV_PYTHON_INSTALL_DIR,
-//     UV_PYTHON_INSTALL_BIN and UV_PYTHON_INSTALL_REGISTRY are where a managed
-//     interpreter comes from. On a box where github.com is blocked and an
-//     internal mirror is configured, dropping them means uv cannot provision
-//     an interpreter at all.
-//   - UV_REQUEST_TIMEOUT is uv's older spelling of UV_HTTP_TIMEOUT, and
-//     UV_CONCURRENT_INSTALLS and UV_CONCURRENT_BUILDS are "how many at a time"
-//     exactly as UV_CONCURRENT_DOWNLOADS is. Keeping one spelling or one third
-//     of a group is the same silent override the two cert-variable spellings
-//     are handled together to avoid.
+// Deliberately excluded, though uv documents them beside the knobs above and a
+// restricted network can genuinely need them:
+//
+//   - UV_INSECURE_HOST turns off certificate verification for a host.
+//   - UV_PYTHON_INSTALL_MIRROR, UV_PYPY_INSTALL_MIRROR and
+//     UV_PYTHON_INSTALL_REGISTRY choose where a managed interpreter is fetched
+//     from; UV_PYTHON_INSTALL_DIR and UV_PYTHON_INSTALL_BIN choose where one is
+//     found.
+//
+// Those decide what binary an embedder downloads and runs, which puts them with
+// UV_INDEX rather than with a timeout — and the whole point of HermeticEnv is
+// that an embedder passing its own inputs is not overruled by an environment it
+// does not control. A user who needs an internal mirror configures it in the
+// project, where it is visible, rather than in an ambient variable. (An earlier
+// revision of this list kept all six; that was wrong, and Astro Desktop's own
+// hermetic filter had it right.)
 var operationalEnv = []string{
 	systemCertsEnv,
 	nativeTLSEnv,
-	"UV_INSECURE_HOST",
 	"UV_HTTP_TIMEOUT",
 	"UV_REQUEST_TIMEOUT",
 	"UV_HTTP_RETRIES",
@@ -464,11 +467,6 @@ var operationalEnv = []string{
 	"UV_LINK_MODE",
 	"UV_KEYRING_PROVIDER",
 	"UV_NO_PROGRESS",
-	"UV_PYTHON_INSTALL_MIRROR",
-	"UV_PYPY_INSTALL_MIRROR",
-	"UV_PYTHON_INSTALL_DIR",
-	"UV_PYTHON_INSTALL_BIN",
-	"UV_PYTHON_INSTALL_REGISTRY",
 }
 
 // steersResolution reports whether kv is an inherited UV_* variable outside the

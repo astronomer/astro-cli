@@ -712,11 +712,17 @@ exit 2`
 	}
 }
 
-func TestHermeticEnvKeepsTheVariablesConstrainedNetworksNeed(t *testing.T) {
-	// Deny-by-default makes a missing allowlist entry invisible until someone
-	// on a restricted network hits it, so the awkward ones are pinned here:
-	// the self-signed-index escape hatch, an internal interpreter mirror, and
-	// the older spelling of a timeout whose current spelling is already kept.
+func TestHermeticEnvKeepsTheKnobsAndDropsTheRedirects(t *testing.T) {
+	// The line this list draws. UV_REQUEST_TIMEOUT is kept because it is uv's
+	// older spelling of a timeout already kept, and honoring one spelling of a
+	// pair silently overrules whoever wrote the other.
+	//
+	// UV_INSECURE_HOST and UV_PYTHON_INSTALL_MIRROR are dropped even though a
+	// restricted network can genuinely need them, because they are not knobs:
+	// one turns off certificate verification, the other decides which
+	// interpreter binary is fetched and then run. An environment the embedder
+	// does not control does not get to answer those — the same reason UV_INDEX
+	// goes.
 	t.Setenv("UV_INSECURE_HOST", "index.corp.internal")
 	t.Setenv("UV_PYTHON_INSTALL_MIRROR", "https://mirror.corp.internal/python")
 	t.Setenv("UV_REQUEST_TIMEOUT", "300")
@@ -729,7 +735,7 @@ func TestHermeticEnvKeepsTheVariablesConstrainedNetworksNeed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "host=index.corp.internal mirror=https://mirror.corp.internal/python timeout=300 newer=unset"
+	want := "host=unset mirror=unset timeout=300 newer=unset"
 	if got := readCount(t, seen); got != want {
 		t.Errorf("child env = %q, want %q", got, want)
 	}
