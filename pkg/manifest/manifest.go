@@ -231,9 +231,113 @@ func (e *ParseError) Error() string {
 
 func (e *ParseError) Unwrap() error { return e.Err }
 
+// ProblemCode names the rule a problem came from.
+//
+// The Reason beside it is a sentence for whoever wrote the manifest, and a
+// sentence for a person is not a thing to branch on: it gets reworded, it
+// will one day be translated, and a caller matching its text breaks both
+// times. The code is what stays put, so a caller decides on the code and the
+// prose improves freely.
+//
+// Shape and rule are both here, and the difference is which one repeats. A
+// shape code — CodeRequired, CodeExpectedString — is one rule applied to
+// whichever key is wrong, so many keys share it and the Key says which.
+// A rule code belongs to one refusal and appears once.
+//
+// Values are written out rather than derived from the constant names,
+// because they are the stable part: renaming a Go identifier must not change
+// what a caller sees.
+type ProblemCode string
+
+const (
+	// Shape: the value is not the kind of thing the key takes. One rule,
+	// many keys.
+	CodeRequired            ProblemCode = "required"
+	CodeExpectedString      ProblemCode = "expected_string"
+	CodeExpectedBool        ProblemCode = "expected_bool"
+	CodeExpectedTable       ProblemCode = "expected_table"
+	CodeExpectedStringArray ProblemCode = "expected_string_array"
+	CodeEmptyString         ProblemCode = "empty_string"
+	CodeUnknownKey          ProblemCode = "unknown_key"
+
+	// The project and the [tool.astro] block.
+	CodeProjectNameInvalid       ProblemCode = "project_name_invalid"
+	CodeAirflowVersionInvalid    ProblemCode = "airflow_version_invalid"
+	CodeDockerfileSeparators     ProblemCode = "dockerfile_separators"
+	CodeDockerfileOutsideProject ProblemCode = "dockerfile_outside_project"
+	// CodeTargetNotAName is [tool.astro] target given a table: the old
+	// spelling of the backend-config section, which is its own block now.
+	CodeTargetNotAName ProblemCode = "target_not_a_name"
+
+	// Links: what a deployment link may be called and what it must name.
+	CodeLinkNeedsName               ProblemCode = "link_needs_name"
+	CodeLinkNameReserved            ProblemCode = "link_name_reserved"
+	CodeTargetUnusable              ProblemCode = "target_unusable"
+	CodeInheritedTargetUnusable     ProblemCode = "inherited_target_unusable"
+	CodeTargetNeedsEnvironment      ProblemCode = "target_needs_environment"
+	CodeURLAndCoordinates           ProblemCode = "url_and_coordinates"
+	CodeDeploymentOnEnvironmentLink ProblemCode = "deployment_on_environment_link"
+	CodeEnvironmentRequired         ProblemCode = "environment_required"
+	CodeEnvironmentOnAstroLink      ProblemCode = "environment_on_astro_link"
+	CodeDeploymentRequired          ProblemCode = "deployment_required"
+	CodeWorkspaceOnNonAstroLink     ProblemCode = "workspace_on_non_astro_link"
+	CodeWorkspaceRequired           ProblemCode = "workspace_required"
+	CodeMultipleDefaults            ProblemCode = "multiple_defaults"
+
+	// A link's url.
+	CodeURLInvalid  ProblemCode = "url_invalid"
+	CodeURLNoScheme ProblemCode = "url_no_scheme"
+	CodeURLNotHTTP  ProblemCode = "url_not_http"
+	CodeURLNoHost   ProblemCode = "url_no_host"
+	//nolint:gosec // G101 reads the name, not the value: this identifies a rule about credentials, it does not hold one
+	CodeURLHasCredentials ProblemCode = "url_has_credentials"
+
+	// A link's auth table.
+	CodeAuthRequired          ProblemCode = "auth_required"
+	CodeAuthMethodRequired    ProblemCode = "auth_method_required"
+	CodeAuthMethodUnknown     ProblemCode = "auth_method_unknown"
+	CodeAuthFieldNotForMethod ProblemCode = "auth_field_not_for_method"
+	CodeAuthFieldRequired     ProblemCode = "auth_field_required"
+	CodeAuthEnvNameInvalid    ProblemCode = "auth_env_name_invalid"
+	CodeAuthCommandEmpty      ProblemCode = "auth_command_empty"
+	CodeAuthPairIncomplete    ProblemCode = "auth_pair_incomplete"
+	//nolint:gosec // G101: as above, a rule identifier
+	CodeAuthNeedsCredentials ProblemCode = "auth_needs_credentials"
+	CodeAuthTooManyPairs     ProblemCode = "auth_too_many_pairs"
+)
+
+// problemCodes is every code above, in declaration order — the closed set, in
+// the package rather than in a test, so the tests that check the set (unique
+// values, identifier spelling, each one reachable from some manifest) read it
+// instead of keeping a second copy that a new code could be left out of.
+var problemCodes = []ProblemCode{
+	CodeRequired, CodeExpectedString, CodeExpectedBool, CodeExpectedTable,
+	CodeExpectedStringArray, CodeEmptyString, CodeUnknownKey,
+
+	CodeProjectNameInvalid, CodeAirflowVersionInvalid,
+	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeTargetNotAName,
+
+	CodeLinkNeedsName, CodeLinkNameReserved, CodeTargetUnusable,
+	CodeInheritedTargetUnusable, CodeTargetNeedsEnvironment,
+	CodeURLAndCoordinates, CodeDeploymentOnEnvironmentLink,
+	CodeEnvironmentRequired, CodeEnvironmentOnAstroLink, CodeDeploymentRequired,
+	CodeWorkspaceOnNonAstroLink, CodeWorkspaceRequired, CodeMultipleDefaults,
+
+	CodeURLInvalid, CodeURLNoScheme, CodeURLNotHTTP, CodeURLNoHost,
+	CodeURLHasCredentials,
+
+	CodeAuthRequired, CodeAuthMethodRequired, CodeAuthMethodUnknown,
+	CodeAuthFieldNotForMethod, CodeAuthFieldRequired, CodeAuthEnvNameInvalid,
+	CodeAuthCommandEmpty, CodeAuthPairIncomplete, CodeAuthNeedsCredentials,
+	CodeAuthTooManyPairs,
+}
+
 // Problem is one validation finding, addressed by the dotted TOML key it
 // concerns.
 type Problem struct {
+	// Code names the rule, and is the part a caller may rely on. Reason is
+	// the part a person reads; see ProblemCode for why they are separate.
+	Code   ProblemCode
 	Key    string
 	Reason string
 }
@@ -324,8 +428,7 @@ func Parse(data []byte) (*Manifest, error) {
 	}
 	p.validate(m)
 	if len(p.problems) > 0 {
-		// Map iteration made the order random; error text must be stable.
-		sort.Slice(p.problems, func(i, j int) bool { return p.problems[i].Key < p.problems[j].Key })
+		p.sortProblems()
 		return nil, &ValidationError{Problems: p.problems}
 	}
 	return m, nil
@@ -359,8 +462,26 @@ type parser struct {
 	problems []Problem
 }
 
-func (p *parser) add(key, reason string) {
-	p.problems = append(p.problems, Problem{Key: key, Reason: reason})
+// sortProblems puts the findings in a fixed order. Links are decoded out of a
+// map, so the order they were found in is random and the error text would
+// differ run to run.
+//
+// Key first, because that is what a reader scans. Key alone would very nearly
+// do — no two rules currently address the same key — but nothing enforces
+// that and sort.Slice is not stable, so a second rule on some key would start
+// randomizing the pair with no other sign. Code settles it, and settles it
+// totally, since codes are unique.
+func (p *parser) sortProblems() {
+	sort.Slice(p.problems, func(i, j int) bool {
+		if p.problems[i].Key != p.problems[j].Key {
+			return p.problems[i].Key < p.problems[j].Key
+		}
+		return p.problems[i].Code < p.problems[j].Code
+	})
+}
+
+func (p *parser) add(code ProblemCode, key, reason string) {
+	p.problems = append(p.problems, Problem{Code: code, Key: key, Reason: reason})
 }
 
 // astro decodes [tool.astro]. Links come last: they resolve against the
@@ -392,7 +513,7 @@ func (p *parser) astro(raw map[string]any) Astro {
 func (p *parser) defaultTarget(v any) string {
 	const key = astroRoot + ".target"
 	if _, isTable := v.(map[string]any); isTable {
-		p.add(key, "is a target name; backend config lives in [tool.astro.targets.<name>]")
+		p.add(CodeTargetNotAName, key, "is a target name; backend config lives in [tool.astro.targets.<name>]")
 		return ""
 	}
 	return p.str(key, v)
@@ -425,10 +546,10 @@ func (p *parser) links(v any, a *Astro) map[string]Link {
 	for name, raw := range table {
 		switch name {
 		case "":
-			p.add(key, "a link needs a name")
+			p.add(CodeLinkNeedsName, key, "a link needs a name")
 			continue
 		case ReservedLinkName:
-			p.add(key+"."+name, "reserved: local always means the Airflow running on this machine — name the link something else")
+			p.add(CodeLinkNameReserved, key+"."+name, "reserved: local always means the Airflow running on this machine — name the link something else")
 			continue
 		}
 		linkKey := key + "." + name
@@ -470,39 +591,39 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 func (p *parser) badTarget(key, target string, own bool) {
 	const supported = " — supported: astro, mwaa, composer, in lower case"
 	if own {
-		p.add(key+".target", fmt.Sprintf("%q is not a target a link can use", target)+supported)
+		p.add(CodeTargetUnusable, key+".target", fmt.Sprintf("%q is not a target a link can use", target)+supported)
 		return
 	}
-	p.add(key+".target", fmt.Sprintf("inherits target = %q from [tool.astro], which is not a target a link can use", target)+supported)
+	p.add(CodeInheritedTargetUnusable, key+".target", fmt.Sprintf("inherits target = %q from [tool.astro], which is not a target a link can use", target)+supported)
 }
 
 // coordinates checks that the link names the one coordinate its kind uses, and
 // only that one.
 func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
 	if link.URL != "" && link.Target != string(KindAstro) {
-		p.add(key, fmt.Sprintf("target = %q names an environment, not a url: set environment = '<%s environment name>', or drop target for a plain url link", link.Target, link.Target))
+		p.add(CodeTargetNeedsEnvironment, key, fmt.Sprintf("target = %q names an environment, not a url: set environment = '<%s environment name>', or drop target for a plain url link", link.Target, link.Target))
 		return
 	}
 	switch kind {
 	case KindEndpoint:
 		if link.Deployment != "" || link.Environment != "" {
-			p.add(key, "sets both a url and coordinates: a link names either a url or deployment/environment coordinates, never both")
+			p.add(CodeURLAndCoordinates, key, "sets both a url and coordinates: a link names either a url or deployment/environment coordinates, never both")
 			return
 		}
 		p.url(key+".url", link.URL)
 	case KindMWAA, KindComposer:
 		if link.Deployment != "" {
-			p.add(key+".deployment", fmt.Sprintf("a %s link has no Astro deployment id: name the environment with environment = '<%s environment name>'", kind, kind))
+			p.add(CodeDeploymentOnEnvironmentLink, key+".deployment", fmt.Sprintf("a %s link has no Astro deployment id: name the environment with environment = '<%s environment name>'", kind, kind))
 		}
 		if link.Environment == "" {
-			p.add(key+".environment", fmt.Sprintf("required: the name of the %s environment", kind))
+			p.add(CodeEnvironmentRequired, key+".environment", fmt.Sprintf("required: the name of the %s environment", kind))
 		}
 	case KindAstro:
 		if link.Environment != "" {
-			p.add(key+".environment", "only an mwaa or composer link sets environment; this is an astro link")
+			p.add(CodeEnvironmentOnAstroLink, key+".environment", "only an mwaa or composer link sets environment; this is an astro link")
 		}
 		if link.Deployment == "" {
-			p.add(key+".deployment", "required on an astro link: the Deployment id — or set target = 'mwaa' or target = 'composer' with an environment, or a url")
+			p.add(CodeDeploymentRequired, key+".deployment", "required on an astro link: the Deployment id — or set target = 'mwaa' or target = 'composer' with an environment, or a url")
 		}
 	}
 }
@@ -513,15 +634,15 @@ func (p *parser) url(key, raw string) {
 	u, err := url.Parse(raw)
 	switch {
 	case err != nil:
-		p.add(key, fmt.Sprintf("%q is not a URL", raw))
+		p.add(CodeURLInvalid, key, fmt.Sprintf("%q is not a URL", raw))
 	case u.Scheme == "":
-		p.add(key, fmt.Sprintf("%q has no scheme: write the address in full, like https://%s", raw, raw))
+		p.add(CodeURLNoScheme, key, fmt.Sprintf("%q has no scheme: write the address in full, like https://%s", raw, raw))
 	case u.Scheme != "http" && u.Scheme != "https":
-		p.add(key, fmt.Sprintf("%q is not an http(s) URL", raw))
+		p.add(CodeURLNotHTTP, key, fmt.Sprintf("%q is not an http(s) URL", raw))
 	case u.Host == "":
-		p.add(key, fmt.Sprintf("%q names no host", raw))
+		p.add(CodeURLNoHost, key, fmt.Sprintf("%q names no host", raw))
 	case u.User != nil:
-		p.add(key, "a url must not carry a username or password: name env vars instead, with auth = { method = 'basic', username-env = 'AIRFLOW_USER', password-env = 'AIRFLOW_PASSWORD' }")
+		p.add(CodeURLHasCredentials, key, "a url must not carry a username or password: name env vars instead, with auth = { method = 'basic', username-env = 'AIRFLOW_USER', password-env = 'AIRFLOW_PASSWORD' }")
 	}
 }
 
@@ -532,13 +653,13 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 	own := p.str(key+".workspace", raw)
 	if kind != KindAstro {
 		if own != "" {
-			p.add(key+".workspace", fmt.Sprintf("only an astro link has a workspace; this is a %s link", kind))
+			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro link has a workspace; this is a %s link", kind))
 		}
 		return ""
 	}
 	ws := firstNonEmpty(own, fallback)
 	if ws == "" {
-		p.add(key+".workspace", "no workspace: set workspace on the link or a default with [tool.astro] workspace")
+		p.add(CodeWorkspaceRequired, key+".workspace", "no workspace: set workspace on the link or a default with [tool.astro] workspace")
 	}
 	return ws
 }
@@ -547,7 +668,7 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 func (p *parser) unknownKeys(key string, table map[string]any, known []string) {
 	for name := range table {
 		if !slices.Contains(known, name) {
-			p.add(key+"."+name, "unknown key")
+			p.add(CodeUnknownKey, key+"."+name, "unknown key")
 		}
 	}
 }
@@ -561,11 +682,11 @@ func (p *parser) str(key string, v any) string {
 	}
 	s, ok := v.(string)
 	if !ok {
-		p.add(key, "expected a string")
+		p.add(CodeExpectedString, key, "expected a string")
 		return ""
 	}
 	if s == "" {
-		p.add(key, "must not be empty")
+		p.add(CodeEmptyString, key, "must not be empty")
 		return ""
 	}
 	return s
@@ -574,7 +695,7 @@ func (p *parser) str(key string, v any) string {
 // reqStr decodes a string the section cannot do without.
 func (p *parser) reqStr(key string, v any) string {
 	if v == nil {
-		p.add(key, "required")
+		p.add(CodeRequired, key, "required")
 		return ""
 	}
 	return p.str(key, v)
@@ -586,7 +707,7 @@ func (p *parser) boolean(key string, v any) bool {
 	}
 	b, ok := v.(bool)
 	if !ok {
-		p.add(key, "expected true or false")
+		p.add(CodeExpectedBool, key, "expected true or false")
 	}
 	return b
 }
@@ -597,7 +718,7 @@ func (p *parser) table(key string, v any) map[string]any {
 	}
 	t, ok := v.(map[string]any)
 	if !ok {
-		p.add(key, "expected a table")
+		p.add(CodeExpectedTable, key, "expected a table")
 		return nil
 	}
 	return t
@@ -613,14 +734,18 @@ func (p *parser) packages(v any) []string {
 	}
 	items, ok := v.([]any)
 	if !ok {
-		p.add(key, "expected an array of strings")
+		p.add(CodeExpectedStringArray, key, "expected an array of strings")
 		return nil
 	}
 	out := make([]string, 0, len(items))
 	for i, item := range items {
 		s, ok := item.(string)
-		if !ok || strings.TrimSpace(s) == "" {
-			p.add(fmt.Sprintf("%s[%d]", key, i), "must be a non-empty string")
+		if !ok {
+			p.add(CodeExpectedString, fmt.Sprintf("%s[%d]", key, i), "expected a string")
+			continue
+		}
+		if strings.TrimSpace(s) == "" {
+			p.add(CodeEmptyString, fmt.Sprintf("%s[%d]", key, i), "must be a non-empty string")
 			continue
 		}
 		out = append(out, s)
@@ -649,13 +774,13 @@ var airflowVersionRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
 func (p *parser) validate(m *Manifest) {
 	switch {
 	case m.Project.Name == "":
-		p.add("project.name", "required")
+		p.add(CodeRequired, "project.name", "required")
 	case !projectNameRe.MatchString(m.Project.Name):
-		p.add("project.name", "not a valid project name (letters, digits, -._; must start and end with a letter or digit)")
+		p.add(CodeProjectNameInvalid, "project.name", "not a valid project name (letters, digits, -._; must start and end with a letter or digit)")
 	}
 
 	if v := m.Astro.AirflowVersion; v != "" && !airflowVersionRe.MatchString(v) {
-		p.add(astroRoot+".airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", v))
+		p.add(CodeAirflowVersionInvalid, astroRoot+".airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", v))
 	}
 
 	// The path has to stay inside the project, because the consumer joins it to
@@ -697,12 +822,12 @@ func (p *parser) validate(m *Manifest) {
 		// on Windows too, so nothing is lost.
 		switch {
 		case strings.Contains(v, "\\"):
-			p.add(astroRoot+".dockerfile", fmt.Sprintf("%q has to use forward slashes, which work on every platform", v))
+			p.add(CodeDockerfileSeparators, astroRoot+".dockerfile", fmt.Sprintf("%q has to use forward slashes, which work on every platform", v))
 		case !filepath.IsLocal(v):
 			// Lexical, and it says yes to "." — a consumer that joins this to
 			// the project directory has to check it is a file, not just that
 			// something is there. See pkg/localrt.
-			p.add(astroRoot+".dockerfile", fmt.Sprintf("%q has to be a path inside the project", v))
+			p.add(CodeDockerfileOutsideProject, astroRoot+".dockerfile", fmt.Sprintf("%q has to be a path inside the project", v))
 		}
 	}
 
@@ -714,7 +839,7 @@ func (p *parser) validate(m *Manifest) {
 	}
 	if len(defaults) > 1 {
 		sort.Strings(defaults)
-		p.add(astroRoot+".deployments", fmt.Sprintf("more than one link sets default = true (%s): at most one may be the default", strings.Join(defaults, ", ")))
+		p.add(CodeMultipleDefaults, astroRoot+".deployments", fmt.Sprintf("more than one link sets default = true (%s): at most one may be the default", strings.Join(defaults, ", ")))
 	}
 }
 

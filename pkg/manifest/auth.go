@@ -121,14 +121,14 @@ func (p *parser) auth(key string, raw any, kind LinkKind) Auth {
 	case nil:
 		method := defaultAuthMethod[kind]
 		if method == "" {
-			p.add(key, "required on a url link: nothing about a url says how its Airflow checks callers — add an auth table naming one of: "+methodList())
+			p.add(CodeAuthRequired, key, "required on a url link: nothing about a url says how its Airflow checks callers — add an auth table naming one of: "+methodList())
 			return Auth{}
 		}
 		return Auth{Method: method}
 	case map[string]any:
 		return p.authTable(key, table)
 	default:
-		p.add(key, "must be a table like { method = 'token', token-env = 'AIRFLOW_TOKEN' }")
+		p.add(CodeExpectedTable, key, "must be a table like { method = 'token', token-env = 'AIRFLOW_TOKEN' }")
 		return Auth{}
 	}
 }
@@ -148,7 +148,7 @@ func (p *parser) authTable(key string, table map[string]any) Auth {
 			continue
 		}
 		if !slices.Contains(spec.fields, field) {
-			ap.addField(field, notAField(method, spec.fields))
+			ap.addField(CodeAuthFieldNotForMethod, field, notAField(method, spec.fields))
 			continue
 		}
 		ap.seen[field] = true
@@ -196,25 +196,25 @@ type authParser struct {
 }
 
 // addField reports a problem against one field of this table.
-func (p *authParser) addField(field, reason string) {
-	p.add(p.key+"."+field, reason)
+func (p *authParser) addField(code ProblemCode, field, reason string) {
+	p.add(code, p.key+"."+field, reason)
 }
 
 // method decodes the `method` field, the one field every auth table must
 // carry: the rest of the table means nothing until the method is known.
 func (p *authParser) method(raw any) (AuthMethod, bool) {
 	if raw == nil {
-		p.addField("method", "required — name one of: "+methodList())
+		p.addField(CodeAuthMethodRequired, "method", "required — name one of: "+methodList())
 		return "", false
 	}
 	s, ok := raw.(string)
 	if !ok {
-		p.addField("method", "expected a string")
+		p.addField(CodeExpectedString, "method", "expected a string")
 		return "", false
 	}
 	m := AuthMethod(s)
 	if !slices.Contains(authMethods, m) {
-		p.addField("method", fmt.Sprintf("%q is not an auth method — name one of: %s", s, methodList()))
+		p.addField(CodeAuthMethodUnknown, "method", fmt.Sprintf("%q is not an auth method — name one of: %s", s, methodList()))
 		return "", false
 	}
 	return m, true
@@ -226,15 +226,15 @@ func (p *authParser) method(raw any) (AuthMethod, bool) {
 func (p *authParser) value(field string, raw any) string {
 	s, ok := raw.(string)
 	if !ok {
-		p.addField(field, "expected a string")
+		p.addField(CodeExpectedString, field, "expected a string")
 		return ""
 	}
 	if s == "" {
-		p.addField(field, "must not be empty")
+		p.addField(CodeEmptyString, field, "must not be empty")
 		return ""
 	}
 	if strings.HasSuffix(field, "-env") && !envNameRe.MatchString(s) {
-		p.addField(field, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit) — this field names the variable holding the value, not the value", s))
+		p.addField(CodeAuthEnvNameInvalid, field, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit) — this field names the variable holding the value, not the value", s))
 		return ""
 	}
 	return s
@@ -246,18 +246,22 @@ func (p *authParser) value(field string, raw any) string {
 func (p *authParser) command(raw any) []string {
 	items, ok := raw.([]any)
 	if !ok {
-		p.addField(commandField, "expected an array, argv style: command = ['acme-airflow-token', '--profile', 'prod']")
+		p.addField(CodeExpectedStringArray, commandField, "expected an array, argv style: command = ['acme-airflow-token', '--profile', 'prod']")
 		return nil
 	}
 	if len(items) == 0 {
-		p.addField(commandField, "must name a program to run")
+		p.addField(CodeAuthCommandEmpty, commandField, "must name a program to run")
 		return nil
 	}
 	out := make([]string, 0, len(items))
 	for i, item := range items {
 		s, ok := item.(string)
-		if !ok || s == "" {
-			p.add(fmt.Sprintf("%s.%s[%d]", p.key, commandField, i), "expected a non-empty string")
+		if !ok {
+			p.add(CodeExpectedString, fmt.Sprintf("%s.%s[%d]", p.key, commandField, i), "expected a string")
+			continue
+		}
+		if s == "" {
+			p.add(CodeEmptyString, fmt.Sprintf("%s.%s[%d]", p.key, commandField, i), "expected a non-empty string")
 			continue
 		}
 		out = append(out, s)
@@ -271,7 +275,7 @@ func (p *authParser) command(raw any) []string {
 func (p *authParser) required(method AuthMethod, spec authSpec) {
 	for _, field := range spec.required {
 		if !p.seen[field] {
-			p.addField(field, fmt.Sprintf("required by the %s method", method))
+			p.addField(CodeAuthFieldRequired, field, fmt.Sprintf("required by the %s method", method))
 		}
 	}
 	if len(spec.pairs) == 0 {
@@ -283,18 +287,18 @@ func (p *authParser) required(method AuthMethod, spec authSpec) {
 		case p.seen[pair[0]] && p.seen[pair[1]]:
 			whole++
 		case p.seen[pair[0]]:
-			p.addField(pair[1], "required alongside "+pair[0])
+			p.addField(CodeAuthPairIncomplete, pair[1], "required alongside "+pair[0])
 		case p.seen[pair[1]]:
-			p.addField(pair[0], "required alongside "+pair[1])
+			p.addField(CodeAuthPairIncomplete, pair[0], "required alongside "+pair[1])
 		}
 	}
 	switch {
 	// seen holds only this method's own fields, so an empty set means the
 	// table named no credential at all; half a pair has reported itself.
 	case len(p.seen) == 0:
-		p.add(p.key, fmt.Sprintf("the %s method needs credentials to exchange: %s", method, pairList(spec.pairs)))
+		p.add(CodeAuthNeedsCredentials, p.key, fmt.Sprintf("the %s method needs credentials to exchange: %s", method, pairList(spec.pairs)))
 	case whole > 1:
-		p.add(p.key, fmt.Sprintf("the %s method takes one credential pair, not both: %s", method, pairList(spec.pairs)))
+		p.add(CodeAuthTooManyPairs, p.key, fmt.Sprintf("the %s method takes one credential pair, not both: %s", method, pairList(spec.pairs)))
 	}
 }
 

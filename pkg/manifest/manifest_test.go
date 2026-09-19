@@ -430,71 +430,98 @@ func TestLoadNoAstroSection(t *testing.T) {
 	}
 }
 
-func TestValidation(t *testing.T) {
-	cases := []struct {
-		name     string
-		content  string
-		wantKeys []string
-	}{
-		{
-			name:     "missing project name",
-			content:  "[tool.astro]\nairflow = \"3.1\"\n",
-			wantKeys: []string{"project.name"},
-		},
-		{
-			name:     "bad project name",
-			content:  "[project]\nname = \"-bad-\"\n\n[tool.astro]\nairflow = \"3.1\"\n",
-			wantKeys: []string{"project.name"},
-		},
-		{
-			name:     "missing airflow",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\ndeployments = {}\n",
-			wantKeys: []string{"tool.astro.airflow"},
-		},
-		{
-			name:     "bad airflow version",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"three\"\n",
-			wantKeys: []string{"tool.astro.airflow"},
-		},
-		{
-			name:     "empty package entry",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\npackages = [\"libpq-dev\", \"  \"]\n",
-			wantKeys: []string{"tool.astro.packages[1]"},
-		},
-		{
-			// The consumer joins this to the project dir and hands it to a
-			// docker build, so a path climbing out of the project is refused
-			// rather than resolved.
-			name:     "dockerfile escaping the project",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"../../etc/Dockerfile\"\n",
-			wantKeys: []string{"tool.astro.dockerfile"},
-		},
-		{
-			name:     "absolute dockerfile path",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"/etc/Dockerfile\"\n",
-			wantKeys: []string{"tool.astro.dockerfile"},
-		},
-		{
-			// Works on Windows, is one filename with a backslash in it
-			// everywhere else. Refused on every platform so the error lands on
-			// the machine that wrote it, not on a colleague who pulled it.
-			name:     "dockerfile with windows separators",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 'docker\\Dockerfile'\n",
-			wantKeys: []string{"tool.astro.dockerfile"},
-		},
-		{
-			name:     "dockerfile of the wrong shape",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 3\n",
-			wantKeys: []string{"tool.astro.dockerfile"},
-		},
-		{
-			name:     "unknown key in [tool.astro]",
-			content:  "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nairflw = \"3.1\"\n",
-			wantKeys: []string{"tool.astro.airflw"},
-		},
-		{
-			name: "unknown key on a link",
-			content: `
+// validationCases is shared with code_test.go's TestEveryProblemCarriesACode,
+// so a case added here is a case that check sees too — a rule added without a
+// code then fails there rather than shipping silently.
+var validationCases = []struct {
+	name    string
+	content string
+	// wantKeys is which key each finding is addressed to, wantCodes which
+	// rule raised it — both in the order Load returns them. The key alone
+	// does not identify a rule: several keys carry two rules apiece.
+	wantKeys  []string
+	wantCodes []ProblemCode
+}{
+	{
+		name:      "missing project name",
+		wantCodes: []ProblemCode{CodeRequired},
+		content:   "[tool.astro]\nairflow = \"3.1\"\n",
+		wantKeys:  []string{"project.name"},
+	},
+	{
+		name:      "bad project name",
+		wantCodes: []ProblemCode{CodeProjectNameInvalid},
+		content:   "[project]\nname = \"-bad-\"\n\n[tool.astro]\nairflow = \"3.1\"\n",
+		wantKeys:  []string{"project.name"},
+	},
+	{
+		name:      "missing airflow",
+		wantCodes: []ProblemCode{CodeRequired},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\ndeployments = {}\n",
+		wantKeys:  []string{"tool.astro.airflow"},
+	},
+	{
+		name:      "bad airflow version",
+		wantCodes: []ProblemCode{CodeAirflowVersionInvalid},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"three\"\n",
+		wantKeys:  []string{"tool.astro.airflow"},
+	},
+	{
+		// An element of the wrong type and an element that is empty are two
+		// different faults, and merging them under one code was the bug that
+		// made this case worth writing: a number in the list reported
+		// "empty_string", which is not what is wrong with it.
+		name:      "package entry of the wrong type",
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\npackages = [\"libpq-dev\", 3]\n",
+		wantKeys:  []string{"tool.astro.packages[1]"},
+		wantCodes: []ProblemCode{CodeExpectedString},
+	},
+	{
+		name:      "empty package entry",
+		wantCodes: []ProblemCode{CodeEmptyString},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\npackages = [\"libpq-dev\", \"  \"]\n",
+		wantKeys:  []string{"tool.astro.packages[1]"},
+	},
+	{
+		// The consumer joins this to the project dir and hands it to a
+		// docker build, so a path climbing out of the project is refused
+		// rather than resolved.
+		name:      "dockerfile escaping the project",
+		wantCodes: []ProblemCode{CodeDockerfileOutsideProject},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"../../etc/Dockerfile\"\n",
+		wantKeys:  []string{"tool.astro.dockerfile"},
+	},
+	{
+		name:      "absolute dockerfile path",
+		wantCodes: []ProblemCode{CodeDockerfileOutsideProject},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"/etc/Dockerfile\"\n",
+		wantKeys:  []string{"tool.astro.dockerfile"},
+	},
+	{
+		// Works on Windows, is one filename with a backslash in it
+		// everywhere else. Refused on every platform so the error lands on
+		// the machine that wrote it, not on a colleague who pulled it.
+		name:      "dockerfile with windows separators",
+		wantCodes: []ProblemCode{CodeDockerfileSeparators},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 'docker\\Dockerfile'\n",
+		wantKeys:  []string{"tool.astro.dockerfile"},
+	},
+	{
+		name:      "dockerfile of the wrong shape",
+		wantCodes: []ProblemCode{CodeExpectedString},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 3\n",
+		wantKeys:  []string{"tool.astro.dockerfile"},
+	},
+	{
+		name:      "unknown key in [tool.astro]",
+		wantCodes: []ProblemCode{CodeUnknownKey},
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nairflw = \"3.1\"\n",
+		wantKeys:  []string{"tool.astro.airflw"},
+	},
+	{
+		name:      "unknown key on a link",
+		wantCodes: []ProblemCode{CodeUnknownKey},
+		content: `
 [project]
 name = "p"
 
@@ -506,11 +533,12 @@ workspace = "ws-abc"
 deployment = "dep-xyz"
 defaults = true
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.defaults"},
-		},
-		{
-			name: "incomplete deployment",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.defaults"},
+	},
+	{
+		name:      "incomplete deployment",
+		wantCodes: []ProblemCode{CodeDeploymentRequired, CodeWorkspaceRequired},
+		content: `
 [project]
 name = "p"
 
@@ -520,22 +548,24 @@ airflow = "3.1"
 [tool.astro.deployments.prod]
 target = "astro"
 `,
-			wantKeys: []string{
-				"tool.astro.deployments.prod.deployment",
-				"tool.astro.deployments.prod.workspace",
-			},
+		wantKeys: []string{
+			"tool.astro.deployments.prod.deployment",
+			"tool.astro.deployments.prod.workspace",
 		},
-		{
-			name:    "several at once",
-			content: "[tool.astro]\nairflow = \"v3\"\n\n[tool.astro.deployments.d]\nworkspace = \"w\"\ndeployment = \"x\"\n",
-			wantKeys: []string{
-				"project.name",
-				"tool.astro.airflow",
-			},
+	},
+	{
+		name:      "several at once",
+		wantCodes: []ProblemCode{CodeRequired, CodeAirflowVersionInvalid},
+		content:   "[tool.astro]\nairflow = \"v3\"\n\n[tool.astro.deployments.d]\nworkspace = \"w\"\ndeployment = \"x\"\n",
+		wantKeys: []string{
+			"project.name",
+			"tool.astro.airflow",
 		},
-		{
-			name: "missing workspace at both levels",
-			content: `
+	},
+	{
+		name:      "missing workspace at both levels",
+		wantCodes: []ProblemCode{CodeWorkspaceRequired},
+		content: `
 [project]
 name = "p"
 
@@ -545,11 +575,12 @@ airflow = "3.1"
 [tool.astro.deployments.prod]
 deployment = "dep-xyz"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.workspace"},
-		},
-		{
-			name: "empty per-link target rejected",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.workspace"},
+	},
+	{
+		name:      "empty per-link target rejected",
+		wantCodes: []ProblemCode{CodeEmptyString},
+		content: `
 [project]
 name = "p"
 
@@ -561,11 +592,12 @@ workspace = "ws-abc"
 target = ""
 deployment = "dep-xyz"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.target"},
-		},
-		{
-			name: "empty top-level target rejected",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.target"},
+	},
+	{
+		name:      "empty top-level target rejected",
+		wantCodes: []ProblemCode{CodeEmptyString},
+		content: `
 [project]
 name = "p"
 
@@ -573,11 +605,12 @@ name = "p"
 airflow = "3.1"
 target = ""
 `,
-			wantKeys: []string{"tool.astro.target"},
-		},
-		{
-			name: "target as a table is the old spelling of targets",
-			content: `
+		wantKeys: []string{"tool.astro.target"},
+	},
+	{
+		name:      "target as a table is the old spelling of targets",
+		wantCodes: []ProblemCode{CodeTargetNotAName},
+		content: `
 [project]
 name = "p"
 
@@ -587,11 +620,12 @@ airflow = "3.1"
 [tool.astro.target.astro]
 image = { os = "ubi" }
 `,
-			wantKeys: []string{"tool.astro.target"},
-		},
-		{
-			name: "target a link cannot use",
-			content: `
+		wantKeys: []string{"tool.astro.target"},
+	},
+	{
+		name:      "target a link cannot use",
+		wantCodes: []ProblemCode{CodeTargetUnusable},
+		content: `
 [project]
 name = "p"
 
@@ -603,11 +637,12 @@ workspace = "ws-abc"
 target = "MWAA"
 environment = "orders-prod"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.target"},
-		},
-		{
-			name: "link inherits a target it cannot use",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.target"},
+	},
+	{
+		name:      "link inherits a target it cannot use",
+		wantCodes: []ProblemCode{CodeInheritedTargetUnusable},
+		content: `
 [project]
 name = "p"
 
@@ -619,11 +654,12 @@ target = "oss"
 [tool.astro.deployments.prod]
 deployment = "dep-xyz"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.target"},
-		},
-		{
-			name: "two links marked default",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.target"},
+	},
+	{
+		name:      "two links marked default",
+		wantCodes: []ProblemCode{CodeMultipleDefaults},
+		content: `
 [project]
 name = "p"
 
@@ -639,11 +675,12 @@ default = true
 deployment = "dep-dev"
 default = true
 `,
-			wantKeys: []string{"tool.astro.deployments"},
-		},
-		{
-			name: "a link sets both a url and coordinates",
-			content: `
+		wantKeys: []string{"tool.astro.deployments"},
+	},
+	{
+		name:      "a link sets both a url and coordinates",
+		wantCodes: []ProblemCode{CodeURLAndCoordinates},
+		content: `
 [project]
 name = "p"
 
@@ -656,11 +693,12 @@ url = "https://airflow.corp.dev"
 deployment = "dep-xyz"
 auth = { method = "none" }
 `,
-			wantKeys: []string{"tool.astro.deployments.mixed"},
-		},
-		{
-			name: "an mwaa link with a url",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.mixed"},
+	},
+	{
+		name:      "an mwaa link with a url",
+		wantCodes: []ProblemCode{CodeTargetNeedsEnvironment},
+		content: `
 [project]
 name = "p"
 
@@ -672,11 +710,12 @@ target = "mwaa"
 url = "https://airflow.corp.dev"
 auth = { method = "aws" }
 `,
-			wantKeys: []string{"tool.astro.deployments.prod"},
-		},
-		{
-			name: "environment on an astro link",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod"},
+	},
+	{
+		name:      "environment on an astro link",
+		wantCodes: []ProblemCode{CodeEnvironmentOnAstroLink},
+		content: `
 [project]
 name = "p"
 
@@ -688,11 +727,12 @@ workspace = "ws-abc"
 deployment = "dep-xyz"
 environment = "orders-prod"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.environment"},
-		},
-		{
-			name: "deployment id on an mwaa link",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.environment"},
+	},
+	{
+		name:      "deployment id on an mwaa link",
+		wantCodes: []ProblemCode{CodeDeploymentOnEnvironmentLink},
+		content: `
 [project]
 name = "p"
 
@@ -704,11 +744,12 @@ target = "mwaa"
 environment = "orders-prod"
 deployment = "dep-xyz"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.deployment"},
-		},
-		{
-			name: "workspace on an mwaa link",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.deployment"},
+	},
+	{
+		name:      "workspace on an mwaa link",
+		wantCodes: []ProblemCode{CodeWorkspaceOnNonAstroLink},
+		content: `
 [project]
 name = "p"
 
@@ -720,11 +761,12 @@ target = "mwaa"
 environment = "orders-prod"
 workspace = "ws-abc"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.workspace"},
-		},
-		{
-			name: "composer link without an environment",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.workspace"},
+	},
+	{
+		name:      "composer link without an environment",
+		wantCodes: []ProblemCode{CodeEnvironmentRequired},
+		content: `
 [project]
 name = "p"
 
@@ -734,11 +776,12 @@ airflow = "3.1"
 [tool.astro.deployments.prod]
 target = "composer"
 `,
-			wantKeys: []string{"tool.astro.deployments.prod.environment"},
-		},
-		{
-			name: "url with no scheme",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.prod.environment"},
+	},
+	{
+		name:      "url with no scheme",
+		wantCodes: []ProblemCode{CodeURLNoScheme},
+		content: `
 [project]
 name = "p"
 
@@ -749,11 +792,12 @@ airflow = "3.1"
 url = "airflow.staging.corp.dev"
 auth = { method = "none" }
 `,
-			wantKeys: []string{"tool.astro.deployments.staging.url"},
-		},
-		{
-			name: "url carrying a username and password",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.staging.url"},
+	},
+	{
+		name:      "url carrying a username and password",
+		wantCodes: []ProblemCode{CodeURLHasCredentials},
+		content: `
 [project]
 name = "p"
 
@@ -764,14 +808,15 @@ airflow = "3.1"
 url = "https://admin:hunter2@airflow.corp.dev"
 auth = { method = "none" }
 `,
-			wantKeys: []string{"tool.astro.deployments.staging.url"},
-		},
-		{
-			// `local` is the machine's own word — `astro local start`,
-			// `astro local af dags list`. A link may not take it, so nobody has to
-			// work out which one a reader meant.
-			name: "a link named local",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.staging.url"},
+	},
+	{
+		// `local` is the machine's own word — `astro local start`,
+		// `astro local af dags list`. A link may not take it, so nobody has to
+		// work out which one a reader meant.
+		name:      "a link named local",
+		wantCodes: []ProblemCode{CodeLinkNameReserved},
+		content: `
 [project]
 name = "p"
 
@@ -782,11 +827,12 @@ workspace = "ws-abc"
 [tool.astro.deployments.local]
 deployment = "dep-xyz"
 `,
-			wantKeys: []string{"tool.astro.deployments.local"},
-		},
-		{
-			name: "a link with no name",
-			content: `
+		wantKeys: []string{"tool.astro.deployments.local"},
+	},
+	{
+		name:      "a link with no name",
+		wantCodes: []ProblemCode{CodeLinkNeedsName},
+		content: `
 [project]
 name = "p"
 
@@ -797,11 +843,38 @@ workspace = "ws-abc"
 [tool.astro.deployments.""]
 deployment = "dep-xyz"
 `,
-			wantKeys: []string{"tool.astro.deployments"},
-		},
-	}
+		wantKeys: []string{"tool.astro.deployments"},
+	},
+	{
+		// The four cases below exist so that every declared ProblemCode is
+		// raised by some manifest; see TestEveryCodeIsReachable.
+		name:      "a link default that is not a boolean",
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nworkspace = \"ws\"\n\n[tool.astro.deployments.prod]\ndeployment = \"d\"\ndefault = \"yes\"\n",
+		wantKeys:  []string{"tool.astro.deployments.prod.default"},
+		wantCodes: []ProblemCode{CodeExpectedBool},
+	},
+	{
+		name:      "a url that will not parse",
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n[tool.astro.deployments.prod]\nurl = \"http://[::1\"\nauth = { method = \"none\" }\n",
+		wantKeys:  []string{"tool.astro.deployments.prod.url"},
+		wantCodes: []ProblemCode{CodeURLInvalid},
+	},
+	{
+		name:      "a url that is not http",
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n[tool.astro.deployments.prod]\nurl = \"ftp://airflow.example.com\"\nauth = { method = \"none\" }\n",
+		wantKeys:  []string{"tool.astro.deployments.prod.url"},
+		wantCodes: []ProblemCode{CodeURLNotHTTP},
+	},
+	{
+		name:      "a url naming no host",
+		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n[tool.astro.deployments.prod]\nurl = \"https:///dags\"\nauth = { method = \"none\" }\n",
+		wantKeys:  []string{"tool.astro.deployments.prod.url"},
+		wantCodes: []ProblemCode{CodeURLNoHost},
+	},
+}
 
-	for _, tc := range cases {
+func TestValidation(t *testing.T) {
+	for _, tc := range validationCases {
 		t.Run(tc.name, func(t *testing.T) {
 			path := write(t, tc.content)
 			_, err := Load(path)
@@ -811,6 +884,9 @@ deployment = "dep-xyz"
 			}
 			if keys := problemKeys(ve); !reflect.DeepEqual(keys, tc.wantKeys) {
 				t.Errorf("problem keys = %v, want %v", keys, tc.wantKeys)
+			}
+			if codes := problemCodesOf(ve); !reflect.DeepEqual(codes, tc.wantCodes) {
+				t.Errorf("problem codes = %v, want %v", codes, tc.wantCodes)
 			}
 		})
 	}
@@ -850,132 +926,151 @@ target = "astro"
 	}
 }
 
-func TestAuthValidation(t *testing.T) {
-	const key = "tool.astro.deployments.staging.auth"
-	cases := []struct {
-		name       string
-		auth       string
-		wantKeys   []string
-		wantReason string // substring of the first problem's reason
+// authKey is the key every auth case is addressed under: one link, so one
+// prefix.
+const authKey = "tool.astro.deployments.staging.auth"
+
+// authCases is the auth table, in a function so that TestEveryCodeIsReachable
+// can drive the same fixtures without a second copy of them.
+func authCases() []struct {
+	name      string
+	auth      string
+	wantKeys  []string
+	wantCodes []ProblemCode
+} {
+	const key = authKey
+	return []struct {
+		name     string
+		auth     string
+		wantKeys []string
+		// wantCodes is which rule refused, in the order Load returns the
+		// problems. This used to pin a substring of the first problem's
+		// prose, which asserted the English rather than the rule and went
+		// quiet the moment a message was reworded; the code is the part
+		// that is promised to a caller, so it is the part asserted here.
+		wantCodes []ProblemCode
 	}{
 		{
-			name:       "a url link with no auth table at all",
-			auth:       "",
-			wantKeys:   []string{key},
-			wantReason: "required on a url link",
+			name:      "a url link with no auth table at all",
+			auth:      "",
+			wantKeys:  []string{key},
+			wantCodes: []ProblemCode{CodeAuthRequired},
 		},
 		{
-			name:       "auth is not a table",
-			auth:       `auth = "token"`,
-			wantKeys:   []string{key},
-			wantReason: "must be a table",
+			name:      "auth is not a table",
+			auth:      `auth = "token"`,
+			wantKeys:  []string{key},
+			wantCodes: []ProblemCode{CodeExpectedTable},
 		},
 		{
-			name:       "auth table names no method",
-			auth:       `auth = { token-env = "AIRFLOW_TOKEN" }`,
-			wantKeys:   []string{key + ".method"},
-			wantReason: "required",
+			name:      "auth table names no method",
+			auth:      `auth = { token-env = "AIRFLOW_TOKEN" }`,
+			wantKeys:  []string{key + ".method"},
+			wantCodes: []ProblemCode{CodeAuthMethodRequired},
 		},
 		{
-			name:       "unknown method",
-			auth:       `auth = { method = "kerberos" }`,
-			wantKeys:   []string{key + ".method"},
-			wantReason: `"kerberos" is not an auth method`,
+			name:      "unknown method",
+			auth:      `auth = { method = "kerberos" }`,
+			wantKeys:  []string{key + ".method"},
+			wantCodes: []ProblemCode{CodeAuthMethodUnknown},
 		},
 		{
-			name:       "field on the wrong method",
-			auth:       `auth = { method = "basic", username-env = "U", password-env = "P", token-env = "T" }`,
-			wantKeys:   []string{key + ".token-env"},
-			wantReason: "not a field of the basic method",
+			name:      "field on the wrong method",
+			auth:      `auth = { method = "basic", username-env = "U", password-env = "P", token-env = "T" }`,
+			wantKeys:  []string{key + ".token-env"},
+			wantCodes: []ProblemCode{CodeAuthFieldNotForMethod},
 		},
 		{
-			name:       "field on a method that takes none",
-			auth:       `auth = { method = "google", token-env = "T" }`,
-			wantKeys:   []string{key + ".token-env"},
-			wantReason: "not a field of the google method",
+			name:      "field on a method that takes none",
+			auth:      `auth = { method = "google", token-env = "T" }`,
+			wantKeys:  []string{key + ".token-env"},
+			wantCodes: []ProblemCode{CodeAuthFieldNotForMethod},
 		},
 		{
-			name:       "unknown field",
-			auth:       `auth = { method = "token", token-env = "T", audience = "airflow" }`,
-			wantKeys:   []string{key + ".audience"},
-			wantReason: "not a field of the token method",
+			name:      "unknown field",
+			auth:      `auth = { method = "token", token-env = "T", audience = "airflow" }`,
+			wantKeys:  []string{key + ".audience"},
+			wantCodes: []ProblemCode{CodeAuthFieldNotForMethod},
 		},
 		{
-			name:       "token method without its env var",
-			auth:       `auth = { method = "token" }`,
-			wantKeys:   []string{key + ".token-env"},
-			wantReason: "required by the token method",
+			name:      "token method without its env var",
+			auth:      `auth = { method = "token" }`,
+			wantKeys:  []string{key + ".token-env"},
+			wantCodes: []ProblemCode{CodeAuthFieldRequired},
 		},
 		{
-			name:     "basic method missing both env vars",
-			auth:     `auth = { method = "basic" }`,
-			wantKeys: []string{key + ".password-env", key + ".username-env"},
+			name:      "basic method missing both env vars",
+			auth:      `auth = { method = "basic" }`,
+			wantKeys:  []string{key + ".password-env", key + ".username-env"},
+			wantCodes: []ProblemCode{CodeAuthFieldRequired, CodeAuthFieldRequired},
 		},
 		{
-			name:       "a literal secret where an env-var name belongs",
-			auth:       `auth = { method = "token", token-env = "eyJhbGciOi.J9 secret" }`,
-			wantKeys:   []string{key + ".token-env"},
-			wantReason: "is not an env-var name",
+			name:      "a literal secret where an env-var name belongs",
+			auth:      `auth = { method = "token", token-env = "eyJhbGciOi.J9 secret" }`,
+			wantKeys:  []string{key + ".token-env"},
+			wantCodes: []ProblemCode{CodeAuthEnvNameInvalid},
 		},
 		{
-			name:       "empty field value",
-			auth:       `auth = { method = "token", token-env = "" }`,
-			wantKeys:   []string{key + ".token-env"},
-			wantReason: "must not be empty",
+			name:      "empty field value",
+			auth:      `auth = { method = "token", token-env = "" }`,
+			wantKeys:  []string{key + ".token-env"},
+			wantCodes: []ProblemCode{CodeEmptyString},
 		},
 		{
-			name:       "field value of the wrong type",
-			auth:       `auth = { method = "token", token-env = 7 }`,
-			wantKeys:   []string{key + ".token-env"},
-			wantReason: "expected a string",
+			name:      "field value of the wrong type",
+			auth:      `auth = { method = "token", token-env = 7 }`,
+			wantKeys:  []string{key + ".token-env"},
+			wantCodes: []ProblemCode{CodeExpectedString},
 		},
 		{
-			name:       "exec command as a string",
-			auth:       `auth = { method = "exec", command = "acme-airflow-token --profile prod" }`,
-			wantKeys:   []string{key + ".command"},
-			wantReason: "expected an array, argv style",
+			name:      "exec command as a string",
+			auth:      `auth = { method = "exec", command = "acme-airflow-token --profile prod" }`,
+			wantKeys:  []string{key + ".command"},
+			wantCodes: []ProblemCode{CodeExpectedStringArray},
 		},
 		{
-			name:       "exec command with nothing in it",
-			auth:       `auth = { method = "exec", command = [] }`,
-			wantKeys:   []string{key + ".command"},
-			wantReason: "must name a program to run",
+			name:      "exec command with nothing in it",
+			auth:      `auth = { method = "exec", command = [] }`,
+			wantKeys:  []string{key + ".command"},
+			wantCodes: []ProblemCode{CodeAuthCommandEmpty},
 		},
 		{
-			name:       "exec command with a non-string argument",
-			auth:       `auth = { method = "exec", command = ["acme-token", 7] }`,
-			wantKeys:   []string{key + ".command[1]"},
-			wantReason: "expected a non-empty string",
+			name:      "exec command with a non-string argument",
+			auth:      `auth = { method = "exec", command = ["acme-token", 7] }`,
+			wantKeys:  []string{key + ".command[1]"},
+			wantCodes: []ProblemCode{CodeExpectedString},
 		},
 		{
-			name:       "half an airflow-token credential pair",
-			auth:       `auth = { method = "airflow-token", client-id-env = "AF_CLIENT_ID" }`,
-			wantKeys:   []string{key + ".client-secret-env"},
-			wantReason: "required alongside client-id-env",
+			name:      "half an airflow-token credential pair",
+			auth:      `auth = { method = "airflow-token", client-id-env = "AF_CLIENT_ID" }`,
+			wantKeys:  []string{key + ".client-secret-env"},
+			wantCodes: []ProblemCode{CodeAuthPairIncomplete},
 		},
 		{
-			name:       "airflow-token with both credential pairs",
-			auth:       `auth = { method = "airflow-token", client-id-env = "ID", client-secret-env = "SECRET", username-env = "U", password-env = "P" }`,
-			wantKeys:   []string{key},
-			wantReason: "takes one credential pair, not both",
+			name:      "airflow-token with both credential pairs",
+			auth:      `auth = { method = "airflow-token", client-id-env = "ID", client-secret-env = "SECRET", username-env = "U", password-env = "P" }`,
+			wantKeys:  []string{key},
+			wantCodes: []ProblemCode{CodeAuthTooManyPairs},
 		},
 		{
-			name:       "airflow-token with nothing to exchange",
-			auth:       `auth = { method = "airflow-token" }`,
-			wantKeys:   []string{key},
-			wantReason: "needs credentials to exchange",
+			name:      "airflow-token with nothing to exchange",
+			auth:      `auth = { method = "airflow-token" }`,
+			wantKeys:  []string{key},
+			wantCodes: []ProblemCode{CodeAuthNeedsCredentials},
 		},
 	}
+}
 
-	for _, tc := range cases {
+func TestAuthValidation(t *testing.T) {
+	for _, tc := range authCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Load(write(t, endpointLink(tc.auth)))
 			ve := validationError(t, err)
 			if keys := problemKeys(ve); !reflect.DeepEqual(keys, tc.wantKeys) {
 				t.Fatalf("problem keys = %v, want %v", keys, tc.wantKeys)
 			}
-			if tc.wantReason != "" && !strings.Contains(ve.Problems[0].Reason, tc.wantReason) {
-				t.Errorf("first reason = %q, want it to contain %q", ve.Problems[0].Reason, tc.wantReason)
+			if codes := problemCodesOf(ve); !reflect.DeepEqual(codes, tc.wantCodes) {
+				t.Errorf("problem codes = %v, want %v", codes, tc.wantCodes)
 			}
 		})
 	}
