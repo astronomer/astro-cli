@@ -55,6 +55,9 @@ type Renderer struct {
 // with exit 0 — a human sees nothing and is told nothing. The branch is
 // load-bearing, and a panic is what says so when it goes missing.
 func (r Renderer) Emit(v any, text func(w io.Writer) error) error {
+	if emitObserver != nil {
+		emitObserver(v)
+	}
 	if r.Format == FormatJSON {
 		return json.NewEncoder(r.Out).Encode(v)
 	}
@@ -66,6 +69,14 @@ func (r Renderer) Emit(v any, text func(w io.Writer) error) error {
 	}
 	return text(r.Out)
 }
+
+// emitObserver, when set, is handed every value Emit publishes. It is nil in
+// production and exists for one test: the schema goldens pin Go types, and
+// nothing in them can tell you a command still emits the type its golden
+// holds. Watching the door is the only way to know, and the door is only
+// worth watching because everything now goes through it — see
+// TestEmitIsTheOnlyJSONEncoder.
+var emitObserver func(any)
 
 // addOutputFlag registers the shared --output flag on cmd's persistent
 // flags, so one registration covers a whole command family.
