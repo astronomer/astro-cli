@@ -30,11 +30,11 @@ type Inputs struct {
 // exact command that provides it — "clone-and-run says exactly which env
 // values are missing and how to set them".
 type Missing struct {
-	Section envschema.Section
-	Name    string
+	Section envschema.Section `json:"section"`
+	Name    string            `json:"name"`
 	// EnvKey is the Airflow env-var name that satisfies this value
 	// (NAME, AIRFLOW_VAR_<KEY>, or AIRFLOW_CONN_<ID>).
-	EnvKey string
+	EnvKey string `json:"env_key"`
 	// SourceNote explains why a workspace-source value could not be fetched —
 	// logged out, offline, no workspace set, access lost, org secret policy —
 	// so the missing-value message names the cause and the fix. Empty for a

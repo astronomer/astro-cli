@@ -3,9 +3,9 @@
   "project": "x",
   "missing": [
     {
-      "Section": "x",
-      "Name": "x",
-      "EnvKey": "x",
+      "section": "x",
+      "name": "x",
+      "env_key": "x",
       "source_note": "x",
       "set_command": "x"
     }
