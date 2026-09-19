@@ -289,6 +289,78 @@ func TestRunFatalReportIsEnvNotReady(t *testing.T) {
 	assert.Contains(t, err.Error(), "airflow")
 }
 
+// A blocked check says how to stop being blocked — when that is a question it
+// can answer.
+//
+// A venv holding a Python and no Airflow is what an interrupted `astro local
+// start` leaves, and the reader got the Python exception and the sentinel and
+// nothing else, while the no-interpreter case beside it has named both
+// remedies all along.
+func TestAnEnvironmentFatalNamesAWayOut(t *testing.T) {
+	_, err := Run(context.Background(), Options{ProjectPath: "/p"}, &fakeParser{
+		report: ParseReport{
+			Fatal:              "ModuleNotFoundError: No module named 'airflow'",
+			FatalIsEnvironment: true,
+		},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrEnvNotReady)
+
+	for _, want := range []string{"astro local start", "uv sync"} {
+		assert.Contains(t, err.Error(), want,
+			"a reader who cannot check needs to know what would let them")
+	}
+	// What is wrong still comes before what to do about it.
+	assert.Contains(t, err.Error(), "ModuleNotFoundError")
+}
+
+// Everything DagBag raised is the project's own, and gets no remedy.
+//
+// The script's fatal used to come from one except around the Airflow import
+// AND the DagBag construction, so a malformed airflow.cfg, a plugins package
+// that will not import and a dags directory that cannot be read were all
+// indistinguishable from a missing Airflow. Attaching "rebuild the
+// environment" to the lot of them would send their authors to rebuild
+// something that was never the problem — the guess ParseWith's sibling case
+// explicitly refuses to make.
+func TestAProjectFatalIsReportedWithoutARemedy(t *testing.T) {
+	_, err := Run(context.Background(), Options{ProjectPath: "/p"}, &fakeParser{
+		report: ParseReport{Fatal: "AirflowConfigException: error at airflow.cfg line 3"},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrEnvNotReady)
+
+	assert.Contains(t, err.Error(), "AirflowConfigException")
+	for _, absent := range []string{"astro local start", "uv sync", "rebuilds"} {
+		assert.NotContains(t, err.Error(), absent,
+			"neither command fixes a config file, and saying so wastes a rebuild")
+	}
+}
+
+// And a check running in an environment the CLI built for it gets no remedy
+// either, whichever fatal it hit.
+//
+// RunProvisioned inspects a venv in a cache directory that neither command
+// touches. Telling somebody who has just watched the CLI build an environment
+// to go and build one is the kind of advice that makes a reader doubt the
+// rest of the output.
+func TestAProvisionedRunOffersNoRemedy(t *testing.T) {
+	_, err := RunProvisioned(context.Background(), Options{ProjectPath: "/p"},
+		ProvisionInput{ProjectPath: "/p", Pin: "3.1"},
+		&fakeProvisioner{python: "/tmp/venv/bin/python"},
+		&fakeTargetParser{report: ParseReport{
+			Fatal:              "ImportError: cannot import name 'x'",
+			FatalIsEnvironment: true,
+		}},
+		nil)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrEnvNotReady)
+
+	assert.Contains(t, err.Error(), "ImportError")
+	assert.NotContains(t, err.Error(), "astro local start",
+		"the environment under inspection is the one this call just built")
+}
+
 func TestRunPropagatesParserError(t *testing.T) {
 	_, err := Run(context.Background(), Options{ProjectPath: "/p"}, &fakeParser{err: ErrEnvNotReady})
 	assert.ErrorIs(t, err, ErrEnvNotReady)

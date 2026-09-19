@@ -198,6 +198,26 @@ type Parser interface {
 // ErrEnvNotReady when the environment cannot be inspected; any other non-nil
 // error is an unexpected failure to run the parse at all.
 func Run(ctx context.Context, opts Options, parser Parser) (Result, error) {
+	return run(ctx, opts, parser, buildRemedy)
+}
+
+// buildRemedy is what to do about an environment the check could not use.
+//
+// Both commands, because this package cannot tell whether the project runs in
+// docker mode and only one of them is the answer in either — the same reason
+// the sibling case in ParseWith names both.
+//
+// The mode qualifies the SECOND command, and is written to read that way. It
+// used to trail the whole sentence — "…and `uv sync` rebuilds it without
+// starting Airflow, which is what a docker-mode project needs" — where it
+// scanned as a condition on the advice as a whole, and the first question it
+// drew was whether any of this applied outside Docker. It applies to every
+// project; only the choice between the two commands depends on the mode.
+const buildRemedy = " — `astro local start` rebuilds it, or `uv sync` if this project builds in Docker"
+
+// run is Run with the remedy chosen by the caller, so that the one path where
+// it would be wrong can say so.
+func run(ctx context.Context, opts Options, parser Parser, remedy string) (Result, error) {
 	in := ParseInput{
 		ProjectPath: opts.ProjectPath,
 		DagsDir:     DefaultDagsDir(opts.ProjectPath),
@@ -207,7 +227,13 @@ func Run(ctx context.Context, opts Options, parser Parser) (Result, error) {
 		return Result{}, err
 	}
 	if report.Fatal != "" {
-		// Airflow missing or unimportable in the venv — nothing to judge.
+		// Nothing to judge. Whether that is worth a remedy depends on which
+		// of the two fatals it is: Airflow out of reach is answered by
+		// building an environment, and anything DagBag raised is the
+		// project's own and is not. See ParseReport.FatalIsEnvironment.
+		if report.FatalIsEnvironment {
+			return Result{}, fmt.Errorf("%s: %w%s", report.Fatal, ErrEnvNotReady, remedy)
+		}
 		return Result{}, fmt.Errorf("%s: %w", report.Fatal, ErrEnvNotReady)
 	}
 	return evaluate(report), nil
@@ -257,7 +283,11 @@ func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov P
 	if err != nil {
 		return Result{}, err
 	}
-	return Run(ctx, opts, withInterpreter{python: python, parser: parser})
+	// No remedy here: the environment under inspection is the one this call
+	// just built, in a cache directory neither command touches. Telling
+	// somebody who has watched the CLI build an environment to go and build
+	// one is the kind of advice that makes a reader doubt the rest.
+	return run(ctx, opts, withInterpreter{python: python, parser: parser}, "")
 }
 
 // projectRequirements is what to install to reproduce the project's own

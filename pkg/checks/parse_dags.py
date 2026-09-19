@@ -150,10 +150,23 @@ def main():
     result = {"schema_version": 1, "dags": [], "import_errors": [], "files": [], "files_unavailable": False}
 
     logging.disable(logging.CRITICAL)
+    # Two blocks, because the caller answers them differently. Reaching Airflow
+    # at all is a question about the environment, and the answer to it is to
+    # build one; everything DagBag then raises — a malformed airflow.cfg, a
+    # plugins package that will not import, a dags directory that cannot be
+    # read — is a question about the project, where rebuilding the environment
+    # is a long way to arrive at the same error. One except around both could
+    # only report the first kind's remedy for all of them.
     try:
         install_parse_monkeypatches()
         from airflow.models.dagbag import DagBag
+    except Exception as exc:
+        result["fatal"] = "{}: {}".format(type(exc).__name__, exc)
+        result["fatal_is_environment"] = True
+        emit(result, real_stdout)
+        return
 
+    try:
         dagbag = DagBag(dag_folder=dags_dir, include_examples=False)
     except Exception as exc:
         result["fatal"] = "{}: {}".format(type(exc).__name__, exc)

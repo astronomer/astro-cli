@@ -60,7 +60,7 @@ func TestParseMissingVenvIsEnvNotReady(t *testing.T) {
 	assert.Contains(t, err.Error(), "uv sync",
 		"a docker-mode project needs a command that builds an interpreter without starting Airflow")
 	// The sentinel leads. Wrapped at the end it landed after a colon, so the
-	// line finished "…is what a docker-mode project needs: project environment
+	// line finished "…if this project builds in Docker: project environment
 	// is not ready to check", reading as the object of that sentence — and
 	// cmd/local prints this verbatim.
 	assert.True(t, strings.HasPrefix(err.Error(), ErrEnvNotReady.Error()+":"),
@@ -199,6 +199,12 @@ func TestScriptRunsUnderRealPython(t *testing.T) {
 	}
 	assert.Contains(t, strings.ToLower(report.Fatal), "airflow",
 		"with no Airflow installed the fatal field should say so")
+	// And it is the ENVIRONMENT kind, which is what decides whether the caller
+	// offers a way to build one. Asserted against a real interpreter because
+	// the flag is set by the script: a Go fixture saying so would only be
+	// repeating the expectation back.
+	assert.True(t, report.FatalIsEnvironment,
+		"an Airflow that cannot be imported is a question about the environment")
 }
 
 func hasEnvPrefix(env []string, prefix string) bool {

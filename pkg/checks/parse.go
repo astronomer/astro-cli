@@ -44,13 +44,20 @@ type ParseInput struct {
 }
 
 // ParseReport is the decoded output of parse_dags.py. Fatal is set when the
-// script could not build a DagBag at all (no Airflow in the venv); the other
-// fields are then empty.
+// script could not build a DagBag at all; the other fields are then empty.
 type ParseReport struct {
-	Fatal        string            `json:"fatal"`
-	Dags         []ReportDag       `json:"dags"`
-	ImportErrors []ReportImportErr `json:"import_errors"`
-	Files        []ReportFile      `json:"files"`
+	Fatal string `json:"fatal"`
+	// FatalIsEnvironment distinguishes the two ways that happens. True when
+	// Airflow could not be reached at all, which is a question about the
+	// environment and has an answer — build one. False for everything DagBag
+	// itself raised: a malformed airflow.cfg, an airflow_local_settings that
+	// raises, a plugins package that will not import. Those are the project's
+	// own, and telling their author to rebuild an environment that was never
+	// the problem is the guess the sibling case in ParseWith refuses to make.
+	FatalIsEnvironment bool              `json:"fatal_is_environment"`
+	Dags               []ReportDag       `json:"dags"`
+	ImportErrors       []ReportImportErr `json:"import_errors"`
+	Files              []ReportFile      `json:"files"`
 	// FilesUnavailable reports that Airflow gave no per-file statistics, so
 	// the checks derived from them did not run. Distinct from Files being
 	// empty, which is a project with no DAG files.
@@ -218,12 +225,16 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 		// you to do it again.
 		//
 		// The sentinel leads rather than trails. Wrapped at the end it landed
-		// after a colon, so the rendered line finished "…which is what a
-		// docker-mode project needs: project environment is not ready to
-		// check", reading as though that were the object of the sentence.
+		// after a colon, so the rendered line finished "…if this project
+		// builds in Docker: project environment is not ready to check",
+		// reading as though that were the object of the sentence.
+		//
+		// The mode qualifies the second command and is written to read that
+		// way, matching Run's remedy: trailing the sentence, it scanned as a
+		// condition on the advice as a whole and drew the question of whether
+		// any of it applied outside Docker.
 		return ParseReport{}, fmt.Errorf(
-			"%w at %s — `astro local start` builds one, and `uv sync` builds one "+
-				"without starting Airflow, which is what a docker-mode project needs",
+			"%w at %s — `astro local start` builds one, or `uv sync` if this project builds in Docker",
 			ErrNoInterpreter, python,
 		)
 	}

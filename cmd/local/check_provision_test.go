@@ -144,13 +144,27 @@ func TestCheckDoesNotPaperOverABrokenProjectEnvironment(t *testing.T) {
 	// Airflow is not importable.
 	d.Checks = stubParser{err: fmt.Errorf("no module named airflow: %w", checks.ErrEnvNotReady)}
 
+	// The .venv is the half of that the fixture was missing. Without it the
+	// case passed on a project that had no environment at all — the state
+	// ErrNoInterpreter describes, not this one — so it could go green for a
+	// reason its own comment rules out, and did: a revision that decided
+	// whether to provision by looking at the directory kept this test passing
+	// while papering over exactly the environment it names.
+	dir, err := d.WorkingDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".venv", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
 	var provisioned bool
 	d.Provisioner = func(context.Context) (checks.Provisioner, error) {
 		provisioned = true
 		return &fakeProvisioner{python: "/tmp/venv/bin/python"}, nil
 	}
 
-	err := execute(t, d, "local", "check")
+	err = execute(t, d, "local", "check")
 	var exit *ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitEnvNotReady {
 		t.Fatalf("a broken project environment should still stop the check, got %v", err)
