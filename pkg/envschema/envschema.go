@@ -158,6 +158,92 @@ type ValueSpec struct {
 	HasSensitive bool
 }
 
+// ProblemCode names the rule a problem came from.
+//
+// The Reason beside it is a sentence for a person, and a sentence for a
+// person is not a thing to branch on: it gets reworded, it will one day be
+// translated, and a caller matching on its text breaks both times. The code
+// is what stays put — so a caller decides on the code, the prose improves
+// freely, and a test asserts the rule fired rather than restating its
+// wording in a second place.
+//
+// One type covers both kinds of finding the package reports. A SpecProblem
+// from Check becomes a Problem on the way out (see checkSpec), so a single
+// code follows it across that seam rather than being translated into a second
+// vocabulary at the boundary.
+//
+// Shape and rule are both here, and the difference is which one repeats. A
+// shape code — CodeExpectedTable, CodeExpectedString — is one rule applied to
+// whichever key is wrong, so many keys share it and the Key says which. A
+// rule code belongs to one refusal.
+//
+// Values are written out rather than derived from the constant names,
+// because they are the stable part: renaming a Go identifier must not change
+// what a caller sees.
+type ProblemCode string
+
+const (
+	// Shape: the value is not the kind of thing the key takes. One rule,
+	// many keys.
+	CodeExpectedTable       ProblemCode = "expected_table"
+	CodeExpectedString      ProblemCode = "expected_string"
+	CodeExpectedBool        ProblemCode = "expected_bool"
+	CodeExpectedStringArray ProblemCode = "expected_string_array"
+	CodeExpectedScalar      ProblemCode = "expected_scalar"
+	CodeExpectedDeclaration ProblemCode = "expected_declaration"
+	CodeUnknownField        ProblemCode = "unknown_field"
+
+	// Decoding one declaration.
+	CodeNameInvalid   ProblemCode = "name_invalid"
+	CodeEmptyType     ProblemCode = "empty_type"
+	CodeEmptyEnum     ProblemCode = "empty_enum"
+	CodeEmptyConnType ProblemCode = "empty_conn_type"
+	CodeUnknownSource ProblemCode = "unknown_source"
+
+	// Checking a decoded declaration against the rules (see SpecProblem).
+	// CodeSensitiveDefault: a sensitive value carries a default, which would
+	// be committed to the manifest.
+	CodeSensitiveDefault ProblemCode = "sensitive_default"
+	// CodeConnectionNotSensitive: a connection declared sensitive = false,
+	// which contradicts what a connection is.
+	CodeConnectionNotSensitive ProblemCode = "connection_not_sensitive"
+	// CodeConnectionSensitiveRedundant: a connection declared sensitive =
+	// true, which says nothing its section has not already said.
+	CodeConnectionSensitiveRedundant ProblemCode = "connection_sensitive_redundant"
+	// CodeTypeOnConnection: `type` on a connection, which declares its kind
+	// with conn_type.
+	CodeTypeOnConnection ProblemCode = "type_on_connection"
+	// CodeEnumOnConnection: `enum` on a connection, which cannot declare the
+	// type it would need.
+	CodeEnumOnConnection ProblemCode = "enum_on_connection"
+	// CodeConnTypeOutsideConnections: conn_type somewhere that is not a
+	// connection.
+	CodeConnTypeOutsideConnections ProblemCode = "conn_type_outside_connections"
+	// CodeUnknownType: a `type` that is not one of the known ones.
+	CodeUnknownType ProblemCode = "unknown_type"
+	// CodeEnumNeedsType: an enum without type = "enum".
+	CodeEnumNeedsType ProblemCode = "enum_needs_type"
+	// CodeEnumTypeNeedsValues: type = "enum" with no values.
+	CodeEnumTypeNeedsValues ProblemCode = "enum_type_needs_values"
+)
+
+// problemCodes is every code above, in declaration order — the closed set, in
+// the package rather than in a test, so the tests that check the set read it
+// instead of keeping a second copy a new code could be left out of.
+var problemCodes = []ProblemCode{
+	CodeExpectedTable, CodeExpectedString, CodeExpectedBool,
+	CodeExpectedStringArray, CodeExpectedScalar, CodeExpectedDeclaration,
+	CodeUnknownField,
+
+	CodeNameInvalid, CodeEmptyType, CodeEmptyEnum, CodeEmptyConnType,
+	CodeUnknownSource,
+
+	CodeSensitiveDefault, CodeConnectionNotSensitive,
+	CodeConnectionSensitiveRedundant, CodeTypeOnConnection,
+	CodeEnumOnConnection, CodeConnTypeOutsideConnections, CodeUnknownType,
+	CodeEnumNeedsType, CodeEnumTypeNeedsValues,
+}
+
 // SpecProblem is one way a declaration is not well formed: the annotation at
 // fault, and why.
 //
@@ -165,6 +251,9 @@ type ValueSpec struct {
 // where the declaration came from. A TOML reader prefixes its dotted key; a
 // writer building a spec from a form can point at the input.
 type SpecProblem struct {
+	// Code names the rule, and is the part a caller may rely on. Reason is
+	// the part a person reads; see ProblemCode for why they are separate.
+	Code ProblemCode
 	// Field is the annotation at fault — "default", "sensitive", "type",
 	// "enum", "conn_type" — or "" for the declaration as a whole.
 	Field string
@@ -204,11 +293,11 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 	var out []SpecProblem
 	// reads defaults to the field itself, which is right for every rule that
 	// consults only what it points at.
-	add := func(field, reason string, reads ...string) {
+	add := func(code ProblemCode, field, reason string, reads ...string) {
 		if len(reads) == 0 {
 			reads = []string{field}
 		}
-		out = append(out, SpecProblem{Field: field, Reads: reads, Reason: reason})
+		out = append(out, SpecProblem{Code: code, Field: field, Reads: reads, Reason: reason})
 	}
 
 	skipTypeCoherence := false
@@ -226,15 +315,15 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 		if s.Type != "" {
 			// Instead of, not as well as, "not a known type": one mistake, and
 			// it is not the spelling.
-			add("type", "type describes an env var or an Airflow variable, so it means nothing on a connection — conn_type is how a connection declares its kind")
+			add(CodeTypeOnConnection, "type", "type describes an env var or an Airflow variable, so it means nothing on a connection — conn_type is how a connection declares its kind")
 		}
 		if len(s.Enum) > 0 {
-			add("enum", "enum needs type = \"enum\", which a connection cannot declare", "enum", "type")
+			add(CodeEnumOnConnection, "enum", "enum needs type = \"enum\", which a connection cannot declare", "enum", "type")
 		}
 	} else if !ValidType(s.Type) {
 		// Reported once: otherwise `{ type = 'enom', enum = ['a'] }` also gets
 		// "enum needs type = enum", contradicting the type the author wrote.
-		add("type", fmt.Sprintf("%q is not a known type (string, int, number, bool, enum, url, port, json)", s.Type))
+		add(CodeUnknownType, "type", fmt.Sprintf("%q is not a known type (string, int, number, bool, enum, url, port, json)", s.Type))
 		skipTypeCoherence = true
 	}
 
@@ -266,9 +355,9 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 	switch {
 	case section != SectionConnection:
 	case !s.Sensitive:
-		add("sensitive", "a connection always holds a credential, so it cannot be declared not sensitive")
+		add(CodeConnectionNotSensitive, "sensitive", "a connection always holds a credential, so it cannot be declared not sensitive")
 	case s.HasSensitive:
-		add("sensitive", "a connection is always sensitive, so sensitive = true adds nothing — remove it; the vault is chosen by the section, not by this flag")
+		add(CodeConnectionSensitiveRedundant, "sensitive", "a connection is always sensitive, so sensitive = true adds nothing — remove it; the vault is chosen by the section, not by this flag")
 	}
 
 	// A sensitive value may not carry a default. A default is committed to the
@@ -285,20 +374,20 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 			// reason it is one.
 			what = "a connection, which is always sensitive,"
 		}
-		add("default", what+" must not carry a default: it would be committed to the manifest and written into the environment on start", "default", "sensitive")
+		add(CodeSensitiveDefault, "default", what+" must not carry a default: it would be committed to the manifest and written into the environment on start", "default", "sensitive")
 	}
 
 	if s.ConnType != "" && section != SectionConnection {
-		add("conn_type", "conn_type describes a connection, so it means nothing in "+string(section))
+		add(CodeConnTypeOutsideConnections, "conn_type", "conn_type describes a connection, so it means nothing in "+string(section))
 	}
 
 	// enum and type = 'enum' each require the other, and each rule reads both.
 	if !skipTypeCoherence {
 		if len(s.Enum) > 0 && s.Type != TypeEnum {
-			add("enum", "enum needs type = \"enum\"", "enum", "type")
+			add(CodeEnumNeedsType, "enum", "enum needs type = \"enum\"", "enum", "type")
 		}
 		if s.Type == TypeEnum && len(s.Enum) == 0 {
-			add("type", "type = \"enum\" needs a non-empty enum", "type", "enum")
+			add(CodeEnumTypeNeedsValues, "type", "type = \"enum\" needs a non-empty enum", "type", "enum")
 		}
 	}
 	return out

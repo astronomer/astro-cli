@@ -12,6 +12,9 @@ import (
 // Problem is one schema-decoding finding, addressed by the dotted TOML key
 // it concerns (mirroring manifest.Problem).
 type Problem struct {
+	// Code names the rule, and is the part a caller may rely on. Reason is
+	// the part a person reads; see ProblemCode for why they are separate.
+	Code   ProblemCode
 	Key    string
 	Reason string
 }
@@ -104,8 +107,8 @@ type schemaParser struct {
 	problems []Problem
 }
 
-func (p *schemaParser) add(key, reason string) {
-	p.problems = append(p.problems, Problem{Key: key, Reason: reason})
+func (p *schemaParser) add(code ProblemCode, key, reason string) {
+	p.problems = append(p.problems, Problem{Code: code, Key: key, Reason: reason})
 }
 
 // specs decodes one map of declarations. validName gates each declared name:
@@ -116,7 +119,7 @@ func (p *schemaParser) add(key, reason string) {
 func (p *schemaParser) specs(key string, raw any, validName func(string) bool, invalidReason string, section Section) map[string]ValueSpec {
 	table, ok := raw.(map[string]any)
 	if !ok {
-		p.add(key, "expected a table")
+		p.add(CodeExpectedTable, key, "expected a table")
 		return nil
 	}
 	if len(table) == 0 {
@@ -126,7 +129,7 @@ func (p *schemaParser) specs(key string, raw any, validName func(string) bool, i
 	for name, specRaw := range table {
 		specKey := key + "." + name
 		if !validName(name) {
-			p.add(specKey, invalidReason)
+			p.add(CodeNameInvalid, specKey, invalidReason)
 			continue
 		}
 		if spec, ok := p.decodeSpec(specKey, specRaw, section); ok {
@@ -161,7 +164,7 @@ func (p *schemaParser) decodeSpec(key string, raw any, section Section) (ValueSp
 	case map[string]any:
 		return p.decodeSpecTable(key, v, section)
 	default:
-		p.add(key, "expected a string default or a table")
+		p.add(CodeExpectedDeclaration, key, "expected a string default or a table")
 		return ValueSpec{}, false
 	}
 }
@@ -234,7 +237,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				// an author can write one. An empty source and an empty
 				// conn_type are both refused; this is the same typo. Check
 				// cannot see the difference, since both arrive as "".
-				p.add(fieldKey, "expected a type, not an empty string — omit the key for a plain string")
+				p.add(CodeEmptyType, fieldKey, "expected a type, not an empty string — omit the key for a plain string")
 				failed["type"] = true
 			default:
 				// An unknown type is Check's rule, not this loop's.
@@ -251,7 +254,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				// stored a non-nil empty slice, which is not DeepEqual to the
 				// nil an undeclared enum leaves — so two specs that mean the
 				// same thing compared unequal.
-				p.add(fieldKey, "expected at least one value — omit the key if there is no fixed set")
+				p.add(CodeEmptyEnum, fieldKey, "expected at least one value — omit the key if there is no fixed set")
 				failed["enum"] = true
 			default:
 				spec.Enum = e
@@ -266,13 +269,13 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 			case !ok:
 				failed["conn_type"] = true
 			case ct == "":
-				p.add(fieldKey, "expected a connection type, not an empty string")
+				p.add(CodeEmptyConnType, fieldKey, "expected a connection type, not an empty string")
 				failed["conn_type"] = true
 			default:
 				spec.ConnType = ct
 			}
 		default:
-			p.add(fieldKey, "unknown field")
+			p.add(CodeUnknownField, fieldKey, "unknown field")
 		}
 	}
 	p.checkSpec(key, spec, section, failed)
@@ -314,7 +317,7 @@ func (p *schemaParser) checkSpec(key string, spec ValueSpec, section Section, fa
 		if problem.Field != "" {
 			problemKey = key + "." + problem.Field
 		}
-		p.add(problemKey, problem.Reason)
+		p.add(problem.Code, problemKey, problem.Reason)
 		ok = false
 	}
 	return ok
@@ -343,7 +346,7 @@ func anyFailed(fields []string, failed map[string]bool) bool {
 func (p *schemaParser) boolField(key string, raw any) (value, ok bool) {
 	v, isBool := raw.(bool)
 	if !isBool {
-		p.add(key, "expected true or false")
+		p.add(CodeExpectedBool, key, "expected true or false")
 		return false, false
 	}
 	return v, true
@@ -358,7 +361,7 @@ func (p *schemaParser) boolField(key string, raw any) (value, ok bool) {
 func (p *schemaParser) strList(key string, raw any) ([]string, bool) {
 	items, ok := raw.([]any)
 	if !ok {
-		p.add(key, "expected an array of strings")
+		p.add(CodeExpectedStringArray, key, "expected an array of strings")
 		return nil, false
 	}
 	out := make([]string, 0, len(items))
@@ -369,7 +372,7 @@ func (p *schemaParser) strList(key string, raw any) ([]string, bool) {
 			// Zero-padded: ParseSchema sorts problems by key as a string, so a
 			// bare index puts enum[10] before enum[1] — and a long enum is
 			// exactly the case this indexing exists to serve.
-			p.add(fmt.Sprintf("%s[%03d]", key, i), "expected a string")
+			p.add(CodeExpectedString, fmt.Sprintf("%s[%03d]", key, i), "expected a string")
 			bad = true
 			continue
 		}
@@ -400,7 +403,7 @@ func (p *schemaParser) scalar(key string, raw any) (string, bool) {
 		// and port types this grammar just added.
 		return strconv.FormatFloat(v, 'f', -1, 64), true
 	default:
-		p.add(key, "expected a string, number, or boolean")
+		p.add(CodeExpectedScalar, key, "expected a string, number, or boolean")
 		return "", false
 	}
 }
@@ -415,7 +418,7 @@ func (p *schemaParser) source(key string, raw any) (Source, bool) {
 	}
 	src := Source(s)
 	if src != SourceWorkspace {
-		p.add(key, fmt.Sprintf("%q is not a source (workspace)", s))
+		p.add(CodeUnknownSource, key, fmt.Sprintf("%q is not a source (workspace)", s))
 		return "", false
 	}
 	return src, true
@@ -424,7 +427,7 @@ func (p *schemaParser) source(key string, raw any) (Source, bool) {
 func (p *schemaParser) str(key string, v any) (string, bool) {
 	s, ok := v.(string)
 	if !ok {
-		p.add(key, "expected a string")
+		p.add(CodeExpectedString, key, "expected a string")
 	}
 	return s, ok
 }
