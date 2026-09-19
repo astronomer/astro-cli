@@ -193,3 +193,33 @@ func TestAddRouteDoesNotPersistTheDiscriminator(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(raw), "a1b2c3")
 }
+
+// The same directory reached with different capitalization is the same
+// project, which matters because rt.CanonicalPath decided the same thing and
+// these two have to agree.
+//
+// When they disagreed, a re-registration from the other spelling read as a
+// stranger: the project was pushed onto a qualified hostname and the original
+// row stayed behind pointing at a port nothing was listening on.
+func TestAddRouteTreatsACaseVariantAsTheSameProject(t *testing.T) {
+	base := t.TempDir()
+	actual := filepath.Join(base, "Analytics")
+	require.NoError(t, os.Mkdir(actual, 0o755))
+	variant := filepath.Join(base, "analytics")
+	if _, err := os.Stat(variant); err != nil {
+		t.Skip("case-sensitive filesystem; the two spellings are two directories here")
+	}
+
+	s := liveStore(t)
+	held(t, s, "analytics.localhost", actual)
+
+	route := &Route{Hostname: "analytics.localhost", ProjectDir: variant, Port: "8081", Discriminator: "a1b2c3"}
+	require.NoError(t, s.AddRoute(route))
+
+	assert.Equal(t, "analytics.localhost", route.Hostname,
+		"one directory reached two ways must keep its own name")
+
+	routes, err := s.ReadRoutes()
+	require.NoError(t, err)
+	assert.Len(t, routes, 1, "and must not gain a second row")
+}

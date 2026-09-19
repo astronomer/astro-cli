@@ -169,7 +169,10 @@ func (k Kind) valid() bool {
 // one directory and four different keys, and on Windows "C:/x" and "C:\x" are
 // interchangeable to every Go path API and distinct here. Requiring Clean output
 // cannot reject a genuinely canonical scope, since localrt.CanonicalPath is
-// filepath.Abs followed by EvalSymlinks and both return Clean-stable paths.
+// filepath.Abs, then EvalSymlinks, then a respelling to the filesystem's own
+// capitalization built with filepath.Join — all of which return Clean-stable
+// paths. The last of those was added later; if the respelling ever stops
+// going through Join, check that it still cannot emit an unclean path.
 //
 // What it still cannot catch is an unresolved symlink, which is why canonicalizing
 // remains the caller's documented job rather than a promise made here.

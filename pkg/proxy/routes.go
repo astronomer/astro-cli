@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -352,9 +353,16 @@ func resolveHostname(routes []Route, route *Route) (string, error) {
 // belongs to somebody else.
 //
 // Falls back to the closest thing it managed, so a directory that has since
-// been deleted still compares equal to itself. This mirrors rt.CanonicalPath,
-// which this module cannot import — pkg/localrt depends on pkg/proxy, not the
-// other way round.
+// been deleted still compares equal to itself.
+//
+// This mirrors rt.CanonicalPath, which this module cannot import — pkg/localrt
+// depends on pkg/proxy, not the other way round — and the mirror has to be
+// kept, not just claimed. When rt learned to respell a path to the
+// filesystem's own capitalization and this did not, the two disagreed about
+// what counts as one project: rt would call a re-registration from
+// ~/Work/analytics the same project as one from ~/work/analytics while this
+// called it a stranger, hand it a qualified hostname, and leave the original
+// row behind pointing at a dead port.
 func canonicalDir(dir string) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -364,7 +372,57 @@ func canonicalDir(dir string) string {
 	if err != nil {
 		return abs
 	}
-	return resolved
+	return trueCase(resolved)
+}
+
+// trueCase respells path the way the filesystem does. It is rt.trueCase; see
+// there for why the walk is component by component and why an exact match
+// wins. Duplicated rather than shared because of the dependency direction
+// above, which canonicalDir already duplicates Abs+EvalSymlinks for.
+func trueCase(path string) string {
+	vol := filepath.VolumeName(path)
+	rest := strings.TrimPrefix(path, vol)
+	if !strings.HasPrefix(rest, string(filepath.Separator)) {
+		return path
+	}
+
+	out := vol + string(filepath.Separator)
+	for _, part := range strings.Split(rest, string(filepath.Separator)) {
+		if part == "" {
+			continue
+		}
+		out = filepath.Join(out, spellingOnDisk(out, part))
+	}
+	return out
+}
+
+func spellingOnDisk(dir, want string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return want
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return pickSpelling(names, want)
+}
+
+// pickSpelling chooses among the names a directory holds: an exact match
+// first, in its own pass, so a case-sensitive filesystem holding both
+// Analytics and analytics keeps them apart.
+func pickSpelling(names []string, want string) string {
+	for _, n := range names {
+		if n == want {
+			return want
+		}
+	}
+	for _, n := range names {
+		if strings.EqualFold(n, want) {
+			return n
+		}
+	}
+	return want
 }
 
 // RemoveRoute deregisters a route by hostname. Returns the number of remaining routes.
