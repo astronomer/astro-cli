@@ -89,12 +89,24 @@ func af2Env(port int) []string {
 }
 
 // devConfigOverrides are the Airflow settings forced for local dev, per the
-// design's decision 13: fast DAG rescan yes, zero default task
-// retries yes, loopback-only bind always — and DAGs stay paused at
-// creation, so no DAGS_ARE_PAUSED_AT_CREATION override here. In Airflow 3
-// the dag-processor is a separate component with its own config section, so
-// both the scheduler and dag_processor intervals are set; the key for
-// whichever Airflow major is not running is ignored.
+// design's decision 13: fast DAG rescan yes, zero default task retries
+// yes, loopback-only bind always. In Airflow 3 the dag-processor is a separate
+// component with its own config section, so both the scheduler and
+// dag_processor intervals are set; the key for whichever Airflow major is not
+// running is ignored.
+//
+// DAGs are created UNPAUSED, which reverses what decision 13 originally said;
+// docs/v2-architecture.md carries the amended wording.
+//
+// Paused-at-creation is a deployment default. It stops a DAG that lands on a
+// shared scheduler from running before anyone has looked at it. Locally there
+// is nothing to protect from: the person who wrote the file is watching the
+// UI, started Airflow themselves, and is waiting to see it run. Left paused,
+// the first-run experience is a DAG sitting still while its next scheduled
+// time slides past, and the remedy is a toggle nothing pointed at. astro-
+// desktop has forced False for its whole life for that reason, so this is
+// also what local users already have — and matching it is what lets the
+// desktop provision through this engine without changing their experience.
 //
 // The api-server (AF3) and webserver (AF2) are pinned to the IPv4 loopback:
 // Airflow's own default bind is 0.0.0.0, which would expose the instance —
@@ -106,6 +118,7 @@ var devConfigOverrides = []string{
 	"AIRFLOW__DAG_PROCESSOR__DAG_DIR_LIST_INTERVAL=2",
 	"AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL=0",
 	"AIRFLOW__CORE__DEFAULT_TASK_RETRIES=0",
+	"AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
 	"AIRFLOW__API__HOST=127.0.0.1",
 	"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1",
 	// The log file is not a terminal, so nothing in it should be coloured.

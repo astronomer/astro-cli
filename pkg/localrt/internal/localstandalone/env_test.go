@@ -49,14 +49,16 @@ func TestBuildEnvDevOverridesAreAuthoritative(t *testing.T) {
 	web, _ := envValue(env, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST")
 	assert.Equal(t, "127.0.0.1", web)
 
-	// Fast rescan and zero retries are on; paused-at-creation stays at
-	// Airflow's default (decision 13).
+	// Fast rescan and zero retries are on, and DAGs are created unpaused: a
+	// local DAG is being watched by the person who just wrote it, so leaving
+	// it paused means it sits still while its next run time slides past.
 	rescan, _ := envValue(env, "AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL")
 	assert.Equal(t, "2", rescan)
 	retries, _ := envValue(env, "AIRFLOW__CORE__DEFAULT_TASK_RETRIES")
 	assert.Equal(t, "0", retries)
-	_, found := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
-	assert.False(t, found)
+	paused, found := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
+	assert.True(t, found, "a local start should decide this rather than inherit Airflow's deployment default")
+	assert.Equal(t, "False", paused)
 
 	// Colour off, because the destination is a capped file rather than a
 	// terminal. Left on, `airflow standalone` colours the component name it
