@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -297,6 +298,211 @@ func TestTwoProjectsOfTheSameNameGetDistinctHostnames(t *testing.T) {
 			t.Errorf("GET / on port %d = %d, want 200", st.Port, code)
 		}
 	}
+
+	// And both names answer through the proxy. Until here nothing asked the
+	// proxy anything: the case compared recorded strings and probed the
+	// direct ports, so two projects could hold two hostnames and neither be
+	// routable.
+	//
+	// What this does NOT prove is that each name reaches its OWN Airflow — a
+	// 200 from either backend passes. Proving that needs something in the
+	// response that differs per project, and the obvious candidates (the
+	// version endpoint, the login page) are identical. A per-project DAG and
+	// an authenticated API call through the proxy would do it, which is more
+	// machinery than the rest of this file has; the distinct-name half is
+	// checked above, and the routing half is checked as far as "answers".
+	// A subtest each, so a missing URL skips its own case rather than the
+	// whole test: a bare t.Skip here would throw away the distinct-hostname
+	// assertions above that already ran, turning a daemon regression into an
+	// invisible skip instead of a loud failure.
+	for _, c := range []struct {
+		name string
+		p    *project
+		st   rtStatus
+	}{{"first", alpha, first}, {"second", twin, second}} {
+		t.Run("the "+c.name+" project answers on its own name", func(t *testing.T) {
+			named := namedURL(t, c.p.forT(t), &c.st)
+			if named == "" {
+				t.Skip("the CLI offers the direct URL, so no proxy name to check")
+			}
+			if code := getURL(t, named); code != http.StatusOK {
+				t.Errorf("GET %s = %d, want 200", named, code)
+			}
+		})
+	}
+}
+
+// namedURL is the proxy URL a running project publishes, or "" when the CLI
+// offered the direct one instead.
+//
+// Asked of the CLI rather than assembled here: the daemon picks its own port
+// when the default is taken, so hostname plus a guessed port would test the
+// guess. Compared against the direct form exactly rather than sniffed for
+// substrings — cmd/local builds it as http://localhost:<port>, and a
+// substring test would call a URL named whenever the record's hostname
+// happened to be empty, since strings.Contains(s, "") is true.
+//
+// Empty covers two states this cannot tell apart: the daemon is down, or the
+// record carries no hostname because no route was ever registered. The second
+// is a regression and this reads it as an absent prerequisite — closing that
+// needs the daemon's own port, which the CLI does not publish.
+func namedURL(t *testing.T, p *project, st *rtStatus) string {
+	t.Helper()
+	var res struct {
+		URL string `json:"url"`
+	}
+	p.run("local", "open", "--print", "--output", "json").requireSuccess().requireJSON(&res)
+	if res.URL == fmt.Sprintf("http://localhost:%d", st.Port) {
+		return ""
+	}
+	return res.URL
+}
+
+// The five things you ask a running Airflow, on one start.
+//
+// Sharing a fixture rather than a case each: this tier costs a start-and-stop
+// cycle per case (~11s and ~2s measured), and these are read-only queries
+// against the same running Airflow.
+//
+// Each subtest takes a project view bound to its own T. Without that, a
+// *result carries the T it was made from, so require* inside a subtest calls
+// Fatalf on the parent — a FailNow from the wrong goroutine, which aborts the
+// run and silently skips every sibling after it. Grouping to isolate failures
+// achieves the opposite if the binding is left alone.
+func TestQueriesAgainstARunningAirflow(t *testing.T) {
+	tier(t, 2)
+
+	parent, st := startedProject(t)
+
+	// `local af health` — the four-part report and its verdict. Every
+	// section is read, per this file's own rule: a field nothing asserts is
+	// a field the CLI can stop publishing.
+	t.Run("af health reports on the running Airflow", func(t *testing.T) {
+		p := parent.forT(t)
+		var report struct {
+			OverallStatus string `json:"overall_status"`
+			Version       struct {
+				Version string `json:"version"`
+				Error   string `json:"error"`
+			} `json:"version"`
+			ImportErrors struct {
+				Count int    `json:"count"`
+				Error string `json:"error"`
+			} `json:"import_errors"`
+			DAGWarnings struct {
+				Count int    `json:"count"`
+				Error string `json:"error"`
+			} `json:"dag_warnings"`
+			DAGStats struct {
+				Error string `json:"error"`
+			} `json:"dag_stats"`
+			Unread []string `json:"unread"`
+		}
+		p.runSlow("local", "af", "health", "--output", "json").
+			requireSuccess().
+			requireJSON(&report)
+
+		if report.OverallStatus != "healthy" {
+			t.Errorf("overall_status = %q, want healthy for an Airflow that just started", report.OverallStatus)
+		}
+		if len(report.Unread) != 0 {
+			t.Errorf("health could not read %v; a section it cannot read is the failure this reports", report.Unread)
+		}
+		// The four sections, each reported as failed rather than ending the
+		// command — so an error field is how a degraded report shows itself.
+		if report.Version.Version == "" || report.Version.Error != "" {
+			t.Errorf("version section: %+v", report.Version)
+		}
+		for name, errText := range map[string]string{
+			"import_errors": report.ImportErrors.Error,
+			"dag_warnings":  report.DAGWarnings.Error,
+			"dag_stats":     report.DAGStats.Error,
+		} {
+			if errText != "" {
+				t.Errorf("%s section reported an error: %s", name, errText)
+			}
+		}
+	})
+
+	// `local run` must use the PROJECT's interpreter, not the machine's,
+	// which is the whole claim. Compared against this project's own path:
+	// ".venv" alone would accept an ambient venv leaked through the
+	// environment, which is the mistake worth catching.
+	t.Run("run uses this project's interpreter", func(t *testing.T) {
+		p := parent.forT(t)
+		out := strings.TrimSpace(p.runSlow("local", "run", "python", "-c",
+			"import sys; print(sys.executable)").requireSuccess().Stdout)
+
+		// The venv DIRECTORY on both sides, never the interpreter: a venv's
+		// bin/python is a symlink to the base interpreter, so resolving the
+		// binary lands on Homebrew's python and reports the project's own
+		// venv as the machine's. Resolving the directory is still needed for
+		// /var against /private/var on macOS.
+		want, err := filepath.EvalSymlinks(filepath.Join(p.Dir, ".venv"))
+		if err != nil {
+			t.Fatalf("resolving the project venv: %v", err)
+		}
+		got, err := filepath.EvalSymlinks(filepath.Dir(filepath.Dir(out)))
+		if err != nil {
+			t.Fatalf("resolving the venv behind %q: %v", out, err)
+		}
+		if got != want {
+			t.Errorf("`local run` used %q, whose venv is %q, want %q", out, got, want)
+		}
+	})
+
+	// And reaches the Airflow that is running, which `airflow version` does
+	// not: that prints the installed package's version and talks to nothing.
+	// `dags list` reads the metadata database this start migrated.
+	t.Run("run reaches the running Airflow's database", func(t *testing.T) {
+		p := parent.forT(t)
+		out := p.runSlow("local", "run", "airflow", "dags", "list").requireSuccess().Stdout
+		if strings.TrimSpace(out) == "" {
+			t.Error("`local run airflow dags list` printed nothing; it should at least render a header")
+		}
+	})
+
+	// `--tail N` is the feature, not the logs: unbounded output from a busy
+	// Airflow is unreadable. Exactly min(N, total) — an upper bound alone
+	// passes for a --tail that returns nothing.
+	t.Run("logs --tail returns exactly the last N", func(t *testing.T) {
+		p := parent.forT(t)
+		total := countNonEmptyLines(p.runSlow("local", "logs").requireSuccess().Stdout)
+		if total == 0 {
+			t.Skip("nothing logged yet; --tail has nothing to bound")
+		}
+		const n = 5
+		got := countNonEmptyLines(p.runSlow("local", "logs", "--tail", fmt.Sprint(n)).requireSuccess().Stdout)
+
+		if want := min(n, total); got != want {
+			t.Errorf("--tail %d returned %d lines of %d, want %d", n, got, total, want)
+		}
+	})
+
+	// The named URL is why the proxy exists; the direct port is covered by
+	// TestStartRunsAirflowAndStopEndsIt.
+	t.Run("the named URL answers", func(t *testing.T) {
+		p := parent.forT(t)
+		named := namedURL(t, p, &st)
+		if named == "" {
+			t.Skip("the CLI offers the direct URL, so no proxy name to check")
+		}
+		if code := getURL(t, named); code != http.StatusOK {
+			t.Errorf("GET %s = %d, want 200", named, code)
+		}
+	})
+}
+
+// countNonEmptyLines counts what --tail bounds: a blank trailing line is
+// formatting, not output.
+func countNonEmptyLines(s string) int {
+	n := 0
+	for _, l := range strings.Split(s, "\n") {
+		if strings.TrimSpace(l) != "" {
+			n++
+		}
+	}
+	return n
 }
 
 // `astro local reset` wipes the derived state and leaves the project alone.
@@ -351,9 +557,43 @@ func TestResetWipesTheDerivedStateAndKeepsTheProject(t *testing.T) {
 // get is one HTTP GET against a local port, returning the status code or 0.
 func get(t *testing.T, port int) int {
 	t.Helper()
-	client := &http.Client{Timeout: httpProbeTimeout}
-	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/", port))
+	return getURL(t, fmt.Sprintf("http://localhost:%d/", port))
+}
+
+// getURL is get for a whole URL, which the named <project>.localhost address
+// needs: the proxy decides where to send a request by its Host header, so a
+// port alone cannot ask the question.
+//
+// The connection goes to 127.0.0.1 with Host set, rather than letting the
+// resolver look up <project>.localhost. Go's resolver has no built-in rule
+// for .localhost — it works on a developer's Mac and wherever
+// systemd-resolved synthesizes it, and returns a connection error elsewhere.
+// The nightly runs on ubuntu-latest, where a missing rule would file an issue
+// reading as a proxy regression. airflow/proxy's own probeProxySignature asks
+// the same way and for the same reason.
+func getURL(t *testing.T, rawURL string) int {
+	t.Helper()
+	u, err := url.Parse(rawURL)
 	if err != nil {
+		t.Errorf("parsing %q: %v", rawURL, err)
+		return 0
+	}
+	port := u.Port()
+	if port == "" {
+		port = "80"
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
+		"http://127.0.0.1:"+port+u.EscapedPath(), http.NoBody)
+	if err != nil {
+		t.Errorf("building a request for %q: %v", rawURL, err)
+		return 0
+	}
+	// What the proxy routes on.
+	req.Host = u.Host
+
+	resp, err := (&http.Client{Timeout: httpProbeTimeout}).Do(req)
+	if err != nil {
+		t.Logf("GET %s (as 127.0.0.1 with Host %s): %v", rawURL, u.Host, err)
 		return 0
 	}
 	defer resp.Body.Close()

@@ -181,6 +181,19 @@ type project struct {
 	cache string
 }
 
+// forT returns a view of p whose failures land on t.
+//
+// A *result binds the T it was created from, so require* inside a subtest
+// calls Fatalf on the PARENT — which is a FailNow from the wrong goroutine:
+// Go reports "subtest may have called FailNow on a parent test", the subtest
+// aborts, and every sibling after it is skipped silently. Grouping cases as
+// subtests to isolate their failures does the opposite without this.
+func (p *project) forT(t *testing.T) *project {
+	sub := *p
+	sub.t = t
+	return &sub
+}
+
 // newProject returns an isolated project directory. Everything it creates is
 // under the test's own temp directory, so it goes away with the test.
 func newProject(t *testing.T) *project {
