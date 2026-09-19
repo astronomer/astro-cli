@@ -161,6 +161,21 @@ func (w *lockedWriter) Write(p []byte) (int, error) {
 	return w.b.Write(p)
 }
 
+// errorLine is the CLI's own error line out of a stderr stream that may also
+// carry warnings and notices. Empty when there is none.
+//
+// Assertions about what the CLI reported belong on this line: a scan of the
+// whole stream passes or fails on text from anything else that wrote there,
+// which for a start includes the port-fallback notice and any proxy warning.
+func errorLine(stderr string) string {
+	for _, line := range strings.Split(stderr, "\n") {
+		if strings.HasPrefix(line, "Error:") {
+			return line
+		}
+	}
+	return ""
+}
+
 // exitInterrupted is what a shell reports for a process ended by SIGINT, and
 // what main.go returns for a canceled command.
 const exitInterrupted = 130
@@ -179,7 +194,7 @@ func TestInterruptDuringTheSyncLeavesNothingBehind(t *testing.T) {
 	needsUV(t)
 
 	p := newProject(t)
-	p.run("init", "--name", "interrupted").requireSuccess()
+	p.run("init", "--name", "syncstop").requireSuccess()
 
 	s := p.background("local", "start")
 	// uv has spoken, so the sync is under way and there is something to
@@ -191,6 +206,24 @@ func TestInterruptDuringTheSyncLeavesNothingBehind(t *testing.T) {
 
 	if r.ExitCode != exitInterrupted {
 		t.Errorf("exit = %d, want %d for an interrupted command\n%s", r.ExitCode, exitInterrupted, r.output())
+	}
+
+	// And it says it was interrupted rather than reporting a uv failure —
+	// pkg/uv's interruptedError has the why. Asserted here as well as there
+	// because this is where the words reach a person.
+	//
+	// "was interrupted" rather than "interrupted", and the project is not
+	// named that either: it was, and since the CLI prints the project path and
+	// the derived hostname on several paths, the assertion could have been
+	// satisfied by the fixture's own name rather than by the message.
+	//
+	// The absence is checked on the error line rather than on the whole
+	// stream, because other things legitimately write to stderr during a start
+	// and one of them containing the word would fail a case about something
+	// else.
+	r.requireStderr("was interrupted")
+	if line := errorLine(r.Stderr); strings.Contains(line, "uv sync failed") {
+		t.Errorf("the error line still reports a failure for something the user asked for: %s", line)
 	}
 
 	// Read before `list` or `status`: the route store drops entries whose pid
@@ -278,6 +311,17 @@ func TestInterruptDuringTheHealthWaitKeepsAirflow(t *testing.T) {
 
 	if r.ExitCode != exitInterrupted {
 		t.Errorf("exit = %d, want %d for an interrupted command\n%s", r.ExitCode, exitInterrupted, r.output())
+	}
+
+	// And the message says the runtime was left up. "context canceled" was
+	// what this printed: the name of a Go value, describing the mechanism
+	// rather than the outcome, with no way for the reader to tell that an
+	// Airflow is now running on their machine.
+	for _, want := range []string{"still starting", "astro local stop"} {
+		r.requireStderr(want)
+	}
+	if line := errorLine(r.Stderr); strings.Contains(line, "context canceled") {
+		t.Errorf("the error line names the mechanism instead of the outcome: %s", line)
 	}
 
 	// Still running, and still recorded: this is the instance the interrupt

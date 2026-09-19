@@ -204,7 +204,7 @@ const defaultWaitDelay = 10 * time.Second
 func (c *Client) command(ctx context.Context, project string, stdio Stdio, args ...string) error {
 	args = c.globalArgs(args)
 	stderr, err := c.run(ctx, project, c.childEnv(), stdio, args)
-	return commandError(args, stderr, err)
+	return commandError(ctx, args, stderr, err)
 }
 
 // globalArgs prefixes the flags every invocation carries.
@@ -288,7 +288,7 @@ func (c *Client) fetch(ctx context.Context, project string, stdio Stdio, args ..
 			runErr = errors.Join(runErr, retryErr)
 		}
 	}
-	return commandError(args, stderr, runErr)
+	return commandError(ctx, args, stderr, runErr)
 }
 
 // stderrOf returns the captured stderr from err, or "" when err carries none.
@@ -301,7 +301,11 @@ func stderrOf(err error) string {
 }
 
 // commandError wraps a failed invocation, or returns nil for a successful one.
-func commandError(args []string, stderr string, err error) error {
+//
+// A context that is done makes this an *interruptedError instead, which keeps
+// the CommandError inside it; see that type for why the distinction is worth
+// a type.
+func commandError(ctx context.Context, args []string, stderr string, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -309,6 +313,9 @@ func commandError(args []string, stderr string, err error) error {
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		cmdErr.ExitCode = exitErr.ExitCode()
+	}
+	if ctx.Err() != nil {
+		return &interruptedError{Op: verb(args), Err: ctx.Err(), Cmd: cmdErr}
 	}
 	return cmdErr
 }

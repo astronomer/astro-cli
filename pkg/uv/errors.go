@@ -1,6 +1,7 @@
 package uv
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -20,6 +21,67 @@ type VersionError struct {
 
 func (e *VersionError) Error() string {
 	return fmt.Sprintf("uv %s at %s is older than the minimum supported %s; upgrade uv", e.Version, e.Bin, e.Min)
+}
+
+// interruptedError reports a uv invocation cut short by its context.
+//
+// It exists because the summary was wrong for this case and could not be made
+// right: uv is killed partway through, so what it wrote is a half-finished
+// progress line rather than a reason, and the summariser — correctly, with no
+// diagnostic to find — falls back to that line. "uv sync failed (exit -1):
+// Creating virtual environment at: .venv" describes a failure that did not
+// happen and blames a step that was going fine.
+//
+// Canceled and DeadlineExceeded are told apart, because they are not the same
+// event to the person reading: one is somebody pressing Ctrl-C, the other is a
+// bound the caller set being reached, and "interrupted" is only true of the
+// first. An embedder wrapping a sync in context.WithTimeout gets a message
+// that says so.
+//
+// The CommandError is kept rather than replaced. A cancel can land while uv is
+// in the middle of a real failure, and a caller that reaches for the exit code
+// or the captured stderr — cmd/local/preflight.go asks errors.As for a
+// *ResolutionError to build a constraint conflict — should still find it.
+// Unwrap returns both, so errors.Is(err, context.Canceled) and
+// errors.As(err, &cmdErr) are both true.
+type interruptedError struct {
+	// Op is the uv verb that was running.
+	Op string
+	// Err is context.Canceled or context.DeadlineExceeded.
+	Err error
+	// Cmd is what the invocation itself reported, kept for a caller that
+	// wants the exit code or the stderr behind it.
+	Cmd *CommandError
+}
+
+func (e *interruptedError) Error() string {
+	if errors.Is(e.Err, context.DeadlineExceeded) {
+		return "uv " + e.Op + " ran out of time"
+	}
+	return "uv " + e.Op + " was interrupted"
+}
+
+// Unwrap returns both causes: the context's error and the command's own.
+func (e *interruptedError) Unwrap() []error {
+	if e.Cmd == nil {
+		return []error{e.Err}
+	}
+	return []error{e.Err, e.Cmd}
+}
+
+// verb is the uv subcommand in an argument list, skipping the global flags the
+// runner prepends and any value they carry.
+func verb(args []string) string {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+		if globalFlagValues[a] {
+			i++
+		}
+	}
+	return strings.Join(args, " ")
 }
 
 // CommandError reports a uv invocation that failed. Stderr always carries
@@ -49,20 +111,7 @@ func (e *CommandError) Unwrap() error { return e.Err }
 // word following one of them is not the subcommand either.
 var globalFlagValues = map[string]bool{"--color": true}
 
-// verb is the uv subcommand, skipping the global flags the runner prepends and
-// any value they carry.
-func (e *CommandError) verb() string {
-	for i := 0; i < len(e.Args); i++ {
-		a := e.Args[i]
-		if !strings.HasPrefix(a, "-") {
-			return a
-		}
-		if globalFlagValues[a] {
-			i++
-		}
-	}
-	return strings.Join(e.Args, " ")
-}
+func (e *CommandError) verb() string { return verb(e.Args) }
 
 // summarize picks the part of uv's stderr worth putting on one line.
 //

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -122,7 +121,7 @@ func TestStartNamesTheLogTheCallerAskedFor(t *testing.T) {
 // interrupted with Ctrl-C deliberately leaves Airflow coming up — so the exit
 // check must not turn that into an error about a dead child.
 func TestStartStillReportsCancellationAsCancellation(t *testing.T) {
-	e, _, _ := testEngine(t)
+	e, procs, _ := testEngine(t)
 	p := testPlan(t)
 	e.healthTimeout = time.Hour
 	e.health = neverHealthy
@@ -136,6 +135,15 @@ func TestStartStillReportsCancellationAsCancellation(t *testing.T) {
 	_, err := e.Start(ctx, p, rt.Callbacks{})
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, context.Canceled), "got %v", err)
-	assert.False(t, strings.Contains(err.Error(), "exited while starting"),
-		"a canceled start is not an exited one")
+
+	// Asserted on what the start decided, not on a phrase the message no
+	// longer has any way to contain. This used to check that the text did not
+	// say "exited while starting", which stopped being able to fail once a
+	// canceled start got an error type of its own: the string is unreachable
+	// by construction, so the guard passed for the wrong reason. Whether the
+	// cancellation was mistaken for a dead child is visible in the outcome —
+	// a dead child is torn down, a canceled start is left running and says so.
+	assert.Contains(t, err.Error(), "still starting",
+		"a canceled start leaves Airflow coming up, and the message says which outcome it took")
+	assert.True(t, procs.alive[fakePID], "a canceled start is not an exited one")
 }

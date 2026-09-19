@@ -166,7 +166,7 @@ func checkHealth(ctx context.Context, port string, timeout time.Duration, cfg ai
 // health the process group is killed and the record cleared — leaving them
 // would make the next Start mistake a reused PID for a running Airflow
 // (desktop's PID-reuse-after-failed-health bug).
-func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airflow, error) {
+func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.Airflow, err error) {
 	if p.Mode != rt.ModeStandalone {
 		return nil, fmt.Errorf("localstandalone got a %q plan", p.Mode)
 	}
@@ -178,6 +178,18 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, err
 	}
 	rt.OnState(cb, rt.StateStarting, nil)
+	// Every failure from here on reports StateError, once, with whatever error
+	// is actually returned — the same deferred emit localdocker.Start uses,
+	// for the reason its comment gives: emitting per site covers the exits
+	// somebody noticed and leaves the rest ending the stream on "starting",
+	// where a consumer has to read silence as failure. This engine had one
+	// such emit, on the failed-health path, and a dozen exits without one,
+	// including both ways an interrupt leaves.
+	defer func() {
+		if err != nil {
+			rt.OnState(cb, rt.StateError, err)
+		}
+	}()
 
 	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
@@ -227,6 +239,16 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 		return nil, err
 	}
 
+	// Asked between the sync finishing and the launch, because that gap is
+	// real: uv can complete successfully in the same moment the signal
+	// arrives, and a successful command reports no error whatever the context
+	// says. Without this an interrupt during the sync went on to start an
+	// Airflow nobody asked for, and the branch below then left it running —
+	// the opposite of what an interrupt during provisioning promises.
+	if ctx.Err() != nil {
+		return nil, &startInterrupted{err: ctx.Err(), left: "Airflow was not started"}
+	}
+
 	env := e.buildEnv(p, projectPath, stateDir, airflowHome, port)
 	pid, err := e.launch(projectPath, env, bin, args...)
 	if err != nil {
@@ -272,29 +294,93 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (rt.Airf
 	if major == "2" {
 		cfg.AirflowMajorVersion = "2"
 	}
-	if err := e.waitHealthy(ctx, rec, strconv.Itoa(port), cfg, logPath); err != nil {
-		if ctx.Err() != nil {
-			// Canceled, not unhealthy: leave Airflow starting in the
-			// background, recorded AND routed, the same shape as docker mode —
-			// `astro local stop` reaps all of it. The daemon is not started
-			// here, so the named URL begins answering when the next command
-			// brings it up; the route it needs is already there.
-			return nil, ctx.Err()
-		}
-		e.killGroup(pid, syscall.SIGTERM)
-		// The route goes with the record now that it was added above. Leaving
-		// it would point the proxy at a port this engine has just killed, and
-		// the next project to take that port would answer for this hostname.
-		if rmErr := errors.Join(localshared.RemoveRoute(e.routes, rec.Hostname), localstate.Remove(projectPath)); rmErr != nil {
-			err = errors.Join(err, rmErr)
-		}
-		rt.OnState(cb, rt.StateError, err)
-		return nil, err
+	if healthErr := e.waitHealthy(ctx, rec, strconv.Itoa(port), cfg, logPath); healthErr != nil {
+		return nil, e.afterFailedHealth(ctx, p, rec, healthErr)
 	}
 
 	localshared.EnsureDaemon(e.daemon, cb, e.now(), rec.Hostname)
 	rt.OnState(cb, rt.StateRunning, nil)
 	return &airflow{eng: e, rec: rec}, nil
+}
+
+// afterFailedHealth decides what a start that never became healthy leaves
+// behind, and returns the error that says so.
+//
+// Canceled with the runtime up and nothing about to reap it: leave Airflow
+// starting in the background, recorded AND routed, the same shape as docker
+// mode — `astro local stop` reaps all of it. The daemon is not started here,
+// so the named URL begins answering when the next command brings it up; the
+// route it needs is already there.
+//
+// Both of the other conditions are load-bearing, and claiming the runtime
+// survives without checking them was wrong twice over:
+//
+//   - StopWithSession armed the supervisor's parent watch, so Airflow is
+//     killed the moment this process exits. Telling the reader it is still
+//     starting is false by the time they read it, and the record left behind
+//     turns up as "stopped (stale)".
+//   - A start can be canceled in the same moment Airflow dies of its own
+//     accord. waitHealthy knows — it returns "Airflow exited while starting"
+//     with the log path — and preferring the cancellation threw that away to
+//     announce a runtime that is not there.
+//
+// Either way the teardown is what should run, and the error it reports is the
+// one that says what happened.
+func (e *Engine) afterFailedHealth(ctx context.Context, p rt.Plan, rec localstate.Record, healthErr error) error {
+	if ctx.Err() != nil && !p.StopWithSession && e.groupAlive(rec) {
+		return &startInterrupted{err: ctx.Err(), left: leftRunning(rec.Port)}
+	}
+	e.killGroup(rec.PID, syscall.SIGTERM)
+	// The route goes with the record now that it is added before the wait.
+	// Leaving it would point the proxy at a port this engine has just killed,
+	// and the next project to take that port would answer for this hostname.
+	err := healthErr
+	if rmErr := errors.Join(localshared.RemoveRoute(e.routes, rec.Hostname), localstate.Remove(rec.ProjectPath)); rmErr != nil {
+		err = errors.Join(err, rmErr)
+	}
+	// An interrupt that lands on a session-tied start is still an interrupt,
+	// and saying so beats reporting the health wait's own cancellation. When
+	// Airflow died instead, err already says that and names the log, which is
+	// better than anything this could add.
+	if ctx.Err() != nil && p.StopWithSession {
+		return &startInterrupted{err: ctx.Err(), left: "Airflow was stopped with this session"}
+	}
+	return err
+}
+
+// startInterrupted reports a start cut short by a canceled context, and says
+// what the interrupt left behind.
+//
+// What it left is the whole point. "context canceled" names a Go value and
+// describes the mechanism; a start can be interrupted before Airflow exists,
+// after it is up and staying up, or after it is up and about to be reaped with
+// the session, and those are three different things for the person deciding
+// what to do next. So the outcome is a field rather than something the reader
+// is left to infer.
+//
+// Unwraps to the context's error, so errors.Is(err, context.Canceled) still
+// holds for anything deciding whether this was a cancellation.
+type startInterrupted struct {
+	err error
+	// left says what is true now, in the words the reader needs.
+	left string
+}
+
+func (e *startInterrupted) Error() string { return "interrupted: " + e.left }
+
+func (e *startInterrupted) Unwrap() error { return e.err }
+
+// leftRunning is what an interrupt leaves when Airflow is up and nothing is
+// going to reap it.
+//
+// The port rather than the hostname, because the hostname is the one that
+// might not answer yet: the proxy daemon is not started on this path, so the
+// named URL begins working when the next command brings it up, while the port
+// answers as soon as Airflow finishes its own startup.
+func leftRunning(port int) string {
+	return fmt.Sprintf(
+		"Airflow is still starting on port %d — `astro local status` shows it, `astro local stop` ends it",
+		port)
 }
 
 // checkNotRunning refuses to start over a live record. A dead record is

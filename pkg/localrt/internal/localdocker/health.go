@@ -35,6 +35,19 @@ func healthURLs(port int, major string) []string {
 	return urls
 }
 
+// interrupted reports a health wait cut short by a canceled context.
+//
+// Unwraps to the context's error, so errors.Is(err, context.Canceled) still
+// holds for anything deciding whether this was a cancellation.
+type interrupted struct{ err error }
+
+func (e *interrupted) Error() string {
+	return "interrupted: the containers keep starting in the background — " +
+		"`astro local logs` shows their progress, `astro local stop` ends them"
+}
+
+func (e *interrupted) Unwrap() error { return e.err }
+
 // waitHealthy polls the urls until one returns 200, the timeout passes, or
 // ctx is canceled. Ported from v1's checkWebserverHealth, minus the printing.
 func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) error {
@@ -49,7 +62,14 @@ func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) erro
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				return fmt.Errorf("%w after %s; the containers keep starting in the background — `astro local logs` shows their progress", ErrHealthTimeout, timeout)
 			}
-			return ctx.Err()
+			// The same thing the deadline branch above says, for the same
+			// reason, because the same thing is true: Start published the
+			// record and the route before this wait and does not tear them
+			// down on the way out, so the containers keep coming up. Returning
+			// the context's error bare said "context canceled" — the name of a
+			// Go value — to somebody who had just pressed Ctrl-C and could not
+			// tell from it whether an Airflow was now running.
+			return &interrupted{err: ctx.Err()}
 		case <-ticker.C:
 			for _, url := range urls {
 				if healthOK(ctx, client, url) {
