@@ -133,23 +133,29 @@ func (c *Client) EnsureSynced(ctx context.Context, project, python string, stdio
 	}
 
 	if err := c.Sync(ctx, project, python, stdio); err != nil {
-		var re *ResolutionError
-		if errors.As(err, &re) || ctx.Err() != nil {
-			// The solver is deterministic — a fresh venv cannot change
-			// its answer — and a canceled context is not a poisoned venv.
+		if ctx.Err() != nil {
+			// A canceled sync leaves the venv unfinished rather than
+			// unreadable, and the retry below would run under the same dead
+			// context.
 			return err
 		}
-		if isTLSTrustFailure(stderrOf(err)) {
-			// Sync already tried the platform trust store and the chain was
-			// refused both ways. A wipe cannot change which roots the machine
-			// trusts, so retrying here only spends another full resolve and
-			// download to reach the same refusal — and the two retries compose,
-			// turning one provisioning attempt into four fetches on exactly the
-			// link least able to afford them.
+		// Retried only for the failure a clean tree actually fixes. Everything
+		// else — a typo in pyproject.toml, a 401 from a private index, a full
+		// disk — survives a wipe unchanged, so deleting the environment only
+		// spends a full reinstall on the way to the identical error, and costs
+		// the environment to get there.
+		if !isPoisonedVenv(stderrOf(err)) {
 			return err
 		}
 		if rmErr := os.RemoveAll(venv); rmErr != nil {
 			return errors.Join(err, fmt.Errorf("removing venv for retry: %w", rmErr))
+		}
+		// After the delete and before the second sync: a delete that failed
+		// returns above, so this never announces a retry that does not happen,
+		// and the expensive half is still ahead, so a consumer hears about the
+		// wait while there is still a wait to explain.
+		if c.opts.OnSyncRetry != nil {
+			c.opts.OnSyncRetry(err)
 		}
 		if err := c.Sync(ctx, project, python, stdio); err != nil {
 			return err
@@ -335,6 +341,21 @@ func (c *Client) run(ctx context.Context, project string, env []string, stdio St
 	// to hold anything.
 	err := normalizeWaitError(cmd.Run())
 	return stderrTail.String(), err
+}
+
+// isPoisonedVenv reports whether stderr is uv failing to read back something it
+// previously installed. That is the one sync failure deleting the venv fixes:
+// uv records an install inside the tree, so a half-written one makes later syncs
+// fail on state nothing but a clean tree clears.
+//
+// Deliberately narrow, and narrower than the hazard's reputation. Against uv
+// 0.11 a missing RECORD is a warning it recovers from, a corrupt METADATA is
+// ignored, a deleted interpreter makes it rebuild the environment, and a
+// garbage pyvenv.cfg is tolerated — the case that actually fails is a dist-info
+// it cannot read, reported as "Failed to read metadata from: <path>". Matching
+// wider than that spends a working environment to reach the same error twice.
+func isPoisonedVenv(stderr string) bool {
+	return strings.Contains(strings.ToLower(stderr), "failed to read metadata")
 }
 
 // isTLSTrustFailure reports whether stderr is uv refusing a certificate chain,

@@ -95,6 +95,32 @@ type Options struct {
 	// healthy one. A callback rather than a log line: this package does not
 	// print.
 	OnCertFallback func()
+
+	// OnSyncRetry, when set, is called by EnsureSynced once it has deleted a
+	// venv a sync failed against and is about to sync a second time, with the
+	// failure that prompted it.
+	//
+	// Named for the retry rather than the wipe because that is what it reports.
+	// EnsureSynced also deletes an unmarked venv up front, silently, and this
+	// does not fire for that one.
+	//
+	// Worth reporting because the retry is not free: it is a second resolve,
+	// and where the first one downloaded, a second download. On a slow link
+	// that doubles a first start, and nothing else distinguishes it from one
+	// unusually slow sync.
+	//
+	// Called after the delete has succeeded and before the second sync starts,
+	// so it never announces a retry that does not happen — a failed delete
+	// returns instead — and never waits until the cost has already been paid.
+	//
+	// cause is the first sync's error. Its stderr has already reached
+	// Stdio.Err if one was supplied, and Error() renders only uv's last line,
+	// so a consumer wanting the whole diagnosis should read CommandError.Stderr
+	// rather than assume this is short.
+	//
+	// May be called from any goroutine, and concurrently when one Client serves
+	// several projects; an implementation has to be safe for that.
+	OnSyncRetry func(cause error)
 }
 
 // Client is a resolved, version-checked uv binary plus the options every

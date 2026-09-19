@@ -79,7 +79,7 @@ type Engine struct {
 	daemon rt.ProxyDaemon
 
 	cmd       Commander
-	uv        func(ctx context.Context) (venvSyncer, error)
+	uv        func(ctx context.Context, emit func(rt.LogLine)) (venvSyncer, error)
 	launch    launchFunc
 	prepAF2   func(projectPath string) error
 	health    func(ctx context.Context, port string, timeout time.Duration, cfg airflowrt.HealthCheckConfig) error
@@ -99,11 +99,6 @@ type Engine struct {
 // does. The cache directory is deliberately absent: it is shared across
 // projects and consumers so a Python toolchain downloads once, so the engine
 // owns it.
-type UVOptions struct {
-	HermeticEnv    bool
-	OnCertFallback func()
-}
-
 // New builds the production engine. routesDir is where pkg/proxy keeps
 // routes.json (~/.astro/proxy); the composition root supplies it because
 // this package must not read config.
@@ -133,8 +128,8 @@ func New(routesDir string, daemon rt.ProxyDaemon, uvOpts UVOptions) *Engine {
 // every other operation (status, stop, logs) works on a machine whose uv
 // disappeared. The cache dir is shared across projects under the astro
 // cache root, so Python toolchains and wheels download once.
-func uvClientFactory(opts UVOptions) func(context.Context) (venvSyncer, error) {
-	return func(ctx context.Context) (venvSyncer, error) {
+func uvClientFactory(opts UVOptions) func(context.Context, func(rt.LogLine)) (venvSyncer, error) {
+	return func(ctx context.Context, emit func(rt.LogLine)) (venvSyncer, error) {
 		root, err := rt.CacheRoot()
 		if err != nil {
 			return nil, err
@@ -143,6 +138,18 @@ func uvClientFactory(opts UVOptions) func(context.Context) (venvSyncer, error) {
 			CacheDir:       filepath.Join(root, "uv"),
 			HermeticEnv:    opts.HermeticEnv,
 			OnCertFallback: opts.OnCertFallback,
+			// Reported through the start's own progress channel rather than a
+			// hook on the runtime, because that is what it is: one event in one
+			// start. A construction-time callback would carry no project — the
+			// consumer builds one Runtime and starts every project through it —
+			// and would interleave unpredictably with the uv output it belongs
+			// beside, which travels this way already.
+			OnSyncRetry: func(cause error) {
+				emit(rt.LogLine{
+					Component: "uv",
+					Text:      "the environment could not be synced, so it was rebuilt from scratch and is being installed again: " + cause.Error(),
+				})
+			},
 		})
 	}
 }
@@ -315,14 +322,23 @@ func (e *Engine) checkNotRunning(projectPath string) error {
 // installs with metadata errors — desktop's uv-metadata-poisoning bug,
 // handled in pkg/uv).
 func (e *Engine) syncVenv(ctx context.Context, projectPath, python string, cb rt.Callbacks) error {
-	client, err := e.uv(ctx)
+	// One emitter for everything this step reports, so uv's own output and the
+	// notices about it arrive on the same channel, in order, stamped by the
+	// same clock. A line that already carries a time keeps it.
+	emit := func(l rt.LogLine) {
+		if l.Time.IsZero() {
+			l.Time = e.now()
+		}
+		if cb.OnLine != nil {
+			cb.OnLine(l)
+		}
+	}
+	client, err := e.uv(ctx, emit)
 	if err != nil {
 		return err
 	}
 	w := &rt.LineWriter{Emit: func(line string) {
-		if cb.OnLine != nil {
-			cb.OnLine(rt.LogLine{Component: "uv", Time: e.now(), Text: line})
-		}
+		emit(rt.LogLine{Component: "uv", Text: line})
 	}}
 	err = client.EnsureSynced(ctx, projectPath, python, uv.Stdio{Out: w, Err: w})
 	w.Flush()

@@ -82,7 +82,7 @@ func testEngine(t *testing.T) (*Engine, *fakeProcs, *[]string) {
 	procs := &fakeProcs{alive: map[int]bool{}}
 	var launches []string
 	e := New(filepath.Join(t.TempDir(), "proxy"), nil, UVOptions{})
-	e.uv = func(context.Context) (venvSyncer, error) { return fakeUV{}, nil }
+	e.uv = func(context.Context, func(rt.LogLine)) (venvSyncer, error) { return fakeUV{}, nil }
 	e.launch = func(_ string, _ []string, name string, args ...string) (int, error) {
 		launches = append(launches, name+" "+strings.Join(args, " "))
 		procs.alive[fakePID] = true
@@ -297,7 +297,7 @@ func TestStartWithoutAirflowInVenv(t *testing.T) {
 	e, _, launches := testEngine(t)
 	// A syncer that produces no airflow binary (a pyproject without an
 	// Airflow distribution) fails before anything launches.
-	e.uv = func(context.Context) (venvSyncer, error) {
+	e.uv = func(context.Context, func(rt.LogLine)) (venvSyncer, error) {
 		return syncerFunc(func(_ context.Context, project, _ string, _ uv.Stdio) error {
 			return os.MkdirAll(filepath.Join(project, ".venv", "bin"), 0o755)
 		}), nil
@@ -317,7 +317,7 @@ func (f syncerFunc) EnsureSynced(ctx context.Context, project, python string, st
 func TestUVFailureSurfaces(t *testing.T) {
 	e, _, _ := testEngine(t)
 	uvErr := errors.New("no solution found")
-	e.uv = func(context.Context) (venvSyncer, error) {
+	e.uv = func(context.Context, func(rt.LogLine)) (venvSyncer, error) {
 		return fakeUV{err: uvErr}, nil
 	}
 	p := testPlan(t)

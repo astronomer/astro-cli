@@ -236,7 +236,8 @@ if [ "$c" -eq 0 ]; then
 fi
 mkdir -p .venv
 exit 0`
-	c := newTestClient(t, Options{}, body)
+	var retries []error
+	c := newTestClient(t, Options{OnSyncRetry: func(cause error) { retries = append(retries, cause) }}, body)
 
 	if err := c.EnsureSynced(t.Context(), project, "", Stdio{}); err != nil {
 		t.Fatal(err)
@@ -244,11 +245,115 @@ exit 0`
 	if got := readCount(t, countFile); got != "2" {
 		t.Errorf("sync ran %s times, want 2 (fail, wipe, retry)", got)
 	}
+	// The retry is a second resolve and download, so it is reported — and with
+	// the failure that caused it, since "doing this again" is worth little
+	// without what went wrong the first time.
+	if len(retries) != 1 {
+		t.Fatalf("OnSyncRetry called %d times, want 1", len(retries))
+	}
+	if !strings.Contains(retries[0].Error(), "Failed to read metadata") {
+		t.Errorf("cause = %v, want the failure that prompted the retry", retries[0])
+	}
 	if _, err := os.Stat(filepath.Join(project, ".venv", "junk")); !errors.Is(err, os.ErrNotExist) {
 		t.Error("poisoned venv contents survived the retry wipe")
 	}
 	if _, err := os.Stat(filepath.Join(project, ".venv", markerName)); err != nil {
 		t.Errorf("marker not written after retry: %v", err)
+	}
+}
+
+func TestAFailureTheTreeCannotFixKeepsTheVenv(t *testing.T) {
+	// A typo in pyproject.toml, a 401 from a private index, a full disk: none
+	// of them are anything a clean tree fixes, and deleting the environment to
+	// run the identical failing sync again costs a full reinstall to arrive at
+	// the same error. The venv has to survive.
+	for _, tc := range []struct {
+		name   string
+		stderr string
+	}{
+		{"a manifest uv cannot parse", "error: Failed to parse `pyproject.toml`"},
+		{"an index that refuses us", "error: Failed to fetch: HTTP status client error (401 Unauthorized)"},
+		{"a full disk", "error: failed to write wheel: No space left on device (os error 28)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			project := t.TempDir()
+			venv := filepath.Join(project, ".venv")
+			if err := os.MkdirAll(venv, 0o750); err != nil {
+				t.Fatal(err)
+			}
+			// Marked and holding something, so its survival is observable.
+			for _, name := range []string{markerName, "keep-me"} {
+				if err := os.WriteFile(filepath.Join(venv, name), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			countFile := filepath.Join(t.TempDir(), "count")
+			retries := 0
+			body := `c=0
+[ -f "` + countFile + `" ] && c=$(cat "` + countFile + `")
+echo $((c+1)) > "` + countFile + `"
+echo "` + tc.stderr + `" >&2
+exit 1`
+			c := newTestClient(t, Options{OnSyncRetry: func(error) { retries++ }}, body)
+
+			if err := c.EnsureSynced(t.Context(), project, "", Stdio{}); err == nil {
+				t.Fatal("EnsureSynced() = nil, want the failure reported")
+			}
+
+			if _, err := os.Stat(filepath.Join(venv, "keep-me")); err != nil {
+				t.Errorf("the venv was destroyed by a failure a clean tree cannot fix: %v", err)
+			}
+			if got := readCount(t, countFile); got != "1" {
+				t.Errorf("sync ran %s times, want 1 — a second one reaches the same error", got)
+			}
+			if retries != 0 {
+				t.Errorf("OnSyncRetry called %d times, want 0", retries)
+			}
+		})
+	}
+}
+
+func TestAFailedWipeAnnouncesNoRetry(t *testing.T) {
+	// The rule the notice depends on: it may only describe a retry that
+	// actually follows. The wipe can fail — a read-only mount, a file owned by
+	// someone else — and then EnsureSynced returns instead of syncing again, so
+	// a notice sent before the delete would have described a second install
+	// that never ran.
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores the directory permissions this relies on")
+	}
+	project := t.TempDir()
+	venv := filepath.Join(project, ".venv")
+	if err := os.MkdirAll(venv, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// Marked, so it survives the up-front wipe and reaches the retry path.
+	if err := os.WriteFile(filepath.Join(venv, markerName), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	retries := 0
+	c := newTestClient(t, Options{OnSyncRetry: func(error) { retries++ }},
+		"echo \"error: Failed to read metadata from installed package\" >&2\nexit 1")
+
+	// Read-only project directory: the sync fails, and the delete of .venv
+	// inside it cannot succeed.
+	if err := os.Chmod(project, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(project, 0o750) })
+
+	err := c.EnsureSynced(t.Context(), project, "", Stdio{})
+
+	if err == nil {
+		t.Fatal("EnsureSynced() = nil, want the failure that could not be recovered")
+	}
+	if !strings.Contains(err.Error(), "removing venv for retry") {
+		t.Errorf("error = %v, want it to name the wipe that failed", err)
+	}
+	if retries != 0 {
+		t.Errorf("OnSyncRetry called %d times although nothing was retried, want 0", retries)
 	}
 }
 
@@ -260,9 +365,17 @@ func TestEnsureSyncedDoesNotRetryResolutionErrors(t *testing.T) {
 echo $((c+1)) > "` + countFile + `"
 cat "` + fixturePath(t) + `" >&2
 exit 1`
-	c := newTestClient(t, Options{}, body)
+	retries := 0
+	c := newTestClient(t, Options{OnSyncRetry: func(error) { retries++ }}, body)
 
 	err := c.EnsureSynced(t.Context(), project, "", Stdio{})
+
+	// Nothing was retried, so nothing may say one was: a notice for a cost
+	// nobody paid sends the next reader hunting a doubled install that never
+	// happened.
+	if retries != 0 {
+		t.Errorf("OnSyncRetry called %d times for a refused dependency set, want 0", retries)
+	}
 
 	var resErr *ResolutionError
 	if !errors.As(err, &resErr) {
@@ -697,9 +810,16 @@ mkdir -p .venv
 echo "error: Failed to fetch: https://pypi.org/simple/apache-airflow/" >&2
 echo "  Caused by: invalid peer certificate: UnknownIssuer" >&2
 exit 2`
-	c := newTestClient(t, Options{}, body)
+	retries := 0
+	c := newTestClient(t, Options{OnSyncRetry: func(error) { retries++ }}, body)
 
 	err := c.EnsureSynced(t.Context(), t.TempDir(), "", Stdio{})
+
+	// A wipe cannot change which roots a machine trusts, so no retry happens
+	// here — and nothing may claim one did.
+	if retries != 0 {
+		t.Errorf("OnSyncRetry called %d times for a refused certificate chain, want 0", retries)
+	}
 
 	if err == nil {
 		t.Fatal("EnsureSynced() error = nil, want the trust failure")
