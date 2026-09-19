@@ -384,13 +384,19 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 // or both — then render the result. The v2 logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
 func deployV2(cmd *cobra.Command, args []string) error {
-	if err := refuseFlagsV2DeployIgnores(cmd); err != nil {
-		cmd.SilenceUsage = true
-		return err
-	}
+	// The format is read before the flag refusals so that they can be
+	// reported through deployV2Err like every other v2 deploy failure.
+	// Refusing first meant `astro deploy --pytest --output json` exited 1
+	// with an empty stdout and plain text on stderr, while every other
+	// refusal on this path published {"error":..., "code":1} — so a script
+	// that reads stdout to find out what went wrong got nothing, which is the
+	// same silence these refusals exist to break.
 	format, err := parseDeployFormat(deployOutput)
 	if err != nil {
 		return err
+	}
+	if rerr := refuseFlagsV2DeployIgnores(cmd); rerr != nil {
+		return deployV2Err(cmd, format, rerr)
 	}
 
 	out := cmd.OutOrStdout()
