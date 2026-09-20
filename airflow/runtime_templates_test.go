@@ -193,6 +193,119 @@ func (s *RuntimeTemplateSuite) TestInitFromTemplate() {
 	})
 }
 
+func (s *RuntimeTemplateSuite) TestExtractTarGzContainment() {
+	// tarEntry describes a single archive member for the crafted tarballs below.
+	type tarEntry struct {
+		Name     string
+		Body     string
+		Typeflag byte
+		Linkname string
+	}
+
+	buildTarGz := func(entries []tarEntry) *bytes.Buffer {
+		buffer := new(bytes.Buffer)
+		gzipWriter := gzip.NewWriter(buffer)
+		tw := tar.NewWriter(gzipWriter)
+		for _, entry := range entries {
+			hdr := &tar.Header{
+				Name:     entry.Name,
+				Mode:     0o600,
+				Typeflag: entry.Typeflag,
+				Linkname: entry.Linkname,
+			}
+			if entry.Typeflag == tar.TypeReg {
+				hdr.Size = int64(len(entry.Body))
+			}
+			s.NoError(tw.WriteHeader(hdr))
+			if entry.Typeflag == tar.TypeReg {
+				_, err := tw.Write([]byte(entry.Body))
+				s.NoError(err)
+			}
+		}
+		s.NoError(tw.Close())
+		s.NoError(gzipWriter.Close())
+		return buffer
+	}
+
+	s.Run("rejects an entry that escapes the destination via ../", func() {
+		parent, err := os.MkdirTemp("", "escape")
+		s.NoError(err)
+		defer os.RemoveAll(parent)
+		dest := filepath.Join(parent, "dest")
+		s.NoError(os.MkdirAll(dest, 0o755))
+
+		buf := buildTarGz([]tarEntry{
+			{Name: "repo/tmpl/../../escape.txt", Body: "pwned", Typeflag: tar.TypeReg},
+		})
+
+		err = extractTarGz(buf, dest, "tmpl")
+		s.Error(err)
+		s.Contains(err.Error(), "escapes destination directory")
+
+		// Nothing should have been written outside dest.
+		exists, err := fileutil.Exists(filepath.Join(parent, "escape.txt"), nil)
+		s.NoError(err)
+		s.False(exists)
+	})
+
+	s.Run("rejects an entry with an absolute path", func() {
+		parent, err := os.MkdirTemp("", "abs")
+		s.NoError(err)
+		defer os.RemoveAll(parent)
+		dest := filepath.Join(parent, "dest")
+		s.NoError(os.MkdirAll(dest, 0o755))
+
+		buf := buildTarGz([]tarEntry{
+			{Name: "repo/tmpl//etc/evil.txt", Body: "pwned", Typeflag: tar.TypeReg},
+		})
+
+		err = extractTarGz(buf, dest, "tmpl")
+		s.Error(err)
+		s.Contains(err.Error(), "absolute paths are not allowed")
+	})
+
+	s.Run("rejects a symlink entry", func() {
+		parent, err := os.MkdirTemp("", "symlink")
+		s.NoError(err)
+		defer os.RemoveAll(parent)
+		dest := filepath.Join(parent, "dest")
+		s.NoError(os.MkdirAll(dest, 0o755))
+
+		buf := buildTarGz([]tarEntry{
+			{Name: "repo/tmpl/link", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
+		})
+
+		err = extractTarGz(buf, dest, "tmpl")
+		s.Error(err)
+		s.Contains(err.Error(), "symlinks and hardlinks are not allowed")
+
+		exists, err := fileutil.Exists(filepath.Join(dest, "link"), nil)
+		s.NoError(err)
+		s.False(exists)
+	})
+
+	s.Run("extracts a well-formed archive", func() {
+		dest, err := os.MkdirTemp("", "happy")
+		s.NoError(err)
+		defer os.RemoveAll(dest)
+
+		buf := buildTarGz([]tarEntry{
+			{Name: "repo/tmpl/dags", Typeflag: tar.TypeDir},
+			{Name: "repo/tmpl/dags/dag.py", Body: "print('hi')", Typeflag: tar.TypeReg},
+			{Name: "repo/tmpl/file1.txt", Body: "Hello", Typeflag: tar.TypeReg},
+		})
+
+		err = extractTarGz(buf, dest, "tmpl")
+		s.NoError(err)
+
+		for _, file := range []string{"dags/dag.py", "file1.txt"} {
+			exists, err := fileutil.Exists(filepath.Join(dest, file), nil)
+			s.NoError(err)
+			s.True(exists)
+		}
+	})
+}
+
 func createMockTarballInMemory() (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	gzipWriter := gzip.NewWriter(buffer)
