@@ -510,3 +510,35 @@ func (r *result) requireJSON(v any) {
 		r.t.Fatalf("stdout is not the JSON payload it claims to be: %v\n%s", err, r.output())
 	}
 }
+
+// requireLastJSON decodes the LAST line of stdout into v, for the commands that
+// stream.
+//
+// A streaming surface emits NDJSON — one object per line, progress then result
+// — so requireJSON's "stdout is only the payload" is the wrong assertion there
+// and fails on the first build log. Each line still has to parse, because a
+// half-written object in the middle of a stream is a consumer's problem too;
+// only the last one is decoded into v.
+func (r *result) requireLastJSON(v any) {
+	r.t.Helper()
+	lines := strings.Split(strings.TrimSpace(r.Stdout), "\n")
+	var last string
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var probe any
+		if err := json.Unmarshal([]byte(line), &probe); err != nil {
+			r.t.Fatalf("stdout line %d is not JSON, so this is not a clean NDJSON stream: %v\n%s",
+				i+1, err, r.output())
+		}
+		last = line
+	}
+	if last == "" {
+		r.t.Fatalf("stdout carried no JSON at all\n%s", r.output())
+	}
+	if err := json.Unmarshal([]byte(last), v); err != nil {
+		r.t.Fatalf("the last stdout line does not decode into the expected shape: %v\n%s", err, r.output())
+	}
+}
