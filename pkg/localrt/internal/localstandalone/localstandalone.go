@@ -423,6 +423,36 @@ func (e *Engine) checkNotRunning(projectPath string) error {
 	return nil
 }
 
+// Sync provisions the project environment and stops there — Start's first
+// step, on its own.
+//
+// Deliberately does NOT require a record or refuse a running project. A
+// project nobody has started is the case this exists for, and a caller that
+// wants packages added to a LIVE Airflow wants HotInstall, which leaves the
+// scheduler up. Running this against a running project rebuilds the venv
+// underneath it, which is the caller's decision to make and not one this can
+// tell apart from the ordinary case.
+func (e *Engine) Sync(ctx context.Context, p rt.Plan, cb rt.Callbacks) (err error) {
+	if p.Mode != "" && p.Mode != rt.ModeStandalone {
+		return fmt.Errorf("localstandalone got a %q plan", p.Mode)
+	}
+	projectPath, err := filepath.Abs(p.ProjectPath)
+	if err != nil {
+		return fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
+	}
+	// Reported the way Start reports, for the reason Start's own comment
+	// gives: a consumer wiring one set of Callbacks cannot be left reading
+	// silence as either outcome. This is a shorter sequence than a start, but
+	// it is the same minutes of resolve and download behind it.
+	rt.OnState(cb, rt.StateStarting, nil)
+	defer func() {
+		if err != nil {
+			rt.OnState(cb, rt.StateError, err)
+		}
+	}()
+	return e.syncVenv(ctx, projectPath, p.PythonVersion, cb)
+}
+
 // syncVenv provisions <project>/.venv via uv. EnsureSynced carries the
 // completion marker and wipe-and-retry that recover poisoned venvs (uv
 // tracks installs inside the venv, so an interrupted run fails later
@@ -846,6 +876,12 @@ func (a *airflow) Run(ctx context.Context, argv []string, s rt.Stdio) error {
 	}
 	bin := airflowrt.ResolveInEnvPath(argv[0], env)
 	return a.eng.cmd.Run(ctx, a.rec.ProjectPath, env, s, bin, argv[1:]...)
+}
+
+// Env hands out the environment Run and Shell use, for a caller that runs
+// its own process in it rather than asking the engine to.
+func (a *airflow) Env() ([]string, error) {
+	return a.eng.shellEnv(a.rec)
 }
 
 // Shell opens an interactive shell inside the project's Airflow

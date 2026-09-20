@@ -255,6 +255,7 @@ func (fakeAirflow) Status() (localrt.Status, error)                    { return 
 func (fakeAirflow) Logs(context.Context, localrt.LogOptions) error     { return nil }
 func (fakeAirflow) Run(context.Context, []string, localrt.Stdio) error { return nil }
 func (fakeAirflow) Shell(context.Context, localrt.Stdio) error         { return nil }
+func (fakeAirflow) Env() ([]string, error)                             { return nil, nil }
 
 // attachableRuntime is fakeRuntime with a working Attach and a running status.
 // Both are needed to reach the reporting in runRestart: it reads the status

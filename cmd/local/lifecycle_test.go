@@ -26,6 +26,7 @@ func (a runAirflow) Run(context.Context, []string, localrt.Stdio) error {
 	return a.runErr
 }
 func (a runAirflow) Shell(context.Context, localrt.Stdio) error { return nil }
+func (a runAirflow) Env() ([]string, error)                     { return nil, nil }
 
 // attachRuntime hands every attach the same fake Airflow.
 type attachRuntime struct {

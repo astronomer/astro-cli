@@ -42,6 +42,15 @@ func (e *Engine) HotInstall(_ context.Context, _ string, _ []string, _ rt.Callba
 	return ErrWindowsUnsupported
 }
 
+// Sync answers what every other entry point here answers. rt.ErrNotImplemented
+// would collapse two different facts into one sentinel: the façade uses it to
+// mean "wrong mode for this operation", and a Windows caller has to be able to
+// tell that from "this OS has no standalone engine" — which is also the answer
+// that tells them what to do instead.
+func (e *Engine) Sync(_ context.Context, _ rt.Plan, _ rt.Callbacks) error {
+	return ErrWindowsUnsupported
+}
+
 func (e *Engine) Attach(_ string) (rt.Airflow, error) {
 	return nil, ErrWindowsUnsupported
 }

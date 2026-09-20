@@ -21,7 +21,7 @@ const lockFile = "start.lock"
 // ErrLocked reports that another start for the same project holds the lock.
 // Its message is user-facing: a second `astro local start` returns it rather
 // than racing the first and clobbering the record.
-var ErrLocked = errors.New("another start is already in progress for this project")
+var ErrLocked = errors.New("another operation is already running for this project")
 
 // Lock takes the per-project start lock so two concurrent starts cannot both
 // write the runtime record — where the loser's dying pid would orphan the

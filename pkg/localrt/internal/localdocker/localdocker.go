@@ -812,6 +812,15 @@ func (a *airflow) Shell(ctx context.Context, s rt.Stdio) error {
 	return a.exec(ctx, []string{"/bin/bash"}, s)
 }
 
+// Env has no answer in docker mode: the project's interpreter and its
+// packages are inside the container, so there is no environment on this side
+// that would make `airflow` resolve to the running one. A caller that wants a
+// command run in the project's environment has Run, which execs into the
+// container.
+func (a *airflow) Env() ([]string, error) {
+	return nil, fmt.Errorf("%w: a docker-mode project's environment lives in its container", rt.ErrNotImplemented)
+}
+
 func (a *airflow) exec(ctx context.Context, argv []string, s rt.Stdio) error {
 	conn, name := a.project(ctx)
 	if name == "" {

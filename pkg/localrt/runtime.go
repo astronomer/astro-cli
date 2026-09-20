@@ -319,6 +319,67 @@ func (r *Runtime) HotInstall(ctx context.Context, projectPath string, deps []str
 	return r.standalone.HotInstall(ctx, projectPath, deps, cb)
 }
 
+// Sync provisions a project's environment without starting Airflow on it.
+//
+// Start does this as its first step; this is that step alone, for a caller
+// that needs the venv to exist for some reason other than running something.
+// The editor is the case in hand: import resolution needs a populated venv,
+// and making someone start Airflow to get code intelligence is a strange
+// price for opening a file.
+//
+// It does NOT require a record, which makes it the only method here that
+// works on a project nobody has started — exactly what it serves. It does
+// refuse one that IS running, which is not the same question: uv sync
+// resolves the whole set, removes what the manifest no longer names, and
+// deletes the venv outright when a previous run left the completion marker
+// off. Doing any of that under a live scheduler executing from that venv is
+// not a caller's decision to weigh, because the caller here is an editor
+// opening a file rather than anyone who asked. A caller that does want
+// packages added to a running Airflow wants HotInstall, which leaves it up.
+//
+// Standalone only. A docker-mode project's packages live in an image, so the
+// equivalent is a build, which is a different operation with a different cost.
+func (r *Runtime) Sync(ctx context.Context, p Plan, cb Callbacks) error {
+	if p.ProjectPath == "" {
+		// filepath.Abs("") is the process's working directory, so without
+		// this an empty plan provisions a venv wherever the embedder happens
+		// to be standing.
+		return errors.New("Sync needs a project path")
+	}
+	// The same normalization Start applies, and for the same reason: a plan
+	// built for a command that asked for no particular runtime leaves Mode
+	// empty, and standalone is the default. Re-deriving it here rather than
+	// sharing Start's would make Sync refuse plans Start accepts.
+	if planMode(p) == ModeDocker {
+		return fmt.Errorf("%w: preparing the environment of a docker-mode project", ErrNotImplemented)
+	}
+
+	unlock, err := localstate.Lock(p.ProjectPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	// After the lock, so the answer cannot go stale between reading it and
+	// acting on it. A missing record is the ordinary case here and not an
+	// error — that is the project this exists for.
+	if rec, rerr := localstate.Load(p.ProjectPath); rerr == nil && r.statusOf(rec).State == StateRunning {
+		return fmt.Errorf("%w: this project's local Airflow is running, and preparing its environment again would rebuild the venv underneath it", ErrNotImplemented)
+	}
+
+	return r.standalone.Sync(ctx, p, cb)
+}
+
+// planMode is Start's mode defaulting, shared so the read paths agree with it.
+// A plan built for a command that asked for no specific runtime leaves Mode
+// empty; standalone is the default.
+func planMode(p Plan) Mode {
+	if p.Mode == "" {
+		return ModeStandalone
+	}
+	return p.Mode
+}
+
 func (r *Runtime) Attach(projectPath string) (Airflow, error) {
 	rec, err := localstate.Load(projectPath)
 	if err != nil {

@@ -23,6 +23,10 @@ import (
 // the per-project JWT secret, and finally the dev-mode overrides — which
 // come last so they are authoritative: the loopback bind in particular must
 // win over everything (docs/v2-architecture.md, "Defaults").
+// goosDarwin names the platform whose _scproxy fork-safety workaround the
+// AF2 blocks below depend on.
+const goosDarwin = "darwin"
+
 func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, port int) []string {
 	env := airflowrt.BuildEnv(projectPath, strconv.Itoa(port), "")
 	// BuildEnv hardcodes AIRFLOW_HOME to the default location; honor the
@@ -46,7 +50,7 @@ func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, 
 		// Python to skip _scproxy entirely. BuildEnv already sets this when
 		// no proxy is configured; under AF2's LocalExecutor forking it must
 		// hold unconditionally.
-		if e.goos == "darwin" {
+		if e.goos == goosDarwin {
 			env = append(env, "NO_PROXY=*", "no_proxy=*")
 		}
 	}
@@ -164,19 +168,43 @@ func jwtSecret(stateDir string) string {
 	return secret
 }
 
-// shellEnv is the environment for Run and Shell: the same BuildEnv-derived
-// env the Airflow process runs with (so commands share its config and
-// metadata DB) plus venv activation. BuildEnv already prepends .venv/bin to
-// PATH; VIRTUAL_ENV completes the activation. The plan's Env layer is not
-// available from a state record — the plan builder (a later issue) will
-// carry it — so hand-set env vars reach Run only through the project's
-// .env for now.
+// shellEnv is the environment for Run, Shell and Env: the same
+// BuildEnv-derived env the Airflow process runs with (so commands share its
+// config and metadata DB) plus venv activation. BuildEnv already prepends
+// .venv/bin to PATH; VIRTUAL_ENV completes the activation.
+//
+// Rebuilt from the state record rather than the plan, because the plan is
+// gone by the time anyone asks. What the record cannot carry is therefore
+// missing, and the gaps are real rather than theoretical:
+//
+//   - Plan.Env and Plan.SecretEnv. Hand-set variables reach a command only
+//     through the project's .env. A project whose plan supplies a
+//     SQL_ALCHEMY_CONN or a FERNET_KEY gets a command talking to a different
+//     metadata DB, or unable to decrypt connections.
+//   - Plan.StateDir and Plan.AirflowHome. Both fall back to the canonical
+//     locations, so an embedder that relocates either gets a different
+//     AIRFLOW_HOME and a JWT secret the running api-server will reject.
+//
+// Closing those needs the record extended to carry them, which is a change
+// to what a start persists rather than to this function.
+// TODO(localrt): carry the plan's env layer and relocations on the record.
+//
+// The generation-specific block IS recoverable, because the record names it,
+// and leaving it out was a live divergence: an AF2 project's `airflow tasks
+// test` ran under SequentialExecutor with the REST auth backends unset, and
+// on macOS without the _scproxy fork-safety workaround AF2 needs.
 func (e *Engine) shellEnv(rec localstate.Record) ([]string, error) {
 	stateDir, err := rt.StateDir(rec.ProjectPath)
 	if err != nil {
 		return nil, err
 	}
 	env := airflowrt.BuildEnv(rec.ProjectPath, strconv.Itoa(rec.Port), "")
+	if rec.AirflowMajor == "2" {
+		env = append(env, af2Env(rec.Port)...)
+		if e.goos == goosDarwin {
+			env = append(env, "NO_PROXY=*", "no_proxy=*")
+		}
+	}
 	env = append(jwtEnv(env, stateDir), devConfigOverrides...)
 	return append(env, "VIRTUAL_ENV="+filepath.Join(rec.ProjectPath, ".venv")), nil
 }

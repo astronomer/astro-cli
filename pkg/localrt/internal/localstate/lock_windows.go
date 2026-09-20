@@ -15,7 +15,7 @@ import (
 const lockFile = "start.lock"
 
 // ErrLocked reports that another start for the same project holds the lock.
-var ErrLocked = errors.New("another start is already in progress for this project")
+var ErrLocked = errors.New("another operation is already running for this project")
 
 // Lock on Windows opens the lock file without flock, matching pkg/proxy's
 // Windows lock: file locking is best-effort here because the MVP runs local

@@ -259,6 +259,28 @@ type Airflow interface {
 	Logs(ctx context.Context, opts LogOptions) error
 	Run(ctx context.Context, argv []string, s Stdio) error
 	Shell(ctx context.Context, s Stdio) error
+
+	// Env is the environment Run and Shell use, in os/exec form: the
+	// project venv ahead of PATH, AIRFLOW_HOME, the generation-specific
+	// settings and the rest of what BuildEnv settles.
+	//
+	// Run and Shell cover an embedder that wants the engine to run
+	// something. This covers one that has to run its own: a terminal hands
+	// the user an interactive session the engine never sees, and it still
+	// has to be the project's environment or `airflow` in that terminal is
+	// a different Airflow from the one on screen.
+	//
+	// It is what Run uses, NOT everything the running process was started
+	// with. Both are rebuilt from the state record, which does not carry the
+	// plan's own Env and SecretEnv layers or a relocated state dir — so a
+	// project that sets those through its plan rather than its .env gets a
+	// command that differs from the scheduler in exactly those variables.
+	// The engine's shellEnv documents which, and closing the gap means
+	// extending the record.
+	//
+	// Docker mode has no such environment to hand out — the project's
+	// Python lives in a container — and answers ErrNotImplemented.
+	Env() ([]string, error)
 }
 
 // ErrNotImplemented marks a contract entry point that has no engine behind it
