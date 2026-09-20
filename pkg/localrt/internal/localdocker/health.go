@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
 const (
@@ -19,7 +21,12 @@ const (
 // ErrHealthTimeout reports that Airflow did not become healthy in time.
 // The containers keep starting in the background: the project is still up,
 // registered, and stoppable.
-var ErrHealthTimeout = errors.New("timed out waiting for Airflow to become healthy")
+//
+// airflowrt's, not one of this package's own, so a caller holding an error from
+// either engine asks once. Which engine ran is the runtime's business, and the
+// question "did the wait run out" has the same answer and the same remedy
+// whichever did.
+var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 
 // healthURLs is where an Airflow generation answers that it is up. Airflow 3
 // serves the monitor endpoint under the v2 API. Astronomer's newer Airflow 2
@@ -56,11 +63,24 @@ func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) erro
 	client := &http.Client{Timeout: healthRequestTimeout}
 	ticker := time.NewTicker(healthPollInterval)
 	defer ticker.Stop()
+
+	// Once before the loop; see the same call in airflowrt.CheckHealth. A
+	// timeout shorter than the poll interval otherwise expires having issued
+	// no request, which was unreachable while the wait was a hardcoded five
+	// minutes and is not now that a caller can choose it.
+	if anyHealthy(ctx, client, urls) {
+		return nil
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("%w after %s; the containers keep starting in the background — `astro local logs` shows their progress", ErrHealthTimeout, timeout)
+				// No environment variable here; see airflowrt.ErrHealthTimeout
+				// for why the name of one belongs to the CLI and not to a
+				// module Astro Desktop also builds on.
+				return fmt.Errorf("%w after %s; the containers keep starting in the background — "+
+					"`astro local logs` shows their progress", ErrHealthTimeout, timeout)
 			}
 			// The same thing the deadline branch above says, for the same
 			// reason, because the same thing is true: Start published the
@@ -71,10 +91,8 @@ func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) erro
 			// tell from it whether an Airflow was now running.
 			return &interrupted{err: ctx.Err()}
 		case <-ticker.C:
-			for _, url := range urls {
-				if healthOK(ctx, client, url) {
-					return nil
-				}
+			if anyHealthy(ctx, client, urls) {
+				return nil
 			}
 		}
 	}
@@ -91,4 +109,14 @@ func healthOK(ctx context.Context, client *http.Client, url string) bool {
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+// anyHealthy reports whether any of the urls answers.
+func anyHealthy(ctx context.Context, client *http.Client, urls []string) bool {
+	for _, url := range urls {
+		if healthOK(ctx, client, url) {
+			return true
+		}
+	}
+	return false
 }

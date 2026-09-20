@@ -9,6 +9,7 @@ package localstandalone
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -26,6 +27,12 @@ type Engine struct{}
 
 // New matches the Unix constructor.
 func New(_ string, _ rt.ProxyDaemon, _ UVOptions) *Engine { return &Engine{} }
+
+// SetHealthTimeout matches the Unix setter. Nothing here waits for health —
+// Start refuses before it could — so the value has nowhere to go; the method
+// exists because the API matches the Unix implementation and callers compile
+// without build tags.
+func (e *Engine) SetHealthTimeout(_ time.Duration) {}
 
 func (e *Engine) Start(_ context.Context, _ rt.Plan, _ rt.Callbacks) (rt.Airflow, error) {
 	return nil, ErrWindowsUnsupported

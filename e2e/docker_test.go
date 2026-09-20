@@ -54,10 +54,13 @@ func needsDocker(t *testing.T, p *project) {
 // case that leaks into the developer's own state worse than no case, and
 // docker's storage is the one place the three env levers cannot reach.
 //
-// --clean is the command's own answer to all of it: containers, volumes, the
-// compose file and the built image, in one call the CLI already has to get
-// right. An earlier revision removed the image by hand and left the volumes,
-// on the mistaken belief that only `reset` could drop either.
+// `reset --yes` rather than `stop --clean`, which is the same list of things
+// and one command short of reaching them here: stop refuses outright when no
+// runtime is recorded — "no local Airflow is recorded for this project" — and
+// a case that has already stopped, as the lifecycle one does because stopping
+// is what it asserts, has no record left by the time cleanup runs. It left the
+// 44 MB volume every time. Reset derives the compose project from the path and
+// so works either way, which is the case its own doc says it was written for.
 //
 // runSlow because a compose down gives five containers ten seconds each before
 // it removes them, which a loaded machine can take past the ordinary bound —
@@ -67,7 +70,11 @@ func dockerProject(t *testing.T, name string) *project {
 	t.Helper()
 	p := newNamedProject(t, name)
 	p.run("init", "--name", name).requireSuccess()
-	t.Cleanup(func() { p.runSlow("local", "stop", "--clean") })
+	// Checked, because an unchecked cleanup is how the last leak went unnoticed
+	// for a whole revision: `stop --clean` had been refusing on every
+	// already-stopped case and nothing said so. Reset returns early and
+	// succeeds when there is no compose file, which is the skipped-docker case.
+	t.Cleanup(func() { p.runSlow("local", "reset", "--yes").requireSuccess() })
 	return p
 }
 
@@ -122,9 +129,26 @@ func composeProject(t *testing.T, p *project) string {
 // it is watching for and which plain `ps` cannot see.
 func containersFor(t *testing.T, project string) []string {
 	t.Helper()
-	out, err := exec.CommandContext(t.Context(), "docker", "ps", "--all",
+	return containersMatching(t, project, "--all")
+}
+
+// runningContainersFor is the subset that is actually up.
+//
+// The distinction matters where the claim is that containers are still coming
+// up: containersFor counts an exited one, so a stack that crashed on its way
+// up satisfies "they were left running" while being the opposite of it.
+func runningContainersFor(t *testing.T, project string) []string {
+	t.Helper()
+	return containersMatching(t, project, "--filter", "status=running")
+}
+
+func containersMatching(t *testing.T, project string, extra ...string) []string {
+	t.Helper()
+	args := append([]string{"ps"}, extra...)
+	args = append(args,
 		"--filter", "label=com.docker.compose.project="+project,
-		"--format", "{{.Names}}").Output()
+		"--format", "{{.Names}}")
+	out, err := exec.CommandContext(t.Context(), "docker", args...).Output()
 	if err != nil {
 		t.Fatalf("listing containers for %s: %v", project, err)
 	}
@@ -200,7 +224,7 @@ func TestDockerStartRunsAirflowAndStopTakesItDown(t *testing.T) {
 	// issued the removals, and dockerd tears the published port's forwarding
 	// down after that. runtime_test.go calls the released port the one
 	// genuinely asynchronous thing in this suite, and uses the same wait.
-	waitFor(t, 30*time.Second, "the port to be released", func() bool {
+	waitFor(t, "the port to be released", func() bool {
 		return portClosed(t, st.Port)
 	})
 }

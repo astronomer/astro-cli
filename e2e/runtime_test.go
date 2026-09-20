@@ -182,7 +182,7 @@ func TestListCleanRemovesARecordWhoseAirflowDied(t *testing.T) {
 	if err := syscall.Kill(-st.PID, syscall.SIGKILL); err != nil {
 		t.Fatalf("ending the Airflow process group: %v", err)
 	}
-	waitFor(t, 30*time.Second, "the port to be released", func() bool { return portClosed(t, st.Port) })
+	waitFor(t, "the port to be released", func() bool { return portClosed(t, st.Port) })
 
 	// The record outlived the process, which is what stale means.
 	row, ok := lineWith(p.run("local", "list", "--all").requireSuccess().Stdout, p.Dir)
@@ -622,22 +622,28 @@ func portClosed(t *testing.T, port int) bool {
 	return false
 }
 
+// waitForLimit bounds every waitFor. One value rather than an argument,
+// because every caller wants the same thing from it: long enough that a
+// machine under load is not called a failure, short enough that a real hang
+// is reported rather than waited out. Nothing here is waiting on a human.
+const waitForLimit = 30 * time.Second
+
 // waitFor polls until cond holds, and fails the test naming what it waited
-// for. Used for the one thing here that is genuinely asynchronous: a killed
-// process group releasing its port.
+// for. Used for what is genuinely asynchronous after a teardown: a signaled
+// process group going, and the port it held coming free.
 //
 // The bound is only honest if a probe is short next to it, which is why the
 // dial timeout below is a fraction of the poll interval rather than the ten
 // seconds an HTTP client would take — otherwise "waited 30s" could mean forty,
 // over three samples.
-func waitFor(t *testing.T, limit time.Duration, what string, cond func() bool) {
+func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(limit)
+	deadline := time.Now().Add(waitForLimit)
 	for time.Now().Before(deadline) {
 		if cond() {
 			return
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	t.Fatalf("waited %s for %s", limit, what)
+	t.Fatalf("waited %s for %s", waitForLimit, what)
 }

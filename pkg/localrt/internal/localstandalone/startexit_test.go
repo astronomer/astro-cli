@@ -5,6 +5,7 @@ package localstandalone
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"syscall"
 	"testing"
@@ -94,6 +95,45 @@ func TestStartNamesTheLogWhenItGivesUp(t *testing.T) {
 		assert.Contains(t, err.Error(), "health check timed out", "the original reason survives")
 		assert.Contains(t, err.Error(), logFileName, "and now it says where to look")
 	})
+}
+
+// A start that never becomes healthy has to take Airflow down with it, even
+// when Airflow will not go quietly.
+//
+// The teardown sent one SIGTERM and immediately removed the record and the
+// route. `airflow standalone` forwards the signal to the scheduler, the
+// api-server and the triggerer, and a component wedged in an import does not
+// take it — which is not a corner case here, because a wedged component is one
+// of the ordinary reasons a start never becomes healthy in the first place. So
+// the most likely failure left a live process group that nothing on disk named:
+// status showed nothing, stop had nothing to stop, and the port stayed held.
+func TestAFailedStartKillsAGroupThatIgnoresSIGTERM(t *testing.T) {
+	e, procs, _ := testEngine(t)
+	p := testPlan(t)
+
+	procs.onTerm = func(int) bool { return false }
+	e.stopTimeout = 50 * time.Millisecond
+	e.stopPoll = 5 * time.Millisecond
+	// Alive throughout: the only way out of the wait is the health error, so
+	// this is the timeout path rather than the exited-child path.
+	e.health = func(context.Context, string, time.Duration, airflowrt.HealthCheckConfig) error {
+		return fmt.Errorf("%w after 20ms", airflowrt.ErrHealthTimeout)
+	}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.Error(t, err)
+
+	// Reality, not bookkeeping. That the record and the route were removed was
+	// already asserted elsewhere and was true the whole time the orphan ran.
+	assert.False(t, procs.alive[fakePID],
+		"the failed start returned with Airflow still running and nothing left naming it")
+	assert.Equal(t,
+		[]string{
+			fmt.Sprintf("%d:%v", -fakePID, syscall.SIGTERM),
+			fmt.Sprintf("%d:%v", -fakePID, syscall.SIGKILL),
+		},
+		procs.sigs,
+		"ask first, then insist — the same sequence `astro local stop` uses")
 }
 
 // The log it names has to be the log it wrote.

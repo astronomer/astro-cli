@@ -9,6 +9,7 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -194,10 +195,66 @@ func routesDir() string {
 // the real image builder.
 func newRuntime() *localrt.Runtime {
 	return localrt.New(localrt.Config{
-		RoutesDir:   routesDir(),
-		ProxyDaemon: newProxyDaemon(),
-		Images:      newImageBuilder(),
+		RoutesDir:     routesDir(),
+		ProxyDaemon:   newProxyDaemon(),
+		Images:        newImageBuilder(),
+		HealthTimeout: healthTimeout(),
 	})
+}
+
+// healthTimeoutEnv names how long a start waits for Airflow before giving up.
+const healthTimeoutEnv = "ASTRO_LOCAL_HEALTH_TIMEOUT"
+
+// adviseHealthTimeout adds the name of the variable that lengthens the wait to
+// an error that says the wait ran out.
+//
+// Here rather than in the engines, which used to carry the name in their own
+// message text. pkg/localrt and pkg/airflowrt are also what Astro Desktop is
+// built on, and desktop fills Config.HealthTimeout from its own settings and
+// never looks at this variable — so advice that is useful here was false
+// there, told to a user with no shell in sight. The modules report that the
+// wait ran out; naming the knob belongs to whoever owns one.
+//
+// Matching on the sentinel rather than on words, so the engines stay free to
+// word it for their own mode: the docker one has containers that keep starting
+// and the standalone one does not.
+func adviseHealthTimeout(err error) error {
+	if !errors.Is(err, localrt.ErrHealthTimeout) {
+		return err
+	}
+	return fmt.Errorf("%w; set %s (e.g. 10m) to wait longer", err, healthTimeoutEnv)
+}
+
+// healthTimeout reads that variable, and returns zero for "use the default".
+//
+// An environment variable rather than a flag, because the two commands that
+// wait — `local start` in either mode — would each need one, and the answer is
+// a property of the machine rather than of the run: a slow link or a cold
+// image pull is true of every start on that box, not of the one being typed.
+//
+// Unparseable is ignored rather than refused — this is a tuning knob with a
+// working default, and a start is a bad place to learn that a variable
+// somebody exported months ago has a typo in it — but it is not ignored
+// silently.
+//
+// "600" is the spelling to expect, meaning ten minutes, because that is what
+// houston.dial_timeout takes and what a reader assumes. ParseDuration refuses
+// it for want of a unit, and without a word here the start runs its default
+// five minutes and then advises setting the very variable that was set. The
+// warning is the only thing that tells "unset" from "rejected" apart.
+func healthTimeout() time.Duration {
+	raw := os.Getenv(healthTimeoutEnv)
+	if raw == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		fmt.Fprintf(os.Stderr,
+			"warning: ignoring %s=%q, which is not a positive duration — use a unit, like 10m or 90s\n",
+			healthTimeoutEnv, raw)
+		return 0
+	}
+	return d
 }
 
 // imageBuilder adapts pkg/imagebuild to localrt.ImageBuilder. The seam exists

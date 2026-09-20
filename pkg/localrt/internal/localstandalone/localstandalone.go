@@ -99,6 +99,21 @@ type Engine struct {
 	stopPoll      time.Duration
 }
 
+// SetHealthTimeout bounds how long a start waits for Airflow to answer.
+//
+// A setter rather than another parameter on New, which already takes three and
+// would take a fourth that almost every caller leaves at its default. See
+// localrt.Config.HealthTimeout for why this is configurable at all.
+func (e *Engine) SetHealthTimeout(d time.Duration) {
+	// Guarded here rather than only at the caller: a zero would make every
+	// context expire on creation, so every start would fail instantly having
+	// brought the runtime all the way up. The rule that non-positive means
+	// "keep the default" belongs with the field it protects.
+	if d > 0 {
+		e.healthTimeout = d
+	}
+}
+
 // UVOptions are the consumer's preferences for the venv provisioning a start
 // does. The cache directory is deliberately absent: it is shared across
 // projects and consumers so a Python toolchain downloads once, so the engine
@@ -276,7 +291,9 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		StopWithSession: p.StopWithSession,
 	}
 	if err := localstate.Save(rec); err != nil {
-		e.killGroup(pid, syscall.SIGTERM)
+		// Nothing on disk names this group now, so it has to go all the way
+		// down here rather than be asked nicely and forgotten.
+		e.endGroup(ctx, rec)
 		return nil, err
 	}
 	// The route lands BEFORE the health wait, which is what docker mode does
@@ -334,7 +351,7 @@ func (e *Engine) afterFailedHealth(ctx context.Context, p rt.Plan, rec localstat
 	if ctx.Err() != nil && !p.StopWithSession && e.groupAlive(rec) {
 		return &startInterrupted{err: ctx.Err(), left: leftRunning(rec.Port)}
 	}
-	e.killGroup(rec.PID, syscall.SIGTERM)
+	e.endGroup(ctx, rec)
 	// The route goes with the record now that it is added before the wait.
 	// Leaving it would point the proxy at a port this engine has just killed,
 	// and the next project to take that port would answer for this hostname.
@@ -591,6 +608,13 @@ func (e *Engine) waitHealthy(ctx context.Context, rec localstate.Record, port st
 // suffix for an error. Empty when there is no path, so a missing one never
 // replaces the failure being reported.
 //
+// A semicolon rather than a dash because it is rarely the only clause added.
+// A start that runs out of time reads "health check timed out after 5m0s —
+// Airflow may still be starting", then this, then the CLI's note about the
+// variable that lengthens the wait: three clauses, and the em dash is already
+// spent on the first. airflowrt used to end its own message by advising a look
+// at the logs, which read oddly directly before the sentence naming one.
+//
 // It takes the path rather than deriving it. Deriving it meant calling
 // rt.StateDir, which is only planStateDir's fallback: the plan's own StateDir
 // wins when a caller sets one, and that field exists so an embedder can put the
@@ -600,7 +624,7 @@ func logHint(logPath string) string {
 	if logPath == "" {
 		return ""
 	}
-	return " — its output is in " + logPath
+	return "; its output is in " + logPath
 }
 
 // groupAlive reports whether any process in the record's group is still
@@ -618,6 +642,46 @@ func (e *Engine) groupAlive(rec localstate.Record) bool {
 func (e *Engine) killGroup(pgid int, sig syscall.Signal) {
 	if pgid > 0 {
 		_ = e.kill(-pgid, sig) //nolint:errcheck // best-effort signal to the process group
+	}
+}
+
+// endGroup ends the record's process group: SIGTERM, a bounded wait, then
+// SIGKILL for whatever is still there. Returns once nothing in the group is
+// reachable, or once it has done all it can.
+//
+// Shared by Stop and by the two teardowns on the start path, because one
+// SIGTERM is not a stop. `airflow standalone` forwards the signal to the
+// scheduler, the api-server and the triggerer, and a component wedged in an
+// import — which is a common reason a start never becomes healthy in the
+// first place — does not take it. The teardown then removed the record and the
+// route and returned, so a group that was still very much alive had nothing
+// left naming it: `astro local status` reported nothing running, `astro local
+// stop` had nothing to stop, and the port stayed held until somebody found the
+// processes by hand. The e2e case that watches a failed start for orphans
+// cannot see it: the Airflow it starts takes the signal, and giving a process
+// that was always going to exit thirty seconds to do so says nothing about one
+// that was not. The unit test alongside it drives a group that refuses.
+//
+// ctx bounds the grace period rather than the kill. A caller who has already
+// been canceled gets the SIGTERM and the SIGKILL back to back, which is what
+// Ctrl-C during a stop has always done.
+func (e *Engine) endGroup(ctx context.Context, rec localstate.Record) {
+	pgid := rec.GroupID()
+	if pgid <= 0 || !e.groupAlive(rec) {
+		return
+	}
+	e.killGroup(pgid, syscall.SIGTERM)
+	// kill(-pgid, 0) succeeds while any group member remains.
+	deadline := time.Now().Add(e.stopTimeout)
+	for time.Now().Before(deadline) && ctx.Err() == nil {
+		time.Sleep(e.stopPoll)
+		if !e.groupAlive(rec) {
+			return
+		}
+	}
+	if e.groupAlive(rec) {
+		e.killGroup(pgid, syscall.SIGKILL)
+		time.Sleep(e.stopPoll)
 	}
 }
 
@@ -689,27 +753,14 @@ func (a *airflow) Status() (rt.Status, error) {
 // StopProcess still have; an earlier fix fixes it there).
 func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	e := a.eng
-	pgid := a.rec.GroupID()
-	if pgid > 0 && e.groupAlive(a.rec) {
-		if opts.Force {
-			// Airflow's sqlite runs in WAL mode, so SIGKILL cannot corrupt
-			// the database.
+	if opts.Force {
+		// Airflow's sqlite runs in WAL mode, so SIGKILL cannot corrupt
+		// the database.
+		if pgid := a.rec.GroupID(); pgid > 0 && e.groupAlive(a.rec) {
 			e.killGroup(pgid, syscall.SIGKILL)
-		} else {
-			e.killGroup(pgid, syscall.SIGTERM)
-			// kill(-pgid, 0) succeeds while any group member remains.
-			deadline := time.Now().Add(e.stopTimeout)
-			for time.Now().Before(deadline) && ctx.Err() == nil {
-				time.Sleep(e.stopPoll)
-				if !e.groupAlive(a.rec) {
-					break
-				}
-			}
-			if e.groupAlive(a.rec) {
-				e.killGroup(pgid, syscall.SIGKILL)
-				time.Sleep(e.stopPoll)
-			}
 		}
+	} else {
+		e.endGroup(ctx, a.rec)
 	}
 	errs := []error{
 		localshared.RemoveRoute(e.routes, a.rec.Hostname),

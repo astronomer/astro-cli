@@ -82,6 +82,21 @@ type Engine struct {
 	healthTimeout time.Duration
 }
 
+// SetHealthTimeout bounds how long a start waits for the api-server to answer.
+//
+// A setter rather than another parameter on New, which already takes three and
+// would take a fourth that almost every caller leaves at its default. See
+// localrt.Config.HealthTimeout for why this is configurable at all.
+func (e *Engine) SetHealthTimeout(d time.Duration) {
+	// Guarded here rather than only at the caller: a zero would make every
+	// context expire on creation, so every start would fail instantly having
+	// brought the containers all the way up. The rule that non-positive means
+	// "keep the default" belongs with the field it protects.
+	if d > 0 {
+		e.healthTimeout = d
+	}
+}
+
 // New builds the production engine. routesDir is where pkg/proxy keeps
 // routes.json (~/.astro/proxy); the composition root supplies it because
 // this package must not read config.

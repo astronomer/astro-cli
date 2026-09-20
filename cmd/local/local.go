@@ -155,7 +155,14 @@ func newStartCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   nameStart,
 		Short: "Start local Airflow for this project",
-		Args:  cobra.NoArgs,
+		// The wait is the one thing about a start somebody needs to change and
+		// cannot from a flag, and until now the only way to find that out was
+		// to hit it. A slow link or a cold image pull outlasts five minutes
+		// with nothing wrong.
+		Long: "Start local Airflow for this project.\n\n" +
+			"A start waits up to five minutes for Airflow to answer. Set " +
+			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			mode := localrt.Mode("")
 			if opts.docker {
@@ -193,7 +200,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	warnEnvValues(r, built.EnvWarnings)
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
-		return err
+		return adviseHealthTimeout(err)
 	}
 	st, err := af.Status()
 	if err != nil {
@@ -422,7 +429,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	}
 	af, err = c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
-		return err
+		return adviseHealthTimeout(err)
 	}
 	st, err = af.Status()
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localdocker"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstandalone"
@@ -72,17 +73,40 @@ type Config struct {
 	// machine whose trust anchor is missing from uv's bundle from a healthy
 	// one, because nothing else about the start looks different.
 	OnUVCertFallback func()
+	// HealthTimeout bounds how long a start waits for Airflow to answer before
+	// giving up. Zero takes each engine's own default, five minutes, which is
+	// generous because a first run initializes the metadata database.
+	//
+	// Configurable because five minutes is a guess about somebody else's
+	// machine. A cold Docker pull on a slow link can outlast it, and a caller
+	// that would rather fail fast — CI, a scripted check, the suite that tests
+	// what a start leaves behind when it does not finish — has no way to ask
+	// for that otherwise.
+	HealthTimeout time.Duration
 }
+
+// ErrHealthTimeout reports a start whose Airflow did not answer in the time
+// allowed. Exported here because Config.HealthTimeout is set here: an embedder
+// that offers its user a way to change the wait is the one that can usefully
+// say so, and this is the error to say it on.
+var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 
 // New returns a Runtime configured by cfg.
 func New(cfg Config) *Runtime {
 	docker := localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images)
+	standalone := localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon, localstandalone.UVOptions{
+		HermeticEnv:    cfg.HermeticUVEnv,
+		OnCertFallback: cfg.OnUVCertFallback,
+	})
+	// Applied to both engines or neither: a caller asking a start to give up
+	// sooner means the start, not the standalone one.
+	if cfg.HealthTimeout > 0 {
+		docker.SetHealthTimeout(cfg.HealthTimeout)
+		standalone.SetHealthTimeout(cfg.HealthTimeout)
+	}
 	return &Runtime{
-		docker: docker,
-		standalone: localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon, localstandalone.UVOptions{
-			HermeticEnv:    cfg.HermeticUVEnv,
-			OnCertFallback: cfg.OnUVCertFallback,
-		}),
+		docker:         docker,
+		standalone:     standalone,
 		routes:         proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
 		now:            time.Now,
 		containersGone: docker.ContainersGone,
