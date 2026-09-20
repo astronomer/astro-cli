@@ -158,11 +158,22 @@ func airflowMajor(version string) string {
 // directories in different paths never collide (same idea as v1's
 // ProjectNameUnique, keyed by rt.ProjectID instead of md5).
 func composeProjectName(projectPath string) (string, error) {
-	id, err := rt.ProjectID(projectPath)
+	// The label comes off the canonical path, not the one the caller typed.
+	// SanitizeLabel keeps [a-z0-9-] and drops the rest, and the two Unicode
+	// spellings of one name do not survive that the same way: café composed
+	// loses the é and becomes "caf", while decomposed it keeps the e and
+	// becomes "cafe". One directory would get two compose projects, two
+	// postgres volumes and two Airflows — the id being equal is not enough on
+	// its own, because the id is only half the name.
+	canonical, err := rt.CanonicalPath(projectPath)
 	if err != nil {
 		return "", err
 	}
-	label := proxy.SanitizeLabel(filepath.Base(projectPath))
+	id, err := rt.ProjectID(canonical)
+	if err != nil {
+		return "", err
+	}
+	label := proxy.SanitizeLabel(filepath.Base(canonical))
 	if label == "" {
 		return "astro-" + id[:6], nil
 	}

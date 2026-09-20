@@ -405,24 +405,66 @@ func spellingOnDisk(dir, want string) string {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	return pickSpelling(names, want)
+	if spelled, ok := pickSpelling(names, want); ok {
+		return spelled
+	}
+	return sameEntrySpelling(dir, entries, want)
 }
 
 // pickSpelling chooses among the names a directory holds: an exact match
 // first, in its own pass, so a case-sensitive filesystem holding both
-// Analytics and analytics keeps them apart.
-func pickSpelling(names []string, want string) string {
+// Analytics and analytics keeps them apart. The bool reports whether any name
+// matched, which is what sends a miss on to the identity scan.
+func pickSpelling(names []string, want string) (string, bool) {
 	for _, n := range names {
 		if n == want {
-			return want
+			return want, true
 		}
 	}
 	for _, n := range names {
 		if strings.EqualFold(n, want) {
-			return n
+			return n, true
 		}
 	}
-	return want
+	return want, false
+}
+
+// sameEntrySpelling is rt.sameEntrySpelling; see there for why identity is
+// asked of the filesystem rather than guessed from the text, why the
+// comparison is lstat on both sides, and why two claimants mean no answer.
+//
+// Here for the reason the rest of this mirror is here, and the reason that
+// mirror's own note gives: when rt learned something about what counts as one
+// directory and this did not, the two disagreed, and a re-registration from
+// the other spelling was handed a qualified hostname while the original row
+// was left pointing at a dead port. rt learned Unicode normalization; this is
+// that same lesson, arriving at the same time rather than a release later.
+func sameEntrySpelling(dir string, entries []os.DirEntry, want string) string {
+	target, err := os.Lstat(filepath.Join(dir, want))
+	if err != nil {
+		return want
+	}
+	found := ""
+	for _, e := range entries {
+		if e.IsDir() != target.IsDir() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if !os.SameFile(target, info) {
+			continue
+		}
+		if found != "" {
+			return want
+		}
+		found = e.Name()
+	}
+	if found == "" {
+		return want
+	}
+	return found
 }
 
 // RemoveRoute deregisters a route by hostname. Returns the number of remaining routes.

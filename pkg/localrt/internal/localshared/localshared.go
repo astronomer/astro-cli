@@ -108,6 +108,13 @@ func PlanHostname(p rt.Plan, projectPath string) (string, error) {
 	if p.Hostname != "" {
 		return p.Hostname, nil
 	}
+	// From the canonical path, for the reason composeProjectName gives: the
+	// label is a sanitized directory name, and the two Unicode spellings of
+	// one name sanitize differently, so one directory would ask for two
+	// hostnames and the second would be told its own name was taken.
+	if canonical, cErr := rt.CanonicalPath(projectPath); cErr == nil {
+		projectPath = canonical
+	}
 	hostname, _, err := proxy.DeriveHostname(projectPath)
 	return hostname, err
 }

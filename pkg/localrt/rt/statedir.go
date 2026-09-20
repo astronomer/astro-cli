@@ -47,12 +47,24 @@ func CanonicalPath(path string) (string, error) {
 // Component by component, because there is no portable call that asks a
 // filesystem how it spells a path. An exact match always wins, so a
 // case-SENSITIVE filesystem holding both Analytics and analytics keeps them
-// apart; only a component with no exact match is resolved case-insensitively,
-// which is precisely the case-insensitive-filesystem situation.
+// apart; only a component with no exact match is resolved by other means,
+// which is precisely the insensitive-filesystem situation.
+//
+// Those other means end in a question rather than a guess. Comparing names
+// closes one equivalence at a time — case was folded in and Unicode
+// normalization was not, so `café` typed in a terminal and the same name from
+// Finder stayed two project ids for one directory — and there is no list of
+// equivalences to finish, because which ones a volume honors is the volume's
+// business. So the last resort asks the filesystem which entry this actually
+// is, by identity, and takes that entry's name.
 //
 // Best effort: a directory this process cannot read leaves its component as
 // given. Costs one ReadDir per component — about 1ms for a path eight deep,
-// against callers that run once or twice per command.
+// against callers that run once or twice per command. The identity scan runs
+// only for a component no name matched, and costs one Lstat of that component
+// plus, at most, the entry kinds already carried by the listing. On a
+// byte-exact filesystem a component that exists always matches by name, so
+// only the Lstat is reached, and only for a component that is not there.
 func trueCase(path string) string {
 	vol := filepath.VolumeName(path)
 	rest := strings.TrimPrefix(path, vol)
@@ -83,30 +95,108 @@ func spellingOnDisk(dir, want string) string {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	return pickSpelling(names, want)
+	if spelled, ok := pickSpelling(names, want); ok {
+		return spelled
+	}
+	return sameEntrySpelling(dir, entries, want)
 }
 
-// pickSpelling chooses among the names a directory holds.
+// sameEntrySpelling finds the entry that IS dir/want and returns its name.
+//
+// The general form of the question pickSpelling answers by comparing text:
+// two names a filesystem considers one are one, whether they differ by case,
+// by Unicode normalization, or by something this code has never heard of.
+//
+// "Is" has to be read narrowly, and the narrowing is the whole of this
+// function's correctness:
+//
+// "Is" has to be read narrowly, and the narrowing is the whole of this
+// function's correctness.
+//
+// Lstat on both sides, never Stat. That single choice is what makes a symlink
+// unable to win: an alias is a different object that points at the target, so
+// comparing objects rather than what they resolve to excludes it. Comparing
+// resolved files instead — os.Stat on each entry, which is how this was first
+// written — made an `aaa-alias` sorting before the real `café` compare equal
+// to it, and its name became the canonical spelling: the wrong id, and a path
+// with an unresolved symlink in it after CanonicalPath has promised there are
+// none. Measured, and it is what the normalization test's symlink decoy holds.
+//
+// Two claimants mean no answer. Hard links make two names for one file —
+// directories cannot have them, but the leaf of a path need not be a
+// directory — and a filesystem that reports identity badly, as SMB and several
+// FUSE mounts do by handing out a zero inode for everything, makes every entry
+// look like the target. Either way the alphabetically first sibling would
+// become the project's identity. Ambiguity is a reason to stop, not to guess.
+//
+// The kind check and the lstat are independent guards against the same thing,
+// and each alone is sufficient: DirEntry.IsDir reports the entry's own type,
+// so a symlink to a directory is already excluded by kind before identity is
+// consulted. Measured, because it decides what the tests can prove — removing
+// either one on its own changes no test, and removing both reproduces the
+// alias defect, which the normalization test's symlink decoy then catches.
+// The kind check also narrows the degenerate-filesystem case above, where it
+// keeps a directory from being answered for by a file.
+//
+// Returns want when nothing answers — the component is absent, cannot be
+// stat'd, or is claimed more than once — because trueCase is best effort and a
+// spelling it cannot verify is left as the caller wrote it.
+func sameEntrySpelling(dir string, entries []os.DirEntry, want string) string {
+	target, err := os.Lstat(filepath.Join(dir, want))
+	if err != nil {
+		return want
+	}
+	found := ""
+	for _, e := range entries {
+		if e.IsDir() != target.IsDir() {
+			continue
+		}
+		// Info is the entry's own lstat, and comes from the listing, so most
+		// platforms answer it without another syscall.
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if !os.SameFile(target, info) {
+			continue
+		}
+		if found != "" {
+			return want
+		}
+		found = e.Name()
+	}
+	if found == "" {
+		return want
+	}
+	return found
+}
+
+// pickSpelling chooses among the names a directory holds, and reports
+// whether any of them matched.
 //
 // Separate from the ReadDir so the rule can be tested anywhere. The rule
 // that matters — an exact match wins over a case-insensitive one — only
 // shows itself when a directory holds two names differing just by case,
 // which a case-insensitive filesystem cannot represent. Left inside the I/O
 // it was unfalsifiable on macOS: removing the exact pass changed no test.
-func pickSpelling(names []string, want string) string {
+//
+// The bool is what lets a miss fall through to the identity scan rather than
+// being reported as "spelled exactly as asked", which is the same answer for
+// two different situations.
+func pickSpelling(names []string, want string) (string, bool) {
 	// Exact first, and in its own pass: on a case-sensitive filesystem both
 	// spellings can exist, and the one asked for is the one meant.
 	for _, n := range names {
 		if n == want {
-			return want
+			return want, true
 		}
 	}
 	for _, n := range names {
 		if strings.EqualFold(n, want) {
-			return n
+			return n, true
 		}
 	}
-	return want
+	return want, false
 }
 
 // ProjectID returns the identity key for a project directory: the sha256
@@ -115,12 +205,12 @@ func pickSpelling(names []string, want string) string {
 // ID, so per-project state never forks. IDs key state; hostnames are display
 // labels only.
 //
-// Because the ID is a hash of a spelling, each new way of reaching one
-// directory has to be folded in here: symlinks were, capitalization now is,
-// and Unicode normalization (NFC against NFD on APFS) is not. Keying identity
-// on what the filesystem calls the object — dev+inode — would close the
-// family rather than one member at a time, at the cost of an on-disk map from
-// identity to state directory.
+// The ID is a hash of a spelling, so every way of reaching one directory has
+// to arrive at one spelling. Symlinks are resolved, case is respelled from the
+// directory listing, and anything else a volume treats as the same name —
+// Unicode normalization, NFC against NFD, is the one that turns up on APFS —
+// is settled by asking the filesystem which entry it is. That last step is
+// what closes the family rather than one member at a time; see trueCase.
 func ProjectID(projectPath string) (string, error) {
 	resolved, err := CanonicalPath(projectPath)
 	if err != nil {
