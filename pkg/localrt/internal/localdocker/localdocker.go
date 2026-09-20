@@ -744,10 +744,9 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	if err := a.eng.downProject(ctx, conn, name, timeout, rt.Callbacks{}, extra...); err != nil {
 		return fmt.Errorf("stopping project containers: %w", err)
 	}
-	errs := []error{a.eng.removeRoute(a.rec), localstate.Remove(a.rec.ProjectPath)}
-	// The route is gone; drop the daemon too if it was the last one, so the
+	// removeRoute drops the daemon too when this was the last route, so the
 	// last project to stop leaves no orphan proxy behind.
-	localshared.ReapDaemon(a.eng.daemon)
+	errs := []error{a.eng.removeRoute(a.rec), localstate.Remove(a.rec.ProjectPath)}
 	if opts.Clean {
 		if p := a.composeFilePath(); p != "" {
 			if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -986,7 +985,8 @@ func (e *Engine) recordRegisteredHostname(rec *localstate.Record, registered str
 	}
 }
 
-// removeRoute deregisters the project's proxy route.
+// removeRoute deregisters the project's proxy route, and the proxy with it
+// when no route is left.
 func (e *Engine) removeRoute(rec localstate.Record) error {
-	return localshared.RemoveRoute(e.routes, rec.Hostname)
+	return localshared.RemoveRoute(e.routes, rec.Hostname, e.daemon)
 }

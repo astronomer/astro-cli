@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -193,6 +194,15 @@ func TestListCleanRemovesARecordWhoseAirflowDied(t *testing.T) {
 		t.Errorf("a record whose process is gone should read as stale: %q", row)
 	}
 
+	// Anchored before it is negated. The assertion below waits for the daemon
+	// to go, and would pass just as contentedly if one had never been there:
+	// EnsureDaemon is best-effort — a daemon that cannot spawn is a log line,
+	// not a failed start — so "no proxy at all" is a reachable state, and in it
+	// this case would report the leak fixed while nothing had been reaped.
+	if !proxyRunning(p.home) {
+		t.Fatal("no proxy daemon is running, so --clean has nothing to reap and this proves nothing")
+	}
+
 	cleaned := p.run("local", "list", "--clean").requireSuccess()
 	if !strings.Contains(cleaned.Stdout, "Removed 1 stale record") {
 		t.Errorf("--clean should report what it removed\n%s", cleaned.output())
@@ -200,6 +210,52 @@ func TestListCleanRemovesARecordWhoseAirflowDied(t *testing.T) {
 	if _, still := lineWith(p.run("local", "list", "--all").requireSuccess().Stdout, p.Dir); still {
 		t.Error("the stale record should be gone from disk")
 	}
+
+	// And the proxy that served the route goes too.
+	//
+	// `stop` has always reaped it; --clean did not, so the one command whose
+	// job is to tidy up after a runtime that died badly left a daemon running
+	// with nothing to serve, and nothing would ever collect it — the next
+	// start adopts the daemon it finds rather than counting them. One leaked
+	// per run of this suite, which has exactly this one --clean case.
+	waitFor(t, "the proxy daemon to be reaped", func() bool { return !proxyRunning(p.home) })
+}
+
+// proxyRunning reports whether the proxy daemon under an ASTRO_HOME is alive,
+// read from the record the daemon writes there.
+//
+// The record rather than a process scan: every project in a suite run spawns
+// its own daemon from the same built binary, and each binds a port of its own,
+// so neither the argv nor the port distinguishes them. The file is per-home and
+// the home is per-project, which is the attribution this needs.
+//
+// A missing file and a dead pid are both "not running": the daemon removes its
+// record on the way out, and one left behind by a kill names a pid that no
+// longer answers. A pid the OS has since recycled would read as alive, which is
+// the one way this can be wrong — the window is a whole pid space wide and the
+// caller waits rather than asks once, so it is not worth a second signal.
+//
+// Takes the home rather than the project, and does not call t.Helper: it
+// reports a bool and never fails a test, so there is no frame to hide.
+func proxyRunning(home string) bool {
+	raw, err := os.ReadFile(filepath.Join(home, ".astro", "proxy", "proxy.pid"))
+	if err != nil {
+		return false
+	}
+	// pkg/proxy writes "<pid> <version> <port>", pid first and space
+	// separated, and has done since before the version and port were added —
+	// fields are appended there, never reordered, precisely so a reader can
+	// take the first and ignore the rest.
+	fields := strings.Fields(string(raw))
+	if len(fields) == 0 {
+		return false
+	}
+	pid, err := strconv.Atoi(fields[0])
+	if err != nil || pid <= 1 {
+		return false
+	}
+	// Signal 0 asks without delivering: nil means some process owns that pid.
+	return syscall.Kill(pid, 0) == nil
 }
 
 // Two projects running at once get a port each.

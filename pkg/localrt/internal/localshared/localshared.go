@@ -128,14 +128,36 @@ func HostnameDiscriminator(projectPath string) string {
 	return id[:proxy.HostnameIDLen]
 }
 
-// RemoveRoute deregisters a project's proxy route; an empty hostname means
-// no route was ever registered.
-func RemoveRoute(s *proxy.Store, hostname string) error {
+// RemoveRoute deregisters a project's proxy route and, when that was the last
+// one, puts the proxy away. An empty hostname means no route was ever
+// registered, so there is nothing to remove and nothing to conclude.
+//
+// The reap lives here, at the one place a localrt route is ever removed,
+// rather than at each caller. Three call this — both engines' Stop and the
+// --clean sweep — and a fourth arrives whenever somebody adds a teardown, so
+// the alternative is a list of sites that has to be re-audited by hand and is
+// wrong the first time it is not.
+//
+// It reaps on the count this removal returned rather than by asking the daemon
+// to decide. Asking meant airflow/proxy.StopIfEmpty, which re-lists through a
+// store built with no liveness predicate — the default one, which evicts a
+// route whose recorded PID is dead. That is not the same question: a
+// standalone master exits before the children in its group during shutdown, so
+// the default predicate calls a route dead while localprune, reading the
+// record's process group, correctly calls it alive. ListRoutes writes back
+// what it pruned, so consulting that store did not merely answer wrongly, it
+// deleted a live project's route on the way. The count here comes from this
+// store, which carries the record-aware predicate, and costs no second pass.
+func RemoveRoute(s *proxy.Store, hostname string, d rt.ProxyDaemon) error {
 	if hostname == "" {
 		return nil
 	}
-	if _, err := s.RemoveRoute(hostname); err != nil {
+	remaining, err := s.RemoveRoute(hostname)
+	if err != nil {
 		return fmt.Errorf("removing proxy route %s: %w", hostname, err)
+	}
+	if remaining == 0 {
+		ReapDaemon(d)
 	}
 	return nil
 }

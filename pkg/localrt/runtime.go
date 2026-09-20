@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localdocker"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstandalone"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -38,6 +39,10 @@ type Runtime struct {
 	// one: the answer comes from outside the process, and a test that needs
 	// no engine to be reachable cannot make the machine it runs on have none.
 	containersGone func(context.Context, string) (bool, error)
+	// daemon is the proxy the routes point at. The engines each hold it for
+	// the start and stop they drive; the Runtime holds it for --clean, which
+	// removes routes without going through either.
+	daemon ProxyDaemon
 }
 
 // Config is what a consumer supplies to build a Runtime. Nothing here is
@@ -110,6 +115,7 @@ func New(cfg Config) *Runtime {
 		routes:         proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
 		now:            time.Now,
 		containersGone: docker.ContainersGone,
+		daemon:         cfg.ProxyDaemon,
 	}
 }
 
@@ -389,6 +395,18 @@ func (r *Runtime) statusOf(rec localstate.Record) Status {
 	return r.standalone.StatusOf(rec)
 }
 
+// PruneStale removes the records, and the routes, of every runtime that is
+// gone, and returns what it removed. It backs `astro local list --clean`.
+//
+// It can also stop the proxy: removing the last route puts the daemon away,
+// the same rule Stop follows. Worth knowing for an embedder whose ProxyDaemon
+// is an in-process server rather than a forked one — Astro Desktop's is — and
+// which might otherwise call this on a timer without expecting its own proxy
+// to go down whenever no project happens to be running.
+//
+// A sweep it could not start reaps nothing: the listing has to succeed before
+// there is anything to remove, and a reap follows a removal rather than
+// replacing one.
 func (r *Runtime) PruneStale() ([]Status, error) {
 	statuses, err := r.List()
 	if err != nil {
@@ -449,8 +467,17 @@ func (r *Runtime) pruneAll(statuses []Status) ([]Status, error) {
 		// would otherwise make every record unprunable for good. Reported,
 		// and the record still goes.
 		if st.Hostname != "" {
-			if _, rerr := r.routes.RemoveRoute(st.Hostname); rerr != nil {
-				errs = append(errs, fmt.Errorf("removing route %s: %w", st.Hostname, rerr))
+			// Through localshared, which is where a localrt route removal
+			// reaps the proxy when it takes the last one. --clean used not to
+			// go through it: it removed the route, removed the record, and
+			// left the daemon for that runtime alive and listening with
+			// nothing to serve — and nothing would collect it later, since the
+			// next start adopts the daemon it finds rather than counting them.
+			// One leaked per run of the e2e suite, which has a single --clean
+			// case; twenty-six had accumulated on one machine before anybody
+			// looked at a process list.
+			if rerr := localshared.RemoveRoute(r.routes, st.Hostname, r.daemon); rerr != nil {
+				errs = append(errs, rerr)
 			}
 		}
 		if rerr := localstate.Remove(st.ProjectPath); rerr != nil {

@@ -360,6 +360,42 @@ func TestStopSignalsProcessGroup(t *testing.T) {
 	assert.Empty(t, routes)
 }
 
+// countingProxy answers the daemon seam and counts both halves of its
+// lifecycle. The seam is nil in every other test in this package, which is why
+// nothing here had ever checked that the engine uses it.
+type countingProxy struct {
+	started int
+	stopped int
+}
+
+func (d *countingProxy) EnsureRunning() (string, error) { d.started++; return "6563", nil }
+func (d *countingProxy) StopIfEmpty()                   { d.stopped++ }
+
+// A start brings the proxy up and a stop puts it away again.
+//
+// The reap lives in localshared.RemoveRoute now, so it depends on this engine
+// handing its daemon to that call — and that is exactly the kind of argument a
+// refactor drops in silence. Nothing else would notice: the route goes, the
+// record goes, the stop reports success, and only a process list shows the
+// daemon still listening with nothing to serve.
+func TestStopPutsTheProxyAwayWithTheLastRoute(t *testing.T) {
+	e, _, _ := testEngine(t)
+	daemon := &countingProxy{}
+	e.daemon = daemon
+	p := testPlan(t)
+
+	af, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	require.Equal(t, 1, daemon.started, "a start registers a route, so it needs the proxy up")
+
+	require.NoError(t, af.Stop(context.Background(), rt.StopOptions{}))
+
+	routes, err := e.routes.ReadRoutes()
+	require.NoError(t, err)
+	require.Empty(t, routes, "the stop should have taken the route with it")
+	assert.Equal(t, 1, daemon.stopped, "the last route went and the proxy was left running")
+}
+
 func TestStopEscalatesWhenGroupSurvivesSigterm(t *testing.T) {
 	e, procs, _ := testEngine(t)
 	procs.onTerm = func(int) bool { return false } // the group ignores SIGTERM

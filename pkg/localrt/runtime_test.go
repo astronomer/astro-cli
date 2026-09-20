@@ -28,9 +28,7 @@ import (
 // follow rather than being left behind testing nothing.
 func realRuntime(t *testing.T) *Runtime {
 	t.Helper()
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	t.Setenv("ASTRO_HOME", t.TempDir())
-	return New(Config{RoutesDir: t.TempDir()})
+	return isolatedRuntime(t, nil)
 }
 
 func TestRefuseLiveStartGuardsAgainstOrphaning(t *testing.T) {

@@ -101,6 +101,7 @@ type Runtime interface {
 	List() ([]localrt.Status, error)
 	// PruneStale removes the records (and their routes) whose runtime is
 	// gone, returning what it removed. It backs `astro local list --clean`.
+	// Removing the last route also stops the proxy daemon, as a stop does.
 	PruneStale() ([]localrt.Status, error)
 	// Reset stops a project's Airflow if it is running and wipes the state a
 	// run derives. Unlike Stop it does not go through Attach, so it serves a
