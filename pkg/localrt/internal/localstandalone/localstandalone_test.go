@@ -30,6 +30,9 @@ const fakePID = 4242
 // uv.
 type fakeUV struct {
 	err error
+	// pipInstalled records what a hot install asked for, when a test cares.
+	pipInstalled *[]string
+	pipErr       error
 }
 
 func (f fakeUV) EnsureSynced(_ context.Context, project, _ string, _ uv.Stdio) error {
@@ -41,6 +44,15 @@ func (f fakeUV) EnsureSynced(_ context.Context, project, _ string, _ uv.Stdio) e
 		return err
 	}
 	return os.WriteFile(filepath.Join(binDir, "airflow"), []byte("#!/bin/sh\n"), 0o755)
+}
+
+// PipInstall records what a hot install asked for; the venv it installs into
+// was fabricated by EnsureSynced above.
+func (f fakeUV) PipInstall(_ context.Context, _, _ string, reqs []string, _ string, _ uv.Stdio) error {
+	if f.pipInstalled != nil {
+		*f.pipInstalled = append(*f.pipInstalled, reqs...)
+	}
+	return f.pipErr
 }
 
 // fakeProcs tracks fake process groups: which are alive and every signal
@@ -312,6 +324,10 @@ type syncerFunc func(ctx context.Context, project, python string, stdio uv.Stdio
 
 func (f syncerFunc) EnsureSynced(ctx context.Context, project, python string, stdio uv.Stdio) error {
 	return f(ctx, project, python, stdio)
+}
+
+func (syncerFunc) PipInstall(context.Context, string, string, []string, string, uv.Stdio) error {
+	return nil
 }
 
 func TestUVFailureSurfaces(t *testing.T) {

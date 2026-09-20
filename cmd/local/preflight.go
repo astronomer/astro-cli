@@ -122,7 +122,10 @@ func (p *uvProvisioner) EnsureVenv(ctx context.Context, spec checks.VenvSpec, pr
 	if err := p.client.VenvAt(ctx, dir, spec.Python, uv.Stdio{}); err != nil {
 		return "", err
 	}
-	if err := p.client.PipInstall(ctx, python, spec.Reqs, "", uv.Stdio{}); err != nil {
+	// No project directory, deliberately: this is a scratch environment in the
+	// cache, not a project, so there is no [tool.uv] configuration of its own to
+	// honor and uv should not pick up whatever the caller happens to be sitting in.
+	if err := p.client.PipInstall(ctx, "", python, spec.Reqs, "", uv.Stdio{}); err != nil {
 		return "", err
 	}
 	if err := os.WriteFile(marker, nil, markerPerms); err != nil {

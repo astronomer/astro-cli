@@ -536,7 +536,7 @@ func TestPipInstallPassesInterpreterConstraintAndReqs(t *testing.T) {
 	argsFile := filepath.Join(t.TempDir(), "args")
 	c := newTestClient(t, Options{}, "echo \"$@\" > \""+argsFile+"\"\nexit 0")
 
-	err := c.PipInstall(t.Context(), "/scratch/bin/python", []string{"apache-airflow==3.0.6", "pandas"}, "https://c/constraints.txt", Stdio{})
+	err := c.PipInstall(t.Context(), "", "/scratch/bin/python", []string{"apache-airflow==3.0.6", "pandas"}, "https://c/constraints.txt", Stdio{})
 	if err != nil {
 		t.Fatalf("PipInstall() error = %v", err)
 	}
@@ -550,7 +550,7 @@ func TestPipInstallPassesInterpreterConstraintAndReqs(t *testing.T) {
 
 func TestPipInstallResolutionError(t *testing.T) {
 	c := newTestClient(t, Options{}, "cat \""+fixturePath(t)+"\" >&2\nexit 1")
-	err := c.PipInstall(t.Context(), "/p", []string{"pandas"}, "", Stdio{})
+	err := c.PipInstall(t.Context(), "", "/p", []string{"pandas"}, "", Stdio{})
 	var re *ResolutionError
 	if !errors.As(err, &re) {
 		t.Fatalf("PipInstall() error = %v, want *ResolutionError", err)

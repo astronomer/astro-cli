@@ -60,6 +60,10 @@ var ErrNotStandaloneMode = errors.New("this project's local Airflow is not runni
 // real uv or Python ever runs.
 type venvSyncer interface {
 	EnsureSynced(ctx context.Context, project, python string, stdio uv.Stdio) error
+	// PipInstall adds to an environment that already exists, which is what a
+	// hot install is: EnsureSynced would resolve the whole set and can remove
+	// what the manifest no longer names, out from under a running scheduler.
+	PipInstall(ctx context.Context, project, pythonBin string, reqs []string, constraint string, stdio uv.Stdio) error
 }
 
 // launchFunc starts the supervisor process detached: its own process

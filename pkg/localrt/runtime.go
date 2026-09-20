@@ -242,6 +242,53 @@ func (r *Runtime) Reset(ctx context.Context, projectPath string) (ResetReport, e
 	return report, errors.Join(errs...)
 }
 
+// HotInstall adds dependencies to a project's environment without restarting
+// the Airflow running on it, then nudges the scheduler to re-parse its Dags.
+//
+// Standalone only. Refusing docker mode is the honest answer rather than a gap:
+// those dependencies live in an image, so making them live means rebuilding it,
+// which is a restart under another name — a caller that wants that should ask.
+//
+// deps are the project's declared dependencies, passed in rather than read
+// here, because nothing in this package reads a manifest. Plan.Dependencies
+// arrives the same way for the same reason.
+func (r *Runtime) HotInstall(ctx context.Context, projectPath string, deps []string, cb Callbacks) error {
+	// Before anything else, including the record: a caller watching a manifest
+	// cannot know a project declares no dependencies until it asks, and
+	// answering "nothing to do" is truer than "no Airflow is recorded".
+	if len(deps) == 0 {
+		return nil
+	}
+
+	// The lock Start and Reset take, for the reason Reset states: two uv
+	// processes in one venv is how it ends up half-written. A hot install
+	// racing a restart would install into the venv EnsureSynced is rebuilding,
+	// and racing a reset would install into one Clean is deleting. The lock is
+	// non-blocking and the engines take none of their own, so holding it across
+	// this cannot deadlock.
+	unlock, err := localstate.Lock(projectPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	rec, err := localstate.Load(projectPath)
+	if err != nil {
+		return err
+	}
+	if rec.Mode == ModeDocker {
+		return fmt.Errorf("%w: hot install for a docker-mode project", ErrNotImplemented)
+	}
+	// Recorded is not running. A crash leaves the record behind, and installing
+	// into a stopped project then reporting success tells the caller a package
+	// is live in a scheduler that does not exist — when the entire reason to
+	// call this rather than restart is that something IS running.
+	if r.statusOf(rec).State != StateRunning {
+		return fmt.Errorf("%w: this project's local Airflow is not running, so there is nothing to install into without restarting it", ErrNotImplemented)
+	}
+	return r.standalone.HotInstall(ctx, projectPath, deps, cb)
+}
+
 func (r *Runtime) Attach(projectPath string) (Airflow, error) {
 	rec, err := localstate.Load(projectPath)
 	if err != nil {

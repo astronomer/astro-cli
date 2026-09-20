@@ -31,6 +31,10 @@ func (e *Engine) Start(_ context.Context, _ rt.Plan, _ rt.Callbacks) (rt.Airflow
 	return nil, ErrWindowsUnsupported
 }
 
+func (e *Engine) HotInstall(_ context.Context, _ string, _ []string, _ rt.Callbacks) error {
+	return ErrWindowsUnsupported
+}
+
 func (e *Engine) Attach(_ string) (rt.Airflow, error) {
 	return nil, ErrWindowsUnsupported
 }

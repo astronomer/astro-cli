@@ -56,18 +56,39 @@ func (c *Client) VenvAt(ctx context.Context, dir, python string, stdio Stdio) er
 	return c.fetch(ctx, "", stdio, args...)
 }
 
+// ErrRequirementLooksLikeFlag reports a requirement uv would read as an option.
+//
+// Requirements reaching here can come from a project's own manifest, which is
+// a file a repository ships — so an entry like "--index-url=https://…" would
+// become a uv flag and silently redirect the install, build backends and all.
+// uv has no argv terminator for `pip install`, so the guard is here.
+var ErrRequirementLooksLikeFlag = errors.New("this requirement would be read as a command-line option")
+
 // PipInstall installs reqs into the venv whose interpreter is pythonBin, using
 // `uv pip install`. constraint, when set, is passed as --constraint (a path or
-// URL). A solver failure surfaces as *ResolutionError. It backs a scratch
-// venv that is not driven from a pyproject.toml, so it takes an explicit
-// requirement list rather than a project directory.
-func (c *Client) PipInstall(ctx context.Context, pythonBin string, reqs []string, constraint string, stdio Stdio) error {
+// URL). A solver failure surfaces as *ResolutionError.
+//
+// project is the directory uv runs in, and it matters: uv discovers [tool.uv]
+// configuration — indexes, find-links, constraint-dependencies — by walking up
+// from its working directory. Empty means the caller's own directory, which for
+// an embedder is its process cwd and not the project, so a project resolving
+// from a private index would silently get the public one. Pass the project
+// directory whenever the requirements are that project's.
+//
+// Unlike sync, this does not read the manifest's dependency list; reqs is
+// explicit, which is what makes it usable on an environment that already exists.
+func (c *Client) PipInstall(ctx context.Context, project, pythonBin string, reqs []string, constraint string, stdio Stdio) error {
+	for _, r := range reqs {
+		if strings.HasPrefix(r, "-") {
+			return fmt.Errorf("%w: %q", ErrRequirementLooksLikeFlag, r)
+		}
+	}
 	args := []string{"pip", "install", "--python", pythonBin}
 	if constraint != "" {
 		args = append(args, "--constraint", constraint)
 	}
 	args = append(args, reqs...)
-	return asResolution("pip install", c.fetch(ctx, "", stdio, args...))
+	return asResolution("pip install", c.fetch(ctx, project, stdio, args...))
 }
 
 // PipCompile resolves reqs (read from stdio.In as a requirements list on
@@ -110,7 +131,14 @@ func (c *Client) Run(ctx context.Context, project string, argv []string, stdio S
 // markerName marks a fully synced venv. uv tracks installed packages inside
 // the venv (dist-info), so partial state from an interrupted install poisons
 // later syncs with metadata errors; the marker's absence is how we tell.
-const markerName = ".install-complete"
+// MarkerName is exported because a second writer into the same venv has to
+// drop and restore it: the marker is the claim that a venv finished installing,
+// and anything that makes that claim briefly false must use this name rather
+// than its own spelling of it.
+const MarkerName = ".install-complete"
+
+// markerName is the internal spelling, kept so this file reads unchanged.
+const markerName = MarkerName
 
 // markerMode is owner-only: the marker says this venv finished installing, and
 // a reader that trusts it skips the sync that would have rebuilt it.
