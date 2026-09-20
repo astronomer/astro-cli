@@ -631,6 +631,72 @@ func (s *Suite) TestStandaloneBuildEnv_WithEnvFile() {
 	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
 }
 
+func (s *Suite) TestStandaloneBuildEnv_LoopbackDefaults() {
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+
+	envMap := make(map[string]string)
+	for _, e := range env {
+		if parts := splitEnvVar(e); parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// The api-server (AF3) and webserver (AF2) must default to loopback so a
+	// standalone instance with all-admins auth is not reachable from the LAN.
+	s.Equal("127.0.0.1", envMap["AIRFLOW__API__HOST"])
+	s.Equal("127.0.0.1", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
+func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByEnvFile() {
+	tmpDir, err := os.MkdirTemp("", "standalone-loopback-envfile")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	envContent := "AIRFLOW__API__HOST=0.0.0.0\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
+	err = os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+
+	envMap := make(map[string]string)
+	for _, e := range env {
+		if parts := splitEnvVar(e); parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// A user's explicit .env setting wins over the loopback default.
+	s.Equal("0.0.0.0", envMap["AIRFLOW__API__HOST"])
+	s.Equal("0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
+func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByInheritedEnv() {
+	s.T().Setenv("AIRFLOW__API__HOST", "0.0.0.0")
+	s.T().Setenv("AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "0.0.0.0")
+
+	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.NoError(err)
+
+	env := handler.buildEnv()
+
+	envMap := make(map[string]string)
+	for _, e := range env {
+		if parts := splitEnvVar(e); parts != nil {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// A user's setting in the inherited environment wins over the loopback default.
+	s.Equal("0.0.0.0", envMap["AIRFLOW__API__HOST"])
+	s.Equal("0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
 func splitEnvVar(s string) []string {
 	idx := indexOf(s, '=')
 	if idx < 0 {
@@ -1115,6 +1181,51 @@ func (s *Suite) TestStandaloneStop_Running() {
 	s.NoError(err)
 
 	// PID file should be removed
+	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
+	s.True(os.IsNotExist(err))
+}
+
+func (s *Suite) TestStandaloneStop_WaitsForProcessGroup() {
+	tmpDir, err := os.MkdirTemp("", "standalone-stop-group")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	// Reproduce airflow standalone's shutdown shape: the master exits on
+	// SIGTERM right away, but a child in the same process group (like the
+	// scheduler or triggerer) keeps running for a bit. The child inherits
+	// `trap '' TERM` so only the master dies on Stop's SIGTERM; the group
+	// must still be waited on. The ready file tells us the child exists, so
+	// Stop's SIGTERM can't land before the trap is set.
+	readyFile := filepath.Join(tmpDir, "ready")
+	script := fmt.Sprintf(`trap '' TERM; sleep 2 & touch %q; trap - TERM; wait $!`, readyFile)
+	cmd := exec.Command("bash", "-c", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	err = cmd.Start()
+	s.NoError(err)
+	go cmd.Wait() //nolint:errcheck
+	pid := cmd.Process.Pid
+	s.Eventually(func() bool {
+		_, statErr := os.Stat(readyFile)
+		return statErr == nil
+	}, 5*time.Second, 10*time.Millisecond, "child process never came up")
+
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", pid)), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Stop(false)
+	s.NoError(err)
+
+	// Stop must not return while any group member is alive. Polling only the
+	// master PID would return here with the child still running.
+	s.Error(syscall.Kill(-pid, syscall.Signal(0)), "process group should be fully dead after Stop")
+
 	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
 	s.True(os.IsNotExist(err))
 }
