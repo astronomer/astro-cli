@@ -78,6 +78,41 @@ type Config struct {
 	// machine whose trust anchor is missing from uv's bundle from a healthy
 	// one, because nothing else about the start looks different.
 	OnUVCertFallback func()
+	// The three UV* fields below configure the uv that provisions a standalone
+	// venv. Standalone only: docker mode builds an image instead and never
+	// sees them, and Windows has no standalone engine, so all three are inert
+	// in both.
+	//
+	// UVBinDir is where to look for uv before PATH, for an embedder shipping
+	// its own copy. The desktop bundles one inside its .app so a user who never
+	// installed uv can still build an environment; unset, the search falls
+	// through to PATH and the installer locations and never finds it.
+	UVBinDir string
+	// UVCacheDir overrides the shared cache under the astro cache root. An
+	// embedder with a cache of its own wants one cache, not two, or the Python
+	// toolchain and the Airflow wheel are downloaded once per cache.
+	//
+	// Must be absolute; a relative path is refused rather than resolved
+	// against the project. Creating it is the embedder's job — uv makes it at
+	// its own mode on first use, and a caller that wants a particular one has
+	// to get there first.
+	//
+	// Worth being clear about the scope of "one cache": this keeps the
+	// EMBEDDER's two consumers on one, not the machine's. A user who also runs
+	// `astro local start` in a terminal still has the CLI's cache under the
+	// astro root alongside it.
+	UVCacheDir string
+	// UVNoConfig passes --no-config, so uv ignores a uv.toml or a [tool.uv]
+	// table discovered from the project upwards.
+	//
+	// Off by default for the reason HermeticUVEnv is: a uv a user configured
+	// for their own shell is theirs. An embedder that supplies python,
+	// dependencies and constraints itself can only be contradicted by one.
+	//
+	// It discards the PROJECT's [tool.uv] as well as the user's, which is the
+	// half that surprises: a project pinning a private index there resolves
+	// against public PyPI instead, and the failure names no flag.
+	UVNoConfig bool
 	// HealthTimeout bounds how long a start waits for Airflow to answer before
 	// giving up. Zero takes each engine's own default, five minutes, which is
 	// generous because a first run initializes the metadata database.
@@ -102,6 +137,9 @@ func New(cfg Config) *Runtime {
 	standalone := localstandalone.New(cfg.RoutesDir, cfg.ProxyDaemon, localstandalone.UVOptions{
 		HermeticEnv:    cfg.HermeticUVEnv,
 		OnCertFallback: cfg.OnUVCertFallback,
+		BinDir:         cfg.UVBinDir,
+		CacheDir:       cfg.UVCacheDir,
+		NoConfig:       cfg.UVNoConfig,
 	})
 	// Applied to both engines or neither: a caller asking a start to give up
 	// sooner means the start, not the standalone one.

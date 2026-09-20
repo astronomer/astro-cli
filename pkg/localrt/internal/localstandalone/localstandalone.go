@@ -114,10 +114,6 @@ func (e *Engine) SetHealthTimeout(d time.Duration) {
 	}
 }
 
-// UVOptions are the consumer's preferences for the venv provisioning a start
-// does. The cache directory is deliberately absent: it is shared across
-// projects and consumers so a Python toolchain downloads once, so the engine
-// owns it.
 // New builds the production engine. routesDir is where pkg/proxy keeps
 // routes.json (~/.astro/proxy); the composition root supplies it because
 // this package must not read config.
@@ -146,15 +142,18 @@ func New(routesDir string, daemon rt.ProxyDaemon, uvOpts UVOptions) *Engine {
 // uvClientFactory discovers uv lazily — at Start, not engine construction — so
 // every other operation (status, stop, logs) works on a machine whose uv
 // disappeared. The cache dir is shared across projects under the astro
-// cache root, so Python toolchains and wheels download once.
+// cache root, so Python toolchains and wheels download once — unless the
+// embedder names its own, which is how it keeps one cache rather than two.
 func uvClientFactory(opts UVOptions) func(context.Context, func(rt.LogLine)) (venvSyncer, error) {
 	return func(ctx context.Context, emit func(rt.LogLine)) (venvSyncer, error) {
-		root, err := rt.CacheRoot()
+		cache, err := uvCacheDir(opts)
 		if err != nil {
 			return nil, err
 		}
 		return uv.New(ctx, uv.Options{
-			CacheDir:       filepath.Join(root, "uv"),
+			BinDir:         opts.BinDir,
+			CacheDir:       cache,
+			NoConfig:       opts.NoConfig,
 			HermeticEnv:    opts.HermeticEnv,
 			OnCertFallback: opts.OnCertFallback,
 			// Reported through the start's own progress channel rather than a
@@ -893,6 +892,37 @@ func (a *airflow) Shell(ctx context.Context, s rt.Stdio) error {
 	}
 	return a.Run(ctx, []string{sh}, s)
 }
+
+// uvCacheDir is the embedder's cache when it named one, and the shared
+// location under the astro cache root otherwise.
+//
+// Resolved at Start rather than at construction, like the client itself, so a
+// machine whose cache root cannot be resolved still stops and reports status.
+// A start on such a machine fails — there is nowhere to download to — which is
+// the same thing the old inline CacheRoot call did.
+//
+// A relative CacheDir is refused rather than joined to something. uv runs with
+// its working directory set to the project, so a relative path would quietly
+// become one cache per project: the outcome the option exists to prevent, with
+// no error and no log line to say so.
+func uvCacheDir(opts UVOptions) (string, error) {
+	if opts.CacheDir != "" {
+		if !filepath.IsAbs(opts.CacheDir) {
+			return "", fmt.Errorf("the uv cache directory %q is relative; uv runs from the project directory, so it has to be absolute", opts.CacheDir)
+		}
+		return opts.CacheDir, nil
+	}
+	root, err := rt.CacheRoot()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, defaultUVCacheDirName), nil
+}
+
+// defaultUVCacheDirName is the shared cache's name under the astro cache root.
+// Named so the default has one spelling to test against, and so a change to it
+// is visibly a change to where every consumer's downloads live.
+const defaultUVCacheDirName = "uv"
 
 // planStateDir resolves the runtime state home: the plan's when set, the
 // canonical per-project location otherwise (same fallback as localdocker's
