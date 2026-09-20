@@ -393,12 +393,31 @@ func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
 }
 
 // landingPage shows a table of active routes.
+//
+// Reads and filters; never writes. It listed through ListRoutes, which prunes
+// and then persists what it pruned — so rendering this page deleted rows. The
+// daemon's store carries no liveness predicate (airflow/proxy's Routes()), so
+// the verdict being persisted was the default one: a route judged by the pid
+// recorded in it, which is the process that registered the route rather than
+// the runtime it fronts. Those diverge whenever the owner is replaced — desktop
+// restarting, or a standalone master exiting ahead of the group it leads — and
+// one GET on http://localhost:6563/ then removed a live project's hostname.
+//
+// The filtering stays, because a page listing projects that stopped weeks ago
+// would be its own bug. Only the writing goes.
+//
+// Reading without the routes lock, as GetRoute does on the request path and
+// for the same reason: writes land by atomic rename, so a reader sees one
+// version or the other. It also keeps a browser hit off a lock the CLI needs —
+// the landing page holding it is what made stopping the daemon while a request
+// was in flight turn a graceful shutdown into a kill.
 func (p *Proxy) landingPage(w http.ResponseWriter) {
-	routes, err := p.store.ListRoutes()
+	stored, err := p.store.ReadRoutes()
 	if err != nil {
 		http.Error(w, "Error reading routes", http.StatusInternalServerError)
 		return
 	}
+	routes := p.store.pruneStale(stored)
 
 	listed := make([]LandingRoute, len(routes))
 	for i, r := range routes {
