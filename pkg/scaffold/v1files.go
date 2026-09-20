@@ -94,18 +94,49 @@ type v1Project struct {
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
 	//
-	// The file itself is not retired — it also names Deployments, which have
-	// somewhere else to go — so this is read from a file that stays.
+	// The file itself is not retired, so this is read from a file that stays.
 	projectName string
+	// deployment is `project.deployment` from the same file: the target
+	// `astro deploy --save` remembers, or empty when nothing saved one. The key
+	// is a single string and always has been, so there is at most one.
+	deployment string
+	// workspace is `project.workspace` beside it. Never written by a command,
+	// only by `astro config set`, so it is usually absent even when deployment
+	// is not — but when it is there it is the other half of a manifest link.
+	workspace string
 }
 
-// v1ConfigName is the one field of .astro/config.yaml this reads. The rest of
-// the file is v1 CLI configuration that a v2 project does not carry, and the
-// Deployments it names get a note pointing at [tool.astro] instead.
-type v1ConfigName struct {
+// v1Config is the three fields of .astro/config.yaml this reads. The rest of
+// the file is v1 CLI configuration that a v2 project does not carry.
+//
+// Deployment is `project.deployment`, and reading it is what keeps the note
+// about it honest. The note used to fire on the file merely existing, which is
+// every v1 project, since `astro dev init` wrote it, while the key it spoke
+// about is set only by `astro deploy --save`, whose flag defaults to false. So
+// a conversion was routinely told to move a Deployment the file did not name.
+//
+// Deployment and Workspace are `any` rather than `string` on purpose. A struct
+// field types the whole decode: `deployment:` holding a map or a sequence makes
+// yaml fail the file, and readV1Config's error path drops the name with it, so
+// declaring these as strings would rename a project after its directory over a
+// key the conversion does not need. Decoding loose and taking the value only
+// when it is a scalar keeps a malformed deploy target from costing the name.
+type v1Config struct {
 	Project struct {
-		Name string `yaml:"name"`
+		Name       string `yaml:"name"`
+		Deployment any    `yaml:"deployment"`
+		Workspace  any    `yaml:"workspace"`
 	} `yaml:"project"`
+}
+
+// yamlString is the value of a loosely-decoded scalar string, and "" for every
+// other shape. Numbers and booleans are not ids, so they read as absent.
+func yamlString(v any) string {
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(s)
 }
 
 // v1ConfigRelPath is where a v1 project states its own name.
@@ -140,15 +171,16 @@ func readV1Project(dir string) (*v1Project, error) {
 	}
 
 	// The project's own name, which is the one thing in .astro/config.yaml a
-	// v2 project keeps. Not added to present: this file is not a candidate for
-	// retirement — it names Deployments too, and those get a note — so
-	// recording it there would offer it for deletion.
-	//
-	name, note, err := readV1ConfigName(dir)
+	// v2 project keeps, and the Deployment id that decides whether this file
+	// gets a note at all. Not added to present: the file holds v1 CLI
+	// configuration this conversion neither reads nor replaces, so it is not a
+	// candidate for retirement, and recording it there would offer it for
+	// deletion.
+	name, deployment, workspace, note, err := readV1Config(dir)
 	if err != nil {
 		return nil, err
 	}
-	v1.projectName = name
+	v1.projectName, v1.deployment, v1.workspace = name, deployment, workspace
 	if note != "" {
 		v1.notes = append(v1.notes, note)
 	}
@@ -259,8 +291,8 @@ func dockerfileIsPinOnly(data []byte) bool {
 	return seenFrom
 }
 
-// readV1ConfigName reads the project's own name out of .astro/config.yaml,
-// which is the one thing in that file a v2 project keeps.
+// readV1Config reads the project's own name out of .astro/config.yaml, plus
+// the deploy target and workspace that decide whether the file earns a note.
 //
 // A malformed file is not an error. v1's own loader tolerated one, nothing
 // else in a conversion depends on this file, and failing `astro init` over
@@ -275,17 +307,18 @@ func dockerfileIsPinOnly(data []byte) bool {
 // The PROJECT's config only, never the home one, though v1 resolved this key
 // with a fallback to it. A global project.name would otherwise rename every
 // project converted on that machine to the same thing.
-func readV1ConfigName(dir string) (name, note string, err error) {
+func readV1Config(dir string) (name, deployment, workspace, note string, err error) {
 	data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
 	if err != nil || data == nil {
-		return "", "", err
+		return "", "", "", "", err
 	}
-	var cfg v1ConfigName
+	var cfg v1Config
 	if uerr := yaml.Unmarshal(data, &cfg); uerr != nil {
-		return "", v1ConfigRelPath +
+		return "", "", "", v1ConfigRelPath +
 			": could not be read, so the project is named after its directory. " + uerr.Error(), nil
 	}
-	return strings.TrimSpace(cfg.Project.Name), "", nil
+	return strings.TrimSpace(cfg.Project.Name),
+		yamlString(cfg.Project.Deployment), yamlString(cfg.Project.Workspace), "", nil
 }
 
 // readIfPresent returns nil bytes and no error when the file is not there.

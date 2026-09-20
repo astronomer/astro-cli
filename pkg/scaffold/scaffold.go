@@ -369,7 +369,8 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// The v1 notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, leftovers(abs, cs.AirflowVersion, &pin, v1))
+	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, v1)
+	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, lefts)
 
 	// And the deletions go last of all. Apply walks this slice in order and
 	// stops at the first failure, so removing requirements.txt before the
@@ -380,11 +381,12 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// That state does make a rerun refuse, since a manifest carrying
 	// [tool.astro] is what ErrAlreadyAstroProject tests. Refusing over a project
 	// whose dependencies are intact is the better half of the trade.
-	for _, name := range planRetirements(v1, cs.Notes, cs.AirflowVersion) {
+	for _, name := range planRetirements(v1,
+		slices.Concat(v1.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
 		cs.Changes = append(cs.Changes, Change{
 			Kind:   Delete,
 			Path:   name,
-			Labels: []string{name + " (migrated into " + manifest.Marker + ", so removed)"},
+			Labels: []string{name + " (migrated into " + manifest.Marker + ", removed)"},
 		})
 	}
 
@@ -991,33 +993,58 @@ func sanitizeName(s string) string {
 	return strings.TrimRight(b.String(), "-_.")
 }
 
-// leftovers reports the files init found, did not read, and cannot carry over
-// on its own, with where each one belongs. Reading a Dockerfile means guessing
-// what its RUN lines were for, so init names it and stops there. The list is
-// the hand-off: what a person, or the agent working with them, does next.
+// leftovers reports what init found and cannot carry over on its own, with
+// where each one belongs. Reading a Dockerfile means guessing what its RUN
+// lines were for, so init names it and stops there. The list is the hand-off:
+// what a person, or the agent working with them, does next.
 // facts is a pointer only because the struct crossed gocritic's hugeParam
 // threshold when it gained a field; nothing here writes through it.
-func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) []string {
-	// requirements.txt, packages.txt, the Dockerfile and airflow_settings.yaml
-	// are READ now, so they are gone from this list: whatever they could not
-	// carry is a note from the reader that says which line and why, which is
-	// strictly better than "move its pins" about a file that was mostly
-	// carried. Leaving the settings entry here told a user to hand-move
-	// connections the same run had just carried for them.
-	// Names are slash-form, and joined only to look for the file. The name
-	// reaches a json contract a consumer parses, so it has to read the same on
-	// every platform: filepath.Join here reported `.astro\config.yaml` on
-	// Windows while envschema.LegacyRelPath, a slash-form constant, reported
-	// `.astro/env.schema.yaml` in the same list — the same contract
-	// disagreeing with itself about two files in the same directory.
+// The second return is the same list minus any note built from a value out of
+// a user's file, which is what planRetirements is given. That function decides
+// deletions by substring-matching filenames against notes, so a saved deploy
+// target called "Dockerfile" would otherwise keep this project's Dockerfile
+// alive after the manifest had already taken its pin. The comment further down
+// this file flags that hazard for environment variable names; this is the same
+// one, arriving through a different door.
+func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes, forRetirement []string) {
+	// requirements.txt, packages.txt, the Dockerfile, airflow_settings.yaml and
+	// .astro/config.yaml are READ now, so none of them is matched on presence
+	// here: whatever they could not carry is a note from the reader that says
+	// which line and why, which is strictly better than "move its pins" about a
+	// file that was mostly carried. Leaving the settings entry here told a user
+	// to hand-move connections the same run had just carried for them, and
+	// leaving the config entry here told nearly everyone to move a Deployment
+	// their file did not name.
+	// Every name printed below is slash-form, and joined only to look a file
+	// up. A name reaches a json contract a consumer parses, so it has to read
+	// the same on every platform: filepath.Join once reported
+	// `.astro\config.yaml` on Windows while envschema.LegacyRelPath, a
+	// slash-form constant, reported `.astro/env.schema.yaml` in the same list,
+	// one contract disagreeing with itself about two files in one directory.
+	// v1ConfigRelPath, the only nested name emitted now, is that same kind of
+	// constant and is concatenated rather than joined.
+	var out []string
+	// Reported on the target being there, never on the file being there. The
+	// file is in every v1 project, `project.deployment` is in very few, and the
+	// note keyed on the wrong one: it told most conversions to move a
+	// Deployment their config did not name.
+	//
+	// Called a saved deploy target rather than a Deployment because the key
+	// holds either. cmd/astro/deploy.go saves an Astro Deployment id here and
+	// cmd/apc/deploy.go saves a Software release name, and nothing in the file
+	// tells them apart, so the note says what to do with it if it is the first
+	// rather than asserting that it is.
+	var deployNote string
+	if v1.deployment != "" {
+		deployNote = v1ConfigRelPath + ": " + deployTargetNote(v1.deployment, v1.workspace)
+		out = append(out, deployNote)
+	}
 	checks := []struct{ file, note string }{
-		{v1ConfigRelPath, "move the Deployments it names into deployments under [tool.astro]"},
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
 		{"docker-compose.override.yml", "not read — move any service your dags need into your own setup"},
 		{"docker-compose.override.yaml", "not read — move any service your dags need into your own setup"},
 	}
-	var out []string
 	for _, c := range checks {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(c.file))); err != nil {
 			continue
@@ -1067,7 +1094,53 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) []strin
 				strconv.Itoa(len(v1.dependencies))+" requirements were not migrated either")
 		}
 	}
-	return out
+	if deployNote == "" {
+		return out, out
+	}
+	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote })
+}
+
+// deployTargetNote says what .astro/config.yaml saved and what a manifest entry
+// for it looks like, including the table NAME that entry needs. An earlier
+// wording said only "under [tool.astro.deployments]"; written out literally
+// that is `deployment = '...'` as a bare key of the deployments table, which
+// manifest.Parse rejects with CodeExpectedTable. A hand-off that produces an
+// unparseable manifest when followed is worse than no hand-off.
+//
+// The value is printed only when it is a plain id. planRetirements aside, a
+// value carrying a newline would put a second, unindented line under "Left to
+// do:" and a multi-line string into the json notes array a consumer groups by
+// the file name each note starts with.
+func deployTargetNote(deployment, workspace string) string {
+	const entry = ". If that is an Astro Deployment, give it a name under " +
+		"[tool.astro.deployments], say [tool.astro.deployments.prod], with "
+	if !plainDeployID(deployment) {
+		return "project.deployment holds this project's saved deploy target" + entry +
+			"deployment set to it and the workspace it lives in"
+	}
+	if plainDeployID(workspace) {
+		return deployment + " in workspace " + workspace + " is this project's saved deploy target" +
+			entry + "deployment = '" + deployment + "' and workspace = '" + workspace + "'"
+	}
+	return deployment + " is this project's saved deploy target" + entry +
+		"deployment = '" + deployment + "' and the workspace it lives in"
+}
+
+// plainDeployID reports a value safe to read at the end of a note: one line, no
+// spaces, and short. Both shapes this key holds qualify, an Astro Deployment
+// cuid and a Software release name.
+func plainDeployID(s string) bool {
+	if s == "" || len(s) > 96 {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // pronoun keeps the left-in-the-file note grammatical for one connection or

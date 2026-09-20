@@ -122,11 +122,11 @@ func TestChooseNameTakesWhatTheProjectCallsItself(t *testing.T) {
 
 // Reading the name does not put the file up for deletion.
 //
-// .astro/config.yaml also names Deployments, which have somewhere else to go
-// and get a note saying where, so the file stays. Recording it as one of the
-// v1 files present would offer it to planRetirements, which retires a file
-// once everything it said reached the manifest — and the name would be
-// everything, as far as that code could tell.
+// .astro/config.yaml holds v1 CLI configuration this conversion neither reads
+// nor replaces, so the file stays. Recording it as one of the v1 files present
+// would offer it to planRetirements, which retires a file once everything it
+// said reached the manifest — and the name would be everything, as far as that
+// code could tell.
 func TestReadingTheV1NameDoesNotRetireTheConfig(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
@@ -145,7 +145,7 @@ func TestReadingTheV1NameDoesNotRetireTheConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "orders-pipeline", res.Name)
 	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
-	assert.NoError(t, statErr, "the config names Deployments too, so it stays")
+	assert.NoError(t, statErr, "the config holds v1 CLI configuration this run does not replace, so it stays")
 }
 
 // A malformed config costs the name, not the conversion.

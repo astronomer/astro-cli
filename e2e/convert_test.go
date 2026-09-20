@@ -388,11 +388,27 @@ func v1Cases() []v1Case {
 				"dags/",
 				".gitignore",
 			},
+			// No note about .astro/config.yaml. This is what `astro dev init`
+			// writes, it saved no deploy target, and the name it does state was
+			// carried. The case below is the one that earns the note.
+		},
+		{
+			// The same file after `astro deploy --save`. The saved target is
+			// the one thing here a v2 project wants, so the note states the
+			// whole manifest entry for it, table name included, rather than
+			// pointing at the section it belongs in.
+			name: "a v1 project with a saved deploy target",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
+					"  deployment: cm1orders\n  workspace: cm1ws\n",
+				"Dockerfile": runtime2,
+			},
+			airflow:     "2",
+			projectName: "orders-pipeline",
+			kept:        []string{"Dockerfile", ".astro/config.yaml"},
 			notes: []string{
-				// The Deployments it names have somewhere to go; the file is
-				// kept and the run says where. The name it also states needs no
-				// note — it was carried.
-				".astro/config.yaml: move the Deployments it names",
+				"cm1orders in workspace cm1ws is this project's saved deploy target",
+				"[tool.astro.deployments.prod]",
 			},
 		},
 		{
@@ -410,11 +426,9 @@ func v1Cases() []v1Case {
 			kept:        []string{".astro/config.yaml"},
 			// An advisory, not a note: it is already named that.
 			//
-			// The Deployments note this file also earns is deliberately not
-			// asserted. leftovers fires it on the file being present, never on
-			// it naming a Deployment, and this fixture's config names none —
-			// so pinning it here would make a note that is wrong for this
-			// input into a contract.
+			// And no config note, which is the whole rule: leftovers fires it
+			// on the file naming a deploy target, never on the file being
+			// present, and this fixture's config names none.
 			advisories: []string{"from Orders Pipeline in .astro/config.yaml"},
 		},
 		{
