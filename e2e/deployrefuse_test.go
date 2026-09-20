@@ -197,6 +197,18 @@ func v2ProjectForDeploy(t *testing.T) *project {
 // declareDockerfile adds `dockerfile = "Dockerfile"` under [tool.astro].
 func declareDockerfile(t *testing.T, p *project) {
 	t.Helper()
+	addAstroKey(t, p, `dockerfile = "Dockerfile"`)
+}
+
+// addAstroKey inserts one line under the manifest's [tool.astro] table.
+//
+// One copy of the anchor. It was written out twice — once here and once for the
+// packages case — which states the same assumption about the scaffold's layout
+// in two places: when that layout changes, a comment landing above the table or
+// tomledit emitting it differently, one copy gets fixed and the other keeps
+// inserting somewhere harmless-looking and wrong.
+func addAstroKey(t *testing.T, p *project, line string) {
+	t.Helper()
 	path := filepath.Join(p.Dir, "pyproject.toml")
 	raw := read(t, path)
 
@@ -204,5 +216,5 @@ func declareDockerfile(t *testing.T, p *project) {
 	if !strings.Contains(raw, anchor) {
 		t.Fatalf("no [tool.astro] in the scaffolded manifest:\n%s", raw)
 	}
-	write(t, path, strings.Replace(raw, anchor, anchor+"dockerfile = \"Dockerfile\"\n", 1))
+	write(t, path, strings.Replace(raw, anchor, anchor+line+"\n", 1))
 }

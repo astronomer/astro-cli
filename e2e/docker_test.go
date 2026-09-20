@@ -70,6 +70,10 @@ func dockerProject(t *testing.T, name string) *project {
 	t.Helper()
 	p := newNamedProject(t, name)
 	p.run("init", "--name", name).requireSuccess()
+	// A case here can leave containers, a metadata volume and a built image.
+	// The image is not only the declared-Dockerfile cases: imagebuild runs the
+	// base as-is only when the project adds no dependencies AND no OS packages,
+	// so declaring either one tags astro-local/<project> too.
 	// Checked, because an unchecked cleanup is how the last leak went unnoticed
 	// for a whole revision: `stop --clean` had been refusing on every
 	// already-stopped case and nothing said so. Reset returns early and
