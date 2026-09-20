@@ -22,19 +22,18 @@ func saveRecord(t *testing.T, project string, mode Mode) {
 	}))
 }
 
-func testRuntime(t *testing.T) *Runtime {
-	t.Helper()
-	return New(Config{RoutesDir: t.TempDir()})
-}
-
 // A docker project's dependencies live in an image, so making them live is a
 // rebuild — a restart under another name. Refusing says so; dispatching to the
 // standalone engine would install into a venv that does not exist.
 func TestHotInstallRefusesDockerMode(t *testing.T) {
+	// Built first, because it is what moves the cache lever: saveRecord writes
+	// through whatever the environment says at the moment it runs, and running
+	// it first put the record in the developer's real cache.
+	rtime := isolatedRuntime(t)
 	project := filepath.Join(t.TempDir(), "proj")
 	saveRecord(t, project, ModeDocker)
 
-	err := testRuntime(t).HotInstall(t.Context(), project, []string{"pandas"}, Callbacks{})
+	err := rtime.HotInstall(t.Context(), project, []string{"pandas"}, Callbacks{})
 
 	require.ErrorIs(t, err, ErrNotImplemented)
 	require.Contains(t, err.Error(), "docker-mode")
@@ -45,10 +44,11 @@ func TestHotInstallRefusesDockerMode(t *testing.T) {
 // live in a scheduler that does not exist — when the whole reason to call this
 // rather than restart is that something IS running.
 func TestHotInstallRefusesAProjectThatIsNotRunning(t *testing.T) {
+	rtime := isolatedRuntime(t)
 	project := filepath.Join(t.TempDir(), "proj")
 	saveRecord(t, project, ModeStandalone)
 
-	err := testRuntime(t).HotInstall(t.Context(), project, []string{"pandas"}, Callbacks{})
+	err := rtime.HotInstall(t.Context(), project, []string{"pandas"}, Callbacks{})
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not running")
@@ -59,7 +59,9 @@ func TestHotInstallRefusesAProjectThatIsNotRunning(t *testing.T) {
 // do" is truer than "no Airflow is recorded" — which is what it used to say,
 // because the check sat below the load.
 func TestHotInstallWithNoDependenciesAnswersBeforeLookingForARuntime(t *testing.T) {
-	err := testRuntime(t).HotInstall(t.Context(), filepath.Join(t.TempDir(), "never-started"), nil, Callbacks{})
+	rtime := isolatedRuntime(t)
+
+	err := rtime.HotInstall(t.Context(), filepath.Join(t.TempDir(), "never-started"), nil, Callbacks{})
 
 	require.NoError(t, err)
 }

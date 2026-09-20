@@ -26,7 +26,7 @@ import (
 // asserted value rather than whatever the wall clock said.
 func claimedRuntime(t *testing.T, at time.Time) *Runtime {
 	t.Helper()
-	r := realRuntime(t)
+	r := isolatedRuntime(t)
 	r.now = func() time.Time { return at }
 	return r
 }

@@ -19,20 +19,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
 )
 
-// realRuntime builds a Runtime against throwaway cache and astro home dirs, so
-// its record-based dispatch runs for real without touching the user's machine.
-//
 // These tests came from cmd/local/deps_test.go along with the code they cover:
-// refusing to start over a live runtime, and picking the right engine to read logs
-// through. Both were CLI-private and are now the shared contract's, so the tests
-// follow rather than being left behind testing nothing.
-func realRuntime(t *testing.T) *Runtime {
-	t.Helper()
-	return isolatedRuntime(t, nil)
-}
+// refusing to start over a live runtime, and picking the right engine to read
+// logs through. Both were CLI-private and are now the shared contract's, so the
+// tests follow rather than being left behind testing nothing.
 
 func TestRefuseLiveStartGuardsAgainstOrphaning(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	project := t.TempDir()
 	pgid, reap := liveGroup(t)
 	require.NoError(t, localstate.Save(localstate.Record{
@@ -58,13 +51,13 @@ func TestRefuseLiveStartGuardsAgainstOrphaning(t *testing.T) {
 }
 
 func TestRefuseLiveStartAllowsFirstStart(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	// No record at all: the first start proceeds.
 	require.NoError(t, rt.refuseLiveStart(Plan{ProjectPath: t.TempDir(), Mode: ModeStandalone}))
 }
 
 func TestLogSourceDispatch(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 
 	// No record: standalone's detached log handle serves a stopped project.
 	stopped := t.TempDir()

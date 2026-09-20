@@ -73,7 +73,7 @@ func orderedProjects(t *testing.T, parent, firstName, secondName string) (first,
 // that record permanent, because the one command that removes it could not run
 // while it was there.
 func TestPruneRemovesARecordWhoseProjectIsGone(t *testing.T) {
-	rtime := realRuntime(t)
+	rtime := isolatedRuntime(t)
 	gone := staleRecordFor(t, t.TempDir())
 
 	removed, err := rtime.PruneStale()
@@ -95,7 +95,7 @@ func TestPruneRemovesARecordWhoseProjectIsGone(t *testing.T) {
 // as long as the project ran — would be bytes nothing can reach and nothing
 // will ever free.
 func TestPruneReclaimsTheStateDirectoryOfAProjectThatIsGone(t *testing.T) {
-	rtime := realRuntime(t)
+	rtime := isolatedRuntime(t)
 	project := filepath.Join(t.TempDir(), "logger")
 	saveStale(t, project, 8080)
 
@@ -115,7 +115,7 @@ func TestPruneReclaimsTheStateDirectoryOfAProjectThatIsGone(t *testing.T) {
 
 // Two stale records, one of each kind, both pruned.
 func TestPruneRemovesBothAGoneAndAPresentProject(t *testing.T) {
-	rtime := realRuntime(t)
+	rtime := isolatedRuntime(t)
 	parent := t.TempDir()
 
 	gone := staleRecordFor(t, parent)
@@ -148,7 +148,7 @@ func TestPruneReportsWhatItCouldNotRemoveAndPrunesTheRest(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, which ignores the directory permission this relies on")
 	}
-	rtime := realRuntime(t)
+	rtime := isolatedRuntime(t)
 	// The unremovable record is reached first, which is the only arrangement
 	// that says anything about carrying on past it.
 	stuck, ok := orderedProjects(t, t.TempDir(), "stuck", "ok")
@@ -191,9 +191,11 @@ func TestPruneDropsTheRecordEvenWhenItsRouteWillNotGo(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, which ignores the directory permission this relies on")
 	}
+	// isolatedLevers rather than isolatedRuntime, because this one keeps a
+	// handle on the routes directory so it can make it unwritable below. The
+	// levers are still set in exactly one place.
 	routes := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	t.Setenv("ASTRO_HOME", t.TempDir())
+	isolatedLevers(t)
 	rtime := New(Config{RoutesDir: routes})
 
 	project := filepath.Join(t.TempDir(), "routed")
@@ -221,7 +223,7 @@ func TestPruneDropsTheRecordEvenWhenItsRouteWillNotGo(t *testing.T) {
 // well be running. Swallowed, --clean printed "No stale local Airflow records
 // to remove" — which is a different claim, and the wrong one.
 func TestPruneSaysItCouldNotReachAnEngineRatherThanNothingToDo(t *testing.T) {
-	rtime := realRuntime(t)
+	rtime := isolatedRuntime(t)
 	unreachable := errors.New("no container engine reachable")
 	asked := 0
 	rtime.containersGone = func(context.Context, string) (bool, error) {
@@ -264,7 +266,7 @@ func TestRemoveReportsAFailureToDeriveThatIsNotAMissingProject(t *testing.T) {
 // A docker record whose containers are still there is not stale, and skipping
 // it is not a failure.
 func TestPruneLeavesADockerRecordWhoseContainersAreStillThere(t *testing.T) {
-	rtime := realRuntime(t)
+	rtime := isolatedRuntime(t)
 	rtime.containersGone = func(context.Context, string) (bool, error) { return false, nil }
 
 	removed, err := rtime.pruneAll([]Status{

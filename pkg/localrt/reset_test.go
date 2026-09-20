@@ -47,7 +47,7 @@ func standaloneProject(t *testing.T) (dir, airflowHome, venv string) {
 // "stopped", so `airflow: stopped` never printed and the json said false on
 // every reset there has ever been.
 func TestResetReportsTheStopItActuallyPerformed(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	project, airflowHome, venv := standaloneProject(t)
 	pgid, _ := liveGroup(t)
 	require.NoError(t, localstate.Save(localstate.Record{
@@ -75,7 +75,7 @@ func TestResetReportsTheStopItActuallyPerformed(t *testing.T) {
 // reset looks the same, and a report that is always false is as useless as one
 // that is always true.
 func TestResetDoesNotClaimAStopItDidNotPerform(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	project, airflowHome, venv := standaloneProject(t)
 	pgid, reap := liveGroup(t)
 	require.NoError(t, localstate.Save(localstate.Record{
@@ -103,7 +103,7 @@ func TestResetDoesNotClaimAStopItDidNotPerform(t *testing.T) {
 // broken, wipe it" got `no local Airflow is recorded for this project` and
 // nothing was wiped.
 func TestResetWipesAStoppedProjectWithNoRecord(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	project, airflowHome, venv := standaloneProject(t)
 
 	report, err := rt.Reset(context.Background(), project)
@@ -121,7 +121,7 @@ func TestResetWipesAStoppedProjectWithNoRecord(t *testing.T) {
 // without a record: `astro local check` parses DAGs with the project's own
 // .venv interpreter in docker mode too.
 func TestResetLeavesTheVenvOfAProjectStandaloneNeverRan(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	project := t.TempDir()
 	venv := filepath.Join(project, ".venv")
 	require.NoError(t, os.MkdirAll(filepath.Join(venv, "bin"), 0o755))
@@ -140,7 +140,7 @@ func TestResetLeavesTheVenvOfAProjectStandaloneNeverRan(t *testing.T) {
 // for. The lock is non-blocking by design, so what that buys reset is the same
 // thing it buys a second start — a refusal, not a wait.
 func TestResetRefusesToRaceAStart(t *testing.T) {
-	rt := realRuntime(t)
+	rt := isolatedRuntime(t)
 	project, airflowHome, _ := standaloneProject(t)
 
 	unlock, err := localstate.Lock(project)

@@ -47,19 +47,6 @@ func (d *recordingDaemon) StopIfEmpty() {
 
 func (d *recordingDaemon) asks() int { return len(d.whenAsked) }
 
-// isolatedRuntime builds an isolated Runtime with the proxy seam filled in.
-//
-// The three environment levers are the whole isolation contract — records,
-// config and routes, and the vault's home — and a Runtime test that sets two
-// of them writes into the developer's real state. One copy of them, here,
-// rather than one per file: realRuntime is this with no daemon.
-func isolatedRuntime(t *testing.T, daemon ProxyDaemon) *Runtime {
-	t.Helper()
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	t.Setenv("ASTRO_HOME", t.TempDir())
-	return New(Config{RoutesDir: t.TempDir(), ProxyDaemon: daemon})
-}
-
 // runtimeWatchingItsProxy is isolatedRuntime with a daemon that records.
 func runtimeWatchingItsProxy(t *testing.T) (*Runtime, *recordingDaemon) {
 	t.Helper()
