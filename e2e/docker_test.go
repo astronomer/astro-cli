@@ -152,15 +152,9 @@ func containersMatching(t *testing.T, project string, extra ...string) []string 
 	args = append(args,
 		"--filter", "label=com.docker.compose.project="+project,
 		"--format", "{{.Names}}")
-	out, err := exec.CommandContext(t.Context(), "docker", args...).Output()
+	names, err := dockerLines(t.Context(), args...)
 	if err != nil {
 		t.Fatalf("listing containers for %s: %v", project, err)
-	}
-	var names []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line != "" {
-			names = append(names, line)
-		}
 	}
 	return names
 }

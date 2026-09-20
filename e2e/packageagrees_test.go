@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"context"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -47,8 +48,8 @@ func TestTheLocalBuildAndThePackagedImageAgreeOnADockerfile(t *testing.T) {
 	// Registered BEFORE the build that creates them, and by tag prefix rather
 	// than by the name the result reports. dockerProject's cleanup only knows
 	// the tags the local build makes; astro-package/<name> is this case's to
-	// take away, and the first version of this registered it after parsing the
-	// result — so when that parse failed, the image leaked.
+	// take away. Registering after the result is parsed leaks the image
+	// whenever that parse fails, which is the run where cleanup matters most.
 	t.Cleanup(func() { removeImagesNamed(t, "astro-package/agrees") })
 
 	// Path two: the packaged image, asked directly of the image it names.
@@ -86,14 +87,17 @@ func TestTheLocalBuildAndThePackagedImageAgreeOnADockerfile(t *testing.T) {
 // `<repo>:<runtime>-<hash>` and a moving `<repo>:latest`, and a case that
 // removed only the tag its result named left the other behind pinning the
 // layers.
+//
+// context.Background rather than t.Context: this runs from t.Cleanup, and the
+// test's context is already canceled by then. dockerLines bounds it.
 func removeImagesNamed(t *testing.T, repo string) {
 	t.Helper()
-	out, err := exec.Command("docker", "images", "--format", "{{.Repository}}:{{.Tag}}", repo).Output()
+	tags, err := dockerLines(context.Background(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo)
 	if err != nil {
 		t.Logf("listing images for %s: %v", repo, err)
 		return
 	}
-	for _, tag := range strings.Fields(string(out)) {
+	for _, tag := range tags {
 		if err := exec.Command("docker", "image", "rm", "-f", tag).Run(); err != nil {
 			t.Logf("removing %s: %v", tag, err)
 		}

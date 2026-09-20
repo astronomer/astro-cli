@@ -386,3 +386,21 @@ func TestOldAirflowSpellingStillPoints(t *testing.T) {
 		t.Errorf("astro airflow start should name astro local start; got %q", combined)
 	}
 }
+
+// The e2e suite matches running proxy daemons on this spelling, and cannot
+// import it: e2e is its own module and deliberately requires nothing, so that a
+// dependency the suite takes can never reach the shipped binary.
+//
+// Pinned from this side instead. The suite's leak census hard-codes the literal
+// as proxyServeArg to find daemons a run started and failed to reap, and a
+// rename would fail nothing over there — pgrep would simply stop matching, and
+// the axis would report zero daemons forever. Renaming the constant is fine;
+// changing what it spells means changing the census to match.
+func TestServeSubcommandSpellingIsWhatE2EMatches(t *testing.T) {
+	const spelledInE2E = "__proxy-serve"
+	if proxydaemon.ServeSubcommand != spelledInE2E {
+		t.Fatalf("ServeSubcommand is %q, but the e2e leak census matches proxy daemons on %q — "+
+			"update its proxyServeArg or that axis silently stops finding anything",
+			proxydaemon.ServeSubcommand, spelledInE2E)
+	}
+}

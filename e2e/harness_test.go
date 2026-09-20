@@ -104,7 +104,28 @@ func runSuite(m *testing.M) (int, error) {
 	if err := buildAstro(dir); err != nil {
 		return 0, err
 	}
-	return m.Run(), nil
+
+	// Taken after the build, so the census is about what the CASES do. The
+	// census's own doc says what it covers and what it cannot.
+	//
+	// A ceiling that does not parse censuses nothing: the first tier() call
+	// fails the run and says why, and guessing a tier here would either skip a
+	// check that was wanted or pay for one that cannot find anything.
+	ceiling, ok := tierCeiling()
+	if !ok {
+		ceiling = 0
+	}
+	before := takeCensus(context.Background(), ceiling)
+
+	code := m.Run()
+
+	// Reported even when the run already failed: a case that fails partway is
+	// the one most likely to have skipped its own teardown, and that is exactly
+	// when knowing what is still on the machine is worth having.
+	if reportLeaks(before, ceiling) && code == 0 {
+		code = 1
+	}
+	return code, nil
 }
 
 // buildAstro builds the CLI from the repository this module sits in.
@@ -145,18 +166,32 @@ func repoRoot() (string, error) {
 	return root, nil
 }
 
-// maxTier is the highest tier this run executes. See the package doc.
-func maxTier(t *testing.T) int {
-	t.Helper()
+// tierCeiling reads ASTRO_E2E_MAX_TIER. ok is false when it is set to something
+// that is not a number.
+//
+// Split out of maxTier so that TestMain can read the ceiling too: it has no
+// *testing.T, and the leak census uses the ceiling to decide whether asking
+// docker anything can tell it something.
+func tierCeiling() (n int, ok bool) {
 	raw := os.Getenv("ASTRO_E2E_MAX_TIER")
 	if raw == "" {
-		return 0
+		return 0, true
 	}
 	n, err := strconv.Atoi(raw)
 	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// maxTier is the highest tier this run executes. See the package doc.
+func maxTier(t *testing.T) int {
+	t.Helper()
+	n, ok := tierCeiling()
+	if !ok {
 		// Not a skip: a typo here would silently run the hermetic tier and
 		// report green for a suite the caller believed covered Docker.
-		t.Fatalf("ASTRO_E2E_MAX_TIER=%q is not a number", raw)
+		t.Fatalf("ASTRO_E2E_MAX_TIER=%q is not a number", os.Getenv("ASTRO_E2E_MAX_TIER"))
 	}
 	return n
 }
