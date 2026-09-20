@@ -458,8 +458,7 @@ func (d *DockerImage) Pull(remoteImage, username, token string) error {
 		}
 		pass := token
 		pass = strings.TrimPrefix(pass, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registry + " -u " + username + " --password-stdin"
-		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		err = cmdExecWithStdin(containerRuntime, pass, os.Stdout, os.Stderr, "login", registry, "-u", username, "--password-stdin")
 	}
 	if err != nil {
 		return err
@@ -703,7 +702,27 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	return nil
 }
 
-// When login and push do not work use bash to run docker commands, this function is for users using colima
+// cmdExecWithStdin runs cmd directly (no shell) and writes stdin to the process's stdin pipe.
+// Used for registry logins so a password is never parsed by a shell.
+var cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+	_, lookErr := exec.LookPath(cmd)
+	if lookErr != nil {
+		return fmt.Errorf("failed to find the %s command: %w", cmd, lookErr)
+	}
+
+	execCMD := exec.Command(cmd, args...)
+	execCMD.Stdin = strings.NewReader(stdin)
+	execCMD.Stdout = stdout
+	execCMD.Stderr = stderr
+
+	if cmdErr := execCMD.Run(); cmdErr != nil {
+		return fmt.Errorf("failed to execute cmd: %w", cmdErr)
+	}
+
+	return nil
+}
+
+// When login and push do not work via the go client, fall back to invoking the container runtime binary directly. This function is for users using colima
 func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
@@ -713,9 +732,8 @@ func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		pass := authConfig.Password
 		pass = strings.TrimPrefix(pass, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		var stderr bytes.Buffer
-		err = cmdExec("bash", os.Stdout, &stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		err = cmdExecWithStdin(containerRuntime, pass, os.Stdout, &stderr, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
 		if err != nil {
 			stderrOutput := stderr.String()
 			if stderrOutput != "" {
