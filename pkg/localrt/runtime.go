@@ -160,10 +160,18 @@ func (r *Runtime) refuseLiveStart(p Plan) error {
 	if r.statusOf(rec).State != StateRunning {
 		return nil
 	}
+	// Both wrap the sentinels a claim returns for the same two conditions.
+	// external.go says the two refusals must not diverge and then they did:
+	// a claim reported ErrForeignMode and ErrAlreadyRunning while this
+	// reported prose, so the same condition was machine-readable through one
+	// door and not the other. The wording still differs on purpose — Start
+	// tells a person which command to type, a claim lets its consumer decide
+	// — but what happened is now the same value either way.
 	if rec.Mode != p.Mode {
-		return fmt.Errorf("local Airflow is already running for this project in %s mode; stop it first with `astro local stop`", modeLabel(rec.Mode))
+		return fmt.Errorf("%w: local Airflow is already running for this project in %s mode; stop it first with `astro local stop`",
+			ErrForeignMode, modeLabel(rec.Mode))
 	}
-	return fmt.Errorf("local Airflow is already running for this project; use `astro local restart` to restart it or `astro local stop` to stop it")
+	return fmt.Errorf("%w; use `astro local restart` to restart it or `astro local stop` to stop it", ErrAlreadyRunning)
 }
 
 // RunInImage runs one command in a docker-mode project's image, with no

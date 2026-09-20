@@ -1,4 +1,5 @@
 {
   "error": "x",
-  "code": -1
+  "code": -1,
+  "kind": "x"
 }

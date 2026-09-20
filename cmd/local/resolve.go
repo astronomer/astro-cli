@@ -169,7 +169,8 @@ func (c *cli) clientFor(ctx context.Context, i instances.Instance) (*airflowapi.
 // errNoLocalAirflow reports an `astro local` query with nothing running. The
 // fix is to start Airflow, never to point somewhere else — that is what the
 // top-level spelling is for.
-var errNoLocalAirflow = errors.New("no local Airflow is running for this project — start one with `astro local start`")
+var errNoLocalAirflow = fmt.Errorf(
+	"%w — start one with `astro local start`", localrt.ErrNotRunning)
 
 // machineInstance is the Airflow every `astro local` query command acts on: the
 // one this project has running right now. It reads the project's own runtime

@@ -155,6 +155,11 @@ func (e errJSONShown) Unwrap() error { return e.err }
 type jsonError struct {
 	Error string `json:"error"`
 	Code  int    `json:"code"`
+	// Kind is the stable name for WHICH failure this is, for a consumer that
+	// wants to branch. Error is prose and will be reworded; Kind is contract.
+	// Absent when the failure has no kind yet — see problemKind, which does not
+	// invent one.
+	Kind ProblemKind `json:"kind,omitempty"`
 }
 
 // emitJSONError writes the single JSON error object a failed command reports in
@@ -173,7 +178,7 @@ type jsonError struct {
 func emitJSONError(w io.Writer, err error) {
 	//nolint:errcheck // the command already failed; a write error changes nothing
 	Renderer{Format: FormatJSON, Out: w}.Emit(
-		jsonError{Error: err.Error(), Code: 1},
+		jsonError{Error: err.Error(), Code: 1, Kind: problemKind(err)},
 		func(io.Writer) error { return nil },
 	)
 }

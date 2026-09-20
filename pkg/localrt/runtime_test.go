@@ -39,10 +39,16 @@ func TestRefuseLiveStartGuardsAgainstOrphaning(t *testing.T) {
 	// A second start in the same mode is refused, not allowed to clobber.
 	err := rt.refuseLiveStart(Plan{ProjectPath: project, Mode: ModeStandalone})
 	require.ErrorContains(t, err, "already running")
+	// And carries the sentinel a claim returns for the same condition.
+	// external.go says these two refusals must not diverge, and they had:
+	// a claim reported the sentinel while this reported only prose, so the
+	// condition was machine-readable through one door and not the other.
+	require.ErrorIs(t, err, ErrAlreadyRunning)
 
 	// A different mode is refused and names the mode that is live.
 	err = rt.refuseLiveStart(Plan{ProjectPath: project, Mode: ModeDocker})
 	require.ErrorContains(t, err, "standalone mode")
+	require.ErrorIs(t, err, ErrForeignMode)
 
 	// Once the runtime is gone, the stale record no longer blocks a start.
 	reap()

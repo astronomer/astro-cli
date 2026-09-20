@@ -826,7 +826,11 @@ func (c *cli) runOpen(printURL bool) error {
 		return err
 	}
 	if st.State != localrt.StateRunning {
-		return fmt.Errorf("local Airflow is %s; run `%s` first", st.State, replaceStart)
+		// Wrapping the sentinel, like the query commands: this is the same
+		// condition a consumer branches on, and it published no kind while
+		// `astro local stop` published one for the identical situation.
+		return fmt.Errorf("%w: local Airflow is %s; run `%s` first",
+			localrt.ErrNotRunning, st.State, replaceStart)
 	}
 	url := primaryURL(st)
 	if printURL {
