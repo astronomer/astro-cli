@@ -11,7 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -289,4 +291,153 @@ func TestStopIfEmpty_NoRoutes(t *testing.T) {
 
 	// StopIfEmpty should not panic when there are no routes
 	StopIfEmpty()
+}
+
+// The decision and the handover happen under the routes lock.
+//
+// StopIfEmpty used to read through ListRoutes, which takes the lock and gives
+// it straight back, then signal with nothing held. In that gap a concurrent
+// start registers a route, finds the daemon alive and adopts it —
+// EnsureRunning holds this same lock across its own check-then-start to close
+// exactly that — and the SIGTERM lands on the daemon the start now depends on.
+//
+// Asserted by holding the lock and watching StopIfEmpty wait for it. The
+// symptom needs two processes racing a real daemon to show itself, and a test
+// that has to lose a race to pass is a test that passes once the race is gone.
+func TestStopIfEmptyWaitsForTheRoutesLock(t *testing.T) {
+	setupTestDir(t)
+
+	lockFile, err := Routes().AcquireLock()
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		StopIfEmpty()
+		close(done)
+	}()
+	// Joined before the test returns however it ends: StopIfEmpty reads the
+	// config.HomeConfigPath global that setupTestDir's cleanup writes back,
+	// and files under a TempDir the framework removes, so leaving it running
+	// is a data race reported exactly when a real regression is being
+	// diagnosed.
+	defer func() {
+		pkgproxy.ReleaseLock(lockFile)
+		<-done
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("StopIfEmpty ran to completion while another holder had the routes lock")
+	case <-time.After(300 * time.Millisecond):
+		// Still waiting, which is the point.
+	}
+}
+
+// And the lock is NOT held while the daemon is being waited for.
+//
+// The first version of this fix held it across the whole stop, which was worse
+// than the bug it fixed: the daemon answers the landing page by calling
+// ListRoutes, which takes this lock, so a stop overlapping any request to the
+// proxy blocked the daemon's own graceful shutdown until the poll gave up and
+// SIGKILLed it. Waiting for something that is waiting for you.
+//
+// The same moment carries the other half of the claim: by the time the wait
+// starts, the pid record is already gone, which is what stops a concurrent
+// start from adopting a daemon that has been signaled.
+func TestStopIfEmptyReleasesTheLockBeforeWaiting(t *testing.T) {
+	setupTestDir(t)
+
+	// A pid nothing owns, reported alive, so the stop path runs all the way
+	// to the wait while the SIGTERM it sends lands on nobody — ESRCH, ignored.
+	// Signaling os.Getpid() here would terminate the test binary.
+	const absentPID = 99999999
+	origAlive := pkgproxy.IsPIDAlive
+	t.Cleanup(func() { pkgproxy.IsPIDAlive = origAlive })
+	pkgproxy.IsPIDAlive = func(int) bool { return true }
+
+	// Nothing has created the proxy directory: this case registers no route,
+	// and it is AcquireLock inside AddRoute that usually makes it.
+	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
+	require.NoError(t, pkgproxy.WriteRecord(pidFilePath(), pkgproxy.Record{
+		PID:     absentPID,
+		Version: "test",
+		Port:    "6563",
+	}))
+
+	orig := waitForDaemonExit
+	t.Cleanup(func() { waitForDaemonExit = orig })
+
+	var lockFree, recordGone atomic.Bool
+	waitForDaemonExit = func(int) {
+		if f, err := Routes().AcquireLock(); err == nil {
+			lockFree.Store(true)
+			pkgproxy.ReleaseLock(f)
+		}
+		if _, err := os.Stat(pidFilePath()); os.IsNotExist(err) {
+			recordGone.Store(true)
+		}
+	}
+
+	StopIfEmpty()
+
+	if !lockFree.Load() {
+		t.Error("the routes lock was still held while waiting for the daemon, which is what the daemon needs to shut down")
+	}
+	if !recordGone.Load() {
+		t.Error("the pid record still named the daemon being stopped, so a concurrent start could adopt it")
+	}
+}
+
+func TestStopIfEmptyCountsOnlyLiveRoutes(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		routeLive bool
+		docker    bool
+		wantStop  bool
+	}{
+		{name: "a live route keeps the daemon", routeLive: true, wantStop: false},
+		{name: "a stale route does not", routeLive: false, wantStop: true},
+		// Docker routes are never pruned by pid — the CLI exits after starting
+		// the containers, so the recorded process says nothing about them — so
+		// one left behind keeps the daemon up for good. That is the orphan the
+		// sweep in `astro local list --clean` exists to collect, and pinning it
+		// here makes the leak visible if the predicate ever changes.
+		{name: "a docker route is never stale to this", routeLive: false, docker: true, wantStop: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupTestDir(t)
+
+			origAlive := pkgproxy.IsPIDAlive
+			t.Cleanup(func() { pkgproxy.IsPIDAlive = origAlive })
+			pkgproxy.IsPIDAlive = func(int) bool { return tc.routeLive }
+
+			route := &pkgproxy.Route{
+				Hostname:   "one.localhost",
+				Port:       "8080",
+				ProjectDir: t.TempDir(),
+				PID:        os.Getpid(),
+			}
+			if tc.docker {
+				route.Mode = pkgproxy.RouteModeDocker
+			}
+			require.NoError(t, Routes().AddRoute(route))
+
+			// A record for a daemon that is not alive, so deciding to stop
+			// removes it and deciding otherwise leaves it. No signal is sent
+			// either way, so the decision is observable without a seam.
+			require.NoError(t, pkgproxy.WriteRecord(pidFilePath(), pkgproxy.Record{
+				PID:     99999999,
+				Version: "test",
+				Port:    "6563",
+			}))
+
+			StopIfEmpty()
+
+			_, err := os.Stat(pidFilePath())
+			stopped := os.IsNotExist(err)
+			if stopped != tc.wantStop {
+				t.Errorf("decided to stop the daemon = %v, want %v", stopped, tc.wantStop)
+			}
+		})
+	}
 }

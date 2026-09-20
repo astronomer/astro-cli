@@ -303,22 +303,24 @@ func StopDaemon() error {
 
 	logger.Debugf("stopping proxy daemon (PID %d)", pid)
 	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
+	waitForExit(pid)
+	removeDaemonFiles()
+	return nil
+}
 
-	// Poll for exit
+// waitForExit polls until pid is gone, escalating to SIGKILL once stopTimeout
+// has passed. Shared with StopIfEmpty, which does its own signaling under the
+// routes lock and then waits out here.
+func waitForExit(pid int) {
 	deadline := time.Now().Add(stopTimeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(stopPollWait)
 		if !pkgproxy.IsPIDAlive(pid) {
-			removeDaemonFiles()
-			return nil
+			return
 		}
 	}
-
-	// Force kill
 	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this v1 path
 	time.Sleep(stopPollWait)
-	removeDaemonFiles()
-	return nil
 }
 
 func removeDaemonFiles() {
@@ -326,14 +328,93 @@ func removeDaemonFiles() {
 	os.Remove(portFilePath()) //nolint:errcheck // best-effort cleanup
 }
 
-// StopIfEmpty stops the proxy daemon if there are no active routes.
+// StopIfEmpty stops the proxy daemon when no route needs it any more.
+//
+// Split across the routes lock rather than wrapped in it. What has to be
+// atomic is the decision and the moment the daemon stops being adoptable:
+// EnsureRunning takes this same lock and adopts whatever the pid record names,
+// so once that record is gone under the lock, no start can attach itself to a
+// daemon that is already being signaled. That is the whole of the race, and
+// it is closed by the ordering rather than by the duration of the hold.
+//
+// The waiting happens outside. Holding the lock across it was the first
+// attempt and it was worse than the bug: the daemon answers the landing page
+// by calling ListRoutes, which takes this lock, so a stop overlapping any
+// request to http://localhost:6563/ blocked the daemon's own graceful
+// shutdown — srv.Shutdown's grace expired, the poll below then reached
+// SIGKILL, and a clean stop became a forced kill with a dropped connection.
+// Holding it for the full stopTimeout also let a stop and a start queue to
+// about fifteen and a half seconds, past pkg/proxy's fifteen-second lock
+// timeout, so a third waiter's AddRoute failed and that project started with
+// no hostname at all.
 func StopIfEmpty() {
-	routes, err := Routes().ListRoutes()
-	if err != nil {
+	pid, ok := claimDaemonForStop()
+	if !ok {
 		return
 	}
-	if len(routes) == 0 {
-		logger.Debugf("no active routes, stopping proxy daemon")
-		StopDaemon() //nolint:errcheck // error deliberately ignored in this v1 path
+	waitForDaemonExit(pid)
+}
+
+// waitForDaemonExit is the seam the stop waits through, so a test can observe
+// what is true while the wait is in flight — which for this function is the
+// claim, and is not visible from either side of the call.
+var waitForDaemonExit = waitForExit
+
+// claimDaemonForStop decides, under the routes lock, whether the daemon should
+// go; if so it makes the daemon unadoptable and signals it, returning the pid
+// still to be reaped.
+//
+// Every caller has already worked out that no route remains — localshared's
+// RemoveRoute and airflow/docker.go both call this only when their own count
+// reaches zero, and both count through a store that judges a route by its
+// owning record. The count here is a second, weaker opinion: pkgproxy's
+// default predicate judges a route by the pid recorded in it, which calls a
+// route dead whenever the process that registered it has been replaced. It can
+// therefore only ever agree with a caller that has already seen zero, which is
+// why it is kept as a guard and must never become the only gate.
+//
+// Pruned to decide, never written back. ListRoutes persists what it prunes,
+// and persisting that predicate's verdict is what deletes a live project's
+// route. Stale rows are `astro local list --clean`'s to remove, through the
+// store that knows better.
+func claimDaemonForStop() (int, bool) {
+	store := Routes()
+	lockFile, err := store.AcquireLock()
+	if err != nil {
+		// Worth saying: the daemon is now never reaped, and nothing else will
+		// mention it.
+		logger.Debugf("not stopping the proxy daemon: %s", err)
+		return 0, false
 	}
+	defer pkgproxy.ReleaseLock(lockFile)
+
+	// ReadRoutes, not ListRoutes: ListRoutes takes this same lock, and the
+	// flock is not reentrant across descriptors — measured. It would not
+	// deadlock, because AcquireLock polls LOCK_NB against a deadline; it would
+	// stall fifteen seconds and then fail, and the daemon would simply never
+	// be stopped, slowly.
+	routes, err := store.ReadRoutes()
+	if err != nil {
+		logger.Debugf("not stopping the proxy daemon: %s", err)
+		return 0, false
+	}
+	if len(pkgproxy.PruneStaleRoutes(routes)) != 0 {
+		return 0, false
+	}
+
+	pid, alive := IsRunning()
+	if !alive {
+		if pid > 0 {
+			removeDaemonFiles()
+		}
+		return 0, false
+	}
+
+	logger.Debugf("no active routes, stopping proxy daemon (PID %d)", pid)
+	// The record first, and under the lock, because that is what closes the
+	// race: a start holding this lock next finds nothing to adopt and brings
+	// up a daemon of its own.
+	removeDaemonFiles()
+	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
+	return pid, true
 }
