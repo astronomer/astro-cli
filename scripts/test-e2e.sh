@@ -31,9 +31,17 @@ export GORACE=atexit_sleep_ms=0
 # panic dumps goroutines instead, and does not run t.Cleanup, so tier 2 would
 # also leave a real Airflow holding a port. Tier 2's bound is ten minutes (see
 # slowCommandTimeout), so the suite gets thirty.
+#
+# Tier 3 gets more again. Its cases carry the same ten-minute bound, and the
+# first of them pays for a 1.34 GB image pull inside that bound on a runner
+# that starts with nothing cached — and a -timeout panic there leaves
+# containers, a volume and the image behind, which is the state this tier is
+# least able to afford leaking.
 timeout=15m
-if [ "${ASTRO_E2E_MAX_TIER:-0}" -ge 2 ]; then
-  timeout=30m
-fi
+case "${ASTRO_E2E_MAX_TIER:-0}" in
+  0 | 1) ;;
+  2) timeout=30m ;;
+  *) timeout=45m ;;
+esac
 
 exec go test -count=1 -race -shuffle=on -timeout="$timeout" -tags e2e "$@" ./...

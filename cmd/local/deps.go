@@ -229,10 +229,22 @@ func (b imageBuilder) RuntimeImage(ctx context.Context, airflowVersion string) (
 	return imagebuild.LocalRuntimeImage(ctx, airflowVersion, b.versionCacheDir)
 }
 
+// Build copies every field across, and the two that used to be missing are
+// the whole of Dockerfile mode.
+//
+// Without them a project declaring `dockerfile = ...` reached the builder as a
+// request with no Dockerfile AND no BaseImage — the engine leaves BaseImage
+// empty precisely because the file declares its own FROM — so the builder had
+// nothing to build, returned an empty tag, and the compose file was written
+// with `image:` blank. The start then died on "services.db-migration.image
+// must be a string": a compose validation error, naming no Dockerfile, for a
+// feature that had never run.
 func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb localrt.Callbacks) (string, error) {
 	return imagebuild.New(imagebuild.NewExecCommander(), time.Now).Build(ctx, imagebuild.Request{
 		WorkDir:      req.WorkDir,
 		BaseImage:    req.BaseImage,
+		Dockerfile:   req.Dockerfile,
+		Context:      req.Context,
 		Tag:          req.Tag,
 		Dependencies: req.Dependencies,
 		Packages:     req.Packages,

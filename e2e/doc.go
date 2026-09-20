@@ -30,8 +30,12 @@
 //	   server is the first thing here with real timing risk. A failure opens
 //	   an issue (.github/workflows/nightly-e2e.yaml), since a nightly nobody
 //	   reads is worse than no test. Unix only, and the cases say why.
-//	3  needs Docker.
-//	4  needs cloud credentials.
+//	3  needs Docker — the same lifecycle as tier 2 with containers instead of
+//	   a process, plus the project's own Dockerfile. Nightly with tier 2, and
+//	   off the pull-request path for what it pulls: the runtime image is
+//	   1.34 GB and a runner starts with none of it, against about forty
+//	   seconds for the cases themselves. Unix only, as tier 2 is.
+//	4  needs cloud credentials. Not written.
 //
 // # Isolation contract
 //

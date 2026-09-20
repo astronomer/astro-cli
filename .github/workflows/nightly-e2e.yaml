@@ -1,6 +1,6 @@
 name: Nightly e2e
 
-# Tier 2 starts a real Airflow — a database migration, a supervisor, an API
+# Tiers 2 and 3 start a real Airflow — a database migration, a supervisor, an API
 # server to wait for — so it runs here rather than on every pull request.
 #
 # A nightly nobody reads is worse than no test, so a failure opens an issue and
@@ -23,17 +23,22 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  ISSUE_TITLE: Nightly e2e (tier 2) is failing
+  ISSUE_TITLE: Nightly e2e (tiers 2-3) is failing
 
 jobs:
-  tier2:
+  tiers23:
     runs-on: ubuntu-latest
     # Measured at ~130s for all three tiers, so this is generous. It is here
     # because a cancelled job is neither failure() nor success(): without a
     # bound, a stalled uv download runs to GitHub's six-hour default and then
     # reports nothing at all, which is the one outcome this workflow is built
     # to prevent.
-    timeout-minutes: 30
+    # Above the suite's own 45m for tier 3, so that an overrun is go test's
+    # panic — which names the test and dumps its goroutines — rather than
+    # GitHub cancelling the job. A cancelled job is neither failure() nor
+    # success(), so both steps below would be skipped and the nightly would
+    # report nothing at all.
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -76,11 +81,16 @@ jobs:
           key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
           restore-keys: uv-${{ runner.os }}-
 
-      # Every tier, not only tier 2: the tiers below run per pull request, but
-      # running them here too costs seconds and catches the interactions
+      # Every tier, not only the top one: the tiers below run per pull request,
+      # but running them here too costs seconds and catches the interactions
       # between them that a tier on its own cannot.
-      - name: Run e2e tests (tiers 0 through 2)
-        run: make test-e2e ASTRO_E2E_MAX_TIER=2
+      #
+      # Tier 3 is here rather than on the PR path because of what it pulls: the
+      # Airflow runtime image is 1.34 GB, and a runner starts with none of it.
+      # That is a nightly's kind of minute, not a pull request's — and the cases
+      # themselves run in about forty seconds once the image is down.
+      - name: Run e2e tests (tiers 0 through 3)
+        run: make test-e2e ASTRO_E2E_MAX_TIER=3
 
       # gh rather than a scripting action, because the runner already has it
       # and this repo pins every action by SHA — one fewer thing to pin and
@@ -115,16 +125,16 @@ jobs:
           # printf rather than a quoted block, so the body carries no leading
           # indentation — four spaces would render the whole issue as code.
           body=$(printf '%s\n' \
-            "Tier 2 of the e2e suite failed on the nightly run." \
+            "Tier 2 or 3 of the e2e suite failed on the nightly run." \
             "" \
             "$RUN_URL" \
             "" \
-            "Tier 2 starts a real Airflow, so this is either a regression in start/stop, port allocation, stale-record cleaning or reset, or the flakiness that keeps this tier off the pull-request path. The run log says which." \
+            "Tier 2 starts a real Airflow and tier 3 starts one in Docker, so this is either a regression in start/stop, port allocation, stale-record cleaning, reset, or the docker image build and teardown — or the flakiness that keeps these tiers off the pull-request path. The run log says which." \
             "" \
             "Reproduce locally:" \
             "" \
             '```' \
-            "make test-e2e ASTRO_E2E_MAX_TIER=2" \
+            "make test-e2e ASTRO_E2E_MAX_TIER=3" \
             '```' \
             "" \
             "This issue closes itself when a nightly passes again.")

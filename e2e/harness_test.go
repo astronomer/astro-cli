@@ -323,6 +323,35 @@ func (p *project) env(extra map[string]string) []string {
 		"USERPROFILE="+p.home,
 		// Assertions are on text and JSON, not on escape sequences.
 		"NO_COLOR=1",
+		// What HOME redirection broke, put back deliberately — and the one
+		// documented exception to the isolation contract above.
+		//
+		// `docker compose` is a CLI plugin, and docker looks for plugins under
+		// the config directory, which defaults to $HOME/.docker. Redirecting
+		// HOME therefore hides it, and docker answers a compose call with
+		// "unknown command: docker compose" — which reads as a machine without
+		// compose installed rather than as a test that moved it.
+		//
+		// This points at the developer's real config rather than a temp one,
+		// and that is a choice with a cost. The same directory holds docker
+		// contexts and registry credentials, and buildx writes its own state
+		// into it during a build — so a tier-3 case reads and writes there.
+		// A temp directory with cli-plugins symlinked in would restore
+		// discovery without the rest, and would also break every developer
+		// whose engine is reached through a context: Colima, Rancher Desktop
+		// and rootless podman all keep the endpoint in that same config, so an
+		// isolated one would point the suite at a default engine that is not
+		// theirs.
+		//
+		// An ambient DOCKER_CONFIG wins, because a developer or a CI job that
+		// set one has already said where docker's configuration lives, and
+		// overriding it is how this reintroduces the error it exists to
+		// remove.
+		//
+		// Set for every tier, not only the docker one, because the cost is a
+		// variable nothing below tier 3 reads and the alternative is a lever
+		// each case has to remember.
+		"DOCKER_CONFIG="+dockerConfigDir(),
 		// Not optional. The CLI's own guard against tracking its test runs
 		// recognizes a Go test binary by its ".test" suffix, and this suite
 		// drives a binary named "astro" — so without this, every case spawns a
@@ -342,6 +371,24 @@ func (p *project) env(extra map[string]string) []string {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// dockerConfigDir is where docker's configuration lives for this run: what the
+// environment already says, or the real user's directory resolved from the
+// TEST process's own home rather than the redirected one the CLI gets.
+//
+// Empty when there is no home to read, which leaves DOCKER_CONFIG set to the
+// empty string — docker then falls back to its own default, which is the
+// behavior of a run that never set it.
+func dockerConfigDir() string {
+	if set := os.Getenv("DOCKER_CONFIG"); set != "" {
+		return set
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".docker")
 }
 
 func isLeaky(key string) bool {
