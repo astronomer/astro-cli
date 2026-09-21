@@ -226,9 +226,9 @@ func TestPruneSaysItCouldNotReachAnEngineRatherThanNothingToDo(t *testing.T) {
 	rtime := isolatedRuntime(t)
 	unreachable := errors.New("no container engine reachable")
 	asked := 0
-	rtime.containersGone = func(context.Context, string) (bool, error) {
+	rtime.containersGone = func(context.Context, []string) (map[string]bool, error) {
 		asked++
-		return false, unreachable
+		return nil, unreachable
 	}
 
 	removed, err := rtime.pruneAll([]Status{
@@ -238,9 +238,9 @@ func TestPruneSaysItCouldNotReachAnEngineRatherThanNothingToDo(t *testing.T) {
 
 	require.ErrorIs(t, err, unreachable)
 	assert.Empty(t, removed, "a record whose containers could not be checked must not be dropped")
-	// Asked once. The engine will not come back inside one loop, and one
-	// thing wrong with the machine should not be reported once per record,
-	// each repeat costing another probe timeout.
+	// Asked once for both records, not once each. The engine will not come
+	// back inside one sweep, one thing wrong with the machine should not be
+	// reported once per record, and every repeat costs another two shellouts.
 	assert.Equal(t, 1, asked, "one machine-wide cause, asked and reported once")
 }
 
@@ -267,7 +267,10 @@ func TestRemoveReportsAFailureToDeriveThatIsNotAMissingProject(t *testing.T) {
 // it is not a failure.
 func TestPruneLeavesADockerRecordWhoseContainersAreStillThere(t *testing.T) {
 	rtime := isolatedRuntime(t)
-	rtime.containersGone = func(context.Context, string) (bool, error) { return false, nil }
+	// Nothing is confirmed gone: an absent path is not a confirmation.
+	rtime.containersGone = func(context.Context, []string) (map[string]bool, error) {
+		return map[string]bool{}, nil
+	}
 
 	removed, err := rtime.pruneAll([]Status{
 		{ProjectPath: "/p/one", Mode: ModeDocker, State: StateStopped},

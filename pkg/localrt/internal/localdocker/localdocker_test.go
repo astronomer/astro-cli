@@ -36,6 +36,11 @@ type fakeCmd struct {
 	// the one thing that makes SecretEnv work — the values reaching the up, and
 	// not reaching anything else — with no coverage at all.
 	env map[string][]string
+	// outputBounded records, per Output call, whether its context carried a
+	// deadline. Booleans rather than the contexts themselves: holding a
+	// context in a struct is the thing containedctx exists to refuse, and the
+	// only question a test asks of one here is whether it was bounded at all.
+	outputBounded []bool
 }
 
 // envFor returns the environment recorded for the first call containing substr.
@@ -52,8 +57,24 @@ func (f *fakeCmd) Output(ctx context.Context, _ []string, name string, args ...s
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	_, bounded := ctx.Deadline()
+	f.outputBounded = append(f.outputBounded, bounded)
 	call := name + " " + strings.Join(args, " ")
 	f.calls = append(f.calls, call)
+	// Same contract Run honors, and for a sharper reason here: an engine that
+	// accepts the call and then never answers is the failure this package's
+	// probe deadline exists for, and without a hook that blocks, every test
+	// about that deadline can only assert a deadline was SET — which passes
+	// for an implementation that sets one the plumbing cannot act on.
+	if f.delayFor != nil {
+		if d := f.delayFor(call); d > 0 {
+			select {
+			case <-time.After(d):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
 	if f.output == nil {
 		return nil, nil
 	}

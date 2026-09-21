@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -684,8 +685,73 @@ func (e *Engine) ReadStatus(projectPath string) (rt.Status, error) {
 // StatusOf reports the live status for an already loaded record, so
 // callers holding one (list, the handle) skip the disk round trip.
 func (e *Engine) StatusOf(rec localstate.Record) rt.Status {
-	_, name := e.findProject(context.Background(), rec.ProjectPath)
-	return rec.Status(name == rec.ComposeProject)
+	st, _ := e.StatusOfReached(rec)
+	return st
+}
+
+// StatusOfReached is StatusOf plus whether an engine actually answered.
+//
+// The two are not the same question, and one caller must not confuse them.
+// Bounding the probe means a busy engine can miss its deadline, and a missed
+// deadline looks exactly like "no containers" — which for a listing is a
+// cosmetic wrong answer, but for refuseLiveStart is permission to start a
+// second Airflow over a live one. Docker mode has no other double-start guard,
+// so that path asks this and refuses what it cannot confirm.
+func (e *Engine) StatusOfReached(rec localstate.Record) (rt.Status, bool) {
+	_, name, reached := e.probeEngines(context.Background(), rec.ProjectPath)
+	return rec.Status(claims([]string{name}, rec)), reached
+}
+
+// StatusOfAll reports the live status of many records with one sweep of the
+// engines rather than one probe per record. Order is preserved, so a caller
+// can zip the answers back onto the records it asked about.
+//
+// The whole point is the call count: see runningProjects. A listing that asked
+// per record spent 18 seconds on a machine that had 26 of them.
+func (e *Engine) StatusOfAll(ctx context.Context, recs []localstate.Record) ([]rt.Status, error) {
+	if len(recs) == 0 {
+		return nil, nil
+	}
+	paths := make([]string, len(recs))
+	for i := range recs {
+		// Mirrors ReadStatus rather than judging a standalone record by
+		// container liveness, which would report every one of them stopped
+		// and say nothing about why. Today's only caller filters by mode, so
+		// this guards the exported surface against the next one.
+		if recs[i].Mode != rt.ModeDocker {
+			return nil, fmt.Errorf("%w: %s", ErrNotDockerMode, recs[i].ProjectPath)
+		}
+		paths[i] = recs[i].ProjectPath
+	}
+	running, _ := e.runningProjects(ctx, paths)
+	statuses := make([]rt.Status, len(recs))
+	for i := range recs {
+		statuses[i] = recs[i].Status(claims(running[recs[i].ProjectPath], recs[i]))
+	}
+	return statuses, nil
+}
+
+// claims reports whether any project running in the record's directory is the
+// record's own, which is what makes its Airflow live.
+//
+// A list rather than one name because a directory can hold more than one
+// compose project — a person's own `docker compose up` beside ours, an older
+// astro stack still up under a previous name — and the record's own project
+// must not lose its place to a neighbor.
+//
+// The emptiness guard is the other half. A probe that found nothing
+// contributes "", and a record written without a compose project name carries
+// "" too, so the bare equality this replaces read those two silences as
+// agreement and reported such a record as a running Airflow — forever, since
+// nothing about a stopped project ever makes the probe answer differently.
+// Worse, it could not be cleaned up: a --clean sweep skips records that report
+// running, so the only way out was deleting the state file by hand. Both
+// halves have to name the same project, and "" is not a project.
+func claims(probed []string, rec localstate.Record) bool {
+	if rec.ComposeProject == "" {
+		return false
+	}
+	return slices.Contains(probed, rec.ComposeProject)
 }
 
 // airflow is the handle to one docker-mode Airflow, valid because it was

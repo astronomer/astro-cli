@@ -90,7 +90,9 @@ func TestCleanPutsTheProxyAwayWithTheLastRoute(t *testing.T) {
 // assertion stayed green.
 func TestCleanPutsTheProxyAwayAfterADockerRouteGoes(t *testing.T) {
 	rtime, daemon := runtimeWatchingItsProxy(t)
-	rtime.containersGone = func(context.Context, string) (bool, error) { return true, nil }
+	rtime.containersGone = func(_ context.Context, paths []string) (map[string]bool, error) {
+		return allGone(paths), nil
+	}
 
 	require.NoError(t, rtime.routes.AddRoute(&proxy.Route{
 		Hostname:   "boxed.localhost",
@@ -122,7 +124,9 @@ func TestCleanPutsTheProxyAwayAfterADockerRouteGoes(t *testing.T) {
 // and a remaining route means no ask at all.
 func TestCleanLeavesTheProxyWhileARouteRemains(t *testing.T) {
 	rtime, daemon := runtimeWatchingItsProxy(t)
-	rtime.containersGone = func(context.Context, string) (bool, error) { return true, nil }
+	rtime.containersGone = func(_ context.Context, paths []string) (map[string]bool, error) {
+		return allGone(paths), nil
+	}
 
 	// One route that survives the sweep, and one that does not.
 	for _, r := range []*proxy.Route{

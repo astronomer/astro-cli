@@ -34,11 +34,21 @@ type Runtime struct {
 	// own clock for the records they write; this is the same seam for the
 	// records Claim writes, which have no engine behind them.
 	now func() time.Time
-	// containersGone confirms a docker project's containers are really absent
-	// before --clean drops its record. A field for the same reason now is
+	// containersGone confirms docker projects' containers are really absent
+	// before --clean drops their records. A field for the same reason now is
 	// one: the answer comes from outside the process, and a test that needs
 	// no engine to be reachable cannot make the machine it runs on have none.
-	containersGone func(context.Context, string) (bool, error)
+	//
+	// Batched, because the sweep that calls it runs over every stale record
+	// and each call shells out twice. Asked per record it kept the whole cost
+	// the listing had just shed: 18 seconds to --clean the 26 records that
+	// prompted this, after List itself was down to one call.
+	containersGone func(context.Context, []string) (map[string]bool, error)
+	// dockerStatuses answers a batch of docker records. A seam beside
+	// containersGone and for the same reason — without it the listing tests
+	// reach the host's real docker and podman, which pkg/localdocker's
+	// Commander doc says explicitly must never happen in a test.
+	dockerStatuses func(context.Context, []localstate.Record) ([]Status, error)
 	// daemon is the proxy the routes point at. The engines each hold it for
 	// the start and stop they drive; the Runtime holds it for --clean, which
 	// removes routes without going through either.
@@ -152,7 +162,8 @@ func New(cfg Config) *Runtime {
 		standalone:     standalone,
 		routes:         proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
 		now:            time.Now,
-		containersGone: docker.ContainersGone,
+		containersGone: docker.ContainersGoneAll,
+		dockerStatuses: docker.StatusOfAll,
 		daemon:         cfg.ProxyDaemon,
 	}
 }
@@ -195,7 +206,22 @@ func (r *Runtime) refuseLiveStart(p Plan) error {
 	if err != nil {
 		return err
 	}
-	if r.statusOf(rec).State != StateRunning {
+	st, reached := r.statusOfReached(rec)
+	if !reached {
+		// Bounding the probe gave a busy engine a way to miss its deadline,
+		// and a missed deadline is indistinguishable from "no containers" —
+		// which here would be permission to start a second Airflow over a
+		// live one. Docker mode has no other double-start guard, and the
+		// damage is not recoverable by retrying: publish overwrites the
+		// record, the in-use port sends allocPort to a new one, and the
+		// original stack is left running behind a stale route. So an engine
+		// that did not answer refuses the start rather than waving it
+		// through, the same way --clean refuses to delete what it could not
+		// confirm.
+		return fmt.Errorf(
+			"cannot tell whether %s is already running: no container engine answered in time", p.ProjectPath)
+	}
+	if st.State != StateRunning {
 		return nil
 	}
 	// Both wrap the sentinels a claim returns for the same two conditions.
@@ -482,15 +508,66 @@ func (r *Runtime) List() ([]Status, error) {
 			hostByProject[rt.ProjectDir] = rt.Hostname
 		}
 	}
-	statuses := make([]Status, 0, len(recs))
-	for i := range recs {
-		st := r.statusOf(recs[i])
-		if st.Hostname == "" {
-			st.Hostname = hostByProject[st.ProjectPath]
+	statuses, err := r.statusOfAll(recs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range statuses {
+		if statuses[i].Hostname == "" {
+			statuses[i].Hostname = hostByProject[statuses[i].ProjectPath]
 		}
-		statuses = append(statuses, st)
 	}
 	return statuses, nil
+}
+
+// statusOfAll reports every record's live status, asking the container engines
+// once for the whole list instead of once per docker record.
+//
+// Standalone liveness is a syscall, so those stay one at a time — it is the
+// docker probes that shell out, and a long list multiplied them. Asking per
+// record cost a machine with 26 of them 18 seconds for a command that prints a
+// table, because each record that was not running also paid for a fall-through
+// probe of the other engine.
+//
+// Order is preserved: the answers go back to the slots their records came
+// from, so a caller reading the two lists together still lines them up.
+func (r *Runtime) statusOfAll(recs []localstate.Record) ([]Status, error) {
+	statuses := make([]Status, len(recs))
+	var docker []localstate.Record
+	var dockerAt []int
+	for i := range recs {
+		if recs[i].Mode == ModeDocker {
+			docker = append(docker, recs[i])
+			dockerAt = append(dockerAt, i)
+			continue
+		}
+		statuses[i] = r.standalone.StatusOf(recs[i])
+	}
+	if len(docker) == 0 {
+		// Nothing to ask an engine about, so no engine is asked. Structural
+		// rather than left to the engine's own early return: the sweep is one
+		// call instead of N now, but one call against a wedged podman is
+		// still the wait this change exists to remove.
+		return statuses, nil
+	}
+	answered, err := r.dockerStatuses(context.Background(), docker)
+	if err != nil {
+		return nil, err
+	}
+	for j := range answered {
+		statuses[dockerAt[j]] = answered[j]
+	}
+	return statuses, nil
+}
+
+// statusOfReached is statusOf plus whether the engine behind it answered.
+// Standalone liveness is a syscall on this machine's own process table, so it
+// always answers; only a container engine can go quiet.
+func (r *Runtime) statusOfReached(rec localstate.Record) (Status, bool) {
+	if rec.Mode == ModeDocker {
+		return r.docker.StatusOfReached(rec)
+	}
+	return r.standalone.StatusOf(rec), true
 }
 
 // statusOf reports one record's live status through the engine that owns its
@@ -522,6 +599,19 @@ func (r *Runtime) PruneStale() ([]Status, error) {
 	return r.pruneAll(statuses)
 }
 
+// staleDockerPaths is every docker record the sweep might remove: the ones
+// already reporting stopped. A running project is not a candidate, so asking
+// the engine about it would buy nothing.
+func staleDockerPaths(statuses []Status) []string {
+	var paths []string
+	for i := range statuses {
+		if statuses[i].Mode == ModeDocker && statuses[i].State != StateRunning {
+			paths = append(paths, statuses[i].ProjectPath)
+		}
+	}
+	return paths
+}
+
 // pruneAll is PruneStale's loop over statuses already read. Separate because
 // List reaches a container engine to judge docker liveness, and what this
 // does with a failure is worth testing without one.
@@ -533,37 +623,30 @@ func (r *Runtime) pruneAll(statuses []Status) ([]Status, error) {
 	// other stale one behind it. What could be pruned is pruned, and what
 	// could not is reported at the end.
 	var errs []error
-	// ContainersGone fails only when no engine is reachable at all, which is
-	// one thing wrong with the machine rather than one thing wrong per
-	// record. Asked once: the engine will not come back inside this loop, and
-	// reporting it once beats the same sentence with a different path after
-	// it, each costing another probe timeout.
-	var engineErr error
+	// Docker liveness cannot tell "compose gone" from "engine down", so the
+	// containers are confirmed really absent before anything is deleted: a
+	// blip in the daemon must not wipe a running project's record. Standalone
+	// liveness is a syscall, so its stopped verdict is trusted as-is.
+	//
+	// Asked once for every candidate at once. Not only because an engine that
+	// is down will not come back inside this loop — that was already true when
+	// the question was asked per record — but because each asking shells out
+	// twice, and a sweep of 26 stale records spent 18 seconds on it. One
+	// machine-wide cause is also reported once rather than once per record.
+	gone, engineErr := r.containersGone(context.Background(), staleDockerPaths(statuses))
+	if engineErr != nil {
+		// Not knowing is not the same as nothing to do. Unreported, --clean
+		// says "no stale records to remove" when what happened is that it
+		// could not go look.
+		errs = append(errs, engineErr)
+	}
 	for i := range statuses {
 		st := &statuses[i]
 		if st.State == StateRunning {
 			continue
 		}
-		// Docker liveness cannot tell "compose gone" from "engine down", so
-		// confirm the containers are really absent before deleting. A blip in
-		// the daemon must not wipe a running project's record. Standalone
-		// liveness is a syscall, so its stopped verdict is trusted as-is.
-		if st.Mode == ModeDocker {
-			if engineErr != nil {
-				continue
-			}
-			gone, cerr := r.containersGone(context.Background(), st.ProjectPath)
-			if cerr != nil {
-				// Not knowing is not the same as nothing to do. Unreported,
-				// --clean says "no stale records to remove" when what
-				// happened is that it could not go look.
-				engineErr = cerr
-				errs = append(errs, cerr)
-				continue
-			}
-			if !gone {
-				continue
-			}
+		if st.Mode == ModeDocker && !gone[st.ProjectPath] {
+			continue
 		}
 		// Drop the route first, while the record still backs it, then the
 		// record. Removing an absent record is not an error.
