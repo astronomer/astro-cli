@@ -264,7 +264,7 @@ func TestParseDockerfileAtReadsRealReferences(t *testing.T) {
 // A FROM built from a build argument is no answer at all.
 //
 // Its value can also arrive from the build command line, so nothing read from
-// the file can say what it builds on. A caller that refuses on an unrecognised
+// the file can say what it builds on. A caller that refuses on an unrecognized
 // base has to be told that rather than handed "${BASE}".
 func TestUnresolvedRefsAreReportedAsSuch(t *testing.T) {
 	dir := t.TempDir()
