@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -167,10 +168,31 @@ func TestStartStillReportsCancellationAsCancellation(t *testing.T) {
 	e.health = neverHealthy
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		cancel()
-	}()
+	// The interrupt lands on the exit check's first liveness probe. That is
+	// the moment worth testing and the only one that can confuse the two
+	// outcomes: the wait is genuinely in progress, the poll has just found
+	// the group alive, and the cancellation arrives on top of it.
+	//
+	// It used to land 20 milliseconds after Start was called, which is a race
+	// against everything Start does before the wait — the sync, the venv
+	// check, the launch. Lose that race and the cancel is seen by the
+	// pre-launch check instead, which correctly reports "Airflow was not
+	// started": a different branch, a different outcome, and an assertion
+	// failure saying the message is wrong when what happened is that the case
+	// measured something else. It failed on a loaded machine, and ten times
+	// out of ten under -count, having passed every quiet single run.
+	//
+	// Driven through the kill seam for the reason exitsAfter gives: a
+	// liveness probe is a signal 0 on the waiting goroutine, so hanging the
+	// cancellation off one orders it against the wait by construction rather
+	// than by the clock.
+	var once sync.Once
+	e.kill = func(pid int, sig syscall.Signal) error {
+		if sig == 0 {
+			once.Do(cancel)
+		}
+		return procs.kill(pid, sig)
+	}
 
 	_, err := e.Start(ctx, p, rt.Callbacks{})
 	require.Error(t, err)
