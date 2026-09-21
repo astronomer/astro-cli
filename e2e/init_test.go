@@ -113,7 +113,10 @@ func TestInitRefusesToReinitialize(t *testing.T) {
 
 	p.run("init", "--name", "demo").
 		requireFailure().
-		requireStderr("already an Astro project")
+		requireStderr("already an Astro project").
+		// The refusal points at a file to edit instead, so it has to say
+		// which file: naming the directory alone leaves that dangling.
+		requireStderr("pyproject.toml")
 
 	if got := read(t, filepath.Join(p.Dir, "pyproject.toml")); got != manifest {
 		t.Errorf("a refused init rewrote pyproject.toml anyway:\n--- before\n%s\n--- after\n%s", manifest, got)

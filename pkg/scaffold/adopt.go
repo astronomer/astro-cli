@@ -58,7 +58,12 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 		return nil, nil, pin, fmt.Errorf("parsing %s: %w", path, err)
 	}
 	if _, ok := ed.Get([]string{"tool", "astro"}); ok {
-		return nil, nil, pin, fmt.Errorf("%s %w; edit that manifest instead of re-initializing", dir, ErrAlreadyAstroProject)
+		// Named, rather than "that manifest": the sentence points at a
+		// directory, so an unnamed manifest leaves the reader to work out
+		// which file it meant. The bare marker and not the full path,
+		// because the directory it sits in is the subject of the same
+		// sentence and spelling the path out repeats it.
+		return nil, nil, pin, fmt.Errorf("%s %w; edit its %s instead of re-initializing", dir, ErrAlreadyAstroProject, manifest.Marker)
 	}
 	// [project] and [tool.astro] are what make the directory an Astro project,
 	// so they lead the manifest the way [project] leads a pyproject.toml

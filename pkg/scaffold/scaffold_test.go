@@ -130,6 +130,9 @@ func TestRunRefusesAnAstroProject(t *testing.T) {
 	_, err := Run(dir, Options{})
 	require.ErrorIs(t, err, ErrAlreadyAstroProject)
 	assert.Contains(t, err.Error(), dir)
+	// The refusal sends the reader to a file, so it has to say which one:
+	// "edit that manifest" beside a directory names nothing.
+	assert.Contains(t, err.Error(), manifest.Marker)
 }
 
 func TestRunAdoptsExistingManifest(t *testing.T) {
