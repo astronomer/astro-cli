@@ -150,3 +150,140 @@ func TestParseDockerfileAtResolvesTheFinalStage(t *testing.T) {
 		})
 	}
 }
+
+// What counts as an Astro Runtime image, and what does not.
+//
+// The negatives carry the weight. This replaced a `strings.Contains(from,
+// "runtime")` check, which accepted three of the cases below — and the compose
+// file written for such an image runs Airflow as the `astro` user and reads a
+// generation off the tag, neither of which an arbitrary base offers.
+func TestIsAstroRuntimeImage(t *testing.T) {
+	for _, tc := range []struct {
+		image string
+		want  bool
+	}{
+		{"astrocrpublic.azurecr.io/runtime", true},
+		{"quay.io/astronomer/astro-runtime", true},
+		{"quay.io/astronomer/ap-airflow", true},
+
+		// A repository under the registry, not the registry alone: `FROM
+		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
+		// which is an unrelated image and not this one.
+		{"astrocrpublic.azurecr.io", false},
+		{"quay.io/astronomer", false},
+		{"astrocrpublic.azurecr.io/", false},
+
+		// The ordinary OSS image, which is the shape a v1 repo brings.
+		{"apache/airflow", false},
+		{"python", false},
+		{"ubuntu", false},
+		// Named to look like one without being published as one.
+		{"myco/our-runtime", false},
+		{"runtime", false},
+		// A registry whose name merely starts with the real one.
+		{"astrocrpublic.azurecr.io.example.com/runtime", false},
+		{"quay.io/astronomer-mirror/astro-runtime", false},
+		{"", false},
+	} {
+		t.Run(tc.image, func(t *testing.T) {
+			if got := IsAstroRuntimeImage(tc.image); got != tc.want {
+				t.Errorf("IsAstroRuntimeImage(%q) = %v, want %v", tc.image, got, tc.want)
+			}
+		})
+	}
+}
+
+// The reference shapes a real Dockerfile carries.
+//
+// Each of these was read wrongly at some point, and each becomes a wrong answer
+// rather than a missing one: a caller that refuses a start on what this returns
+// turns a misparse into a project that cannot run.
+func TestParseDockerfileAtReadsRealReferences(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, wantImage, wantTag string
+	}{
+		{
+			// The ordinary way to build an amd64 image on Apple silicon.
+			name:      "a per-stage platform flag is not the image",
+			body:      "FROM --platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-12",
+		},
+		{
+			name:      "and neither is a templated one",
+			body:      "FROM --platform=$BUILDPLATFORM astrocrpublic.azurecr.io/runtime:3.1-12\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-12",
+		},
+		{
+			// docker splits on any run of whitespace; a "FROM " prefix match
+			// does not see this line at all.
+			name:      "a tab after FROM",
+			body:      "FROM\tastrocrpublic.azurecr.io/runtime:3.1-12\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-12",
+		},
+		{
+			// Splitting on the first colon reads the image as "localhost".
+			name:      "a registry host carrying a port",
+			body:      "FROM localhost:5000/astro-runtime:3.1-12\n",
+			wantImage: "localhost:5000/astro-runtime", wantTag: "3.1-12",
+		},
+		{
+			name:      "a port and no tag",
+			body:      "FROM localhost:5000/astro-runtime\n",
+			wantImage: "localhost:5000/astro-runtime", wantTag: "latest",
+		},
+		{
+			// A digest names an exact image and carries no version. Reporting
+			// the hex as a tag reads as Airflow 2 to anything parsing it.
+			name:      "a digest reference has no tag",
+			body:      "FROM astrocrpublic.azurecr.io/runtime@sha256:abc123\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "",
+		},
+		{
+			name:      "case and alias keywords are not the image",
+			body:      "from astrocrpublic.azurecr.io/runtime:3.1-12 as base\n",
+			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-12",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "Dockerfile")
+			if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			image, tag, err := ParseDockerfileAt(path)
+			if err != nil {
+				t.Fatalf("ParseDockerfileAt: %v", err)
+			}
+			if image != tc.wantImage || tag != tc.wantTag {
+				t.Errorf("ParseDockerfileAt = %q:%q, want %q:%q", image, tag, tc.wantImage, tc.wantTag)
+			}
+		})
+	}
+}
+
+// A FROM built from a build argument is no answer at all.
+//
+// Its value can also arrive from the build command line, so nothing read from
+// the file can say what it builds on. A caller that refuses on an unrecognised
+// base has to be told that rather than handed "${BASE}".
+func TestUnresolvedRefsAreReportedAsSuch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Dockerfile")
+	body := "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	image, _, err := ParseDockerfileAt(path)
+	if err != nil {
+		t.Fatalf("ParseDockerfileAt: %v", err)
+	}
+	if !IsUnresolvedRef(image) {
+		t.Errorf("IsUnresolvedRef(%q) = false; a caller would judge the literal text", image)
+	}
+	if IsAstroRuntimeImage(image) {
+		t.Errorf("%q is not a resolved image reference and must not read as one", image)
+	}
+	if IsUnresolvedRef("astrocrpublic.azurecr.io/runtime") {
+		t.Error("a plain reference must not read as unresolved")
+	}
+}

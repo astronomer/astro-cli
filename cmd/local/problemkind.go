@@ -50,6 +50,10 @@ const (
 	// retry policy is correct everywhere; it simply has nothing to fire on
 	// there.
 	KindLocked ProblemKind = "locked"
+	// KindUnsupportedBase: the project's declared Dockerfile does not build on
+	// an Astro Runtime image, so docker mode refuses before starting anything.
+	// Not transient and not about the machine: the project has to change.
+	KindUnsupportedBase ProblemKind = "unsupported_base"
 	// KindNotRunning: no local Airflow is running for this project.
 	KindNotRunning ProblemKind = "not_running"
 )
@@ -94,6 +98,7 @@ var problemKinds = []struct {
 	{KindForeignMode, sentinel(localrt.ErrForeignMode)},
 	{KindAlreadyRunning, sentinel(localrt.ErrAlreadyRunning)},
 	{KindHealthTimeout, sentinel(localrt.ErrHealthTimeout)},
+	{KindUnsupportedBase, sentinel(localrt.ErrUnsupportedBase)},
 	// ErrStartInProgress, not a second name for it: pkg/localrt already
 	// exports this sentinel, and adding another public alias to a module with
 	// its own go.mod would mean one failure with two contracts.

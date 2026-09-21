@@ -1,6 +1,7 @@
 package airflowrt
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,14 +56,28 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 	type stage struct{ alias, ref string }
 	var stages []stage
 	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(strings.ToUpper(line), "FROM ") {
+		// Tokenized rather than prefix-matched. docker splits an instruction on
+		// any run of whitespace, so `FROM<tab>image` is valid and a "FROM "
+		// prefix misses it — and a missed FROM is not a missed opportunity for
+		// a caller that refuses on what this returns.
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.EqualFold(fields[0], "FROM") {
 			continue
 		}
-		ref, alias := strings.TrimSpace(line[5:]), ""
-		if idx := strings.Index(strings.ToUpper(ref), " AS "); idx >= 0 {
-			alias = strings.ToLower(strings.TrimSpace(ref[idx+4:]))
-			ref = strings.TrimSpace(ref[:idx])
+		rest := fields[1:]
+		// Per-stage flags come before the reference. `FROM --platform=$BUILDPLATFORM
+		// <image>` is the ordinary workaround for building an amd64 image on an
+		// Apple-silicon machine, and treating the flag as the image name reads
+		// every such file as an unknown base.
+		for len(rest) > 0 && strings.HasPrefix(rest[0], "--") {
+			rest = rest[1:]
+		}
+		if len(rest) == 0 {
+			continue
+		}
+		ref, alias := rest[0], ""
+		if len(rest) >= 3 && strings.EqualFold(rest[1], "AS") {
+			alias = strings.ToLower(rest[2])
 		}
 		stages = append(stages, stage{alias: alias, ref: ref})
 	}
@@ -84,11 +99,30 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 		ref = stages[earlier].ref
 	}
 
-	parts := strings.SplitN(ref, ":", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1], nil
+	image, tag = splitImageRef(ref)
+	return image, tag, nil
+}
+
+// splitImageRef separates an image reference into its name and tag.
+//
+// The tag is what follows the last colon AFTER the last slash, not the first
+// colon in the string: a registry host may carry a port, and splitting
+// localhost:5000/astro-runtime:3.1-12 on the first one reads the image as
+// "localhost". localdocker's postgresMajor states the same rule for the same
+// reason.
+//
+// A digest reference pins an exact image and carries no tag. Empty rather than
+// the digest, so that a caller reading a generation off the tag is told it has
+// nothing to read instead of being handed a hex string that parses as Airflow 2.
+func splitImageRef(ref string) (image, tag string) {
+	if at := strings.Index(ref, "@"); at >= 0 {
+		return ref[:at], ""
 	}
-	return parts[0], "latest", nil
+	lastSlash := strings.LastIndex(ref, "/")
+	if colon := strings.LastIndex(ref, ":"); colon > lastSlash {
+		return ref[:colon], ref[colon+1:]
+	}
+	return ref, "latest"
 }
 
 // ParseRuntimeTagPython extracts the base runtime tag and the Python version from a
@@ -124,4 +158,62 @@ func IsValidRuntimeTag(tag string) bool {
 // IsRuntime3 checks if a runtime tag is for Airflow 3 (runtime 3.x).
 func IsRuntime3(baseTag string) bool {
 	return strings.HasPrefix(baseTag, "3.")
+}
+
+// The registries an Astro Runtime image is published to.
+//
+// pkg/imagebuild carries its own copy of these two hostnames and must: it
+// requires only the contract leaf, deliberately, so it cannot import this
+// module. Its isAstroBase is the same rule, checked on its own side.
+//
+// Two other definitions exist and are NOT this one. pkg/scaffold matches the
+// substring "runtime" when reading a version out of a v1 Dockerfile, so it
+// reads one from a private myco/our-runtime that docker mode then refuses.
+// internal/platform/apc names a wider set — including astronomerinc/ap-airflow
+// — for the v1 Software deploy path, which warns rather than refusing and does
+// not write this compose file. Neither is safe to fold in here without knowing
+// that those images carry the `astro` user, which is what this gate is for.
+const (
+	astroRegistryHost  = "astrocrpublic.azurecr.io"
+	quayAstronomerRepo = "quay.io/astronomer"
+)
+
+// ErrUnsupportedBase reports a declared Dockerfile whose final stage does not
+// build on an Astro Runtime image.
+//
+// The generated compose file is written for that image and not for any image:
+// it runs the services as the `astro` user and picks the service set from the
+// runtime tag's generation. On another base the containers fail to start at
+// all — "unable to find user astro: no matching entries in passwd file" — which
+// names nothing the author wrote.
+var ErrUnsupportedBase = errors.New("a declared Dockerfile must build on an Astro Runtime image")
+
+// IsAstroRuntimeImage reports whether an image reference names an image
+// published as Astro Runtime.
+//
+// The reference without its tag, as ParseDockerfileAt returns it. Matched
+// against the registries rather than by looking for "runtime" in the name,
+// which also accepts a private `myco/our-runtime` that shares none of the
+// conventions the compose file depends on.
+func IsAstroRuntimeImage(image string) bool {
+	for _, base := range []string{astroRegistryHost, quayAstronomerRepo} {
+		// A repository under the registry, not the registry alone: `FROM
+		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
+		// an unrelated image that shares none of the conventions here.
+		if rest, ok := strings.CutPrefix(image, base+"/"); ok && rest != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// IsUnresolvedRef reports a FROM reference this package cannot resolve on its
+// own, because it is built from a build argument.
+//
+// `ARG BASE=...` then `FROM ${BASE}` is a real and supported shape, and its
+// value can also come from the command line, so nothing here can say what it
+// builds on. A caller deciding whether to refuse has to treat this the way it
+// treats a file it could not read: as no answer rather than a wrong one.
+func IsUnresolvedRef(image string) bool {
+	return strings.Contains(image, "$")
 }

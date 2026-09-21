@@ -776,8 +776,11 @@ func TestContainersGone(t *testing.T) {
 func dockerfilePlan(t *testing.T) rt.Plan {
 	t.Helper()
 	p := testPlan(t)
+	// An Astro Runtime base, because Start refuses anything else: the compose
+	// file runs Airflow as the `astro` user and reads its service set off the
+	// runtime tag, so another base cannot come up. See refusebase_test.go.
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
-		[]byte("FROM my-own-base\nRUN echo hi\n"), 0o600))
+		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n"), 0o600))
 	p.Dockerfile = "Dockerfile"
 	p.Dependencies = []string{"pandas"}
 	p.Packages = []string{"libaio"}
@@ -839,19 +842,23 @@ func TestStartWithoutProjectDockerfileStillResolvesBase(t *testing.T) {
 	assert.Equal(t, []string{"pandas"}, req.Dependencies)
 }
 
-// AirflowVersion is honored with a Dockerfile whose base says nothing.
+// AirflowVersion is honored with a Dockerfile no base can be read from.
 //
-// The comment here used to say a user's Dockerfile "cannot be read" for the
-// generation. It can now — see
-// TestStartReadsTheGenerationFromTheDeclaredDockerfile — so this row survives
-// for a narrower reason: dockerfilePlan's file is `FROM my-own-base`, which is
-// not an Astro runtime, so nothing is read from it and the pin is the only
-// statement there is. An Airflow 2 project is the case that would break: it has
-// no dag-processor, and declaring one fails the whole compose merge.
+// One path reaches this now. A base that reads as something other than Astro
+// Runtime is refused outright, so the pin decides the service set only when the
+// parser could not answer at all — a file with no FROM here. That is left to
+// imagebuild.Build on purpose, which reports it with the path and the reason;
+// meanwhile the compose file still has to be written for some generation, and
+// the pin is the only statement there is.
+//
+// An Airflow 2 project is the case that would break: it has no dag-processor,
+// and declaring one fails the whole compose merge.
 func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
 	p := dockerfilePlan(t)
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
+		[]byte("RUN echo no FROM here\n"), 0o600))
 	p.AirflowVersion = "2.10.5"
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
@@ -1285,7 +1292,7 @@ func TestStartResolvesADeclaredDockerfileInASubdirectory(t *testing.T) {
 	p := testPlan(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(p.ProjectPath, "docker"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "docker", "Dockerfile"),
-		[]byte("FROM my-own-base\nRUN echo hi\n"), 0o600))
+		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n"), 0o600))
 	p.Dockerfile = "docker/Dockerfile"
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
@@ -1330,12 +1337,19 @@ func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
 			wantMajor: "3",
 		},
 		{
-			name: "a non-runtime base leaves the pin alone",
-			pin:  "3.1",
-			body: "FROM my-own-base:1.0\nRUN echo hi\n",
-			// Nothing was read from it, so the pin is the only statement there is.
-			wantMajor: "3",
+			// Astronomer publishes more than one image name. This one is
+			// accepted because of where it comes from, not what it is called,
+			// and the generation is then read from its tag like any other —
+			// matching on "runtime" appearing in the name instead would accept
+			// the image and then ignore what it says.
+			name:      "an astronomer image whose name is not runtime",
+			pin:       "3.1",
+			body:      "FROM quay.io/astronomer/ap-airflow:2.5.1\nRUN echo hi\n",
+			wantMajor: "2",
 		},
+		// A non-runtime base used to appear here, falling back to the pin.
+		// Start refuses that file now rather than writing a compose file for an
+		// image it cannot run, so the case lives in refusebase_test.go.
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := &fakeCmd{output: noProjects}

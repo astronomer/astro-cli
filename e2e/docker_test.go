@@ -363,7 +363,13 @@ func TestAFailedDockerBuildSaysSoAndLeavesNothingBehind(t *testing.T) {
 	tier(t, 3)
 	p := dockerProject(t, "badfile")
 	needsDocker(t, p)
-	write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM alpine:3.20\nRUN exit 1\n")
+	// The runtime base, not a small unrelated one. Docker mode refuses a
+	// declared Dockerfile that does not build on an Astro Runtime image, and it
+	// refuses before the build — so a project on `alpine` never reaches the
+	// build this case is about, and passes on a refusal message that happens to
+	// contain the word "Dockerfile".
+	write(t, filepath.Join(p.Dir, "Dockerfile"),
+		"FROM "+runtimeImageFor(t, p)+"\nRUN exit 1\n")
 	declareDockerfile(t, p)
 
 	r := p.runSlow("local", "start", "--docker").requireFailure()
@@ -373,6 +379,13 @@ func TestAFailedDockerBuildSaysSoAndLeavesNothingBehind(t *testing.T) {
 	// nothing the reader wrote.
 	if !strings.Contains(r.Stderr, "Dockerfile") {
 		t.Errorf("the error does not name the Dockerfile that failed\n%s", r.output())
+	}
+	// And it failed at the BUILD. The base refusal also names a Dockerfile, so
+	// a project this case could not build for some other reason would satisfy
+	// the check above while never reaching the build — which is what happened
+	// when this case still said `FROM alpine`.
+	if strings.Contains(r.Stderr, "must build on an Astro Runtime image") {
+		t.Errorf("this case was refused before the build, so it is not testing a failed build\n%s", r.output())
 	}
 
 	// The same four things the standalone twin checks, for the same reason it

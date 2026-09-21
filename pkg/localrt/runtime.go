@@ -141,6 +141,12 @@ type Config struct {
 // say so, and this is the error to say it on.
 var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 
+// ErrUnsupportedBase reports a start refused because the project's declared
+// Dockerfile does not build on an Astro Runtime image. Docker mode only: the
+// refusal is about the compose file this runtime writes, and standalone builds
+// no image at all.
+var ErrUnsupportedBase = airflowrt.ErrUnsupportedBase
+
 // New returns a Runtime configured by cfg.
 func New(cfg Config) *Runtime {
 	docker := localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images)

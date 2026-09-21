@@ -122,6 +122,59 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 	return e
 }
 
+// declaredBase is what a project's own Dockerfile builds on, as far as the file
+// alone can say.
+//
+// Read once and shared by the two decisions that depend on it — whether the
+// start is refused, and which generation the compose file describes. Parsing
+// the same path twice is wasted I/O, and worse, two answers that can disagree
+// about a file edited between them.
+type declaredBase struct {
+	image, tag string
+	// known is false when there is no declared Dockerfile, when the file could
+	// not be parsed, and when its FROM is built from a build argument. All
+	// three mean the same thing to a caller: no answer, rather than a wrong one.
+	known bool
+}
+
+// readDeclaredBase reads the base out of a project's declared Dockerfile.
+//
+// A file that cannot be parsed is neither an answer nor a failure here.
+// imagebuild.Build reports that with the path and the reason a moment later,
+// and guessing at this depth would replace a good message with a worse one.
+func readDeclaredBase(declared string) declaredBase {
+	if declared == "" {
+		return declaredBase{}
+	}
+	image, tag, err := airflowrt.ParseDockerfileAt(declared)
+	if err != nil || airflowrt.IsUnresolvedRef(image) {
+		return declaredBase{}
+	}
+	return declaredBase{image: image, tag: tag, known: true}
+}
+
+// refuseUnsupportedBase rejects a declared Dockerfile that does not build on an
+// Astro Runtime image.
+//
+// The compose file this engine writes is for that image and not for any image:
+// it runs every service as the `astro` user, and the service set comes from the
+// runtime tag. On an ordinary `apache/airflow` base — the shape a v1 repo
+// brings, and one nothing else here rejects — the containers never start, and
+// what reaches the person is "starting project containers: exit status 1" over
+// a daemon error about a missing unix user.
+//
+// Only what the file positively says is refused. A base that could not be read
+// at all is left alone, for the reason readDeclaredBase gives.
+func refuseUnsupportedBase(declared string, base declaredBase) error {
+	if !base.known || airflowrt.IsAstroRuntimeImage(base.image) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
+		"`astro` user and takes its service set from the runtime tag, so another base cannot start. "+
+		"Base the final stage on astrocrpublic.azurecr.io/runtime",
+		airflowrt.ErrUnsupportedBase, declared, base.image)
+}
+
 // planMajor is the Airflow generation the compose file has to describe: read
 // off the declared Dockerfile where there is one, and off the pin otherwise.
 //
@@ -136,19 +189,16 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 // in the CLI's, and leaving it would have relocated the divergence the declared
 // tier exists to end rather than closing it.
 //
-// A file that cannot be read falls back to the pin: imagebuild.Build reports
-// that failure properly a moment later, and guessing here would put the wrong
-// services in the compose file on the way to a better message.
-func planMajor(airflowVersion, declared string) string {
+// The pin is the answer whenever the file does not carry a generation. That is
+// a file nothing could be read from, and a runtime pinned by digest — whose
+// reference names an exact image and no version at all, so there is nothing in
+// it to be read.
+func planMajor(airflowVersion string, base declaredBase) string {
 	pinned := airflowMajor(airflowVersion)
-	if declared == "" {
+	if !base.known || !airflowrt.IsAstroRuntimeImage(base.image) || base.tag == "" {
 		return pinned
 	}
-	from, tag, err := airflowrt.ParseDockerfileAt(declared)
-	if err != nil || !strings.Contains(from, "runtime") {
-		return pinned
-	}
-	baseTag, _ := airflowrt.ParseRuntimeTagPython(tag)
+	baseTag, _ := airflowrt.ParseRuntimeTagPython(base.tag)
 	if airflowrt.IsRuntime3(baseTag) {
 		return "3"
 	}
@@ -168,6 +218,28 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
 	}
+	// Resolved once, and used for the refusal, the build and the generation
+	// below. The pairing of Dockerfile with Context is only correct together,
+	// and doing it twice in one function is how they drift.
+	declared := ""
+	if p.Dockerfile != "" {
+		// FromSlash because the manifest carries a slash-separated path (see the
+		// field's doc) and this may be Windows.
+		declared = filepath.Join(projectPath, filepath.FromSlash(p.Dockerfile))
+	}
+	base := readDeclaredBase(declared)
+	// Before the engine, because it needs no engine: what a Dockerfile builds
+	// on is a property of the file. Starting a stopped Docker Desktop to then
+	// refuse is a minute of somebody's time spent on an answer already on disk.
+	//
+	// And before StateStarting, with the mode and path checks, because nothing
+	// has been started. A consumer told starting→error for a project where no
+	// engine, port or record was ever touched cannot tell this from a start
+	// that got partway and may have left something behind.
+	if err := refuseUnsupportedBase(declared, base); err != nil {
+		return nil, err
+	}
+
 	rt.OnState(cb, rt.StateStarting, nil)
 	// Every failure from here on reports StateError, once, with whatever error is
 	// actually returned. Emitting it per-site was a fix at the wrong depth: it
@@ -206,17 +278,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 			return nil, err
 		}
 	}
-	// Resolved once, and used for both the build and the generation below. The
-	// pairing of Dockerfile with Context is only correct together, and doing it
-	// twice in one function is how they drift.
-	declared := ""
-	if p.Dockerfile != "" {
-		// FromSlash because the manifest carries a slash-separated path (see the
-		// field's doc) and this may be Windows.
-		declared = filepath.Join(projectPath, filepath.FromSlash(p.Dockerfile))
-	}
-
-	major := planMajor(p.AirflowVersion, declared)
+	major := planMajor(p.AirflowVersion, base)
 	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
 		return nil, err
