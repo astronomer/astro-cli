@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -38,8 +37,9 @@ import (
 // and matches no repository filter, so a re-tag orphan is invisible here while
 // still pinning its layers.
 const (
-	// censusTimeout bounds each docker query. A census that hangs would turn a
-	// passing suite into a timeout with no useful output.
+	// censusTimeout bounds the proxy-daemon query. The docker queries take
+	// dockerListTimeout, which the cases share. A census that hangs would turn
+	// a passing suite into a timeout with no useful output.
 	censusTimeout = 30 * time.Second
 	// censusSettle bounds how long the after-snapshot keeps looking while it
 	// still sees something. Teardown here is asynchronous by design: compose
@@ -153,27 +153,6 @@ func (c census) record(a censusAxis, lines []string) {
 		}
 		c.found[a.kind+" "+line] = a.id()
 	}
-}
-
-// dockerLines runs a docker listing and returns its non-empty lines.
-//
-// exec.CommandContext rather than a timeout raced against cmd.Output: the suite
-// runs under -race, and killing the process from a second goroutine reads
-// cmd.Process while Start is writing it.
-func dockerLines(ctx context.Context, args ...string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(ctx, censusTimeout)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "docker", args...).Output()
-	if err != nil {
-		return nil, fmt.Errorf("docker %s: %w", strings.Join(args, " "), err)
-	}
-	var lines []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line != "" {
-			lines = append(lines, line)
-		}
-	}
-	return lines, nil
 }
 
 // leaks reports what the run added and did not take away, plus any axis that

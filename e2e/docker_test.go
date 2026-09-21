@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,9 +99,9 @@ func dockerProject(t *testing.T, name string) *project {
 // needed anyway.
 func composeProject(t *testing.T, p *project) string {
 	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(p.cache, "astro", "projects", "*", "runtime.json"))
-	if err != nil || len(matches) != 1 {
-		t.Fatalf("expected one state record under %s, found %d (%v)", p.cache, len(matches), err)
+	matches := stateFilesInCache(t, p, "runtime.json")
+	if len(matches) != 1 {
+		t.Fatalf("expected one state record under %s, found %d", p.cache, len(matches))
 	}
 	raw, err := os.ReadFile(matches[0])
 	if err != nil {
@@ -116,6 +117,65 @@ func composeProject(t *testing.T, p *project) string {
 		t.Fatalf("no compose project recorded in %s:\n%s", matches[0], raw)
 	}
 	return rec.ComposeProject
+}
+
+// stateFilesInCache lists files of one name across every project state
+// directory in this cache.
+//
+// Named for the whole cache rather than for p, because that is its scope: the
+// state directory is named by a hash of the project path, and p.sibling shares
+// a cache deliberately, so a case with two projects sees both. Callers that
+// want "this project's one file" get that from the count being 1.
+//
+// Read rather than globbed. The directory name is a hash this suite must not
+// reimplement — deriving it here would agree with the code under test whether
+// or not it is right — and a glob would also take the cache path as pattern
+// syntax, so a temp directory carrying a bracket would match the wrong set or
+// fail to parse.
+func stateFilesInCache(t *testing.T, p *project, name string) []string {
+	t.Helper()
+	root := filepath.Join(p.cache, "astro", "projects")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// No project has written state yet, which is an answer.
+			return nil
+		}
+		t.Fatalf("reading %s: %v", root, err)
+	}
+	var found []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		path := filepath.Join(root, e.Name(), name)
+		if _, err := os.Stat(path); err == nil {
+			found = append(found, path)
+		}
+	}
+	return found
+}
+
+// startedDockerStack asserts that a docker-mode start produced a running stack,
+// and returns the compose project it published under.
+//
+// Both halves are read while the project is up, because every later assertion
+// in these cases is that something is GONE, and that is only a change if it was
+// there to begin with.
+//
+// Running containers rather than all of them: containersFor counts an exited
+// one, so a stack that came up and fell over satisfies "there are containers"
+// while being the opposite of the start this is checking for.
+func startedDockerStack(t *testing.T, p *project) string {
+	t.Helper()
+	project := composeProject(t, p)
+	if up := runningContainersFor(t, project); len(up) == 0 {
+		t.Fatalf("no running containers for compose project %s, so the start did not bring a stack up", project)
+	}
+	if vols := volumesFor(t, project); len(vols) == 0 {
+		t.Fatalf("no volumes for compose project %s, so nothing here can show one being removed", project)
+	}
+	return project
 }
 
 // containersFor is every container compose has for this project, running or

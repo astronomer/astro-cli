@@ -4,7 +4,6 @@ package e2e
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,17 +52,10 @@ func TestResettingADockerProjectSparesTheVenv(t *testing.T) {
 		t.Fatalf("the start removed the stand-in venv, before reset ran: %v", err)
 	}
 
-	project := composeProject(t, p)
-	if running := containersFor(t, project); len(running) == 0 {
-		t.Fatalf("no containers for compose project %s, so there is nothing for reset to remove", project)
-	}
 	// Read while it exists, for the same reason the standalone twin reads the
 	// venv first: "it is gone afterwards" means nothing about state that was
 	// never there.
-	volumes := volumesFor(t, project)
-	if len(volumes) == 0 {
-		t.Fatalf("no volumes for compose project %s; this case cannot show that reset removes one", project)
-	}
+	project := startedDockerStack(t, p)
 
 	p.runSlow("local", "reset", "--yes").requireSuccess()
 
@@ -94,6 +86,79 @@ func TestResettingADockerProjectSparesTheVenv(t *testing.T) {
 	}
 }
 
+// `astro local reset` removes a stopped docker project's volume, with no record
+// to tell it what to remove.
+//
+// The case above resets a project that is still up, where the record names the
+// compose project. This is the other path through Clean, and it is the one a
+// person actually reaches: `astro local stop` removes the record and the
+// containers and keeps the metadata volume by design, so the state somebody
+// resets from is usually the state with nothing left to read.
+//
+// With no record, Clean derives the compose project from the project path. A
+// derivation that disagreed with what compose published would take down a
+// project that does not exist, remove the compose file, and report success —
+// while the database the reset was run for stayed on the machine. Nothing else
+// would notice: the containers really are gone by then, so every other symptom
+// of a working reset is already true before this command runs.
+//
+// The state after the stop is asserted, not assumed. If a stop began removing
+// the volume, or stopped removing the record, this would go green while testing
+// neither the derivation nor the removal.
+func TestResettingAStoppedDockerProjectStillFindsItsVolume(t *testing.T) {
+	tier(t, 3)
+	p := dockerProject(t, "dkstopped")
+	needsDocker(t, p)
+
+	p.runSlow("local", "start", "--docker").requireSuccess()
+
+	// Read while there is still a record to read it from. After the stop the
+	// name is exactly what nothing on disk says any more, which is the case.
+	project := startedDockerStack(t, p)
+
+	p.runSlow("local", "stop").requireSuccess()
+
+	// Waited for rather than asserted once. compose down returns when it has
+	// issued the removals, so a loaded machine can still list containers in
+	// Removing — and this is a precondition, so a single shot that lost that
+	// race would fail the case before it ran the reset it exists to check.
+	waitFor(t, "the stopped project's containers to go", func() bool {
+		return len(containersFor(t, project)) == 0
+	})
+	if recs := stateFilesInCache(t, p, "runtime.json"); len(recs) != 0 {
+		t.Fatalf("stop left %d state record(s), so reset would read one instead of deriving: %v", len(recs), recs)
+	}
+	// The compose file is what Clean gates on: it is the only evidence the
+	// project ever ran in docker mode, and a stop that removed it would make
+	// the reset below skip everything and still succeed.
+	if files := stateFilesInCache(t, p, "docker-compose.yaml"); len(files) != 1 {
+		t.Fatalf("want one generated compose file after stop, found %d: %v", len(files), files)
+	}
+	if kept := volumesFor(t, project); len(kept) == 0 {
+		t.Fatalf("stop removed the volume, so there is nothing left here for reset to find; volumes for %s: %v",
+			project, kept)
+	}
+
+	reset := p.runSlow("local", "reset", "--yes").requireSuccess()
+
+	// The direct evidence, rather than inferring the derivation from a side
+	// effect: reset prints the compose project it acted on, and that name comes
+	// from what Clean derived. It also separates the two ways this can go wrong
+	// — a name derived wrongly from no engine having answered, which exits 0
+	// and says so instead of naming a project.
+	if want := "removed compose project " + project; !strings.Contains(reset.Stdout, want) {
+		t.Errorf("reset did not report acting on %s, so it did not derive the name from the path:\n%s",
+			project, reset.output())
+	}
+	if left := volumesFor(t, project); len(left) != 0 {
+		t.Errorf("reset left %d volume(s) behind, holding the database it was run to remove: %v\n%s",
+			len(left), left, reset.output())
+	}
+	if files := stateFilesInCache(t, p, "docker-compose.yaml"); len(files) != 0 {
+		t.Errorf("reset left the generated compose file behind: %v", files)
+	}
+}
+
 // volumesFor lists the volumes compose created for a project.
 //
 // By the compose project label, not by name: `docker volume ls --filter name=`
@@ -102,17 +167,11 @@ func TestResettingADockerProjectSparesTheVenv(t *testing.T) {
 // label for the same reason.
 func volumesFor(t *testing.T, project string) []string {
 	t.Helper()
-	out, err := exec.CommandContext(t.Context(), "docker", "volume", "ls",
+	names, err := dockerLines(t.Context(), "volume", "ls",
 		"--filter", "label=com.docker.compose.project="+project,
-		"--format", "{{.Name}}").Output()
+		"--format", "{{.Name}}")
 	if err != nil {
 		t.Fatalf("listing volumes for %s: %v", project, err)
-	}
-	var names []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line != "" {
-			names = append(names, line)
-		}
 	}
 	return names
 }

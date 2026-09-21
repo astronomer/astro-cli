@@ -128,6 +128,37 @@ func runSuite(m *testing.M) (int, error) {
 	return code, nil
 }
 
+// dockerListTimeout bounds one docker listing. Generous, because it is a
+// backstop against an engine that has stopped answering rather than a budget:
+// a listing that hangs turns a passing suite into a -timeout panic, which
+// dumps goroutines instead of naming the case and skips its cleanup.
+const dockerListTimeout = 30 * time.Second
+
+// dockerLines runs a docker listing and returns its non-empty lines.
+//
+// Shared by the cases that ask docker what exists and by the leak census, so it
+// lives here rather than in either: a bound named for one of them would end up
+// silently deciding the other.
+//
+// exec.CommandContext rather than a timeout raced against cmd.Output: the suite
+// runs under -race, and killing the process from a second goroutine reads
+// cmd.Process while Start is writing it.
+func dockerLines(ctx context.Context, args ...string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, dockerListTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "docker", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker %s: %w", strings.Join(args, " "), err)
+	}
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines, nil
+}
+
 // buildAstro builds the CLI from the repository this module sits in.
 func buildAstro(dir string) error {
 	root, err := repoRoot()
