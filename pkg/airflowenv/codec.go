@@ -24,6 +24,7 @@
 package airflowenv
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -182,7 +183,7 @@ func DecodeConnValue(connID, value string) (connmodel.Connection, error) {
 		return connmodel.Connection{}, fmt.Errorf("connection id is required")
 	}
 	var p connJSON
-	if err := json.Unmarshal([]byte(value), &p); err != nil {
+	if err := decodeExact([]byte(value), &p); err != nil {
 		// Deliberately not %w. The value is decrypted connection JSON, and a
 		// json.SyntaxError quotes the byte it stopped on — which for a
 		// corrupted row can be a byte of the password. The caller gets the
@@ -202,6 +203,46 @@ func DecodeConnValue(connID, value string) (connmodel.Connection, error) {
 		ConnPort:     p.Port,
 		ConnExtra:    p.Extra,
 	}, nil
+}
+
+// decodeExact unmarshals with UseNumber, so a JSON number survives being
+// decoded and re-encoded.
+//
+// Without it every number in `extra` becomes a float64, and re-marshaling one
+// larger than 2^53 writes a different number: a Snowflake account id of
+// 1234567890123456789 came back as 1234567890123456800, eleven off, with
+// nothing reporting it. Connection extras carry exactly that kind of value —
+// account, project and warehouse ids — and a connection is decoded and
+// re-encoded on every read-modify-write of the store.
+//
+// json.Number marshals as the digits it was parsed from, so the round trip is
+// lossless.
+func decodeExact(data []byte, into any) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	return dec.Decode(into)
+}
+
+// DecodeExtra parses a connection's `extra` as given on a command line: a JSON
+// object, with its numbers preserved exactly.
+//
+// It lives here so the two trees that accept --extra share one parser and one
+// message. The distinction the message draws matters: `[1,2]` is valid JSON
+// and telling the user it is not sends them looking for a syntax error that is
+// not there.
+func DecodeExtra(raw string) (map[string]any, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	var extra map[string]any
+	if err := decodeExact([]byte(trimmed), &extra); err != nil {
+		if !strings.HasPrefix(trimmed, "{") {
+			return nil, fmt.Errorf("extra must be a JSON object, like {\"sslmode\":\"require\"}")
+		}
+		return nil, fmt.Errorf("extra is not valid JSON: %w", err)
+	}
+	return extra, nil
 }
 
 // EnvKeyForVarKey returns the AIRFLOW_VAR_* env-var key for a variable key.

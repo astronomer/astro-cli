@@ -179,7 +179,7 @@ func TestMissingEnvError(t *testing.T) {
 	}
 	msg := err.Error()
 	// The one hint form is the exact set command per kind.
-	for _, want := range []string{"API_URL", "astro local env set API_URL --project", "astro local env set conn warehouse --project", "astro local start"} {
+	for _, want := range []string{"API_URL", "astro local env variable set API_URL --project", "astro local env connection set warehouse --project", "astro local start"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("message missing %q:\n%s", want, msg)
 		}

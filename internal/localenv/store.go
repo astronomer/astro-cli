@@ -16,6 +16,31 @@ const (
 	KindVar  Kind = "var"
 )
 
+// Noun is the `astro local env` subcommand that manages a kind: the word
+// `astro env` uses for the same object on the cloud side, so `connection` and
+// `airflow-variable` mean one thing across both trees.
+//
+// It lives here because every hint that tells a user what to run composes the
+// command from it. Spelled at each call site instead, a renamed subcommand
+// leaves the hints naming a command that no longer exists — which is a class
+// of bug nothing fails on, because a hint is a string.
+func Noun(kind Kind) string {
+	switch kind {
+	case KindConn:
+		return "connection"
+	case KindVar:
+		return "airflow-variable"
+	case KindEnv:
+		return "variable"
+	default:
+		// Not "variable". An unmapped kind here would otherwise compose a
+		// runnable command that writes the wrong kind, which is the failure
+		// this function exists to prevent; an empty noun makes the hint
+		// visibly broken instead.
+		return ""
+	}
+}
+
 // Scope labels the file a value lives in.
 type Scope string
 

@@ -36,7 +36,7 @@
 // is declared instead.
 //
 // It is a DECLARATION, and nothing in this repo routes on it yet: `astro local
-// env set` still picks its store from --secret alone. So today it is a promise
+// env <noun> set` still picks its store from --secret alone. So today it is a promise
 // to consumers — Astro Desktop's Environment Manager is the first — rather than
 // a behavior of this CLI. Saying otherwise in the present tense would be a
 // claim about code that does not exist, in the one annotation whose whole point

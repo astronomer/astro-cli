@@ -5,12 +5,13 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
 // MissingEnvError reports that the project declares required environment
 // values this machine has no source for. It is the clone-and-run gate: its
-// message names each missing value and the exact `astro local env set`
+// message names each missing value and the exact `astro local env <noun> set`
 // command that fills it, and Payload backs the same report in --output json.
 // cmd decides how to render it.
 type MissingEnvError struct {
@@ -67,20 +68,15 @@ func (e *MissingEnvError) Payload() any {
 	}
 }
 
-// setHint is the one hint form for every kind: the exact `astro local env set`
+// setHint is the one hint form for every kind: the exact `astro local env <noun> set`
 // command, scoped to the project (the default scope, so a copy-paste lands
 // where the resolver looked).
+//
+// The noun comes from localenv rather than a switch here, so this hint and the
+// command tree it names are renamed together or not at all.
 func setHint(m *envresolve.Missing) string {
-	var args string
-	switch m.Section {
-	case envschema.SectionConnection:
-		args = "conn " + m.Name
-	case envschema.SectionAirflowVariable:
-		args = "var " + m.Name
-	case envschema.SectionEnvVar:
-		args = m.Name
-	}
-	return "astro local env set " + args + " --project"
+	noun := localenv.Noun(localenv.KindForSection(m.Section))
+	return "astro local env " + noun + " set " + m.Name + " --project"
 }
 
 // sectionLabel is the human word for a schema section.

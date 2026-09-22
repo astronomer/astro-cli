@@ -7,7 +7,7 @@ import (
 )
 
 // SecretWrite is one value the conversion stores in the shared vault at
-// ~/.astro/secrets — the same store `astro local env set --secret` writes and
+// ~/.astro/secrets — the same store `astro local env <noun> set --secret` writes and
 // `astro local start` resolves.
 //
 // It is not a Change, and that is the point. A Change is bytes for a path
@@ -87,7 +87,7 @@ func (cs *Changeset) applySecrets() error {
 		// What is carried here is whatever was committed to a v1 file, which
 		// may be months stale or a placeholder. What is already in the vault
 		// was put there deliberately, by this user, through `astro local env
-		// set --secret` or the app. Writing the committed one over it destroys
+		// <noun> set --secret` or the app. Writing the committed one over it destroys
 		// the good credential unrecoverably and leaves the project running
 		// against exactly the value this transform exists to get out of version
 		// control.

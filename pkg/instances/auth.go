@@ -125,7 +125,11 @@ func urlCredentials(d Deps) (airflowapi.CredentialSource, func(context.Context) 
 func (d Deps) envValue(deployment, name string) (string, error) {
 	value, ok := d.credentialEnv(name)
 	if !ok {
-		return "", fmt.Errorf("deployment %q needs the env var %s, which is not set on this machine.\n      provide it:  astro local env set %s --project", deployment, name, name)
+		// "variable" is localenv.Noun(localenv.KindEnv). It is spelled out
+		// rather than called because this is a separate module and cannot
+		// import internal/; the one definition does not reach here, so a
+		// rename of that noun has to update this literal too.
+		return "", fmt.Errorf("deployment %q needs the env var %s, which is not set on this machine.\n      provide it:  astro local env variable set %s --project", deployment, name, name)
 	}
 	return value, nil
 }

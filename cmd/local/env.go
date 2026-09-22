@@ -17,6 +17,8 @@ import (
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/airflowenv"
+	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -79,16 +81,21 @@ type setInput struct {
 	value string
 }
 
-// newEnvCmd builds the `astro local env` tree: set/get/list/delete over
-// plain env vars (a bare NAME), connections (conn <id>), and Airflow
-// Variables (var <key>). Values live in the project's .env or the global
-// ~/.astro/env; see docs/v2-secrets.md.
+// newEnvCmd builds the `astro local env` tree. The three kinds — environment
+// variables, connections and Airflow Variables — are peer nouns, each carrying
+// the same verbs, and none of them is a default: there is no bare-NAME form,
+// so no name is unreachable because it collides with a subcommand.
+//
+// The nouns and their aliases are `astro env`'s, word for word, so a token
+// names the same object on both sides of the CLI. See docs/v2-secrets.md.
 func newEnvCmd(c *cli) *cobra.Command {
 	scope := &scopeFlags{}
 	cmd := &cobra.Command{
 		Use:   "env",
 		Short: "Set, read, and list local Airflow env values for this project",
 		Long: "Manage the environment values local Airflow runs with: plain env vars, connections, and Airflow Variables.\n\n" +
+			"Each kind is a noun with the same verbs under it — `variable`, `connection` and `airflow-variable`, the " +
+			"words `astro env` uses for the same objects on the cloud side.\n\n" +
 			"Values are stored in plain files — the project's .env (default inside a project) or the global ~/.astro/env " +
 			"(--global) — created readable only by you. With --secret a value goes instead to the encrypted vault this " +
 			"machine shares with Astro Desktop, so a value set in either tool is readable in the other; that needs an OS " +
@@ -96,122 +103,312 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"file.\n\n" +
 			"Resolution order at start is shell env > project .env > project vault > global vault > global ~/.astro/env > " +
 			"the workspace's Environment Manager.",
-		Args: cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
-			}
-			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
-		},
+		Args:                       cobra.ArbitraryArgs,
+		RunE:                       helpOrUnknownSubcommand,
+		SuggestionsMinimumDistance: 2,
 	}
 	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's .env (the default inside a project)")
 	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global ~/.astro/env (the default outside a project)")
-	cmd.AddCommand(
-		newEnvSetCmd(c, scope),
-		newEnvGetCmd(c, scope),
-		newEnvListCmd(c, scope),
-		newEnvDeleteCmd(c, scope),
-	)
+	for _, k := range envKinds() {
+		cmd.AddCommand(newEnvKindCmd(c, scope, k))
+	}
+	cmd.AddCommand(newEnvListCmd(c, scope, "", "List declared values of every kind with the source each resolves from"))
 	return cmd
 }
 
-// kindLeaf builds one conn or var subcommand shared by get/delete. The parent
-// handles the bare-NAME (env) case; these name a connection or a Variable
-// instead.
-func kindLeaf(use, short string, kind localenv.Kind, run func(kind localenv.Kind, name string) error) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		Args:  cobra.ExactArgs(1),
-		RunE:  func(_ *cobra.Command, args []string) error { return run(kind, args[0]) },
+// helpOrUnknownSubcommand is the RunE for a group that only holds
+// subcommands: help when called bare, an error naming what was typed
+// otherwise.
+//
+// A group needs this at all because cobra, given no Run, prints help and
+// exits 0 for an unknown subcommand — so `astro local env connection seet x`
+// would look like success to a script. Returning the error restores the
+// failure; SuggestionsFor restores the "Did you mean this?" that cobra's own
+// legacyArgs path would have appended and a hand-rolled error drops.
+func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return cmd.Help()
 	}
-}
-
-func newEnvSetCmd(c *cli, scope *scopeFlags) *cobra.Command {
-	in := &setInput{}
-	run := func(cmd *cobra.Command, kind localenv.Kind, name string) error {
-		value, err := c.readSetValue(cmd, in, kind, name)
-		if err != nil {
-			return err
+	if hint := removedVerbHint(cmd, args[0]); hint != "" {
+		return errors.New(hint)
+	}
+	msg := fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath())
+	// SuggestionsFor, unlike cobra's internal findSuggestions, does not apply
+	// the default minimum distance; the groups set it declaratively so both
+	// this and cobra's own path agree. (At zero, prefix matches still fire —
+	// only the edit-distance ones are lost.)
+	if suggestions := cmd.SuggestionsFor(args[0]); len(suggestions) > 0 {
+		msg += "\n\nDid you mean this?\n"
+		for _, s := range suggestions {
+			msg += "\t" + s + "\n"
 		}
-		return c.runEnvSet(scope, kind, name, value)
 	}
+	return errors.New(msg)
+}
+
+// removedVerbHint names the replacement for a verb-first form this tree used
+// to have, or "" when the argument is not one.
+//
+// `astro local env set API_TOKEN` was the shape in docs, in the demo scripts,
+// in the start-time missing-value hint and in pkg/instances' error text. Those
+// were all updated, but a user's shell history and a teammate's notes were
+// not, and the bare "unknown command" they now get does not point anywhere:
+// SuggestionsFor matches none of variable/connection/airflow-variable for
+// "set" — too far by edit distance, no shared prefix — so the "Did you mean"
+// block never fires for exactly the words most likely to be typed.
+//
+// cmd/local/tree_test.go carries the same rule for `astro dev` and `astro
+// airflow`: a removed spelling names its replacement rather than dead-ending.
+func removedVerbHint(cmd *cobra.Command, arg string) string {
+	if cmd.Name() != nameEnv {
+		return ""
+	}
+	switch arg {
+	case "set", "get", "delete", "rm":
+		verb := arg
+		if verb == "rm" {
+			verb = "delete"
+		}
+		return fmt.Sprintf(
+			"`astro local env %s <NAME>` was removed in v2: each kind is its own noun now.\n"+
+				"  env var:           astro local env variable %s <NAME>\n"+
+				"  connection:        astro local env connection %s <id>\n"+
+				"  Airflow Variable:  astro local env airflow-variable %s <key>",
+			verb, verb, verb, verb)
+	default:
+		return ""
+	}
+}
+
+// envKind is one noun of the env tree: the word, its aliases, the localenv
+// kind its verbs act on, and how its argument and its name read in help.
+//
+// article is carried rather than derived because the three labels do not
+// agree — "a connection" but "an environment variable" — and a Short built by
+// concatenation gets it wrong exactly often enough to notice.
+type envKind struct {
+	aliases []string
+	kind    localenv.Kind
+	arg     string
+	article string
+	label   string
+}
+
+// envKinds is the noun list, named and aliased as `astro env` names the same
+// four objects it manages on the cloud side. The overlap is the point: `conn`
+// is a connection in both trees, and `var` is a plain environment variable in
+// both, rather than an Airflow Variable in one and not the other.
+func envKinds() []envKind {
+	return []envKind{
+		{
+			aliases: []string{"var", "variables", "vars"},
+			kind:    localenv.KindEnv,
+			arg:     "<NAME>",
+			article: "an",
+			label:   "environment variable",
+		},
+		{
+			aliases: []string{"conn", "connections"},
+			kind:    localenv.KindConn,
+			arg:     "<id>",
+			article: "a",
+			label:   "connection",
+		},
+		{
+			aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
+			kind:    localenv.KindVar,
+			arg:     "<key>",
+			article: "an",
+			label:   "Airflow variable",
+		},
+	}
+}
+
+// newEnvKindCmd builds one noun with its verbs. Every noun carries the same
+// four, so what a user learns on one transfers to the others.
+func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <NAME>",
-		Short: "Set an env var (or a connection / variable via the subcommands)",
-		Long: "Set a value in a .env file, or in the encrypted vault with --secret. The value never comes from a " +
-			"bare argument — it would land in shell history and `ps`. By default `set` prompts with echo off; pass " +
-			"--stdin to read it from a pipe, or --value to pass it inline (which is visible in shell history).\n\n" +
-			"--secret stores the value in the vault this machine shares with Astro Desktop, so a value set in " +
-			"either tool is readable in the other. It needs an OS keyring: on a headless machine or in CI there " +
-			"is none, and the command refuses rather than quietly writing a credential to a plain file. " +
-			"--project/--global choose the scope either way.",
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, localenv.KindEnv, args[0])
-		},
+		// The subcommand word comes from localenv.Noun, not a second copy here.
+		// Spelled twice, a rename leaves every hint composed from Noun naming a
+		// command that no longer exists — which is the failure Noun exists to
+		// prevent, so it cannot be the one thing that drifts from it.
+		Use:                        localenv.Noun(k.kind),
+		Aliases:                    k.aliases,
+		SuggestionsMinimumDistance: 2,
+		Short:                      "Manage local " + k.label + "s",
+		Args:                       cobra.ArbitraryArgs,
+		RunE:                       helpOrUnknownSubcommand,
 	}
-	cmd.PersistentFlags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
-	cmd.PersistentFlags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
-	cmd.PersistentFlags().StringVar(&in.value, "value", "", "Pass the value inline (visible in shell history; prefer a prompt or --stdin)")
+	// Reads, then the write, then the destructive one — the same order
+	// `astro env` uses for the same four verbs, so help reads the same
+	// whichever tree you are in. TestEnvVerbOrderMatchesTheCloudTree pins it.
 	cmd.AddCommand(
-		&cobra.Command{
-			Use:   "conn <id>",
-			Short: "Set a connection from a URI or JSON",
-			Args:  cobra.ExactArgs(1),
-			RunE:  func(cmd *cobra.Command, args []string) error { return run(cmd, localenv.KindConn, args[0]) },
-		},
-		&cobra.Command{
-			Use:   "var <key>",
-			Short: "Set an Airflow Variable",
-			Args:  cobra.ExactArgs(1),
-			RunE:  func(cmd *cobra.Command, args []string) error { return run(cmd, localenv.KindVar, args[0]) },
-		},
+		newEnvListCmd(c, scope, k.kind, "List "+k.label+"s with the source each resolves from"),
+		newEnvGetCmd(c, scope, k),
+		newEnvSetCmd(c, scope, k),
+		newEnvDeleteCmd(c, scope, k),
 	)
 	return cmd
 }
 
-func newEnvGetCmd(c *cli, scope *scopeFlags) *cobra.Command {
-	run := func(kind localenv.Kind, name string) error { return c.runEnvGet(scope, kind, name) }
+func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
+	in := &setInput{}
+	fields := &connFields{}
+	long := "Set a value in a .env file, or in the encrypted vault with --secret. The value never comes from a " +
+		"bare argument — it would land in shell history and `ps`. By default `set` prompts with echo off; pass " +
+		"--stdin to read it from a pipe, or --value to pass it inline (which is visible in shell history).\n\n" +
+		"--secret stores the value in the vault this machine shares with Astro Desktop, so a value set in " +
+		"either tool is readable in the other. It needs an OS keyring: on a headless machine or in CI there " +
+		"is none, and the command refuses rather than quietly writing a credential to a plain file. " +
+		"--project/--global choose the scope either way."
+	if k.kind == localenv.KindConn {
+		long += "\n\nA connection can be given whole — a URI or its JSON, through the prompt, --stdin or --value — " +
+			"or field by field with --type and friends, which are the flags `astro env connection set` takes for the " +
+			"same object. The two ways are exclusive: the field flags describe a whole connection too, not a patch."
+	}
 	cmd := &cobra.Command{
-		Use:   "get <NAME>",
-		Short: "Print a value and the source it resolves from",
+		Use:   "set " + k.arg,
+		Short: "Set " + k.article + " " + k.label,
+		Long:  long,
 		Args:  cobra.ExactArgs(1),
-		RunE:  func(_ *cobra.Command, args []string) error { return run(localenv.KindEnv, args[0]) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			value, err := c.readSetValue(cmd, in, fields, k.kind, args[0])
+			if err != nil {
+				return err
+			}
+			return c.runEnvSet(scope, k.kind, args[0], value)
+		},
 	}
-	cmd.PersistentFlags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
-	cmd.AddCommand(
-		kindLeaf("conn <id>", "Get a connection", localenv.KindConn, run),
-		kindLeaf("var <key>", "Get an Airflow Variable", localenv.KindVar, run),
-	)
+	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
+	cmd.Flags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
+	cmd.Flags().StringVar(&in.value, "value", "", "Pass the value inline (visible in shell history; prefer a prompt or --stdin)")
+	if k.kind == localenv.KindConn {
+		addConnFieldFlags(cmd, fields)
+	}
 	return cmd
 }
 
-func newEnvDeleteCmd(c *cli, scope *scopeFlags) *cobra.Command {
-	run := func(kind localenv.Kind, name string) error { return c.runEnvDelete(scope, kind, name) }
+// connFields is the field-by-field way to describe a connection, mirroring the
+// flags `astro env connection set` takes on the cloud side.
+type connFields struct {
+	connType string
+	host     string
+	login    string
+	password string
+	schema   string
+	port     int
+	extra    string
+}
+
+// connFieldFlagNames is the set that makes a set "field-wise" rather than
+// whole-value. --value excludes these; --stdin deliberately does not, because
+// in field mode it is how the password arrives without going through argv.
+var connFieldFlagNames = []string{"type", "host", "login", "password", "schema", "port", "extra"}
+
+// addConnFieldFlags registers the per-field flags on a connection's `set`.
+//
+// The long names are the cloud sibling's, so the same invocation describes the
+// same connection in both trees. The single-letter forms are not: cloud has
+// -t/-l/-p free, but here -p next to --project reads as the scope flag, and a
+// shorthand that invites the wrong guess is worse than no shorthand.
+func addConnFieldFlags(cmd *cobra.Command, f *connFields) {
+	cmd.Flags().StringVar(&f.connType, "type", "", "Connection type (e.g. postgres, http)")
+	cmd.Flags().StringVar(&f.host, "host", "", "Connection host")
+	cmd.Flags().StringVar(&f.login, "login", "", "Connection login or username")
+	cmd.Flags().StringVar(&f.password, "password", "", "Connection password. Visible in shell history, so prefer piping it (or --stdin), which reads the password from stdin.")
+	cmd.Flags().StringVar(&f.schema, "schema", "", "Connection schema")
+	cmd.Flags().IntVar(&f.port, "port", 0, "Connection port")
+	cmd.Flags().StringVar(&f.extra, "extra", "", "Extra configuration as a JSON object string")
+	// --value is exclusive with the fields: both describe a whole connection,
+	// so taking them together has no meaning. --stdin is NOT, because in field
+	// mode it is how the password arrives without going through argv.
+	for _, n := range connFieldFlagNames {
+		cmd.MarkFlagsMutuallyExclusive("value", n)
+	}
+	// --stdin names where a secret comes from, so pairing it with a flag that
+	// also supplies one means half the input is silently thrown away. Refusing
+	// the combination says so instead.
+	cmd.MarkFlagsMutuallyExclusive("stdin", "password")
+}
+
+// connFieldsGiven reports whether the user described the connection field-wise
+// rather than handing over a whole value.
+func connFieldsGiven(cmd *cobra.Command) bool {
+	for _, n := range connFieldFlagNames {
+		if cmd.Flags().Changed(n) {
+			return true
+		}
+	}
+	return false
+}
+
+// connValueFromFields assembles the fields into the stored connection value.
+//
+// It encodes through airflowenv, the same codec a whole-value set normalizes
+// into, so a connection built field by field is byte-identical to the same
+// connection given as a URI. Assembling the JSON here instead would be a
+// second definition of the stored shape.
+// The connection id is deliberately not a parameter: EncodeConnValue writes
+// the value only — there is no conn_id field in it — and Store.Set derives the
+// id from the key it was given. Taking one here would imply it tags the record.
+func connValueFromFields(f *connFields, password string) (string, error) {
+	if f.connType == "" {
+		return "", errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON")
+	}
+	conn := connmodel.Connection{
+		ConnType:     f.connType,
+		ConnHost:     f.host,
+		ConnLogin:    f.login,
+		ConnPassword: password,
+		ConnSchema:   f.schema,
+		ConnPort:     f.port,
+	}
+	if f.extra != "" {
+		extra, err := airflowenv.DecodeExtra(f.extra)
+		if err != nil {
+			return "", fmt.Errorf("--%w", err)
+		}
+		conn.ConnExtra = extra
+	}
+	return airflowenv.EncodeConnValue(conn)
+}
+
+func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete <NAME>",
-		Aliases: []string{"rm"},
-		Short:   "Remove a value from a .env file, or from the vault with --secret",
-		Args:    cobra.ExactArgs(1),
-		RunE:    func(_ *cobra.Command, args []string) error { return run(localenv.KindEnv, args[0]) },
+		Use:   "get " + k.arg,
+		Short: "Print " + k.article + " " + k.label + " and the source it resolves from",
+		Args:  cobra.ExactArgs(1),
+		RunE:  func(_ *cobra.Command, args []string) error { return c.runEnvGet(scope, k.kind, args[0]) },
 	}
-	cmd.PersistentFlags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
-	cmd.AddCommand(
-		kindLeaf("conn <id>", "Remove a connection", localenv.KindConn, run),
-		kindLeaf("var <key>", "Remove an Airflow Variable", localenv.KindVar, run),
-	)
+	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	return cmd
 }
 
-func newEnvListCmd(c *cli, scope *scopeFlags) *cobra.Command {
+func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete " + k.arg,
+		Aliases: []string{"rm"},
+		Short:   "Remove " + k.article + " " + k.label,
+		Args:    cobra.ExactArgs(1),
+		RunE:    func(_ *cobra.Command, args []string) error { return c.runEnvDelete(scope, k.kind, args[0]) },
+	}
+	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
+	return cmd
+}
+
+// newEnvListCmd builds a list. only names the single kind to show, or is empty
+// for the cross-kind view that sits beside the nouns — the one `astro env` has
+// no equivalent for, and the one the start-time missing-value report is built
+// from.
+func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) *cobra.Command {
 	var all bool
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List declared values with the source each resolves from",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   short,
+		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return c.runEnvList(scope, all)
+			return c.runEnvList(scope, all, only)
 		},
 	}
 	cmd.Flags().BoolVar(&all, "all", false, "Widen to the global file plus every project's .env the CLI knows")
@@ -256,7 +453,7 @@ func (c *cli) runEnvSet(scope *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "set %s %s in %s (%s)\n", kind, name, store.ScopeName(), store.Location())
+		_, werr := fmt.Fprintf(w, "set %s %s in %s (%s)\n", localenv.Noun(kind), name, store.ScopeName(), store.Location())
 		return werr
 	})
 }
@@ -278,7 +475,7 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("%s %q is not set in %s", kind, name, store.ScopeName())
+			return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, store.ScopeName())
 		}
 		return emitValue(r, envValue{Kind: kind, Name: name, Source: string(store.ScopeName()), Value: value})
 	}
@@ -295,7 +492,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	}
 	key, ok := localenv.EnvKeyFor(kind, name)
 	if !ok {
-		return fmt.Errorf("%q is not a valid %s name", name, kind)
+		return fmt.Errorf("%q is not a valid %s name", name, localenv.Noun(kind))
 	}
 	for _, p := range src.Providers(vaultenv.Load(projectDir).Providers()) {
 		if v, has := p.Lookup(key); has {
@@ -312,7 +509,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	if ok {
 		return emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
 	}
-	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, the shared vault, or global ~/.astro/env)", kind, name)
+	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, the shared vault, or global ~/.astro/env)", localenv.Noun(kind), name)
 }
 
 // getFromWorkspace resolves a workspace-source name from Environment Manager
@@ -351,7 +548,7 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 	if v, has := wp.Lookup(key); has {
 		return v, wp.Label(), true, nil
 	}
-	return "", "", false, fmt.Errorf("%s %q resolves from the workspace but has no value: %s", kind, name, envresolve.Diagnose(wp, key))
+	return "", "", false, fmt.Errorf("%s %q resolves from the workspace but has no value: %s", localenv.Noun(kind), name, envresolve.Diagnose(wp, key))
 }
 
 // declaredSource returns a declared name's source, so `get` knows to consult
@@ -389,16 +586,20 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%s %q is not set in %s", kind, name, store.ScopeName())
+		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, store.ScopeName())
 	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "deleted"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", kind, name, store.ScopeName(), store.Location())
+		_, werr := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", localenv.Noun(kind), name, store.ScopeName(), store.Location())
 		return werr
 	})
 }
 
-func (c *cli) runEnvList(scope *scopeFlags, all bool) error {
+// runEnvList renders the list. only names a single kind to keep, or is empty
+// for the cross-kind view; it filters the rendered rows rather than the query,
+// so a narrowed list reports exactly what the full one would have for that
+// kind, resolution order and all.
+func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
@@ -429,6 +630,15 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool) error {
 	if err != nil {
 		return err
 	}
+	if only != "" {
+		kept := make([]localenv.ListItem, 0, len(items))
+		for _, it := range items {
+			if it.Kind == only {
+				kept = append(kept, it)
+			}
+		}
+		items = kept
+	}
 	if r.Format == FormatJSON {
 		for _, it := range items {
 			if err := r.Emit(it, nil); err != nil {
@@ -437,11 +647,19 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool) error {
 		}
 		return nil
 	}
-	return r.Emit(items, func(w io.Writer) error { return renderEnvList(w, items) })
+	return r.Emit(items, func(w io.Writer) error { return renderEnvList(w, items, only) })
 }
 
-func renderEnvList(w io.Writer, items []localenv.ListItem) error {
+// renderEnvList prints the table. only names the kind the rows were narrowed
+// to, or is empty for the cross-kind view; it exists for the empty case, where
+// the cross-kind wording ("no entries in any .env") is simply false when the
+// project holds values of the other kinds.
+func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) error {
 	if len(items) == 0 {
+		if only != "" {
+			_, err := fmt.Fprintf(w, "No %ss declared, and none in any .env.\n", localenv.Noun(only))
+			return err
+		}
 		_, err := fmt.Fprintln(w, "No declared env values and no entries in any .env.")
 		return err
 	}
@@ -548,7 +766,19 @@ func (c *cli) loadManifestSchema(projectDir string) (*manifest.Manifest, *envsch
 // readSetValue resolves the value for a `set`: --value inline, else --stdin or
 // a piped stdin, else a no-echo prompt. A bare positional value is never
 // accepted.
-func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, kind localenv.Kind, name string) (string, error) {
+func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, fields *connFields, kind localenv.Kind, name string) (string, error) {
+	// Field flags describe the whole connection, so they answer the value
+	// question outright. This is checked before the piped-stdin branch below,
+	// which would otherwise win in CI — stdin is not a terminal there, so a
+	// connection the user spelled out in flags would be overwritten by an
+	// empty read.
+	if kind == localenv.KindConn && connFieldsGiven(cmd) {
+		password, err := c.connFieldPassword(cmd, in, fields, name)
+		if err != nil {
+			return "", err
+		}
+		return connValueFromFields(fields, password)
+	}
 	if cmd.Flags().Changed("value") {
 		return in.value, nil
 	}
@@ -561,13 +791,62 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, kind localenv.Kind,
 		}
 		return strings.TrimRight(string(b), "\r\n"), nil
 	}
-	fmt.Fprintf(c.d.Stderr, "Value for %s %s: ", kind, name)
+	fmt.Fprintf(c.d.Stderr, "Value for %s %s: ", localenv.Noun(kind), name)
 	b, err := term.ReadPassword(int(f.Fd()))
 	fmt.Fprintln(c.d.Stderr)
 	if err != nil {
 		return "", err
 	}
 	return string(b), nil
+}
+
+// connFieldPassword resolves the password for a field-wise connection set.
+//
+// Field mode cannot use the whole-value paths — those describe a different
+// input — so without this there is no way to supply a password except on
+// argv, which is the leak this command's help tells you to avoid. Worse, a
+// piped password was read by nobody and the set reported success, writing a
+// connection that cannot authenticate.
+//
+// Order matches the cloud sibling: the flag if given, else stdin when it is
+// piped or --stdin was passed. There is deliberately no TTY prompt — many
+// connection types are passwordless (http, fs, a role-based aws), and
+// prompting by default would block the common case.
+//
+// An empty read means "no password", not "the password is the empty string".
+// Field mode builds a whole connection, so an absent password is simply an
+// absent field, and this is what keeps a stray pipe from blanking one.
+func (c *cli) connFieldPassword(cmd *cobra.Command, in *setInput, f *connFields, name string) (string, error) {
+	if cmd.Flags().Changed("password") {
+		return f.password, nil
+	}
+
+	var password string
+	file, isFile := c.d.Stdin.(*os.File)
+	piped := !isFile || !term.IsTerminal(int(file.Fd()))
+	if in.stdin || piped {
+		b, err := io.ReadAll(c.d.Stdin)
+		if err != nil {
+			return "", fmt.Errorf("reading the connection password from stdin: %w", err)
+		}
+		password = strings.TrimRight(string(b), "\r\n")
+	}
+
+	// Passwordless is legitimate — http, fs, an aws connection on an instance
+	// role — so ending with none is neither prompted for nor an error. But a
+	// login with no password is almost always the mistake it looks like, and
+	// the set otherwise reports plain success for a connection that cannot
+	// authenticate.
+	//
+	// The check is on the result rather than on which branch ran, because the
+	// two ways of arriving at no password both matter: a terminal with nothing
+	// piped, and — the one that bites in CI — a pipe that turned out empty.
+	if password == "" && f.login != "" {
+		fmt.Fprintf(c.d.Stderr,
+			"warning: connection %s has a login but no password; pipe one, or pass --password, if it needs one\n",
+			name)
+	}
+	return password, nil
 }
 
 // warnUnignoredEnv prints a stderr warning when a project .env is not covered

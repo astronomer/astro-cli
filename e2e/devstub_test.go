@@ -39,10 +39,13 @@ var devMapping = []struct {
 	// `object` were matched before `object import`, the guidance for the most
 	// specific thing someone typed would be the vaguest one available. That
 	// property needs no case of its own — TestDevSubcommandsAreRemoved runs
-	// every row below and asserts the replacement each one maps to, so a
-	// shorter prefix winning shows up as `object import` answering with
-	// "astro local env".
-	{"object import", "astro local env set"},
+	// every row below and asserts the replacement each one maps to.
+	//
+	// `object export` is the row that carries that check now: there is no
+	// `object import` row any more, because the only honest answer for it was
+	// the same tree the `object` row names and a duplicate row publishes a
+	// duplicate line in the scaffolded AGENTS.md. So a shorter prefix winning
+	// shows up as `object export` answering with "astro local env".
 	{"object export", "astro local env list"},
 	{"object", "astro local env"},
 }

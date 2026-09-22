@@ -10,7 +10,7 @@ import (
 )
 
 // Writer edits one scope of the shared vault: the store behind
-// `astro local env set --secret`. Build it with NewWriter.
+// `astro local env <noun> set --secret`. Build it with NewWriter.
 //
 // It deliberately mirrors localenv.Store — same Set/Get/Delete shape, same
 // (kind, name) addressing, same normalization for a connection — because the

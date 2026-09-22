@@ -86,7 +86,7 @@ func TestEnvGetFromWorkspace(t *testing.T) {
 	d, out, _ := envDeps(t, dir, "")
 	d.AstroV1Client = warehouseClient()
 
-	if err := execute(t, d, "local", "env", "get", "DATA_WAREHOUSE_URI", "--output", "json"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "get", "DATA_WAREHOUSE_URI", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
 	var got struct {
@@ -108,13 +108,13 @@ func TestEnvLocalSetOverridesWorkspace(t *testing.T) {
 
 	d, _, _ := envDeps(t, dir, "postgres://local\n")
 	d.AstroV1Client = warehouseClient()
-	if err := execute(t, d, "local", "env", "set", "DATA_WAREHOUSE_URI"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "DATA_WAREHOUSE_URI"); err != nil {
 		t.Fatal(err)
 	}
 
 	d, out, _ := envDeps(t, dir, "")
 	d.AstroV1Client = warehouseClient()
-	if err := execute(t, d, "local", "env", "get", "DATA_WAREHOUSE_URI", "--output", "json"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "get", "DATA_WAREHOUSE_URI", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
 	var got struct {

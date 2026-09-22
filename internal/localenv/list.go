@@ -121,15 +121,24 @@ func declaredItem(rn envresolve.ResolvedName) ListItem {
 	if rn.Source != "" {
 		item.Source = rn.Source
 	}
-	switch rn.Section {
-	case envschema.SectionEnvVar:
-		item.Kind = KindEnv
-	case envschema.SectionAirflowVariable:
-		item.Kind = KindVar
-	case envschema.SectionConnection:
-		item.Kind = KindConn
-	}
+	item.Kind = KindForSection(rn.Section)
 	return item
+}
+
+// KindForSection maps a manifest schema section onto the kind it declares.
+// An unrecognized section yields the zero Kind, which is what the switch it
+// replaced left behind and what the callers already tolerate.
+func KindForSection(s envschema.Section) Kind {
+	switch s {
+	case envschema.SectionEnvVar:
+		return KindEnv
+	case envschema.SectionAirflowVariable:
+		return KindVar
+	case envschema.SectionConnection:
+		return KindConn
+	default:
+		return ""
+	}
 }
 
 // orphans lists file entries that no schema declares. The files searched
@@ -237,23 +246,8 @@ func declaredKeySet(schema *envschema.Schema) map[string]bool {
 	return set
 }
 
-// removeHint is the exact `astro local env delete` command for an orphan,
-// with the scope flag that names the file it lives in.
+// removeHint is the exact `astro local env <noun> delete` command for an
+// orphan, with the scope flag that names the file it lives in.
 func removeHint(kind Kind, name string, scope Scope) string {
-	return "astro local env delete " + setArgs(kind, name) + " --" + string(scope)
-}
-
-// setArgs renders the positional part of a set/get/delete command for a
-// kind and name: "NAME", "conn <id>", or "var <key>".
-func setArgs(kind Kind, name string) string {
-	switch kind {
-	case KindConn:
-		return "conn " + name
-	case KindVar:
-		return "var " + name
-	case KindEnv:
-		return name
-	default:
-		return name
-	}
+	return "astro local env " + Noun(kind) + " delete " + name + " --" + string(scope)
 }

@@ -16,7 +16,7 @@ import (
 //
 // It is the one definition of what a stored connection looks like, and it lives
 // here rather than beside a caller because there are now two: `astro local env
-// set --secret`, and the conversion that carries a v1 airflow_settings.yaml into
+// connection set --secret`, and the conversion that carries a v1 airflow_settings.yaml into
 // the vault. Two spellings of "canonical" is how one tool writes a record the
 // other cannot read.
 func NormalizeConn(connID, raw string) (string, error) {

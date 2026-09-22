@@ -95,7 +95,7 @@ func TestBuildLoggedOutGatesWithCause(t *testing.T) {
 	if !errors.As(err, &missing) {
 		t.Fatalf("err = %v, want MissingEnvError", err)
 	}
-	if !testUtil.StringContains([]string{"DATA_WAREHOUSE_URI", "log in with 'astro login'", "astro local env set"}, missing.Error()) {
+	if !testUtil.StringContains([]string{"DATA_WAREHOUSE_URI", "log in with 'astro login'", "astro local env variable set"}, missing.Error()) {
 		t.Fatalf("message missing the cause or fix:\n%s", missing.Error())
 	}
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")

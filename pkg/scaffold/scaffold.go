@@ -429,7 +429,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		cs.Notes = append(cs.Notes, SettingsRelPath+": its "+
 			plural(len(cs.Secrets), "connection was", "connections were")+
 			" left in the file. Convert this project in Astro Desktop, or run "+
-			"`astro local env set --secret`, to move "+
+			"`astro local env connection set <id> --secret`, to move "+
 			pronoun(len(cs.Secrets))+" into the encrypted vault")
 		cs.Secrets = nil
 	}

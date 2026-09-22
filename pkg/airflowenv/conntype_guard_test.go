@@ -49,7 +49,7 @@ func TestTheIDSurvivesARefusedValue(t *testing.T) {
 
 // NormalizeConn is the one definition of what a stored connection looks like,
 // and it decodes through DecodeConnEnv — so the guard refuses a typeless
-// connection at the WRITE boundary (`astro local env set --secret`, and the v1
+// connection at the WRITE boundary (`astro local env connection set --secret`, and the v1
 // airflow_settings carry-over) rather than storing something unusable.
 func TestNormalizeConnRefusesAValueWithNoConnType(t *testing.T) {
 	for _, raw := range []string{`{}`, `{"host":"h"}`, `{"conn_type":""}`} {

@@ -25,7 +25,7 @@ const SettingsRelPath = "airflow_settings.yaml"
 // # Connections go to the vault, and are declared
 //
 // A connection is a credential. Its value goes to the shared vault at the
-// project's scope — the same place `astro local env set --secret` writes and
+// project's scope — the same place `astro local env connection set --secret` writes and
 // `astro local start` resolves — and the manifest gets a declaration naming it
 // and its conn_type, marked sensitive.
 //
@@ -224,7 +224,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 			// anyway, minus the part where nothing said so.
 			c.advisories = append(c.advisories, id+
 				": declared as a required connection, with no value to carry. "+
-				"Set it with `astro local env set --secret`")
+				"Set it with `astro local env connection set "+id+" --secret`")
 			continue
 		}
 		c.secrets = append(c.secrets, SecretWrite{
@@ -273,7 +273,7 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 //
 // Both arms end at airflowenv, which is the one definition of what a stored
 // connection looks like. A conn_uri is normalized through the same function
-// `astro local env set --secret` uses, rather than stored as written: the vault
+// `astro local env connection set --secret` uses, rather than stored as written: the vault
 // holds JSON, and a URI sitting in it is a record only one of the two tools can
 // read back.
 //

@@ -67,7 +67,7 @@ func TestEnvSetSecretWritesTheVaultNotTheFile(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	if err := execute(t, d, "local", "env", "set", "API_TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,7 +80,7 @@ func TestEnvSetSecretWritesTheVaultNotTheFile(t *testing.T) {
 	}
 
 	d, out, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "get", "API_TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "get", "API_TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	if got := out.String(); !strings.Contains(got, "s3cr3t") {
@@ -89,7 +89,7 @@ func TestEnvSetSecretWritesTheVaultNotTheFile(t *testing.T) {
 	// Text mode prints the value alone so it can be piped; the source rides the
 	// JSON form.
 	d, jsonOut, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "get", "API_TOKEN", "--output", "json"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "get", "API_TOKEN", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
 	if got := jsonOut.String(); !strings.Contains(got, "vault") {
@@ -103,7 +103,7 @@ func TestEnvSetSecretStoresCiphertext(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "plaintext-canary\n")
-	if err := execute(t, d, "local", "env", "set", "API_TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,7 +130,7 @@ func TestEnvSetSecretStoresCiphertext(t *testing.T) {
 func getJSON(t *testing.T, dir string, args ...string) envValue {
 	t.Helper()
 	d, out, _ := envDeps(t, dir, "")
-	if err := execute(t, d, append([]string{"local", "env", "get"}, append(args, "--output", "json")...)...); err != nil {
+	if err := execute(t, d, append([]string{"local", "env", "variable", "get"}, append(args, "--output", "json")...)...); err != nil {
 		t.Fatalf("get %v: %v", args, err)
 	}
 	var v envValue
@@ -149,7 +149,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 	// A value with no tier name in it, so only the source field can satisfy the
 	// assertion below.
 	d, _, _ := envDeps(t, dir, "shared-secret\n")
-	if err := execute(t, d, "local", "env", "set", "SHARED", "--secret", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--secret", "--global"); err != nil {
 		t.Fatal(err)
 	}
 	got := getJSON(t, dir, "SHARED")
@@ -162,7 +162,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 
 	// And the project tier wins over it for the same name.
 	d, _, _ = envDeps(t, dir, "project-secret\n")
-	if err := execute(t, d, "local", "env", "set", "SHARED", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 	got = getJSON(t, dir, "SHARED")
@@ -177,16 +177,16 @@ func TestPlainProjectFileStillBeatsTheVault(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "from-vault\n")
-	if err := execute(t, d, "local", "env", "set", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "from-file\n")
-	if err := execute(t, d, "local", "env", "set", "TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 
 	d, out, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "get", "TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "get", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	if got := out.String(); !strings.Contains(got, "from-file") {
@@ -199,11 +199,11 @@ func TestEnvDeleteSecret(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "set", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "delete", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 	if names := vaultFiles(t); len(names) != 0 {
@@ -212,7 +212,7 @@ func TestEnvDeleteSecret(t *testing.T) {
 
 	// Deleting what is not there says so rather than reporting success.
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "delete", "TOKEN", "--secret"); err == nil {
+	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN", "--secret"); err == nil {
 		t.Error("deleting a value that is not set should fail")
 	}
 }
@@ -226,7 +226,7 @@ func TestEnvSetSecretRefusesWithoutAKeyring(t *testing.T) {
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	err := execute(t, d, "local", "env", "set", "API_TOKEN", "--secret")
+	err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret")
 	if err == nil {
 		t.Fatal("want a refusal when the keyring is unreachable")
 	}
@@ -252,22 +252,22 @@ func TestEnvSetSecretNormalizesAConnectionLikeTheFileDoes(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "postgres://u:p@h:5432/db\n")
-	if err := execute(t, d, "local", "env", "set", "conn", "my_db", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "my_db", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 	d, vaultOut, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "get", "conn", "my_db", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "get", "my_db", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 
 	// The same input through the plain file, in a fresh project.
 	other := secretEnvProject(t, "")
 	d, _, _ = envDeps(t, other, "postgres://u:p@h:5432/db\n")
-	if err := execute(t, d, "local", "env", "set", "conn", "my_db"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "my_db"); err != nil {
 		t.Fatal(err)
 	}
 	d, fileOut, _ := envDeps(t, other, "")
-	if err := execute(t, d, "local", "env", "get", "conn", "my_db", "--project"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "get", "my_db", "--project"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -287,7 +287,7 @@ func TestListSeesAVaultOnlyValue(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = {}\n")
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	if err := execute(t, d, "local", "env", "set", "API_TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,7 +310,7 @@ func TestSecretOperationsNameTheVault(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, out, _ := envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "set", "TOKEN", "--secret", "--output", "json"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "vault") {

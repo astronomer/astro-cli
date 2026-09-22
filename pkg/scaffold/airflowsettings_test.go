@@ -326,7 +326,7 @@ func anyContains(hay []string, needle string) bool {
 //
 // What is carried is whatever was committed, which may be months stale or a
 // placeholder. What is already there was put there deliberately, through
-// `astro local env set --secret` or the app. Overwriting it destroys the good
+// `astro local env <noun> set --secret` or the app. Overwriting it destroys the good
 // credential and leaves the project running against exactly the value this
 // transform exists to get out of version control.
 func TestAValueAlreadyInTheVaultIsNotOverwritten(t *testing.T) {

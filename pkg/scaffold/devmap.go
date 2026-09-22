@@ -26,8 +26,12 @@ func DevReplacements() []DevReplacement {
 		{"init", "astro init"},
 		// v1 bulk-loaded connections and variables into a running Airflow and
 		// dumped them back out. v2 declares them per name instead, so there is
-		// no bulk equivalent and these name the command that does the job.
-		{"object import", "astro local env set"},
+		// There is no "object import" row: v1's import covered connections and
+		// variables together, no single v2 command does, and the honest answer
+		// — the tree — is what the "object" row below already gives. A second
+		// row saying the same thing publishes a duplicate line in the
+		// scaffolded AGENTS.md and in the stub's payload, and lookup is
+		// longest-prefix-first, so removing it changes no answer.
 		{"object export", "astro local env list"},
 		{"object", "astro local env"},
 	}

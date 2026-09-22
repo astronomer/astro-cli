@@ -40,7 +40,7 @@ func TestMissingCredentialNamesTheVariableAndTheFix(t *testing.T) {
 	if err == nil {
 		t.Fatal("a missing credential resolved")
 	}
-	for _, want := range []string{`deployment "staging"`, "STAGING_AIRFLOW_TOKEN", "astro local env set STAGING_AIRFLOW_TOKEN --project"} {
+	for _, want := range []string{`deployment "staging"`, "STAGING_AIRFLOW_TOKEN", "astro local env variable set STAGING_AIRFLOW_TOKEN --project"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("message does not name %s: %s", want, err)
 		}

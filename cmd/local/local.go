@@ -29,6 +29,7 @@ const (
 	nameRun     = "run"
 	nameInit    = "init"
 	nameDev     = "dev"
+	nameEnv     = "env"
 
 	replaceStart = "astro local start"
 	replaceLogs  = "astro local logs"
