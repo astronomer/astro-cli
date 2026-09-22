@@ -96,7 +96,6 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy Dags to a named Dag bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
-	cmd.Flags().MarkHidden("dag-bundle-name") //nolint:errcheck
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have Dag Deploy enabled your Dags will not be affected.")
 	cmd.Flags().StringVar(&dagsPath, dagsPathFlag, "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
@@ -111,10 +110,6 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&nonDagsMountPath, "non-dags-mount-path", "", "Path to mount the non-Dag bundle in Airflow, for reference by Dags. Used with --non-dags")
 	cmd.Flags().StringVar(&nonDagsBundleType, "non-dags-bundle-type", "none", "Free-form label identifying the kind of non-Dag bundle (e.g. dbt). Any value is accepted. Defaults to \"none\". Used with --non-dags")
 	cmd.Flags().StringVar(&nonDagsBundlePath, "non-dags-local-path", "", "Path to the non-Dag bundle to deploy. Default current directory. Used with --non-dags")
-	cmd.Flags().MarkHidden(nonDagsFlag)            //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-mount-path")  //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-bundle-type") //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-local-path")  //nolint:errcheck
 
 	annotateDeployFlag(cmd, "image", "image")
 	annotateDeployFlag(cmd, imageNameFlag, "image")
