@@ -13,42 +13,26 @@ import (
 )
 
 const envVarExamples = `
-  # list workspace variables (table)
-  astro env variable list --workspace-id <workspace-id>
+  # set a variable, creating it if it does not exist
+  astro env variable set API_TOKEN --workspace-id <ws> --value "$TOKEN" --secret
 
-  # export workspace variables as a dotenv file
-  astro env variable export --workspace-id <workspace-id> > .env
+  # fail instead of creating, to catch a mistyped key
+  astro env variable set API_TOKEN --workspace-id <ws> --value "$TOKEN" --no-create
 
-  # show actual secret values (requires org policy to allow)
-  astro env variable export --workspace-id <workspace-id> --include-secrets > .env
+  # export to a .env file, or set many from one
+  astro env variable export --workspace-id <ws> > .env
+  astro env variable set --workspace-id <ws> --from-file .env
 
-  # list deployment-resolved variables, including those linked from the workspace
-  astro env variable list --deployment-id <deployment-id> --resolve-linked
-
-  # set (creates the variable when missing, updates it when present)
-  astro env variable set --workspace-id <ws-id> DBT_PROFILES_DIR --value /opt/profiles
-  astro env variable set --workspace-id <ws-id> API_TOKEN --value $TOKEN --secret
-
-  # refuse to create, so a mistyped key fails instead of making a second variable
-  astro env variable set --workspace-id <ws-id> DBT_PROFILES_DIR --value /etc/profiles --no-create
-
-  # delete
-  astro env variable delete --workspace-id <ws-id> DBT_PROFILES_DIR --yes
-
-  # bulk set from a dotenv file (round-trips with 'astro env variable export')
-  astro env variable set --workspace-id <ws-id> --from-file .env
-
-  # manage per-deployment links (see 'astro env variable link --help')
-  astro env variable link set --variable-key DBT_PROFILES_DIR --workspace-id <ws-id> --deployment-id <dep-id> --value /etc/profiles
-  astro env variable link list --variable-key DBT_PROFILES_DIR --workspace-id <ws-id>
-`
+  # list and delete
+  astro env variable list --workspace-id <ws>
+  astro env variable delete API_TOKEN --workspace-id <ws> --yes`
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                        "variable",
 		Aliases:                    []string{"var", "variables", "vars"},
-		Short:                      "Manage environment-manager environment variables",
-		Long:                       "List, set, delete, or export environment variables managed through the platform's environment manager. `set` creates a variable when it does not exist and updates it when it does. Variables can be scoped to a workspace or a deployment.",
+		Short:                      "Manage environment variables",
+		Long:                       "Manage environment variables on Astro, scoped to a workspace or a deployment.",
 		Example:                    envVarExamples,
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
@@ -89,8 +73,9 @@ func newEnvVarListCmd(out io.Writer) *cobra.Command {
 func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export environment variables in dotenv format",
-		Long:  "Export environment variables for the given scope as KEY=VALUE lines suitable for a .env file.",
+		Short: "Export environment variables as a .env file",
+		Long: "Write the scope's environment variables as KEY=VALUE lines. Secret values are\n" +
+			"left blank unless --include-secrets is set.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarList(cmd, out, env.FormatDotenv)
 		},
@@ -102,7 +87,7 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get <id-or-key>",
-		Short: "Get a single environment variable by ID or key",
+		Short: "Show an environment variable",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvVarGet(cmd, out, args[0])
@@ -115,9 +100,10 @@ func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set [<id-or-key>]",
-		Short: "Set a variable's value, creating it if it does not exist",
-		Long:  "Set the value of an environment variable. The object is created when the key does not exist and updated when it does, so one verb covers both. Pass --no-create to fail instead of creating, which is the guard against a mistyped key quietly becoming a second variable. Use --from-file to bulk-set from a dotenv file. The platform API does not allow toggling the secret flag on an existing variable; delete and recreate to change it.",
-		Args:  cobra.MaximumNArgs(1),
+		Short: "Set an environment variable",
+		Long: "Set an environment variable, creating it if it does not exist. Pass --no-create\n" +
+			"to fail instead, or --from-file to set many from a dotenv file.",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if envVarFromFile != "" {
 				if len(args) > 0 {
@@ -131,8 +117,8 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 			return runEnvVarSet(cmd, out, args[0])
 		},
 	}
-	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "New variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
-	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "When the variable does not exist and is created, mark it secret. No effect on an existing variable; the platform API does not allow toggling the secret flag.")
+	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
+	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created; to change it later, delete and re-create it")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
 	// --strict was this flag's name while the verb was `update`, where its job
 	// was to take away the create half. Against `set` the name contradicts the
@@ -141,7 +127,7 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 	// `create`, which got a whole tombstone. Deprecated, hidden, still works.
 	cmd.Flags().BoolVar(&envVarNoCreate, "strict", false, "")
 	_ = cmd.Flags().MarkDeprecated("strict", "use --no-create") //nolint:errcheck // the flag is registered on the line above; this only errors on an unknown name
-	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Bulk-set variables from a dotenv file. Pass '-' to read from stdin. Mutually exclusive with --value and the positional <id-or-key>.")
+	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Set many from a dotenv file ('-' reads stdin)")
 	addAutoLinkFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive("value", "from-file")
 	return cmd

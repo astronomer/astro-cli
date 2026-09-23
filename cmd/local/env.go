@@ -92,17 +92,17 @@ func newEnvCmd(c *cli) *cobra.Command {
 	scope := &scopeFlags{}
 	cmd := &cobra.Command{
 		Use:   "env",
-		Short: "Set, read, and list local Airflow env values for this project",
-		Long: "Manage the environment values local Airflow runs with: plain env vars, connections, and Airflow Variables.\n\n" +
-			"Each kind is a noun with the same verbs under it — `variable`, `connection` and `airflow-variable`, the " +
-			"words `astro env` uses for the same objects on the cloud side.\n\n" +
-			"Values are stored in plain files — the project's .env (default inside a project) or the global ~/.astro/env " +
-			"(--global) — created readable only by you. With --secret a value goes instead to the encrypted vault this " +
-			"machine shares with Astro Desktop, so a value set in either tool is readable in the other; that needs an OS " +
-			"keyring, and the command refuses where there is none rather than quietly writing a credential to a plain " +
-			"file.\n\n" +
-			"Resolution order at start is shell env > project .env > project vault > global vault > global ~/.astro/env > " +
-			"the workspace's Environment Manager.",
+		Short: "Manage environment values for local Airflow",
+		// Wrapped by hand at the same width as `astro env --help`, which cobra
+		// does not do for us. What used to follow here moved to where it is
+		// needed: the keyring requirement for --secret is on `set --help`, and
+		// the files' 0600 mode is in docs/v2-secrets.md.
+		Long: "Manage environment values for local Airflow: environment variables,\n" +
+			"connections, and Airflow variables.\n\n" +
+			"Values live in the project's .env, or ~/.astro/env with --global. Pass --secret\n" +
+			"to use the encrypted vault shared with Astro Desktop instead.\n\n" +
+			"At start, each value comes from the first of: shell env, project .env, project\n" +
+			"vault, global vault, ~/.astro/env, the workspace's Environment Manager.",
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
 		SuggestionsMinimumDistance: 2,
@@ -112,7 +112,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 	for _, k := range envKinds() {
 		cmd.AddCommand(newEnvKindCmd(c, scope, k))
 	}
-	cmd.AddCommand(newEnvListCmd(c, scope, "", "List declared values of every kind with the source each resolves from"))
+	cmd.AddCommand(newEnvListCmd(c, scope, "", "List every declared value and where it resolves from"))
 	return cmd
 }
 
@@ -192,6 +192,7 @@ type envKind struct {
 	arg     string
 	article string
 	label   string
+	example string
 }
 
 // envKinds is the noun list, named and aliased as `astro env` names the same
@@ -206,6 +207,18 @@ func envKinds() []envKind {
 			arg:     "<NAME>",
 			article: "an",
 			label:   "environment variable",
+			example: `
+  # set a variable (prompts for the value, echo off)
+  astro local env variable set API_TOKEN
+
+  # read the value from a pipe, or keep it in the vault shared with Astro Desktop
+  echo "$TOKEN" | astro local env variable set API_TOKEN --stdin
+  astro local env variable set API_TOKEN --secret
+
+  # show, list and delete
+  astro local env variable get API_TOKEN
+  astro local env variable list
+  astro local env variable delete API_TOKEN`,
 		},
 		{
 			aliases: []string{"conn", "connections"},
@@ -213,6 +226,18 @@ func envKinds() []envKind {
 			arg:     "<id>",
 			article: "a",
 			label:   "connection",
+			example: `
+  # set from a URI (or connection JSON)
+  astro local env connection set db_main --value 'postgres://admin@db.example.com:5432/warehouse'
+
+  # or field by field, with the password piped
+  echo "$PW" | astro local env connection set db_main \
+    --type postgres --host db.example.com --login admin --port 5432
+
+  # show, list and delete
+  astro local env connection get db_main
+  astro local env connection list
+  astro local env connection delete db_main`,
 		},
 		{
 			aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
@@ -220,6 +245,14 @@ func envKinds() []envKind {
 			arg:     "<key>",
 			article: "an",
 			label:   "Airflow variable",
+			example: `
+  # set a variable
+  astro local env airflow-variable set region --value us-east-1
+
+  # show, list and delete
+  astro local env airflow-variable get region
+  astro local env airflow-variable list
+  astro local env airflow-variable delete region`,
 		},
 	}
 }
@@ -235,7 +268,9 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Use:                        localenv.Noun(k.kind),
 		Aliases:                    k.aliases,
 		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage local " + k.label + "s",
+		Short:                      "Manage " + k.label + "s",
+		Long:                       "Manage " + k.label + "s for local Airflow.",
+		Example:                    k.example,
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
 	}
@@ -243,7 +278,7 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	// `astro env` uses for the same four verbs, so help reads the same
 	// whichever tree you are in. TestEnvVerbOrderMatchesTheCloudTree pins it.
 	cmd.AddCommand(
-		newEnvListCmd(c, scope, k.kind, "List "+k.label+"s with the source each resolves from"),
+		newEnvListCmd(c, scope, k.kind, "List "+k.label+"s and where each resolves from"),
 		newEnvGetCmd(c, scope, k),
 		newEnvSetCmd(c, scope, k),
 		newEnvDeleteCmd(c, scope, k),
@@ -254,17 +289,13 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	in := &setInput{}
 	fields := &connFields{}
-	long := "Set a value in a .env file, or in the encrypted vault with --secret. The value never comes from a " +
-		"bare argument — it would land in shell history and `ps`. By default `set` prompts with echo off; pass " +
-		"--stdin to read it from a pipe, or --value to pass it inline (which is visible in shell history).\n\n" +
-		"--secret stores the value in the vault this machine shares with Astro Desktop, so a value set in " +
-		"either tool is readable in the other. It needs an OS keyring: on a headless machine or in CI there " +
-		"is none, and the command refuses rather than quietly writing a credential to a plain file. " +
-		"--project/--global choose the scope either way."
+	long := "Set " + k.article + " " + k.label + ", creating it if it does not exist.\n\n" +
+		"The value comes from a prompt with echo off, --stdin, or --value; never a bare\n" +
+		"argument, which would land in shell history. --secret stores it in the vault\n" +
+		"shared with Astro Desktop, which needs an OS keyring."
 	if k.kind == localenv.KindConn {
-		long += "\n\nA connection can be given whole — a URI or its JSON, through the prompt, --stdin or --value — " +
-			"or field by field with --type and friends, which are the flags `astro env connection set` takes for the " +
-			"same object. The two ways are exclusive: the field flags describe a whole connection too, not a patch."
+		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type,\n" +
+			"--host and the rest."
 	}
 	cmd := &cobra.Command{
 		Use:   "set " + k.arg,
@@ -281,7 +312,11 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	cmd.Flags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
-	cmd.Flags().StringVar(&in.value, "value", "", "Pass the value inline (visible in shell history; prefer a prompt or --stdin)")
+	valueHelp := "The value; omit it to be prompted with echo off, or use --stdin"
+	if k.kind == localenv.KindConn {
+		valueHelp = "The whole connection as a URI or JSON; omit it to be prompted, or use --stdin"
+	}
+	cmd.Flags().StringVar(&in.value, "value", "", valueHelp)
 	if k.kind == localenv.KindConn {
 		addConnFieldFlags(cmd, fields)
 	}
@@ -315,7 +350,7 @@ func addConnFieldFlags(cmd *cobra.Command, f *connFields) {
 	cmd.Flags().StringVar(&f.connType, "type", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&f.host, "host", "", "Connection host")
 	cmd.Flags().StringVar(&f.login, "login", "", "Connection login or username")
-	cmd.Flags().StringVar(&f.password, "password", "", "Connection password. Visible in shell history, so prefer piping it (or --stdin), which reads the password from stdin.")
+	cmd.Flags().StringVar(&f.password, "password", "", "Connection password; prefer piping it, since a flag lands in shell history")
 	cmd.Flags().StringVar(&f.schema, "schema", "", "Connection schema")
 	cmd.Flags().IntVar(&f.port, "port", 0, "Connection port")
 	cmd.Flags().StringVar(&f.extra, "extra", "", "Extra configuration as a JSON object string")
@@ -376,7 +411,7 @@ func connValueFromFields(f *connFields, password string) (string, error) {
 func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get " + k.arg,
-		Short: "Print " + k.article + " " + k.label + " and the source it resolves from",
+		Short: "Show " + k.article + " " + k.label + " and where it resolves from",
 		Args:  cobra.ExactArgs(1),
 		RunE:  func(_ *cobra.Command, args []string) error { return c.runEnvGet(scope, k.kind, args[0]) },
 	}
@@ -388,7 +423,7 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete " + k.arg,
 		Aliases: []string{"rm"},
-		Short:   "Remove " + k.article + " " + k.label,
+		Short:   "Delete " + k.article + " " + k.label,
 		Args:    cobra.ExactArgs(1),
 		RunE:    func(_ *cobra.Command, args []string) error { return c.runEnvDelete(scope, k.kind, args[0]) },
 	}
@@ -403,16 +438,24 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 // from; the cloud has no resolution chain to report.
 func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) *cobra.Command {
 	var all bool
+	// Only the cross-kind list gets a Long, matching `astro env list`; a
+	// noun's own list says all it needs in its Short.
+	long := ""
+	if only == "" {
+		long = "List every declared value and where it resolves from. Values are not shown;\n" +
+			"use get to see one."
+	}
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   short,
+		Long:    long,
 		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runEnvList(scope, all, only)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "Widen to the global file plus every project's .env the CLI knows")
+	cmd.Flags().BoolVar(&all, "all", false, "Also include the global file and every known project's .env")
 	return cmd
 }
 

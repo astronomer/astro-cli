@@ -14,26 +14,24 @@ import (
 )
 
 const envMetricsExamples = `
-  # List metrics exports in a workspace
-  astro env metrics-export list --workspace-id <ws-id>
+  # set a Prometheus export, creating it if it does not exist
+  astro env metrics-export set prom_main --workspace-id <ws> \
+    --endpoint https://prom.example.com/api/v1/write --exporter-type PROMETHEUS \
+    --auth-type BASIC --username scraper --password "$PW"
 
-  # Set a Prometheus metrics export with basic auth (creates it when missing)
-  astro env metrics-export set prom_main --workspace-id <ws-id> \
-    --endpoint https://prom.example.com/api/v1/write \
-    --exporter-type PROMETHEUS \
-    --auth-type BASIC --username scraper --password ...
+  # change labels on one that must already exist
+  astro env metrics-export set prom_main --workspace-id <ws> --label env=prod --no-create
 
-  # Change labels on an export that must already exist
-  astro env metrics-export set prom_main --workspace-id <ws-id> \
-    --label env=prod --label team=data --no-create
-`
+  # list and delete
+  astro env metrics-export list --workspace-id <ws>
+  astro env metrics-export delete prom_main --workspace-id <ws> --yes`
 
 func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                        "metrics-export",
 		Aliases:                    []string{"metrics", "metrics-exports"},
-		Short:                      "Manage environment-manager metrics exports",
-		Long:                       "List, set, or delete metrics exports managed through the platform's environment manager. `set` creates an export when it does not exist and updates it when it does. Metrics exports can be scoped to a workspace or a deployment.",
+		Short:                      "Manage metrics exports",
+		Long:                       "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
 		Example:                    envMetricsExamples,
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
@@ -69,7 +67,7 @@ func newEnvMetricsListCmd(out io.Writer) *cobra.Command {
 func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get <id-or-key>",
-		Short: "Get a single metrics export by ID or key",
+		Short: "Show a metrics export",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvMetricsGet(cmd, out, args[0])
@@ -82,10 +80,9 @@ func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
 func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <id-or-key>",
-		Short: "Set a metrics export, creating it if it does not exist",
-		Long: "Set a metrics export's fields. The export is created when the key does not exist and updated when it does, so one verb covers both. " +
-			"Creating one needs --endpoint and --exporter-type; updating an existing one needs neither, so a set that turns out to create without them fails naming the missing flag. " +
-			"Pass --no-create to fail instead of creating.",
+		Short: "Set a metrics export",
+		Long: "Set a metrics export, creating it if it does not exist. Pass --no-create to fail\n" +
+			"instead. Creating one needs --endpoint and --exporter-type.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvMetricsSet(cmd, out, args[0])
@@ -117,7 +114,7 @@ func metricsCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&envMetricsAuthType, "auth-type", "", "Auth type: BASIC, AUTH_TOKEN, or SIGV4")
 	cmd.Flags().StringVar(&envMetricsBasicToken, "basic-token", "", "Bearer/auth token (for AUTH_TOKEN auth)")
 	cmd.Flags().StringVar(&envMetricsUsername, "username", "", "Username (for BASIC auth)")
-	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password (for BASIC auth). Prefer piping it, which is read when stdin is not a terminal; passing it here puts it in shell history. An explicit empty value clears a stored password.")
+	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password for BASIC auth; prefer piping it, since a flag lands in shell history (empty clears it)")
 	cmd.Flags().StringVar(&envMetricsSigV4AssumeArn, "sigv4-assume-arn", "", "AWS IAM role to assume (for SIGV4 auth)")
 	cmd.Flags().StringVar(&envMetricsSigV4StsRegion, "sigv4-sts-region", "", "AWS STS region (for SIGV4 auth)")
 	cmd.Flags().StringToStringVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form. Repeatable.")

@@ -17,7 +17,7 @@ const includeSecretsWarning = "Warning: --include-secrets returns secret values 
 // At workspace scope, this toggles the platform's "auto-link to all
 // deployments" flag on the object. Has no effect at deployment scope.
 func addAutoLinkFlag(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&envAutoLink, "auto-link", false, "Workspace scope only: automatically link this object to all deployments in the workspace, including future ones.")
+	cmd.Flags().BoolVar(&envAutoLink, "auto-link", false, "Link to every deployment in the workspace, including future ones (workspace scope only)")
 }
 
 // autoLinkPtr returns nil when --auto-link was not explicitly set (so the
@@ -33,10 +33,10 @@ func autoLinkPtr(cmd *cobra.Command) *bool {
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
 func addScopePersistentFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace scope (mutually exclusive with --deployment-id). Defaults to the current workspace from context.")
-	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment scope (mutually exclusive with --workspace-id)")
-	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Surface secret values (requires org policy to allow)")
-	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope (e.g. workspace -> deployment). In this mode IDs are not returned, since they refer to resolved rows that aren't directly addressable. Use --resolve-linked=false to see IDs.")
+	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the current workspace)")
+	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace")
+	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Show secret values (org policy must allow it)")
+	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 }
 
 // envScope resolves the active scope, validating mutual exclusivity and falling
@@ -116,9 +116,9 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List environment objects of every kind in the scope",
-		Long: "List every environment object the scope holds — variables, connections, Airflow variables and metrics exports — with the kind that manages each one.\n\n" +
-			"This listing never prints a value. The per-kind listings (`astro env variable list` and friends) show the type-specific columns and take --include-secrets; this one answers what exists.",
+		Short:   "List every environment object in the scope",
+		Long: "List every environment object in the scope, grouped by kind. Values are not\n" +
+			"shown; use a kind's own list to see them.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvList(cmd, out)
@@ -135,9 +135,9 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// --include-secrets is deliberately absent: it asks the platform to unmask
 	// values, and this listing has no column to put one in.
-	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace scope (mutually exclusive with --deployment-id). Defaults to the current workspace from context.")
-	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment scope (mutually exclusive with --workspace-id)")
-	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope (e.g. workspace -> deployment). In this mode IDs are not returned, since they refer to resolved rows that aren't directly addressable. Use --resolve-linked=false to see IDs.")
+	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the current workspace)")
+	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace")
+	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd
 }
 
@@ -177,14 +177,12 @@ func newEnvRootCmd(out io.Writer) *cobra.Command {
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
 		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage a Deployment's environment objects on Astro",
-		Long: `Manage Astronomer environment-manager objects: workspace- or deployment-scoped
-environment variables, connections, Airflow variables, and metrics exports.
+		Short:                      "Manage environment objects on Astro",
+		Long: `Manage environment objects on Astro: environment variables, connections,
+Airflow variables, and metrics exports, scoped to a workspace or a deployment.
 
-This command tree is distinct from 'astro deployment variable' (which writes to the
-deployment record directly) and 'astro deployment connection' (which talks to Airflow's
-metadata database). Use 'astro env' for objects that should be shared across deployments
-or managed at workspace scope.`,
+Objects here can be shared across deployments. To change one deployment
+directly, use 'astro deployment variable' or 'astro deployment connection'.`,
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(

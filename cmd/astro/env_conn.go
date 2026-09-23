@@ -16,29 +16,24 @@ import (
 )
 
 const envConnExamples = `
-  # List connections in a workspace
-  astro env connection list --workspace-id <ws-id>
+  # set from a URI, creating it if it does not exist
+  astro env connection set db_main --workspace-id <ws> \
+    --value 'postgres://admin@db.example.com:5432/warehouse' --password "$PW"
 
-  # Set a Postgres connection from a URI, the same value 'astro local env connection set' takes
-  # (credentials may be embedded; percent-encode any reserved characters in them)
-  astro env connection set db_main --workspace-id <ws-id> --value 'postgres://admin@db.example.com:5432/warehouse'
+  # or field by field
+  astro env connection set db_main --workspace-id <ws> \
+    --type postgres --host db.example.com --login admin --port 5432
 
-  # Or field by field
-  astro env connection set db_main --workspace-id <ws-id> --type postgres --host db.example.com --login admin --port 5432
-
-  # Change only the host on a connection that must already exist
-  astro env connection set db_main --workspace-id <ws-id> --type postgres --host db-new.example.com --no-create
-
-  # Delete
-  astro env connection delete db_main --workspace-id <ws-id> --yes
-`
+  # list and delete
+  astro env connection list --workspace-id <ws>
+  astro env connection delete db_main --workspace-id <ws> --yes`
 
 func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                        "connection",
 		Aliases:                    []string{"conn", "connections"},
-		Short:                      "Manage environment-manager connections",
-		Long:                       "List, set, or delete connections managed through the platform's environment manager. `set` creates a connection when it does not exist and updates it when it does. Connections can be scoped to a workspace or a deployment.",
+		Short:                      "Manage connections",
+		Long:                       "Manage connections on Astro, scoped to a workspace or a deployment.",
 		Example:                    envConnExamples,
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
@@ -74,7 +69,7 @@ func newEnvConnListCmd(out io.Writer) *cobra.Command {
 func newEnvConnGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get <id-or-key>",
-		Short: "Get a single connection by ID or key",
+		Short: "Show a connection",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvConnGet(cmd, out, args[0])
@@ -87,9 +82,11 @@ func newEnvConnGetCmd(out io.Writer) *cobra.Command {
 func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <id-or-key>",
-		Short: "Set a connection, creating it if it does not exist",
-		Long:  "Set a connection's fields. The connection is created when the key does not exist and updated when it does, so one verb covers both. Pass --no-create to fail instead of creating, which is the guard against a mistyped key quietly becoming a second connection.",
-		Args:  cobra.ExactArgs(1),
+		Short: "Set a connection",
+		Long: "Set a connection, creating it if it does not exist. Pass --no-create to fail\n" +
+			"instead. Give it whole with --value, as a URI or JSON, or field by field with\n" +
+			"--type, --host and the rest.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvConnSet(cmd, out, args[0])
 		},
@@ -132,11 +129,11 @@ func newEnvConnDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func connFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&envConnValue, "value", "v", "", "The whole connection, as a URI (postgres://user@host:5432/db) or as connection JSON — the value 'astro local env connection set' takes, read by the same parsers. Percent-encode reserved characters in an embedded password. Replaces the fields it can: whatever the value omits is cleared, unlike the field flags, which patch. Two exceptions — a URI with no port leaves the stored port alone (there is no way to say \"no port\"), and a password comes from --password or a pipe rather than being cleared by its absence.")
+	cmd.Flags().StringVarP(&envConnValue, "value", "v", "", "The whole connection as a URI or JSON. Replaces it, where the field flags patch; a stored port or password is kept unless given")
 	cmd.Flags().StringVarP(&envConnType, "type", "t", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&envConnHost, "host", "", "Connection host")
 	cmd.Flags().StringVarP(&envConnLogin, "login", "l", "", "Connection login or username")
-	cmd.Flags().StringVarP(&envConnPassword, "password", "p", "", "Connection password. Prefer piping it, which is read when stdin is not a terminal; passing it here puts it in shell history. An explicit empty value clears a stored password.")
+	cmd.Flags().StringVarP(&envConnPassword, "password", "p", "", "Connection password; prefer piping it, since a flag lands in shell history (empty clears it)")
 	cmd.Flags().StringVar(&envConnSchema, "schema", "", "Connection schema")
 	cmd.Flags().IntVar(&envConnPort, "port", 0, "Connection port")
 	cmd.Flags().StringVar(&envConnExtra, "extra", "", "Extra configuration as a JSON object string")

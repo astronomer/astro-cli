@@ -13,28 +13,22 @@ import (
 )
 
 const envAirflowVarExamples = `
-  # List Airflow variables in a workspace
-  astro env airflow-variable list --workspace-id <ws-id>
+  # set a variable, creating it if it does not exist
+  astro env airflow-variable set region --workspace-id <ws> --value us-east-1
 
-  # Set (creates the variable when missing, updates it when present)
-  astro env airflow-variable set MY_VAR --workspace-id <ws-id> --value some-value
+  # set many from a dotenv file
+  astro env airflow-variable set --workspace-id <ws> --from-file vars.env
 
-  # Refuse to create, so a mistyped key fails instead of making a second variable
-  astro env airflow-variable set MY_VAR --workspace-id <ws-id> --value new-value --no-create
-
-  # Delete
-  astro env airflow-variable delete MY_VAR --workspace-id <ws-id> --yes
-
-  # Bulk set from a dotenv file (POSIX-style keys only)
-  astro env airflow-variable set --workspace-id <ws-id> --from-file vars.env
-`
+  # list and delete
+  astro env airflow-variable list --workspace-id <ws>
+  astro env airflow-variable delete region --workspace-id <ws> --yes`
 
 func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                        "airflow-variable",
 		Aliases:                    []string{"airflow-var", "airflow-vars", "airflow-variables"},
-		Short:                      "Manage environment-manager Airflow variables",
-		Long:                       "List, set, or delete Airflow variables managed through the platform's environment manager. `set` creates a variable when it does not exist and updates it when it does. Variables can be scoped to a workspace or a deployment.",
+		Short:                      "Manage Airflow variables",
+		Long:                       "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
 		Example:                    envAirflowVarExamples,
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
@@ -70,7 +64,7 @@ func newEnvAirflowVarListCmd(out io.Writer) *cobra.Command {
 func newEnvAirflowVarGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get <id-or-key>",
-		Short: "Get a single Airflow variable by ID or key",
+		Short: "Show an Airflow variable",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvAirflowVarGet(cmd, out, args[0])
@@ -83,9 +77,10 @@ func newEnvAirflowVarGetCmd(out io.Writer) *cobra.Command {
 func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set [<id-or-key>]",
-		Short: "Set an Airflow variable's value, creating it if it does not exist",
-		Long:  "Set the value of an Airflow variable. The object is created when the key does not exist and updated when it does, so one verb covers both. Pass --no-create to fail instead of creating, which is the guard against a mistyped key quietly becoming a second variable. Use --from-file to bulk-set from a dotenv file.",
-		Args:  cobra.MaximumNArgs(1),
+		Short: "Set an Airflow variable",
+		Long: "Set an Airflow variable, creating it if it does not exist. Pass --no-create to\n" +
+			"fail instead, or --from-file to set many from a dotenv file.",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if envVarFromFile != "" {
 				if len(args) > 0 {
@@ -99,8 +94,8 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 			return runEnvAirflowVarSet(cmd, out, args[0])
 		},
 	}
-	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "New variable value. If omitted, read from stdin (piped) or prompted (TTY) with echo disabled.")
-	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "When the variable does not exist and is created, mark it secret. No effect on an existing variable.")
+	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
+	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
 	// --strict was this flag's name while the verb was `update`, where its job
 	// was to take away the create half. Against `set` the name contradicts the
@@ -109,7 +104,7 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 	// `create`, which got a whole tombstone. Deprecated, hidden, still works.
 	cmd.Flags().BoolVar(&envVarNoCreate, "strict", false, "")
 	_ = cmd.Flags().MarkDeprecated("strict", "use --no-create") //nolint:errcheck // the flag is registered on the line above; this only errors on an unknown name
-	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Bulk-set variables from a dotenv file. Pass '-' to read from stdin. Mutually exclusive with --value and the positional <id-or-key>.")
+	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Set many from a dotenv file ('-' reads stdin)")
 	addAutoLinkFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive("value", "from-file")
 	return cmd
