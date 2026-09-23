@@ -11,10 +11,12 @@
 // result is held in memory only — Environment Manager values are never written
 // to disk.
 //
-// Scope: env-var-keyed objects only — plain env vars and Airflow variables,
-// whose objectKey is already the Airflow env-var key the local chain reads.
-// Re-encoding native structured CONNECTION objects into an AIRFLOW_CONN_<id>
-// value is out of scope here.
+// Scope: plain env vars, Airflow variables and connections, each indexed under
+// the Airflow env-var key the local chain reads. A connection is re-encoded
+// from its structured fields into the AIRFLOW_CONN_<id> JSON the local tiers
+// store, through the same pkg/airflowenv codec Astro Desktop uses, so a
+// workspace connection resolves to the same value whichever app starts
+// Airflow. Metrics exports are a deployment telemetry concern and stay out.
 package emenv
 
 import (
@@ -27,6 +29,8 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/airflowenv"
+	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 )
 
@@ -143,18 +147,22 @@ func (p *provider) load() {
 	})
 }
 
-// envVarKeyedTypes are the object types whose objectKey is already the Airflow
-// env-var key: plain env vars and Airflow variables. The list endpoint filters
-// by one type per call (a request with no type is rejected server-side), so a
-// fetch is one call per type — still shared across every name in a run. Native
-// connections and metrics exports are out of scope.
-var envVarKeyedTypes = []astrov1.ListEnvironmentObjectsParamsObjectType{
+// fetchedTypes are the object types local Airflow reads. The list endpoint
+// filters by one type per call (a request with no type is rejected
+// server-side), so a fetch is one call per type — still shared across every
+// name in a run. Metrics exports are out of scope.
+//
+// CONNECTION comes after ENVIRONMENT_VARIABLE on purpose: a connection stored
+// both ways — natively and as an AIRFLOW_CONN_* env var — resolves to the
+// native one, since indexObject lets the later write win. Astro Desktop layers
+// the two in the same order.
+var fetchedTypes = []astrov1.ListEnvironmentObjectsParamsObjectType{
 	astrov1.ENVIRONMENTVARIABLE,
 	astrov1.AIRFLOWVARIABLE,
+	astrov1.CONNECTION,
 }
 
-// fetch reads the workspace's env-var-keyed objects and indexes them by
-// objectKey. It reads at workspace scope only (no resolveLinked, no deployment
+// fetch reads the workspace's objects and indexes them by Airflow env-var key. It reads at workspace scope only (no resolveLinked, no deployment
 // id): workspace objects are the team-shared tier meant for local dev, and a
 // deployment's runtime config stays off the laptop.
 //
@@ -165,13 +173,13 @@ var envVarKeyedTypes = []astrov1.ListEnvironmentObjectsParamsObjectType{
 // reader of the endpoint.
 func (p *provider) fetch(ctx httpcontext.Context, org string, showSecrets bool) (map[string]objectValue, error) {
 	out := map[string]objectValue{}
-	for _, objectType := range envVarKeyedTypes {
+	for _, objectType := range fetchedTypes {
 		rows, err := p.listType(ctx, org, objectType, showSecrets)
 		if err != nil {
 			return nil, err
 		}
 		for i := range rows {
-			indexObject(out, &rows[i])
+			indexObject(out, &rows[i], showSecrets)
 		}
 	}
 	return out, nil
@@ -202,10 +210,11 @@ func (p *provider) listType(ctx httpcontext.Context, org string, objectType astr
 	})
 }
 
-// indexObject adds one env-var-keyed object to the index. Native connections
-// (structured CONNECTION objects) and metrics exports are skipped: a
-// connection stored env-keyed as an ENVIRONMENT_VARIABLE still lands here.
-func indexObject(out map[string]objectValue, obj *astrov1.EnvironmentObject) {
+// indexObject adds one object to the index under the Airflow env-var key that
+// satisfies it. An object whose key cannot be an env var is skipped, since no
+// local declaration could name it. showSecrets is whether this read asked for
+// secret values, which decides what a connection can resolve to.
+func indexObject(out map[string]objectValue, obj *astrov1.EnvironmentObject, showSecrets bool) {
 	switch obj.ObjectType {
 	case astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE:
 		if obj.EnvironmentVariable != nil {
@@ -213,14 +222,58 @@ func indexObject(out map[string]objectValue, obj *astrov1.EnvironmentObject) {
 		}
 	case astrov1.EnvironmentObjectObjectTypeAIRFLOWVARIABLE:
 		if obj.AirflowVariable != nil {
-			out[obj.ObjectKey] = objectValue{value: obj.AirflowVariable.Value, isSecret: obj.AirflowVariable.IsSecret}
+			out[airflowenv.EnvKeyForStoredVarKey(obj.ObjectKey)] = objectValue{value: obj.AirflowVariable.Value, isSecret: obj.AirflowVariable.IsSecret}
 		}
-	case astrov1.EnvironmentObjectObjectTypeCONNECTION, astrov1.EnvironmentObjectObjectTypeMETRICSEXPORT:
-		// Native structured connections need re-encoding into an
-		// AIRFLOW_CONN_<id> value, out of scope here; metrics exports are a
-		// deployment telemetry concern, also out of scope. Skip both. (fetch
-		// asks for neither type, so this is a defensive guard.)
+	case astrov1.EnvironmentObjectObjectTypeCONNECTION:
+		if obj.Connection == nil {
+			return
+		}
+		key, value, ok := airflowenv.EncodeConnEnv(connFromObject(obj.ObjectKey, obj.Connection))
+		if !ok {
+			return
+		}
+		if !showSecrets {
+			// Read without secrets, the password and the values in extra arrive
+			// blank, and nothing in the object says which were blanked: "no
+			// password" and "password withheld" look the same. Encoding what is
+			// left would hand Airflow a connection that starts and then fails to
+			// authenticate. So every native connection read this way is a
+			// withheld secret — a hard miss in reveal mode whose cause names the
+			// org toggle, and still present for list, which never needs the value.
+			// Astro Desktop skips these connections the same way.
+			out[key] = objectValue{isSecret: true}
+			return
+		}
+		out[key] = objectValue{value: value}
+	case astrov1.EnvironmentObjectObjectTypeMETRICSEXPORT:
+		// A deployment telemetry concern, out of scope. fetch does not ask for
+		// the type, so this is a defensive guard.
 	}
+}
+
+// connFromObject is a CONNECTION object's structured fields as the connection
+// the shared codec encodes.
+func connFromObject(objectKey string, c *astrov1.EnvironmentObjectConnection) connmodel.Connection {
+	out := connmodel.Connection{ConnID: airflowenv.ConnIDForStoredConnKey(objectKey), ConnType: c.Type}
+	if c.Host != nil {
+		out.ConnHost = *c.Host
+	}
+	if c.Login != nil {
+		out.ConnLogin = *c.Login
+	}
+	if c.Password != nil {
+		out.ConnPassword = *c.Password
+	}
+	if c.Schema != nil {
+		out.ConnSchema = *c.Schema
+	}
+	if c.Port != nil {
+		out.ConnPort = *c.Port
+	}
+	if c.Extra != nil {
+		out.ConnExtra = *c.Extra
+	}
+	return out
 }
 
 // httpError carries the HTTP status of a failed read, which NormalizeAPIError

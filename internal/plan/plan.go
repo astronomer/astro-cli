@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -204,16 +203,12 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 	vault := vaultenv.Load(proj.Dir)
 	in := envresolve.Inputs{Schema: schema, Providers: src.Providers(vault.Providers())}
 	if opts.WorkspaceProvider != nil {
-		if opts.Mode == localrt.ModeDocker {
-			// Docker start writes Plan.Env into the on-disk compose file, so a
-			// resolved Environment Manager value would land on disk — the one
-			// thing the read-through posture rules out. Withhold it in docker
-			// mode (stage 1); standalone injects it in memory only.
-			in.WorkspaceProvider = emenv.Unavailable("Environment Manager values are injected in standalone mode only; run without --docker, or set it locally")
-		} else {
-			// reveal = true: start needs the real values to run Airflow.
-			in.WorkspaceProvider = opts.WorkspaceProvider(m.Astro.Workspace, true)
-		}
+		// reveal = true: start needs the real values to run Airflow. Both modes:
+		// a value resolved here travels as SecretEnv (below), which docker mode
+		// hands to the compose process rather than writing into the compose
+		// file, so it stays off disk either way — the posture Astro Desktop
+		// already runs its docker starts under.
+		in.WorkspaceProvider = opts.WorkspaceProvider(m.Astro.Workspace, true)
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
@@ -235,11 +230,24 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 			Missing: res.Missing,
 		}
 	}
-	// The file sources inject from disk; the Environment Manager values are not
-	// on disk, so layer them in here. They only fill keys no local file held
-	// (local always wins), so this never overrides a file value.
+	// The file sources inject from disk; the manifest defaults and the
+	// Environment Manager values are not on disk, so layer them in here. They
+	// only fill keys no local file held (local always wins), so this never
+	// overrides a file value. The Environment Manager ones are split off into
+	// wsInj, to travel as SecretEnv.
+	winner := make(map[string]string, len(res.Resolved))
+	for _, r := range res.Resolved {
+		if r.Found {
+			winner[r.EnvKey] = r.Source
+		}
+	}
 	inj := src.Injection(schema)
+	wsInj := map[string]string{}
 	for k, v := range res.Injected {
+		if winner[k] == string(envschema.SourceWorkspace) {
+			wsInj[k] = v
+			continue
+		}
 		inj[k] = v
 	}
 	// The vault's own injection, separate the whole way down so it can be
@@ -260,12 +268,6 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 	// resolved — the project tier injects wholesale — so those are checked
 	// against the sources that outrank the vault.
 	secretInj := vault.SecretInjection(schema)
-	winner := make(map[string]string, len(res.Resolved))
-	for _, r := range res.Resolved {
-		if r.Found {
-			winner[r.EnvKey] = r.Source
-		}
-	}
 	for k := range secretInj {
 		if source, declared := winner[k]; declared {
 			if vaultenv.IsVaultSource(source) {
@@ -283,6 +285,14 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 			delete(secretInj, k)
 			continue
 		}
+		delete(inj, k)
+	}
+	// After the vault reconciliation, which would otherwise delete these: a
+	// workspace value won its name, so nothing else may carry that name, and
+	// no file held it — resolveWorkspace only answers when the local chain
+	// did not.
+	for k, v := range wsInj {
+		secretInj[k] = v
 		delete(inj, k)
 	}
 	return inj, secretInj, passthroughKeys(res.Resolved, inj), valueWarnings(res.Violations), nil

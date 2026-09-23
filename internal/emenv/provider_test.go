@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -137,8 +138,8 @@ func TestSharedFetchAcrossNames(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "2", v)
 
-	// One call per env-var-keyed object type, shared across both lookups.
-	mc.AssertNumberOfCalls(t, "ListEnvironmentObjectsWithResponse", len(envVarKeyedTypes))
+	// One call per fetched object type, shared across both lookups.
+	mc.AssertNumberOfCalls(t, "ListEnvironmentObjectsWithResponse", len(fetchedTypes))
 }
 
 func TestLoggedOutProviderAbsent(t *testing.T) {
@@ -249,7 +250,53 @@ func TestSecretsDisabledHardMiss(t *testing.T) {
 	require.Equal(t, "workspace", p.Label())
 	// The first typed call is refused; the retry re-fetches every type without
 	// secrets: one refused call plus a full fetch.
-	mc.AssertNumberOfCalls(t, "ListEnvironmentObjectsWithResponse", 1+len(envVarKeyedTypes))
+	mc.AssertNumberOfCalls(t, "ListEnvironmentObjectsWithResponse", 1+len(fetchedTypes))
+}
+
+// With secret fetching disabled, a native connection arrives with its password
+// and extra values blanked, indistinguishable from one that has none. It must
+// hard-miss with the org-toggle cause rather than resolve to a connection that
+// starts and then fails to authenticate — and it must not overwrite an
+// env-keyed secret copy into a quiet pass.
+func TestSecretsDisabledConnectionHardMiss(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ShowSecrets != nil && *p.ShowSecrets
+		}),
+	).Return(errResp(http.StatusForbidden, "showSecrets is not allowed for this organization"), nil).Once()
+	byType := map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject{
+		astrov1.ENVIRONMENTVARIABLE: {envVarObj("AIRFLOW_CONN_DB_MAIN", "", true)},
+		astrov1.CONNECTION: {connObj("db_main", &astrov1.EnvironmentObjectConnection{
+			Type: "postgres", Host: ptr("db.example.com"), Login: ptr("admin"),
+		})},
+	}
+	for _, objectType := range fetchedTypes {
+		objs := byType[objectType]
+		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p != nil && p.ShowSecrets != nil && !*p.ShowSecrets && p.ObjectType != nil && *p.ObjectType == objectType
+			}),
+		).Return(okResp(objs...), nil)
+	}
+
+	p := NewProvider(testWorkspace, mc, true)
+	_, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
+	require.False(t, ok, "a connection read without secrets is a hard miss")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), `enable "Environment Secrets Fetching"`)
+}
+
+// Presence mode (list) still reports such a connection as held by the
+// workspace: list never needs the value, only whether it is there.
+func TestPresenceModeConnectionWithoutSecrets(t *testing.T) {
+	mc := typedClient(map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject{
+		astrov1.CONNECTION: {connObj("db_main", &astrov1.EnvironmentObjectConnection{Type: "postgres"})},
+	})
+	p := loggedInProvider(t, mc, false)
+
+	_, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
+	require.True(t, ok)
 }
 
 // With the org policy on, a revealed secret returns its value.
@@ -365,4 +412,101 @@ func TestFetchPagesThroughMoreThanOneWindow(t *testing.T) {
 	v, ok := p.Lookup("LAST_KEY")
 	require.True(t, ok, "a key in the second window resolves")
 	require.Equal(t, "found", v)
+}
+
+// typedClient answers each list call with the objects of the type it asked
+// for, the way the endpoint filters, so a test can hold one object per type
+// without every call returning all of them.
+func typedClient(byType map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject) *astrov1_mocks.ClientWithResponsesInterface {
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	for _, objectType := range fetchedTypes {
+		mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+			mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p != nil && p.ObjectType != nil && *p.ObjectType == objectType
+			}),
+		).Return(okResp(byType[objectType]...), nil)
+	}
+	return mc
+}
+
+func connObj(key string, c *astrov1.EnvironmentObjectConnection) astrov1.EnvironmentObject {
+	return astrov1.EnvironmentObject{
+		ObjectKey:  key,
+		ObjectType: astrov1.EnvironmentObjectObjectTypeCONNECTION,
+		Connection: c,
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// A native connection resolves under AIRFLOW_CONN_<ID> as the JSON the local
+// tiers store, so a declared workspace connection is satisfied rather than
+// reported missing.
+func TestLookupResolvesNativeConnection(t *testing.T) {
+	mc := typedClient(map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject{
+		astrov1.CONNECTION: {connObj("db_main", &astrov1.EnvironmentObjectConnection{
+			Type: "postgres", Host: ptr("db.example.com"), Login: ptr("admin"),
+			Password: ptr("s3cret"), Port: ptr(5432), Schema: ptr("warehouse"),
+			Extra: &map[string]interface{}{"sslmode": "require"},
+		})},
+	})
+	p := loggedInProvider(t, mc, true)
+
+	v, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
+	require.True(t, ok)
+	conn, ok := airflowenv.DecodeConnEnv("AIRFLOW_CONN_DB_MAIN", v)
+	require.True(t, ok, "the value is a connection the local chain can decode: %s", v)
+	require.Equal(t, "postgres", conn.ConnType)
+	require.Equal(t, "db.example.com", conn.ConnHost)
+	require.Equal(t, "admin", conn.ConnLogin)
+	require.Equal(t, "s3cret", conn.ConnPassword)
+	require.Equal(t, 5432, conn.ConnPort)
+	require.Equal(t, "warehouse", conn.ConnSchema)
+	require.Equal(t, "require", conn.ConnExtra["sslmode"])
+}
+
+// The platform takes an Airflow variable's own key or one already in env form,
+// and both must answer the one key a declaration looks up.
+func TestLookupResolvesAirflowVarByEitherKeyForm(t *testing.T) {
+	mc := typedClient(map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject{
+		astrov1.AIRFLOWVARIABLE: {
+			airflowVarObj("region", "us-east", false),
+			airflowVarObj("AIRFLOW_VAR_TIER", "gold", false),
+		},
+	})
+	p := loggedInProvider(t, mc, true)
+
+	v, ok := p.Lookup("AIRFLOW_VAR_REGION")
+	require.True(t, ok)
+	require.Equal(t, "us-east", v)
+	v, ok = p.Lookup("AIRFLOW_VAR_TIER")
+	require.True(t, ok)
+	require.Equal(t, "gold", v)
+}
+
+// A connection held both natively and as an env-keyed variable resolves to the
+// native one, the order Astro Desktop layers them in.
+func TestNativeConnectionWinsOverEnvKeyedCopy(t *testing.T) {
+	mc := typedClient(map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject{
+		astrov1.ENVIRONMENTVARIABLE: {envVarObj("AIRFLOW_CONN_DB_MAIN", `{"conn_type":"mysql"}`, false)},
+		astrov1.CONNECTION:          {connObj("db_main", &astrov1.EnvironmentObjectConnection{Type: "postgres"})},
+	})
+	p := loggedInProvider(t, mc, true)
+
+	v, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
+	require.True(t, ok)
+	conn, ok := airflowenv.DecodeConnEnv("AIRFLOW_CONN_DB_MAIN", v)
+	require.True(t, ok)
+	require.Equal(t, "postgres", conn.ConnType)
+}
+
+// A connection id that cannot be an env var is one no declaration could name,
+// so it is skipped rather than indexed under a key nothing looks up.
+func TestConnectionWithUnrepresentableIDIsSkipped(t *testing.T) {
+	mc := typedClient(map[astrov1.ListEnvironmentObjectsParamsObjectType][]astrov1.EnvironmentObject{
+		astrov1.CONNECTION: {connObj("my-db", &astrov1.EnvironmentObjectConnection{Type: "postgres"})},
+	})
+	p := loggedInProvider(t, mc, true).(*provider)
+	p.load()
+	require.Empty(t, p.objects)
 }

@@ -20,11 +20,9 @@ func NewProvider(workspaceID string, client astrov1.APIClient, reveal bool) envr
 	return &provider{workspaceID: workspaceID, client: client, reveal: reveal}
 }
 
-// Unavailable returns a provider that is absent for the given reason. Stage 1
-// uses it for `astro local start --docker`, which cannot inject a resolved
-// value without writing it into the on-disk compose file — the one thing the
-// read-through posture rules out. A workspace-source name then resolves from
-// nowhere and, if required, gates the start with the reason.
+// Unavailable returns a provider that is absent for the given reason, such as a
+// manifest with no workspace to read. A workspace-source name then resolves
+// from nowhere and, if required, gates the start with the reason.
 func Unavailable(reason string) envresolve.Provider {
 	return &unavailable{reason: reason}
 }

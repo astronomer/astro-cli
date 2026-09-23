@@ -272,6 +272,28 @@ func IsVarEnvKey(key string) bool {
 	return strings.HasPrefix(key, VarPrefix) && len(key) > len(VarPrefix)
 }
 
+// EnvKeyForStoredVarKey is the AIRFLOW_VAR_* key for an Airflow variable as
+// Environment Manager keys it. The platform accepts either form as an object
+// key — the variable's own key ("region") or one already in env form
+// ("AIRFLOW_VAR_REGION") — so both readers of it, the CLI and Astro Desktop,
+// map through this one function and cannot disagree on which it was.
+func EnvKeyForStoredVarKey(objectKey string) string {
+	if IsVarEnvKey(objectKey) {
+		return objectKey
+	}
+	return EnvKeyForVarKey(objectKey)
+}
+
+// ConnIDForStoredConnKey is the connection id for a CONNECTION object as
+// Environment Manager keys it, for the same reason as EnvKeyForStoredVarKey:
+// the key is the id ("db_main") or already in env form ("AIRFLOW_CONN_DB_MAIN").
+func ConnIDForStoredConnKey(objectKey string) string {
+	if IsConnEnvKey(objectKey) {
+		return ConnIDForEnvKey(objectKey)
+	}
+	return objectKey
+}
+
 // DecodeVarEnv parses an AIRFLOW_VAR_* pair into (lowercased key, value).
 func DecodeVarEnv(key, value string) (varKey, val string, ok bool) {
 	if !IsVarEnvKey(key) {

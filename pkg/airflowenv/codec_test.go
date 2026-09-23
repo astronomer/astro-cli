@@ -196,3 +196,28 @@ func TestConnIDForEnvKeyReadsTheKeyAlone(t *testing.T) {
 		}
 	}
 }
+
+// Environment Manager takes either form as an object key, so both must land on
+// the one env key a local declaration looks up.
+func TestStoredKeysMapToOneEnvKey(t *testing.T) {
+	vars := map[string]string{
+		"region":             "AIRFLOW_VAR_REGION",
+		"AIRFLOW_VAR_REGION": "AIRFLOW_VAR_REGION",
+		"api_token":          "AIRFLOW_VAR_API_TOKEN",
+	}
+	for objectKey, want := range vars {
+		if got := EnvKeyForStoredVarKey(objectKey); got != want {
+			t.Errorf("EnvKeyForStoredVarKey(%q) = %q, want %q", objectKey, got, want)
+		}
+	}
+
+	conns := map[string]string{
+		"db_main":              "db_main",
+		"AIRFLOW_CONN_DB_MAIN": "db_main",
+	}
+	for objectKey, want := range conns {
+		if got := ConnIDForStoredConnKey(objectKey); got != want {
+			t.Errorf("ConnIDForStoredConnKey(%q) = %q, want %q", objectKey, got, want)
+		}
+	}
+}

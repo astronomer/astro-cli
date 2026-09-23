@@ -77,8 +77,11 @@ func TestBuildInjectsWorkspaceValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	if got := built.Plan.Env["DATA_WAREHOUSE_URI"]; got != "postgres://cloud" {
-		t.Fatalf("injected env = %q, want the Environment Manager value", got)
+	if got := built.Plan.SecretEnv["DATA_WAREHOUSE_URI"]; got != "postgres://cloud" {
+		t.Fatalf("injected secret env = %q, want the Environment Manager value", got)
+	}
+	if _, onDisk := built.Plan.Env["DATA_WAREHOUSE_URI"]; onDisk {
+		t.Fatal("an Environment Manager value traveled in Env, which docker mode writes to disk")
 	}
 }
 
@@ -143,23 +146,54 @@ DATA_WAREHOUSE_URI = { source = 'workspace' }
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
-// Docker start would write a resolved value into the on-disk compose file, so
-// Environment Manager values are withheld in docker mode: a required workspace
-// value gates the start with the standalone-or-set-locally message, and the
-// API is never read.
-func TestBuildDockerWithholdsWorkspaceValue(t *testing.T) {
+// Docker start writes Plan.Env into the compose file it leaves on disk, so an
+// Environment Manager value travels as SecretEnv, which the compose process
+// receives without the file holding it. Docker mode resolves the value exactly
+// as standalone does rather than withholding it.
+func TestBuildDockerCarriesWorkspaceValueOffDisk(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	dir := newWorkspaceProject(t, workspaceManifest)
 
-	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
-	_, err := Build(dir, Options{Mode: localrt.ModeDocker, WorkspaceProvider: emProvider(mc)})
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
+		Return(okListResp(astrov1.EnvironmentObject{
+			ObjectKey:           "DATA_WAREHOUSE_URI",
+			ObjectType:          astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
+			EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "postgres://cloud"},
+		}), nil)
 
-	var missing *MissingEnvError
-	if !errors.As(err, &missing) {
-		t.Fatalf("err = %v, want MissingEnvError", err)
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker, WorkspaceProvider: emProvider(mc)})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
 	}
-	if !testUtil.StringContains([]string{"DATA_WAREHOUSE_URI", "standalone mode only", "--docker"}, missing.Error()) {
-		t.Fatalf("message missing the docker-mode cause:\n%s", missing.Error())
+	if got := built.Plan.SecretEnv["DATA_WAREHOUSE_URI"]; got != "postgres://cloud" {
+		t.Fatalf("secret env = %q, want the Environment Manager value", got)
+	}
+	if _, onDisk := built.Plan.Env["DATA_WAREHOUSE_URI"]; onDisk {
+		t.Fatal("an Environment Manager value traveled in Env, which docker mode writes into the compose file")
+	}
+}
+
+// A local file still wins over the workspace, and the file's value is the one
+// that travels: the workspace value must not ride along in SecretEnv, where
+// the engine could apply it over the file's.
+func TestBuildLocalFileBeatsWorkspaceValue(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dir := newWorkspaceProject(t, workspaceManifest)
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("DATA_WAREHOUSE_URI=postgres://local\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called: the file answered
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker, WorkspaceProvider: emProvider(mc)})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if got := built.Plan.Env["DATA_WAREHOUSE_URI"]; got != "postgres://local" {
+		t.Fatalf("env = %q, want the project .env value", got)
+	}
+	if _, ok := built.Plan.SecretEnv["DATA_WAREHOUSE_URI"]; ok {
+		t.Fatal("the losing workspace value traveled beside the file's")
 	}
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
