@@ -99,6 +99,77 @@ var (
 	envMetricsLabels         map[string]string
 )
 
+// newEnvListCmd is the cross-kind listing that sits beside the nouns: every
+// environment object in the scope, whatever its type, with a KIND column
+// telling them apart. `astro local env list` is the same idea on the other
+// side, and this is what makes the two trees answer "what is in here?" the
+// same way.
+//
+// It is one API call, not four: the list endpoint documents objectType as a
+// filter, so omitting it returns every type.
+//
+// The columns are what the four per-type listings have left in common once
+// their type-specific ones are removed, which means no value column — so this
+// is value-free by construction rather than by redaction, and takes no
+// --include-secrets.
+func newEnvListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List environment objects of every kind in the scope",
+		Long: "List every environment object the scope holds — variables, connections, Airflow variables and metrics exports — with the kind that manages each one.\n\n" +
+			"This listing never prints a value. The per-kind listings (`astro env variable list` and friends) show the type-specific columns and take --include-secrets; this one answers what exists.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runEnvList(cmd, out)
+		},
+	}
+	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	// The scope flags are persistent on each noun rather than on `env`, so a
+	// command sitting directly under the group has to register its own. They
+	// are worded exactly as addScopePersistentFlags words them, and the
+	// mutual exclusion is left to envScope for the same reason: a cobra flag
+	// group would answer the same mistake with a different sentence here than
+	// on the four nouns, and make env.ErrScopeAmbiguous unreachable.
+	//
+	// --include-secrets is deliberately absent: it asks the platform to unmask
+	// values, and this listing has no column to put one in.
+	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace scope (mutually exclusive with --deployment-id). Defaults to the current workspace from context.")
+	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment scope (mutually exclusive with --workspace-id)")
+	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope (e.g. workspace -> deployment). In this mode IDs are not returned, since they refer to resolved rows that aren't directly addressable. Use --resolve-linked=false to see IDs.")
+	return cmd
+}
+
+func runEnvList(cmd *cobra.Command, out io.Writer) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	f, err := env.ParseFormat(envFormat)
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+	// Checked before the call, not after rendering: there is no reason to
+	// fetch every object in the scope to then refuse to print it. The same
+	// sentinel guards WriteInventory, so the two cannot disagree.
+	if f == env.FormatDotenv {
+		return env.ErrInventoryHasNoValues
+	}
+
+	items, err := env.ListInventory(scope, envResolveLinked, astroV1Client)
+	if err != nil {
+		return err
+	}
+	w, closer, err := openOutput(out)
+	if err != nil {
+		return err
+	}
+	defer closer()
+	return env.WriteInventory(items, f, w)
+}
+
 func newEnvRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                        "env",
@@ -121,6 +192,7 @@ or managed at workspace scope.`,
 		newEnvConnRootCmd(out),
 		newEnvAirflowVarRootCmd(out),
 		newEnvMetricsExportRootCmd(out),
+		newEnvListCmd(out),
 	)
 	return cmd
 }

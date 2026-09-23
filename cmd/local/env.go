@@ -397,9 +397,10 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 }
 
 // newEnvListCmd builds a list. only names the single kind to show, or is empty
-// for the cross-kind view that sits beside the nouns — the one `astro env` has
-// no equivalent for, and the one the start-time missing-value report is built
-// from.
+// for the cross-kind view that sits beside the nouns, which `astro env list`
+// mirrors on the cloud side. This one additionally reports where each value
+// resolves from, and is what the start-time missing-value report is built
+// from; the cloud has no resolution chain to report.
 func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) *cobra.Command {
 	var all bool
 	cmd := &cobra.Command{
@@ -664,6 +665,11 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		return err
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	// The KIND cell names the subcommand that manages the value, the same as
+	// every other user-facing string in this tree. The JSON `kind` field keeps
+	// env/conn/var, because that one is a wire contract; this one is a table a
+	// person reads, and printing `var` for an Airflow Variable contradicts the
+	// grammar, where `var` is an alias for a plain environment variable.
 	fmt.Fprintln(tw, "KIND\tNAME\tSOURCE\tNOTE")
 	for _, it := range items {
 		note := ""
@@ -683,7 +689,7 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 				note += "; remove: " + it.RemoveHint
 			}
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.Kind, it.Name, it.Source, note)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", localenv.Noun(it.Kind), it.Name, it.Source, note)
 	}
 	return tw.Flush()
 }

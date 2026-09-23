@@ -2,7 +2,6 @@
 package astro
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -348,25 +347,6 @@ func parseWholeConn(idOrKey, raw string) (connmodel.Connection, error) {
 	return airflowenv.ConnFromURI(idOrKey, trimmed)
 }
 
-// decodeConnExtra parses --extra with its numbers preserved, and says
-// "not an object" when that is what is wrong rather than blaming the syntax.
-func decodeConnExtra(raw string) (map[string]any, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return nil, nil
-	}
-	var extra map[string]any
-	dec := json.NewDecoder(strings.NewReader(trimmed))
-	dec.UseNumber()
-	if err := dec.Decode(&extra); err != nil {
-		if !strings.HasPrefix(trimmed, "{") {
-			return nil, fmt.Errorf(`--extra must be a JSON object, like {"sslmode":"require"}`)
-		}
-		return nil, fmt.Errorf("--extra is not valid JSON: %w", err)
-	}
-	return extra, nil
-}
-
 // suppliedPassword reports a password given out of band — by flag, or piped —
 // and whether one was given at all. An empty piped read is "not given": stdin
 // is not a terminal in CI, so reading it as an empty password is how a stored
@@ -409,20 +389,14 @@ func buildConnInput(cmd *cobra.Command, idOrKey string) (env.ConnInput, error) {
 		in.Port = &envConnPort
 	}
 	if cmd.Flags().Changed("extra") {
-		// Decoded with json.Unmarshal every number becomes a float64, so an
-		// account id above 2^53 is re-marshaled as a different number — a
-		// Snowflake account silently eleven off. UseNumber keeps it.
-		//
-		// The --value path has the same fault on this branch and is NOT fixed
-		// here: it decodes through airflowenv.DecodeConnValue, which #274
-		// changes to decode exactly. Until that lands and this rebases onto
-		// it, --extra is exact and --value is not — the two shapes disagree,
-		// which is the opposite of the point. Afterwards this call collapses
-		// into airflowenv.DecodeExtra, the same parse plus the "valid JSON but
-		// not an object" message.
-		extra, err := decodeConnExtra(envConnExtra)
+		// One parser for both shapes and both trees: DecodeExtra keeps numbers
+		// exact (an account id above 2^53 is otherwise re-marshaled eleven
+		// off) and distinguishes "not an object" from a syntax error. The
+		// --value path reaches the same decoder through DecodeConnValue, so
+		// --extra and --value now agree on the extras they produce.
+		extra, err := airflowenv.DecodeExtra(envConnExtra)
 		if err != nil {
-			return env.ConnInput{}, err
+			return env.ConnInput{}, fmt.Errorf("--%w", err)
 		}
 		in.Extra = &extra
 	}

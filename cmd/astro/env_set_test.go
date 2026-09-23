@@ -747,6 +747,29 @@ func TestEveryEnvGroupRejectsAnUnknownSubcommand(t *testing.T) {
 	walk(newEnvRootCmd(new(bytes.Buffer)))
 }
 
+// The env group lists its nouns and then the cross-kind `list`, the same order
+// `astro local env` uses — where the list is last because it is the odd one
+// out rather than a fifth noun. cmd/local pins the same sequence, and the two
+// drifted the moment this command was added.
+func TestEnvGroupListsTheNounsThenTheCrossKindList(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	sorting := cobra.EnableCommandSorting
+	cobra.EnableCommandSorting = false
+	defer func() { cobra.EnableCommandSorting = sorting }()
+
+	var got []string
+	for _, sub := range newEnvRootCmd(new(bytes.Buffer)).Commands() {
+		if sub.IsAvailableCommand() {
+			got = append(got, sub.Name())
+		}
+	}
+	assert.Equal(t,
+		[]string{"variable", "connection", "airflow-variable", "metrics-export", "list"},
+		got)
+}
+
 // stdin not being a terminal is not a value. In CI `readSecretValue` read
 // zero bytes and `set` wrote an explicit empty value over the stored one,
 // printing "Updated" and exiting 0 — and once `set` upserted, the same
@@ -882,36 +905,6 @@ func TestEnvConnSetValueRejectsASchemelessURI(t *testing.T) {
 	mc.AssertExpectations(t)
 }
 
-// --extra and --value have to agree on the extras they produce, or the two
-// shapes this command unifies are not the same command.
-func TestEnvConnExtraKeepsLargeIntegersExact(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	defer resetEnvFlags()
-
-	const id = "1234567890123456789"
-	var got *astrov1.CreateEnvironmentObjectConnectionRequest
-	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	expectAbsent(mc, "sf")
-	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, mock.Anything,
-		mock.MatchedBy(func(body astrov1.CreateEnvironmentObjectJSONRequestBody) bool {
-			got = body.Connection
-			return true
-		}),
-	).Return(&astrov1.CreateEnvironmentObjectResponse{
-		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200:      &astrov1.CreateEnvironmentObject{Id: "cabc12def0123456789012345"},
-	}, nil).Once()
-	astroV1Client = mc
-
-	_, err := execEnvCmd("connection", "set", "sf", "--workspace-id", "ws-test",
-		"--type", "snowflake", "--extra", `{"account":`+id+`}`)
-	assert.NoError(t, err)
-	if assert.NotNil(t, got) && assert.NotNil(t, got.Extra) {
-		assert.Equal(t, id, fmt.Sprint((*got.Extra)["account"]))
-	}
-	mc.AssertExpectations(t)
-}
-
 // The tombstone may only offer --strict to the nouns that have it; the other
 // two never did, so following the advice produced "unknown flag".
 func TestUpdateTombstoneOnlyOffersStrictWhereItExists(t *testing.T) {
@@ -993,5 +986,215 @@ func TestSetRefusesToCreateAnObjectNamedAfterAnID(t *testing.T) {
 			assert.Contains(t, err.Error(), "an ID cannot be created")
 			mc.AssertExpectations(t)
 		})
+	}
+}
+
+// The listing asks for each type in turn rather than omitting the filter and
+// trusting the endpoint to default to "all". Nothing in this repo has ever
+// called the list without a type, and no spec is vendored here to settle what
+// omitting it does — while the failure mode of guessing wrong is a confident,
+// complete-looking table missing three kinds. One mocked call per type is that
+// contract: a regression to a single unfiltered call fails here.
+func expectListOfType(mc *astrov1_mocks.ClientWithResponsesInterface, typ astrov1.ListEnvironmentObjectsParamsObjectType, objs ...astrov1.EnvironmentObject) {
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ObjectType != nil && *p.ObjectType == typ
+		}),
+	).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{
+			EnvironmentObjects: objs,
+			TotalCount:         len(objs),
+		},
+	}, nil).Once()
+}
+
+func obj(key string, typ astrov1.EnvironmentObjectObjectType) astrov1.EnvironmentObject {
+	return astrov1.EnvironmentObject{ObjectKey: key, ObjectType: typ, Scope: astrov1.EnvironmentObjectScopeWORKSPACE}
+}
+
+func TestEnvListAsksForEveryKindExplicitly(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	expectListOfType(mc, astrov1.ENVIRONMENTVARIABLE, obj("API_TOKEN", astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE))
+	expectListOfType(mc, astrov1.CONNECTION, obj("db_main", astrov1.EnvironmentObjectObjectTypeCONNECTION))
+	expectListOfType(mc, astrov1.AIRFLOWVARIABLE, obj("region", astrov1.EnvironmentObjectObjectTypeAIRFLOWVARIABLE))
+	expectListOfType(mc, astrov1.METRICSEXPORT, obj("prom_main", astrov1.EnvironmentObjectObjectTypeMETRICSEXPORT))
+	astroV1Client = mc
+
+	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	assert.NoError(t, err)
+	for _, want := range []string{"KIND", "API_TOKEN", "db_main", "region", "prom_main"} {
+		assert.Contains(t, out, want)
+	}
+	mc.AssertExpectations(t)
+}
+
+// Rows group by kind in the order the help lists the nouns, then by key.
+// Server order is unspecified, so without sorting the kinds interleave and the
+// numbered column means something different on every run.
+func TestEnvListGroupsByKindThenKey(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	expectListOfType(mc, astrov1.ENVIRONMENTVARIABLE,
+		obj("ZULU", astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE),
+		obj("ALPHA", astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE))
+	expectListOfType(mc, astrov1.CONNECTION, obj("db_main", astrov1.EnvironmentObjectObjectTypeCONNECTION))
+	expectListOfType(mc, astrov1.AIRFLOWVARIABLE)
+	expectListOfType(mc, astrov1.METRICSEXPORT)
+	astroV1Client = mc
+
+	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	assert.NoError(t, err)
+	alpha, zulu, conn := strings.Index(out, "ALPHA"), strings.Index(out, "ZULU"), strings.Index(out, "db_main")
+	assert.Less(t, alpha, zulu, "keys sort within a kind")
+	assert.Less(t, zulu, conn, "variables come before connections, as the help lists them")
+	mc.AssertExpectations(t)
+}
+
+// --resolve-linked=false is how every other env listing reveals IDs, so the
+// cross-kind one carries the column too — otherwise the flag costs a
+// non-resolving fetch and returns nothing extra.
+func TestEnvListShowsIDsWhenNotResolvingLinks(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	id := cuid.New()
+	withID := obj("API_TOKEN", astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE)
+	withID.Id = &id
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	expectListOfType(mc, astrov1.ENVIRONMENTVARIABLE, withID)
+	expectListOfType(mc, astrov1.CONNECTION)
+	expectListOfType(mc, astrov1.AIRFLOWVARIABLE)
+	expectListOfType(mc, astrov1.METRICSEXPORT)
+	astroV1Client = mc
+
+	out, err := execEnvCmd("list", "--workspace-id", "ws-test", "--resolve-linked=false")
+	assert.NoError(t, err)
+	assert.Contains(t, out, "ID")
+	assert.Contains(t, out, id)
+	mc.AssertExpectations(t)
+}
+
+// The KIND column names the subcommand that manages the object, not the API's
+// enum — a listing that names the command you would type next is worth more
+// than one that names the wire constant. This is the same rule the local tree
+// follows for its prose.
+func TestEnvListNamesTheNounNotTheWireType(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	expectListOfType(mc, astrov1.ENVIRONMENTVARIABLE, obj("K", astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE))
+	expectListOfType(mc, astrov1.CONNECTION)
+	expectListOfType(mc, astrov1.AIRFLOWVARIABLE, obj("A", astrov1.EnvironmentObjectObjectTypeAIRFLOWVARIABLE))
+	expectListOfType(mc, astrov1.METRICSEXPORT)
+	astroV1Client = mc
+
+	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	assert.NoError(t, err)
+	assert.Contains(t, out, "variable")
+	assert.Contains(t, out, "airflow-variable")
+	assert.NotContains(t, out, "ENVIRONMENT_VARIABLE")
+	assert.NotContains(t, out, "AIRFLOW_VARIABLE")
+	mc.AssertExpectations(t)
+}
+
+// No value column survives the intersection of the four per-kind listings, so
+// this one is value-free by construction. A secret value must not appear even
+// masked — there is nowhere for it to go.
+func TestEnvListPrintsNoValues(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			// Never asks the platform to unmask: there is no column for it.
+			return p != nil && p.ShowSecrets != nil && !*p.ShowSecrets
+		}),
+	).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{
+			EnvironmentObjects: []astrov1.EnvironmentObject{
+				{
+					ObjectKey: "API_TOKEN", ObjectType: astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
+					Scope:               astrov1.EnvironmentObjectScopeWORKSPACE,
+					EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "s3cr3t"},
+				},
+			},
+			TotalCount: 1,
+		},
+	}, nil).Times(4)
+	astroV1Client = mc
+
+	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	assert.NoError(t, err)
+	assert.Contains(t, out, "API_TOKEN")
+	assert.NotContains(t, out, "s3cr3t")
+	mc.AssertExpectations(t)
+}
+
+// dotenv is KEY=VALUE and this listing has no values, so emitting it would
+// produce a file whose re-import is the blank-every-secret shape
+// `set --from-file` now refuses.
+func TestEnvListRefusesDotenv(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	// No call is mocked: the format is refused before anything is fetched.
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mc
+
+	_, err := execEnvCmd("list", "--workspace-id", "ws-test", "--format", "dotenv")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "has none of")
+}
+
+// --extra and --value now reach the same parser, so an account id above 2^53
+// survives either shape. Before the codec fix they disagreed.
+func TestEnvConnExtraAndValueAgreeOnLargeIntegers(t *testing.T) {
+	const id = "1234567890123456789"
+
+	capture := func(t *testing.T, args ...string) *astrov1.CreateEnvironmentObjectConnectionRequest {
+		t.Helper()
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		defer resetEnvFlags()
+
+		var got *astrov1.CreateEnvironmentObjectConnectionRequest
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		expectAbsent(mc, "sf")
+		mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, mock.Anything,
+			mock.MatchedBy(func(body astrov1.CreateEnvironmentObjectJSONRequestBody) bool {
+				got = body.Connection
+				return true
+			}),
+		).Return(&astrov1.CreateEnvironmentObjectResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrov1.CreateEnvironmentObject{Id: "cabc12def0123456789012345"},
+		}, nil).Once()
+		astroV1Client = mc
+
+		full := append([]string{"connection", "set", "sf", "--workspace-id", "ws-test"}, args...)
+		_, err := execEnvCmd(full...)
+		assert.NoError(t, err)
+		mc.AssertExpectations(t)
+		return got
+	}
+
+	viaExtra := capture(t, "--type", "snowflake", "--extra", `{"account":`+id+`}`)
+	viaValue := capture(t, "--value", `{"conn_type":"snowflake","extra":{"account":`+id+`}}`)
+
+	for name, got := range map[string]*astrov1.CreateEnvironmentObjectConnectionRequest{
+		"--extra": viaExtra, "--value": viaValue,
+	} {
+		if assert.NotNil(t, got) && assert.NotNil(t, got.Extra) {
+			assert.Equal(t, id, fmt.Sprint((*got.Extra)["account"]), "%s rewrote the account id", name)
+		}
 	}
 }

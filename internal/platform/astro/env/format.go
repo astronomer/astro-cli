@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -476,4 +477,62 @@ func writeYAML(v any, out io.Writer) error {
 	enc := yaml.NewEncoder(out)
 	defer enc.Close() //nolint:errcheck // best-effort close
 	return enc.Encode(generic)
+}
+
+// WriteInventory renders the cross-kind listing.
+//
+// FormatDotenv is deliberately absent: a dotenv file is KEY=VALUE, and this
+// listing has no values to put on the right of the equals sign. Accepting the
+// flag and emitting keys with empty values would produce a file that, read
+// back through `set --from-file`, is exactly the blank-every-secret shape that
+// path now refuses.
+func WriteInventory(items []InventoryItem, format Format, out io.Writer) error {
+	switch format {
+	case "", FormatTable:
+		return writeInventoryTable(items, out)
+	case FormatJSON:
+		return writeJSON(items, out)
+	case FormatYAML:
+		return writeYAML(items, out)
+	case FormatDotenv:
+		return ErrInventoryHasNoValues
+	}
+	return fmt.Errorf("invalid format %q", format)
+}
+
+// ErrInventoryHasNoValues refuses a format that writes values for a listing
+// that has none.
+//
+// It is a sentinel rather than a message built at each site because the check
+// runs twice: once in the command, before paying for the objects, and once
+// here, so a future caller cannot bypass it. Two hand-copied sentences would
+// drift, and the early one is the one users see.
+var ErrInventoryHasNoValues = errors.New(
+	"that format writes values, which a cross-kind listing has none of; " +
+		"use it on a single kind, e.g. `astro env variable export`")
+
+func writeInventoryTable(items []InventoryItem, out io.Writer) error {
+	if len(items) == 0 {
+		fmt.Fprintln(out, "No environment objects found")
+		return nil
+	}
+	header := []string{"#", "KIND", "KEY", "SCOPE"}
+	showID := slices.ContainsFunc(items, func(i InventoryItem) bool { return i.ID != "" })
+	if showID {
+		header = append(header, "ID")
+	}
+	t := &printutil.Table{DynamicPadding: true, Header: header}
+	for i := range items {
+		row := []string{
+			strconv.Itoa(i + 1),
+			items[i].Kind,
+			items[i].Key,
+			items[i].Scope,
+		}
+		if showID {
+			row = append(row, items[i].ID)
+		}
+		t.AddRow(row, false)
+	}
+	return t.Print(out)
 }

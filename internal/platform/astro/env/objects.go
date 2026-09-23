@@ -86,12 +86,12 @@ func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObj
 				return nil, 0, err
 			}
 			if resp.JSON200 == nil {
-				return nil, 0, fmt.Errorf("listing %s objects: the response carried no body", objectType)
+				return nil, 0, fmt.Errorf("listing %s objects: the response carried no body", nounForListType(objectType))
 			}
 			return resp.JSON200.EnvironmentObjects, resp.JSON200.TotalCount, nil
 		})
 	if err != nil {
-		return nil, fmt.Errorf("listing %s objects: %w", objectType, err)
+		return nil, fmt.Errorf("listing %s objects: %w", nounForListType(objectType), err)
 	}
 	return objs, nil
 }

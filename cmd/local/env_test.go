@@ -893,3 +893,51 @@ func TestConnFieldSetWarnsOnALoginWithNoPassword(t *testing.T) {
 		t.Errorf("a passwordless connection with no login should warn nothing, got: %q", stderr.String())
 	}
 }
+
+// The KIND column names the subcommand, like every other user-facing string
+// in this tree — and unlike the JSON `kind` field, which keeps env/conn/var
+// because that one is a wire contract.
+//
+// Printing `var` for an Airflow Variable contradicted the grammar this tree
+// exists to fix, where `var` is an alias for a plain environment variable, and
+// it was the one column where the two env trees still disagreed.
+func TestListKindColumnNamesTheNounButJSONKeepsTheWireToken(t *testing.T) {
+	dir := envProject(t, "")
+	for _, s := range [][]string{
+		{"variable", "AN_ENV", "v"},
+		{"connection", "a_conn", "sqlite:///x.db"},
+		{"airflow-variable", "an_av", "v"},
+	} {
+		d, _, _ := envDeps(t, dir, "")
+		if err := execute(t, d, "local", "env", s[0], "set", s[1], "--value", s[2]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	d, out, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list"); err != nil {
+		t.Fatal(err)
+	}
+	table := out.String()
+	for _, want := range []string{"variable", "connection", "airflow-variable"} {
+		if !strings.Contains(table, want) {
+			t.Errorf("KIND column should name %q:\n%s", want, table)
+		}
+	}
+	for _, unwanted := range []string{"\nvar ", "\nconn ", "\nenv "} {
+		if strings.Contains(table, unwanted) {
+			t.Errorf("KIND column still prints the wire token %q:\n%s", strings.TrimSpace(unwanted), table)
+		}
+	}
+
+	d, out, _ = envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	// The wire contract is unchanged: Astro Desktop and any script parse these.
+	for _, want := range []string{`"kind":"env"`, `"kind":"conn"`, `"kind":"var"`} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("JSON should keep the wire token %s:\n%s", want, out.String())
+		}
+	}
+}
