@@ -21,7 +21,7 @@ import (
 var (
 	HoustonClient ClientInterface
 
-	HoustonConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: %w"
+	HoustonConnectionErrMsg = "cannot connect to APC. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: %w"
 
 	errInaptPermissionsMsg       = "You do not have the appropriate permissions for that"
 	errAuthTokenRefreshFailedMsg = "AUTH_TOKEN_REFRESH_FAILED" //nolint:gosec
@@ -127,9 +127,9 @@ func NewHTTPClient() *httputil.HTTPClient {
 	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
 	// #nosec
 	httpClient.HTTPClient.Transport = &http.Transport{
-		Dial: (&net.Dialer{
+		DialContext: (&net.Dialer{
 			Timeout: time.Duration(dialTimeout) * time.Second,
-		}).Dial,
+		}).DialContext,
 		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
 	}

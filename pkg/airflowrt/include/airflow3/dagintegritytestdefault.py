@@ -1,4 +1,4 @@
-"""Test the validity of all DAGs. **USED BY DEV PARSE COMMAND DO NOT EDIT**"""
+"""Test the validity of all Dags. **USED BY DEV PARSE COMMAND DO NOT EDIT**"""
 
 from contextlib import contextmanager
 import logging
@@ -87,7 +87,7 @@ def variable_get_monkeypatch(key: str, default_var=_no_default, deserialize_json
 Variable.get = variable_get_monkeypatch
 
 # Also patch airflow.sdk.Variable for Airflow 3.x SDK imports
-# This ensures DAGs using 'from airflow.sdk import Variable' work with parse
+# This ensures Dags using 'from airflow.sdk import Variable' work with parse
 try:
     from airflow import sdk as airflow_sdk
 
@@ -114,7 +114,7 @@ def suppress_logging(namespace):
 
 def get_import_errors():
     """
-    Generate a tuple for import errors in the dag bag, and include DAGs without errors.
+    Generate a tuple for import errors in the dag bag, and include Dags without errors.
     """
     with suppress_logging("airflow"):
         dag_bag = DagBag(include_examples=False)
@@ -129,7 +129,7 @@ def get_import_errors():
         for k, v in dag_bag.import_errors.items():
             result.append((strip_path_prefix(k), v.strip()))
 
-        # Check if there are DAGs without errors
+        # Check if there are Dags without errors
         for file_path in dag_bag.dags:
             # Check if the file_path is not in import_errors, meaning no errors
             if file_path not in dag_bag.import_errors:

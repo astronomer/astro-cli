@@ -241,7 +241,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	imageName := opts.ImageName
 	settingsFile := opts.SettingsFile
 	composeFile := opts.ComposeFile
-	buildSecretString := opts.BuildSecretString
+	buildSecrets := opts.BuildSecrets
 	noCache := opts.NoCache
 	noBrowser := opts.NoBrowser
 	waitTime := opts.WaitTime
@@ -257,7 +257,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 			}
 		}
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
 		if !config.CFG.DisableAstroRun.GetBool() {
 			// remove astro-run-dag from requirments.txt
 			err := fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
@@ -282,7 +282,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	}
 
 	// Determine ports: allocate random ports when proxy is enabled, use config defaults otherwise
-	var portOvr *PortOverrides
+	var ovr *ComposeOverrides
 	var proxyHostname, proxyPort string
 	if useProxy {
 		proxyPort = config.CFG.ProxyPort.GetString()
@@ -319,7 +319,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 				}
 			}
 
-			portOvr = &PortOverrides{
+			ovr = &ComposeOverrides{
 				PostgresPort:  pgPort,
 				WebserverPort: webPort,
 				APIServerPort: webPort,
@@ -335,9 +335,24 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	// Create a compose project (with port overrides if proxy is enabled)
 	var project *composetypes.Project
-	if useProxy && composeFile == "" {
-		project, err = createDockerProjectWithPorts(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels, portOvr)
+	if composeFile == "" {
+		// Settle which postgres version this project runs before compose takes hold of
+		// the volume: an existing data directory keeps its own version, a new one
+		// follows config. Only matters when we generate the compose file ourselves.
+		pgTagOvr, pgErr := d.resolvePostgresTag(context.Background())
+		if pgErr != nil {
+			return pgErr
+		}
+		if pgTagOvr != "" {
+			if ovr == nil {
+				ovr = &ComposeOverrides{}
+			}
+			ovr.PostgresTag = pgTagOvr
+		}
+
+		project, err = createDockerProjectWithOverrides(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels, ovr)
 	} else {
+		// A user-supplied compose file is theirs to control; nothing is overridden.
 		project, err = createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, composeFile, imageLabels)
 	}
 	if err != nil {
@@ -372,15 +387,15 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	switch airflowMajorVersion {
 	case "3":
 		apiPort := config.CFG.APIServerPort.GetString()
-		if portOvr != nil && portOvr.APIServerPort != "" {
-			apiPort = portOvr.APIServerPort
+		if ovr != nil && ovr.APIServerPort != "" {
+			apiPort = ovr.APIServerPort
 		}
 		healthURL = fmt.Sprintf("http://localhost:%s/api/v2/monitor/health", apiPort)
 		healthComponent = "api-server"
 	case "2":
 		wsPort := config.CFG.WebserverPort.GetString()
-		if portOvr != nil && portOvr.WebserverPort != "" {
-			wsPort = portOvr.WebserverPort
+		if ovr != nil && ovr.WebserverPort != "" {
+			wsPort = ovr.WebserverPort
 		}
 		healthURL = fmt.Sprintf("http://localhost:%s/health", wsPort)
 		healthComponent = WebserverDockerContainerName
@@ -401,12 +416,12 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 	proxyActive := useProxy && proxyHostname != ""
 	if proxyActive {
 		services := map[string]string{}
-		if portOvr != nil && portOvr.PostgresPort != "" {
-			services["postgres"] = portOvr.PostgresPort
+		if ovr != nil && ovr.PostgresPort != "" {
+			services["postgres"] = ovr.PostgresPort
 		}
 		route := proxy.Route{
 			Hostname:   proxyHostname,
-			Port:       portOvr.WebserverPort,
+			Port:       ovr.WebserverPort,
 			ProjectDir: d.airflowHome,
 			PID:        0, // Docker routes don't track PID — CLI exits after start
 			Services:   services,
@@ -423,9 +438,9 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 
 	// Print the status
 	if proxyActive {
-		err = printProxyStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, portOvr)
+		err = printProxyStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, proxyHostname, proxyPort, ovr)
 	} else {
-		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, portOvr)
+		err = printStatus(settingsFile, envConns, airflowDockerVersion, noBrowser, ovr)
 	}
 	if err != nil {
 		return err
@@ -449,8 +464,19 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 		return err
 	}
 
+	// Export the postgres version this project actually runs, not the configured one,
+	// so the exported file starts the same database `astro dev start` would.
+	pgTagOvr, err := d.resolvePostgresTag(context.Background())
+	if err != nil {
+		return err
+	}
+	var ovr *ComposeOverrides
+	if pgTagOvr != "" {
+		ovr = &ComposeOverrides{PostgresTag: pgTagOvr}
+	}
+
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
+	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels, ovr)
 	if err != nil {
 		return errors.Wrap(err, "failed to create Compose file")
 	}
@@ -580,6 +606,11 @@ func (d *DockerCompose) Kill() error {
 	originalLevel := logrus.GetLevel()
 	logrus.SetLevel(logrus.ErrorLevel)
 
+	// A version probe left behind by an interrupted start still holds the data volume,
+	// and compose will not remove a volume that is in use — it says so and exits zero,
+	// leaving the project pinned to its old postgres for good.
+	d.removeStaleProbes(context.Background())
+
 	// Shut down our project
 	err := d.composeService.Down(context.Background(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {
@@ -663,12 +694,12 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString string) (string, error) {
+func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string, buildSecrets []string) (string, error) {
 	// deployImageName may be provided to the function if it is being used in the deploy command
 	if deployImageName == "" {
 		// build image
 		if customImageName == "" {
-			err := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+			err := d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 			if err != nil {
 				return "", err
 			}
@@ -701,10 +732,10 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 0 { // exit code 0 means the pytests passed
 		return "", nil
 	}
-	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
+	return exitCode, errors.New("something went wrong while Pytesting your Dags")
 }
 
-func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, buildSecretString string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
+func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage string, buildSecrets []string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.APIClient) error { //nolint:gocognit,gocyclo
 	// figure out which tests to run
 	if !versionTest && !dagTest && !lintTest {
 		versionTest = true
@@ -729,7 +760,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	} else {
 		// build image for current Airflow version to get current Airflow version
 		fmt.Println("\nBuilding image for current version")
-		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+		imageBuildErr := d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 		if imageBuildErr != nil {
 			return imageBuildErr
 		}
@@ -758,7 +789,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	newDockerFile := destFolder + "/Dockerfile"
 
 	if versionTest {
-		err := d.versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage, buildSecretString)
+		err := d.versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage, buildSecrets)
 		if err != nil {
 			return err
 		}
@@ -767,7 +798,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 	var failed bool
 
 	if dagTest {
-		dagTestPassed, err := d.dagTest(testHomeDirectory, newVersion, newDockerFile, customImage, buildSecretString)
+		dagTestPassed, err := d.dagTest(testHomeDirectory, newVersion, newDockerFile, customImage, buildSecrets)
 		if err != nil {
 			return err
 		}
@@ -797,7 +828,7 @@ func (d *DockerCompose) UpgradeTest(newVersion, deploymentID, customImage, build
 		fmt.Printf("\tDependency Version Comparison Results file: %s\n", "dependency_compare.txt")
 	}
 	if dagTest {
-		fmt.Printf("\tDAG Parse Test HTML Report: %s\n", "dag-test-report.html")
+		fmt.Printf("\tDag Parse Test HTML Report: %s\n", "dag-test-report.html")
 	}
 	if lintTest {
 		fmt.Printf("\tRuff Linter Results: %s\n", "ruff-lint-results.txt")
@@ -829,7 +860,7 @@ func (d *DockerCompose) pullImageFromDeployment(deploymentID string, astroV1Clie
 	return nil
 }
 
-func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage, buildSecretString string) error {
+func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymentImage, newDockerFile, newVersion, customImage string, buildSecrets []string) error {
 	fmt.Println("\nComparing dependency versions between current and upgraded environment")
 	// pip freeze old Airflow image
 	fmt.Println("\nObtaining pip freeze for current version")
@@ -845,7 +876,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymen
 		return err
 	}
 	fmt.Println("\nBuilding image for new version")
-	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 	if imageBuildErr != nil {
 		return imageBuildErr
 	}
@@ -867,8 +898,8 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymen
 	return nil
 }
 
-func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, customImage, buildSecretString string) (bool, error) {
-	fmt.Printf("\nChecking the DAGs in this project for errors against the new Airflow version %s\n", newVersion)
+func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, customImage string, buildSecrets []string) (bool, error) {
+	fmt.Printf("\nChecking the Dags in this project for errors against the new Airflow version %s\n", newVersion)
 
 	// build image with the new runtime version
 	err := upgradeDockerfile(d.dockerfile, newDockerFile, newVersion, customImage)
@@ -883,7 +914,7 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 		fmt.Printf("Adding 'pytest-html' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 	}
 	fmt.Println("\nBuilding image for new version")
-	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecretString, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
+	imageBuildErr := d.imageHandler.Build(newDockerFile, buildSecrets, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 
 	// remove pytest-html to the requirements
 	err = fileutil.RemoveLineFromFile(reqFile, "pytest-html", " # This package is needed for the upgrade dag test. It will be removed once the test is over")
@@ -909,17 +940,17 @@ func (d *DockerCompose) dagTest(testHomeDirectory, newVersion, newDockerFile, cu
 	// create html report
 	htmlReportArgs := "--html=dag-test-report.html --self-contained-html"
 	// compare pip freeze files
-	fmt.Println("\nRunning DAG parse test with the new Airflow version")
+	fmt.Println("\nRunning Dag parse test with the new Airflow version")
 	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, testHomeDirectory, strings.Fields(htmlReportArgs), true, airflowTypes.ImageBuildConfig{Path: d.airflowHome})
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			fmt.Println("See above for errors detected in your DAGs")
+			fmt.Println("See above for errors detected in your Dags")
 			return false, nil
 		} else {
-			return false, errors.Wrap(err, "something went wrong while parsing your DAGs")
+			return false, errors.Wrap(err, "something went wrong while parsing your Dags")
 		}
 	} else {
-		fmt.Println("\n" + ansi.Green("✔") + " No errors detected in your DAGs ")
+		fmt.Println("\n" + ansi.Green("✔") + " No errors detected in your Dags ")
 	}
 	return true, nil
 }
@@ -1314,7 +1345,7 @@ func checkVersionChange(before, after string) (change bool, updateType string, e
 	}
 }
 
-func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretString string) error {
+func (d *DockerCompose) Parse(customImageName, deployImageName string, buildSecrets []string) error {
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath
 
@@ -1328,28 +1359,28 @@ func (d *DockerCompose) Parse(customImageName, deployImageName, buildSecretStrin
 		return err
 	}
 
-	fmt.Println("Checking your DAGs for errors…")
+	fmt.Println("Checking your Dags for errors…")
 
 	pytestFile := DefaultTestPath
-	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecretString)
+	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecrets)
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			return errors.New("See above for errors detected in your DAGs")
+			return errors.New("See above for errors detected in your Dags")
 		}
-		return errors.Wrap(err, "something went wrong while parsing your DAGs")
+		return errors.Wrap(err, "something went wrong while parsing your Dags")
 	}
-	fmt.Println(ansi.Green("✔") + " No errors detected in your DAGs ")
+	fmt.Println(ansi.Green("✔") + " No errors detected in your Dags ")
 	return err
 }
 
-func (d *DockerCompose) Build(customImageName, buildSecretString string, noCache bool) error {
+func (d *DockerCompose) Build(customImageName string, buildSecrets []string, noCache bool) error {
 	// If a custom image name is provided, tag it as our project image
 	if customImageName != "" {
 		return d.imageHandler.TagLocalImage(customImageName)
 	}
 
 	// Build the image
-	return d.imageHandler.Build(d.dockerfile, buildSecretString, airflowTypes.ImageBuildConfig{
+	return d.imageHandler.Build(d.dockerfile, buildSecrets, airflowTypes.ImageBuildConfig{
 		Path:    d.airflowHome,
 		NoCache: noCache,
 	})
@@ -1463,16 +1494,16 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 
 	// If proxy mode allocated a random port, the actual port is stored in
 	// the proxy route registered during Start. Fall back to config default.
-	var portOvr *PortOverrides
+	var ovr *ComposeOverrides
 	if route, rerr := proxy.GetRouteByProject(d.airflowHome); rerr == nil && route != nil && route.Port != "" {
-		portOvr = &PortOverrides{
+		ovr = &ComposeOverrides{
 			WebserverPort: route.Port,
 			APIServerPort: route.Port,
 		}
 	}
 
-	apiURL := airflowAPIURL(airflowDockerVersion, portOvr)
-	authHeader := airflowAuthHeader(airflowDockerVersion, portOvr)
+	apiURL := airflowAPIURL(airflowDockerVersion, ovr)
+	authHeader := airflowAuthHeader(airflowDockerVersion, ovr)
 
 	err = initSettings(apiURL, authHeader, settingsFile, nil, connections, variables, pools)
 	if err != nil {
@@ -1551,7 +1582,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile, executionDate strin
 			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
 		}
 	}()
-	err = d.imageHandler.Build(d.dockerfile, "", airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
+	err = d.imageHandler.Build(d.dockerfile, nil, airflowTypes.ImageBuildConfig{Path: d.airflowHome, NoCache: noCache})
 	if err != nil {
 		return err
 	}
@@ -1667,9 +1698,9 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 	return project, nil
 }
 
-// createDockerProjectWithPorts creates a Docker Compose project with port overrides for proxy mode.
-var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, portOvr *PortOverrides) (*composetypes.Project, error) {
-	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels, portOvr)
+// createDockerProjectWithOverrides creates a Docker Compose project with port overrides for proxy mode.
+var createDockerProjectWithOverrides = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, ovr *ComposeOverrides) (*composetypes.Project, error) {
+	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels, ovr)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
@@ -1708,6 +1739,9 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load project")
 	}
+	if project == nil {
+		return nil, errors.New("failed to load compose project: parsed project is nil")
+	}
 
 	for name, s := range project.Services {
 		s.CustomLabels = map[string]string{
@@ -1724,19 +1758,19 @@ var createDockerProjectWithPorts = func(projectName, airflowHome, envFile, build
 }
 
 // airflowAPIURL returns the base API URL for the local Airflow instance.
-func airflowAPIURL(airflowMajorVersion uint64, portOvr *PortOverrides) string {
+func airflowAPIURL(airflowMajorVersion uint64, ovr *ComposeOverrides) string {
 	var port, apiPrefix string
 	switch airflowMajorVersion {
 	case airflowMajorVersion3:
 		port = config.CFG.APIServerPort.GetString()
-		if portOvr != nil && portOvr.APIServerPort != "" {
-			port = portOvr.APIServerPort
+		if ovr != nil && ovr.APIServerPort != "" {
+			port = ovr.APIServerPort
 		}
 		apiPrefix = "/api/v2"
 	default:
 		port = config.CFG.WebserverPort.GetString()
-		if portOvr != nil && portOvr.WebserverPort != "" {
-			port = portOvr.WebserverPort
+		if ovr != nil && ovr.WebserverPort != "" {
+			port = ovr.WebserverPort
 		}
 		apiPrefix = "/api/v1"
 	}
@@ -1745,13 +1779,13 @@ func airflowAPIURL(airflowMajorVersion uint64, portOvr *PortOverrides) string {
 }
 
 // airflowAuthHeader returns the Authorization header for the local Airflow instance.
-func airflowAuthHeader(airflowMajorVersion uint64, portOvr *PortOverrides) string {
+func airflowAuthHeader(airflowMajorVersion uint64, ovr *ComposeOverrides) string {
 	if airflowMajorVersion == airflowMajorVersion2 {
 		return "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
 	}
 	// Airflow 3 uses JWT auth via /auth/token endpoint.
 	// With SimpleAuthManager + ALL_ADMINS=True, any credentials work.
-	token, err := fetchLocalAirflowToken(airflowMajorVersion, portOvr)
+	token, err := fetchLocalAirflowToken(airflowMajorVersion, ovr)
 	if err != nil {
 		logger.Debugf("Unable to fetch Airflow auth token: %s", err)
 		return ""
@@ -1760,8 +1794,8 @@ func airflowAuthHeader(airflowMajorVersion uint64, portOvr *PortOverrides) strin
 }
 
 // fetchLocalAirflowToken gets a JWT token from the local Airflow 3 instance.
-func fetchLocalAirflowToken(airflowMajorVersion uint64, portOvr *PortOverrides) (string, error) {
-	apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
+func fetchLocalAirflowToken(airflowMajorVersion uint64, ovr *ComposeOverrides) (string, error) {
+	apiURL := airflowAPIURL(airflowMajorVersion, ovr)
 	root := strings.TrimSuffix(apiURL, "/api/v2")
 	return fetchAirflowJWTToken(root)
 }
@@ -1796,14 +1830,14 @@ func fetchAirflowJWTToken(baseURL string) (string, error) {
 }
 
 // printProxyStatus prints status information when the proxy is active.
-func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, portOvr *PortOverrides) error {
+func printProxyStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, hostname, proxyPort string, ovr *ComposeOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
-		authHeader := airflowAuthHeader(airflowMajorVersion, portOvr)
+		apiURL := airflowAPIURL(airflowMajorVersion, ovr)
+		authHeader := airflowAuthHeader(airflowMajorVersion, ovr)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
@@ -1815,8 +1849,8 @@ func printProxyStatus(settingsFile string, envConns map[string]astrov1.Environme
 	fmt.Printf(bullet+composeLinkUIMsg+"\n", ansi.Bold(uiURL))
 
 	pgPort := config.CFG.PostgresPort.GetString()
-	if portOvr != nil && portOvr.PostgresPort != "" {
-		pgPort = portOvr.PostgresPort
+	if ovr != nil && ovr.PostgresPort != "" {
+		pgPort = ovr.PostgresPort
 	}
 	fmt.Printf(bullet+composeLinkPostgresMsg+"\n", ansi.Bold("postgresql://localhost:"+pgPort+"/postgres"))
 
@@ -1834,14 +1868,14 @@ func printProxyStatus(settingsFile string, envConns map[string]astrov1.Environme
 	return nil
 }
 
-func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, portOvr *PortOverrides) error {
+func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, airflowMajorVersion uint64, noBrowser bool, ovr *ComposeOverrides) error {
 	settingsFileExists, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if settingsFileExists || len(envConns) > 0 {
-		apiURL := airflowAPIURL(airflowMajorVersion, portOvr)
-		authHeader := airflowAuthHeader(airflowMajorVersion, portOvr)
+		apiURL := airflowAPIURL(airflowMajorVersion, ovr)
+		authHeader := airflowAuthHeader(airflowMajorVersion, ovr)
 		err = initSettings(apiURL, authHeader, settingsFile, envConns, true, true, true)
 		if err != nil {
 			return err
@@ -1852,20 +1886,20 @@ func printStatus(settingsFile string, envConns map[string]astrov1.EnvironmentObj
 	switch airflowMajorVersion {
 	case airflowMajorVersion2:
 		port = config.CFG.WebserverPort.GetString()
-		if portOvr != nil && portOvr.WebserverPort != "" {
-			port = portOvr.WebserverPort
+		if ovr != nil && ovr.WebserverPort != "" {
+			port = ovr.WebserverPort
 		}
 	case airflowMajorVersion3:
 		port = config.CFG.APIServerPort.GetString()
-		if portOvr != nil && portOvr.APIServerPort != "" {
-			port = portOvr.APIServerPort
+		if ovr != nil && ovr.APIServerPort != "" {
+			port = ovr.APIServerPort
 		}
 	}
 	parts := strings.Split(port, ":")
 	uiURL := "http://localhost:" + parts[len(parts)-1]
 	pgPort := config.CFG.PostgresPort.GetString()
-	if portOvr != nil && portOvr.PostgresPort != "" {
-		pgPort = portOvr.PostgresPort
+	if ovr != nil && ovr.PostgresPort != "" {
+		pgPort = ovr.PostgresPort
 	}
 	bullet := ansi.Cyan("\u27A4") + " "
 	fmt.Printf(bullet+composeLinkUIMsg+"\n", ansi.Bold(uiURL))

@@ -26,13 +26,14 @@ import (
 )
 
 var (
-	authLogin          = auth.Login
-	defaultDomain      = "astronomer.io"
-	client             = httputil.NewHTTPClient()
-	isDeploymentFile   = false
-	parseAPIToken      = util.ParseAPIToken
-	errNotAPIToken     = errors.New("the API token given does not appear to be an Astro API Token")
-	errExpiredAPIToken = errors.New("the API token given has expired")
+	authLogin             = auth.Login
+	fetchDomainAuthConfig = auth.FetchDomainAuthConfig
+	defaultDomain         = "astronomer.io"
+	client                = httputil.NewHTTPClient()
+	isDeploymentFile      = false
+	parseAPIToken         = util.ParseAPIToken
+	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
+	errExpiredAPIToken    = errors.New("the API token given has expired")
 )
 
 const (
@@ -147,7 +148,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 
 		return nil
 	} else if isExpired(expireTime, accessTokenExpThreshold) {
-		authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
+		authConfig, err := fetchDomainAuthConfig(c.Domain)
 		if err != nil {
 			return err
 		}
@@ -275,7 +276,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		}
 	}
 
-	authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
+	authConfig, err := fetchDomainAuthConfig(c.Domain)
 	if err != nil {
 		return false, err
 	}

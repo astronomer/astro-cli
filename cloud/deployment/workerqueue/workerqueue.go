@@ -207,7 +207,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
 				i, _ := input.Confirm(
-					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)))
+					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)))
 
 				if !i {
 					fmt.Fprintf(out, "Canceling worker queue %s\n", action)
@@ -532,7 +532,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 	if QueueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
 			i, _ := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)))
+				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)))
 
 			if !i {
 				fmt.Fprintf(out, "Canceling worker queue deletion\n")

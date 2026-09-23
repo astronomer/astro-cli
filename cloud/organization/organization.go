@@ -14,6 +14,7 @@ import (
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/cloud/pagination"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -45,22 +46,27 @@ var organizationTableConfig = output.BuildTableConfig(
 	output.WithPadding([]int{44, 50}),
 )
 
+// organizationPager fetches one page of Organizations at a time for the
+// pagination helpers.
+func organizationPager(astroV1Client astrov1.APIClient) pagination.FetchPage[astrov1.Organization] {
+	return func(offset int) ([]astrov1.Organization, int, error) {
+		pageSize := 100
+		params := &astrov1.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
+		resp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), params)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
+		}
+		return resp.JSON200.Organizations, resp.JSON200.TotalCount, nil
+	}
+}
+
+// ListOrganizations returns every Organization the caller has access to, paging
+// through the API as needed.
 func ListOrganizations(astroV1Client astrov1.APIClient) ([]astrov1.Organization, error) {
-	limit := 100
-	organizationListParams := &astrov1.ListOrganizationsParams{
-		Limit: &limit,
-	}
-	resp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
-	if err != nil {
-		return nil, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	orgsPaginated := *resp.JSON200
-	orgs := orgsPaginated.Organizations
-	return orgs, nil
+	return pagination.Collect("organizations", organizationPager(astroV1Client))
 }
 
 func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
@@ -75,31 +81,12 @@ func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Or
 	return resp.JSON200, nil
 }
 
+// findOrganizationByName pages through Organizations and returns as soon as it
+// finds a name match, so a match on an early page avoids fetching later pages.
 func findOrganizationByName(name string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
-	pageSize := 100
-	offset := 0
-	for {
-		params := &astrov1.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
-		resp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), params)
-		if err != nil {
-			return nil, err
-		}
-		err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		paginated := *resp.JSON200
-		for i := range paginated.Organizations {
-			if paginated.Organizations[i].Name == name {
-				return &paginated.Organizations[i], nil
-			}
-		}
-		offset += pageSize
-		if offset >= paginated.TotalCount {
-			break
-		}
-	}
-	return nil, nil
+	return pagination.Find("organizations", organizationPager(astroV1Client), func(o astrov1.Organization) bool {
+		return o.Name == name
+	})
 }
 
 // ListData returns organization list data for structured output

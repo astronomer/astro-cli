@@ -1,6 +1,8 @@
 package cloud
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
@@ -65,7 +67,7 @@ func newRemoteDeployCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&remotePlatform, "platform", "", "Target platform for client image build (e.g., linux/amd64,linux/arm64). Defaults to host machine platform")
 	cmd.Flags().StringVarP(&remoteImageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag. The image should be present on the local machine.")
-	cmd.Flags().StringArrayVar(&remoteBuildSecrets, "build-secrets", []string{}, "Mimics docker build --secret flag. See https://docs.docker.com/build/building/secrets/ for more information. Example input id=mysecret,src=secrets.txt")
+	utils.AddBuildSecretFlags(cmd.Flags(), &remoteBuildSecrets)
 	cmd.Flags().StringVar(&remoteDeploymentID, "deployment-id", "", "Deployment ID to validate client image runtime version against deployment runtime version")
 
 	return cmd
@@ -76,14 +78,12 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	buildSecretString := util.GetbuildSecretString(remoteBuildSecrets)
-
 	deployInput := cloud.InputClientDeploy{
-		Path:              config.WorkingPath,
-		ImageName:         remoteImageName,
-		Platform:          remotePlatform,
-		BuildSecretString: buildSecretString,
-		DeploymentID:      remoteDeploymentID,
+		Path:         config.WorkingPath,
+		ImageName:    remoteImageName,
+		Platform:     remotePlatform,
+		BuildSecrets: util.ResolveBuildSecrets(remoteBuildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
+		DeploymentID: remoteDeploymentID,
 	}
 
 	return cloud.DeployClientImage(deployInput, astroV1Client)

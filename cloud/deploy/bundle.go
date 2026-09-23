@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -215,6 +216,19 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 			}
 		}
 	}()
+
+	// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy; with
+	// the setting off the deploy does not touch the tree at all. Cleanup runs
+	// first and is fatal on failure (a stale artifact must not ship inside the
+	// bundle), while stamping is best-effort (a missing artifact is safe).
+	// Artifacts left by earlier enabled deploys are removed with
+	// `astro dbt cleanup`.
+	if config.CFG.CosmosBoostPreDeploy.GetBool() {
+		if err := cosmosboost.EnsureClean(bundlePath); err != nil {
+			return "", err
+		}
+		cosmosboost.BestEffortPreDeploy(bundlePath)
+	}
 
 	// Generate the bundle tar
 	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})

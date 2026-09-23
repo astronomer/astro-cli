@@ -839,7 +839,7 @@ func TestImageDeployOnRemoteExecutionDeploymentSucceedsWithoutDagDeploy(t *testi
 	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 	if err != nil {
-		assert.NotContains(t, err.Error(), "DAG-only deploys are not enabled")
+		assert.NotContains(t, err.Error(), "Dag-only deploys are not enabled")
 	}
 
 	mockV1Client.AssertExpectations(t)
@@ -869,7 +869,7 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockV1Client, nil)
-	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-deployment-id --dag-deploy enable' to enable DAG-only deploys")
+	assert.Equal(t, err.Error(), "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update test-deployment-id --dag-deploy enable' to enable Dag-only deploys")
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -929,7 +929,7 @@ func TestDeployFailure(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy(deployInput, mockV1Client, nil)
-	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
+	assert.EqualError(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(3)
@@ -1168,7 +1168,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockV1Client)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", "", nil, false, false, mockV1Client)
 	assert.ErrorIs(t, err, errMock)
 
 	// dockerfile parsing error: no imageName, version label empty → enters parse branch
@@ -1180,7 +1180,7 @@ func TestBuildImageFailure(t *testing.T) {
 		return mockImageHandler
 	}
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockV1Client)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", nil, false, false, mockV1Client)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
@@ -1195,7 +1195,7 @@ func TestBuildImageFailure(t *testing.T) {
 	}
 	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
 	dockerfile = "Dockerfile.invalid" // would normally cause a parse error
-	_, err = buildImage("./testfiles/", "4.2.5", "", "my-registry/my-image:tag", "", "", false, false, mockV1Client)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "my-registry/my-image:tag", "", nil, false, false, mockV1Client)
 	assert.NoError(t, err, "Dockerfile should not be parsed when --image-name is provided")
 
 	// failed to get runtime releases
@@ -1208,7 +1208,7 @@ func TestBuildImageFailure(t *testing.T) {
 	}
 	dockerfile = "Dockerfile"
 	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, errMock).Once()
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", "", false, false, mockV1Client)
+	_, err = buildImage("./testfiles/", "4.2.5", "", "", "", nil, false, false, mockV1Client)
 	assert.ErrorIs(t, err, errMock)
 	mockV1Client.AssertExpectations(t)
 	mockV1Client.AssertExpectations(t)
@@ -1294,7 +1294,7 @@ func TestBuildImagePreBuildCheckWarnsBeforeBuildRuns(t *testing.T) {
 
 	var err error
 	output := captureStdout(t, func() {
-		_, err = buildImage("./testfiles/", "12.0.0", "", "", "", "", false, false, mockV1Client)
+		_, err = buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
 	})
 
 	assert.Error(t, err)
@@ -1338,7 +1338,7 @@ func TestBuildImagePreBuildCheckSkipsOnUnresolvedArgFrom(t *testing.T) {
 
 	var version string
 	output := captureStdout(t, func() {
-		version, err = buildImage(tempDir, "12.0.0", "", "", "", "", false, false, mockV1Client)
+		version, err = buildImage(tempDir, "12.0.0", "", "", "", nil, false, false, mockV1Client)
 	})
 
 	assert.NoError(t, err)
@@ -1365,7 +1365,7 @@ func TestBuildImageDoesNotWarnForPlainRuntimeImage(t *testing.T) {
 	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
 
 	output := captureStdout(t, func() {
-		_, err := buildImage("./testfiles/", "12.0.0", "", "", "", "", false, false, mockV1Client)
+		_, err := buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -1592,16 +1592,16 @@ func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "", "").Return("", errMock).Once()
+	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "", mock.Anything).Return("", errMock).Once()
 
 	// random error on running airflow pytest
-	err := checkPytest("", mockDeployImage, "", mockContainerHandler)
+	err := checkPytest("", mockDeployImage, nil, mockContainerHandler)
 	assert.ErrorIs(t, err, errMock)
 	mockContainerHandler.AssertExpectations(t)
 
 	// airflow pytest exited with status code 1
-	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "", "").Return("exit code 1", errMock).Once()
-	err = checkPytest("", mockDeployImage, "", mockContainerHandler)
+	mockContainerHandler.On("Pytest", "", "", mockDeployImage, "", mock.Anything).Return("exit code 1", errMock).Once()
+	err = checkPytest("", mockDeployImage, nil, mockContainerHandler)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 	mockContainerHandler.AssertExpectations(t)
@@ -1651,7 +1651,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock image handler
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
 		// The Dockerfile.client's FROM image is pulled and inspected once by the new
 		// pre-build check, then the built image itself is inspected once more by the
 		// existing post-build check -- both resolve to the same mocked env vars here.
@@ -1672,8 +1672,8 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              tempDir,
-			BuildSecretString: "",
+			Path:         tempDir,
+			BuildSecrets: nil,
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1702,8 +1702,8 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              "/test/path",
-			BuildSecretString: "",
+			Path:         "/test/path",
+			BuildSecrets: nil,
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1730,8 +1730,8 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("") // Empty registry
 
 		deployInput := InputClientDeploy{
-			Path:              "/test/path",
-			BuildSecretString: "",
+			Path:         "/test/path",
+			BuildSecrets: nil,
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1776,7 +1776,7 @@ func TestDeployClientImage(t *testing.T) {
 		// the build itself is about to fail -- it happens before Build is ever called.
 		mockImageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(true, nil).Once()
-		mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(errors.New("build failed")).Once()
+		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(errors.New("build failed")).Once()
 
 		// Override airflowImageHandler
 		originalAirflowImageHandler := airflowImageHandler
@@ -1790,8 +1790,8 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              tempDir,
-			BuildSecretString: "",
+			Path:         tempDir,
+			BuildSecrets: nil,
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1832,7 +1832,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock image handler with push failure
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
 		mockImageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(true, nil).Twice()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", errors.New("push failed")).Once()
@@ -1849,8 +1849,8 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 		deployInput := InputClientDeploy{
-			Path:              tempDir,
-			BuildSecretString: "",
+			Path:         tempDir,
+			BuildSecrets: nil,
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1896,9 +1896,9 @@ func TestDeployClientImage(t *testing.T) {
 		defer os.RemoveAll(tempDir)
 
 		deployInput := InputClientDeploy{
-			Path:              tempDir,
-			ImageName:         "custom-image:tag",
-			BuildSecretString: "",
+			Path:         tempDir,
+			ImageName:    "custom-image:tag",
+			BuildSecrets: nil,
 		}
 
 		err = DeployClientImage(deployInput, nil)
@@ -1940,9 +1940,9 @@ func TestDeployClientImageFailsWhenImageLacksAgentMarker(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	deployInput := InputClientDeploy{
-		Path:              tempDir,
-		ImageName:         "custom-image:tag",
-		BuildSecretString: "",
+		Path:         tempDir,
+		ImageName:    "custom-image:tag",
+		BuildSecrets: nil,
 	}
 
 	output := captureStdout(t, func() {
@@ -1987,7 +1987,7 @@ func TestDeployClientImagePreBuildCheckWarnsBeforeBuildRuns(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	mockImageHandler.On("Pull", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Once()
-	mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(errors.New("build blew up")).Once()
+	mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(errors.New("build blew up")).Once()
 
 	originalAirflowImageHandler := airflowImageHandler
 	airflowImageHandler = func(imageName string) airflow.ImageHandler {
@@ -1998,8 +1998,8 @@ func TestDeployClientImagePreBuildCheckWarnsBeforeBuildRuns(t *testing.T) {
 	config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 	deployInput := InputClientDeploy{
-		Path:              tempDir,
-		BuildSecretString: "",
+		Path:         tempDir,
+		BuildSecrets: nil,
 	}
 
 	output := captureStdout(t, func() {
@@ -2045,7 +2045,7 @@ func TestDeployClientImagePreBuildCheckSkipsOnUnresolvedArgFrom(t *testing.T) {
 	// the unrelated, pre-existing post-build check against the already-built image --
 	// mocked as agent-flavored here since that check is now fatal on a mismatch, and
 	// this test is only exercising the pre-build ARG-skip behavior, not the post-build one.
-	mockImageHandler.On("Build", "Dockerfile.client", "", mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+	mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
 	mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(true, nil).Once()
 	mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
 
@@ -2058,8 +2058,8 @@ func TestDeployClientImagePreBuildCheckSkipsOnUnresolvedArgFrom(t *testing.T) {
 	config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
 
 	deployInput := InputClientDeploy{
-		Path:              tempDir,
-		BuildSecretString: "",
+		Path:         tempDir,
+		BuildSecrets: nil,
 	}
 
 	output := captureStdout(t, func() {
@@ -2866,7 +2866,7 @@ func TestBuildImageWithoutDagsPreservesDockerignore(t *testing.T) {
 			mockImageHandler := new(mocks.ImageHandler)
 			mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-			err = buildImageWithoutDags(dir, "", mockImageHandler)
+			err = buildImageWithoutDags(dir, nil, mockImageHandler)
 			assert.NoError(t, err)
 
 			got, err := os.ReadFile(dockerignorePath)
@@ -2885,7 +2885,7 @@ func TestBuildImageWithoutDagsCleansUpCreatedDockerignore(t *testing.T) {
 	mockImageHandler := new(mocks.ImageHandler)
 	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	err := buildImageWithoutDags(dir, "", mockImageHandler)
+	err := buildImageWithoutDags(dir, nil, mockImageHandler)
 	assert.NoError(t, err)
 
 	_, statErr := os.Stat(dockerignorePath)
@@ -2931,7 +2931,7 @@ func TestBuildImageWithoutDagsAppendsDagsDuringBuild(t *testing.T) {
 				assert.Equal(t, tc.expectedDuringBuild, string(got))
 			}).Return(nil)
 
-			err = buildImageWithoutDags(dir, "", mockImageHandler)
+			err = buildImageWithoutDags(dir, nil, mockImageHandler)
 			assert.NoError(t, err)
 
 			mockImageHandler.AssertExpectations(t)

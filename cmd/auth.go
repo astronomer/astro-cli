@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	apcAuth "github.com/astronomer/astro-cli/apc/auth"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
-	softwareAuth "github.com/astronomer/astro-cli/software/auth"
 )
 
 var (
@@ -20,16 +20,16 @@ var (
 	token                  string
 	oAuth                  bool
 
-	cloudLogin     = cloudAuth.Login
-	cloudLogout    = cloudAuth.Logout
-	softwareLogin  = softwareAuth.Login
-	softwareLogout = softwareAuth.Logout
+	cloudLogin  = cloudAuth.Login
+	cloudLogout = cloudAuth.Logout
+	apcLogin    = apcAuth.Login
+	apcLogout   = apcAuth.Logout
 )
 
 // newLoginCommand is a top-level alias for "astro auth login" kept for backward compatibility.
 func newLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := newAuthLoginCommand(astroV1Client, out)
-	cmd.Long = "Authenticate to Astro or Astro Private Cloud. This is an alias for 'astro auth login'."
+	cmd.Long = "Authenticate to Astro or APC. This is an alias for 'astro auth login'."
 	return cmd
 }
 
@@ -50,9 +50,9 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 			// get the domain from context as an extra check
 			ctx, _ := context.GetCurrentContext()
 			if context.IsCloudDomain(ctx.Domain) {
-				fmt.Fprintf(out, "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
-			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
+			return apcLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
 		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink)
 	}
@@ -64,7 +64,7 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink)
 	}
-	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
+	return apcLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -85,7 +85,7 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 	if context.IsCloudDomain(domain) {
 		cloudLogout(domain, out)
 	} else {
-		softwareLogout(domain)
+		apcLogout(domain)
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func newAuthRootCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Manage authentication to Astronomer",
-		Long:  "Commands for authenticating to Astro or Astro Private Cloud",
+		Long:  "Commands for authenticating to Astro or APC",
 	}
 	cmd.AddCommand(
 		newAuthLoginCommand(astroV1Client, out),
@@ -108,7 +108,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
-		Long:  "Authenticate to Astro or Astro Private Cloud",
+		Long:  "Authenticate to Astro or APC",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return login(cmd, args, astroV1Client, out)
@@ -117,7 +117,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
 	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
-	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
+	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
 	return cmd
 }
 

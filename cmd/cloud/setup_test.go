@@ -16,6 +16,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -367,6 +368,13 @@ func TestCheckAPIKeys(t *testing.T) {
 		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
+
+		// Stub auth config fetch so the test doesn't hit the network.
+		origFetch := fetchDomainAuthConfig
+		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
+			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
+		}
+		defer func() { fetchDomainAuthConfig = origFetch }()
 
 		t.Setenv("ASTRONOMER_KEY_ID", "key")
 		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")

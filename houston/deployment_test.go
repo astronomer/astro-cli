@@ -108,6 +108,51 @@ func (s *Suite) TestCreateDeployment() {
 		_, err := api.CreateDeployment(map[string]interface{}{})
 		s.Contains(err.Error(), "Internal Server Error")
 	})
+
+	s.Run("uses mode-aware query and passes mode for Houston >= 2.1.0", func() {
+		oldVersion := version
+		version = "2.1.0"
+		defer func() { version = oldVersion }()
+
+		var capturedBody string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			b, _ := io.ReadAll(req.Body)
+			capturedBody = string(b)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.CreateDeployment(map[string]interface{}{"mode": OperatorDeploymentMode})
+		s.NoError(err)
+		s.Contains(capturedBody, "$mode: AllowedDeploymentModeValues")
+		s.Contains(capturedBody, OperatorDeploymentMode)
+	})
+
+	s.Run("omits mode variable from query for Houston < 2.1.0", func() {
+		oldVersion := version
+		version = "1.0.1"
+		defer func() { version = oldVersion }()
+
+		var capturedBody string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			b, _ := io.ReadAll(req.Body)
+			capturedBody = string(b)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.CreateDeployment(map[string]interface{}{})
+		s.NoError(err)
+		s.NotContains(capturedBody, "$mode: AllowedDeploymentModeValues")
+	})
 }
 
 func (s *Suite) TestDeleteDeployment() {

@@ -18,9 +18,19 @@ const (
 	maxStdinBytes = 64 * 1024 // 64KB
 )
 
-// Send posts a TelemetryPayload to the given API URL synchronously.
-// It returns the HTTP status code and any error encountered.
+// Send posts a TelemetryPayload synchronously without credentials, returning the
+// HTTP status code. Callers holding an Astro token should use SendWithToken.
 func Send(payload TelemetryPayload, apiURL string) (int, error) {
+	return SendWithToken(payload, apiURL, "")
+}
+
+// SendWithToken posts a TelemetryPayload synchronously, attaching token as a
+// bearer credential when it is non-empty.
+//
+// An empty token is normal, not an error — logged-out usage is still recorded,
+// just unattributed. The token is sent as a header only, never serialized into
+// the payload body.
+func SendWithToken(payload TelemetryPayload, apiURL, token string) (int, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return 0, err
@@ -34,6 +44,9 @@ func Send(payload TelemetryPayload, apiURL string) (int, error) {
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -59,11 +72,11 @@ func SendEvent() error {
 		return err
 	}
 
-	var sp senderPayload
+	var sp SenderPayload
 	if err := json.Unmarshal(payloadBytes, &sp); err != nil {
 		return err
 	}
 
-	_, err = Send(sp.TelemetryPayload, sp.APIURL)
+	_, err = SendWithToken(sp.TelemetryPayload, sp.APIURL, sp.Token)
 	return err
 }

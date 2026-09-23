@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
+	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -67,7 +68,7 @@ const (
 
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
-	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
+	enableDagDeployMsg       = "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable Dag-only deploys"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
 	invalidWorkspaceID       = "Invalid workspace id %s was provided through the --workspace-id flag\n"
 	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
@@ -90,7 +91,7 @@ var (
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	errDagsParseFailed = errors.New("your local Dags did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
@@ -117,33 +118,33 @@ type deploymentInfo struct {
 }
 
 type InputDeploy struct {
-	Path              string
-	RuntimeID         string
-	WsID              string
-	Pytest            string
-	EnvFile           string
-	ImageName         string
-	DeploymentName    string
-	Prompt            bool
-	Dags              bool
-	NoDagsBaseDir     bool
-	Image             bool
-	WaitForStatus     bool
-	WaitTime          time.Duration
-	DagsPath          string
-	Description       string
-	BuildSecretString string
-	Force             bool
-	DagBundleName     string
+	Path           string
+	RuntimeID      string
+	WsID           string
+	Pytest         string
+	EnvFile        string
+	ImageName      string
+	DeploymentName string
+	Prompt         bool
+	Dags           bool
+	NoDagsBaseDir  bool
+	Image          bool
+	WaitForStatus  bool
+	WaitTime       time.Duration
+	DagsPath       string
+	Description    string
+	BuildSecrets   []string
+	Force          bool
+	DagBundleName  string
 }
 
 // InputClientDeploy contains inputs for client image deployments
 type InputClientDeploy struct {
-	Path              string
-	ImageName         string
-	Platform          string
-	BuildSecretString string
-	DeploymentID      string
+	Path         string
+	ImageName    string
+	Platform     string
+	BuildSecrets []string
+	DeploymentID string
 }
 
 const accessYourDeploymentFmt = `
@@ -353,7 +354,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 	if deployInput.Dags {
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+			i, _ := input.Confirm("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?")
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -361,12 +362,12 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 			}
 		}
 		if deployInput.Pytest != "" {
-			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, astroV1Client)
+			runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecrets, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, astroV1Client)
 			if err != nil {
 				return err
 			}
 
-			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
+			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecrets)
 			if err != nil {
 				return err
 			}
@@ -376,7 +377,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
 
-		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
+		fmt.Println("Initiating Dag deploy for: " + deployInfo.deploymentID)
 		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astrov1.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
@@ -400,7 +401,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 			}
 
 			fmt.Println(
-				"\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
+				"\nSuccessfully uploaded Dags with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
 					fmt.Sprintf(accessYourDeploymentFmt, ansi.Bold(deploymentURL), ansi.Bold(deployInfo.webserverURL)),
 			)
 
@@ -408,7 +409,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		fmt.Println(
-			"\nSuccessfully uploaded DAGs with version " + ansi.Bold(
+			"\nSuccessfully uploaded Dags with version " + ansi.Bold(
 				dagTarballVersion,
 			) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 				fmt.Sprintf(
@@ -432,7 +433,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+			i, _ := input.Confirm("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?")
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -441,18 +442,18 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		// Build our image
-		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecretString, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, astroV1Client)
+		runtimeVersion, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.organizationID, deployInput.BuildSecrets, deployInfo.dagDeployEnabled, deployInfo.isRemoteExecutionEnabled, astroV1Client)
 		if err != nil {
 			return err
 		}
 
 		if len(dagFiles) > 0 {
-			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecretString)
+			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecrets)
 			if err != nil {
 				return err
 			}
 		} else {
-			fmt.Println("No DAGs found. Skipping testing...")
+			fmt.Println("No Dags found. Skipping testing...")
 		}
 
 		repository := imageRepository
@@ -473,7 +474,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 					return err
 				}
 			} else {
-				fmt.Println("Image Deploy only. Skipping deploying DAG...")
+				fmt.Println("Image Deploy only. Skipping deploying Dag...")
 			}
 		}
 		// finish deploy
@@ -558,10 +559,10 @@ func getDeploymentInfo(
 	return deployInfo, nil
 }
 
-func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace, buildSecretString string) error {
+func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace string, buildSecrets []string) error {
 	validDAGParseVersion := airflowversions.CompareRuntimeVersions(runtimeVersion, dagParseAllowedVersion) >= 0
 	if !validDAGParseVersion {
-		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
+		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip Dag parse...")
 	}
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace)
@@ -573,26 +574,26 @@ func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace, b
 	case pytest == parse && validDAGParseVersion:
 		// parse dags
 		fmt.Println("Testing image...")
-		err := parseDAGs(deployImage, buildSecretString, containerHandler)
+		err := parseDAGs(deployImage, buildSecrets, containerHandler)
 		if err != nil {
 			return err
 		}
 	case pytest != "" && pytest != parse && pytest != parseAndPytest:
 		// check pytests
 		fmt.Println("Testing image...")
-		err := checkPytest(pytest, deployImage, buildSecretString, containerHandler)
+		err := checkPytest(pytest, deployImage, buildSecrets, containerHandler)
 		if err != nil {
 			return err
 		}
 	case pytest == parseAndPytest:
 		// parse dags and check pytests
 		fmt.Println("Testing image...")
-		err := parseDAGs(deployImage, buildSecretString, containerHandler)
+		err := parseDAGs(deployImage, buildSecrets, containerHandler)
 		if err != nil {
 			return err
 		}
 
-		err = checkPytest(pytest, deployImage, buildSecretString, containerHandler)
+		err = checkPytest(pytest, deployImage, buildSecrets, containerHandler)
 		if err != nil {
 			return err
 		}
@@ -600,9 +601,9 @@ func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace, b
 	return nil
 }
 
-func parseDAGs(deployImage, buildSecretString string, containerHandler airflow.ContainerHandler) error {
+func parseDAGs(deployImage string, buildSecrets []string, containerHandler airflow.ContainerHandler) error {
 	if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
-		err := containerHandler.Parse("", deployImage, buildSecretString)
+		err := containerHandler.Parse("", deployImage, buildSecrets)
 		if err != nil {
 			fmt.Println(err)
 			return errDagsParseFailed
@@ -615,17 +616,17 @@ func parseDAGs(deployImage, buildSecretString string, containerHandler airflow.C
 }
 
 // Validate code with pytest
-func checkPytest(pytest, deployImage, buildSecretString string, containerHandler airflow.ContainerHandler) error {
+func checkPytest(pytest, deployImage string, buildSecrets []string, containerHandler airflow.ContainerHandler) error {
 	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "", buildSecretString)
+	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "", buildSecrets)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 		}
-		return errors.Wrap(err, "Something went wrong while Pytesting your DAGs,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
+		return errors.Wrap(err, "Something went wrong while Pytesting your Dags,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
 	}
 
 	fmt.Print("\nAll Pytests passed!\n")
@@ -674,7 +675,7 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 	}, nil
 }
 
-func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.ImageHandler) error {
+func buildImageWithoutDags(path string, buildSecrets []string, imageHandler airflow.ImageHandler) error {
 	fullpath := filepath.Join(path, ".dockerignore")
 
 	// Snapshot the original bytes so we can restore byte-for-byte after the build
@@ -709,7 +710,7 @@ func buildImageWithoutDags(path, buildSecretString string, imageHandler airflow.
 		}
 	}
 
-	return imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+	return imageHandler.Build("", buildSecrets, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 }
 
 // isAgentFlavorImage reports whether the image has a baked-in environment variable
@@ -815,12 +816,25 @@ func dockerignoreContainsDags(content []byte) bool {
 	return false
 }
 
-func buildImage(path, currentVersion, deployImage, imageName, organizationID, buildSecretString string, dagDeployEnabled, isRemoteExecutionEnabled bool, astroV1Client astrov1.APIClient) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName, organizationID string, buildSecrets []string, dagDeployEnabled, isRemoteExecutionEnabled bool, astroV1Client astrov1.APIClient) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
+
+		// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy;
+		// with the setting off the build does not touch the tree at all.
+		// Cleanup runs first and is fatal on failure (a stale artifact must
+		// not ship inside the image), while stamping is best-effort (a
+		// missing artifact is safe). Artifacts left by earlier enabled
+		// deploys are removed with `astro dbt cleanup`.
+		if config.CFG.CosmosBoostPreDeploy.GetBool() {
+			if err := cosmosboost.EnsureClean(path); err != nil {
+				return "", err
+			}
+			cosmosboost.BestEffortPreDeploy(path)
+		}
 
 		// Fail-early check: inspect the Dockerfile's FROM image directly, before running
 		// docker build, so a slow build isn't wasted on an obvious flavor mismatch. This
@@ -830,12 +844,12 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID, bu
 		warnIfPreBuildAgentFlavorMismatch(imageHandler, filepath.Join(path, dockerfile), warningAgentBaseImageInHostedDeployMsg, true)
 
 		if dagDeployEnabled || isRemoteExecutionEnabled {
-			err := buildImageWithoutDags(path, buildSecretString, imageHandler)
+			err := buildImageWithoutDags(path, buildSecrets, imageHandler)
 			if err != nil {
 				return "", err
 			}
 		} else {
-			err := imageHandler.Build("", buildSecretString, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+			err := imageHandler.Build("", buildSecrets, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
 			if err != nil {
 				return "", err
 			}
@@ -916,7 +930,7 @@ func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion st
 		return err
 	}
 	if resp.JSON200.DagTarballVersion != nil {
-		fmt.Println("Deployed DAG bundle: ", *resp.JSON200.DagTarballVersion)
+		fmt.Println("Deployed Dag bundle: ", *resp.JSON200.DagTarballVersion)
 	}
 	if resp.JSON200.ImageTag != "" {
 		fmt.Println("Deployed Image Tag: ", resp.JSON200.ImageTag)
@@ -1268,7 +1282,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		// (isAgentFlavorImage on the built image) remains as the safety net either way.
 		warnIfPreBuildAgentFlavorMismatch(imageHandler, filepath.Join(deployInput.Path, "Dockerfile.client"), warningNonAgentBaseImageInClientDeployMsg, false)
 
-		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecretString, buildConfig)
+		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecrets, buildConfig)
 		if err != nil {
 			return fmt.Errorf("failed to build client image: %w", err)
 		}

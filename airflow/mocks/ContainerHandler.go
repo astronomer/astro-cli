@@ -32,17 +32,17 @@ func (_m *ContainerHandler) Bash(container string) error {
 	return r0
 }
 
-// Build provides a mock function with given fields: customImageName, buildSecretString, noCache
-func (_m *ContainerHandler) Build(customImageName string, buildSecretString string, noCache bool) error {
-	ret := _m.Called(customImageName, buildSecretString, noCache)
+// Build provides a mock function with given fields: customImageName, buildSecrets, noCache
+func (_m *ContainerHandler) Build(customImageName string, buildSecrets []string, noCache bool) error {
+	ret := _m.Called(customImageName, buildSecrets, noCache)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Build")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, bool) error); ok {
-		r0 = rf(customImageName, buildSecretString, noCache)
+	if rf, ok := ret.Get(0).(func(string, []string, bool) error); ok {
+		r0 = rf(customImageName, buildSecrets, noCache)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -177,17 +177,17 @@ func (_m *ContainerHandler) PS() (*types.PSStatus, error) {
 	return r0, r1
 }
 
-// Parse provides a mock function with given fields: customImageName, deployImageName, buildSecretString
-func (_m *ContainerHandler) Parse(customImageName string, deployImageName string, buildSecretString string) error {
-	ret := _m.Called(customImageName, deployImageName, buildSecretString)
+// Parse provides a mock function with given fields: customImageName, deployImageName, buildSecrets
+func (_m *ContainerHandler) Parse(customImageName string, deployImageName string, buildSecrets []string) error {
+	ret := _m.Called(customImageName, deployImageName, buildSecrets)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Parse")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(customImageName, deployImageName, buildSecretString)
+	if rf, ok := ret.Get(0).(func(string, string, []string) error); ok {
+		r0 = rf(customImageName, deployImageName, buildSecrets)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -195,9 +195,9 @@ func (_m *ContainerHandler) Parse(customImageName string, deployImageName string
 	return r0
 }
 
-// Pytest provides a mock function with given fields: pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString
-func (_m *ContainerHandler) Pytest(pytestFile string, customImageName string, deployImageName string, pytestArgsString string, buildSecretString string) (string, error) {
-	ret := _m.Called(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
+// Pytest provides a mock function with given fields: pytestFile, customImageName, deployImageName, pytestArgsString, buildSecrets
+func (_m *ContainerHandler) Pytest(pytestFile string, customImageName string, deployImageName string, pytestArgsString string, buildSecrets []string) (string, error) {
+	ret := _m.Called(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecrets)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Pytest")
@@ -205,17 +205,17 @@ func (_m *ContainerHandler) Pytest(pytestFile string, customImageName string, de
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string) (string, error)); ok {
-		return rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) (string, error)); ok {
+		return rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecrets)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string) string); ok {
-		r0 = rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, []string) string); ok {
+		r0 = rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecrets)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string, string) error); ok {
-		r1 = rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecretString)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, []string) error); ok {
+		r1 = rf(pytestFile, customImageName, deployImageName, pytestArgsString, buildSecrets)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -295,17 +295,17 @@ func (_m *ContainerHandler) Stop(waitForExit bool) error {
 	return r0
 }
 
-// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroV1Client
-func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, customImageName string, buildSecretString string, versionTest bool, dagTest bool, lintTest bool, includeLintDeprecations bool, lintFix bool, lintConfigFile string, astroV1Client astrov1.ClientWithResponsesInterface) error {
-	ret := _m.Called(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroV1Client)
+// UpgradeTest provides a mock function with given fields: runtimeVersion, deploymentID, customImageName, buildSecrets, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroV1Client
+func (_m *ContainerHandler) UpgradeTest(runtimeVersion string, deploymentID string, customImageName string, buildSecrets []string, versionTest bool, dagTest bool, lintTest bool, includeLintDeprecations bool, lintFix bool, lintConfigFile string, astroV1Client astrov1.ClientWithResponsesInterface) error {
+	ret := _m.Called(runtimeVersion, deploymentID, customImageName, buildSecrets, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroV1Client)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpgradeTest")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, bool, bool, bool, bool, bool, string, astrov1.ClientWithResponsesInterface) error); ok {
-		r0 = rf(runtimeVersion, deploymentID, customImageName, buildSecretString, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroV1Client)
+	if rf, ok := ret.Get(0).(func(string, string, string, []string, bool, bool, bool, bool, bool, string, astrov1.ClientWithResponsesInterface) error); ok {
+		r0 = rf(runtimeVersion, deploymentID, customImageName, buildSecrets, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix, lintConfigFile, astroV1Client)
 	} else {
 		r0 = ret.Error(0)
 	}
