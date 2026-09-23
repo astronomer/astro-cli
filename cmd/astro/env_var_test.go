@@ -30,6 +30,20 @@ func execEnvCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
+// expectAbsent mocks the key lookup `set` makes before it decides whether to
+// update or create. An empty list is what makes the update report ErrNotFound,
+// which is what sends the upsert down the create path.
+func expectAbsent(mc *astrov1_mocks.ClientWithResponsesInterface, key string) {
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything,
+		mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+			return p != nil && p.ObjectKey != nil && *p.ObjectKey == key
+		}),
+	).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
+	}, nil).Once()
+}
+
 func resetEnvFlags() {
 	envWorkspaceID = ""
 	envDeploymentID = ""
@@ -39,16 +53,19 @@ func resetEnvFlags() {
 	envResolveLinked = false
 	envYes = false
 
-	envVarKey, envVarValue, envVarSecret, envVarStrict, envVarFromFile = "", "", false, false, ""
+	envVarValue, envVarSecret, envVarNoCreate, envVarFromFile = "", false, false, ""
 
 	envLinkVariableID, envLinkVariableKey = "", ""
 	envLinkDeploymentID, envLinkValue, envLinkExclude = "", "", false
 
-	envConnKey, envConnType, envConnHost, envConnLogin = "", "", "", ""
+	envConnNoCreate = false
+	envConnValue = ""
+	envConnType, envConnHost, envConnLogin = "", "", ""
 	envConnPassword, envConnSchema, envConnExtra = "", "", ""
 	envConnPort = 0
 
-	envMetricsKey, envMetricsEndpoint, envMetricsExporterType = "", "", ""
+	envMetricsNoCreate = false
+	envMetricsEndpoint, envMetricsExporterType = "", ""
 	envMetricsAuthType, envMetricsBasicToken, envMetricsUsername = "", "", ""
 	envMetricsPassword, envMetricsSigV4AssumeArn, envMetricsSigV4StsRegion = "", "", ""
 	envMetricsHeaders, envMetricsLabels = nil, nil
@@ -111,7 +128,7 @@ func TestEnvVarDeleteRequiresYes(t *testing.T) {
 	mc.AssertExpectations(t)
 }
 
-func TestEnvVarCreateReadsValueFromStdin(t *testing.T) {
+func TestEnvVarSetReadsValueFromStdin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
@@ -127,6 +144,7 @@ func TestEnvVarCreateReadsValueFromStdin(t *testing.T) {
 
 	createdID := "cabc12def0123456789012345"
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	expectAbsent(mc, "FOO")
 	mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(body astrov1.CreateEnvironmentObjectJSONRequestBody) bool {
 		return body.ObjectKey == "FOO" &&
 			body.EnvironmentVariable != nil &&
@@ -138,7 +156,7 @@ func TestEnvVarCreateReadsValueFromStdin(t *testing.T) {
 	}, nil).Once()
 	astroV1Client = mc
 
-	out, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--key", "FOO")
+	out, err := execEnvCmd("var", "set", "FOO", "--workspace-id", "ws-test")
 	assert.NoError(t, err)
 	assert.Contains(t, out, "Created FOO")
 	mc.AssertExpectations(t)
@@ -173,19 +191,20 @@ func TestEnvVarExportIncludeSecretsWarnsToStderr(t *testing.T) {
 	mc.AssertExpectations(t)
 }
 
-func TestEnvVarCreateRequiresKey(t *testing.T) {
+func TestEnvVarSetRequiresAnIDOrFromFile(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	astroV1Client = mc
 
-	_, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--value", "bar")
-	assert.Error(t, err) // missing --key (and no --from-file)
+	_, err := execEnvCmd("var", "set", "--workspace-id", "ws-test", "--value", "bar")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "set requires <id-or-key> or --from-file")
 	mc.AssertExpectations(t)
 }
 
-func TestEnvVarCreateFromFile(t *testing.T) {
+func TestEnvVarSetFromFileCreatesAbsentKeys(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
@@ -199,9 +218,11 @@ func TestEnvVarCreateFromFile(t *testing.T) {
 	createdID := "cabc12def0123456789012345"
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	// Three creates in alphabetical order. Assert each carries IsSecret=true (from --secret).
+	// Three keys, none of which exist: each looks itself up, misses, and is
+	// created. Assert each carries IsSecret=true (from --secret).
 	for _, key := range []string{"BAZ", "FOO", "WITH_QUOTE"} {
 		k := key
+		expectAbsent(mc, k)
 		mc.On("CreateEnvironmentObjectWithResponse", mock.Anything, mock.Anything,
 			mock.MatchedBy(func(body astrov1.CreateEnvironmentObjectJSONRequestBody) bool {
 				return body.ObjectKey == k &&
@@ -216,7 +237,7 @@ func TestEnvVarCreateFromFile(t *testing.T) {
 	}
 	astroV1Client = mc
 
-	out, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--from-file", envPath, "--secret")
+	out, err := execEnvCmd("var", "set", "--workspace-id", "ws-test", "--from-file", envPath, "--secret")
 	assert.NoError(t, err)
 	assert.Contains(t, out, "Created BAZ")
 	assert.Contains(t, out, "Created FOO")
@@ -224,21 +245,20 @@ func TestEnvVarCreateFromFile(t *testing.T) {
 	mc.AssertExpectations(t)
 }
 
-func TestEnvVarFromFileMutuallyExclusiveWithKey(t *testing.T) {
+func TestEnvVarSetRejectsAnIDTogetherWithFromFile(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	astroV1Client = mc
 
-	_, err := execEnvCmd("var", "create", "--workspace-id", "ws-test", "--key", "FOO", "--from-file", "/tmp/whatever.env")
+	_, err := execEnvCmd("var", "set", "FOO", "--workspace-id", "ws-test", "--from-file", "/tmp/whatever.env")
 	assert.Error(t, err)
-	// cobra phrases mutual-exclusion as "none of the others can be"
-	assert.Contains(t, err.Error(), "key from-file")
+	assert.Contains(t, err.Error(), "cannot pass an <id-or-key> together with --from-file")
 	mc.AssertExpectations(t)
 }
 
-func TestEnvVarUpdateFromFileUpserts(t *testing.T) {
+func TestEnvVarSetFromFileUpserts(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
@@ -284,7 +304,7 @@ func TestEnvVarUpdateFromFileUpserts(t *testing.T) {
 	}, nil).Once()
 	astroV1Client = mc
 
-	out, err := execEnvCmd("var", "update", "--workspace-id", "ws-test", "--from-file", envPath)
+	out, err := execEnvCmd("var", "set", "--workspace-id", "ws-test", "--from-file", envPath)
 	assert.NoError(t, err)
 	assert.Contains(t, out, "Updated EXISTS")
 	assert.Contains(t, out, "Created MISSING")

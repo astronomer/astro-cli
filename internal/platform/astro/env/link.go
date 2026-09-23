@@ -42,15 +42,21 @@ type VarLink struct {
 	OverrideValue *string `json:"overrideValue,omitempty" yaml:"overrideValue,omitempty"`
 }
 
-// LinkVar attaches a workspace-scoped env var to a specific deployment.
-// Upsert semantics: if the link doesn't exist it's created; if it does, only
-// the override field is touched, and only when overrideValue is non-nil.
-// Calling with overrideValue=nil on an existing link is a no-op for the
-// override (the platform preserves fields omitted from a link entry; note it
-// does NOT preserve the Links/ExcludeLinks arrays themselves when a PATCH
-// omits them -- see echoPreservedFields). To remove an existing override,
-// delete the link then re-create it without --value.
-func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, astroV1Client astrov1.APIClient) error {
+// LinkVar sets a workspace-scoped env var's link to a deployment.
+//
+// Set semantics, matching `set` on the object nouns: the link is created when
+// absent and updated when present, and overrideValue describes the whole
+// override — nil means the link has none, so an existing one is cleared
+// rather than left alone. That last part is the change from the old
+// create-shaped behavior, where omitting the value preserved whatever was
+// stored and removing an override meant deleting the link and re-creating it.
+//
+// noCreate refuses to create a link that is not there, the same guard the
+// object nouns spell --no-create.
+//
+// Note the platform does NOT preserve the Links/ExcludeLinks arrays
+// themselves when a PATCH omits them -- see echoPreservedFields.
+func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, noCreate bool, astroV1Client astrov1.APIClient) error {
 	if err := validateDeploymentID(depID); err != nil {
 		return err
 	}
@@ -62,7 +68,11 @@ func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, a
 		return fmt.Errorf("environment variable %q has deployment %s in its exclude list; remove the exclude first", current.ObjectKey, depID)
 	}
 
-	links := upsertLinkInUpdateList(current.Links, depID, overrideValue)
+	links, found := upsertLinkInUpdateList(current.Links, depID, overrideValue)
+	if !found && noCreate {
+		return fmt.Errorf("environment variable %q is not linked to deployment %s and --no-create was passed",
+			current.ObjectKey, depID)
+	}
 	return patchVarLinks(*current.Id, current, &links, nil, astroV1Client)
 }
 
@@ -213,8 +223,33 @@ func excludeExists(excludes *[]astrov1.EnvironmentObjectExcludeLink, depID strin
 	})
 }
 
-// newOverrideRequest wraps an override value in the PATCH body's nested
-// override shape.
+// overrideValueField is the name `unsetFields` uses for an environment
+// variable's override value, matching the `value` json tag on
+// UpdateEnvironmentObjectEnvironmentVariableOverridesRequest.
+const overrideValueField = "value"
+
+// linkOverride renders the override for one link.
+//
+// Clearing one has to be said out loud. Omitting `overrides` leaves whatever
+// is stored in place — which is why `link create` without --value was a no-op
+// against an existing override, and why removing one used to mean deleting
+// the link and re-creating it. `unsetFields` is the API's way to say "drop
+// this and inherit the parent value".
+//
+// A link with no override has nothing to unset — whether it is being created
+// or merely re-linked — so it omits the field instead.
+func linkOverride(value *string, hasOverride bool) *astrov1.UpdateEnvironmentObjectOverridesRequest {
+	if value != nil {
+		return newOverrideRequest(*value)
+	}
+	if !hasOverride {
+		return nil
+	}
+	return &astrov1.UpdateEnvironmentObjectOverridesRequest{
+		UnsetFields: &[]string{overrideValueField},
+	}
+}
+
 func newOverrideRequest(value string) *astrov1.UpdateEnvironmentObjectOverridesRequest {
 	return &astrov1.UpdateEnvironmentObjectOverridesRequest{
 		EnvironmentVariable: &astrov1.UpdateEnvironmentObjectEnvironmentVariableOverridesRequest{Value: &value},
@@ -244,22 +279,21 @@ func toExcludeRequest(e astrov1.EnvironmentObjectExcludeLink) astrov1.ExcludeLin
 // upsertLinkInUpdateList builds the PATCH-shape Links list with the entry for
 // depID created or updated. Other links round-trip with their existing
 // overrides intact. The platform PATCH merges per-entry rather than fully
-// replacing the array, so sending `overrides: nil` on an existing entry is a
-// no-op for the override (it's preserved). To clear an override, the caller
-// must delete the link first.
-func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID string, overrideValue *string) []astrov1.UpdateEnvironmentObjectLinkRequest {
-	var newOverride *astrov1.UpdateEnvironmentObjectOverridesRequest
-	if overrideValue != nil {
-		newOverride = newOverrideRequest(*overrideValue)
-	}
+// replacing the array, so an entry's override is whatever overrideValue says:
+// a value sets it, and nil clears one that is there, through unsetFields.
+// Omitting `overrides` would preserve it, which is what the create-shaped
+// behavior used to do.
+func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID string, overrideValue *string) (out []astrov1.UpdateEnvironmentObjectLinkRequest, found bool) {
 	links := derefSlice(current)
-	out := make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links)+1)
-	found := false
+	out = make([]astrov1.UpdateEnvironmentObjectLinkRequest, 0, len(links)+1)
 	for i := range links {
 		req := toUpdateLink(&links[i])
 		if links[i].ScopeEntityId == depID {
 			found = true
-			req.Overrides = newOverride
+			// "has an override", not merely "the link exists": asking the API
+			// to unset a field that was never set is a request for something
+			// that is not there, and it would fire on every no-op re-link.
+			req.Overrides = linkOverride(overrideValue, links[i].EnvironmentVariableOverrides != nil)
 		}
 		out = append(out, req)
 	}
@@ -267,10 +301,10 @@ func upsertLinkInUpdateList(current *[]astrov1.EnvironmentObjectLink, depID stri
 		out = append(out, astrov1.UpdateEnvironmentObjectLinkRequest{
 			Scope:         astrov1.UpdateEnvironmentObjectLinkRequestScopeDEPLOYMENT,
 			ScopeEntityId: depID,
-			Overrides:     newOverride,
+			Overrides:     linkOverride(overrideValue, false),
 		})
 	}
-	return out
+	return out, found
 }
 
 // buildUpdateLinks converts the GET-shape Links into the PATCH-shape, copying

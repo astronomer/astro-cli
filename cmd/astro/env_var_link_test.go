@@ -50,7 +50,7 @@ func TestEnvVarLinkCreate(t *testing.T) {
 	}, nil).Once()
 	astroV1Client = mc
 
-	out, err := execEnvCmd("var", "link", "create", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", depID)
+	out, err := execEnvCmd("var", "link", "set", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", depID)
 	assert.NoError(t, err)
 	assert.Contains(t, out, "Linked FOO to deployment "+depID)
 	mc.AssertExpectations(t)
@@ -99,12 +99,12 @@ func TestEnvVarLinkVariableFlagValidation(t *testing.T) {
 
 	// create requires --deployment-id
 	resetEnvFlags()
-	_, err = execEnvCmd("var", "link", "create", "--variable-key", "FOO", "--workspace-id", cuid.New())
+	_, err = execEnvCmd("var", "link", "set", "--variable-key", "FOO", "--workspace-id", cuid.New())
 	assert.ErrorContains(t, err, `required flag(s) "deployment-id" not set`)
 
 	// --value and --exclude are mutually exclusive
 	resetEnvFlags()
-	_, err = execEnvCmd("var", "link", "create", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", cuid.New(), "--value", "x", "--exclude")
+	_, err = execEnvCmd("var", "link", "set", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", cuid.New(), "--value", "x", "--exclude")
 	assert.ErrorContains(t, err, "none of the others can be")
 
 	// empty identifier values satisfy cobra's one-required group but are rejected
@@ -112,7 +112,7 @@ func TestEnvVarLinkVariableFlagValidation(t *testing.T) {
 	_, err = execEnvCmd("var", "link", "list", "--variable-id", "", "--workspace-id", cuid.New())
 	assert.ErrorContains(t, err, "--variable-id or --variable-key cannot be empty")
 	resetEnvFlags()
-	_, err = execEnvCmd("var", "link", "create", "--variable-key", "", "--workspace-id", cuid.New(), "--deployment-id", cuid.New())
+	_, err = execEnvCmd("var", "link", "set", "--variable-key", "", "--workspace-id", cuid.New(), "--deployment-id", cuid.New())
 	assert.ErrorContains(t, err, "--variable-id or --variable-key cannot be empty")
 	resetEnvFlags()
 }

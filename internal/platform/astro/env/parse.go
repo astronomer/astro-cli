@@ -17,7 +17,7 @@ import (
 // Keys must follow POSIX shell variable naming (alphanumerics + underscore,
 // not starting with a digit). Platform objects with non-POSIX keys (e.g.
 // Airflow variables containing `-` or `.`) cannot be bulk-imported via this
-// path; use single-key create instead.
+// path; use single-key `set <id-or-key>` instead.
 //
 // Duplicate keys in the source file silently keep the last occurrence;
 // callers should warn the user before overwriting.

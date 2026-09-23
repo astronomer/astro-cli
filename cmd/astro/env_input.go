@@ -8,11 +8,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // readSecretValue resolves a secret value from one of three sources, in order:
@@ -35,6 +37,33 @@ func readSecretValue(flagValue, prompt string) (string, error) {
 		return strings.TrimRight(string(b), "\r\n"), nil
 	}
 	return input.Password(prompt + ": ")
+}
+
+// readSetValue resolves the value for a `set`, refusing to invent one.
+//
+// readSecretValue treats "no flag and nothing on stdin" as the empty string,
+// which is right for an optional secret and wrong for the thing a `set` is
+// setting: hasPipedStdin() is true whenever stdin is not a terminal, so in CI
+// `astro env variable set API_TOKEN` with the --value expansion gone empty
+// read zero bytes and wrote an explicit empty value over the stored token,
+// printing "Updated API_TOKEN" and exiting 0. Now that `set` upserts, the same
+// invocation against a mistyped key created an empty variable instead.
+//
+// An explicit --value is authoritative including when empty, since setting a
+// variable to the empty string is legitimate; it is only the absence of any
+// input that is now an error rather than a silent blanking.
+func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (string, error) {
+	if cmd.Flags().Changed(flagName) {
+		return flagValue, nil
+	}
+	v, err := readSecretValue(flagValue, prompt)
+	if err != nil {
+		return "", err
+	}
+	if v == "" {
+		return "", fmt.Errorf("no value supplied: pass --%s, or pipe one on stdin", flagName)
+	}
+	return v, nil
 }
 
 // confirmTTY returns true if the user confirms y/Y at an interactive prompt.
@@ -61,9 +90,46 @@ type createFn func(scope env.Scope, key, value string, isSecret bool, autoLink *
 // updateFn matches the per-type UpdateVar / UpdateAirflowVar signature.
 type updateFn func(idOrKey string, scope env.Scope, value string, autoLink *bool, client astrov1.APIClient) (*astrov1.EnvironmentObject, error)
 
-// runFromFileCreate parses a dotenv file and calls create for each entry,
-// printing per-entry status to out. Stops at the first error.
-func runFromFileCreate(out io.Writer, scope env.Scope, autoLink *bool, isSecret bool, path string, create createFn) error {
+// printCreated reports a newly created object, with the id scripts read out
+// of this line. One definition because five paths print it — the four nouns
+// and the bulk import — and a create/update split that drifted per noun is
+// what this change exists to undo.
+func printCreated(out io.Writer, obj *astrov1.EnvironmentObject) {
+	id := ""
+	if obj.Id != nil {
+		id = *obj.Id
+	}
+	fmt.Fprintf(out, "Created %s (id: %s)\n", obj.ObjectKey, id)
+}
+
+// refuseCreateByID rejects creating an object addressed by an id.
+//
+// Mapping the id branch's 404 to ErrNotFound was needed so --no-create and
+// the upsert could see a miss at all, but it also handed the create arm a
+// CUID to use as the new object's key: `set <stale-cuid>` would have made an
+// ENVIRONMENT_VARIABLE literally named cl9abc… Creating requires a key the
+// caller chose; an id names something that was supposed to exist already.
+func refuseCreateByID(noun, idOrKey string) error {
+	if !util.IsCUID(idOrKey) {
+		return nil
+	}
+	return fmt.Errorf("%s %q does not exist, and an ID cannot be created: "+
+		"pass the key you want the new %s to have", noun, idOrKey, noun)
+}
+
+// setNotFound explains a lookup miss that --no-create turned into a failure.
+//
+// Without it the single-key paths returned a bare "environment object not
+// found", indistinguishable from any other miss and silent about the flag
+// that made it fatal — while the bulk path already said so.
+func setNotFound(noun, idOrKey string, err error) error {
+	return fmt.Errorf("%s %q does not exist and --no-create was passed: %w", noun, idOrKey, err)
+}
+
+// runFromFileSet parses a dotenv file and sets each entry. Honors the same
+// --no-create semantic as the single-key path: when noCreate is true and a key
+// does not exist, this aborts rather than creating.
+func runFromFileSet(out io.Writer, scope env.Scope, autoLink *bool, isSecret, noCreate bool, path string, create createFn, update updateFn) error {
 	parsed, err := env.ParseDotenvFile(path)
 	if err != nil {
 		return err
@@ -72,48 +138,54 @@ func runFromFileCreate(out io.Writer, scope env.Scope, autoLink *bool, isSecret 
 		fmt.Fprintf(out, "no variables found in %s\n", displayPath(path))
 		return nil
 	}
+	var skipped []string
 	for _, k := range sortedKeys(parsed) {
-		obj, err := create(scope, k, parsed[k], isSecret, autoLink, astroV1Client)
+		// An empty value in a dotenv file is very often not a value at all.
+		// `astro env variable export` writes `KEY=  # secret, use
+		// --include-secrets` for every secret it will not reveal, which parses
+		// back as "" — so the round trip this command advertises would set each
+		// of those to the empty string and report success. Skipping is the only
+		// non-destructive reading: nothing here can tell the placeholder apart
+		// from a deliberate empty, and one of the two silently destroys
+		// credentials.
+		if parsed[k] == "" {
+			skipped = append(skipped, k)
+			continue
+		}
+		obj, err := update(k, scope, parsed[k], autoLink, astroV1Client)
 		if err != nil {
-			return fmt.Errorf("create %s: %w", k, err)
+			if errors.Is(err, env.ErrNotFound) && !noCreate {
+				obj, err = create(scope, k, parsed[k], isSecret, autoLink, astroV1Client)
+				if err != nil {
+					return fmt.Errorf("set %s: creating it failed: %w", k, err)
+				}
+				printCreated(out, obj)
+				continue
+			}
+			if errors.Is(err, env.ErrNotFound) {
+				return fmt.Errorf("set %s: it does not exist and --no-create was passed: %w", k, err)
+			}
+			return fmt.Errorf("set %s: %w", k, err)
 		}
-		id := ""
-		if obj.Id != nil {
-			id = *obj.Id
-		}
-		fmt.Fprintf(out, "Created %s (id: %s)\n", obj.ObjectKey, id)
+		fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
+	}
+	if len(skipped) > 0 {
+		fmt.Fprintf(os.Stderr,
+			"skipped %d entr%s with an empty value: %s\n"+
+				"  An export without --include-secrets writes secrets as empty placeholders;\n"+
+				"  importing those would overwrite the stored values. Set them individually,\n"+
+				"  or re-export with --include-secrets.\n",
+			len(skipped), plural(len(skipped)), strings.Join(skipped, ", "))
 	}
 	return nil
 }
 
-// runFromFileUpdate parses a dotenv file and upserts each entry. Honors the
-// same `--strict` semantic as the single-key update path: when strict is true
-// and a key does not exist, this aborts rather than creating.
-func runFromFileUpdate(out io.Writer, scope env.Scope, autoLink *bool, isSecret, strict bool, path string, create createFn, update updateFn) error {
-	parsed, err := env.ParseDotenvFile(path)
-	if err != nil {
-		return err
+// plural is the suffix for "entry"/"entries" in the skip notice.
+func plural(n int) string {
+	if n == 1 {
+		return "y"
 	}
-	if len(parsed) == 0 {
-		fmt.Fprintf(out, "no variables found in %s\n", displayPath(path))
-		return nil
-	}
-	for _, k := range sortedKeys(parsed) {
-		obj, err := update(k, scope, parsed[k], autoLink, astroV1Client)
-		if err != nil {
-			if errors.Is(err, env.ErrNotFound) && !strict {
-				obj, err = create(scope, k, parsed[k], isSecret, autoLink, astroV1Client)
-				if err != nil {
-					return fmt.Errorf("create %s: %w", k, err)
-				}
-				fmt.Fprintf(out, "Created %s\n", obj.ObjectKey)
-				continue
-			}
-			return fmt.Errorf("update %s: %w", k, err)
-		}
-		fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
-	}
-	return nil
+	return "ies"
 }
 
 // displayPath renders "-" as "<stdin>" for user-facing messages; otherwise

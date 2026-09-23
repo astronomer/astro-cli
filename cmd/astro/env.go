@@ -65,18 +65,18 @@ var (
 	envResolveLinked  bool
 	envYes            bool
 
-	// var / airflow-var create + update inputs
-	envVarKey      string
+	// var / airflow-var set inputs
 	envVarValue    string
 	envVarSecret   bool
-	envVarStrict   bool
+	envVarNoCreate bool
 	envVarFromFile string
 
-	// shared auto-link toggle for create + update across all four types
+	// shared auto-link toggle for set across all four types
 	envAutoLink bool
 
-	// connection create + update inputs
-	envConnKey      string
+	// connection set inputs
+	envConnNoCreate bool
+	envConnValue    string
 	envConnType     string
 	envConnHost     string
 	envConnLogin    string
@@ -85,8 +85,8 @@ var (
 	envConnPort     int
 	envConnExtra    string
 
-	// metrics-export create + update inputs
-	envMetricsKey            string
+	// metrics-export set inputs
+	envMetricsNoCreate       bool
 	envMetricsEndpoint       string
 	envMetricsExporterType   string
 	envMetricsAuthType       string
@@ -101,9 +101,12 @@ var (
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "env",
-		Aliases: []string{"environment"},
-		Short:   "Manage a Deployment's environment objects on Astro",
+		Use:                        "env",
+		Aliases:                    []string{"environment"},
+		Args:                       cobra.ArbitraryArgs,
+		RunE:                       helpOrUnknownSubcommand,
+		SuggestionsMinimumDistance: 2,
+		Short:                      "Manage a Deployment's environment objects on Astro",
 		Long: `Manage Astronomer environment-manager objects: workspace- or deployment-scoped
 environment variables, connections, Airflow variables, and metrics exports.
 

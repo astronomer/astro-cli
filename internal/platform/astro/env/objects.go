@@ -111,6 +111,14 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 		if err != nil {
 			return nil, err
 		}
+		// A missing id has to report ErrNotFound like a missing key does.
+		// Returning the raw server message meant errors.Is(…, ErrNotFound)
+		// was false on this branch, so an upsert would not fall through to
+		// create and --no-create would not explain itself — for exactly half
+		// the inputs `set <id-or-key>` advertises.
+		if resp.HTTPResponse != nil && resp.HTTPResponse.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%w: %s", ErrNotFound, idOrKey)
+		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, err
 		}

@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	envLinkNoCreate     bool
 	envLinkVariableID   string
 	envLinkVariableKey  string
 	envLinkDeploymentID string
@@ -20,13 +21,20 @@ var (
 
 const envVarLinkExamples = `
   # link a workspace variable to a deployment
-  astro env variable link create --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id>
+  astro env variable link set --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id>
 
   # link with a per-deployment override value
-  astro env variable link create --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id> --value postgres://prod
+  astro env variable link set --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id> --value postgres://prod
+
+  # drop that override, keeping the link (one command: the link's override is
+  # whatever --value says, and saying nothing means it has none)
+  astro env variable link set --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id>
+
+  # refuse to create the link if it is not already there
+  astro env variable link set --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id> --value x --no-create
 
   # exclude a deployment from an auto-linked variable
-  astro env variable link create --variable-key LOG_LEVEL --workspace-id <ws-id> --deployment-id <dep-id> --exclude
+  astro env variable link set --variable-key LOG_LEVEL --workspace-id <ws-id> --deployment-id <dep-id> --exclude
 
   # remove a link (or an exclude, with --exclude)
   astro env variable link delete --variable-key DATABASE_URL --workspace-id <ws-id> --deployment-id <dep-id>
@@ -40,11 +48,16 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 		Use:     "link",
 		Aliases: []string{"links"},
 		Short:   "Manage deployment links for workspace variables",
-		Long:    "Create, delete, or list the explicit per-deployment links (and auto-link excludes) of a workspace-scoped environment variable. Identify the variable with --variable-id or --variable-key.",
+		Long:    "Set, delete, or list the explicit per-deployment links (and auto-link excludes) of a workspace-scoped environment variable. Identify the variable with --variable-id or --variable-key.",
 		Example: envVarLinkExamples,
+
+		Args:                       cobra.ArbitraryArgs,
+		RunE:                       helpOrUnknownSubcommand,
+		SuggestionsMinimumDistance: 2,
 	}
 	cmd.AddCommand(
-		newEnvVarLinkCreateCmd(out),
+		newEnvVarLinkSetCmd(out),
+		newRemovedLinkCreateCmd(),
 		newEnvVarLinkDeleteCmd(out),
 		newEnvVarLinkListCmd(out),
 	)
@@ -73,24 +86,42 @@ func linkVariableIDOrKey() (string, error) {
 	return "", errors.New("--variable-id or --variable-key cannot be empty")
 }
 
-func newEnvVarLinkCreateCmd(out io.Writer) *cobra.Command {
+// newRemovedLinkCreateCmd is the `link create` tombstone. The nouns' stub
+// cannot serve here: its guidance names `set <id-or-key>`, and a link is
+// addressed by two flags rather than a positional.
+func newRemovedLinkCreateCmd() *cobra.Command {
+	return removedVerbStub("create", []string{"cr"}, func([]string) string {
+		return "`astro env variable link create` was removed in v2.\n" +
+			"  use:  astro env variable link set --variable-key <key> --deployment-id <id>\n" +
+			"`set` links the deployment when it is not linked and updates the link when it is. " +
+			"It also treats --value as the whole override, so omitting it now CLEARS an existing " +
+			"override rather than leaving it in place — which is how one is removed. " +
+			"Pass --no-create to fail instead of linking."
+	})
+}
+
+func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create",
-		Aliases: []string{"cr"},
-		Short:   "Link a workspace variable to a deployment, optionally with an override",
+		Use:   "set",
+		Short: "Set a workspace variable's link to a deployment, with or without an override",
 		Long: `Attach a workspace-scoped environment variable to a specific deployment.
 If --value is provided, that value overrides the workspace default for the linked deployment only.
 Pass --exclude to add the deployment to the excludeLinks list instead (used with --auto-link to opt specific deployments out).
 
-Upsert semantics: if not already linked, the link is created; if already linked, the override is replaced when --value is passed. Re-running without --value is a no-op for an existing link's override (the platform preserves fields omitted from a link entry). To remove an existing override, delete the link then re-create it without --value.`,
+Set semantics, the same as ` + "`set`" + ` on the object nouns: the link is created when it is not there and updated when it is, and --value describes the whole override. Saying nothing means the link has no override, so running this against a link that has one CLEARS it — which is how an override is removed now, in place of the old delete-then-recreate. Pass --no-create to fail instead of creating a link that does not exist.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarLinkCreate(cmd, out)
+			return runEnvVarLinkSet(cmd, out)
 		},
 	}
 	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to link (required)")
-	cmd.Flags().StringVar(&envLinkValue, "value", "", "Override value to use for the linked deployment (only the linked deployment sees this value)")
+	cmd.Flags().StringVar(&envLinkValue, "value", "", "Override value for the linked deployment only. Omit it and the link has no override, clearing any it had.")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Add to excludeLinks instead of links (auto-link only)")
+	cmd.Flags().BoolVar(&envLinkNoCreate, "no-create", false, "Fail if the deployment is not already linked, instead of linking it")
+	// --exclude takes a different path entirely (the platform's exclude-linking
+	// endpoint), which has no create/update distinction for --no-create to
+	// govern. Accepting the pair would have silently ignored the guard.
+	cmd.MarkFlagsMutuallyExclusive("exclude", "no-create")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.MarkFlagsMutuallyExclusive("value", "exclude")
 	return cmd
@@ -126,7 +157,7 @@ func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func runEnvVarLinkCreate(cmd *cobra.Command, out io.Writer) error {
+func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
@@ -148,13 +179,13 @@ func runEnvVarLinkCreate(cmd *cobra.Command, out io.Writer) error {
 	if cmd.Flags().Changed("value") {
 		override = &envLinkValue
 	}
-	if err := env.LinkVar(idOrKey, scope, envLinkDeploymentID, override, astroV1Client); err != nil {
+	if err := env.LinkVar(idOrKey, scope, envLinkDeploymentID, override, envLinkNoCreate, astroV1Client); err != nil {
 		return err
 	}
 	if override != nil {
 		fmt.Fprintf(out, "Linked %s to deployment %s (override value applied)\n", idOrKey, envLinkDeploymentID)
 	} else {
-		fmt.Fprintf(out, "Linked %s to deployment %s\n", idOrKey, envLinkDeploymentID)
+		fmt.Fprintf(out, "Linked %s to deployment %s (no override)\n", idOrKey, envLinkDeploymentID)
 	}
 	return nil
 }
