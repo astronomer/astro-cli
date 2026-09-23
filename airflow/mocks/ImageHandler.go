@@ -124,6 +124,34 @@ func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string,
 	return r0, r1
 }
 
+// HasEnvVarWithPrefix provides a mock function with given fields: altImageName, prefix
+func (_m *ImageHandler) HasEnvVarWithPrefix(altImageName string, prefix string) (bool, error) {
+	ret := _m.Called(altImageName, prefix)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasEnvVarWithPrefix")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string) (bool, error)); ok {
+		return rf(altImageName, prefix)
+	}
+	if rf, ok := ret.Get(0).(func(string, string) bool); ok {
+		r0 = rf(altImageName, prefix)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(altImageName, prefix)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListLabels provides a mock function with no fields
 func (_m *ImageHandler) ListLabels() (map[string]string, error) {
 	ret := _m.Called()
