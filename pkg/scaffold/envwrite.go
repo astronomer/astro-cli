@@ -3,12 +3,15 @@ package scaffold
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
@@ -139,6 +142,37 @@ func RemoveEnvDeclaration(dir string, wrap func(run func() error) error, section
 		}
 		return nil
 	}, noNewEnvProblems)
+}
+
+// EnvDeclarationKey reports the key name is declared under in section of the
+// pyproject.toml in dir, found the way EditEnvDeclaration and
+// RemoveEnvDeclaration find it: name as given, then case-insensitively for a
+// variable key or connection id, then the same for its folded form. A name
+// that is not declared reports the key a new declaration would be written
+// under, with declared false.
+//
+// It reads the file and does not judge it, so a caller can name a declaration
+// in a section that does not load. It is for reporting: an edit made after it
+// looks the name up again under its own wrapper.
+func EnvDeclarationKey(dir string, section envschema.Section, name string) (key string, declared bool, err error) {
+	folded, err := envschema.FoldName(section, name)
+	if err != nil {
+		return "", false, err
+	}
+	path := filepath.Join(dir, manifest.Marker)
+	src, err := fsatomic.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", false, fmt.Errorf("%w: %w", manifest.ErrNotFound, err)
+		}
+		return "", false, fmt.Errorf("reading %s: %w", path, err)
+	}
+	ed, err := tomledit.NewSurgical(src)
+	if err != nil {
+		return "", false, fmt.Errorf("reading %s: %w", path, err)
+	}
+	key, _, declared = findEnvDeclaration(ed, section, name, folded)
+	return key, declared, nil
 }
 
 func editEnvDeclaration(ed tomledit.Editor, section envschema.Section, names []string, edit EnvDeclarationEdit) error {

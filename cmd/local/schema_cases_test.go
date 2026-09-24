@@ -38,6 +38,7 @@ var publishedPayloads = []schemaCase{
 	{"dev-removed", devRemoved{}},
 	{"env-result", envResult{}},
 	{"env-value", envValue{}},
+	{"env-declaration", envDeclarationResult{}},
 	// `astro local env list --output json` streams one of these per value,
 	// then the whole slice in text mode. Found by recording what Emit
 	// actually receives during the command tests: it is declared in

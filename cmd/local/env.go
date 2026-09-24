@@ -234,7 +234,10 @@ func envKinds() []envKind {
   # show, list and delete
   astro local env variable get API_TOKEN
   astro local env variable list
-  astro local env variable delete API_TOKEN`,
+  astro local env variable delete API_TOKEN
+
+  # declare it in pyproject.toml, so a start requires it, and keep it in the vault
+  astro local env variable declare API_TOKEN --sensitive --description 'Token for the API'`,
 		},
 		{
 			aliases: []string{"conn", "connections"},
@@ -253,7 +256,10 @@ func envKinds() []envKind {
   # show, list and delete
   astro local env connection get db_main
   astro local env connection list
-  astro local env connection delete db_main`,
+  astro local env connection delete db_main
+
+  # declare it in pyproject.toml, resolved from the workspace when no file sets it
+  astro local env connection declare db_main --type postgres --source workspace`,
 		},
 		{
 			aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
@@ -268,13 +274,17 @@ func envKinds() []envKind {
   # show, list and delete
   astro local env airflow-variable get region
   astro local env airflow-variable list
-  astro local env airflow-variable delete region`,
+  astro local env airflow-variable delete region
+
+  # declare it with a committed default, or remove the declaration
+  astro local env airflow-variable declare region --default us-east-1
+  astro local env airflow-variable undeclare region`,
 		},
 	}
 }
 
 // newEnvKindCmd builds one noun with its verbs. Every noun carries the same
-// four, so what a user learns on one transfers to the others.
+// six, so what a user learns on one transfers to the others.
 func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
 		// The subcommand word comes from localenv.Noun, not a second copy here.
@@ -292,12 +302,16 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	}
 	// Reads, then the write, then the destructive one — the same order
 	// `astro env` uses for the same four verbs, so help reads the same
-	// whichever tree you are in. TestEnvVerbOrderMatchesTheCloudTree pins it.
+	// whichever tree you are in. The two declaration verbs, which the cloud
+	// tree has no counterpart for, follow them. TestEnvVerbOrderMatchesTheCloudTree
+	// pins it.
 	cmd.AddCommand(
 		newEnvListCmd(c, scope, k.kind, "List "+k.label+"s and where each resolves from"),
 		newEnvGetCmd(c, scope, k),
 		newEnvSetCmd(c, scope, k),
 		newEnvDeleteCmd(c, scope, k),
+		newEnvDeclareCmd(c, scope, k),
+		newEnvUndeclareCmd(c, scope, k),
 	)
 	return cmd
 }
