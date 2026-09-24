@@ -174,7 +174,41 @@ func TestDeployImageV2_ImageNameSkipsBuild(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployImageV2_NoDepsPullsBase(t *testing.T) {
+// containerdStore models Docker's containerd image store on a host whose
+// platform differs from the build's (an arm64 Mac building linux/amd64).
+//
+// `docker pull --platform linux/amd64 <base>` leaves the base's tag naming its
+// multi-platform index with only the amd64 variant local, and `docker image
+// inspect` without --platform then reads an empty config: no labels. A tag
+// produced by `docker build --platform linux/amd64` names that one platform,
+// and inspect reads its labels. So a label is only readable off a tag the fake
+// saw built.
+func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, handlers map[string]*mocks.ImageHandler) {
+	t.Helper()
+	cmd, _ = withImageSeams(t, runtimeVersion)
+	handlers = map[string]*mocks.ImageHandler{}
+	airflowImageHandler = func(name string) airflow.ImageHandler {
+		if h, ok := handlers[name]; ok {
+			return h
+		}
+		label := ""
+		if hasImageCall(cmd.calls, "build --tag "+name+" ") {
+			label = runtimeVersion
+		}
+		h := new(mocks.ImageHandler)
+		h.On("GetLabel", mock.Anything, runtimeImageLabel).Return(label, nil).Maybe()
+		h.On("Push", mock.Anything, registryUsername, mock.Anything, mock.Anything).Return("", nil).Maybe()
+		handlers[name] = h
+		return h
+	}
+	return cmd, handlers
+}
+
+// No deps and no packages: nothing to install, and the deploy still has to
+// read the runtime label and push a linux/amd64 image. Under the containerd
+// store a pulled base reads no labels, so this only succeeds when the deploy
+// builds a single-platform image at linux/amd64 and inspects and pushes that.
+func TestDeployImageV2_NothingToInstallBuildsASinglePlatformImage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
@@ -183,20 +217,25 @@ func TestDeployImageV2_NoDepsPullsBase(t *testing.T) {
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
-	cmd, _ := withImageSeams(t, "7.0.0")
+	cmd, handlers := containerdStore(t, "7.0.0")
 
-	// No deps and no packages: the builder installs nothing and hands back the
-	// runtime base, so the deploy must pull it to make it local before pushing.
+	dir := v2ProjectDir(t)
 	res, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
+		ProjectDir:     dir,
 		DeploymentID:   "test-deployment-id",
 		AirflowVersion: "3.1",
+		Dependencies:   []string{"apache-airflow==3.1.*"},
 		IncludeDags:    false,
 	}, client)
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
-	assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing to install must skip the build, got %v", cmd.calls)
-	assert.True(t, hasImageCall(cmd.calls, "pull --platform linux/amd64 astrocrpublic.azurecr.io/runtime:3.1"), "the base must be pulled, got %v", cmd.calls)
+
+	tag := deployImageTag(dir)
+	assert.True(t, hasImageCall(cmd.calls, "build --tag "+tag+" "), "nothing to install still builds, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "at linux/amd64, got %v", cmd.calls)
+	assert.False(t, hasImageCall(cmd.calls, "docker pull"), "a pulled base is not what ships, got %v", cmd.calls)
+	require.Contains(t, handlers, tag, "the built tag is what is inspected and pushed")
+	handlers[tag].AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
 	client.AssertExpectations(t)
 }
 
@@ -312,6 +351,7 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 		AirflowVersion: "3.1",
 		Dependencies:   []string{"pandas"},
 		Dockerfile:     "docker/Dockerfile",
+		BuildSecrets:   []string{"id=tok,env=TOK"},
 		IncludeDags:    true,
 	}, client)
 	require.NoError(t, err)
@@ -319,6 +359,8 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 	declared := filepath.Join(dir, "docker", "Dockerfile")
 	assert.True(t, hasImageCall(cmd.calls, "--file "+declared),
 		"the declared file has to be the build, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, "--secret id=tok,env=TOK"),
+		"a --build-secret reaches a declared Dockerfile's build, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"),
 		"a deploy build stays linux/amd64 in Dockerfile mode too, got %v", cmd.calls)
 	// The base is never resolved in this mode, so nothing is pulled for it.

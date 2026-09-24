@@ -43,11 +43,13 @@ import (
 const RuntimeImageRepo = "astrocrpublic.azurecr.io/runtime"
 
 // RuntimeImage maps an Airflow version to the runtime base image a build starts
-// FROM. The version arrives resolved by the caller — a pinned runtime tag
-// ("3.1-2") or a floating one ("3.1") — and is used as the tag directly. Only
-// Airflow 3 ships as Astro Runtime 3, so anything else is refused; the built
-// image's io.astronomer label gives back the exact version. Both the local
-// Docker engine and the deploy path resolve the base this way.
+// FROM. The version is a manifest's `airflow` pin, reduced to its series by
+// AirflowSeries: "3.1" and "3.1.2" both build FROM runtime:3.1, and a pinned
+// runtime tag ("3.1-2") passes through as the tag. A bare major ("3") is
+// refused, naming the pin. Only Airflow 3 ships as Astro Runtime 3, so anything
+// else is refused; the built image's io.astronomer label gives back the exact
+// version. Deploy, `astro package astro` and the local Docker engine's Airflow 3
+// path all resolve the base this way.
 func RuntimeImage(airflowVersion string) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {
@@ -56,7 +58,35 @@ func RuntimeImage(airflowVersion string) (string, error) {
 	if major, _, _ := strings.Cut(v, "."); major != "3" {
 		return "", fmt.Errorf("only Airflow 3 is supported in this release, not %q", v)
 	}
-	return RuntimeImageRepo + ":" + v, nil
+	series, ok := AirflowSeries(v)
+	if !ok {
+		return "", fmt.Errorf("the airflow pin %q in pyproject.toml names no minor version, so there is no runtime image to build from. Set airflow under [tool.astro] to a series such as \"3.1\"", v)
+	}
+	return RuntimeImageRepo + ":" + series, nil
+}
+
+// AirflowSeries reduces a manifest's `airflow` pin to the MAJOR.MINOR series a
+// runtime image is published under, and reports whether the pin named one.
+//
+// pkg/manifest accepts "3", "3.1" and "3.1.2" as pins, but the runtime image
+// tag is built by concatenation, and runtime:3.1.2 and runtime:3 are not
+// published tags. Used as written, either fails the build with a registry
+// manifest-not-found that says nothing about the manifest.
+//
+// So a patch pin resolves to its series: the patch is decided by the image the
+// series tag serves, as it is for a Dockerfile's `FROM runtime:3.1`. A pin
+// naming only a major returns ok=false, because there is no series to choose
+// and guessing one would silently move a project between Airflow minors.
+//
+// Whitespace around the pin is trimmed, and the minor segment is kept whole,
+// so a runtime tag such as "3.1-2" is its own series. Policy (which
+// generations are accepted) stays with the caller.
+func AirflowSeries(pin string) (series string, ok bool) {
+	parts := strings.Split(strings.TrimSpace(pin), ".")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", false
+	}
+	return parts[0] + "." + parts[1], true
 }
 
 const (
@@ -90,14 +120,15 @@ type Commander interface {
 	Run(ctx context.Context, env []string, s rt.Stdio, name string, args ...string) error
 }
 
-// Request describes an image to build from a manifest's fields. It carries no
-// localdocker or deploy types, so either caller can fill it.
 // filePermRW is the mode for the files written into the build context:
 // owner read/write. Was pkg/proxy's FilePermRW, borrowed for the constant alone —
 // a file mode is not a contract worth a module dependency, and taking one on the
 // proxy from an image builder was coupling with nothing behind it.
 const filePermRW = 0o600
 
+// Request describes an image to build from a manifest's fields. It carries no
+// localdocker or deploy types, so either caller can fill it. ForManifest fills
+// the fields that decide which image a manifest builds.
 type Request struct {
 	// WorkDir is the directory the build context and Dockerfile are written
 	// under; the caller owns its location and lifetime. Unused in Dockerfile
@@ -114,7 +145,7 @@ type Request struct {
 	// `FROM <base>` and the install happens in the runtime image's own ONBUILD
 	// triggers, so there is no RUN of the project's for a secret to be mounted
 	// into. Callers refuse the combination rather than passing secrets that
-	// could not be read — see cmd/cloud's v2 deploy.
+	// could not be read; FromDeclaredDockerfile is the check.
 	//
 	// The SPEC is forwarded, never a secret value: docker reads the value itself
 	// from the src file or the named env var. So these strings are safe in a
@@ -193,6 +224,13 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // Build output streams to cb.OnLine (component "build"); a failed build returns
 // a named error, never a hang.
 func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (string, error) {
+	return b.buildImage(ctx, req, cb, true)
+}
+
+// buildImage is Build, with the generated mode's fast path optional: with
+// fastPath false a request with nothing to install still builds, producing
+// req.Tag over the base rather than returning the base itself.
+func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, fastPath bool) (string, error) {
 	if req.Dockerfile != "" {
 		// Checked here rather than in each caller, because this is where they
 		// meet: localdocker reaches it through the rt.ImageBuilder seam, and
@@ -220,7 +258,7 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 	deps := runtimeDeps(req.Dependencies)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is.
-	if len(deps) == 0 && len(req.Packages) == 0 {
+	if fastPath && len(deps) == 0 && len(req.Packages) == 0 {
 		return req.BaseImage, nil
 	}
 
@@ -282,7 +320,7 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	// secret has nothing of the project's to be mounted into. Callers refuse the
 	// combination; this makes the invariant hold whether or not they do, rather
 	// than handing docker a flag that cannot work.
-	if req.Dockerfile != "" {
+	if req.FromDeclaredDockerfile() {
 		for _, secret := range req.Secrets {
 			args = append(args, "--secret", secret)
 		}

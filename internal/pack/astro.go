@@ -32,10 +32,14 @@ const (
 var ErrNoDocker = errors.New("building the astro package image needs Docker, but no engine is reachable; start Docker and try again (a dags-only `astro deploy --dags` needs no Docker, and remote builds are coming)")
 
 // ImageBuilder builds a deployable image from a manifest's fields. It is the
-// seam onto internal/imagebuild; *imagebuild.Builder satisfies it, and a test
+// seam onto pkg/imagebuild; *imagebuild.Builder satisfies it, and a test
 // substitutes a fake that never touches a daemon.
+//
+// BuildLocal rather than Build: the target inspects, tags and saves the image
+// it gets back, so it has to be a single-platform image in the local store,
+// built at the requested platform even when there is nothing to install.
 type ImageBuilder interface {
-	Build(ctx context.Context, req imagebuild.Request, cb localrt.Callbacks) (string, error)
+	BuildLocal(ctx context.Context, req imagebuild.Request, cb localrt.Callbacks) (string, error)
 }
 
 // AstroTarget builds the Astro artifact: a container image over Astronomer's
@@ -75,22 +79,20 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, errors.New("the project has no name; set [project] name in pyproject.toml")
 	}
 	airflowVersion := req.Manifest.Astro.AirflowVersion
-	// A declared Dockerfile IS the build, so no base is resolved for it — the
-	// same rule local docker mode and deploy follow. Without this, packaging a
-	// tier-3 project produced an artifact built over the runtime base with none
-	// of the project's own build in it.
-	declared := ""
-	if req.Manifest.Astro.Dockerfile != "" {
-		declared = filepath.Join(req.ProjectDir, filepath.FromSlash(req.Manifest.Astro.Dockerfile))
+	// Which image the manifest builds is imagebuild's rule, the one deploy
+	// follows too, so the artifact is the image a deploy of the same project
+	// would build.
+	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuild{
+		ProjectDir:     req.ProjectDir,
+		AirflowVersion: airflowVersion,
+		Dockerfile:     req.Manifest.Astro.Dockerfile,
+		Dependencies:   req.Manifest.Project.Dependencies,
+		Packages:       req.Manifest.Astro.Packages,
+	})
+	if err != nil {
+		return Result{}, err
 	}
-	base := ""
-	if declared == "" {
-		var err error
-		base, err = imagebuild.RuntimeImage(airflowVersion)
-		if err != nil {
-			return Result{}, err
-		}
-	}
+	declared := breq.Dockerfile
 
 	// The astro artifact is an image, so Docker is required. Probe the engine up
 	// front for a plain message rather than an opaque build failure.
@@ -98,9 +100,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, ErrNoDocker
 	}
 
-	deps := req.Manifest.Project.Dependencies
-	packages := req.Manifest.Astro.Packages
-	hash, err := contentHash(base, req.Platform, deps, packages, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -119,32 +119,22 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		defer os.RemoveAll(workDir) //nolint:errcheck // scratch dir; a leftover temp dir is harmless
 	}
 
-	// Build into a source-hash working tag. With nothing to install the builder
-	// returns the base image unchanged, so `built` is whichever image the final
-	// tag should point at.
+	// Build into a source-hash working tag, which BuildLocal always returns:
+	// with nothing to install it still builds the one-line image over the base.
 	workingTag := fmt.Sprintf("astro-package/%s:src-%s", name, hash)
-	built, err := t.builder.Build(ctx, imagebuild.Request{
-		WorkDir:      workDir,
-		BaseImage:    base,
-		Tag:          workingTag,
-		Dependencies: deps,
-		Packages:     packages,
-		// Set together: Dockerfile mode builds the project's file against the
-		// project as context, and imagebuild ignores Dependencies and Packages
-		// there rather than rejecting them.
-		Dockerfile: declared,
-		Context:    dockerfileContext(declared, req.ProjectDir),
-		Platform:   req.Platform,
-		Bin:        t.bin,
-		Env:        t.env,
-	}, cb)
+	breq.WorkDir = workDir
+	breq.Tag = workingTag
+	breq.Platform = req.Platform
+	breq.Bin = t.bin
+	breq.Env = t.env
+	built, err := t.builder.BuildLocal(ctx, breq, cb)
 	if err != nil {
 		return Result{}, err
 	}
-	// The builder tags the image under workingTag only when it actually builds;
-	// with nothing to install it returns the base image untouched. Drop the
-	// working tag once the final names point at the image, so package leaves a
-	// clean set of tags — best effort, an orphaned tag is harmless.
+	// Drop the working tag once the final names point at the image, so package
+	// leaves a clean set of tags. Best effort; an orphaned tag is harmless.
+	// Compared rather than assumed, so a builder that returns another reference
+	// never has that reference untagged.
 	if built == workingTag {
 		defer t.untag(ctx, workingTag)
 	}
@@ -402,18 +392,4 @@ func contentHash(base, platform string, deps, packages []string, df declaredDock
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
-}
-
-// dockerfileContext is the build context for a declared Dockerfile, and empty
-// for a generated build (which builds its own context under WorkDir).
-//
-// Paired in one function because the two fields are only correct together:
-// Context without Dockerfile changes nothing, and Dockerfile without Context
-// builds the project's file against imagebuild's generated directory, where none
-// of the project's own COPY paths exist.
-func dockerfileContext(declared, projectDir string) string {
-	if declared == "" {
-		return ""
-	}
-	return projectDir
 }

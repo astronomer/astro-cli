@@ -54,6 +54,15 @@ func TestLocalRuntimeImageAirflow3IsUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1", ref)
 	assert.Zero(t, *calls, "Airflow 3 resolves from the pin alone, with no lookup")
+
+	// Docker-mode local start takes the series rule with deploy: a patch pin
+	// builds FROM its series and a bare major is refused.
+	ref, err = LocalRuntimeImage(t.Context(), "3.1.2", cache)
+	require.NoError(t, err)
+	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1", ref)
+	_, err = LocalRuntimeImage(t.Context(), "3", cache)
+	assert.ErrorContains(t, err, "airflow pin")
+	assert.Zero(t, *calls)
 }
 
 func TestLocalRuntimeImageAirflow2(t *testing.T) {

@@ -196,6 +196,51 @@ func TestRuntimeImage(t *testing.T) {
 	assert.ErrorContains(t, err, "no Airflow version")
 }
 
+// A manifest pin builds FROM its series: runtime:3.1.2 and runtime:3 are not
+// published tags.
+func TestRuntimeImageBuildsFromThePinsSeries(t *testing.T) {
+	for _, tc := range []struct{ pin, want string }{
+		{"3.1.2", RuntimeImageRepo + ":3.1"},
+		{"3.1", RuntimeImageRepo + ":3.1"},
+		{" 3.1.2 ", RuntimeImageRepo + ":3.1"},
+		{"3.10.1", RuntimeImageRepo + ":3.10"},
+	} {
+		ref, err := RuntimeImage(tc.pin)
+		require.NoError(t, err, "pin %q", tc.pin)
+		assert.Equal(t, tc.want, ref, "pin %q", tc.pin)
+	}
+}
+
+// A bare major names no series, and the refusal names the manifest's pin
+// rather than leaving a registry error to explain it.
+func TestRuntimeImageRefusesABareMajorNamingThePin(t *testing.T) {
+	for _, pin := range []string{"3", " 3 ", "3."} {
+		_, err := RuntimeImage(pin)
+		require.Error(t, err, "pin %q", pin)
+		assert.Contains(t, err.Error(), "airflow pin", "pin %q", pin)
+		assert.Contains(t, err.Error(), "pyproject.toml", "pin %q", pin)
+	}
+}
+
+func TestAirflowSeries(t *testing.T) {
+	for pin, want := range map[string]string{
+		"3.1.2":   "3.1",
+		"3.1":     "3.1",
+		"\t3.1.2": "3.1",
+		"2.9.3":   "2.9",
+		"3.1-2":   "3.1-2",
+	} {
+		got, ok := AirflowSeries(pin)
+		assert.True(t, ok, "pin %q", pin)
+		assert.Equal(t, want, got, "pin %q", pin)
+	}
+	for _, pin := range []string{"", "3", "3.", ".1", "  "} {
+		got, ok := AirflowSeries(pin)
+		assert.False(t, ok, "pin %q", pin)
+		assert.Empty(t, got, "pin %q", pin)
+	}
+}
+
 func TestBuildPassesPlatform(t *testing.T) {
 	cmd := &fakeCmd{}
 	req := testRequest(t)

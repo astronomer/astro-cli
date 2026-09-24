@@ -209,8 +209,8 @@ func uploadDeployDags(projectDir, deploymentID string, dep *astrov1.Deployment, 
 
 // prepareDeployImage returns the local image to push and its runtime version.
 // With a prebuilt image (--image-name) it validates the image exists locally and
-// carries a runtime label; otherwise it resolves the runtime base from the
-// manifest's Airflow pin and builds linux/amd64 through internal/imagebuild.
+// carries a runtime label; otherwise it builds linux/amd64 from the manifest
+// through pkg/imagebuild's ForManifest.
 func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebuild.Commander, bin string, env []string) (localImage, runtimeVersion string, err error) {
 	if in.ImageName != "" {
 		// A registry image name says nothing about its base, so read the label
@@ -226,19 +226,17 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebu
 		return in.ImageName, version, nil
 	}
 
-	// A declared Dockerfile IS the build, so no base is resolved for it: asking
-	// the version service for an image we would not use turns a working deploy
-	// into a network dependency, the same reason localdocker skips it.
-	declared := ""
-	if in.Dockerfile != "" {
-		declared = filepath.Join(in.ProjectDir, filepath.FromSlash(in.Dockerfile))
-	}
-	base := ""
-	if declared == "" {
-		base, err = imagebuild.RuntimeImage(in.AirflowVersion)
-		if err != nil {
-			return "", "", err
-		}
+	// Which image the manifest builds is imagebuild's rule, shared with every
+	// other consumer that builds from a manifest.
+	req, err := imagebuild.ForManifest(imagebuild.ManifestBuild{
+		ProjectDir:     in.ProjectDir,
+		AirflowVersion: in.AirflowVersion,
+		Dockerfile:     in.Dockerfile,
+		Dependencies:   in.Dependencies,
+		Packages:       in.Packages,
+	})
+	if err != nil {
+		return "", "", err
 	}
 	workDir, err := os.MkdirTemp("", "astro-deploy-build-*")
 	if err != nil {
@@ -246,34 +244,18 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebu
 	}
 	defer os.RemoveAll(workDir) //nolint:errcheck // best-effort cleanup of a temp dir
 
-	tag := deployImageTag(in.ProjectDir)
-	built, err := imagebuild.New(cmd, buildNow).Build(ctx, imagebuild.Request{
-		WorkDir:      workDir,
-		BaseImage:    base,
-		Tag:          tag,
-		Dependencies: in.Dependencies,
-		Packages:     in.Packages,
-		// Set together or not at all: Dockerfile mode needs the project as its
-		// context, and imagebuild ignores Dependencies and Packages there rather
-		// than rejecting them, so they are handed over either way.
-		Dockerfile: declared,
-		Context:    contextFor(declared, in.ProjectDir),
-		Secrets:    in.BuildSecrets,
-		Platform:   deployImagePlatformSupport[0],
-		Bin:        bin,
-		Env:        env,
-	}, localrt.Callbacks{})
+	req.WorkDir = workDir
+	req.Tag = deployImageTag(in.ProjectDir)
+	req.Secrets = in.BuildSecrets
+	req.Platform = deployImagePlatformSupport[0]
+	req.Bin = bin
+	req.Env = env
+	// BuildLocal, not Build: the image is inspected, tagged and pushed next, so
+	// it has to be a single-platform image in the local store even when there
+	// is nothing to install. See BuildLocal for why a pulled base is not.
+	built, err := imagebuild.New(cmd, buildNow).BuildLocal(ctx, req, localrt.Callbacks{})
 	if err != nil {
 		return "", "", err
-	}
-	// With nothing to install the builder returns the base tag unbuilt, so pull
-	// it to make it local before we tag, inspect, and push it. Dockerfile mode
-	// has no base and never takes that path, and `built == base` would be true
-	// of two empty strings — so it is gated on there being a base at all.
-	if base != "" && built == base {
-		if err := cmd.Run(ctx, env, localrt.Stdio{}, bin, "pull", "--platform", deployImagePlatformSupport[0], base); err != nil {
-			return "", "", fmt.Errorf("pulling the runtime base image %s: %w", base, err)
-		}
 	}
 
 	version, err := airflowImageHandler(built).GetLabel("", runtimeImageLabel)
@@ -284,29 +266,14 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebu
 		// Two different mistakes, so two different messages. A generated build
 		// missing the label means the base we chose is wrong, which is ours. A
 		// declared Dockerfile missing it means the user's own FROM is not an
-		// Astro Runtime — naming `base` there would name an empty string and
-		// send them at a decision they did not make.
-		if declared != "" {
+		// Astro Runtime, and naming the base there would name an empty string
+		// and send them at a decision they did not make.
+		if req.FromDeclaredDockerfile() {
 			return "", "", fmt.Errorf("the image built from %s is missing the %s label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image", in.Dockerfile, runtimeImageLabel)
 		}
-		return "", "", fmt.Errorf("the built image is missing the %s label; the runtime base %s should carry it", runtimeImageLabel, base)
+		return "", "", fmt.Errorf("the built image is missing the %s label; the runtime base %s should carry it", runtimeImageLabel, req.BaseImage)
 	}
 	return built, version, nil
-}
-
-// contextFor is the build context for a declared Dockerfile, and empty for a
-// generated build (which builds its own context under WorkDir).
-//
-// A function rather than an inline conditional because setting Context without
-// Dockerfile silently changes nothing and setting Dockerfile without Context
-// builds the project's file against imagebuild's generated directory, where none
-// of the project's own COPY paths exist. Pairing them in one place is the only
-// way they cannot drift apart.
-func contextFor(declared, projectDir string) string {
-	if declared == "" {
-		return ""
-	}
-	return projectDir
 }
 
 // deployImageTag is the local tag the built deploy image carries. It appends a

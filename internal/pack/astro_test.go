@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ type fakeBuilder struct {
 	err     error
 }
 
-func (f *fakeBuilder) Build(_ context.Context, req imagebuild.Request, _ localrt.Callbacks) (string, error) {
+func (f *fakeBuilder) BuildLocal(_ context.Context, req imagebuild.Request, _ localrt.Callbacks) (string, error) {
 	f.mu.Lock()
 	f.gotReq = req
 	f.mu.Unlock()
@@ -46,12 +47,20 @@ func (f *fakeBuilder) Build(_ context.Context, req imagebuild.Request, _ localrt
 // call, answers `image inspect` with a canned runtime label, and can fail a
 // chosen verb. A `save` writes a small file so the size path has something to
 // stat.
+//
+// With containerd set it models Docker's containerd image store on a host of
+// another platform: only a tag the fake saw built (or tagged from a built one)
+// reads its labels, and any other ref, such as a base pulled at a foreign
+// platform, inspects with no labels, the way `docker image inspect` without
+// --platform reads the host's missing variant of a multi-platform index.
 type fakeDocker struct {
 	mu         sync.Mutex
 	calls      [][]string
 	inspectOut string
 	failVerb   string
 	failErr    error
+	containerd bool
+	built      map[string]bool
 }
 
 func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name string, args ...string) error {
@@ -68,10 +77,29 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 		}
 		return errors.New("fake docker failure")
 	}
+	f.mu.Lock()
+	if f.built == nil {
+		f.built = map[string]bool{}
+	}
+	switch {
+	case verb == "build" && len(args) > 2 && args[1] == "--tag":
+		f.built[args[2]] = true
+	case verb == "tag" && len(args) == 3:
+		f.built[args[2]] = f.built[args[1]]
+	}
+	f.mu.Unlock()
 	switch {
 	case verb == "image" && len(args) > 1 && args[1] == "inspect":
+		ref := args[len(args)-1]
+		f.mu.Lock()
+		readable := !f.containerd || f.built[ref]
+		f.mu.Unlock()
 		if s.Out != nil {
-			io.WriteString(s.Out, f.inspectOut)
+			if readable {
+				io.WriteString(s.Out, f.inspectOut)
+			} else {
+				io.WriteString(s.Out, "<no value>\t<no value>")
+			}
 		}
 	case verb == "save":
 		// args: save --output <path> <ref>
@@ -145,6 +173,54 @@ func TestAstroBuildTagShape(t *testing.T) {
 	// The builder started FROM the resolved runtime base and pinned the platform.
 	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1", builder.gotReq.BaseImage)
 	assert.Equal(t, "linux/amd64", builder.gotReq.Platform)
+}
+
+// The builder receives the manifest's build: the pin's base, its dependencies
+// and its OS packages.
+func TestAstroBuildHandsTheManifestBuildToTheBuilder(t *testing.T) {
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1", builder.gotReq.BaseImage)
+	assert.Equal(t, []string{"apache-airflow==3.1.*", "pandas"}, builder.gotReq.Dependencies)
+	assert.Equal(t, []string{"libpq-dev"}, builder.gotReq.Packages)
+	assert.Empty(t, builder.gotReq.Dockerfile)
+}
+
+// With nothing to install the target still packages a single-platform image
+// built at the requested platform, not the base's multi-platform tag: under
+// the containerd store a pulled foreign-platform base inspects with no labels,
+// so the runtime version would silently fall back to the manifest pin and the
+// saved or pushed tag would be the index, not the one platform. Driven through
+// the real imagebuild.Builder over the fake docker, since the build is the
+// builder's and a fake builder would hide it.
+func TestAstroBuildWithNothingToInstallPackagesASinglePlatformImage(t *testing.T) {
+	req := testRequest(t)
+	req.Manifest.Project.Dependencies = []string{"apache-airflow==3.1.*"}
+	req.Manifest.Astro.Packages = nil
+
+	docker := &fakeDocker{inspectOut: "3.1-2", containerd: true}
+	target := newAstro(imagebuild.New(docker, time.Now), docker)
+	res, err := target.Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	calls := docker.callStrings()
+	assert.Equal(t, "3.1-2", res.RuntimeVersion, "the label is read off the built image, got calls %v", calls)
+	build, firstTag := -1, -1
+	for i, c := range calls {
+		if strings.HasPrefix(c, "docker build --tag astro-package/my-project:src-") && build < 0 {
+			build = i
+		}
+		if strings.HasPrefix(c, "docker tag ") && firstTag < 0 {
+			firstTag = i
+		}
+	}
+	require.GreaterOrEqual(t, build, 0, "nothing to install still builds, got %v", calls)
+	assert.Contains(t, calls[build], "--platform linux/amd64")
+	require.GreaterOrEqual(t, firstTag, 0, "the image must be tagged, got %v", calls)
+	assert.Less(t, build, firstTag, "the build must come before the tag, got %v", calls)
+	assert.False(t, hasCall(calls, "docker pull"), "a pulled base is not what ships, got %v", calls)
+	assert.False(t, hasCall(calls, "docker tag "+imagebuild.RuntimeImageRepo), "the base is never tagged as the artifact, got %v", calls)
 }
 
 func TestAstroBuildTagIsContentAddressed(t *testing.T) {
