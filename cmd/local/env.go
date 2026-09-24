@@ -38,10 +38,17 @@ const vaultFlagHelp = "Use the encrypted vault shared with Astro Desktop instead
 // value belongs to, --secret picks WHICH STORE holds it. They compose, so
 // `--global --secret` is a machine-wide secret and `--global` alone is a
 // machine-wide plaintext default.
+//
+// secretGiven records whether --secret was on the command line at all, which
+// the value of secret cannot say: `--secret=false` and no flag both leave it
+// false, and only the first is a request for a plain file. set refuses that
+// request for a name the manifest declares sensitive, and the way to keep an
+// undeclared connection or Airflow variable out of the vault; see routeSet.
 type scopeFlags struct {
-	project bool
-	global  bool
-	secret  bool
+	project     bool
+	global      bool
+	secret      bool
+	secretGiven bool
 }
 
 // valueStore is the one store a set/get/delete acts on: a plain dotenv file or
@@ -54,6 +61,10 @@ type scopeFlags struct {
 type valueStore interface {
 	Set(kind localenv.Kind, name, value string) (string, error)
 	Get(kind localenv.Kind, name string) (string, bool, error)
+	// Has reports whether the store holds a value for (kind, name) without
+	// decrypting one, so a read can pick between two stores without opening
+	// the keyring for the one it does not use.
+	Has(kind localenv.Kind, name string) (bool, error)
 	Delete(kind localenv.Kind, name string) (bool, error)
 	// ScopeName is the tier, for the confirmation message.
 	ScopeName() localenv.Scope
@@ -74,6 +85,11 @@ type fileStore struct{ *localenv.Store }
 func (f fileStore) ScopeName() localenv.Scope { return f.Scope }
 func (f fileStore) Location() string          { return f.Path }
 func (f fileStore) DotenvPath() string        { return f.Path }
+
+func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
+	_, ok, err := f.Get(kind, name)
+	return ok, err
+}
 
 // setInput carries the shared value-source flags for `set`.
 type setInput struct {
@@ -292,7 +308,11 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	long := "Set " + k.article + " " + k.label + ", creating it if it does not exist.\n\n" +
 		"The value comes from a prompt with echo off, --stdin, or --value; never a bare\n" +
 		"argument, which would land in shell history. --secret stores it in the vault\n" +
-		"shared with Astro Desktop, which needs an OS keyring."
+		"shared with Astro Desktop, which needs an OS keyring.\n\n" +
+		"Connections and Airflow variables go to the vault by default; --secret=false\n" +
+		"keeps one in a plain file. An environment variable goes to the vault when\n" +
+		"the project's pyproject.toml declares it sensitive. --secret=false is refused\n" +
+		"for a declared-sensitive name."
 	if k.kind == localenv.KindConn {
 		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type,\n" +
 			"--host and the rest."
@@ -303,11 +323,18 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Long:  long,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			scope.secretGiven = cmd.Flags().Changed("secret")
+			// The route is decided before the value is read, so a save the
+			// manifest will refuse fails before prompting for a credential.
+			route, err := c.routeSet(scope, k.kind, args[0])
+			if err != nil {
+				return err
+			}
 			value, err := c.readSetValue(cmd, in, fields, k.kind, args[0])
 			if err != nil {
 				return err
 			}
-			return c.runEnvSet(scope, k.kind, args[0], value)
+			return c.runEnvSet(route, k.kind, args[0], value)
 		},
 	}
 	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
@@ -413,7 +440,10 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Use:   "get " + k.arg,
 		Short: "Show " + k.article + " " + k.label + " and where it resolves from",
 		Args:  cobra.ExactArgs(1),
-		RunE:  func(_ *cobra.Command, args []string) error { return c.runEnvGet(scope, k.kind, args[0]) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			scope.secretGiven = cmd.Flags().Changed("secret")
+			return c.runEnvGet(scope, k.kind, args[0])
+		},
 	}
 	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	return cmd
@@ -425,7 +455,10 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Aliases: []string{"rm"},
 		Short:   "Delete " + k.article + " " + k.label,
 		Args:    cobra.ExactArgs(1),
-		RunE:    func(_ *cobra.Command, args []string) error { return c.runEnvDelete(scope, k.kind, args[0]) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			scope.secretGiven = cmd.Flags().Changed("secret")
+			return c.runEnvDelete(scope, k.kind, args[0])
+		},
 	}
 	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	return cmd
@@ -476,17 +509,132 @@ type envValue struct {
 	Value  string        `json:"value"`
 }
 
-func (c *cli) runEnvSet(scope *scopeFlags, kind localenv.Kind, name, value string) error {
+// envRoute is the store choice a set acts on once the defaults and the manifest
+// have had their say: the flags as given, or the flags with the vault chosen.
+type envRoute struct {
+	scope *scopeFlags
+	// vaultedBecause says why the vault was chosen without --secret, as a
+	// clause for the messages ("is declared sensitive in <file>"), and is empty
+	// when the flags alone chose the store.
+	vaultedBecause string
+	// declared is true when that reason is a declaration, which --secret=false
+	// cannot override, rather than the default for the kind, which it can.
+	declared bool
+}
+
+// vaultsByDefault reports whether a kind goes to the vault when set without
+// --secret. Connections and Airflow variables do, whether or not the manifest
+// declares them, as they do in Astro Desktop: both routinely carry credentials,
+// and nothing outside Airflow reads them. A plain environment variable stays in
+// the .env file unless it is declared sensitive, since most are not secrets and
+// other tools read that file.
+func vaultsByDefault(kind localenv.Kind) bool {
+	return kind == localenv.KindConn || kind == localenv.KindVar
+}
+
+// routeSet decides the store for a set of one name:
+//
+//   - --secret: the vault, and the manifest is not read, since no declaration
+//     makes the vault more secret.
+//   - A connection or Airflow variable with no --secret flag: the vault, by
+//     default. The manifest is not read for this either.
+//   - A name the project's manifest declares sensitive: the vault, and
+//     --secret=false is refused. That flag is an explicit request for the
+//     plaintext file the declaration rules out. Declared connections count,
+//     because envschema makes every one of them sensitive.
+//   - Anything else, including an undeclared connection or Airflow variable
+//     with --secret=false, the escape hatch where there is no keyring: the
+//     plain file.
+//
+// Where the answer depends on the declarations and they do not read, the set is
+// refused rather than guessing. Treating an unreadable manifest as "nothing is
+// sensitive" decides the question from an answer that does not give it, and
+// the result is a declared credential in a plaintext file. `astro local start`
+// refuses the same project, so declining the save until it is fixed is the
+// smaller surprise. Outside a project there is no manifest to consult.
+func (c *cli) routeSet(scope *scopeFlags, kind localenv.Kind, name string) (envRoute, error) {
+	route := envRoute{scope: scope}
+	if scope.secret {
+		return route, nil
+	}
+	if vaultsByDefault(kind) && !scope.secretGiven {
+		return vaultRoute(scope, "is "+kindPhrase(kind)+", and those are stored in the vault by default", false), nil
+	}
+	projectDir, err := c.discoverProject()
+	if err != nil {
+		return route, nil //nolint:nilerr // outside a project there are no declarations; envStore reports a --project that needed one
+	}
+	manifestPath := filepath.Join(projectDir, project.Marker)
+	_, schema, err := c.loadManifestSchema(projectDir)
+	if err != nil {
+		return route, fmt.Errorf("cannot tell whether %s declares %s sensitive: %w", manifestPath, name, err)
+	}
+	spec, ok := declaredSpec(schema, kind, name)
+	if !ok || !spec.Sensitive {
+		return route, nil
+	}
+	if scope.secretGiven {
+		return route, plaintextRefusal(kind, name, manifestPath)
+	}
+	return vaultRoute(scope, "is declared sensitive in "+manifestPath, true), nil
+}
+
+func vaultRoute(scope *scopeFlags, because string, declared bool) envRoute {
+	vaulted := *scope
+	vaulted.secret = true
+	return envRoute{scope: &vaulted, vaultedBecause: because, declared: declared}
+}
+
+// kindPhrase names a vault-by-default kind with its article, for a sentence
+// about one name.
+func kindPhrase(kind localenv.Kind) string {
+	if kind == localenv.KindConn {
+		return "a connection"
+	}
+	return "an Airflow variable"
+}
+
+// plaintextRefusal is the error for `set --secret=false` on a declared-sensitive
+// name. A connection cannot be declared otherwise, so its message does not
+// offer the edit that would allow it.
+func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
+	if kind == localenv.KindConn {
+		return fmt.Errorf("connection %s is declared in %s, and a declared connection is always sensitive, "+
+			"so it can only be stored in the vault shared with Astro Desktop. Drop --secret=false to store it there",
+			name, manifestPath)
+	}
+	return fmt.Errorf("%s %s is declared sensitive in %s, so it can only be stored in the vault shared with Astro Desktop. "+
+		"Drop --secret=false to store it there, or remove `sensitive = true` from its declaration to keep it in a plain file",
+		localenv.Noun(kind), name, manifestPath)
+}
+
+func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
 	}
-	store, projectDir, err := c.envStore(scope)
+	store, projectDir, err := c.envStore(route.scope)
 	if err != nil {
 		return err
 	}
 	if _, err := store.Set(kind, name, value); err != nil {
+		switch {
+		case route.declared:
+			return fmt.Errorf("%s %s %s, so it is stored only in the vault: %w",
+				localenv.Noun(kind), name, route.vaultedBecause, err)
+		case route.vaultedBecause != "":
+			return fmt.Errorf("%s %s %s: %w", localenv.Noun(kind), name, route.vaultedBecause, err)
+		}
 		return err
+	}
+	if route.declared {
+		fmt.Fprintf(c.d.Stderr, "note: %s %s, so it was stored in the vault\n", name, route.vaultedBecause)
+	}
+	if err := c.removeOtherCopy(route.scope, kind, name); err != nil {
+		return err
+	}
+	if route.scope.global {
+		c.warnProjectShadows(route.scope, kind, name)
 	}
 	// Warn (on stderr, so json stdout stays clean) when a project .env would
 	// be tracked by git — the failure mode that actually leaks secrets.
@@ -502,28 +650,135 @@ func (c *cli) runEnvSet(scope *scopeFlags, kind localenv.Kind, name, value strin
 	})
 }
 
+// removeOtherCopy deletes the name from the store a set did not write, in the
+// same scope, so each name has one home per scope. Two copies are worse than
+// untidy: the project .env outranks the vault, so a plaintext copy left beside a
+// vaulted value keeps winning at start and keeps the credential in a file, and a
+// delete against one store leaves the other copy standing. Astro Desktop's
+// saves keep the same rule.
+//
+// The vault side needs no keyring for this: removing a vault entry deletes its
+// file, so a plain set on a machine with no keyring still succeeds. A vault that
+// cannot even be opened holds nothing to remove.
+func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string) error {
+	flipped := *scope
+	flipped.secret = !scope.secret
+	other, _, err := c.envStore(&flipped)
+	if err != nil {
+		return nil //nolint:nilerr // a store that cannot be opened holds no copy to remove
+	}
+	removed, err := other.Delete(kind, name)
+	if err != nil {
+		return fmt.Errorf("%s %s was set, but its other copy in %s could not be removed: %w",
+			localenv.Noun(kind), name, other.Location(), err)
+	}
+	if removed {
+		fmt.Fprintf(c.d.Stderr, "note: removed the other copy of %s from %s (%s)\n", name, other.ScopeName(), other.Location())
+	}
+	return nil
+}
+
+// warnProjectShadows warns, after a --global set inside a project, about a copy
+// of the name in the project scope: the project .env and the project vault both
+// outrank every global tier, so start keeps using that copy and the value just
+// set does not reach this project. It names the command that removes each copy
+// rather than removing it: a --global command does not delete project values.
+// Best effort, like the gitignore advisory.
+func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name string) {
+	if _, err := c.discoverProject(); err != nil {
+		return
+	}
+	for _, secret := range []bool{false, true} {
+		projScope := *scope
+		projScope.global, projScope.project, projScope.secret = false, true, secret
+		st, _, err := c.envStore(&projScope)
+		if err != nil {
+			continue
+		}
+		if ok, err := st.Has(kind, name); err != nil || !ok {
+			continue
+		}
+		flag := "--secret=false"
+		if secret {
+			flag = "--secret"
+		}
+		fmt.Fprintf(c.d.Stderr,
+			"warning: %s is also set in %s (%s), which outranks the global value for this project, so start uses that copy. "+
+				"Remove it with: astro local env %s delete %s --project %s\n",
+			name, st.ScopeName(), st.Location(), localenv.Noun(kind), name, flag)
+	}
+}
+
 func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
 	}
-	// A scope flag reads that one file; no flag resolves the whole chain and
-	// reports the winning source.
-	if scope.project || scope.global || scope.secret {
-		store, _, err := c.envStore(scope)
-		if err != nil {
-			return err
-		}
-		value, ok, err := store.Get(kind, name)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, store.ScopeName())
-		}
-		return emitValue(r, envValue{Kind: kind, Name: name, Source: string(store.ScopeName()), Value: value})
+	// A scope or store flag reads that scope; no flag resolves the whole chain
+	// and reports the winning source.
+	if scope.project || scope.global || scope.secretGiven {
+		return c.getScoped(r, scope, kind, name)
 	}
 	return c.getResolved(r, kind, name)
+}
+
+// getScoped reads one scope. --secret reads only its vault and --secret=false
+// only its plain file. With neither, it reads both, since set files a value in
+// whichever one its routing picked and delete clears both: a get that looked in
+// one store would miss what the same flags just set.
+//
+// set keeps one copy per scope, so at most one store should answer. If both
+// do, the one the resolution chain would use wins, the order being the chain's
+// within one scope: the project .env outranks the project vault, and the global
+// vault outranks ~/.astro/env. A note on stderr names the other copy. The
+// manifest is not read.
+func (c *cli) getScoped(r Renderer, scope *scopeFlags, kind localenv.Kind, name string) error {
+	store, _, err := c.envStore(scope)
+	if err != nil {
+		return err
+	}
+	stores := []valueStore{store}
+	if !scope.secretGiven {
+		vaultScope := *scope
+		vaultScope.secret = true
+		if vault, _, verr := c.envStore(&vaultScope); verr == nil {
+			if string(vault.ScopeName()) == vaultenv.SourceGlobal {
+				stores = []valueStore{vault, store}
+			} else {
+				stores = append(stores, vault)
+			}
+		}
+	}
+	var winner valueStore
+	for _, st := range stores {
+		ok, err := st.Has(kind, name)
+		if err != nil {
+			return err
+		}
+		switch {
+		case !ok:
+		case winner == nil:
+			winner = st
+		default:
+			fmt.Fprintf(c.d.Stderr, "note: %s is also set in %s (%s); showing the %s copy, which is the one Airflow gets\n",
+				name, st.ScopeName(), st.Location(), winner.ScopeName())
+		}
+	}
+	if winner == nil {
+		names := make([]string, len(stores))
+		for i, st := range stores {
+			names[i] = string(st.ScopeName())
+		}
+		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, strings.Join(names, " or "))
+	}
+	value, ok, err := winner.Get(kind, name)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, winner.ScopeName())
+	}
+	return emitValue(r, envValue{Kind: kind, Name: name, Source: string(winner.ScopeName()), Value: value})
 }
 
 // getResolved reads a value through the full chain and reports the winning
@@ -598,15 +853,27 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 // declaredSource returns a declared name's source, so `get` knows to consult
 // Environment Manager for a workspace source.
 func declaredSource(schema *envschema.Schema, kind localenv.Kind, name string) envschema.Source {
+	spec, _ := declaredSpec(schema, kind, name)
+	return spec.Source
+}
+
+// declaredSpec returns the declaration of (kind, name) and whether the schema
+// has one. A nil schema declares nothing.
+func declaredSpec(schema *envschema.Schema, kind localenv.Kind, name string) (envschema.ValueSpec, bool) {
+	if schema == nil {
+		return envschema.ValueSpec{}, false
+	}
+	var specs map[string]envschema.ValueSpec
 	switch kind {
 	case localenv.KindEnv:
-		return schema.EnvVars[name].Source
+		specs = schema.EnvVars
 	case localenv.KindVar:
-		return schema.AirflowVariables[name].Source
+		specs = schema.AirflowVariables
 	case localenv.KindConn:
-		return schema.Connections[name].Source
+		specs = schema.Connections
 	}
-	return ""
+	spec, ok := specs[name]
+	return spec, ok
 }
 
 func emitValue(r Renderer, v envValue) error {
@@ -616,6 +883,16 @@ func emitValue(r Renderer, v envValue) error {
 	})
 }
 
+// runEnvDelete removes a name from the scope. With no --secret flag it clears
+// both stores, the plain file and the vault, as Astro Desktop's delete does:
+// set keeps one copy per scope, so "delete this name" means wherever it is, and
+// a copy that got into the other store by hand or before the routing changed is
+// the one a delete of a credential most needs to catch. --secret deletes only
+// the vault copy, and --secret=false only the plaintext one, which is how a stale
+// plaintext copy of a sensitive name is removed on its own.
+//
+// Removing a vault entry deletes its file and needs no keyring, so the no-flag
+// form works where there is none.
 func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) error {
 	r, err := c.renderer()
 	if err != nil {
@@ -625,13 +902,51 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 	if err != nil {
 		return err
 	}
-	ok, err := store.Delete(kind, name)
+	if scope.secretGiven {
+		ok, err := store.Delete(kind, name)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, store.ScopeName())
+		}
+		return emitDeleted(r, kind, name, store)
+	}
+	// Both stores, the vault first. A vault removal that fails then leaves both
+	// copies as they were, so the error is the whole story; a file removal that
+	// fails after the vault copy went says that it went.
+	vaultScope := *scope
+	vaultScope.secret = true
+	var vaulted valueStore
+	removedVault := false
+	if vault, _, verr := c.envStore(&vaultScope); verr == nil {
+		removedVault, err = vault.Delete(kind, name)
+		if err != nil {
+			return fmt.Errorf("could not remove %s %s from the vault, so nothing was deleted: %w", localenv.Noun(kind), name, err)
+		}
+		vaulted = vault
+	}
+	removedFile, err := store.Delete(kind, name)
 	if err != nil {
+		if removedVault {
+			return fmt.Errorf("deleted %s %s from %s (%s), but its plaintext copy in %s could not be removed: %w",
+				localenv.Noun(kind), name, vaulted.ScopeName(), vaulted.Location(), store.Location(), err)
+		}
 		return err
 	}
-	if !ok {
-		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, store.ScopeName())
+	ok := removedFile || removedVault
+	if removedVault {
+		// The status names the store that held it; when both did, the vault
+		// is the one worth naming.
+		store = vaulted
 	}
+	if !ok {
+		return fmt.Errorf("%s %q is not set in %s or the vault", localenv.Noun(kind), name, store.ScopeName())
+	}
+	return emitDeleted(r, kind, name, store)
+}
+
+func emitDeleted(r Renderer, kind localenv.Kind, name string, store valueStore) error {
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "deleted"}
 	return r.Emit(res, func(w io.Writer) error {
 		_, werr := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", localenv.Noun(kind), name, store.ScopeName(), store.Location())
@@ -656,7 +971,11 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	opts := localenv.ListOptions{All: all}
 	// The vault tiers, or a name held only there reports as "absent" while start
 	// injects it and get returns it.
-	opts.VaultProviders = vaultenv.Load(projectDir).Providers()
+	vault := vaultenv.Load(projectDir)
+	opts.VaultProviders = vault.Providers()
+	// And what the vault holds undeclared, listed as orphans the way an
+	// undeclared file entry is.
+	opts.VaultTiers = vault.Tiers()
 	// reveal = false: list reports where each name resolves, never a value, so
 	// it reads Environment Manager for presence only and pulls no secret.
 	if m != nil && c.d.WorkspaceClients != nil {
@@ -707,13 +1026,26 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		_, err := fmt.Fprintln(w, "No declared env values and no entries in any .env.")
 		return err
 	}
+	// DESCRIPTION is a column only when some row has one, so a project that
+	// writes no descriptions keeps the four-column table.
+	described := false
+	for _, it := range items {
+		if it.Description != "" {
+			described = true
+			break
+		}
+	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	// The KIND cell names the subcommand that manages the value, the same as
 	// every other user-facing string in this tree. The JSON `kind` field keeps
 	// env/conn/var, because that one is a wire contract; this one is a table a
 	// person reads, and printing `var` for an Airflow Variable contradicts the
 	// grammar, where `var` is an alias for a plain environment variable.
-	fmt.Fprintln(tw, "KIND\tNAME\tSOURCE\tNOTE")
+	header := "KIND\tNAME\tSOURCE\tNOTE"
+	if described {
+		header += "\tDESCRIPTION"
+	}
+	fmt.Fprintln(tw, header)
 	for _, it := range items {
 		note := ""
 		if it.Orphan {
@@ -732,7 +1064,13 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 				note += "; remove: " + it.RemoveHint
 			}
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", localenv.Noun(it.Kind), it.Name, it.Source, note)
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, note)
+		if described {
+			// Collapsed to one line: a TOML multi-line string would otherwise
+			// break the row out of the table.
+			row += "\t" + strings.Join(strings.Fields(it.Description), " ")
+		}
+		fmt.Fprintln(tw, row)
 	}
 	return tw.Flush()
 }

@@ -13,30 +13,12 @@ import (
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
 
-// secretEnvProject is envProject plus the isolation the vault needs, which is
-// NOT the same isolation the files need.
-//
-// envProject points ASTRO_HOME at a scratch dir. pkg/secrets deliberately
-// ignores ASTRO_HOME — one of the two tools sharing the vault is a GUI app that
-// inherits no shell environment, so a vault whose location depends on how the
-// process started could move out from under its own index — and resolves the
-// real home directory instead. Without the HOME override below, these tests
-// would read and write the developer's own ~/.astro/secrets.
-//
-// USERPROFILE as well as HOME: os.UserHomeDir reads that one on Windows.
-//
-// The keyring mock is separate again: the master key is keyed by the keyring
-// service name and not by any path, so no amount of directory isolation keeps a
-// test out of the login keychain.
+// secretEnvProject names the vault tests' project. envProject already isolates
+// the vault (HOME and a mocked keyring), since any set can reach it; this name
+// says which tests depend on that isolation.
 func secretEnvProject(t *testing.T, envBody string) (dir string) {
 	t.Helper()
-	dir = envProject(t, envBody)
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	keyring.MockInit()
-	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
-	return dir
+	return envProject(t, envBody)
 }
 
 // vaultFiles is what the shared vault holds on disk.
@@ -173,6 +155,9 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 
 // A plaintext entry still beats a vaulted one of the same name, which is the
 // chain position this tier was given: below the project's .env.
+//
+// The file entry is written by hand, because `set` keeps one copy per scope and
+// would remove the vaulted one.
 func TestPlainProjectFileStillBeatsTheVault(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
@@ -180,8 +165,7 @@ func TestPlainProjectFileStillBeatsTheVault(t *testing.T) {
 	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
 		t.Fatal(err)
 	}
-	d, _, _ = envDeps(t, dir, "from-file\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("TOKEN=from-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -263,7 +247,7 @@ func TestEnvSetSecretNormalizesAConnectionLikeTheFileDoes(t *testing.T) {
 	// The same input through the plain file, in a fresh project.
 	other := secretEnvProject(t, "")
 	d, _, _ = envDeps(t, other, "postgres://u:p@h:5432/db\n")
-	if err := execute(t, d, "local", "env", "connection", "set", "my_db"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "my_db", "--secret=false"); err != nil {
 		t.Fatal(err)
 	}
 	d, fileOut, _ := envDeps(t, other, "")

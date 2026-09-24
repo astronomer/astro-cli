@@ -256,6 +256,59 @@ func TestListSourceAndOrphans(t *testing.T) {
 	}
 }
 
+// Each declared row carries its declaration's required, sensitive and
+// description, per section, so `list --output json` answers what the manifest
+// asks for without a second read of it. An orphan has no declaration and
+// carries none of them.
+func TestListCarriesTheDeclarationFlags(t *testing.T) {
+	t.Setenv("ASTRO_HOME", t.TempDir())
+	projDir := t.TempDir()
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("STRAY=y\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	schema := &envschema.Schema{
+		EnvVars: map[string]envschema.ValueSpec{
+			"API_TOKEN": {Sensitive: true, Description: "Token for the API"},
+			"LOG_LEVEL": {Optional: true},
+		},
+		AirflowVariables: map[string]envschema.ValueSpec{
+			"region": {Description: "Deploy region"},
+		},
+		Connections: map[string]envschema.ValueSpec{
+			"db_main": {Sensitive: true, Optional: true},
+		},
+	}
+	items, err := List(nil, projDir, schema, ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	type flags struct {
+		required, sensitive bool
+		description         string
+	}
+	want := map[string]flags{
+		"API_TOKEN": {true, true, "Token for the API"},
+		"LOG_LEVEL": {false, false, ""},
+		"region":    {true, false, "Deploy region"},
+		"db_main":   {false, true, ""},
+		"STRAY":     {false, false, ""},
+	}
+	got := map[string]flags{}
+	for _, it := range items {
+		got[it.Name] = flags{it.Required, it.Sensitive, it.Description}
+	}
+	for name, w := range want {
+		g, ok := got[name]
+		if !ok {
+			t.Errorf("%s missing from the listing", name)
+			continue
+		}
+		if g != w {
+			t.Errorf("%s = %+v, want %+v", name, g, w)
+		}
+	}
+}
+
 // TestListAllDedupesCurrentProject guards the fix for --all listing the
 // current project's own orphans twice once it has a state record.
 func TestListAllDedupesCurrentProject(t *testing.T) {

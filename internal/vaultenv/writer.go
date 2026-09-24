@@ -3,6 +3,7 @@ package vaultenv
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -76,6 +77,13 @@ func (w *Writer) Location() string { return "the vault shared with Astro Desktop
 
 // Set stores value for the (kind, name) pair and returns the Airflow env-var
 // key it will resolve under.
+//
+// Any other entry of this kind in this scope that resolves to the same env-var
+// key is removed, so the scope holds one value per key as the plain file does.
+// The encoding upper-cases connection ids and Airflow variable keys, so
+// "region" and "REGION" are one AIRFLOW_VAR_REGION to Airflow but two vault
+// entries, and the chain picks one by name: left in place, the other spelling
+// could shadow the value just set.
 func (w *Writer) Set(kind localenv.Kind, name, value string) (envKey string, err error) {
 	key, vaultKey, err := w.keys(kind, name)
 	if err != nil {
@@ -90,17 +98,35 @@ func (w *Writer) Set(kind localenv.Kind, name, value string) (envKey string, err
 	if err := w.store.Set(vaultKey, value); err != nil {
 		return "", refusal(err)
 	}
+	others, err := w.sameEnvKey(kind, key)
+	if err != nil {
+		return "", err
+	}
+	for _, other := range others {
+		if other == vaultKey {
+			continue
+		}
+		if err := w.store.Delete(other); err != nil && !errors.Is(err, secrets.ErrNotFound) {
+			return "", fmt.Errorf("set %s, but could not remove another entry for %s: %w", name, key, refusal(err))
+		}
+	}
 	return key, nil
 }
 
-// Get returns the stored value for (kind, name) and whether this scope holds
-// one.
+// Get returns the value this scope holds under (kind, name)'s env-var key and
+// whether it holds one. It matches on the key, as the plain file and the
+// resolution chain do, so "region" finds a value stored as "REGION"; where two
+// spellings are stored, it returns the one the chain resolves.
 func (w *Writer) Get(kind localenv.Kind, name string) (value string, ok bool, err error) {
-	_, vaultKey, err := w.keys(kind, name)
+	key, _, err := w.keys(kind, name)
 	if err != nil {
 		return "", false, err
 	}
-	v, err := w.store.Get(vaultKey)
+	matches, err := w.sameEnvKey(kind, key)
+	if err != nil || len(matches) == 0 {
+		return "", false, err
+	}
+	v, err := w.store.Get(matches[len(matches)-1])
 	switch {
 	case err == nil:
 		return v, true, nil
@@ -111,21 +137,74 @@ func (w *Writer) Get(kind localenv.Kind, name string) (value string, ok bool, er
 	}
 }
 
-// Delete removes (kind, name) from this scope. ok is false when it held no such
-// value, which is not an error — the same contract localenv.Store.Delete has.
-func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
-	_, vaultKey, err := w.keys(kind, name)
+// Has reports whether this scope holds a value under (kind, name)'s env-var
+// key. It reads the index only, so it needs no keyring.
+func (w *Writer) Has(kind localenv.Kind, name string) (bool, error) {
+	key, _, err := w.keys(kind, name)
 	if err != nil {
 		return false, err
 	}
-	switch err := w.store.Delete(vaultKey); {
-	case err == nil:
-		return true, nil
-	case errors.Is(err, secrets.ErrNotFound):
-		return false, nil
-	default:
-		return false, refusal(err)
+	matches, err := w.sameEnvKey(kind, key)
+	return len(matches) > 0, err
+}
+
+// Delete removes every entry of this kind in this scope that resolves to (kind,
+// name)'s env-var key, for the reason Set removes the other spellings. ok is
+// false when it held none, which is not an error: the same contract
+// localenv.Store.Delete has.
+func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
+	key, _, err := w.keys(kind, name)
+	if err != nil {
+		return false, err
 	}
+	matches, err := w.sameEnvKey(kind, key)
+	if err != nil {
+		return false, err
+	}
+	for _, vaultKey := range matches {
+		switch err := w.store.Delete(vaultKey); {
+		case err == nil:
+			ok = true
+		case errors.Is(err, secrets.ErrNotFound):
+		default:
+			return ok, refusal(err)
+		}
+	}
+	return ok, nil
+}
+
+// sameEnvKey returns this scope's vault keys of kind whose names resolve to
+// envKey, ordered the way the resolution chain breaks a tie (by name, then by
+// vault key), so the last is the one Airflow gets. It reads the index only and
+// needs no keyring.
+func (w *Writer) sameEnvKey(kind localenv.Kind, envKey string) ([]string, error) {
+	metas, err := w.store.ListMeta()
+	if err != nil {
+		return nil, fmt.Errorf("list the shared vault: %w", err)
+	}
+	type entry struct{ vaultKey, name string }
+	var found []entry
+	want := vaultKind(kind)
+	for _, m := range metas {
+		k, scope, name, perr := secrets.ParseKey(m.Key)
+		if perr != nil || k != want || scope != w.scope {
+			continue
+		}
+		if ek, ok := envKeyFor(k, name); ok && ek == envKey {
+			found = append(found, entry{m.Key, name})
+		}
+	}
+	sort.Slice(found, func(i, j int) bool {
+		if found[i].name != found[j].name {
+			return found[i].name < found[j].name
+		}
+		return found[i].vaultKey < found[j].vaultKey
+	})
+	keys := make([]string, len(found))
+	for i, e := range found {
+		keys[i] = e.vaultKey
+	}
+	return keys, nil
 }
 
 // keys returns both names one operation needs: the Airflow env-var key the value
@@ -190,8 +269,8 @@ func refusal(err error) error {
 		// The umbrella: no keyring to reach at all.
 		return fmt.Errorf("this machine's keyring is unreachable, so a secret cannot be stored or read here: %w\n\n"+
 			"On a headless machine or in CI there is no keyring to hold the master key. Supply the value in the "+
-			"environment instead, which the resolution chain reads first, or set it without --secret to keep it in "+
-			"a plain file", err)
+			"environment instead, which the resolution chain reads first, or, for a name the project does not "+
+			"declare sensitive, set it with --secret=false to keep it in a plain file", err)
 	default:
 		return err
 	}

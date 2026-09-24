@@ -46,6 +46,7 @@ import (
 	"sync"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -243,6 +244,48 @@ func envKeyFor(kind secrets.Kind, name string) (string, bool) {
 		return airflowenv.EnvKeyForConnID(name), airflowenv.ValidConnID(name)
 	default:
 		return "", false
+	}
+}
+
+// Tiers lists what each tier holds, for a listing that shows undeclared vault
+// entries the way it shows undeclared file entries. It reads the index only and
+// decrypts nothing, so it needs no keyring. The project tier comes first and is
+// omitted outside a project; a vault that cannot be listed yields empty tiers.
+// Where two names share an env key, the one the chain resolves is listed.
+func (s *Source) Tiers() []localenv.VaultTier {
+	s.load()
+	var out []localenv.VaultTier
+	if s.scope != "" {
+		out = append(out, localenv.VaultTier{Label: SourceProject, Scope: localenv.ScopeProject, Entries: entries(s.scoped)})
+	}
+	return append(out, localenv.VaultTier{Label: SourceGlobal, Scope: localenv.ScopeGlobal, Entries: entries(s.global)})
+}
+
+// entries turns one tier's index into listing entries, sorted by env key.
+func entries(index map[string]string) []localenv.VaultEntry {
+	out := make([]localenv.VaultEntry, 0, len(index))
+	for envKey, vaultKey := range index {
+		kind, _, name, err := secrets.ParseKey(vaultKey)
+		if err != nil {
+			continue // load indexed only keys that parse
+		}
+		out = append(out, localenv.VaultEntry{Kind: localKind(kind), Name: name, EnvKey: envKey})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].EnvKey < out[j].EnvKey })
+	return out
+}
+
+// localKind is vaultKind's inverse.
+func localKind(kind secrets.Kind) localenv.Kind {
+	switch kind {
+	case secrets.KindEnv:
+		return localenv.KindEnv
+	case secrets.KindConn:
+		return localenv.KindConn
+	case secrets.KindVar:
+		return localenv.KindVar
+	default:
+		return ""
 	}
 }
 

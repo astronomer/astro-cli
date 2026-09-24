@@ -35,12 +35,15 @@
 // Inferring sensitivity from a name is the guess that leaks a credential, so it
 // is declared instead.
 //
-// It is a DECLARATION, and nothing in this repo routes on it yet: `astro local
-// env <noun> set` still picks its store from --secret alone. So today it is a promise
-// to consumers — Astro Desktop's Environment Manager is the first — rather than
-// a behavior of this CLI. Saying otherwise in the present tense would be a
-// claim about code that does not exist, in the one annotation whose whole point
-// is keeping a credential out of a file.
+// Writers route on it, and this package does not: it has no I/O, so the rule
+// lives with each writer. `astro local env <noun> set` stores a declared-sensitive
+// name in the vault shared with Astro Desktop without --secret, refuses
+// --secret=false for one, and refuses a save that depends on the declarations
+// when they do not parse, rather than reading an unparseable section as
+// "nothing is sensitive". Astro Desktop's Environment Manager keeps the same
+// rule for its saves. Both tools also vault every connection and Airflow
+// variable by default, declared or not, so for those two kinds the declaration
+// decides only whether --secret=false may keep one in a plain file.
 //
 // A sensitive declaration may not carry a `default`. A default is committed to
 // the manifest and injected at start, so `{ sensitive = true, default = ... }`

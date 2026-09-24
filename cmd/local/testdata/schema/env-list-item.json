@@ -1,6 +1,9 @@
 {
   "kind": "x",
   "name": "x",
+  "required": true,
+  "sensitive": true,
+  "description": "x",
   "source": "x",
   "orphan": true,
   "project": "x",

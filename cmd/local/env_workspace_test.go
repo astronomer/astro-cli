@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/internal/emenv"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -41,6 +42,13 @@ func workspaceEnvProject(t *testing.T) string {
 		t.Fatal(err)
 	}
 	t.Setenv("ASTRO_HOME", t.TempDir())
+	// A set also clears the vault's copy of the name; keep that out of the
+	// developer's own vault. See envProject.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	keyring.MockInit()
+	t.Cleanup(keyring.MockInit)
 	return dir
 }
 

@@ -17,6 +17,15 @@ import (
 type ListItem struct {
 	Kind Kind   `json:"kind"`
 	Name string `json:"name"`
+	// Required is true for a declared name the start gate needs: every
+	// declaration not marked optional. Sensitive is the declaration's
+	// sensitive flag, which is always true for a declared connection. Both
+	// describe the declaration, so an orphan, which has none, carries false.
+	Required  bool `json:"required"`
+	Sensitive bool `json:"sensitive"`
+	// Description is the declaration's prose for whoever supplies the value,
+	// and empty when it has none or the row is an orphan.
+	Description string `json:"description,omitempty"`
 	// Source is where the value resolves from: shell, project, global,
 	// workspace, default, or absent (for a declared name with no value
 	// anywhere).
@@ -55,6 +64,31 @@ type ListOptions struct {
 	// open is reported as the source's unavailable label rather than failing
 	// the listing.
 	VaultProviders []envresolve.Provider
+	// VaultTiers are the names each vault tier holds, so an undeclared one is
+	// listed as an orphan the way an undeclared file entry is. A connection or
+	// Airflow variable is stored in the vault by default, so without this a
+	// value just set would be missing from the listing. Only the unnarrowed
+	// view reads them, for the reason listProviders gives. nil lists no vault
+	// orphans.
+	VaultTiers []VaultTier
+}
+
+// VaultTier is what one tier of the vault holds, with the label the resolution
+// chain gives it and the scope a delete names.
+type VaultTier struct {
+	Label   string
+	Scope   Scope
+	Entries []VaultEntry
+}
+
+// VaultEntry is one name a vault tier holds. The name is the one stored, not
+// one recovered from EnvKey: that encoding upper-cases, so the Airflow
+// variables "my_var" and "MY_VAR" share an env key, and a delete hint built
+// from it could name neither.
+type VaultEntry struct {
+	Kind   Kind
+	Name   string
+	EnvKey string
 }
 
 // List builds the resolver-backed listing: every schema-declared name with
@@ -77,7 +111,7 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 
 	var items []ListItem
 	for _, rn := range res.Resolved {
-		items = append(items, declaredItem(rn))
+		items = append(items, declaredItem(rn, schema))
 	}
 	items = append(items, orphans(src, schema, opts, projectDir)...)
 	sort.SliceStable(items, func(i, j int) bool {
@@ -112,8 +146,15 @@ func listProviders(src Sources, scope Scope, vault []envresolve.Provider) []envr
 	}
 }
 
-func declaredItem(rn envresolve.ResolvedName) ListItem {
-	item := ListItem{Name: rn.Name, Source: SourceAbsent}
+func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem {
+	spec := specFor(schema, rn.Section, rn.Name)
+	item := ListItem{
+		Name:        rn.Name,
+		Source:      SourceAbsent,
+		Required:    !spec.Optional,
+		Sensitive:   spec.Sensitive,
+		Description: spec.Description,
+	}
 	// A resolved name carries its winning source; a workspace-source name that
 	// did not resolve still carries the "workspace" label (with any
 	// "unavailable" reason), so the row says where it was meant to come from.
@@ -123,6 +164,25 @@ func declaredItem(rn envresolve.ResolvedName) ListItem {
 	}
 	item.Kind = KindForSection(rn.Section)
 	return item
+}
+
+// specFor returns the declaration behind a resolved name. The resolver only
+// reports names it found in schema, so the zero spec is reached only by a
+// section this function does not know.
+func specFor(schema *envschema.Schema, section envschema.Section, name string) envschema.ValueSpec {
+	if schema == nil {
+		return envschema.ValueSpec{}
+	}
+	switch section {
+	case envschema.SectionEnvVar:
+		return schema.EnvVars[name]
+	case envschema.SectionAirflowVariable:
+		return schema.AirflowVariables[name]
+	case envschema.SectionConnection:
+		return schema.Connections[name]
+	default:
+		return envschema.ValueSpec{}
+	}
 }
 
 // KindForSection maps a manifest schema section onto the kind it declares.
@@ -165,6 +225,17 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 			add(src.project, ScopeProject)
 		}
 		add(src.global, ScopeGlobal)
+		for _, tier := range opts.VaultTiers {
+			for _, e := range tier.Entries {
+				if declared[e.EnvKey] {
+					continue
+				}
+				out = append(out, ListItem{
+					Kind: e.Kind, Name: e.Name, Source: tier.Label, Orphan: true,
+					RemoveHint: removeHint(e.Kind, e.Name, tier.Scope) + " --secret",
+				})
+			}
+		}
 	}
 	if opts.All {
 		out = append(out, crossProjectOrphans(declared, projectDir)...)

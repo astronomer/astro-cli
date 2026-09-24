@@ -10,12 +10,19 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/internal/localenv"
 )
 
-// envProject writes a project with the given [tool.astro.env] body and points
-// ASTRO_HOME at a scratch dir, so project and global files are both isolated.
+// envProject writes a project with the given [tool.astro.env] body and isolates
+// every store a set can reach: ASTRO_HOME for the plain files, and HOME plus a
+// mocked keyring for the vault, since a connection or Airflow variable goes to
+// the vault by default. pkg/secrets ignores ASTRO_HOME and resolves the real
+// home directory, so without the HOME override these tests would write the
+// developer's own ~/.astro/secrets. USERPROFILE is what os.UserHomeDir reads on
+// Windows. The master key is keyed by the keyring service name, not a path, so
+// only the mock keeps a test out of the login keychain.
 func envProject(t *testing.T, envBody string) (dir string) {
 	t.Helper()
 	dir = t.TempDir()
@@ -27,6 +34,11 @@ func envProject(t *testing.T, envBody string) (dir string) {
 		t.Fatal(err)
 	}
 	t.Setenv("ASTRO_HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	keyring.MockInit()
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 	return dir
 }
 
@@ -90,10 +102,12 @@ func TestEnvGetJSONShape(t *testing.T) {
 	}
 }
 
+// --secret=false keeps an undeclared connection in the .env file, which is where
+// this checks the stored encoding.
 func TestEnvSetConnFromURI(t *testing.T) {
 	dir := envProject(t, "")
 	d, _, _ := envDeps(t, dir, "postgres://u:p@host:5432/db\n")
-	if err := execute(t, d, "local", "env", "connection", "set", "warehouse"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "warehouse", "--secret=false"); err != nil {
 		t.Fatal(err)
 	}
 	content, err := os.ReadFile(filepath.Join(dir, ".env"))
@@ -109,11 +123,11 @@ func TestEnvSetConnAndVarWithValueFlag(t *testing.T) {
 	dir := envProject(t, "")
 	// The conn/var subcommands inherit --value (persistent on `set`); no stdin.
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "http_api", "--value", `{"conn_type":"http","host":"api"}`); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "http_api", "--value", `{"conn_type":"http","host":"api"}`, "--secret=false"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "airflow-variable", "set", "region", "--value", "us-east-1"); err != nil {
+	if err := execute(t, d, "local", "env", "airflow-variable", "set", "region", "--value", "us-east-1", "--secret=false"); err != nil {
 		t.Fatal(err)
 	}
 	content, _ := os.ReadFile(filepath.Join(dir, ".env"))
@@ -282,6 +296,64 @@ func TestEnvListOrphanNote(t *testing.T) {
 	// A declared value is not an orphan, so its note stays empty.
 	if strings.Contains(lines["DECLARED"], "orphan") {
 		t.Errorf("a declared value should carry no note: %q", lines["DECLARED"])
+	}
+}
+
+// A declaration's description shows in the text list, and the JSON rows carry
+// it with the required and sensitive flags.
+func TestEnvListShowsTheDescription(t *testing.T) {
+	dir := envProject(t, "[tool.astro.env]\n"+
+		"API_TOKEN = { sensitive = true, description = '''Token for\nthe API''' }\n"+
+		"LOG_LEVEL = { optional = true }\n")
+
+	d, out, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list"); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(strings.SplitN(text, "\n", 2)[0], "DESCRIPTION") {
+		t.Errorf("the header should name the DESCRIPTION column:\n%s", text)
+	}
+	var tokenRow string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, "API_TOKEN") {
+			tokenRow = line
+		}
+	}
+	if !strings.Contains(tokenRow, "Token for the API") {
+		t.Errorf("API_TOKEN's row should carry its description on one line: %q\n%s", tokenRow, text)
+	}
+
+	d, out, _ = envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	rows := map[string]localenv.ListItem{}
+	dec := json.NewDecoder(strings.NewReader(out.String()))
+	for dec.More() {
+		var it localenv.ListItem
+		if err := dec.Decode(&it); err != nil {
+			t.Fatalf("decode %q: %v", out.String(), err)
+		}
+		rows[it.Name] = it
+	}
+	if it := rows["API_TOKEN"]; !it.Required || !it.Sensitive || it.Description != "Token for\nthe API" {
+		t.Errorf("API_TOKEN row = %+v", it)
+	}
+	if it := rows["LOG_LEVEL"]; it.Required || it.Sensitive || it.Description != "" {
+		t.Errorf("LOG_LEVEL row = %+v", it)
+	}
+}
+
+// A project that writes no descriptions keeps the four-column table.
+func TestEnvListWithoutDescriptionsHasNoColumnForThem(t *testing.T) {
+	dir := envProject(t, "[tool.astro.env]\nLOG_LEVEL = {}\n")
+	d, out, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "DESCRIPTION") {
+		t.Errorf("no row has a description, so there should be no column for one:\n%s", out.String())
 	}
 }
 
