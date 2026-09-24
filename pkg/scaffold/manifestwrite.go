@@ -70,10 +70,24 @@ type ManifestEdit func(before *manifest.Manifest, ed tomledit.Editor) error
 // An edit that changes no bytes writes nothing, so an idempotent caller does
 // not disturb the file's mtime or wake anything watching it.
 func EditManifest(dir string, wrap func(run func() error) error, edit ManifestEdit) error {
+	return editManifestJudged(dir, wrap, edit, func(before *manifest.Manifest, out []byte) error {
+		_, err := loadable(before, out)
+		return err
+	})
+}
+
+// judge decides whether an edit's result may be written: it returns nil, or
+// the parser's error naming why not. before is the manifest as it was read.
+type judge func(before *manifest.Manifest, out []byte) error
+
+// editManifestJudged is EditManifest with the judge of the result as a
+// parameter. EditManifest's is loadable's verdict; RemoveEnvDeclaration's is
+// noNewEnvProblems, which lets a removal fix one of several problems.
+func editManifestJudged(dir string, wrap func(run func() error) error, edit ManifestEdit, ok judge) error {
 	ran := false
 	run := func() error {
 		ran = true
-		return editManifest(dir, edit)
+		return editManifest(dir, edit, ok)
 	}
 	if wrap == nil {
 		return run()
@@ -85,7 +99,7 @@ func EditManifest(dir string, wrap func(run func() error) error, edit ManifestEd
 	return err
 }
 
-func editManifest(dir string, edit ManifestEdit) error {
+func editManifest(dir string, edit ManifestEdit, ok judge) error {
 	path := filepath.Join(dir, manifest.Marker)
 	// The write replaces the file by renaming onto it, and renaming onto a
 	// symlink replaces the link with a regular file. Writing to what it points
@@ -131,12 +145,12 @@ func editManifest(dir string, edit ManifestEdit) error {
 	}
 	// The baseline is parsed again rather than taken from before: the edit is
 	// handed before and may change its maps in place, which would make the
-	// comparison in loadable see the edit as the file's original state.
+	// comparison in the judge see the edit as the file's original state.
 	baseline, err := manifest.Parse(src)
 	if err != nil {
 		return withPath(err, path)
 	}
-	if _, err := loadable(baseline, out); err != nil {
+	if err := ok(baseline, out); err != nil {
 		return fmt.Errorf("%w, because the result would not load: %w", ErrEditRefused, withPath(err, path))
 	}
 	return fsatomic.WriteFile(target, out, mode)
@@ -176,4 +190,39 @@ func loadable(before *manifest.Manifest, out []byte) (*manifest.Manifest, error)
 func ReplaceTable(ed tomledit.Editor, key []string, value any) error {
 	ed.Delete(key)
 	return ed.Set(key, value)
+}
+
+// noNewEnvProblems is loadable, except that a [tool.astro.env] which still
+// does not load is accepted when every problem it has, the file already had.
+//
+// ParseSchema refuses the whole section over any one problem, so under
+// loadable a section with two bad declarations could not lose either: each
+// removal still leaves the other. Judging the problems as a set lets each
+// removal through that makes the section no worse, and still refuses one that
+// adds a problem the file did not have. The manifest itself is held to
+// manifest.Parse as always.
+func noNewEnvProblems(before *manifest.Manifest, out []byte) error {
+	_, err := loadable(before, out)
+	if err == nil {
+		return nil
+	}
+	// A manifest error comes first from loadable and is never a SchemaError,
+	// so it is refused here as it always is.
+	var now *envschema.SchemaError
+	if before == nil || !errors.As(err, &now) {
+		return err
+	}
+	had := map[envschema.Problem]bool{}
+	var was *envschema.SchemaError
+	if _, berr := envschema.ParseSchema(before.Astro.Env); errors.As(berr, &was) {
+		for _, p := range was.Problems {
+			had[p] = true
+		}
+	}
+	for _, p := range now.Problems {
+		if !had[p] {
+			return err
+		}
+	}
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -43,13 +44,7 @@ func saveLink(projectRoot, name, url string) error {
 
 // declareEnv is the desktop's declaration write, under the same lock.
 func declareEnv(projectRoot, name string) error {
-	return scaffold.EditManifest(projectRoot, withWriteLock, func(_ *manifest.Manifest, ed tomledit.Editor) error {
-		key := []string{"tool", "astro", "env", name}
-		if _, ok := ed.Get(key); ok {
-			return nil
-		}
-		return ed.Set(key, map[string]any{})
-	})
+	return scaffold.AddEnvDeclaration(projectRoot, withWriteLock, envschema.SectionEnvVar, name, nil)
 }
 
 func TestEditManifestServesTheDesktopsWriters(t *testing.T) {

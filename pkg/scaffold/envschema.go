@@ -133,42 +133,12 @@ func setEnvDeclarations(ed tomledit.Editor, c carriedEnvSchema) error {
 		for _, name := range sortedSpecNames(sec.specs) {
 			path := append(append([]string{}, sec.path...), name)
 			spec := sec.specs[name]
-			if err := ed.Set(path, specTable(&spec, sec.section)); err != nil {
+			if err := ed.Set(path, envschema.DeclarationTable(&spec, sec.section)); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-// specTable renders one declaration, writing only what the reader would not
-// already assume: `optional` is false by default, and a connection is sensitive
-// by definition, so writing either would be noise at best and — for a
-// connection declared `sensitive = false` — a manifest the grammar refuses.
-func specTable(spec *envschema.ValueSpec, section envschema.Section) map[string]any {
-	out := map[string]any{}
-	if spec.Type != "" {
-		out["type"] = string(spec.Type)
-	}
-	if spec.Optional {
-		out["optional"] = true
-	}
-	if spec.Sensitive && section != envschema.SectionConnection {
-		out["sensitive"] = true
-	}
-	if spec.HasDefault {
-		out["default"] = spec.Default
-	}
-	if spec.ConnType != "" {
-		out["conn_type"] = spec.ConnType
-	}
-	if spec.Description != "" {
-		out["description"] = spec.Description
-	}
-	if len(spec.Enum) > 0 {
-		out["enum"] = asAny(spec.Enum)
-	}
-	return out
 }
 
 func sortedSpecNames(m map[string]envschema.ValueSpec) []string {

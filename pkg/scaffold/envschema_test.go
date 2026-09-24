@@ -213,8 +213,8 @@ func TestRunRefusesAFileThatWouldLoseADeclaration(t *testing.T) {
 	}
 }
 
-// specTable is the only encoder of this grammar outside pkg/envschema, so the
-// round trip is asserted rather than assumed: everything it writes, ParseSchema
+// The conversion writes through envschema.DeclarationTable, and the round trip
+// is asserted here too rather than assumed: everything it writes, ParseSchema
 // reads back as the same declaration. Without this, a change on either side
 // breaks the carry and the failure surfaces after the source file is deleted.
 func TestCarriedDeclarationsRoundTripThroughTheParser(t *testing.T) {
@@ -251,9 +251,9 @@ connections:
 // grammar refuses it there whichever value it carries — so emitting it would
 // make every converted project's own manifest unloadable.
 //
-// specTable has always omitted it; this pins that, because the cost of the
-// omission regressing is now a conversion that produces a file the next command
-// rejects, rather than one noisy key.
+// DeclarationTable omits it; this pins that at the conversion, because the
+// cost of the omission regressing is a conversion that produces a file the next
+// command rejects, rather than one noisy key.
 func TestConversionNeverWritesSensitiveUnderConnections(t *testing.T) {
 	dir := v1ProjectDir(t)
 	writeV1EnvSchema(t, dir, `connections:
