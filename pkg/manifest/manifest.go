@@ -818,6 +818,13 @@ var projectNameRe = regexp.MustCompile(`^(?i:[a-z0-9]|[a-z0-9][a-z0-9._-]*[a-z0-
 // airflowVersionRe accepts a full or partial version: "3", "3.1", "3.1.2".
 var airflowVersionRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
 
+// ValidAirflowVersion reports whether v is a [tool.astro] airflow value Parse
+// accepts: a full or partial version, "3", "3.1" or "3.1.2". A writer checks a
+// pin with it before writing, so a bad one is refused with its own error.
+func ValidAirflowVersion(v string) bool {
+	return airflowVersionRe.MatchString(v)
+}
+
 // validate checks what the decode could not: the standard [project] table,
 // which is typed, and the rules that span more than one key.
 func (p *parser) validate(m *Manifest) {
@@ -828,7 +835,7 @@ func (p *parser) validate(m *Manifest) {
 		p.add(CodeProjectNameInvalid, "project.name", "not a valid project name (letters, digits, -._; must start and end with a letter or digit)")
 	}
 
-	if v := m.Astro.AirflowVersion; v != "" && !airflowVersionRe.MatchString(v) {
+	if v := m.Astro.AirflowVersion; v != "" && !ValidAirflowVersion(v) {
 		p.add(CodeAirflowVersionInvalid, astroRoot+".airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", v))
 	}
 

@@ -1,10 +1,11 @@
 package scaffold
 
 import (
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Reading and writing the Airflow pin is the one bit of packaging grammar this
@@ -15,9 +16,6 @@ import (
 
 // airflowDist is the core Airflow distribution's normalized (PEP 503) name.
 const airflowDist = "apache-airflow"
-
-// airflowPinRe accepts the version shapes tool.astro.airflow allows.
-var airflowPinRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
 
 // airflowRequirement is the [project.dependencies] entry that installs the
 // Airflow the manifest pins. It mirrors [tool.astro].airflow one-to-one: a
@@ -223,7 +221,7 @@ func pinFromSpec(spec string) (version string, ok bool) {
 	if strings.Contains(v, "*") { // a wildcard anywhere but the tail
 		return "", false
 	}
-	if !airflowPinRe.MatchString(v) {
+	if !manifest.ValidAirflowVersion(v) {
 		return "", false
 	}
 	return v, true
