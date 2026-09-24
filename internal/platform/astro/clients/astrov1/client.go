@@ -23,3 +23,15 @@ func NewV1Client(c *httputil.HTTPClient) *ClientWithResponses {
 	})))
 	return cl
 }
+
+// NewV1ClientForLogin creates a v1 API client bound to one stored login — its
+// token and its host's v1 base URL — rather than to whichever login the
+// current-context pointer names at request time. A project's workspace link
+// names its own host, and its values are read with the login for that host even
+// while the CLI is switched to another — see docs/v2-workspace-link.md.
+func NewV1ClientForLogin(c *httputil.HTTPClient, token, baseURL string) *ClientWithResponses {
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) { //nolint:errcheck // same construction as NewV1Client, which cannot fail with a base URL supplied per request
+		return token, baseURL, nil
+	})))
+	return cl
+}

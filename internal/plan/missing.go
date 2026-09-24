@@ -29,7 +29,7 @@ func (e *MissingEnvError) Error() string {
 		}
 		fmt.Fprintf(&b, "      provide it:  %s\n", setHint(&m))
 	}
-	b.WriteString("provide them, then run `astro local start` again.")
+	b.WriteString("provide them, then run `astro local start` again — or start without them: `astro local start --allow-missing`.")
 	return b.String()
 }
 

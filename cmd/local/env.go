@@ -564,12 +564,12 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 // plan takes a constructor rather than the client because the workspace comes
 // from the manifest, which plan is what reads. Building it here keeps the Astro
 // client in cmd/, where reaching into a platform is allowed.
-func (c *cli) workspaceProvider() func(string, bool) envresolve.Provider {
-	if c.d.AstroV1Client == nil {
+func (c *cli) workspaceProvider() func(workspace, domain string, reveal bool) envresolve.Provider {
+	if c.d.WorkspaceClients == nil {
 		return nil
 	}
-	return func(workspace string, reveal bool) envresolve.Provider {
-		return emenv.NewProvider(workspace, c.d.AstroV1Client, reveal)
+	return func(workspace, domain string, reveal bool) envresolve.Provider {
+		return emenv.NewProvider(workspace, domain, c.d.WorkspaceClients, reveal)
 	}
 }
 
@@ -577,7 +577,7 @@ func (c *cli) workspaceProvider() func(string, bool) envresolve.Provider {
 // source, so the caller reports the plain "not set anywhere". A workspace-source
 // name that cannot be fetched is an error naming the cause.
 func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key string) (value, source string, ok bool, err error) {
-	if projectDir == "" || c.d.AstroV1Client == nil {
+	if projectDir == "" || c.d.WorkspaceClients == nil {
 		return "", "", false, nil
 	}
 	m, schema, err := c.loadManifestSchema(projectDir)
@@ -588,7 +588,7 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 		return "", "", false, nil
 	}
 	// reveal = true: get is the one deliberate reveal of a value.
-	wp := emenv.NewProvider(m.Astro.Workspace, c.d.AstroV1Client, true)
+	wp := emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, true)
 	if v, has := wp.Lookup(key); has {
 		return v, wp.Label(), true, nil
 	}
@@ -659,8 +659,8 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	opts.VaultProviders = vaultenv.Load(projectDir).Providers()
 	// reveal = false: list reports where each name resolves, never a value, so
 	// it reads Environment Manager for presence only and pulls no secret.
-	if m != nil && c.d.AstroV1Client != nil {
-		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, c.d.AstroV1Client, false)
+	if m != nil && c.d.WorkspaceClients != nil {
+		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, false)
 	}
 	switch {
 	case scope.project && scope.global:

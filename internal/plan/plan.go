@@ -39,7 +39,12 @@ type Options struct {
 	// the manifest, which this package is what reads. Taking the Astro client
 	// directly would make every plan build import a platform, which the layer
 	// rules forbid below cmd/ (docs/v2-architecture.md).
-	WorkspaceProvider func(workspace string, reveal bool) envresolve.Provider
+	WorkspaceProvider func(workspace, domain string, reveal bool) envresolve.Provider
+	// AllowMissing starts even when a required value has no source, instead
+	// of returning *MissingEnvError: `--allow-missing`, and Astro Desktop's
+	// Start anyway. The missing values come back on Built.StartedWithout for
+	// the caller to warn about. Nothing is invented for them.
+	AllowMissing bool
 }
 
 // Built is a resolved plan plus the discovered project, so cmd can persist the
@@ -56,6 +61,10 @@ type Built struct {
 	// not, and the caller chooses between text and json. Nil when everything
 	// conformed.
 	EnvWarnings []envschema.Violation
+	// StartedWithout is every required value that had no source when the start
+	// was allowed past them (Options.AllowMissing). Empty otherwise: without
+	// the option, a missing value is *MissingEnvError and there is no Built.
+	StartedWithout []envresolve.Missing
 }
 
 // Build discovers the project containing workingDir, loads and validates its
@@ -76,7 +85,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, secretEnv, passEnv, envWarnings, err := resolveEnv(m, proj, opts)
+	resolved, err := resolveEnv(m, proj, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +95,9 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	}
 
 	return &Built{
-		Project:     proj,
-		EnvWarnings: envWarnings,
+		Project:        proj,
+		EnvWarnings:    resolved.warnings,
+		StartedWithout: resolved.startedWithout,
 		Plan: localrt.Plan{
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
@@ -120,15 +130,15 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// the manifest. Here it would only restate what uv is about to
 			// read.
 			StopWithSession: opts.StopWithSession,
-			Env:             env,
+			Env:             resolved.env,
 			// The vault's values, kept out of Env on purpose: docker mode
 			// writes Env into the compose file it leaves in the state
 			// directory, and a decrypted credential on disk would undo the
 			// reason the vault exists. SecretEnv is declared there without a
 			// value and handed to the compose process instead; standalone
 			// treats it as ordinary environment.
-			SecretEnv:      secretEnv,
-			PassthroughEnv: passEnv,
+			SecretEnv:      resolved.secretEnv,
+			PassthroughEnv: resolved.passthrough,
 			Hostname:       proj.Hostname,
 			StateDir:       stateDir,
 			RequestedPort:  choosePort(opts.RequestedPort, us.Port),
@@ -187,14 +197,25 @@ func PersistPort(projectPath string, chosen int) error {
 // same shape one tier down: the project's own secrets wholesale, the
 // machine-wide ones only where the schema declares them
 // (vaultenv.SecretInjection).
-func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env, secretEnv map[string]string, passthrough []string, warnings []envschema.Violation, err error) {
+// resolvedEnv is what resolveEnv hands Build: the environment in its two
+// halves, the names docker passes through from the shell, the value-level
+// warnings, and any required value the start was allowed past.
+type resolvedEnv struct {
+	env, secretEnv map[string]string
+	passthrough    []string
+	warnings       []envschema.Violation
+	startedWithout []envresolve.Missing
+}
+
+func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (resolvedEnv, error) {
+	var startedWithout []envresolve.Missing
 	schema, err := envschema.ParseSchema(m.Astro.Env)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return resolvedEnv{}, err
 	}
 	src, err := localenv.LoadSources(os.Environ(), proj.Dir)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return resolvedEnv{}, err
 	}
 	// The vault shared with Astro Desktop. Opened here rather than inside
 	// localenv because this is the composition root and that package holds the
@@ -208,11 +229,11 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 		// hands to the compose process rather than writing into the compose
 		// file, so it stays off disk either way — the posture Astro Desktop
 		// already runs its docker starts under.
-		in.WorkspaceProvider = opts.WorkspaceProvider(m.Astro.Workspace, true)
+		in.WorkspaceProvider = opts.WorkspaceProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), true)
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return resolvedEnv{}, err
 	}
 	// The start GATE is missing-required only: a value with no source blocks
 	// the run (the clone-and-run message). Value-level problems on values that
@@ -225,10 +246,13 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 	// does not validate the environment yet, so this is the only
 	// thing that surfaces them.
 	if len(res.Missing) > 0 {
-		return nil, nil, nil, nil, &MissingEnvError{
-			Project: proj.Dir,
-			Missing: res.Missing,
+		if !opts.AllowMissing {
+			return resolvedEnv{}, &MissingEnvError{
+				Project: proj.Dir,
+				Missing: res.Missing,
+			}
 		}
+		startedWithout = res.Missing
 	}
 	// The file sources inject from disk; the manifest defaults and the
 	// Environment Manager values are not on disk, so layer them in here. They
@@ -295,7 +319,13 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (env,
 		secretInj[k] = v
 		delete(inj, k)
 	}
-	return inj, secretInj, passthroughKeys(res.Resolved, inj), valueWarnings(res.Violations), nil
+	return resolvedEnv{
+		env:            inj,
+		secretEnv:      secretInj,
+		passthrough:    passthroughKeys(res.Resolved, inj),
+		warnings:       valueWarnings(res.Violations),
+		startedWithout: startedWithout,
+	}, nil
 }
 
 // valueWarnings is the violations a start reports without refusing: everything

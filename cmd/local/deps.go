@@ -22,6 +22,7 @@ import (
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/checks"
@@ -67,6 +68,13 @@ type Deps struct {
 	// from the current login context per request; a logged-out user just makes
 	// the provider absent. A test injects a fake.
 	AstroV1Client astrov1.APIClient
+
+	// WorkspaceClients builds the client the Environment Manager read-through
+	// provider reads workspace-source values with, from the stored login for
+	// the manifest's domain — not the current context, so a production-linked
+	// project keeps reading production while the CLI is switched to dev. Nil
+	// turns workspace resolution off. A test injects a fake.
+	WorkspaceClients emenv.ClientFactory
 
 	// Session hands instance resolution the current login's bearer, for a link
 	// that proves itself with the astro auth method. It is a seam because the
@@ -115,19 +123,20 @@ func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
 	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
 	return Deps{
-		Stdin:         os.Stdin,
-		Stdout:        os.Stdout,
-		Stderr:        os.Stderr,
-		Runtime:       newRuntime(),
-		Checks:        runner,
-		CheckVenv:     runner,
-		Provisioner:   newUVProvisioner,
-		WorkingDir:    os.Getwd,
-		OpenURL:       browser.OpenURL,
-		AstroV1Client: astroV1Client,
-		Session:       astrosession.Bearer,
-		Locator:       instancelocate.New(astroV1Client),
-		Interactive:   stdinIsTerminal,
+		Stdin:            os.Stdin,
+		Stdout:           os.Stdout,
+		Stderr:           os.Stderr,
+		Runtime:          newRuntime(),
+		Checks:           runner,
+		CheckVenv:        runner,
+		Provisioner:      newUVProvisioner,
+		WorkingDir:       os.Getwd,
+		OpenURL:          browser.OpenURL,
+		AstroV1Client:    astroV1Client,
+		WorkspaceClients: emenv.Clients,
+		Session:          astrosession.Bearer,
+		Locator:          instancelocate.New(astroV1Client),
+		Interactive:      stdinIsTerminal,
 	}
 }
 

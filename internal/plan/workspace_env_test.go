@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -27,6 +28,7 @@ requires-python = '>=3.10'
 [tool.astro]
 airflow = '3.1'
 workspace = 'cmws'
+domain = 'localhost'
 
 [tool.astro.env]
 DATA_WAREHOUSE_URI = { source = 'workspace' }
@@ -46,9 +48,9 @@ func newWorkspaceProject(t *testing.T, body string) string {
 // tests still exercise the real emenv provider — its fetch, its scoping, and
 // the messages asserted below — rather than a stub that would only prove plan
 // calls something.
-func emProvider(mc astrov1.APIClient) func(string, bool) envresolve.Provider {
-	return func(workspace string, reveal bool) envresolve.Provider {
-		return emenv.NewProvider(workspace, mc, reveal)
+func emProvider(mc astrov1.APIClient) func(string, string, bool) envresolve.Provider {
+	return func(workspace, domain string, reveal bool) envresolve.Provider {
+		return emenv.NewProvider(workspace, domain, func(emenv.Login) astrov1.APIClient { return mc }, reveal)
 	}
 }
 
@@ -98,10 +100,35 @@ func TestBuildLoggedOutGatesWithCause(t *testing.T) {
 	if !errors.As(err, &missing) {
 		t.Fatalf("err = %v, want MissingEnvError", err)
 	}
-	if !testUtil.StringContains([]string{"DATA_WAREHOUSE_URI", "log in with 'astro login'", "astro local env variable set"}, missing.Error()) {
-		t.Fatalf("message missing the cause or fix:\n%s", missing.Error())
+	if !testUtil.StringContains([]string{"DATA_WAREHOUSE_URI", "not logged in to localhost", "log in with `astro login localhost`", "astro local env variable set", "--allow-missing"}, missing.Error()) {
+		t.Fatalf("message missing the cause, the fix, or the way past it:\n%s", missing.Error())
 	}
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
+}
+
+// --allow-missing starts past the same gap: the plan builds, the value is not
+// invented, and the caller gets the missing name and its cause to warn with.
+func TestBuildAllowMissingStartsWithoutTheValue(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.Initial) // no cloud context
+	dir := newWorkspaceProject(t, workspaceManifest)
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
+	built, err := Build(dir, Options{WorkspaceProvider: emProvider(mc), AllowMissing: true})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if len(built.StartedWithout) != 1 || built.StartedWithout[0].Name != "DATA_WAREHOUSE_URI" {
+		t.Fatalf("StartedWithout = %+v, want DATA_WAREHOUSE_URI", built.StartedWithout)
+	}
+	if !strings.Contains(built.StartedWithout[0].SourceNote, "not logged in to localhost") {
+		t.Errorf("cause = %q, want the not-logged-in cause", built.StartedWithout[0].SourceNote)
+	}
+	if _, ok := built.Plan.Env["DATA_WAREHOUSE_URI"]; ok {
+		t.Error("a value was invented for a missing name")
+	}
+	if _, ok := built.Plan.SecretEnv["DATA_WAREHOUSE_URI"]; ok {
+		t.Error("a value was invented for a missing name")
+	}
 }
 
 // Without a client wired (the offline default), a workspace source resolves

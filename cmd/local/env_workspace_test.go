@@ -10,10 +10,16 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/internal/emenv"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
+
+// workspaceClients answers every login with one fake client.
+func workspaceClients(c astrov1.APIClient) emenv.ClientFactory {
+	return func(emenv.Login) astrov1.APIClient { return c }
+}
 
 const workspaceEnvManifest = `[project]
 name = 'demo'
@@ -22,6 +28,7 @@ requires-python = '>=3.10'
 [tool.astro]
 airflow = '3.1'
 workspace = 'cmws'
+domain = 'localhost'
 
 [tool.astro.env]
 DATA_WAREHOUSE_URI = { source = 'workspace' }
@@ -60,7 +67,7 @@ func TestEnvListShowsWorkspaceSource(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	dir := workspaceEnvProject(t)
 	d, out, _ := envDeps(t, dir, "")
-	d.AstroV1Client = warehouseClient()
+	d.WorkspaceClients = workspaceClients(warehouseClient())
 
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)
@@ -84,7 +91,7 @@ func TestEnvGetFromWorkspace(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	dir := workspaceEnvProject(t)
 	d, out, _ := envDeps(t, dir, "")
-	d.AstroV1Client = warehouseClient()
+	d.WorkspaceClients = workspaceClients(warehouseClient())
 
 	if err := execute(t, d, "local", "env", "variable", "get", "DATA_WAREHOUSE_URI", "--output", "json"); err != nil {
 		t.Fatal(err)
@@ -107,13 +114,13 @@ func TestEnvLocalSetOverridesWorkspace(t *testing.T) {
 	dir := workspaceEnvProject(t)
 
 	d, _, _ := envDeps(t, dir, "postgres://local\n")
-	d.AstroV1Client = warehouseClient()
+	d.WorkspaceClients = workspaceClients(warehouseClient())
 	if err := execute(t, d, "local", "env", "variable", "set", "DATA_WAREHOUSE_URI"); err != nil {
 		t.Fatal(err)
 	}
 
 	d, out, _ := envDeps(t, dir, "")
-	d.AstroV1Client = warehouseClient()
+	d.WorkspaceClients = workspaceClients(warehouseClient())
 	if err := execute(t, d, "local", "env", "variable", "get", "DATA_WAREHOUSE_URI", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +140,7 @@ func TestEnvListLoggedOutUnavailable(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.Initial) // no cloud context
 	dir := workspaceEnvProject(t)
 	d, out, _ := envDeps(t, dir, "")
-	d.AstroV1Client = warehouseClient() // present but unused when logged out
+	d.WorkspaceClients = workspaceClients(warehouseClient()) // present but unused when logged out
 
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)

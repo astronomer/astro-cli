@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
+	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/envschema"
@@ -152,6 +153,7 @@ func newStartCmd(c *cli) *cobra.Command {
 		port            int
 		docker          bool
 		stopWithSession bool
+		allowMissing    bool
 	}
 	cmd := &cobra.Command{
 		Use:   nameStart,
@@ -173,12 +175,14 @@ func newStartCmd(c *cli) *cobra.Command {
 				Mode:            mode,
 				RequestedPort:   opts.port,
 				StopWithSession: opts.stopWithSession,
+				AllowMissing:    opts.allowMissing,
 			})
 		},
 	}
 	cmd.Flags().IntVar(&opts.port, "port", 0, "Preferred API server port (0 lets the runtime pick)")
 	cmd.Flags().BoolVar(&opts.docker, "docker", false, "Run Airflow in Docker instead of the default standalone mode")
 	cmd.Flags().BoolVar(&opts.stopWithSession, "stop-with-session", false, "Stop Airflow when this process exits instead of leaving it running")
+	cmd.Flags().BoolVar(&opts.allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
 	return cmd
 }
 
@@ -199,6 +203,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	}
 	warnStandaloneOmissions(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
+	warnStartedWithout(r, built.StartedWithout)
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return adviseStart(err)
@@ -295,6 +300,25 @@ func warnEnvValues(r Renderer, warnings []envschema.Violation) {
 	}
 }
 
+// warnStartedWithout reports each required value a start was allowed past
+// (--allow-missing), with the cause the resolver found, so a Dag that fails on
+// one later is not a mystery.
+func warnStartedWithout(r Renderer, missing []envresolve.Missing) {
+	for _, m := range missing {
+		reason := "no source on this machine"
+		if m.SourceNote != "" {
+			reason = m.SourceNote
+		}
+		emitWarning(r, event{
+			Event:   "warning",
+			Text:    fmt.Sprintf("started without %s %s: %s", sectionLabel(m.Section), m.Name, reason),
+			Section: string(m.Section),
+			Key:     m.Name,
+			Reason:  reason,
+		})
+	}
+}
+
 // sectionLabel names a section the way a person would, since the wire values
 // are snake_case and these strings are read by one. The machine-readable form
 // travels in the event's own Section field, so rewording these is safe.
@@ -374,20 +398,21 @@ func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
 }
 
 func newRestartCmd(c *cli) *cobra.Command {
-	var force bool
+	var force, allowMissing bool
 	cmd := &cobra.Command{
 		Use:   nameRestart,
 		Short: "Restart local Airflow for this project",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return c.runRestart(cmd.Context(), force)
+			return c.runRestart(cmd.Context(), force, allowMissing)
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Skip the graceful shutdown window when stopping")
+	cmd.Flags().BoolVar(&allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
 	return cmd
 }
 
-func (c *cli) runRestart(ctx context.Context, force bool) error {
+func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
@@ -404,7 +429,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 		// Nothing is running (the record is gone), so there is nothing to stop
 		// and no prior mode or port to carry: restart falls back to a plain
 		// start with the defaults.
-		return c.runStart(ctx, plan.Options{})
+		return c.runStart(ctx, plan.Options{AllowMissing: allowMissing})
 	}
 	// Rebuild the plan from the manifest and env as they are now, so a
 	// restart picks up edits — but keep the running mode, port, and session
@@ -413,6 +438,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 		Mode:            st.Mode,
 		RequestedPort:   st.Port,
 		StopWithSession: st.StopWithSession,
+		AllowMissing:    allowMissing,
 
 		WorkspaceProvider: c.workspaceProvider(),
 	})
@@ -425,6 +451,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	}
 	warnStandaloneOmissions(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
+	warnStartedWithout(r, built.StartedWithout)
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
 	}

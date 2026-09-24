@@ -69,6 +69,11 @@ type Astro struct {
 	// link inherits when the link sets none. Empty if unset. It is already
 	// folded into each Link.Workspace; kept here for display.
 	Workspace string
+	// Domain is [tool.astro] domain, the Astro host Workspace lives on
+	// (astronomer.io, astronomer-dev.io, ...). Empty if unset; read it through
+	// WorkspaceDomain, which applies the default. It names the login a
+	// `source = "workspace"` value is read with — see docs/v2-workspace-link.md.
+	Domain string
 	// Target is [tool.astro] target, the default target every link inherits
 	// when the link sets none. Empty if unset (links then fall back to
 	// "astro"). It is already folded into each Link.Target; kept here for
@@ -268,6 +273,10 @@ const (
 	// CodeTargetNotAName is [tool.astro] target given a table: the old
 	// spelling of the backend-config section, which is its own block now.
 	CodeTargetNotAName ProblemCode = "target_not_a_name"
+	// CodeDomainWithoutWorkspace is [tool.astro] domain with no workspace: a
+	// host for nothing, most likely a workspace line deleted and its domain
+	// left behind.
+	CodeDomainWithoutWorkspace ProblemCode = "domain_without_workspace"
 
 	// Links: what a deployment link may be called and what it must name.
 	CodeLinkNeedsName               ProblemCode = "link_needs_name"
@@ -316,6 +325,7 @@ var problemCodes = []ProblemCode{
 
 	CodeProjectNameInvalid, CodeAirflowVersionInvalid,
 	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeTargetNotAName,
+	CodeDomainWithoutWorkspace,
 
 	CodeLinkNeedsName, CodeLinkNameReserved, CodeTargetUnusable,
 	CodeInheritedTargetUnusable, CodeTargetNeedsEnvironment,
@@ -442,7 +452,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "deployments", "dockerfile", "env", "packages", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "deployments", "dockerfile", "domain", "env", "packages", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
@@ -492,6 +502,7 @@ func (p *parser) astro(raw map[string]any) Astro {
 		AirflowVersion: p.reqStr(astroRoot+".airflow", raw["airflow"]),
 		Packages:       p.packages(raw["packages"]),
 		Workspace:      p.str(astroRoot+".workspace", raw["workspace"]),
+		Domain:         strings.TrimSpace(p.str(astroRoot+".domain", raw["domain"])),
 		Target:         p.defaultTarget(raw["target"]),
 		Targets:        p.targets(raw["targets"]),
 		Env:            p.table(astroRoot+".env", raw["env"]),
@@ -502,8 +513,46 @@ func (p *parser) astro(raw map[string]any) Astro {
 		// presence fallback and take the project's real Dockerfile away.
 		Dockerfile: strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
 	}
+	if a.Domain != "" && a.Workspace == "" {
+		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the host of a workspace, and [tool.astro] sets no workspace")
+	}
 	a.Deployments = p.links(raw["deployments"], &a)
 	return a
+}
+
+// DefaultWorkspaceDomain is the host a workspace link means when the manifest
+// names none and ASTRO_DOMAIN does not either. Every manifest written before
+// [tool.astro] domain existed links a production workspace, and a default that
+// followed the current login would ask a dev host for a production id.
+const DefaultWorkspaceDomain = "astronomer.io"
+
+// WorkspaceDomain is the Astro host the linked workspace lives on, normalized
+// the way `astro login` stores a login's domain so the two meet: [tool.astro]
+// domain; else ASTRO_DOMAIN, the explicit override CI sets beside
+// ASTRO_API_TOKEN and Astro Desktop reads as its own host; else
+// DefaultWorkspaceDomain.
+func (a *Astro) WorkspaceDomain() string {
+	d := a.Domain
+	if d == "" {
+		d = os.Getenv("ASTRO_DOMAIN")
+	}
+	if d = NormalizeDomain(d); d != "" {
+		return d
+	}
+	return DefaultWorkspaceDomain
+}
+
+// NormalizeDomain reduces an Astro host as someone might write it — a copied
+// URL, the cloud UI's host, mixed case — to the form `astro login` stores its
+// login under: "https://cloud.astronomer-dev.io/" is "astronomer-dev.io". A
+// domain written any other way names no stored login, and the fix the error
+// suggests would store the next login under a different key again.
+func NormalizeDomain(d string) string {
+	d = strings.ToLower(strings.TrimSpace(d))
+	d = strings.TrimPrefix(d, "https://")
+	d = strings.TrimPrefix(d, "http://")
+	d = strings.TrimRight(d, "/")
+	return strings.TrimPrefix(d, "cloud.")
 }
 
 // defaultTarget reads [tool.astro] target, the default every link inherits. It

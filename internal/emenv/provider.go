@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
@@ -42,8 +41,13 @@ const sourceLabel = "workspace"
 // run.
 type provider struct {
 	workspaceID string
-	client      astrov1.APIClient
-	reveal      bool // ask for secret values (start/get); false is presence-only (list)
+	// domain is the Astro host the workspace lives on, from the manifest. It
+	// picks the stored login the read uses, whatever host the CLI's current
+	// context names — docs/v2-workspace-link.md.
+	domain    string
+	clientFor ClientFactory
+	client    astrov1.APIClient // built in load, from the domain's login
+	reveal    bool              // ask for secret values (start/get); false is presence-only (list)
 
 	once    sync.Once
 	objects map[string]objectValue
@@ -109,26 +113,43 @@ func (p *provider) Diagnose(key string) string {
 	}
 	if obj, ok := p.objects[key]; ok && obj.isSecret && obj.value == "" {
 		if !p.secretsIncluded {
-			return `it lives in Environment Manager but your org disables secret fetching — ask an org admin to enable "Environment Secrets Fetching"`
+			return causeSecretsWithheld
 		}
-		return "Environment Manager holds it as a secret with no value to resolve"
+		return causeNoValue
 	}
-	return "Environment Manager holds no value for it in this workspace"
+	return causeNoValue
 }
+
+// The causes docs/v2-workspace-link.md lists, worded as it words them. Astro
+// Desktop shows the same text, so a failure reads the same from either app.
+const (
+	causeSecretsWithheld = `your org disables Environment Secrets Fetching — ask an org admin to enable it, or set the value locally`
+	causeNoValue         = "the workspace holds no value for it"
+)
 
 // load fetches the workspace's objects once, recording a whole-provider outage
 // on any failure so Lookup stays silent and Label/Diagnose explain.
 func (p *provider) load() {
 	p.once.Do(func() {
-		// The current context picks the login and the org; a logged-out user
-		// has none, and the provider is simply absent. What counts as logged
-		// out comes from internal/astrosession, so this and the query commands
-		// never disagree about whether there is a session.
-		ctx, err := config.GetCurrentContext()
-		if err != nil || astrosession.Credential(ctx.Token) == "" {
-			p.down = &outage{short: "logged out", cause: "you are not logged in — log in with 'astro login'"}
+		// The manifest's domain picks the login and the org, not the current
+		// context: a production-linked project keeps reading production while
+		// the CLI is switched to dev. No login for that domain and the provider
+		// is simply absent. What counts as logged in comes from
+		// internal/astrosession, so this and the query commands never disagree
+		// about whether there is a session.
+		ctx, err := freshLogin(p.domain)
+		if errors.Is(err, errSessionExpired) {
+			p.down = p.classify(&httpError{code: http.StatusUnauthorized})
 			return
 		}
+		if err != nil || astrosession.Credential(ctx.Token) == "" {
+			p.down = &outage{
+				short: "not logged in to " + p.domain,
+				cause: fmt.Sprintf("not logged in to %s — log in with `astro login %s`", p.domain, p.domain),
+			}
+			return
+		}
+		p.client = p.clientFor(Login{Domain: ctx.Domain, Token: ctx.Token, APIURL: ctx.GetPublicRESTAPIURL("v1")})
 		// When the org disallows reading secrets, non-secret values still
 		// resolve, so the fallback re-reads without the secret request and a
 		// workspace secret then reads as a miss whose cause names the org
@@ -139,7 +160,7 @@ func (p *provider) load() {
 				return p.fetch(reqCtx, ctx.Organization, showSecrets)
 			})
 		if err != nil {
-			p.down = classify(err)
+			p.down = p.classify(err)
 			return
 		}
 		p.objects = objs
@@ -310,19 +331,22 @@ func statusError(wantSecrets bool, resp *astrov1.ListEnvironmentObjectsResponse)
 }
 
 // classify turns a fetch error into the outage a user sees: each named failure
-// mode gets its own short label and remediation cause.
-func classify(err error) *outage {
+// mode gets its own short label and remediation cause, worded as
+// docs/v2-workspace-link.md words them. Each names the domain, because the
+// commonest wrong answer — a production workspace asked of a dev host — is
+// fixed by the login, not by the manifest.
+func (p *provider) classify(err error) *outage {
 	var he *httpError
 	if errors.As(err, &he) {
 		switch he.code {
 		case http.StatusUnauthorized:
-			return &outage{short: "session expired", cause: "your session expired — log in again with 'astro login'"}
+			return &outage{short: "session expired", cause: fmt.Sprintf("your %s session expired — log in again with `astro login %s`", p.domain, p.domain)}
 		case http.StatusForbidden:
-			return &outage{short: "access lost", cause: "you no longer have access to this workspace — ask an org admin to restore it"}
+			return &outage{short: "no access", cause: fmt.Sprintf("you don't have access to this workspace on %s — check your current organization (`astro organization switch`), or ask an org admin", p.domain)}
 		case http.StatusNotFound:
-			return &outage{short: "workspace not found", cause: "this workspace no longer exists — check the `workspace` in your manifest"}
+			return &outage{short: "workspace not found", cause: fmt.Sprintf("workspace %s was not found on %s — check `workspace` and `domain` in pyproject.toml, and your current organization", p.workspaceID, p.domain)}
 		}
-		return &outage{short: "unreachable", cause: fmt.Sprintf("Environment Manager returned an error: %v", he.err)}
+		return &outage{short: "unreachable", cause: fmt.Sprintf("%s returned an error: %v", p.domain, he.err)}
 	}
-	return &outage{short: "offline", cause: "could not reach Astro to read the workspace — check your connection"}
+	return &outage{short: "offline", cause: fmt.Sprintf("could not reach %s — check your connection, or set the value locally", p.domain)}
 }

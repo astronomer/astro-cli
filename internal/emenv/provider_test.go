@@ -9,15 +9,25 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
+	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 const testWorkspace = "cmws123"
+
+// testDomain is the host InitTestConfig(LocalPlatform) stores its login under.
+const testDomain = "localhost"
+
+// clientsOf is a ClientFactory that answers every login with one fake client.
+func clientsOf(c astrov1.APIClient) ClientFactory {
+	return func(Login) astrov1.APIClient { return c }
+}
 
 func envVarObj(key, val string, secret bool) astrov1.EnvironmentObject {
 	return astrov1.EnvironmentObject{
@@ -69,7 +79,7 @@ func mockClient(resp *astrov1.ListEnvironmentObjectsResponse) *astrov1_mocks.Cli
 func loggedInProvider(t *testing.T, client astrov1.APIClient, reveal bool) envresolve.Provider {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	return NewProvider(testWorkspace, client, reveal)
+	return NewProvider(testWorkspace, testDomain, clientsOf(client), reveal)
 }
 
 func TestLookupResolvesEnvVarAndAirflowVar(t *testing.T) {
@@ -104,7 +114,7 @@ func TestFetchUsesWorkspaceScope(t *testing.T) {
 		}),
 	).Return(okResp(envVarObj("K", "v", false)), nil)
 
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 	v, ok := p.Lookup("K")
 	require.True(t, ok)
 	require.Equal(t, "v", v)
@@ -118,7 +128,7 @@ func TestLookupMissForUnknownKey(t *testing.T) {
 	_, ok := p.Lookup("UNKNOWN")
 	require.False(t, ok)
 	require.Equal(t, "workspace", p.Label())
-	require.Equal(t, "Environment Manager holds no value for it in this workspace", p.(envresolve.Diagnoser).Diagnose("UNKNOWN"))
+	require.Equal(t, "the workspace holds no value for it", p.(envresolve.Diagnoser).Diagnose("UNKNOWN"))
 }
 
 // One fetch serves every name in a run: repeated Lookups make one fetch (a call
@@ -129,7 +139,7 @@ func TestSharedFetchAcrossNames(t *testing.T) {
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Return(okResp(envVarObj("A", "1", false), envVarObj("B", "2", false)), nil)
 
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 
 	v, ok := p.Lookup("A")
 	require.True(t, ok)
@@ -145,20 +155,52 @@ func TestSharedFetchAcrossNames(t *testing.T) {
 func TestLoggedOutProviderAbsent(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.Initial) // no cloud context
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 
 	_, ok := p.Lookup("DATA_WAREHOUSE_URI")
 	require.False(t, ok)
-	require.Equal(t, "workspace (unavailable: logged out)", p.Label())
-	require.Equal(t, "you are not logged in — log in with 'astro login'", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "workspace (unavailable: not logged in to localhost)", p.Label())
+	require.Equal(t, "not logged in to localhost — log in with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
+}
+
+// The manifest's domain picks the login, not the current context. A project
+// linked to a production workspace is read with the production login even
+// while the CLI is switched to another host — and with no production login it
+// says so, naming the host, instead of asking the current one for an id it has
+// never heard of.
+func TestManifestDomainPicksTheLogin(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform) // logged in to localhost only
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	var usedDomain string
+	factory := func(l Login) astrov1.APIClient {
+		usedDomain = l.Domain
+		return mc
+	}
+
+	p := NewProvider(testWorkspace, "astronomer.io", factory, true)
+	_, ok := p.Lookup("X")
+	require.False(t, ok)
+	require.Equal(t, "workspace (unavailable: not logged in to astronomer.io)", p.Label())
+	require.Equal(t, "not logged in to astronomer.io — log in with `astro login astronomer.io`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Empty(t, usedDomain, "no client is built without a login for the manifest's domain")
+	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
+
+	// With a login for that domain, the client is built from it.
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
+		Return(okResp(envVarObj("X", "v", false)), nil)
+	p = NewProvider(testWorkspace, testDomain, factory, true)
+	v, ok := p.Lookup("X")
+	require.True(t, ok)
+	require.Equal(t, "v", v)
+	require.Equal(t, testDomain, usedDomain)
 }
 
 // No top-level workspace in the manifest: the provider is unavailable and names
 // the fix, without touching the API.
 func TestNoWorkspaceUnavailable(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	p := NewProvider("", mc, true)
+	p := NewProvider("", testDomain, clientsOf(mc), true)
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
@@ -167,15 +209,74 @@ func TestNoWorkspaceUnavailable(t *testing.T) {
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
-// Docker start can't inject values without writing them to disk, so it wires an
-// Unavailable provider whose reason names the fix.
+// An Unavailable provider never resolves and reports its reason verbatim.
 func TestUnavailableProvider(t *testing.T) {
-	p := Unavailable("run without --docker")
+	p := Unavailable("the reason")
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
-	require.Equal(t, "workspace (unavailable: run without --docker)", p.Label())
-	require.Equal(t, "run without --docker", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "workspace (unavailable: the reason)", p.Label())
+	require.Equal(t, "the reason", p.(envresolve.Diagnoser).Diagnose("X"))
+}
+
+// A stale login for the manifest's domain is refreshed before the read, saved
+// under that domain, and used — without moving the CLI's current context. The
+// CLI refreshes only its current login on its own, so without this a
+// production-linked project read while switched to dev breaks the moment the
+// production token expires.
+func TestStaleLoginForAnotherDomainIsRefreshed(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform) // current context: localhost
+	prod := config.Context{Domain: "astronomer.io"}
+	require.NoError(t, prod.SetContextKey("domain", "astronomer.io"))
+	require.NoError(t, prod.SetContextKey("token", "Bearer old"))
+	require.NoError(t, prod.SetContextKey("refreshtoken", "refresh-1"))
+	// No stored expiry reads as expired.
+
+	restore := refreshLogin
+	t.Cleanup(func() { refreshLogin = restore })
+	refreshLogin = func(domain, refreshToken string) (*astroauth.TokenResponse, error) {
+		require.Equal(t, "astronomer.io", domain)
+		require.Equal(t, "refresh-1", refreshToken)
+		return &astroauth.TokenResponse{AccessToken: "new", RefreshToken: "refresh-2", ExpiresIn: 3600}, nil
+	}
+
+	mc := mockClient(okResp(envVarObj("X", "v", false)))
+	var usedToken string
+	factory := func(l Login) astrov1.APIClient {
+		usedToken = l.Token
+		return mc
+	}
+	p := NewProvider(testWorkspace, "astronomer.io", factory, true)
+	v, ok := p.Lookup("X")
+	require.True(t, ok)
+	require.Equal(t, "v", v)
+	require.Equal(t, "Bearer new", usedToken, "the read uses the refreshed token")
+
+	saved, err := prod.GetContext()
+	require.NoError(t, err)
+	require.Equal(t, "Bearer new", saved.Token)
+	require.Equal(t, "refresh-2", saved.RefreshToken)
+	current, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	require.Equal(t, testDomain, current.Domain, "a refresh must not switch the CLI's current host")
+}
+
+// A refresh that fails reports the domain's session as expired, naming the
+// login that fixes it.
+func TestFailedRefreshReportsSessionExpired(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	require.NoError(t, (&config.Context{Domain: testDomain}).SetContextKey("refreshtoken", "refresh-1"))
+	restore := refreshLogin
+	t.Cleanup(func() { refreshLogin = restore })
+	refreshLogin = func(string, string) (*astroauth.TokenResponse, error) { return nil, errors.New("invalid_grant") }
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	_, ok := p.Lookup("X")
+	require.False(t, ok)
+	require.Equal(t, "workspace (unavailable: session expired)", p.Label())
+	require.Equal(t, "your localhost session expired — log in again with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
+	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
 // Each HTTP failure mode gets its own named label and cause.
@@ -187,9 +288,9 @@ func TestFailureModeMessages(t *testing.T) {
 		wantLabel string
 		wantCause string
 	}{
-		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your session expired — log in again with 'astro login'"},
-		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: access lost)", "you no longer have access to this workspace — ask an org admin to restore it"},
-		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "this workspace no longer exists — check the `workspace` in your manifest"},
+		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your localhost session expired — log in again with `astro login localhost`"},
+		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this workspace on localhost — check your current organization (`astro organization switch`), or ask an org admin"},
+		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "workspace cmws123 was not found on localhost — check `workspace` and `domain` in pyproject.toml, and your current organization"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -209,7 +310,7 @@ func TestOfflineProviderAbsent(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Return((*astrov1.ListEnvironmentObjectsResponse)(nil), errors.New("dial tcp: no route to host"))
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
@@ -237,7 +338,7 @@ func TestSecretsDisabledHardMiss(t *testing.T) {
 		envVarObj("SECRET_TOKEN", "", true),
 	), nil)
 
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 
 	v, ok := p.Lookup("PLAIN")
 	require.True(t, ok, "non-secret value still resolves when secrets are disabled")
@@ -245,7 +346,7 @@ func TestSecretsDisabledHardMiss(t *testing.T) {
 
 	_, ok = p.Lookup("SECRET_TOKEN")
 	require.False(t, ok, "a withheld secret is a hard miss")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), `enable "Environment Secrets Fetching"`)
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "your org disables Environment Secrets Fetching")
 
 	require.Equal(t, "workspace", p.Label())
 	// The first typed call is refused; the retry re-fetches every type without
@@ -281,10 +382,10 @@ func TestSecretsDisabledConnectionHardMiss(t *testing.T) {
 		).Return(okResp(objs...), nil)
 	}
 
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 	_, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
 	require.False(t, ok, "a connection read without secrets is a hard miss")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), `enable "Environment Secrets Fetching"`)
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), "your org disables Environment Secrets Fetching")
 }
 
 // Presence mode (list) still reports such a connection as held by the
@@ -349,13 +450,13 @@ func TestSecretsDisabledWhenTheRefusalIsNotAnEnvelope(t *testing.T) {
 		envVarObj("SECRET_TOKEN", "", true),
 	), nil)
 
-	p := NewProvider(testWorkspace, mc, true)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
 
 	v, ok := p.Lookup("PLAIN")
 	require.True(t, ok, "the fallback ran, so non-secret values still resolve")
 	require.Equal(t, "visible", v)
 	require.Equal(t, "workspace", p.Label(), "the workspace is available, not unreachable")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), `enable "Environment Secrets Fetching"`)
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "your org disables Environment Secrets Fetching")
 }
 
 // A secret the organization allowed but the platform returned empty is not the
@@ -369,8 +470,8 @@ func TestSecretWithNoValueWhenSecretsWereAllowed(t *testing.T) {
 	require.False(t, ok, "a secret with no value is a miss in reveal mode")
 
 	cause := p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN")
-	require.NotContains(t, cause, `enable "Environment Secrets Fetching"`)
-	require.Contains(t, cause, "no value to resolve")
+	require.NotContains(t, cause, "your org disables Environment Secrets Fetching")
+	require.Contains(t, cause, "the workspace holds no value for it")
 }
 
 // A workspace larger than one window needs the offset to reach the request, or
@@ -407,7 +508,7 @@ func TestFetchPagesThroughMoreThanOneWindow(t *testing.T) {
 		mock.MatchedBy(atOffset(emfetch.PageLimit))).Return(
 		window([]astrov1.EnvironmentObject{envVarObj("LAST_KEY", "found", false)}), nil)
 
-	p := NewProvider(testWorkspace, mc, false)
+	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), false)
 
 	v, ok := p.Lookup("LAST_KEY")
 	require.True(t, ok, "a key in the second window resolves")
