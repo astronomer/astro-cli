@@ -55,6 +55,10 @@ var newUVProvisioner = func(ctx context.Context) (checks.Provisioner, error) {
 // what sweepCheckVenvs ages by.
 const venvMarker = ".check-complete"
 
+// venvConstraints names the constraints file written into a check venv whose
+// project declares [tool.uv] constraint-dependencies, for uv pip install to read.
+const venvConstraints = ".check-constraints.txt"
+
 // venvUnusedFor is how long a cached check environment survives without being
 // used.
 //
@@ -123,9 +127,17 @@ func (p *uvProvisioner) EnsureVenv(ctx context.Context, spec checks.VenvSpec, pr
 		return "", err
 	}
 	// No project directory, deliberately: this is a scratch environment in the
-	// cache, not a project, so there is no [tool.uv] configuration of its own to
-	// honor and uv should not pick up whatever the caller happens to be sitting in.
-	if err := p.client.PipInstall(ctx, "", python, spec.Reqs, "", uv.Stdio{}); err != nil {
+	// cache, not a project, so uv should not pick up whatever [tool.uv] the
+	// caller happens to be sitting in. The project's own constraints arrive in
+	// the spec instead, written beside the venv for uv to read.
+	constraints := ""
+	if len(spec.Constraints) > 0 {
+		constraints = filepath.Join(dir, venvConstraints)
+		if err := os.WriteFile(constraints, []byte(strings.Join(spec.Constraints, "\n")+"\n"), markerPerms); err != nil {
+			return "", fmt.Errorf("writing the check environment's constraints: %w", err)
+		}
+	}
+	if err := p.client.PipInstall(ctx, "", python, spec.Reqs, constraints, uv.Stdio{}); err != nil {
 		return "", err
 	}
 	if err := os.WriteFile(marker, nil, markerPerms); err != nil {
@@ -294,6 +306,14 @@ func (p *uvProvisioner) key(spec checks.VenvSpec) string {
 	fmt.Fprintf(h, "%s\x00%s\x00", spec.Airflow, spec.Python)
 	for _, r := range spec.Reqs {
 		fmt.Fprintf(h, "%s\n", r)
+	}
+	// Only when there are any, so a spec without constraints keeps the key it
+	// always had and its cached venv.
+	if len(spec.Constraints) > 0 {
+		fmt.Fprintf(h, "\x00constraints\n")
+		for _, c := range spec.Constraints {
+			fmt.Fprintf(h, "%s\n", c)
+		}
 	}
 	python := spec.Python
 	if python == "" {

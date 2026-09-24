@@ -78,3 +78,17 @@ func TestRunProvisionedReturnsTheProvisionerError(t *testing.T) {
 		&fakeProvisioner{ensureErr: boom}, &fakeTargetParser{}, nil)
 	assert.ErrorIs(t, err, boom)
 }
+
+// The scratch venv sits outside the project, where uv cannot read the
+// project's [tool.uv], so the constraints travel in the spec. Sorted, for the
+// same cache-key reason the requirements are.
+func TestRunProvisionedCarriesTheProjectsConstraints(t *testing.T) {
+	prov := &fakeProvisioner{python: "/tmp/py"}
+	constraints := []string{"sqlalchemy<2.1", "pandas<3"}
+	_, err := RunProvisioned(context.Background(), Options{ProjectPath: "/p"},
+		ProvisionInput{ProjectPath: "/p", Pin: "3.1", Constraints: constraints},
+		prov, &fakeTargetParser{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"pandas<3", "sqlalchemy<2.1"}, prov.gotSpec.Constraints)
+	assert.Equal(t, []string{"sqlalchemy<2.1", "pandas<3"}, constraints, "the caller's slice must not be reordered")
+}

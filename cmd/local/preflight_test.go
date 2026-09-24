@@ -394,11 +394,20 @@ func TestProvisionerKeyIsStableAndSpecific(t *testing.T) {
 		{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "numpy"}},
 		{Airflow: "3.1.8", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "pandas"}},
 		{Airflow: "3.0.6", Python: "3.11", Reqs: []string{"apache-airflow==3.0.6", "pandas"}},
+		{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "pandas"}, Constraints: []string{"sqlalchemy<2.1"}},
 	}
 	for _, spec := range changed {
 		if p.key(spec) == k1 {
 			t.Errorf("a changed spec must change the key: %+v", spec)
 		}
+	}
+
+	// A constraint is not a requirement: the same line in the other list is a
+	// different environment.
+	asReq := checks.VenvSpec{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "sqlalchemy<2.1"}}
+	asConstraint := checks.VenvSpec{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6"}, Constraints: []string{"sqlalchemy<2.1"}}
+	if p.key(asReq) == p.key(asConstraint) {
+		t.Error("a constraint and a requirement with the same text must not share a key")
 	}
 }
 

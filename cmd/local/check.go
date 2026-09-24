@@ -163,6 +163,7 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, m *manife
 		DagsDir:     checks.DefaultDagsDir(project),
 		Pin:         m.Astro.AirflowVersion,
 		Deps:        m.Project.Dependencies,
+		Constraints: m.UV.ConstraintDependencies,
 	}, prov, c.d.CheckVenv, strict, progress)
 }
 
@@ -230,6 +231,7 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 		Pin:            m.Astro.AirflowVersion,
 		Deps:           m.Project.Dependencies,
 		RequiresPython: m.Project.RequiresPython,
+		Constraints:    m.UV.ConstraintDependencies,
 	}, prov, c.d.CheckVenv, c.progressFn(r, nameCheck))
 	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {
 		// An operational failure of the parse itself is not an environment

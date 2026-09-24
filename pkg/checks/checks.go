@@ -253,6 +253,8 @@ type ProvisionInput struct {
 	// RequiresPython is the manifest's [project] requires-python, passed to the
 	// provisioner as its interpreter request.
 	RequiresPython string
+	// Constraints is the manifest's [tool.uv] constraint-dependencies.
+	Constraints []string
 }
 
 // RunProvisioned inspects a project's DAGs with an interpreter it builds, for
@@ -276,9 +278,10 @@ func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov P
 		progress = func(string) {}
 	}
 	python, err := prov.EnsureVenv(ctx, VenvSpec{
-		Airflow: in.Pin,
-		Python:  in.RequiresPython,
-		Reqs:    projectRequirements(in.Pin, in.Deps),
+		Airflow:     in.Pin,
+		Python:      in.RequiresPython,
+		Reqs:        projectRequirements(in.Pin, in.Deps),
+		Constraints: sortedCopy(in.Constraints),
 	}, progress)
 	if err != nil {
 		return Result{}, err

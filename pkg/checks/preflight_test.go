@@ -20,7 +20,7 @@ type fakeProvisioner struct {
 	ensureCalls int
 }
 
-func (f *fakeProvisioner) EnsureVenv(_ context.Context, spec VenvSpec, progress func(string)) (string, error) {
+func (f *fakeProvisioner) EnsureVenv(_ context.Context, spec VenvSpec, progress func(string)) (string, error) { //nolint:gocritic // hugeParam: implements Provisioner, which takes the spec by value
 	f.gotSpec = spec
 	f.ensureCalls++
 	progress("provisioning")
@@ -243,5 +243,16 @@ func TestPreflightToleratesANilProgress(t *testing.T) {
 	}
 	if rep.OpError != "" {
 		t.Errorf("OpError = %q, want none", rep.OpError)
+	}
+}
+
+func TestPreflightCarriesTheProjectsConstraints(t *testing.T) {
+	prov := &fakeProvisioner{python: "/scratch/bin/python"}
+	in := PreflightInput{Pin: "3.1", Deps: []string{"apache-airflow==3.1.*"}, Constraints: []string{"sqlalchemy<2.1"}}
+
+	Preflight(context.Background(), TargetComposer, in, prov, &fakeTargetParser{report: cleanReport()}, false, noteProgress)
+
+	if got := prov.gotSpec.Constraints; len(got) != 1 || got[0] != "sqlalchemy<2.1" {
+		t.Errorf("the target venv should carry the project's constraints, got %v", got)
 	}
 }

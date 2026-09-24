@@ -25,6 +25,18 @@ import (
 // concrete release happens at start time, so new projects track patches.
 const DefaultAirflowVersion = "3.1"
 
+// sqlalchemyCap keeps a new project's environment off SQLAlchemy 2.1, which
+// removed sqlalchemy.orm.attributes.ScalarAttributeImpl. SQLAlchemy-Utils, which
+// Airflow depends on, subclasses it in sqlalchemy_utils/generic.py, so Airflow
+// fails to import. Neither Airflow nor SQLAlchemy-Utils caps SQLAlchemy, so
+// without this every fresh lock since 2.1.0's release resolved an Airflow that
+// cannot start.
+//
+// Remove it once a SQLAlchemy-Utils release supports SQLAlchemy 2.1
+// (https://github.com/kvesteri/sqlalchemy-utils/issues/800), or once projects
+// resolve under Airflow's constraints files, which pin both.
+const sqlalchemyCap = "sqlalchemy<2.1"
+
 // manifestKeyAirflow is the [tool.astro] key carrying the Airflow pin. Both
 // manifest arms write it and the starter DAG's import rule is checked against
 // it, which is three spellings of one name — the drift the file-name constants
@@ -756,7 +768,12 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 		"requires-python = '" + requiresPython(version) + "'\n" +
 		"dependencies = []\n\n" +
 		"[tool.astro]\n" +
-		"airflow = '" + DefaultAirflowVersion + "'\n"
+		"airflow = '" + DefaultAirflowVersion + "'\n\n" +
+		"[tool.uv]\n" +
+		"# SQLAlchemy-Utils, which Airflow depends on, breaks on SQLAlchemy 2.1.\n" +
+		"# Remove this once a SQLAlchemy-Utils release fixes it:\n" +
+		"# https://github.com/kvesteri/sqlalchemy-utils/issues/800\n" +
+		"constraint-dependencies = ['" + sqlalchemyCap + "']\n"
 	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
 		return nil, nil, err

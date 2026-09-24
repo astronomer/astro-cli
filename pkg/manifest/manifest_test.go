@@ -1169,3 +1169,27 @@ func TestParseDockerfileDeclaration(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadReadsUVConstraintDependencies(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\n\n[tool.astro]\nairflow = \"3\"\n\n"+
+		"[tool.uv]\nconstraint-dependencies = [\"sqlalchemy<2.1\", \"pandas<3\"]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"sqlalchemy<2.1", "pandas<3"}; !reflect.DeepEqual(m.UV.ConstraintDependencies, want) {
+		t.Errorf("constraint-dependencies = %#v, want %#v", m.UV.ConstraintDependencies, want)
+	}
+}
+
+// [tool.uv] is uv's table, so a shape uv would reject is uv's to report: the
+// project still loads, and astro reads no constraints from it.
+func TestLoadIgnoresAUVTableOfTheWrongShape(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\n\n[tool.astro]\nairflow = \"3\"\n\n"+
+		"[tool.uv]\nconstraint-dependencies = \"sqlalchemy<2.1\"\n"))
+	if err != nil {
+		t.Fatalf("a [tool.uv] astro does not own must not stop the load: %v", err)
+	}
+	if m.UV.ConstraintDependencies != nil {
+		t.Errorf("a string is not a constraint list, got %#v", m.UV.ConstraintDependencies)
+	}
+}

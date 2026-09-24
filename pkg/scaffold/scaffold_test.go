@@ -79,8 +79,24 @@ func TestScaffoldedProjectLocksWithRealUv(t *testing.T) {
 	require.NoError(t, client.Lock(t.Context(), dir, uv.Stdio{}),
 		"a freshly scaffolded project must uv lock cleanly")
 
-	_, err = os.Stat(filepath.Join(dir, "uv.lock"))
+	lock, err := os.ReadFile(filepath.Join(dir, "uv.lock"))
 	require.NoError(t, err, "uv lock must write a lockfile")
+	// The cap in [tool.uv] reaches the resolve: SQLAlchemy 2.1 has no
+	// ScalarAttributeImpl, which SQLAlchemy-Utils subclasses, so an Airflow
+	// locked against it cannot import.
+	// Both spellings uv writes: a [[package]] entry puts the version on the next
+	// line, a dependency reference in a forked resolve puts it after a comma.
+	assert.NotRegexp(t, `name = "sqlalchemy",?\s+version = "2\.1`, string(lock))
+}
+
+func TestRunCapsSQLAlchemyBelowTwoPointOne(t *testing.T) {
+	dir := t.TempDir()
+	_, err := Run(dir, Options{})
+	require.NoError(t, err)
+
+	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"sqlalchemy<2.1"}, m.UV.ConstraintDependencies)
 }
 
 func TestRunHonorsNameAndAirflowVersion(t *testing.T) {

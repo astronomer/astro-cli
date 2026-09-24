@@ -74,6 +74,11 @@ type VenvSpec struct {
 	// Reqs is the requirement set to install, including the pinned
 	// apache-airflow line.
 	Reqs []string
+	// Constraints limits the versions the install may pick without requiring
+	// anything: the project's [tool.uv] constraint-dependencies, which uv
+	// applies to the project's own environment but cannot see from a scratch
+	// one.
+	Constraints []string
 }
 
 // Provisioner builds and caches a scratch venv for a target, and resolves a
@@ -107,6 +112,8 @@ type PreflightInput struct {
 	Pin string
 	// Deps is the manifest's [project].dependencies.
 	Deps []string
+	// Constraints is the manifest's [tool.uv] constraint-dependencies.
+	Constraints []string
 }
 
 // ConstraintOutcome is the MWAA constraints pre-flight result. Exactly one of
@@ -166,6 +173,8 @@ func (r *TargetReport) ExitCode(strict bool) int {
 // recorded on the report (OpError for operational ones) so a multi-target run
 // reports each target and still picks a single exit code. progress receives
 // human notes for the text renderer to stream.
+//
+//nolint:gocritic // hugeParam: PreflightInput is a contract struct, passed by value like the v2 ones (docs/v2-architecture.md).
 func Preflight(ctx context.Context, target string, in PreflightInput, prov Provisioner, parser TargetParser, strict bool, progress func(string)) TargetReport {
 	// A consumer with nowhere to stream notes passes nil, and this function
 	// promises never to return an error — so it must not panic on one either.
@@ -213,7 +222,7 @@ func Preflight(ctx context.Context, target string, in PreflightInput, prov Provi
 			"%s pins its own Python; checking with the default interpreter, so a Python-version-specific issue may not show", target))
 	}
 
-	pythonBin, err := prov.EnsureVenv(ctx, VenvSpec{Airflow: match.Airflow, Python: python, Reqs: reqs}, progress)
+	pythonBin, err := prov.EnsureVenv(ctx, VenvSpec{Airflow: match.Airflow, Python: python, Reqs: reqs, Constraints: sortedCopy(in.Constraints)}, progress)
 	if err != nil {
 		rep.OpError = fmt.Sprintf("building the %s check environment: %v", target, err)
 		return rep
@@ -289,6 +298,17 @@ func mwaaConstraints(ctx context.Context, prov Provisioner, deps []string, v pla
 // sorted so the cache key over it is stable.
 func requirementSet(airflow string, deps []string) []string {
 	out := append([]string{"apache-airflow==" + airflow}, dropAirflow(deps)...)
+	sort.Strings(out)
+	return out
+}
+
+// sortedCopy orders a list for a cache key that does not depend on how the
+// manifest happened to order it, without reordering the caller's slice.
+func sortedCopy(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := append([]string{}, in...)
 	sort.Strings(out)
 	return out
 }

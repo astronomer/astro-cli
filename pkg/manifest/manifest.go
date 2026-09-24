@@ -46,6 +46,17 @@ import (
 type Manifest struct {
 	Project Project
 	Astro   Astro
+	UV      UV
+}
+
+// UV is the [tool.uv] table, the fields astro reads. uv applies them to the
+// project's own environment itself; astro reads them for the scratch
+// environments it builds outside the project, which uv cannot see the project
+// from, so a check there resolves the way the project does.
+type UV struct {
+	// ConstraintDependencies is [tool.uv] constraint-dependencies: version
+	// limits on packages the project may pull in, without requiring them.
+	ConstraintDependencies []string
 }
 
 // Project is the standard [project] table, the fields astro cares about.
@@ -428,7 +439,7 @@ func Parse(data []byte) (*Manifest, error) {
 	}
 
 	p := &parser{}
-	m := &Manifest{Astro: p.astro(*f.Tool.Astro)}
+	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,
@@ -442,6 +453,19 @@ func Parse(data []byte) (*Manifest, error) {
 		return nil, &ValidationError{Problems: p.problems}
 	}
 	return m, nil
+}
+
+// uvTable reads the [tool.uv] fields astro uses, skipping any value that is not
+// the shape uv documents rather than reporting it: the table is uv's.
+func uvTable(t map[string]any) UV {
+	var out UV
+	list, _ := t["constraint-dependencies"].([]any)
+	for _, v := range list {
+		if s, ok := v.(string); ok {
+			out.ConstraintDependencies = append(out.ConstraintDependencies, s)
+		}
+	}
+	return out
 }
 
 // astroRoot prefixes every key under the section this package owns.
@@ -911,8 +935,12 @@ type wireFile struct {
 // Astro is a pointer so that a present-but-empty [tool.astro] is told apart
 // from an absent one: go-toml leaves a plain map nil for both, and the
 // difference decides between "not an astro project" and "a manifest to fix".
+//
+// UV is left as plain data because astro does not own [tool.uv]: a shape uv
+// would reject is uv's to report, and must not stop astro loading the project.
 type wireTool struct {
 	Astro *map[string]any `toml:"astro"`
+	UV    map[string]any  `toml:"uv"`
 }
 
 type wireProject struct {
