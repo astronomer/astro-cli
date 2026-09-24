@@ -57,7 +57,7 @@ type Plan struct {
 	// Packages is the project's [tool.astro] packages, the OS (apt) packages
 	// it needs at the system level. Docker mode bakes them into the runtime
 	// image through the ONBUILD packages.txt step; standalone mode has no
-	// image and cannot honor them, so it is warned about them at start.
+	// image and cannot honor them; StandaloneOmissions reports them.
 	Packages []string
 	// Dockerfile is a project-relative path to the project's own Dockerfile,
 	// set when the manifest declared one ("tier 3" in the project design: the
@@ -68,7 +68,8 @@ type Plan struct {
 	// which is the common case.
 	//
 	// Standalone mode ignores it: there is no image, so a project pinned to a
-	// Dockerfile has nothing standalone can honor.
+	// Dockerfile has nothing standalone can honor. StandaloneOmissions reports
+	// it, for the caller to tell its user.
 	//
 	// AirflowVersion is still required with this set. It does not pick the
 	// image any more, but the runtime needs the generation to decide the

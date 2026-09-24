@@ -231,45 +231,30 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 // Docker mode does both, so it says nothing there. Warnings route through the
 // renderer, so json mode keeps one JSON object per line.
 //
-// Named for what it does rather than for one of the two keys. It was
-// warnStandalonePackages when packages were the only case, and the name outlived
-// that by exactly one commit — the reader checking whether the Dockerfile case is
-// handled would have found a function and a comment both saying it is not.
+// Which omissions there are, and in what order, is Plan.StandaloneOmissions'
+// answer, shared with Astro Desktop. Only the wording is decided here.
 //
 // Both callers reach it: runStart and runRestart. `astro local restart` has no
 // --docker flag of its own, so the messages name Docker mode as the thing to run
 // in rather than a flag to add to the command in hand.
 func warnStandaloneOmissions(r Renderer, p localrt.Plan) {
-	if p.Mode == localrt.ModeDocker {
-		return
-	}
-	for _, text := range standaloneOmissions(p) {
-		emitWarning(r, event{Event: "warning", Text: text})
+	for _, o := range p.StandaloneOmissions() {
+		emitWarning(r, event{Event: "warning", Text: omissionText(o)})
 	}
 }
 
-// standaloneOmissions lists what this plan declares that standalone mode cannot
-// honor, in the order it matters.
-//
-// The Dockerfile warning is the one that was missing, and it is the larger of
-// the two by a distance: OS packages are a line in the manifest, while a declared
-// Dockerfile IS the build. `astro local start` on a project whose Dockerfile does
-// `RUN apt-get install -y unixodbc-dev` and `COPY vendored/ /opt/vendored`
-// provisions an environment with none of it — and standalone is the DEFAULT, so
-// this is what a user gets by typing the shortest command. rt.Plan's own doc says
-// standalone ignores the field; nothing said it to the person it happens to.
-//
-// Both, and in this order, because a project can declare both and the Dockerfile
-// is the one that changes what they should do about it.
-func standaloneOmissions(p localrt.Plan) []string {
-	var out []string
-	if p.Dockerfile != "" {
-		out = append(out, "this project declares its own Dockerfile ("+p.Dockerfile+"); standalone mode builds no image, so nothing that file installs or copies is applied. Run in Docker mode (--docker) to build it")
+// omissionText is the terminal wording of one standalone omission. A kind this
+// build has no wording for still produces a line naming it, so a new omission
+// is never silently dropped.
+func omissionText(o localrt.Omission) string {
+	switch o.Kind {
+	case localrt.OmissionDockerfile:
+		return "this project declares its own Dockerfile (" + o.Dockerfile + "); standalone mode builds no image, so nothing that file installs or copies is applied. Run in Docker mode (--docker) to build it"
+	case localrt.OmissionPackages:
+		return "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself"
+	default:
+		return "this project declares " + string(o.Kind) + ", which standalone mode does not apply. Run in Docker mode (--docker) to apply it"
 	}
-	if len(p.Packages) > 0 {
-		out = append(out, "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself")
-	}
-	return out
 }
 
 // warnEnvValues reports values that resolved to something other than what their

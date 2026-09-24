@@ -38,6 +38,9 @@ type (
 	Airflow     = rt.Airflow
 	LineWriter  = rt.LineWriter
 	ImageRun    = rt.ImageRun
+	Omission    = rt.Omission
+
+	OmissionKind = rt.OmissionKind
 
 	// ProxyDaemon and the image-builder seam are supplied by the consumer; see
 	// Config.
@@ -59,6 +62,12 @@ const (
 	StateRunning  = rt.StateRunning
 	StateStopping = rt.StateStopping
 	StateError    = rt.StateError
+)
+
+// The kinds of Omission Plan.StandaloneOmissions reports.
+const (
+	OmissionDockerfile = rt.OmissionDockerfile
+	OmissionPackages   = rt.OmissionPackages
 )
 
 // ErrNotImplemented marks a contract entry point with no engine behind it. Still
