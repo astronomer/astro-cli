@@ -246,6 +246,14 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 	// ModifyRequest exists.
 	rp.Rewrite = func(pr *httputil.ProxyRequest) {
 		pr.SetURL(target)
+		// The Host the browser sent, not the backend's address, which is what
+		// SetURL leaves. Airflow 3 accepts a login redirect's `next` only when it
+		// matches the request's own URL or api.base_url, so with 127.0.0.1:<port>
+		// here every hostname link failed at login with "Invalid or unsafe next
+		// URL"; redirects built from the request URL pointed at the bare port
+		// too. Safe to pass on: the handler routed on this Host, so it is a
+		// registered project hostname and nothing a client can pick freely.
+		pr.Out.Host = pr.In.Host
 		pr.SetXForwarded()
 		for _, hook := range p.ModifyRequest {
 			hook(pr)

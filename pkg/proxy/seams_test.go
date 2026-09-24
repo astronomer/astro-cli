@@ -318,6 +318,58 @@ func TestModifyRequestRunsAndTheClientCannotForgeItsOrigin(t *testing.T) {
 	}
 }
 
+// The backend sees the Host the browser sent. SetURL replaces it with the
+// backend's own address, and Airflow 3 then rejects every login redirect from a
+// hostname link: its `next` must match the request's URL, which read as
+// 127.0.0.1:<port> rather than the name in the address bar.
+func TestTheBackendSeesTheHostTheBrowserSent(t *testing.T) {
+	var mu sync.Mutex
+	var gotHost string
+	backend := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		gotHost = r.Host
+		mu.Unlock()
+	}))
+	defer backend.Close()
+	_, backendPort, err := net.SplitHostPort(backend.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStore(t.TempDir())
+	if err := store.AddRoute(&Route{
+		Hostname: "demo" + LocalhostSuffix, Port: backendPort, PID: 1, Mode: RouteModeDocker,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	p := NewProxy("0", store)
+	srv := httptest.NewServer(http.HandlerFunc(p.handler))
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// With the proxy's port, as a browser sends it.
+	want := "demo" + LocalhostSuffix + ":6563"
+	req.Host = want
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want the request routed to the backend", resp.StatusCode)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if gotHost != want {
+		t.Errorf("backend saw Host %q, want %q: Airflow validates redirects against it", gotHost, want)
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
