@@ -108,8 +108,7 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 // The tag is what follows the last colon AFTER the last slash, not the first
 // colon in the string: a registry host may carry a port, and splitting
 // localhost:5000/astro-runtime:3.1-12 on the first one reads the image as
-// "localhost". localdocker's postgresMajor states the same rule for the same
-// reason.
+// "localhost".
 //
 // A digest reference pins an exact image and carries no tag. Empty rather than
 // the digest, so that a caller reading a generation off the tag is told it has

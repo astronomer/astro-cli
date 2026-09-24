@@ -220,21 +220,17 @@ func TestStartBringsProjectUp(t *testing.T) {
 	stateDir, err := rt.StateDir(p.ProjectPath)
 	require.NoError(t, err)
 	composeFile := filepath.Join(stateDir, composeFileName)
-	// Three calls. First the v1-migration probe, which asks whether this
-	// project already has a metadata volume of its own; this project has no v1
-	// config to migrate from, so the check costs exactly this one call (see
-	// legacydb.go).
-	// Then `compose -p <name> ps -aq`, asking whether THIS compose project
-	// already has containers (so a failed start knows whether the cleanup is its
-	// to do) — scoped to the name the teardown would use, and --all so stopped
-	// containers count. Then the up.
-	require.Len(t, cmd.calls, 3)
-	assert.Equal(t, "docker volume ls --quiet --filter name="+name+"_"+metadataVolumeKey, cmd.calls[0],
-		"the migration probe must ask about this runtime's own volume first")
-	assert.Equal(t, "docker compose -p "+name+" ps -aq", cmd.calls[1],
+	// Two calls. First `compose -p <name> ps -aq`, asking whether THIS compose
+	// project already has containers (so a failed start knows whether the
+	// cleanup is its to do) — scoped to the name the teardown would use, and
+	// --all so stopped containers count. Then the up. The `astro dev` note makes
+	// no call here: nothing is listening for lines, so there is no one to tell
+	// (see legacydb.go, and TestAStartTellsAProjectArrivingFromAstroDev).
+	require.Len(t, cmd.calls, 2)
+	assert.Equal(t, "docker compose -p "+name+" ps -aq", cmd.calls[0],
 		"the pre-flight probe must ask about the project the teardown would remove")
 	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull",
-		composeFile, p.ProjectPath, name), cmd.calls[2])
+		composeFile, p.ProjectPath, name), cmd.calls[1])
 	assert.FileExists(t, composeFile)
 
 	// The state record captures what other tools need to reconnect.

@@ -306,12 +306,10 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, err
 	}
 
-	// Before anything is created: a project arriving from `astro dev` has its
-	// metadata database in a volume this runtime's compose project cannot name,
-	// and would otherwise come up empty. See legacydb.go. Deliberately ahead of
-	// the image build, so a project that is going to be told it cannot be
-	// migrated hears it now rather than after a long build.
-	e.adoptLegacyMetadataDB(ctx, conn, projectPath, name, major, cb)
+	// Before anything is created, since "does this project have a volume of its
+	// own yet" is the question the note turns on and the up is what makes one.
+	// See legacydb.go.
+	e.noteLegacyDatabase(ctx, conn, projectPath, name, cb)
 
 	stateDir, err := e.stateDir(projectPath)
 	if err != nil {

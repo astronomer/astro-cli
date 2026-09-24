@@ -37,19 +37,10 @@ func TestLegacyMetadataVolumeReproducesV1Names(t *testing.T) {
 	}
 }
 
-func TestPostgresMajor(t *testing.T) {
-	assert.Equal(t, "12", postgresMajor("docker.io/postgres:12.6"))
-	assert.Equal(t, "13", postgresMajor("postgres:13"))
-	assert.Empty(t, postgresMajor("postgres"))
-	// A registry host may carry a port, so the tag is after the last colon that
-	// follows the last slash — not the first colon in the string.
-	assert.Equal(t, "12", postgresMajor("localhost:5000/postgres:12.6"))
-}
-
-// The copy writes to a name built from metadataVolumeKey and compose mounts the
-// name built from the template, so a rename on either side would leave the
-// database in a volume nothing ever mounts — with the user told it was carried
-// over. Nothing else ties the two together.
+// The note asks about a name built from metadataVolumeKey and compose mounts the
+// name built from the template, so a rename on either side would make every
+// start look like the first one here, and announce a new database each time.
+// Nothing else ties the two together.
 func TestMetadataVolumeKeyMatchesComposeTemplate(t *testing.T) {
 	out, err := generateCompose(composeInput{
 		ProjectName:   "astro-proj-aaaaaa",
@@ -93,299 +84,170 @@ func legacyProject(t *testing.T, body string) (projectPath, legacyVolume string)
 	return projectPath, legacyMetadataVolume(projectPath, "proj")
 }
 
-// engineState scripts a fake engine: which volumes exist, and optional
-// overrides for the other calls adoption makes.
+// engineState scripts which volumes a fake engine has, per engine binary.
 type engineState struct {
-	volumes   []string
-	running   string // container ids for `ps --quiet --filter volume=`
-	names     string // container names for `ps --all --filter label=`
-	pgVersion string
-	fail      string   // substring of the call that should fail
+	docker    []string // volumes the docker engine has
+	podman    []string // volumes the podman engine has
 	lsUnknown []string // volumes whose lookup cannot reach the daemon
 }
 
 func (s *engineState) output(call string) ([]byte, error) {
-	if s.fail != "" && strings.Contains(call, s.fail) {
-		return nil, errors.New("scripted failure")
-	}
-	switch {
-	case strings.Contains(call, "volume ls"):
-		for _, v := range s.lsUnknown {
-			if strings.HasSuffix(call, "name="+v) {
-				return nil, errors.New("cannot connect to the daemon")
-			}
-		}
-		for _, v := range s.volumes {
-			if strings.HasSuffix(call, "name="+v) {
-				return []byte(v + "\n"), nil
-			}
-		}
+	if !strings.Contains(call, "volume ls") {
 		return nil, nil
-	case strings.Contains(call, "ps --quiet"):
-		return []byte(s.running), nil
-	case strings.Contains(call, "ps --all"):
-		return []byte(s.names), nil
-	case strings.Contains(call, "PG_VERSION"):
-		if s.pgVersion == "" {
-			return []byte("12\n"), nil
+	}
+	for _, v := range s.lsUnknown {
+		if strings.HasSuffix(call, "name="+v) {
+			return nil, errors.New("cannot connect to the daemon")
 		}
-		return []byte(s.pgVersion), nil
+	}
+	have := s.docker
+	if strings.HasPrefix(call, "podman ") {
+		have = s.podman
+	}
+	for _, v := range have {
+		if strings.HasSuffix(call, "name="+v) {
+			return []byte(v + "\n"), nil
+		}
 	}
 	return nil, nil
 }
 
-// adoptRun drives one adoption against a scripted engine and reports what ran.
-func adoptRun(t *testing.T, projectPath, major string, s *engineState) (calls, lines []string) {
+// noteRun drives one note against a scripted engine and reports what ran and
+// what it said.
+func noteRun(t *testing.T, projectPath string, s *engineState) (calls, lines []string) {
 	t.Helper()
 	cmd := &fakeCmd{output: s.output}
 	e := testEngine(t, cmd)
 	cb := rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }}
-	e.adoptLegacyMetadataDB(context.Background(), engineConn{bin: "docker"}, projectPath, testComposeProject, major, cb)
+	e.noteLegacyDatabase(context.Background(), engineConn{bin: "docker"}, projectPath, testComposeProject, cb)
 	return cmd.calls, lines
 }
 
-func joined(calls []string) string { return strings.Join(calls, " | ") }
-
-func TestAdoptSkipsWhenThisRuntimeAlreadyHasAVolume(t *testing.T) {
-	projectPath, _ := legacyProject(t, "project:\n  name: proj\n")
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{testNewVolume}})
-
-	require.Len(t, calls, 1, "a project that has already started here must cost one probe, got %v", calls)
-	assert.Empty(t, lines)
-}
-
-// The one that would destroy data: "absent" is the branch that copies INTO this
-// name, so an unanswerable probe must never be read as absent.
-func TestAdoptStopsWhenTheEngineCannotSayIfThisRuntimeHasAVolume(t *testing.T) {
+// A first start of a project arriving from `astro dev` says where the old
+// database is and that Astro CLI v1 can still start it. Otherwise a fresh database
+// reads as the local Airflow having lost everything.
+func TestAFirstStartSaysWhereTheAstroDevDatabaseIs(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	// The legacy volume is perfectly findable; only the question "does this
-	// runtime already have one" goes unanswered. Without that isolation the
-	// copy would be skipped for the wrong reason and the test would pass with
-	// the guard removed.
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{
-		volumes:   []string{legacy},
-		lsUnknown: []string{testNewVolume},
-	})
+	_, lines := noteRun(t, projectPath, &engineState{docker: []string{legacy}})
 
-	assert.NotContains(t, joined(calls), "cp -a",
-		"a daemon hiccup must not be read as \"no database here\" and overwrite a live one")
-	assert.Empty(t, lines)
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "new local Airflow database")
+	assert.Contains(t, lines[0], legacy)
+	assert.Contains(t, lines[0], "docker volume")
+	assert.Contains(t, lines[0], "Astro CLI v1",
+		"the data is reachable from v1, and naming the tool is what stays true in both frontends")
+	assert.NotContains(t, lines[0], "astro dev start",
+		"v2 removed that command, so pointing at it sends the user into `was removed in Astro CLI v2`")
 }
 
-func TestAdoptSkipsProjectThatNeverRanUnderV1(t *testing.T) {
-	calls, lines := adoptRun(t, t.TempDir(), "3", &engineState{})
-
-	require.Len(t, calls, 1, "without a v1 config there is nothing to look for, got %v", calls)
-	assert.Empty(t, lines)
-}
-
-func TestAdoptCopiesTheLegacyDatabase(t *testing.T) {
+// The whole point of the change: the old database is left alone. Every call
+// the note makes is a lookup; nothing is created, copied or removed.
+func TestTheNoteOnlyLooks(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{legacy}})
+	calls, _ := noteRun(t, projectPath, &engineState{docker: []string{legacy}})
 
-	var create, copyCall string
+	require.NotEmpty(t, calls)
 	for _, c := range calls {
-		if strings.Contains(c, "volume create") {
-			create = c
-		}
-		if strings.Contains(c, "cp -a") {
-			copyCall = c
-		}
-	}
-
-	require.NotEmpty(t, create, "the destination must be created with compose's labels, got %v", calls)
-	assert.Contains(t, create, "--label com.docker.compose.project="+testComposeProject,
-		"an unlabeled volume is invisible to the file-less `down --volumes` the teardown runs")
-	assert.Contains(t, create, "--label com.docker.compose.volume="+metadataVolumeKey)
-	assert.Contains(t, create, " "+testNewVolume)
-
-	require.NotEmpty(t, copyCall, "expected a copy, got %v", calls)
-	assert.Contains(t, copyCall, "-v "+legacy+":/src:ro", "the v1 volume must be mounted read-only")
-	assert.Contains(t, copyCall, "-v "+testNewVolume+":/dst")
-	assert.Contains(t, copyCall, "chmod 700 /dst", "postgres refuses to start on a group-readable data directory")
-	assert.Contains(t, copyCall, "rm -f /dst/postmaster.pid", "a stale lock file can stop postgres coming up")
-	assert.NotContains(t, joined(calls), "volume rm", "a successful copy must not remove anything")
-
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "carried over")
-	assert.Contains(t, lines[0], "left on disk untouched")
-}
-
-// Every refusal must name a recovery that can actually work. The start
-// continues and compose then creates an empty volume, so without removing that
-// volume the retry is foreclosed forever.
-func TestEveryRefusalOffersAWorkableRecovery(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		state engineState
-		want  string
-	}{
-		{"v1 stack running", engineState{running: "deadbeef\n"}, "astro dev stop"},
-		{"engine cannot say", engineState{fail: "ps --quiet"}, "could not say"},
-		{"pg version unreadable", engineState{fail: "PG_VERSION"}, "could not be read"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-			tc.state.volumes = []string{legacy}
-			calls, lines := adoptRun(t, projectPath, "3", &tc.state)
-
-			assert.NotContains(t, joined(calls), "cp -a")
-			require.Len(t, lines, 1)
-			assert.Contains(t, lines[0], tc.want)
-			assert.Contains(t, lines[0], "astro local reset",
-				"a refusal that does not say how to clear the empty volume can never be acted on")
-		})
+		assert.Contains(t, c, "volume ls", "the note must only look, got %v", calls)
 	}
 }
 
-// The unreadable-version case must not render as the mismatch case, which
-// printed an empty number: "it is Postgres  data and this runtime runs 12".
-func TestAdoptDistinguishesAnUnreadableVersionFromAMismatch(t *testing.T) {
+// v1 honored container.binary, so a podman user's volume is on the engine this
+// runtime does not prefer, and the note names the engine that has it.
+func TestTheNoteNamesTheEngineThatHasTheVolume(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	_, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{legacy}, fail: "PG_VERSION"})
+	_, lines := noteRun(t, projectPath, &engineState{podman: []string{legacy}})
+
 	require.Len(t, lines, 1)
-	assert.NotContains(t, lines[0], "Postgres  ", "an empty version number means the wrong branch reported")
+	assert.Contains(t, lines[0], "podman volume "+legacy)
 }
 
-func TestAdoptRefusesOnAPostgresMajorMismatch(t *testing.T) {
+// Only a first start. A project that already has a database here has been told,
+// and is not starting on a new one.
+func TestNoNoteOnceThisRuntimeHasAVolume(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{legacy}, pgVersion: "13\n"})
+	calls, lines := noteRun(t, projectPath, &engineState{docker: []string{legacy, testNewVolume}})
 
-	assert.NotContains(t, joined(calls), "cp -a")
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "Postgres 13")
-	assert.Contains(t, lines[0], "Postgres 12")
+	assert.Empty(t, lines)
+	require.Len(t, calls, 1, "a project that has started here must cost one probe, got %v", calls)
 }
 
-func TestAdoptRefusesCustomPostgresCredentials(t *testing.T) {
-	for _, tc := range []struct{ name, body, want string }{
-		{"superuser", "project:\n  name: proj\npostgres:\n  user: astro\n", `"astro"`},
-		{"password", "project:\n  name: proj\npostgres:\n  password: s3cret\n", "postgres.password"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			projectPath, legacy := legacyProject(t, tc.body)
-			calls, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{legacy}})
+// A daemon hiccup is not "no volume here": read that way, it would announce a
+// new database to a project that has one.
+func TestNoNoteWhenTheEngineCannotSayIfThisRuntimeHasAVolume(t *testing.T) {
+	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
+	_, lines := noteRun(t, projectPath, &engineState{docker: []string{legacy}, lsUnknown: []string{testNewVolume}})
 
-			assert.NotContains(t, joined(calls), "cp -a",
-				"the entrypoint only applies POSTGRES_USER/PASSWORD to an empty data directory, so a copy keeps v1's")
-			require.Len(t, lines, 1)
-			assert.Contains(t, lines[0], tc.want)
-		})
-	}
+	assert.Empty(t, lines)
 }
 
-// v1 resolved these keys project-first then home, so a global setting has to be
-// seen or it slips past the guard above.
-func TestAdoptReadsCredentialsFromTheHomeConfigToo(t *testing.T) {
+func TestNoNoteForAProjectThatNeverRanUnderV1(t *testing.T) {
+	calls, lines := noteRun(t, t.TempDir(), &engineState{})
+
+	assert.Empty(t, lines)
+	require.Len(t, calls, 1, "without a v1 config there is nothing to look for, got %v", calls)
+}
+
+func TestNoNoteWhenTheV1ProjectHasNoVolume(t *testing.T) {
+	projectPath, _ := legacyProject(t, "project:\n  name: proj\n")
+	_, lines := noteRun(t, projectPath, &engineState{})
+
+	assert.Empty(t, lines)
+}
+
+// v1 read the project name per key from the home config when the project's own
+// file left it out, and the volume name follows whichever it used.
+func TestTheNoteReadsTheProjectNameFromTheHomeConfigToo(t *testing.T) {
 	home := t.TempDir()
-	require.NoError(t, os.Mkdir(filepath.Join(home, ".astro"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".astro", "config.yaml"),
-		[]byte("postgres:\n  user: astro\n"), 0o600))
 	t.Setenv("ASTRO_HOME", home)
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".astro"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".astro", "config.yaml"), []byte("project:\n  name: proj\n"), 0o600))
 
-	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{legacy}})
+	projectPath, legacy := legacyProject(t, "context: astro\n")
+	_, lines := noteRun(t, projectPath, &engineState{docker: []string{legacy}})
 
-	assert.NotContains(t, joined(calls), "cp -a")
 	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], `"astro"`)
+	assert.Contains(t, lines[0], legacy)
 }
 
-// An Airflow 2 database under an Airflow 3 image means db-migration rewrites
-// the user's schema irreversibly, or aborts and takes every service with it.
-func TestAdoptRefusesAcrossAirflowGenerations(t *testing.T) {
+// And Start asks, before the up creates this runtime's volume and the question
+// stops being answerable. Driven through Start because a unit test of the note
+// passes just as well with the call deleted.
+func TestAStartTellsAProjectArrivingFromAstroDev(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	legacyProj := strings.TrimSuffix(legacy, "_"+metadataVolumeKey)
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{
-		volumes: []string{legacy},
-		names:   legacyProj + "-webserver-1\n" + legacyProj + "-scheduler-1\n",
-	})
-
-	assert.NotContains(t, joined(calls), "cp -a")
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "Airflow 2")
-	assert.Contains(t, lines[0], "Airflow 3")
-}
-
-// The mirror of the case above: an Airflow 2 project moving to an Airflow 2
-// runtime is exactly what should be carried over.
-func TestAdoptProceedsForAnAirflow2Project(t *testing.T) {
-	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	legacyProj := strings.TrimSuffix(legacy, "_"+metadataVolumeKey)
-	calls, lines := adoptRun(t, projectPath, "2", &engineState{
-		volumes: []string{legacy},
-		names:   legacyProj + "-webserver-1\n" + legacyProj + "-scheduler-1\n",
-	})
-
-	assert.Contains(t, joined(calls), "cp -a")
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "carried over")
-}
-
-func TestAdoptProceedsWhenTheGenerationsAgree(t *testing.T) {
-	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	legacyProj := strings.TrimSuffix(legacy, "_"+metadataVolumeKey)
-	calls, _ := adoptRun(t, projectPath, "3", &engineState{
-		volumes: []string{legacy},
-		names:   legacyProj + "-api-server-1\n" + legacyProj + "-dag-processor-1\n",
-	})
-
-	assert.Contains(t, joined(calls), "cp -a")
-}
-
-// v1 honored container.binary, so a podman user's volumes are not on the
-// engine this runtime now prefers.
-func TestAdoptFindsALegacyVolumeOnTheOtherEngine(t *testing.T) {
-	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
-		// Only podman knows the legacy volume.
-		if strings.HasPrefix(call, "podman") && strings.Contains(call, "volume ls") &&
-			strings.HasSuffix(call, "name="+legacy) {
-			return []byte(legacy + "\n"), nil
-		}
-		if strings.Contains(call, "volume ls") {
-			return nil, nil
-		}
-		if strings.Contains(call, "PG_VERSION") {
-			return []byte("12\n"), nil
-		}
-		return nil, nil
-	}}
+	require.NoError(t, os.Mkdir(filepath.Join(projectPath, "dags"), 0o755))
+	state := &engineState{docker: []string{legacy}}
+	cmd := &fakeCmd{output: state.output}
 	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.ProjectPath = projectPath
+
 	var lines []string
-	cb := rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }}
-	e.adoptLegacyMetadataDB(context.Background(), engineConn{bin: "docker"}, projectPath, testComposeProject, "3", cb)
+	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	require.NoError(t, err)
 
-	assert.Contains(t, joined(cmd.calls), "podman run --rm -v "+legacy+":/src:ro",
-		"the copy must read from the engine that actually has the volume, got %v", cmd.calls)
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "carried over")
-}
+	var noted bool
+	for _, l := range lines {
+		if strings.Contains(l, legacy) {
+			noted = true
+		}
+	}
+	assert.True(t, noted, "a first start of a v1 project must say where its old database is; lines were %v", lines)
 
-func TestAdoptDropsAHalfWrittenVolumeWhenTheCopyFails(t *testing.T) {
-	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
-	calls, lines := adoptRun(t, projectPath, "3", &engineState{volumes: []string{legacy}, fail: "cp -a"})
-
-	assert.Contains(t, joined(calls), "volume rm --force "+testNewVolume,
-		"a partial data directory would stop postgres coming up at all, got %v", calls)
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "could not carry over")
-}
-
-// The copy commonly fails BECAUSE the caller's deadline expired, and os/exec
-// refuses to spawn on a canceled context — so a cleanup sharing that context is
-// a no-op in exactly the case it exists for, leaving a torn data directory that
-// every later start reads as "already migrated".
-func TestHalfWrittenVolumeIsRemovedEvenWhenTheContextIsDone(t *testing.T) {
-	cmd := &fakeCmd{}
-	e := testEngine(t, cmd)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	e.removeHalfWrittenVolume(ctx, engineConn{bin: "docker"}, testNewVolume)
-
-	assert.Contains(t, joined(cmd.calls), "volume rm --force "+testNewVolume,
-		"the removal must run on a context detached from the caller's, got %v", cmd.calls)
+	name, err := composeProjectName(projectPath)
+	require.NoError(t, err)
+	probe, up := -1, -1
+	for i, c := range cmd.calls {
+		if c == "docker volume ls --quiet --filter name="+name+"_"+metadataVolumeKey && probe < 0 {
+			probe = i
+		}
+		if strings.Contains(c, " up ") && up < 0 {
+			up = i
+		}
+	}
+	require.GreaterOrEqual(t, probe, 0, "the note never asked about this runtime's volume; calls were %v", cmd.calls)
+	require.GreaterOrEqual(t, up, 0)
+	assert.Less(t, probe, up, "the note must ask before the up creates the volume")
 }
 
 // composeProjectName resolves symlinks and v1's hash did not, so a project
