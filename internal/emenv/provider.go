@@ -123,7 +123,7 @@ func (p *provider) Diagnose(key string) string {
 // The causes docs/v2-workspace-link.md lists, worded as it words them. Astro
 // Desktop shows the same text, so a failure reads the same from either app.
 const (
-	causeSecretsWithheld = `your org disables Environment Secrets Fetching — ask an org admin to enable it, or set the value locally`
+	causeSecretsWithheld = `your org disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally`
 	causeNoValue         = "the workspace holds no value for it"
 )
 
@@ -145,7 +145,7 @@ func (p *provider) load() {
 		if err != nil || astrosession.Credential(ctx.Token) == "" {
 			p.down = &outage{
 				short: "not logged in to " + p.domain,
-				cause: fmt.Sprintf("not logged in to %s — log in with `astro login %s`", p.domain, p.domain),
+				cause: fmt.Sprintf("not logged in to %s. Log in with `astro login %s`", p.domain, p.domain),
 			}
 			return
 		}
@@ -340,13 +340,13 @@ func (p *provider) classify(err error) *outage {
 	if errors.As(err, &he) {
 		switch he.code {
 		case http.StatusUnauthorized:
-			return &outage{short: "session expired", cause: fmt.Sprintf("your %s session expired — log in again with `astro login %s`", p.domain, p.domain)}
+			return &outage{short: "session expired", cause: fmt.Sprintf("your %s session expired. Log in again with `astro login %s`", p.domain, p.domain)}
 		case http.StatusForbidden:
-			return &outage{short: "no access", cause: fmt.Sprintf("you don't have access to this workspace on %s — check your current organization (`astro organization switch`), or ask an org admin", p.domain)}
+			return &outage{short: "no access", cause: fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (`astro organization switch`), or ask an org admin", p.domain)}
 		case http.StatusNotFound:
-			return &outage{short: "workspace not found", cause: fmt.Sprintf("workspace %s was not found on %s — check `workspace` and `domain` in pyproject.toml, and your current organization", p.workspaceID, p.domain)}
+			return &outage{short: "workspace not found", cause: fmt.Sprintf("workspace %s was not found on %s. Check `workspace` and `domain` in pyproject.toml, and your current organization", p.workspaceID, p.domain)}
 		}
 		return &outage{short: "unreachable", cause: fmt.Sprintf("%s returned an error: %v", p.domain, he.err)}
 	}
-	return &outage{short: "offline", cause: fmt.Sprintf("could not reach %s — check your connection, or set the value locally", p.domain)}
+	return &outage{short: "offline", cause: fmt.Sprintf("could not reach %s. Check your connection, or set the value locally", p.domain)}
 }

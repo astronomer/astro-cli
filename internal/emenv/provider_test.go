@@ -160,7 +160,7 @@ func TestLoggedOutProviderAbsent(t *testing.T) {
 	_, ok := p.Lookup("DATA_WAREHOUSE_URI")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: not logged in to localhost)", p.Label())
-	require.Equal(t, "not logged in to localhost — log in with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "not logged in to localhost. Log in with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -182,7 +182,7 @@ func TestManifestDomainPicksTheLogin(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: not logged in to astronomer.io)", p.Label())
-	require.Equal(t, "not logged in to astronomer.io — log in with `astro login astronomer.io`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "not logged in to astronomer.io. Log in with `astro login astronomer.io`", p.(envresolve.Diagnoser).Diagnose("X"))
 	require.Empty(t, usedDomain, "no client is built without a login for the manifest's domain")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 
@@ -275,7 +275,7 @@ func TestFailedRefreshReportsSessionExpired(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: session expired)", p.Label())
-	require.Equal(t, "your localhost session expired — log in again with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "your localhost session expired. Log in again with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -288,9 +288,9 @@ func TestFailureModeMessages(t *testing.T) {
 		wantLabel string
 		wantCause string
 	}{
-		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your localhost session expired — log in again with `astro login localhost`"},
-		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this workspace on localhost — check your current organization (`astro organization switch`), or ask an org admin"},
-		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "workspace cmws123 was not found on localhost — check `workspace` and `domain` in pyproject.toml, and your current organization"},
+		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your localhost session expired. Log in again with `astro login localhost`"},
+		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this workspace on localhost. Check your current organization (`astro organization switch`), or ask an org admin"},
+		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "workspace cmws123 was not found on localhost. Check `workspace` and `domain` in pyproject.toml, and your current organization"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
