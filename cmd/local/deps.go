@@ -226,6 +226,36 @@ func adviseHealthTimeout(err error) error {
 	return fmt.Errorf("%w; set %s (e.g. 10m) to wait longer", err, healthTimeoutEnv)
 }
 
+// adviseDatabaseNewer names the ways out of a metadata database the project's
+// Airflow cannot run on, because a newer Airflow already upgraded it.
+//
+// Here for the reason adviseHealthTimeout is: the engines are shared with
+// Astro Desktop, which resets a project from its own UI, so the command belongs
+// to the layer that has one. Reset rather than a volume by name because it is
+// the one command that clears the database in either mode, whichever mode the
+// project was last started in.
+//
+// Both places a version can come from are named, because the pin is not always
+// the answer: a project that declares a Dockerfile runs whatever its base image
+// is, whatever the pin says (see localdocker's planMajor). Advice naming only
+// the pin sends that user to edit a file that changes nothing.
+func adviseDatabaseNewer(err error) error {
+	if !errors.Is(err, localrt.ErrDatabaseNewerThanAirflow) {
+		return err
+	}
+	return fmt.Errorf("%w. To start over with an empty database, run `astro local reset`; "+
+		"it deletes the Dag runs, connections and variables stored there. "+
+		"To keep them, go back to the newer Airflow: the `airflow` pin in pyproject.toml, "+
+		"or the base image in your Dockerfile if the project declares one", err)
+}
+
+// adviseStart adds what the CLI can say about a failed start to the engine's
+// error. Both start paths return through it, so a new piece of advice cannot
+// reach `local start` and miss `local restart`.
+func adviseStart(err error) error {
+	return adviseDatabaseNewer(adviseHealthTimeout(err))
+}
+
 // healthTimeout reads that variable, and returns zero for "use the default".
 //
 // An environment variable rather than a flag, because the two commands that

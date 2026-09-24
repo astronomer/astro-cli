@@ -147,6 +147,12 @@ var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 // no image at all.
 var ErrUnsupportedBase = airflowrt.ErrUnsupportedBase
 
+// ErrDatabaseNewerThanAirflow reports a start whose Airflow refused the
+// project's metadata database because a newer Airflow had already upgraded it.
+// Docker mode only for now: it is recognized from the migration container's
+// output, which standalone does not have.
+var ErrDatabaseNewerThanAirflow = airflowrt.ErrDatabaseNewerThanAirflow
+
 // New returns a Runtime configured by cfg.
 func New(cfg Config) *Runtime {
 	docker := localdocker.New(cfg.RoutesDir, cfg.ProxyDaemon, cfg.Images)

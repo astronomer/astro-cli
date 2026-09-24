@@ -24,13 +24,14 @@ import (
 // entry here for each row, means a new kind cannot be added without a sample.
 func sampleFor(kind ProblemKind) (error, bool) {
 	samples := map[ProblemKind]error{
-		KindNoProject:       &project.NotFoundError{Start: "/somewhere"},
-		KindForeignMode:     localrt.ErrForeignMode,
-		KindAlreadyRunning:  localrt.ErrAlreadyRunning,
-		KindHealthTimeout:   localrt.ErrHealthTimeout,
-		KindUnsupportedBase: localrt.ErrUnsupportedBase,
-		KindLocked:          localrt.ErrStartInProgress,
-		KindNotRunning:      localrt.ErrNotRunning,
+		KindNoProject:                &project.NotFoundError{Start: "/somewhere"},
+		KindForeignMode:              localrt.ErrForeignMode,
+		KindAlreadyRunning:           localrt.ErrAlreadyRunning,
+		KindHealthTimeout:            localrt.ErrHealthTimeout,
+		KindUnsupportedBase:          localrt.ErrUnsupportedBase,
+		KindDatabaseNewerThanAirflow: localrt.ErrDatabaseNewerThanAirflow,
+		KindLocked:                   localrt.ErrStartInProgress,
+		KindNotRunning:               localrt.ErrNotRunning,
 	}
 	s, ok := samples[kind]
 	return s, ok
@@ -72,6 +73,7 @@ func TestProblemKindOrderIsPinned(t *testing.T) {
 		KindAlreadyRunning,
 		KindHealthTimeout,
 		KindUnsupportedBase,
+		KindDatabaseNewerThanAirflow,
 		KindLocked,
 		KindNotRunning,
 	}

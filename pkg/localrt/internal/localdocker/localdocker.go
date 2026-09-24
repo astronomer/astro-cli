@@ -431,9 +431,22 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 		// rt.Callbacks{} leak containers with no signal anywhere. Joining keeps
 		// errors.Is on the start error intact, and Start's deferred StateError
 		// reports the joined value.
-		return errors.Join(startErr, e.rollback(ctx, up.conn, up.name, cb))
+		revision, cleanup := e.rollback(ctx, up.conn, up.name, cb)
+		if revision != "" {
+			// The one failure the logs can name precisely, so it replaces
+			// "exit status 1" rather than riding beside it.
+			startErr = databaseNewerError(revision)
+		}
+		return errors.Join(startErr, cleanup)
 	}
 	return nil
+}
+
+// databaseNewerError reports a metadata database the project's Airflow cannot
+// run on, because a newer Airflow already upgraded it to revision.
+func databaseNewerError(revision string) error {
+	return fmt.Errorf("%w: it is at migration %s, which this Airflow does not know, and Airflow cannot migrate a database backwards",
+		airflowrt.ErrDatabaseNewerThanAirflow, revision)
 }
 
 // publish records the running project and makes it reachable: the state record,
@@ -548,7 +561,11 @@ var logCaptureTimeout = 20 * time.Second
 // costs disk and nothing else, and a later `stop --clean` or `docker volume
 // prune` collects it. The compose file stays for the same reason it does after a
 // stop: the next start rewrites it.
-func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) error {
+//
+// It also reports the migration revision the logs say Airflow could not find,
+// or "" when they do not, so the caller can name that failure; see
+// captureFailureLogs.
+func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) (string, error) {
 	// Detached from the caller's context, which is the difference between this
 	// running and not. The failure this exists for is a wedged daemon or a stalled
 	// pull, and the desktop drives every docker action under a deadline — so the
@@ -563,15 +580,15 @@ func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb 
 	// migration, so a failing `airflow db migrate` surfaces as nothing more than
 	// "dependency failed to start ... exited (1)" while the traceback sits in that
 	// container. Removing it first makes the error unrecoverable.
-	tail := e.captureFailureLogs(ctx, conn, name, cb)
+	revision, tail := e.captureFailureLogs(ctx, conn, name, cb)
 
 	// cb is threaded through so the teardown is not silent. It can take most of a
 	// minute on a slow daemon, and a consumer rendering the event stream would
 	// otherwise show the failure and then nothing, which reads as a hang.
 	if err := e.downProject(ctx, conn, name, gracefulStopTimeout, cb); err != nil {
-		return errors.Join(fmt.Errorf("cleaning up after the failed start: %w", err), tail)
+		return revision, errors.Join(fmt.Errorf("cleaning up after the failed start: %w", err), tail)
 	}
-	return tail
+	return revision, tail
 }
 
 // captureFailureLogs reports what the containers said before they are removed,
@@ -586,7 +603,14 @@ func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb 
 //
 // Best effort throughout: a start is already failing, so logs that cannot be read
 // are absent rather than a second failure.
-func (e *Engine) captureFailureLogs(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) error {
+//
+// It also reads them for the one failure they name precisely: `airflow db
+// migrate` refusing a database a newer Airflow upgraded. Every service waits on
+// that migration, so it is the most likely reason a start got here, and the
+// revision it names is returned so the error can say so rather than "exit status
+// 1". The migration's refusal is the last thing it prints, so it is inside the
+// tail.
+func (e *Engine) captureFailureLogs(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) (revision string, tail error) {
 	ctx, cancel := context.WithTimeout(ctx, logCaptureTimeout)
 	defer cancel()
 
@@ -599,6 +623,9 @@ func (e *Engine) captureFailureLogs(ctx context.Context, conn engineConn, name s
 	var held []string
 	w := &rt.LineWriter{Emit: func(line string) {
 		l := parseLogLine(line, e.now)
+		if revision == "" {
+			revision, _ = airflowrt.UnknownMigrationRevision(l.Text)
+		}
 		if cb.OnLine != nil {
 			cb.OnLine(l)
 			return
@@ -615,9 +642,9 @@ func (e *Engine) captureFailureLogs(ctx context.Context, conn engineConn, name s
 	w.Flush()
 
 	if cb.OnLine != nil || len(held) == 0 {
-		return nil
+		return revision, nil
 	}
-	return fmt.Errorf("container output before cleanup: %s", strings.Join(held, "; "))
+	return revision, fmt.Errorf("container output before cleanup: %s", strings.Join(held, "; "))
 }
 
 // heldLogLines bounds what captureFailureLogs folds into an error when nothing is

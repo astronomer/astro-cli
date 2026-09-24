@@ -201,7 +201,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	warnEnvValues(r, built.EnvWarnings)
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
-		return adviseHealthTimeout(err)
+		return adviseStart(err)
 	}
 	st, err := af.Status()
 	if err != nil {
@@ -430,7 +430,7 @@ func (c *cli) runRestart(ctx context.Context, force bool) error {
 	}
 	af, err = c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
-		return adviseHealthTimeout(err)
+		return adviseStart(err)
 	}
 	st, err = af.Status()
 	if err != nil {

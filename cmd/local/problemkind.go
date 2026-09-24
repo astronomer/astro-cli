@@ -54,6 +54,11 @@ const (
 	// an Astro Runtime image, so docker mode refuses before starting anything.
 	// Not transient and not about the machine: the project has to change.
 	KindUnsupportedBase ProblemKind = "unsupported_base"
+	// KindDatabaseNewerThanAirflow: a newer Airflow already upgraded the
+	// project's metadata database, and the Airflow it now runs cannot migrate it
+	// back. Not transient: the pin has to go back up, or the database has to go.
+	// Docker mode only today.
+	KindDatabaseNewerThanAirflow ProblemKind = "database_newer_than_airflow"
 	// KindNotRunning: no local Airflow is running for this project.
 	KindNotRunning ProblemKind = "not_running"
 )
@@ -99,6 +104,7 @@ var problemKinds = []struct {
 	{KindAlreadyRunning, sentinel(localrt.ErrAlreadyRunning)},
 	{KindHealthTimeout, sentinel(localrt.ErrHealthTimeout)},
 	{KindUnsupportedBase, sentinel(localrt.ErrUnsupportedBase)},
+	{KindDatabaseNewerThanAirflow, sentinel(localrt.ErrDatabaseNewerThanAirflow)},
 	// ErrStartInProgress, not a second name for it: pkg/localrt already
 	// exports this sentinel, and adding another public alias to a module with
 	// its own go.mod would mean one failure with two contracts.
