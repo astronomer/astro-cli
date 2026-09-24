@@ -49,7 +49,10 @@ jobs:
           git diff --exit-code
 
       - name: Run golangci-lint
-        run: make lint
+        run: make lint-go
+
+      - name: Run deadcode
+        run: make lint-deadcode
 
   test:
     runs-on: ubuntu-latest
