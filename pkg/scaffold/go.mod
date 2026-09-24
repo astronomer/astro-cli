@@ -5,13 +5,13 @@ go 1.26.1
 require (
 	github.com/astronomer/astro-cli/pkg/airflowenv v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/fsatomic v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
 )
 
 require (
-	github.com/astronomer/astro-cli/pkg/fsatomic v0.0.0-00010101000000-000000000000 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/zalando/go-keyring v0.2.8 // indirect

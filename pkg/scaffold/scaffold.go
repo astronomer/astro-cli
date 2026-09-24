@@ -742,10 +742,11 @@ func pickAirflowVersion(flag string, manifestDeps []string, v1 *v1Project) (vers
 
 // renderPyproject builds the greenfield manifest. It fills the template
 // through the surgical editor, so the name, the pin, and the dependency are
-// quoted the way the manifest expects, then round-trips through
-// manifest.Parse, so every scaffolded project is guaranteed to load. An
-// invalid --name or --airflow-version surfaces here as the manifest's own
-// validation error. [project.dependencies] carries the Airflow the project
+// quoted the way the manifest expects, then round-trips through the same load
+// check EditManifest applies (manifest.Parse, then envschema.ParseSchema over
+// the carried declarations), so every scaffolded project is guaranteed to
+// load. An invalid --name or --airflow-version surfaces here as the manifest's
+// own validation error. [project.dependencies] carries the Airflow the project
 // pins, derived from the same version that fills [tool.astro].airflow, so
 // init → start needs no hand-edit.
 func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, notes []string, err error) {
@@ -817,7 +818,7 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 	if err != nil {
 		return nil, nil, err
 	}
-	if _, err := manifest.Parse(data); err != nil {
+	if _, err := loadable(nil, data); err != nil {
 		return nil, nil, err
 	}
 	return data, notes, nil

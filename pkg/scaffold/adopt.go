@@ -148,7 +148,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if err != nil {
 		return nil, nil, pin, err
 	}
-	m, err := manifest.Parse(out)
+	m, err := loadable(nil, out)
 	if err != nil {
 		return nil, nil, pin, withPath(err, path)
 	}
