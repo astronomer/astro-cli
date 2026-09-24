@@ -6,11 +6,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/context"
+	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 )
 
-var noPrompt bool
+var (
+	noPrompt bool
 
-func newContextCmd(out io.Writer) *cobra.Command {
+	cloudSwitch = astroAuth.Switch
+)
+
+func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "context",
 		Aliases: []string{"c"},
@@ -19,7 +26,7 @@ func newContextCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newContextListCmd(out),
-		newContextSwitchCmd(),
+		newContextSwitchCmd(astroV1Client, out),
 		newContextDeleteCmd(),
 	)
 	return cmd
@@ -38,16 +45,29 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newContextSwitchCmd() *cobra.Command {
+func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch [domain]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different context",
-		Long:    "Switch to a different context",
-		RunE:    context.SwitchContext,
-		Args:    cobra.MaximumNArgs(1),
+		Long:    "Switch to a different context. For Astro, the saved login for the domain is refreshed if it can be; the command never opens a browser.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return switchContext(cmd, args, astroV1Client, out)
+		},
+		Args: cobra.MaximumNArgs(1),
 	}
 	return cmd
+}
+
+func switchContext(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
+	if len(args) == 1 {
+		domain := domainutil.ExpandShortName(args[0])
+		if context.IsCloudDomain(domain) {
+			cmd.SilenceUsage = true
+			return cloudSwitch(domain, astroV1Client, out)
+		}
+	}
+	return context.SwitchContext(cmd, args)
 }
 
 func newContextDeleteCmd() *cobra.Command {

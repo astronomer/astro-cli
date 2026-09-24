@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -495,7 +497,14 @@ func TestShouldSignup(t *testing.T) {
 		assert.NoError(t, c.SetExpiresIn(-3600))
 		assert.False(t, ShouldSignup(domain))
 		assert.False(t, ShouldSignup("cloud.astronomer.io"))
-		assert.True(t, ShouldSignup("astronomer-dev.io"))
+	})
+
+	t.Run("only production opens the sign-up screen", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		assert.True(t, ShouldSignup("astronomer.io"))
+		assert.False(t, ShouldSignup("astronomer-dev.io"))
+		assert.False(t, ShouldSignup("astronomer-stage.io"))
+		assert.False(t, ShouldSignup("pr12345.astronomer-dev.io"))
 	})
 }
 
@@ -516,7 +525,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		resp, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		resp, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -535,15 +544,35 @@ func TestAuthDeviceLogin(t *testing.T) {
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
 
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		assert.NoError(t, err)
 		assert.NotContains(t, authorizeURL, "screen_hint=signup")
 		assert.NotContains(t, authorizeURL, "ext-signup-source=cli")
 
-		_, err = mockAuthenticator.authDeviceLogin(Config{}, false, true)
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, false, true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, authorizeURL, "screen_hint=signup")
 		assert.Contains(t, authorizeURL, "ext-signup-source=cli")
+	})
+
+	t.Run("only force makes the identity provider ask for the password again", func(t *testing.T) {
+		var authorizeURL string
+		openURL = func(url string) error {
+			authorizeURL = url
+			return nil
+		}
+		mockAuthenticator := Authenticator{
+			tokenRequester:  func(Config, string, string) (Result, error) { return Result{}, nil },
+			callbackHandler: func() (string, error) { return "test-code", nil },
+		}
+
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
+		assert.NoError(t, err)
+		assert.NotContains(t, authorizeURL, "prompt=login")
+
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, false, false, true)
+		assert.NoError(t, err)
+		assert.Contains(t, authorizeURL, "prompt=login")
 	})
 
 	t.Run("the prompt names the screen the browser opens", func(t *testing.T) {
@@ -559,14 +588,14 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
 
 		out := captureStdout(t, func() {
-			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, true)
+			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, true, false)
 			assert.NoError(t, err)
 		})
 		assert.Contains(t, out, "to open the browser to create your Astro account")
 		assert.Contains(t, out, "astro login --signin")
 
 		out = captureStdout(t, func() {
-			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 			assert.NoError(t, err)
 		})
 		assert.Contains(t, out, "to open the browser to log in")
@@ -581,7 +610,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -596,7 +625,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -609,7 +638,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return mockResponse, nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		resp, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
+		resp, err := mockAuthenticator.authDeviceLogin(Config{}, true, false, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -619,7 +648,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -631,7 +660,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return Result{}, errMock
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false)
+		_, err := mockAuthenticator.authDeviceLogin(Config{}, true, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -651,7 +680,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 
 		var err error
 		out := captureStdout(t, func() {
-			_, err = mockAuthenticator.authDeviceLogin(Config{}, false, false)
+			_, err = mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		})
 		assert.NoError(t, err)
 		assert.Contains(t, out, "to open the browser to log in")
@@ -676,7 +705,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		var resp Result
 		var err error
 		out := captureStdout(t, func() {
-			resp, err = mockAuthenticator.authDeviceLogin(Config{}, false, false)
+			resp, err = mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
@@ -1163,6 +1192,9 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// These cases log in through the browser, so the logins they save must not
+	// be reused by the cases after them.
+	stubRefresh(t, astroauth.TokenResponse{}, errMock)
 	t.Run("success", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
@@ -1184,7 +1216,7 @@ func TestLogin(t *testing.T) {
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Login("astronomer.io", "", mockV1Client, os.Stdout, false, false)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, false, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -1225,7 +1257,7 @@ func TestLogin(t *testing.T) {
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 
-		err = Login("pr5723.cloud.astronomer-dev.io", "", mockV1Client, os.Stdout, false, false)
+		err = Login("pr5723.cloud.astronomer-dev.io", "", mockV1Client, os.Stdout, false, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -1252,23 +1284,24 @@ func TestLogin(t *testing.T) {
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 
-		err := Login("astronomer.io", "OAuth Token", mockV1Client, os.Stdout, false, false)
+		err := Login("astronomer.io", "OAuth Token", mockV1Client, os.Stdout, false, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("invalid domain", func(t *testing.T) {
-		err := Login("fail.astronomer.io", "", nil, os.Stdout, false, false)
+		err := Login("fail.astronomer.io", "", nil, os.Stdout, false, false, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Invalid domain.")
 	})
 
 	t.Run("auth failure", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		callbackHandler := func() (string, error) {
 			return "", errMock
 		}
 		authenticator = Authenticator{callbackHandler: callbackHandler}
-		err := Login("cloud.astronomer.io", "", nil, os.Stdout, false, false)
+		err := Login("cloud.astronomer.io", "", nil, os.Stdout, false, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -1291,7 +1324,7 @@ func TestLogin(t *testing.T) {
 
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfErrorResponse, nil).Once()
-		err := Login("", "", mockV1Client, os.Stdout, false, false)
+		err := Login("", "", mockV1Client, os.Stdout, false, false, false)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
 		mockV1Client.AssertExpectations(t)
 	})
@@ -1323,7 +1356,7 @@ func TestLogin(t *testing.T) {
 		// initialize stdin with user email input
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
 		// do the test
-		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true, false)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true, false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -1354,7 +1387,7 @@ func TestLogin(t *testing.T) {
 		}
 		// initialize user input with email
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
-		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true, false)
+		err := Login("astronomer.io", "", mockV1Client, os.Stdout, true, false, false)
 		assert.NoError(t, err)
 		// assert that everything got set in the right spot
 		domainContext, err := context.GetContext("astronomer.io")
@@ -1364,6 +1397,263 @@ func TestLogin(t *testing.T) {
 		assert.Equal(t, domainContext.Token, "Bearer access_token")
 		assert.Equal(t, currentContext.Token, "token")
 		mockV1Client.AssertExpectations(t)
+	})
+}
+
+// stubAuthConfig answers every auth-config request with authConfig, and puts
+// the real client back when the test ends.
+func stubAuthConfig(t *testing.T, authConfig Config) {
+	t.Helper()
+	previous := httpClient
+	t.Cleanup(func() { httpClient = previous })
+	body, err := json.Marshal(authConfig)
+	assert.NoError(t, err)
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBuffer(body)),
+			Header:     make(http.Header),
+		}
+	})
+}
+
+// stubRefresh answers every refresh with tok, or with err when it is set, and
+// counts the calls.
+func stubRefresh(t *testing.T, tok astroauth.TokenResponse, err error) *int {
+	t.Helper()
+	previous := refreshAccessToken
+	t.Cleanup(func() { refreshAccessToken = previous })
+	calls := new(int)
+	refreshAccessToken = func(_ astroauth.AuthConfig, _ string, _ ...astroauth.RequestOption) (*astroauth.TokenResponse, error) {
+		*calls++
+		if err != nil {
+			return nil, err
+		}
+		return &tok, nil
+	}
+	return calls
+}
+
+// browserAuthenticator stands in for the identity provider. It counts the
+// browser logins, and its userinfo call rejects the tokens in rejected.
+func browserAuthenticator(t *testing.T, rejected ...string) *int {
+	t.Helper()
+	previous := authenticator
+	t.Cleanup(func() { authenticator = previous })
+	browserLogins := new(int)
+	authenticator = Authenticator{
+		userInfoRequester: func(_ Config, accessToken string) (UserInfo, error) {
+			if slices.Contains(rejected, accessToken) {
+				return UserInfo{}, errMock
+			}
+			return UserInfo{Email: "test@astronomer.test"}, nil
+		},
+		tokenRequester: func(Config, string, string) (Result, error) {
+			return Result{AccessToken: "browser-token", RefreshToken: "browser-refresh", ExpiresIn: 3600}, nil
+		},
+		callbackHandler: func() (string, error) {
+			*browserLogins++
+			return "test-code", nil
+		},
+	}
+	openURL = func(string) error { return nil }
+	stubStdinIsTerminal(t, false)
+	return browserLogins
+}
+
+func checkUserSessionMocks() *astrov1_mocks.ClientWithResponsesInterface {
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+	mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
+	mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	return mockV1Client
+}
+
+func saveLogin(t *testing.T, domain, token, refreshToken string, expiresIn int64) {
+	t.Helper()
+	c := config.Context{Domain: domain}
+	assert.NoError(t, c.SetContextKey("token", token))
+	assert.NoError(t, c.SetContextKey("refreshtoken", refreshToken))
+	assert.NoError(t, c.SetExpiresIn(expiresIn))
+}
+
+func TestLoginReusesSavedLogin(t *testing.T) {
+	const domain = "astronomer.io"
+	stubAuthConfig(t, Config{ClientID: "client-id", Audience: "audience", DomainURL: "https://auth.example.com/"})
+
+	t.Run("a saved refresh token logs in without a browser", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, domain, "Bearer expired", "saved-refresh", -60)
+		browserLogins := browserAuthenticator(t)
+		refreshes := stubRefresh(t, astroauth.TokenResponse{AccessToken: "refreshed", ExpiresIn: 3600}, nil)
+		mockV1Client := checkUserSessionMocks()
+
+		out := captureStdout(t, func() {
+			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 0, *browserLogins)
+		assert.Equal(t, 1, *refreshes)
+		assert.Contains(t, out, "Using your saved login for astronomer.io")
+		assert.Contains(t, out, "test@astronomer.test")
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, domain, c.Domain)
+		assert.Equal(t, "Bearer refreshed", c.Token)
+		assert.Equal(t, "saved-refresh", c.RefreshToken)
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("a saved access token with time left is used without a refresh", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, domain, "Bearer still-good", "saved-refresh", 3600)
+		browserLogins := browserAuthenticator(t)
+		refreshes := stubRefresh(t, astroauth.TokenResponse{}, errMock)
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 0, *browserLogins)
+		assert.Equal(t, 0, *refreshes)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer still-good", c.Token)
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("a failed refresh falls back to the browser", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, domain, "Bearer expired", "revoked-refresh", -60)
+		browserLogins := browserAuthenticator(t)
+		stubRefresh(t, astroauth.TokenResponse{}, errMock)
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 1, *browserLogins)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer browser-token", c.Token)
+		assert.Equal(t, "browser-refresh", c.RefreshToken)
+	})
+
+	t.Run("a token userinfo rejects falls back to the browser", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, domain, "Bearer rejected", "", 3600)
+		browserLogins := browserAuthenticator(t, "rejected")
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 1, *browserLogins)
+	})
+
+	t.Run("an access token userinfo rejects falls back to the refresh token", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, domain, "Bearer api-token", "saved-refresh", 3600)
+		browserLogins := browserAuthenticator(t, "api-token")
+		refreshes := stubRefresh(t, astroauth.TokenResponse{AccessToken: "refreshed", ExpiresIn: 3600}, nil)
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 0, *browserLogins)
+		assert.Equal(t, 1, *refreshes)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer refreshed", c.Token)
+		assert.Equal(t, "test@astronomer.test", c.UserEmail)
+	})
+
+	for _, tc := range []struct {
+		name          string
+		token         string
+		signup, force bool
+		browserLogins int
+		savedToken    string
+	}{
+		{name: "force opens the browser", force: true, browserLogins: 1, savedToken: "Bearer browser-token"},
+		{name: "signup opens the browser", signup: true, browserLogins: 1, savedToken: "Bearer browser-token"},
+		{name: "a given token is used as it is", token: "given-token", savedToken: "Bearer given-token"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			saveLogin(t, domain, "Bearer still-good", "saved-refresh", 3600)
+			browserLogins := browserAuthenticator(t)
+			mockV1Client := checkUserSessionMocks()
+
+			captureStdout(t, func() {
+				assert.NoError(t, Login(domain, tc.token, mockV1Client, io.Discard, false, tc.signup, tc.force))
+			})
+
+			assert.Equal(t, tc.browserLogins, *browserLogins)
+			c, err := config.GetCurrentContext()
+			assert.NoError(t, err)
+			assert.Equal(t, tc.savedToken, c.Token)
+		})
+	}
+}
+
+func TestSwitch(t *testing.T) {
+	const domain = "astronomer-dev.io"
+	stubAuthConfig(t, Config{ClientID: "client-id", Audience: "audience", DomainURL: "https://auth.example.com/"})
+
+	t.Run("a saved login is refreshed and the context switched", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, domain, "Bearer expired", "saved-refresh", -60)
+		browserLogins := browserAuthenticator(t)
+		stubRefresh(t, astroauth.TokenResponse{AccessToken: "refreshed", ExpiresIn: 3600}, nil)
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Switch("cloud.astronomer-dev.io", mockV1Client, io.Discard))
+		})
+
+		assert.Equal(t, 0, *browserLogins)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, domain, c.Domain)
+		assert.Equal(t, "Bearer refreshed", c.Token)
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("without a working login it switches and says to log in", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		browserLogins := browserAuthenticator(t)
+		out := new(bytes.Buffer)
+
+		assert.NoError(t, Switch(domain, nil, out))
+
+		assert.Equal(t, 0, *browserLogins)
+		assert.Contains(t, out.String(), "Run 'astro login astronomer-dev.io' to log in")
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, domain, c.Domain)
+	})
+
+	t.Run("when the auth config cannot be read it switches and says why", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		previous := httpClient
+		t.Cleanup(func() { httpClient = previous })
+		httpClient = testUtil.NewTestClient(func(*http.Request) *http.Response {
+			return &http.Response{StatusCode: http.StatusBadGateway, Body: io.NopCloser(bytes.NewBufferString("")), Header: make(http.Header)}
+		})
+		out := new(bytes.Buffer)
+
+		assert.NoError(t, Switch(domain, nil, out))
+
+		assert.Contains(t, out.String(), "Switched to astronomer-dev.io, but could not check its login")
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, domain, c.Domain)
 	})
 }
 
@@ -1402,6 +1692,19 @@ func TestLogout(t *testing.T) {
 
 		// test after logout
 		assertions("", "")
+	})
+
+	t.Run("clears the refresh token so the next login cannot reuse it", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.NoError(t, c.SetContextKey("refreshtoken", "saved-refresh"))
+
+		Logout(c.Domain, io.Discard)
+
+		c, err = context.GetContext(c.Domain)
+		assert.NoError(t, err)
+		assert.Empty(t, c.RefreshToken)
 	})
 }
 

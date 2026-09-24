@@ -11,7 +11,29 @@ const (
 	LocalDomain   = "localhost"
 )
 
-var PRPreviewDomainRegex = regexp.MustCompile(`^(pr\d{4,6}).astronomer-dev\.io$`)
+var (
+	PRPreviewDomainRegex = regexp.MustCompile(`^(pr\d{4,6}).astronomer-dev\.io$`)
+	prPreviewShortName   = regexp.MustCompile(`^pr\d{4,6}$`)
+
+	environmentShortNames = map[string]string{
+		"prod":  DefaultDomain,
+		"stage": "astronomer-stage.io",
+		"dev":   "astronomer-dev.io",
+	}
+)
+
+// ExpandShortName turns the short name of an Astronomer environment into its
+// host: prod, stage, dev, or prNNNNN for a PR preview. Any other name comes
+// back unchanged.
+func ExpandShortName(name string) string {
+	if host, ok := environmentShortNames[name]; ok {
+		return host
+	}
+	if prPreviewShortName.MatchString(name) {
+		return name + ".astronomer-dev.io"
+	}
+	return name
+}
 
 func FormatDomain(domain string) string {
 	if strings.Contains(domain, "cloud") {

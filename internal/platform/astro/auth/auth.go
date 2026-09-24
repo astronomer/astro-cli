@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"cmp"
 	http_context "context"
 	"crypto/sha256"
 	"encoding/json"
@@ -39,11 +40,16 @@ const (
 	configSetDefaultWorkspace = "\"%s\" Workspace found. This is your default Workspace.\n"
 
 	registryAuthSuccessMsg = "Successfully authenticated to Astronomer"
+
+	// AccessTokenRefreshMargin is how close to its expiry an access token is
+	// refreshed rather than used.
+	AccessTokenRefreshMargin = 5 * time.Minute
 )
 
 var (
 	httpClient          = httputil.NewHTTPClient()
 	openURL             = browser.OpenURL
+	refreshAccessToken  = astroauth.RefreshToken
 	stdinIsTerminal     = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 	errEmailNotFound    = errors.New("cannot retrieve email")
@@ -219,7 +225,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink, signup bool) (Result, error) {
+func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink, signup, force bool) (Result, error) {
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:mnd // the value is clear from context
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // reviewed; not a new risk in this v1 code
@@ -232,7 +238,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	var res Result
 
 	authorizeURL := fmt.Sprintf(
-		"%sauthorize?prompt=login&audience=%s&client_id=%s&redirect_uri=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
+		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
 		authConfig.DomainURL,
 		authConfig.Audience,
 		authConfig.ClientID,
@@ -242,6 +248,9 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
 
+	if force {
+		authorizeURL += "&prompt=login"
+	}
 	if signup {
 		// screen_hint routes the universal login to its sign-up screen;
 		// ext-signup-source tags the account the way the web flow's
@@ -496,9 +505,12 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 
 // ShouldSignup reports whether a login to domain should open the sign-up screen
 // rather than the sign-in screen. It says yes when the CLI holds nothing for
-// that domain, which is the state a first-run user is in.
+// that domain, which is the state a first-run user is in. Only production takes
+// new accounts this way: the other environments are Astronomer's own, and
+// whoever logs in to them already has an account.
 func ShouldSignup(domain string) bool {
-	return shouldSignup(context.GetContext, domainutil.FormatDomain(domain))
+	domain = domainutil.FormatDomain(domain)
+	return domain == domainutil.DefaultDomain && shouldSignup(context.GetContext, domain)
 }
 
 // getContext is a parameter, not a direct call, so a test does not need a real ~/.astro.
@@ -514,22 +526,30 @@ func shouldSignup(getContext func(domain string) (config.Context, error), domain
 		c.Workspace == "" && c.LastUsedWorkspace == "" && c.UserEmail == ""
 }
 
-// Login handles authentication to astronomer api and registry
-func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
-	var res Result
+// Login handles authentication to astronomer api and registry. Unless force,
+// signup or a token asks for a new login, it first tries the login already
+// saved for domain and opens the browser only when that login no longer works.
+func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
 	if err != nil {
 		return err
 	}
+
+	if token == "" && !force && !signup {
+		if res, ok := authenticator.savedLogin(domain, authConfig); ok {
+			fmt.Printf("Using your saved login for %s\n", domain)
+			return completeLogin(domain, res, astroV1Client, out, false)
+		}
+	}
+
 	// Welcome User
 	fmt.Print("Welcome to the Astro CLI 🚀\n")
 	fmt.Print("To learn more about Astro, go to https://www.astronomer.io/docs\n")
 
-	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
-
+	var res Result
 	if token == "" {
-		res, err = authenticator.authDeviceLogin(authConfig, shouldDisplayLoginLink, signup)
+		res, err = authenticator.authDeviceLogin(authConfig, shouldDisplayLoginLink, signup, force)
 		if err != nil {
 			return err
 		}
@@ -549,15 +569,72 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	// set email base on userinfo so it always match with access token
 	res.UserEmail = userInfo.Email
 
-	// Create context if it does not exist
-	if domain != "" {
-		// Switch context now that we ensured context exists
-		err = context.Switch(domain)
-		if err != nil {
-			return err
+	return completeLogin(domain, res, astroV1Client, out, signup)
+}
+
+// Switch points the CLI at domain using the login saved for it, and never opens
+// a browser. With no working login it still switches, and says how to log in.
+func Switch(domain string, astroV1Client astrov1.APIClient, out io.Writer) error {
+	domain = domainutil.FormatDomain(domain)
+	authConfig, fetchErr := FetchDomainAuthConfig(domain)
+	if fetchErr == nil {
+		if res, ok := authenticator.savedLogin(domain, authConfig); ok {
+			return completeLogin(domain, res, astroV1Client, out, false)
 		}
 	}
-	c, err = context.GetCurrentContext()
+	if err := context.Switch(domain); err != nil {
+		return err
+	}
+	if fetchErr != nil {
+		fmt.Fprintf(out, "Switched to %s, but could not check its login: %s\n", domain, fetchErr)
+		return nil
+	}
+	fmt.Fprintf(out, "Switched to %s, but there is no working login for it. Run 'astro login %s' to log in.\n", domain, domain)
+	return nil
+}
+
+// savedLogin tries the saved access token before the refresh token. An access
+// token userinfo rejects, such as an API token saved from ASTRO_API_TOKEN,
+// still leaves the refresh token to try.
+func (a *Authenticator) savedLogin(domain string, authConfig Config) (Result, bool) {
+	c, err := context.GetContext(domain)
+	if err != nil {
+		return Result{}, false
+	}
+	expiry, _ := c.GetExpiresIn() //nolint:errcheck // a missing expiry reads as zero, which is expired
+	if accessToken := strings.TrimSpace(strings.TrimPrefix(c.Token, "Bearer ")); accessToken != "" && time.Now().Add(AccessTokenRefreshMargin).Before(expiry) {
+		res := Result{AccessToken: accessToken, RefreshToken: c.RefreshToken, ExpiresIn: int64(time.Until(expiry).Seconds())}
+		if a.withOwner(authConfig, &res) {
+			return res, true
+		}
+	}
+	if c.RefreshToken == "" {
+		return Result{}, false
+	}
+	tok, err := refreshAccessToken(authConfig, c.RefreshToken)
+	if err != nil {
+		return Result{}, false
+	}
+	res := Result{AccessToken: tok.AccessToken, RefreshToken: cmp.Or(tok.RefreshToken, c.RefreshToken), ExpiresIn: tok.ExpiresIn}
+	ok := a.withOwner(authConfig, &res)
+	return res, ok
+}
+
+func (a *Authenticator) withOwner(authConfig Config, res *Result) bool {
+	userInfo, err := a.userInfoRequester(authConfig, res.AccessToken)
+	if err != nil {
+		return false
+	}
+	res.UserEmail = userInfo.Email
+	return true
+}
+
+func completeLogin(domain string, res Result, astroV1Client astrov1.APIClient, out io.Writer, signup bool) error {
+	err := context.Switch(domain)
+	if err != nil {
+		return err
+	}
+	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
@@ -583,6 +660,10 @@ func Logout(domain string, out io.Writer) {
 	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
 
 	err := c.SetContextKey("token", "")
+	if err != nil {
+		return
+	}
+	err = c.SetContextKey("refreshtoken", "")
 	if err != nil {
 		return
 	}

@@ -181,3 +181,21 @@ func (s *Suite) TestGetURLToEndpoint() {
 		s.Equal(expectedURL, actualURL)
 	})
 }
+
+func (s *Suite) TestExpandShortName() {
+	tests := map[string]string{
+		"prod":                     "astronomer.io",
+		"stage":                    "astronomer-stage.io",
+		"dev":                      "astronomer-dev.io",
+		"pr1234":                   "pr1234.astronomer-dev.io",
+		"pr123456":                 "pr123456.astronomer-dev.io",
+		"pr123":                    "pr123",
+		"pr1234567":                "pr1234567",
+		"astronomer.io":            "astronomer.io",
+		"pr1234.astronomer-dev.io": "pr1234.astronomer-dev.io",
+		"software.example.com":     "software.example.com",
+	}
+	for name, want := range tests {
+		s.Equal(want, ExpandShortName(name), name)
+	}
+}

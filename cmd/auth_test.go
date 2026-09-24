@@ -21,6 +21,7 @@ func (s *CmdSuite) TestAuthRootCommand() {
 	s.Contains(output, "Authenticate to Astro or APC")
 	s.Contains(output, "--signup")
 	s.Contains(output, "--signin")
+	s.Contains(output, "--force")
 }
 
 func (s *CmdSuite) TestLogin() {
@@ -28,7 +29,7 @@ func (s *CmdSuite) TestLogin() {
 	cloudDomain := "astronomer.io"
 	apcDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup bool) error {
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
 		s.Equal(cloudDomain, domain)
 		return nil
 	}
@@ -68,7 +69,7 @@ func (s *CmdSuite) TestLoginSignup() {
 	s.T().Cleanup(func() { signup, signin, token = false, false, "" })
 
 	var got bool
-	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag bool) error {
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag, force bool) error {
 		got = signupFlag
 		return nil
 	}
@@ -89,13 +90,76 @@ func (s *CmdSuite) TestLoginSignup() {
 	s.NoError(login(&cobra.Command{}, []string{knownDomain}, nil, buf))
 	s.False(got)
 
+	// Only production takes new accounts, so another environment signs in even
+	// with nothing saved for it.
 	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
+	s.False(got)
+}
+
+func (s *CmdSuite) TestLoginSignupNewProductionAccount() {
+	// The config holds a context for astronomer-dev.io and none for astronomer.io.
+	testUtil.InitTestConfig(testUtil.CloudDevPlatform)
+	s.T().Cleanup(func() { token = "" })
+
+	var got bool
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag, force bool) error {
+		got = signupFlag
+		return nil
+	}
+	buf := new(bytes.Buffer)
+
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
 	s.True(got)
 
 	// A token login opens no browser, so it stays on the sign-in path.
 	token = "a-token"
-	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
 	s.False(got)
+}
+
+func (s *CmdSuite) TestLoginShortNames() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	var got string
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+		got = domain
+		return nil
+	}
+	apcLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+		s.Fail("a short name went to APC login", domain)
+		return nil
+	}
+	tests := map[string]string{
+		"prod":                      "astronomer.io",
+		"stage":                     "astronomer-stage.io",
+		"dev":                       "astronomer-dev.io",
+		"pr12345":                   "pr12345.astronomer-dev.io",
+		"pr12345.astronomer-dev.io": "pr12345.astronomer-dev.io",
+	}
+	for name, want := range tests {
+		s.NoError(login(&cobra.Command{}, []string{name}, nil, new(bytes.Buffer)))
+		s.Equal(want, got, name)
+	}
+}
+
+func (s *CmdSuite) TestLoginForce() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	var got bool
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+		got = force
+		return nil
+	}
+
+	s.T().Cleanup(func() { forceLogin = false })
+	buf := new(bytes.Buffer)
+
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.False(got)
+
+	forceLogin = true
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.True(got)
+	s.NoError(login(&cobra.Command{}, []string{}, nil, buf))
+	s.True(got)
 }
 
 func (s *CmdSuite) TestLoginSignupAndSigninConflict() {
@@ -110,7 +174,7 @@ func (s *CmdSuite) TestLoginSignupAndSigninConflict() {
 // zero: a caller that reads a non-zero exit as "try again" would sign up twice.
 func (s *CmdSuite) TestLoginEmailVerificationPending() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag bool) error {
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signupFlag, force bool) error {
 		return astroAuth.ErrEmailVerificationPending
 	}
 

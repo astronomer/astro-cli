@@ -37,9 +37,8 @@ var (
 )
 
 const (
-	accessTokenExpThreshold = 5 * time.Minute
-	topLvlCmd               = "astro"
-	deploymentCmd           = "deployment"
+	topLvlCmd     = "astro"
+	deploymentCmd = "deployment"
 )
 
 type TokenResponse struct {
@@ -140,13 +139,13 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", astroV1Client, out, false, false)
+		err := authLogin(c.Domain, "", astroV1Client, out, false, false, false)
 		if err != nil {
 			return err
 		}
 
 		return nil
-	} else if isExpired(expireTime, accessTokenExpThreshold) {
+	} else if isExpired(expireTime, auth.AccessTokenRefreshMargin) {
 		authConfig, err := fetchDomainAuthConfig(c.Domain)
 		if err != nil {
 			return err
@@ -154,7 +153,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", astroV1Client, out, false, false)
+			err := authLogin(c.Domain, "", astroV1Client, out, false, false, false)
 			if err != nil {
 				return err
 			}
