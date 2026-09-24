@@ -89,6 +89,24 @@ type Deps struct {
 	// link cannot be reached, which is what a test that declares none wants.
 	Locator instances.Locator
 
+	// LoginDomain is the Astro host the current login is for, which linking a
+	// workspace writes as its domain when none is given. A seam for the same
+	// reason Session is; nil reads as no login.
+	LoginDomain func() (string, error)
+
+	// CurrentWorkspace, PickDeployment and PickWorkspace are the Astro pickers
+	// `astro link` asks with when a run can be asked and an argument is
+	// missing: the current login's workspace, then the Deployment and workspace
+	// lists `astro deploy` and `astro workspace switch` offer. The root wires
+	// them over the v1 client, which this tree cannot import. nil means the
+	// run cannot pick, and the missing argument is an error.
+	CurrentWorkspace func() string
+	// PickDeployment leaves out the Deployments in linked, which maps a
+	// Deployment ID to the link naming it, and reports ErrAllDeploymentsLinked
+	// when that leaves none to offer.
+	PickDeployment func(workspaceID string, linked map[string]string) (PickedDeployment, error)
+	PickWorkspace  func() (string, error)
+
 	// Interactive reports whether this run may ask the user a question. It is a
 	// seam rather than a stdin type-assertion so a test can drive the prompt
 	// path without a pty. nil means non-interactive, which is the safe default:
@@ -136,6 +154,7 @@ func NewDeps() Deps {
 		WorkspaceClients: emenv.Clients,
 		Session:          astrosession.Bearer,
 		Locator:          instancelocate.New(astroV1Client),
+		LoginDomain:      astrosession.Domain,
 		Interactive:      stdinIsTerminal,
 	}
 }
@@ -348,4 +367,15 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 		Bin:          req.Bin,
 		Env:          req.Env,
 	}, cb)
+}
+
+// ErrAllDeploymentsLinked reports a Deployment picker with nothing to offer
+// because the project already links every Deployment in the workspace.
+var ErrAllDeploymentsLinked = errors.New("every Deployment in the workspace is already linked")
+
+// PickedDeployment is the Astro Deployment a picker chose.
+type PickedDeployment struct {
+	ID          string
+	Name        string
+	WorkspaceID string
 }

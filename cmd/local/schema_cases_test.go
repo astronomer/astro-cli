@@ -74,6 +74,8 @@ var publishedPayloads = []schemaCase{
 	{"use-result", useResult{}},
 	{"use-resolution", resolution{}},
 	{"use-instance-row", instanceRow{}},
+	{"link-result", linkResult{}},
+	{"link-workspace", workspaceLinkResult{}},
 	{"error", jsonError{}},
 	{"event", event{}},
 	{"open-url", urlResult{}},

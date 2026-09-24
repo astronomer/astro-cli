@@ -1,9 +1,11 @@
 package printutil
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 )
 
 // Table represents a table to be printed
@@ -79,6 +81,27 @@ func (t *Table) Print(out io.Writer) error {
 		fmt.Fprintln(out, t.SuccessMsg)
 	}
 	return nil
+}
+
+// Pick is the table picker: it prints title when there is one, then the table,
+// then asks for a row after a "> " prompt and reads the answer from in. The
+// answer is the number in the row's # column, which the caller fills with 1
+// for the first row, 2 for the next, and so on. It returns the chosen row's
+// 0-based index, or false when the answer is not one of those numbers.
+func (t *Table) Pick(out io.Writer, in io.Reader, title string) (int, bool) {
+	if title != "" {
+		fmt.Fprintln(out, title)
+	}
+	t.Print(out)                                    //nolint:errcheck // Print never fails; the error is for the interface
+	fmt.Fprint(out, "\n> ")                         //nolint:errcheck // a failed write to the terminal still reads the answer
+	line, _ := bufio.NewReader(in).ReadString('\n') //nolint:errcheck // a failed read is an answer that picks nothing
+	choice := strings.Trim(line, "\r\n")
+	for i := range t.Rows {
+		if choice == strconv.Itoa(i+1) {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // Print header __as well as__ rows

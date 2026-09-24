@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -105,8 +106,22 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		isDeploymentFile = true
 	}
 
+	return ensureLogin(isDeploymentFile, astroV1Client)
+}
+
+// EnsureLogin runs the login check Setup gives every cloud command before it
+// calls the API: an API token, then API keys, then the current login, whose
+// access token is refreshed when it is about to expire (and, with no login at
+// all, the login flow). A command that skips the root's pre-run, as the v2 tree
+// does, calls this before its own API calls.
+func EnsureLogin(astroV1Client astrov1.APIClient) error {
+	return ensureLogin(false, astroV1Client)
+}
+
+// ensureLogin is Setup's auth half, shared with EnsureLogin.
+func ensureLogin(deploymentFile bool, astroV1Client astrov1.APIClient) error {
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, astroV1Client)
+	apiToken, err := checkAPIToken(deploymentFile, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -115,19 +130,38 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(astroV1Client, isDeploymentFile)
+	apiKey, err := checkAPIKeys(astroV1Client, deploymentFile)
 	if err != nil {
 		return err
 	}
 	if apiKey {
 		return nil
 	}
-	err = checkToken(astroV1Client, os.Stdout)
+	return checkToken(astroV1Client, os.Stdout)
+}
+
+// RefreshLogin renews the current login's access token now, whatever expiry
+// the config records, and saves it the way checkToken does. It is for a call
+// the platform refused with 401 although the recorded expiry said the token
+// was good. It never starts the login flow: an error means the session cannot
+// be renewed and the user has to log in again.
+func RefreshLogin() error {
+	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-
-	return nil
+	if c.RefreshToken == "" {
+		return errors.New("the current login has no refresh token")
+	}
+	authConfig, err := fetchDomainAuthConfig(c.Domain)
+	if err != nil {
+		return err
+	}
+	res, err := refresh(c.RefreshToken, authConfig)
+	if err != nil {
+		return err
+	}
+	return saveRenewedToken(&c, &res)
 }
 
 func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
@@ -161,33 +195,29 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 			// and overwrite it with the failed refresh's zero-value token
 			return nil
 		}
-		// persist the updated context with the renewed access token
-		err = c.SetContextKey("token", "Bearer "+res.AccessToken)
-		if err != nil {
-			return err
-		}
-		err = c.SetExpiresIn(res.ExpiresIn)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("workspace", c.Workspace)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("workspace", c.LastUsedWorkspace)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("organization", c.Organization)
-		if err != nil {
-			return err
-		}
-		err = c.SetContextKey("organization_product", c.OrganizationProduct)
-		if err != nil {
-			return err
-		}
+		return saveRenewedToken(&c, &res)
 	}
 	return nil
+}
+
+// saveRenewedToken persists the context with the renewed access token.
+func saveRenewedToken(c *config.Context, res *TokenResponse) error {
+	if err := c.SetContextKey("token", "Bearer "+res.AccessToken); err != nil {
+		return err
+	}
+	if err := c.SetExpiresIn(res.ExpiresIn); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("workspace", c.Workspace); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("workspace", c.LastUsedWorkspace); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("organization", c.Organization); err != nil {
+		return err
+	}
+	return c.SetContextKey("organization_product", c.OrganizationProduct)
 }
 
 // isExpired is true if now() + a threshold is after the given date

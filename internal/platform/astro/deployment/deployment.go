@@ -1910,27 +1910,20 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID", "DAG DEPLOY ENABLED"},
 	}
 
-	fmt.Println(message)
-
 	sort.Slice(deployments, func(i, j int) bool {
 		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
 	})
 
-	deployMap := map[string]astrov1.Deployment{}
 	for i := range deployments {
-		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].IsDagDeployEnabled)}, false)
-
-		deployMap[strconv.Itoa(index)] = deployments[i]
+		tab.AddRow([]string{strconv.Itoa(i + 1), deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].IsDagDeployEnabled)}, false)
 	}
 
-	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
-	selected, ok := deployMap[choice]
+	// The same table picker `astro link` asks with.
+	i, ok := tab.Pick(os.Stdout, os.Stdin, message)
 	if !ok {
 		return astrov1.Deployment{}, ErrInvalidDeploymentKey
 	}
-	return selected, nil
+	return deployments[i], nil
 }
 
 func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {

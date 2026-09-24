@@ -161,7 +161,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	// file before cobra has seen argv. The read creates nothing, so a v2
 	// command on a machine that never logged in leaves no v1 state behind
 	// (config.initHome, and TestInitLeavesNoV1ConfigBehind in e2e).
-	rootCmd.AddCommand(local.AddCmds(local.NewDeps())...)
+	v2Deps := local.NewDeps()
+	wireLinkPickers(&v2Deps, o.platform, astroV1Client, o.out)
+	rootCmd.AddCommand(local.AddCmds(v2Deps)...)
 
 	groupCommands(rootCmd)
 	rootCmd.SetUsageTemplate(rootUsageTemplate(rootCmd))
@@ -197,7 +199,7 @@ var commandGroups = []struct {
 	names []string
 }{
 	{groupDevelop, "Develop locally:", []string{"init", "local", "start", "stop", "logs"}},
-	{groupInspect, "Inspect Airflow:", []string{"af", "use", "api"}},
+	{groupInspect, "Inspect Airflow:", []string{"af", "use", "link", "api"}},
 	{groupShip, "Ship:", []string{"package", "deploy", "remote", "dbt"}},
 	{groupManage, "Manage Astro:", []string{
 		"login", "logout", "auth", "context",

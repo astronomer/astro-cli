@@ -45,6 +45,28 @@ func TestBearerTreatsASchemeWithNoTokenAsLoggedOut(t *testing.T) {
 	}
 }
 
+// Domain is the host the current context names, whether or not its session is
+// still good, and ASTRO_DOMAIN wins over it.
+func TestDomainIsTheCurrentLoginsHost(t *testing.T) {
+	t.Setenv("ASTRO_DOMAIN", "")
+	writeConfig(t, "context: astronomer-dev.io\ncontexts:\n  astronomer-dev_io:\n    domain: astronomer-dev.io\n    token: 'Bearer '\n")
+	if got, err := Domain(); err != nil || got != "astronomer-dev.io" {
+		t.Fatalf("Domain() = (%q, %v), want astronomer-dev.io", got, err)
+	}
+	t.Setenv("ASTRO_DOMAIN", "astronomer-stage.io")
+	if got, _ := Domain(); got != "astronomer-stage.io" {
+		t.Fatalf("Domain() with ASTRO_DOMAIN = %q, want astronomer-stage.io", got)
+	}
+}
+
+func TestDomainWithNoLoginSaysSo(t *testing.T) {
+	t.Setenv("ASTRO_DOMAIN", "")
+	writeConfig(t, "")
+	if _, err := Domain(); err != ErrNoDomain { //nolint:errorlint // the sentinel is returned as is
+		t.Fatalf("err = %v, want ErrNoDomain", err)
+	}
+}
+
 // writeConfig points config/ at an in-memory home holding the given YAML, the
 // same way pkg/testing does for its own fixtures.
 func writeConfig(t *testing.T, yaml string) {
