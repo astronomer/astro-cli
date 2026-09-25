@@ -43,7 +43,7 @@ var leftoverFixture = strings.Replace(pinFixture, "[tool.astro]\n", "[tool.astro
 func TestSetAirflowVersionRewritesTheRequirementSurgically(t *testing.T) {
 	dir, path := writeEditFixture(t, pinFixture, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.2")
+	change, err := SetAirflowVersionWith(dir, nil, "3.2", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	want := strings.NewReplacer(
@@ -70,7 +70,7 @@ func TestSetAirflowVersionRaisesThePythonFloorPastThreePointOne(t *testing.T) {
 		"[project]\nname = 'x'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n",
 		0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.3")
+	change, err := SetAirflowVersionWith(dir, nil, "3.3", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, ">=3.12", change.RequiresPython)
 	assert.Contains(t, readFile(t, path), "requires-python = '>=3.12'")
@@ -79,7 +79,7 @@ func TestSetAirflowVersionRaisesThePythonFloorPastThreePointOne(t *testing.T) {
 func TestSetAirflowVersionPinsAFullVersionExactly(t *testing.T) {
 	dir, path := writeEditFixture(t, pinFixture, 0o644)
 
-	_, err := SetAirflowVersion(dir, nil, "2.10.5")
+	_, err := SetAirflowVersionWith(dir, nil, "2.10.5", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	got := readFile(t, path)
@@ -99,7 +99,7 @@ func TestSetAirflowVersionRefusesAnInvalidPin(t *testing.T) {
 				return run()
 			}
 
-			_, err := SetAirflowVersion(dir, wrap, v)
+			_, err := SetAirflowVersionWith(dir, wrap, v, AirflowPinOptions{})
 
 			require.ErrorIs(t, err, ErrInvalidAirflowVersion)
 			assert.False(t, wrapped, "the wrapper ran for a pin that was refused")
@@ -117,7 +117,7 @@ func TestSetAirflowVersionRunsInsideTheWrapper(t *testing.T) {
 		return err
 	}
 
-	_, err := SetAirflowVersion(dir, wrap, "3.1")
+	_, err := SetAirflowVersionWith(dir, wrap, "3.1", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.Contains(t, during, "'apache-airflow[celery]==3.1.*'", "the write happened outside the wrapper")
 
@@ -125,7 +125,7 @@ func TestSetAirflowVersionRunsInsideTheWrapper(t *testing.T) {
 	// edit leaves the file alone.
 	dir, path = writeEditFixture(t, pinFixture, 0o644)
 	locked := errors.New("locked")
-	_, err = SetAirflowVersion(dir, func(func() error) error { return locked }, "3.1")
+	_, err = SetAirflowVersionWith(dir, func(func() error) error { return locked }, "3.1", AirflowPinOptions{})
 	require.ErrorIs(t, err, locked)
 	assert.Equal(t, pinFixture, readFile(t, path))
 }
@@ -136,7 +136,7 @@ func TestSetAirflowVersionKeepsTheFileMode(t *testing.T) {
 	}
 	dir, path := writeEditFixture(t, pinFixture, 0o600)
 
-	_, err := SetAirflowVersion(dir, nil, "3.1")
+	_, err := SetAirflowVersionWith(dir, nil, "3.1", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	info, err := os.Stat(path)
@@ -161,7 +161,7 @@ func TestSetAirflowVersionWritesNothingForTheSamePin(t *testing.T) {
 			past := time.Now().Add(-time.Hour).Truncate(time.Second)
 			require.NoError(t, os.Chtimes(path, past, past))
 
-			change, err := SetAirflowVersion(dir, nil, c.pin)
+			change, err := SetAirflowVersionWith(dir, nil, c.pin, AirflowPinOptions{})
 			require.NoError(t, err)
 
 			assert.False(t, change.Changed)
@@ -191,7 +191,7 @@ func TestSetAirflowVersionMakesTheRequirementSayTheVersion(t *testing.T) {
 			body := strings.Replace(pinFixture, "'apache-airflow[celery]==2.9.*'", c.entry, 1)
 			dir, path := writeEditFixture(t, body, 0o644)
 
-			change, err := SetAirflowVersion(dir, nil, c.to)
+			change, err := SetAirflowVersionWith(dir, nil, c.to, AirflowPinOptions{})
 			require.NoError(t, err)
 
 			assert.Contains(t, readFile(t, path), c.want+",")
@@ -211,7 +211,7 @@ func TestSetAirflowVersionMovesEveryAirflowEntry(t *testing.T) {
 		"    \"apache-airflow-core==2.9.*; sys_platform == 'linux'\",\n    \"apache-airflow-core==2.9.*; sys_platform != 'linux'\",\n", 1)
 	dir, path := writeEditFixture(t, body, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.3")
+	change, err := SetAirflowVersionWith(dir, nil, "3.3", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{
@@ -227,7 +227,7 @@ func TestSetAirflowVersionKeepsAMarker(t *testing.T) {
 	body := strings.Replace(pinFixture, "'apache-airflow[celery]==2.9.*'", `"apache-airflow==2.9.3 ; python_version < '3.13'"`, 1)
 	dir, path := writeEditFixture(t, body, 0o644)
 
-	_, err := SetAirflowVersion(dir, nil, "2.10")
+	_, err := SetAirflowVersionWith(dir, nil, "2.10", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Contains(t, readFile(t, path), `"apache-airflow==2.10.*; python_version < '3.13'"`)
@@ -239,7 +239,7 @@ func TestSetAirflowVersionKeepsAChosenPythonBound(t *testing.T) {
 	body := strings.Replace(pinFixture, "'>=3.10,<3.13'", "'>=3.11,<3.13'", 1)
 	dir, path := writeEditFixture(t, body, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.1")
+	change, err := SetAirflowVersionWith(dir, nil, "3.1", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Contains(t, readFile(t, path), "requires-python = '>=3.11,<3.13'")
@@ -256,7 +256,7 @@ func TestSetAirflowVersionReportsADeclaredDockerfile(t *testing.T) {
 	dockerfile := "FROM astrocrpublic.azurecr.io/runtime:2.9-1\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600))
 
-	change, err := SetAirflowVersion(dir, nil, "3.1")
+	change, err := SetAirflowVersionWith(dir, nil, "3.1", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "Dockerfile", change.Dockerfile)
@@ -267,7 +267,7 @@ func TestSetAirflowVersionReportsADeclaredDockerfile(t *testing.T) {
 func TestSetAirflowVersionNeverCreatesAManifest(t *testing.T) {
 	dir := t.TempDir()
 
-	_, err := SetAirflowVersion(dir, nil, "3.1")
+	_, err := SetAirflowVersionWith(dir, nil, "3.1", AirflowPinOptions{})
 
 	require.ErrorIs(t, err, manifest.ErrNotFound)
 	_, statErr := os.Stat(filepath.Join(dir, manifest.Marker))
@@ -275,7 +275,7 @@ func TestSetAirflowVersionNeverCreatesAManifest(t *testing.T) {
 }
 
 // A manifest carrying the leftover [tool.astro] airflow line does not load,
-// and SetAirflowVersion is one of the two edits that repair it: it runs on
+// and SetAirflowVersionWith is one of the two edits that repair it: it runs on
 // that manifest, deletes the line, and writes nothing else of it.
 func TestSetAirflowVersionDeletesALeftoverAirflowKey(t *testing.T) {
 	for _, to := range []string{"2.9", "3.2"} {
@@ -284,7 +284,7 @@ func TestSetAirflowVersionDeletesALeftoverAirflowKey(t *testing.T) {
 			_, err := manifest.Load(path)
 			require.Error(t, err, "the fixture should not load as it stands")
 
-			change, err := SetAirflowVersion(dir, nil, to)
+			change, err := SetAirflowVersionWith(dir, nil, to, AirflowPinOptions{})
 			require.NoError(t, err)
 
 			assert.True(t, change.RemovedAirflowKey)
@@ -299,7 +299,7 @@ func TestSetAirflowVersionDeletesALeftoverAirflowKey(t *testing.T) {
 
 	// The same version is still a change: the line goes, and only the line.
 	dir, path := writeEditFixture(t, leftoverFixture, 0o644)
-	change, err := SetAirflowVersion(dir, nil, "2.9")
+	change, err := SetAirflowVersionWith(dir, nil, "2.9", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, change.Requirements)
 	assert.Equal(t, pinFixture, readFile(t, path))
@@ -413,12 +413,12 @@ func TestMigrateAirflowKeyRefusesALoneKeyThatIsNotAVersion(t *testing.T) {
 	assert.Equal(t, body, readFile(t, path))
 }
 
-// SetAirflowVersion repairs the same manifest, writing the requirement for the
+// SetAirflowVersionWith repairs the same manifest, writing the requirement for the
 // version it is given, and reports the key's version as the previous one.
 func TestSetAirflowVersionRepairsALoneKey(t *testing.T) {
 	dir, path := writeEditFixture(t, keyOnlyFixture, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.2")
+	change, err := SetAirflowVersionWith(dir, nil, "3.2", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "2.9", change.Previous)
@@ -480,7 +480,7 @@ func TestMigrateAirflowKeyRefusesBothDistributions(t *testing.T) {
 	assert.Equal(t, body, readFile(t, path))
 }
 
-// SetAirflowVersion is given the version, so it repairs any requirement that
+// SetAirflowVersionWith is given the version, so it repairs any requirement that
 // states none, with or without a leftover key.
 func TestSetAirflowVersionRepairsAnUnclearRequirement(t *testing.T) {
 	for name, body := range map[string]string{
@@ -493,7 +493,7 @@ func TestSetAirflowVersionRepairsAnUnclearRequirement(t *testing.T) {
 			_, err := manifest.Load(path)
 			require.Error(t, err, "the fixture should not load as it stands")
 
-			change, err := SetAirflowVersion(dir, nil, "3.2")
+			change, err := SetAirflowVersionWith(dir, nil, "3.2", AirflowPinOptions{})
 			require.NoError(t, err)
 
 			assert.True(t, change.Changed)
@@ -510,7 +510,7 @@ func TestSetAirflowVersionKeepsRequiresPythonWithNoPreviousVersion(t *testing.T)
 	body := "[project]\nname = 'x'\nrequires-python = '>=3.12'\ndependencies = ['pandas']\n\n[tool.astro]\n"
 	dir, path := writeEditFixture(t, body, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "2.9")
+	change, err := SetAirflowVersionWith(dir, nil, "2.9", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Empty(t, change.Previous)
@@ -539,7 +539,10 @@ airflow = '2.9'
 func TestAirflowRepairsRefuseDynamicDependencies(t *testing.T) {
 	for name, repair := range map[string]func(dir string) error{
 		"MigrateAirflowKey": func(dir string) error { _, err := MigrateAirflowKey(dir, nil); return err },
-		"SetAirflowVersion": func(dir string) error { _, err := SetAirflowVersion(dir, nil, "3.2"); return err },
+		"SetAirflowVersionWith": func(dir string) error {
+			_, err := SetAirflowVersionWith(dir, nil, "3.2", AirflowPinOptions{})
+			return err
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir, path := writeEditFixture(t, dynamicFixture, 0o644)
@@ -561,7 +564,7 @@ func TestSetAirflowVersionSwitchesCoreForAnAirflow2(t *testing.T) {
 	body := strings.Replace(pinFixture, "'apache-airflow[celery]==2.9.*'", `"apache-airflow-core[otel]==3.2.*; os_name == 'posix'"`, 1)
 
 	dir, path := writeEditFixture(t, body, 0o644)
-	change, err := SetAirflowVersion(dir, nil, "2.10")
+	change, err := SetAirflowVersionWith(dir, nil, "2.10", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.True(t, change.CoreReplaced)
 	assert.Equal(t, []string{"apache-airflow[otel]==2.10.*; os_name == 'posix'"}, change.Requirements)
@@ -570,7 +573,7 @@ func TestSetAirflowVersionSwitchesCoreForAnAirflow2(t *testing.T) {
 	assert.Equal(t, "2.10", m.Airflow().Pin)
 
 	dir, _ = writeEditFixture(t, body, 0o644)
-	change, err = SetAirflowVersion(dir, nil, "3.3")
+	change, err = SetAirflowVersionWith(dir, nil, "3.3", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.False(t, change.CoreReplaced)
 	assert.Equal(t, []string{"apache-airflow-core[otel]==3.3.*; os_name == 'posix'"}, change.Requirements)
@@ -585,7 +588,7 @@ func TestSetAirflowVersionRepairsCorePinnedToAnAirflow2(t *testing.T) {
 	_, err := manifest.Load(path)
 	require.Error(t, err, "the fixture should not load as it stands")
 
-	change, err := SetAirflowVersion(dir, nil, "2.9")
+	change, err := SetAirflowVersionWith(dir, nil, "2.9", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.True(t, change.CoreReplaced)
@@ -601,7 +604,7 @@ func TestSetAirflowVersionReadsCoreOnAirflow2AsThePreviousVersion(t *testing.T) 
 	body := strings.Replace(pinFixture, "'apache-airflow[celery]==2.9.*'", "'apache-airflow-core==2.9.*'", 1)
 	dir, path := writeEditFixture(t, body, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.2")
+	change, err := SetAirflowVersionWith(dir, nil, "3.2", AirflowPinOptions{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "2.9", change.Previous)

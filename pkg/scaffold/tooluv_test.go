@@ -93,7 +93,7 @@ func TestSetAirflowVersionLeavesToolUVAlone(t *testing.T) {
 				"[project]\nname = 'x'\ndependencies = ['apache-airflow=="+tc.from+".*']\n\n"+
 					"[tool.astro]\nairflow = '"+tc.from+"'\n"+theirs, 0o644)
 
-			_, err := SetAirflowVersion(dir, nil, tc.to)
+			_, err := SetAirflowVersionWith(dir, nil, tc.to, AirflowPinOptions{})
 			require.NoError(t, err)
 			assert.True(t, strings.HasSuffix(readFile(t, path), theirs), "[tool.uv] changed:\n%s", readFile(t, path))
 		})
@@ -112,7 +112,7 @@ func TestSetAirflowVersionMovesTheFloorAnOlderInitWrote(t *testing.T) {
 		t.Run(to, func(t *testing.T) {
 			dir, path := writeEditFixture(t, olderInitManifest, 0o644)
 
-			change, err := SetAirflowVersion(dir, nil, to)
+			change, err := SetAirflowVersionWith(dir, nil, to, AirflowPinOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, ">=3.12", change.RequiresPython)
 			assert.Contains(t, readFile(t, path), "requires-python = '>=3.12'")
@@ -125,7 +125,7 @@ func TestSetAirflowVersionKeepsAChosenFloorOnAnOlderProject(t *testing.T) {
 	dir, path := writeEditFixture(t,
 		strings.Replace(olderInitManifest, "'>=3.10'", "'>=3.13'", 1), 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.3")
+	change, err := SetAirflowVersionWith(dir, nil, "3.3", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, change.RequiresPython)
 	assert.Contains(t, readFile(t, path), "requires-python = '>=3.13'")
@@ -138,7 +138,7 @@ func TestSetAirflowVersionKeepsAnOpenBoundOnAirflowTwo(t *testing.T) {
 		"[project]\nname = 'x'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==2.9.*']\n\n"+
 			"[tool.astro]\n", 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "2.10")
+	change, err := SetAirflowVersionWith(dir, nil, "2.10", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, change.RequiresPython)
 	assert.Contains(t, readFile(t, path), "requires-python = '>=3.10'")
@@ -149,7 +149,7 @@ func TestSetAirflowVersionKeepsAnOpenBoundOnAirflowTwo(t *testing.T) {
 func TestSetAirflowVersionLeavesAnOlderProjectAloneOnTheSamePin(t *testing.T) {
 	dir, path := writeEditFixture(t, olderInitManifest, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.2")
+	change, err := SetAirflowVersionWith(dir, nil, "3.2", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.False(t, change.Changed)
 	assert.Empty(t, change.RequiresPython)

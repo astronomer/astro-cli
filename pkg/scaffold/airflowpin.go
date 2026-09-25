@@ -11,11 +11,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// ErrInvalidAirflowVersion reports a pin SetAirflowVersion refused before
+// ErrInvalidAirflowVersion reports a pin SetAirflowVersionWith refused before
 // reading the manifest, because an Airflow requirement cannot pin it.
 var ErrInvalidAirflowVersion = errors.New("not an Airflow version")
 
-// AirflowPinChange is what SetAirflowVersion did to a manifest.
+// AirflowPinChange is what SetAirflowVersionWith did to a manifest.
 type AirflowPinChange struct {
 	// Previous is the version the manifest's Airflow requirement pinned.
 	Previous string `json:"previous"`
@@ -45,7 +45,18 @@ type AirflowPinChange struct {
 	Dockerfile string `json:"dockerfile,omitempty"`
 }
 
-// SetAirflowVersion moves the Airflow the manifest in dir pins to version,
+// AirflowPinOptions adjust SetAirflowVersionWith.
+type AirflowPinOptions struct {
+	// Catalog is the runtime catalog, when the caller has one loaded. With it,
+	// a requires-python that init derived from the catalog (">=" and the
+	// lowest Python an Airflow 3 series' runtime ships) counts as one this
+	// package wrote, so it moves with the pin, and the new bound comes from
+	// the catalog too. nil means only the built-in rule is known, and a
+	// catalog-derived bound that differs from it reads as the user's.
+	Catalog *runtimeversions.Catalog
+}
+
+// SetAirflowVersionWith moves the Airflow the manifest in dir pins to version,
 // through EditManifest, so wrap and every write rule apply as they do there.
 //
 // The version is the Airflow requirement in [project] dependencies, so that is
@@ -70,7 +81,7 @@ type AirflowPinChange struct {
 //   - requires-python moves to the new pin's bound only when it is exactly a
 //     bound this package wrote for the previous pin, today's or the ">=3.10"
 //     init once wrote for all of Airflow 3. A bound someone chose stays theirs.
-//     SetAirflowVersionWith also recognizes, and writes, the bound the runtime
+//     With opts.Catalog it also recognizes, and writes, the bound the runtime
 //     catalog gives.
 //
 // [tool.uv] is the project's, and a pin change never touches it.
@@ -82,24 +93,6 @@ type AirflowPinChange struct {
 //
 // Nothing else changes: providers, Dag code and Dockerfile steps an upgrade
 // may need are judgment, not a pin, and are left to the user or an agent.
-func SetAirflowVersion(dir string, wrap func(run func() error) error, version string) (AirflowPinChange, error) {
-	return SetAirflowVersionWith(dir, wrap, version, AirflowPinOptions{})
-}
-
-// AirflowPinOptions adjust SetAirflowVersionWith.
-type AirflowPinOptions struct {
-	// Catalog is the runtime catalog, when the caller has one loaded. With it,
-	// a requires-python that init derived from the catalog (">=" and the
-	// lowest Python an Airflow 3 series' runtime ships) counts as one this
-	// package wrote, so it moves with the pin, and the new bound comes from
-	// the catalog too. nil means only the built-in rule is known, and a
-	// catalog-derived bound that differs from it reads as the user's.
-	Catalog *runtimeversions.Catalog
-}
-
-// SetAirflowVersionWith is SetAirflowVersion with options, and the one
-// implementation of both: the repairs, the requirement rewrite and the
-// requires-python move are the same whichever is called.
 func SetAirflowVersionWith(dir string, wrap func(run func() error) error, version string, opts AirflowPinOptions) (AirflowPinChange, error) {
 	if !manifest.ValidAirflowVersion(version) {
 		return AirflowPinChange{}, fmt.Errorf("%w: %q is not a version like 3, 3.1, or 3.1.2", ErrInvalidAirflowVersion, version)
@@ -182,7 +175,7 @@ type AirflowKeyMigration struct {
 //   - Beside a requirement that pins one version, the line decides nothing, so
 //     it is deleted and the requirement stays what the project runs. When the
 //     line named a different series, moving the requirement to it is
-//     SetAirflowVersion's job, and the caller's to offer. An
+//     SetAirflowVersionWith's job, and the caller's to offer. An
 //     apache-airflow-core entry on an Airflow 2 moves to apache-airflow at
 //     its own version, which CoreReplaced reports.
 //   - Beside a requirement that does not (manifest.CodeAirflowMissing,

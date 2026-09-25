@@ -40,7 +40,7 @@ func TestSetAirflowVersionWithMovesACatalogBound(t *testing.T) {
 func TestSetAirflowVersionWithoutTheCatalogKeepsACatalogBound(t *testing.T) {
 	dir, path := writeEditFixture(t, catalogPinned, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.41")
+	change, err := SetAirflowVersionWith(dir, nil, "3.41", AirflowPinOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, change.RequiresPython)
 	assert.Contains(t, readFile(t, path), "requires-python = '>=3.13'")

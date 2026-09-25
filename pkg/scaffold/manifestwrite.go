@@ -70,7 +70,7 @@ type ManifestEdit func(before *manifest.Manifest, ed tomledit.Editor) error
 // leftover [tool.astro] airflow line, or a requirement that is missing, pins
 // no single series or states the version twice (manifest.ParseForRepair). It
 // is read, so that the edit repairing it (MigrateAirflowKey,
-// SetAirflowVersion) can run. The result is still held to the full check, so
+// SetAirflowVersionWith) can run. The result is still held to the full check, so
 // any other edit of it is refused, naming the problem, until it is fixed.
 //
 // An edit that changes no bytes writes nothing, so an idempotent caller does

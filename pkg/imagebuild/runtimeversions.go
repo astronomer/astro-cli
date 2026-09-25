@@ -39,12 +39,6 @@ const (
 // carries. Callers branch with errors.Is.
 var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow version")
 
-// LocalRuntimeImage is LocalRuntimeImageWith given only a cache directory: the
-// catalog's default timeout, and no User-Agent of the caller's own.
-func LocalRuntimeImage(ctx context.Context, airflowVersion, cacheDir string) (string, error) {
-	return LocalRuntimeImageWith(ctx, airflowVersion, runtimeversions.Options{CacheDir: cacheDir})
-}
-
 // LocalRuntimeImageWith picks the base image local Docker mode builds FROM.
 // Airflow 3 resolves exactly as the deploy path does. Airflow 2 is looked up in
 // the runtime catalog, and the newest runtime carrying that Airflow wins, down

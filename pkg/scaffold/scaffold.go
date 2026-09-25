@@ -34,7 +34,7 @@ type DefaultAirflow func() (series, requiresPython string, src runtimeversions.S
 
 // manifestKeyAirflow is the [tool.astro] key that carried the Airflow pin
 // before the apache-airflow requirement became the only place a project
-// states its version. Nothing writes it; SetAirflowVersion and
+// states its version. Nothing writes it; SetAirflowVersionWith and
 // MigrateAirflowKey delete a leftover one.
 const manifestKeyAirflow = "airflow"
 

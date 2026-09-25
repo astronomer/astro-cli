@@ -122,8 +122,9 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	}
 	// --airflow-version is the user naming the version, and the requirement is
 	// where the version lives, so an Airflow requirement the manifest already
-	// had moves to it, pinned or a range, the rewrite SetAirflowVersion makes. Left alone, the
-	// project would keep running the old one while init reported the new.
+	// had moves to it, pinned or a range, the rewrite SetAirflowVersionWith
+	// makes. Left alone, the project would keep running the old one while init
+	// reported the new.
 	var repinned []string
 	if opts.AirflowVersion != "" {
 		if repinned, _, err = repinAirflowRequirements(ed, version); err != nil {

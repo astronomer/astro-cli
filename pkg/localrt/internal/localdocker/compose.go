@@ -146,8 +146,9 @@ func dbCommand(major string) []string {
 }
 
 // airflowMajor is the generation a plan's Airflow version names. The version
-// arrives validated — imagebuild.LocalRuntimeImage refuses anything but the
-// two generations before this is asked — so a leading segment is all it takes.
+// arrives validated — imagebuild.LocalRuntimeImageWith refuses anything but
+// the two generations before this is asked — so a leading segment is all it
+// takes.
 func airflowMajor(version string) string {
 	major, _, _ := strings.Cut(strings.TrimSpace(version), ".")
 	return major
