@@ -23,7 +23,7 @@ import (
 // DefaultAirflowVersion is the Airflow version a new project pins when
 // --airflow-version is not given. Partial on purpose: resolution to a
 // concrete release happens at start time, so new projects track patches.
-const DefaultAirflowVersion = "3.1"
+const DefaultAirflowVersion = "3.3"
 
 // sqlalchemyCap keeps a new project's environment off SQLAlchemy 2.1, which
 // removed sqlalchemy.orm.attributes.ScalarAttributeImpl. SQLAlchemy-Utils, which
@@ -35,7 +35,18 @@ const DefaultAirflowVersion = "3.1"
 // Remove it once a SQLAlchemy-Utils release supports SQLAlchemy 2.1
 // (https://github.com/kvesteri/sqlalchemy-utils/issues/800), or once projects
 // resolve under Airflow's constraints files, which pin both.
+//
+// Only a 3.1 pin gets it: 3.2 dropped SQLAlchemy-Utils and 3.0 and 2.x cap
+// SQLAlchemy themselves, so elsewhere it would only block a future resolve.
 const sqlalchemyCap = "sqlalchemy<2.1"
+
+// needsSQLAlchemyCap reports whether a project pinned to this Airflow needs
+// sqlalchemyCap: a 3.1 series or patch pin, and nothing else.
+func needsSQLAlchemyCap(airflow string) bool {
+	major, rest, _ := strings.Cut(strings.TrimSpace(airflow), ".")
+	minor, _, _ := strings.Cut(rest, ".")
+	return major == "3" && minor == "1"
+}
 
 // manifestKeyAirflow is the [tool.astro] key carrying the Airflow pin. Both
 // manifest arms write it and the starter DAG's import rule is checked against
@@ -768,12 +779,14 @@ func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, not
 		"requires-python = '" + requiresPython(version) + "'\n" +
 		"dependencies = []\n\n" +
 		"[tool.astro]\n" +
-		"airflow = '" + DefaultAirflowVersion + "'\n\n" +
-		"[tool.uv]\n" +
-		"# SQLAlchemy-Utils, which Airflow depends on, breaks on SQLAlchemy 2.1.\n" +
-		"# Remove this once a SQLAlchemy-Utils release fixes it:\n" +
-		"# https://github.com/kvesteri/sqlalchemy-utils/issues/800\n" +
-		"constraint-dependencies = ['" + sqlalchemyCap + "']\n"
+		"airflow = '" + DefaultAirflowVersion + "'\n"
+	if needsSQLAlchemyCap(version) {
+		tmpl += "\n[tool.uv]\n" +
+			"# SQLAlchemy-Utils, which Airflow 3.1 depends on, breaks on SQLAlchemy 2.1.\n" +
+			"# Remove this once a SQLAlchemy-Utils release fixes it:\n" +
+			"# https://github.com/kvesteri/sqlalchemy-utils/issues/800\n" +
+			"constraint-dependencies = ['" + sqlalchemyCap + "']\n"
+	}
 	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
 		return nil, nil, err

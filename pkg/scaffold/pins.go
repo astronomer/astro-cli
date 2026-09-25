@@ -91,11 +91,21 @@ func airflowExtrasNote(spec string) []string {
 // it here would mean editing this file every time one ships — the failure that
 // bound would cause (refusing a Python that works) is worse than the one it
 // would prevent.
+//
+// Its floor follows the Astro Runtime rather than Airflow's own metadata, so
+// standalone mode builds on a Python the runtime image also ships. Runtime 3.2
+// and later offer 3.12 to 3.14 while Airflow itself still declares >=3.10, so
+// 3.2 and later, a bare "3" (the newest 3) and anything past 3 get >=3.12. 3.0
+// and 3.1 keep >=3.10.
 func requiresPython(airflow string) string {
 	const floor = ">=3.10"
 	major, rest, _ := strings.Cut(airflow, ".")
+	minor, _, _ := strings.Cut(rest, ".")
 	if major != "2" {
-		return floor
+		if major == "3" && (minor == "0" || minor == "1") {
+			return floor
+		}
+		return ">=3.12"
 	}
 	// Python 3.12 support arrived in Airflow 2.9. Before that the ceiling is
 	// 3.11, which docs/install.md states in the same words: "Airflow 2.7 wants
@@ -105,7 +115,7 @@ func requiresPython(airflow string) string {
 	//
 	// A bare "2" means the newest Airflow 2, which is past 2.9, so it takes the
 	// wider bound — Atoi fails on the empty minor and falls through.
-	if minor, _, _ := strings.Cut(rest, "."); minor != "" {
+	if minor != "" {
 		if n, err := strconv.Atoi(minor); err == nil && n < 9 {
 			return floor + ",<3.12"
 		}

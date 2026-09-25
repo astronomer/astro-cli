@@ -621,7 +621,7 @@ func TestGreenfieldDeduplicatesRequirements(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	// First spelling wins, and "Flask"/"flask" are one PEP 503 name.
-	assert.Equal(t, []string{"apache-airflow==3.1.*", "pandas==1.5.0", "Flask"}, m.Project.Dependencies)
+	assert.Equal(t, []string{"apache-airflow==3.3.*", "pandas==1.5.0", "Flask"}, m.Project.Dependencies)
 }
 
 // Extras on a dropped apache-airflow requirement are real dependencies and are

@@ -39,25 +39,40 @@ auth = { method = 'none' }
 func TestSetAirflowVersionRewritesThePinSurgically(t *testing.T) {
 	dir, path := writeEditFixture(t, pinFixture, 0o644)
 
-	change, err := SetAirflowVersion(dir, nil, "3.1")
+	// 3.2 rather than 3.1, which would also add the SQLAlchemy cap: that has
+	// tests of its own in airflowpin_cap_test.go.
+	change, err := SetAirflowVersion(dir, nil, "3.2")
 	require.NoError(t, err)
 
 	want := strings.NewReplacer(
-		"requires-python = '>=3.10,<3.13'", "requires-python = '>=3.10'",
-		"'apache-airflow[celery]==2.9.*'", "'apache-airflow[celery]==3.1.*'",
-		"airflow = '2.9' # upgrade", "airflow = '3.1' # upgrade",
+		"requires-python = '>=3.10,<3.13'", "requires-python = '>=3.12'",
+		"'apache-airflow[celery]==2.9.*'", "'apache-airflow[celery]==3.2.*'",
+		"airflow = '2.9' # upgrade", "airflow = '3.2' # upgrade",
 	).Replace(pinFixture)
 	assert.Equal(t, want, readFile(t, path), "anything but the pin, its requirement and its Python bound changed")
 	assert.Equal(t, AirflowPinChange{
 		Previous:       "2.9",
-		Version:        "3.1",
+		Version:        "3.2",
 		Changed:        true,
-		Requirements:   []string{"apache-airflow[celery]==3.1.*"},
-		RequiresPython: ">=3.10",
+		Requirements:   []string{"apache-airflow[celery]==3.2.*"},
+		RequiresPython: ">=3.12",
 	}, change)
 	m, err := manifest.Load(path)
 	require.NoError(t, err)
-	assert.Equal(t, "3.1", m.Astro.AirflowVersion)
+	assert.Equal(t, "3.2", m.Astro.AirflowVersion)
+}
+
+// Moving off 3.1 moves the Python floor init wrote for it to the one the
+// runtime offers from 3.2 on.
+func TestSetAirflowVersionRaisesThePythonFloorPastThreePointOne(t *testing.T) {
+	dir, path := writeEditFixture(t,
+		"[project]\nname = 'x'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nairflow = '3.1'\n",
+		0o644)
+
+	change, err := SetAirflowVersion(dir, nil, "3.3")
+	require.NoError(t, err)
+	assert.Equal(t, ">=3.12", change.RequiresPython)
+	assert.Contains(t, readFile(t, path), "requires-python = '>=3.12'")
 }
 
 func TestSetAirflowVersionPinsAFullVersionExactly(t *testing.T) {

@@ -306,9 +306,9 @@ func v1Cases() []v1Case {
 			files: map[string]string{
 				"requirements.txt": "pandas==2.1.0\n",
 			},
-			airflow:       "3.1",
-			manifestLines: []string{"dependencies = ['apache-airflow==3.1.*', 'pandas==2.1.0']"},
-			manifestHas:   []string{"airflow = '3.1'"},
+			airflow:       "3.3",
+			manifestLines: []string{"dependencies = ['apache-airflow==3.3.*', 'pandas==2.1.0']"},
+			manifestHas:   []string{"airflow = '3.3'"},
 			retired:       []string{"requirements.txt"},
 			noNotes:       true,
 		},

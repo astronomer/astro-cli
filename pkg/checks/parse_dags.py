@@ -166,8 +166,21 @@ def main():
         emit(result, real_stdout)
         return
 
+    # Airflow 3.3 removed include_examples, and passing it there is a
+    # TypeError, so it goes only where DagBag still takes it. There it
+    # defaults to the load_examples setting, and the example DAGs would be
+    # checked alongside the project's.
+    kwargs = {}
     try:
-        dagbag = DagBag(dag_folder=dags_dir, include_examples=False)
+        import inspect
+
+        if "include_examples" in inspect.signature(DagBag.__init__).parameters:
+            kwargs["include_examples"] = False
+    except (TypeError, ValueError):
+        kwargs["include_examples"] = False
+
+    try:
+        dagbag = DagBag(dag_folder=dags_dir, **kwargs)
     except Exception as exc:
         result["fatal"] = "{}: {}".format(type(exc).__name__, exc)
         emit(result, real_stdout)

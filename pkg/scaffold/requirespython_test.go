@@ -28,10 +28,17 @@ func TestRequiresPythonBoundsAirflowTwo(t *testing.T) {
 		{"2.10.5", ">=3.10,<3.13"},
 		{"2.11", ">=3.10,<3.13"},
 		// Airflow 3 tracks new interpreters, so it is left open rather than
-		// capped at whatever was current when this was written.
-		{"3", ">=3.10"},
+		// capped at whatever was current when this was written. The floor is
+		// the runtime's: 3.12 from runtime 3.2 on, and a bare "3" is the newest.
+		{"3", ">=3.12"},
+		{"3.0", ">=3.10"},
 		{"3.1", ">=3.10"},
 		{"3.1.2", ">=3.10"},
+		{"3.2", ">=3.12"},
+		{"3.3", ">=3.12"},
+		{"3.3.2", ">=3.12"},
+		{"3.10", ">=3.12"},
+		{"4", ">=3.12"},
 	} {
 		assert.Equal(t, tc.want, requiresPython(tc.airflow), tc.airflow)
 	}
@@ -45,6 +52,7 @@ func TestInitPinsAnInterpreterTheAirflowCanRun(t *testing.T) {
 	for _, tc := range []struct{ airflow, want string }{
 		{"2.10", ">=3.10,<3.13"},
 		{"3.1", ">=3.10"},
+		{"3.3", ">=3.12"},
 	} {
 		t.Run(tc.airflow, func(t *testing.T) {
 			dir := t.TempDir()

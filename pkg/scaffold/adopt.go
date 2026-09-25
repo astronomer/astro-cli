@@ -114,6 +114,10 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if err != nil {
 		return nil, nil, pin, err
 	}
+	capLabel, err := ensureSQLAlchemyCap(ed, version)
+	if err != nil {
+		return nil, nil, pin, err
+	}
 	// packages.txt is carried unconditionally, and there is no "unless one is
 	// already there" case to handle.
 	//
@@ -172,6 +176,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// uv may build the environment with, and a preview that leaves it out shows
 	// a review with the most restrictive key missing.
 	labels = appendLabel(labels, requiresPythonLabel)
+	labels = appendLabel(labels, capLabel)
 	// Same reason as the greenfield arm's: this is the key that decides whether
 	// the image is generated or built from the user's own file, so a preview
 	// without it hides the most consequential thing the run did.
@@ -300,6 +305,35 @@ func ensureAirflowDependency(ed tomledit.Editor, version string, dynamic bool) (
 		return "", err
 	}
 	return airflowRequirement(version), nil
+}
+
+// ensureSQLAlchemyCap gives an adopted manifest the sqlalchemyCap a greenfield
+// one with the same pin gets, and reports what it added.
+//
+// A constraint the manifest already states on SQLAlchemy is left as written:
+// its author chose it, and stacking a second one is uv's to intersect. A
+// constraint-dependencies that is not an array is left for uv to reject.
+func ensureSQLAlchemyCap(ed tomledit.Editor, version string) (label string, err error) {
+	if !needsSQLAlchemyCap(version) {
+		return "", nil
+	}
+	key := []string{"tool", "uv", "constraint-dependencies"}
+	raw, ok := ed.Get(key)
+	if !ok {
+		err = ed.Set(key, []any{sqlalchemyCap})
+	} else {
+		if _, isArray := raw.([]any); !isArray {
+			return "", nil
+		}
+		if slices.ContainsFunc(asStrings(raw), func(c string) bool { return distName(c) == "sqlalchemy" }) {
+			return "", nil
+		}
+		err = ed.Set(append(key, strconv.Itoa(arrayLen(raw))), sqlalchemyCap)
+	}
+	if err != nil {
+		return "", err
+	}
+	return manifest.Marker + " (added " + sqlalchemyCap + " to [tool.uv] constraint-dependencies)", nil
 }
 
 // defaultProjectVersion is what a manifest with no version gets. It is a
