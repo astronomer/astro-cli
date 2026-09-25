@@ -46,7 +46,7 @@ func (l *locator) astroBaseURL(ctx context.Context, i instances.Instance) (strin
 		return "", fmt.Errorf("could not reach Astro to look up %q — check your connection: %w", i.Name, err)
 	}
 	if resp.JSON200 == nil {
-		return "", deploymentOutage(i.Name, deploymentID, resp)
+		return "", deploymentOutage(l.domain, i.Name, deploymentID, resp)
 	}
 	url := resp.JSON200.WebServerAirflowApiUrl
 	if url == "" {
@@ -73,14 +73,14 @@ func bearer(token string) astrov1.RequestEditorFn {
 // deploymentOutage names what the control plane said. Each status has its own
 // fix, and a status with none still carries Astro's own words rather than a
 // bare number.
-func deploymentOutage(name, deploymentID string, resp *astrov1.GetDeploymentResponse) error {
+func deploymentOutage(domain, name, deploymentID string, resp *astrov1.GetDeploymentResponse) error {
 	status := 0
 	if resp.HTTPResponse != nil {
 		status = resp.HTTPResponse.StatusCode
 	}
 	switch status {
 	case http.StatusUnauthorized:
-		return fmt.Errorf("your session expired — log in again with `astro login` (looking up %q)", name)
+		return fmt.Errorf("%w (looking up %q)", astrosession.Rejected(domain), name)
 	case http.StatusForbidden:
 		return fmt.Errorf("you do not have access to Astro Deployment %s (%q) — ask a workspace admin to grant it", deploymentID, name)
 	case http.StatusNotFound:

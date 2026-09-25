@@ -25,9 +25,10 @@ import (
 // read them, and a build carrying neither refuses those methods by name. See
 // providers.go.
 type Deps struct {
-	// Session hands back the current Astro login's bearer token for the astro
-	// auth method, or an error naming why it cannot — logged out, expired,
-	// offline. nil means no session is wired, which reads as logged out.
+	// Session hands back the Astro login's bearer token for the astro auth
+	// method, or an error naming why it cannot — logged out, expired, offline.
+	// The caller picks the login: the CLI reads the one for the project's Astro
+	// host. nil means no session is wired, which reads as logged out.
 	Session func(ctx context.Context) (string, error)
 	// LookupEnv reads an env var. nil uses the process environment.
 	LookupEnv func(name string) (string, bool)

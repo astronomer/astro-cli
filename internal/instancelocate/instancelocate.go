@@ -36,6 +36,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/googleauth"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	pkglocate "github.com/astronomer/astro-cli/pkg/instancelocate"
 	"github.com/astronomer/astro-cli/pkg/instances"
 )
@@ -56,12 +57,13 @@ type Deployments interface {
 // seam, so the lookups can be driven against stubs with no Astro login and no
 // Google account.
 type locator struct {
-	// deployments reads Astro Deployments. It authenticates from the current
-	// login on every request, the same client internal/emenv reads Environment
-	// Manager through.
+	// domain is the Astro host the project's login lives on, or empty for the
+	// current context's. The lookup's own outages name it.
+	domain string
+	// deployments reads Astro Deployments on domain's control plane.
 	deployments Deployments
-	// session reports the current login's bearer, or the named reason there is
-	// none. It gates the deployment lookup so a logged-out machine is told what
+	// session reports the login's bearer, or the named reason there is none.
+	// It gates the deployment lookup so a logged-out machine is told what
 	// happened rather than handed the API's own refusal.
 	session func(ctx context.Context) (string, error)
 	// organization is the org the session is scoped to. Deployments are read
@@ -85,16 +87,32 @@ type locator struct {
 	composerEndpoint string
 }
 
-// New builds the production locator over the v1 API client the process already
-// holds. It does no I/O: every lookup happens when a command asks for one.
-func New(deployments Deployments) instances.Locator {
+// New builds the production locator for a project whose Astro host is domain:
+// its Deployment lookups go to that host's control plane under that host's
+// login and organization, whatever the current context names. An empty domain
+// is the current context's host. It does no I/O: every lookup happens when a
+// command asks for one.
+func New(domain string) instances.Locator {
 	return &locator{
-		deployments:   deployments,
-		session:       astrosession.Bearer,
-		organization:  currentOrganization,
+		domain:      domain,
+		deployments: deploymentsOn(domain),
+		session: func(ctx context.Context) (string, error) {
+			return astrosession.BearerFor(ctx, domain)
+		},
+		organization:  func() (string, error) { return organization(domain) },
 		googleToken:   googleauth.AccessToken,
 		googleAccount: googleauth.Account,
 	}
+}
+
+// deploymentsOn is the v1 client for domain's control plane. Its token is left
+// empty because astroBaseURL puts the session's bearer on every request.
+func deploymentsOn(domain string) Deployments {
+	if domain == "" {
+		return astrov1.NewV1Client(httputil.NewHTTPClient())
+	}
+	c := config.Context{Domain: domain}
+	return astrov1.NewV1ClientForLogin(httputil.NewHTTPClient(), "", c.GetPublicRESTAPIURL("v1"))
 }
 
 // GoogleChain is implemented by a locator that resolves Application Default
@@ -141,21 +159,32 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 	return "", fmt.Errorf("cannot look up the Airflow URL of a %s deployment", i.Kind)
 }
 
-// currentOrganization reads the org out of the current login context. It is
-// the one place this package touches config/, and it is the same read
+// organization reads the org out of the login for domain, or out of the
+// current login context when domain is empty. It is the same read
 // internal/emenv makes for the same reason.
 // The organization is the piece ASTRO_API_TOKEN alone cannot supply: it lives
 // in the login context, and a CI machine that never ran `astro login` has none.
 // Reaching an astro link there needs a Deployment lookup, and the lookup needs
 // an org, so the message says which half is missing rather than reporting the
 // whole machine as logged out.
-func currentOrganization() (string, error) {
-	ctx, err := config.GetCurrentContext()
+func organization(domain string) (string, error) {
+	if domain == "" {
+		ctx, err := config.GetCurrentContext()
+		if err != nil {
+			return "", fmt.Errorf("no Astro organization on this machine, and looking up a Deployment's URL needs one: run `astro login`, or set ASTRO_DOMAIN and log in once so the organization is on disk")
+		}
+		if ctx.Organization == "" {
+			return "", fmt.Errorf("your login is not scoped to an organization — pick one with `astro organization switch`")
+		}
+		return ctx.Organization, nil
+	}
+	c := config.Context{Domain: domain}
+	ctx, err := c.GetContext()
 	if err != nil {
-		return "", fmt.Errorf("no Astro organization on this machine, and looking up a Deployment's URL needs one: run `astro login`, or set ASTRO_DOMAIN and log in once so the organization is on disk")
+		return "", fmt.Errorf("no Astro organization for %s on this machine, and looking up a Deployment's URL needs one: run `astro login %s` once so the organization is on disk", domain, domain)
 	}
 	if ctx.Organization == "" {
-		return "", fmt.Errorf("your login is not scoped to an organization — pick one with `astro organization switch`")
+		return "", fmt.Errorf("your %s login is not scoped to an organization — log in with `astro login %s` and pick one", domain, domain)
 	}
 	return ctx.Organization, nil
 }

@@ -34,7 +34,7 @@ func TestURLTargetNeedsNoProject(t *testing.T) {
 	}
 	// Opening the client is what announces the target, so the URL a run is
 	// about to talk to is never invisible.
-	if _, err := c.clientFor(context.Background(), sel.Instance); err != nil {
+	if _, err := c.clientFor(context.Background(), sel.Instance, ""); err != nil {
 		t.Fatalf("client: %v", err)
 	}
 	if !strings.Contains(errOut.String(), "→ https://airflow.corp.dev") {
@@ -87,10 +87,10 @@ func TestDeploymentAndURLTogetherAreRefused(t *testing.T) {
 func TestDeploymentClientOpensAClientOnWhatResolved(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
 	d, _, errOut := instanceDeps(t, dir)
-	d.Session = func(context.Context) (string, error) { return "Bearer t", nil }
-	d.Locator = locatorFunc(func(context.Context, instances.Instance) (string, error) {
+	d.Session = func(context.Context, string) (string, error) { return "Bearer t", nil }
+	d.Locator = anyDomain(locatorFunc(func(context.Context, instances.Instance) (string, error) {
 		return "https://airflow.example.com", nil
-	})
+	}))
 	c := &cli{d: d}
 
 	client, err := c.deploymentClient(context.Background(), deploymentFlags{})

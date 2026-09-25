@@ -141,7 +141,22 @@ func (c *cli) deploymentClient(ctx context.Context, f deploymentFlags) (*airflow
 	if err != nil {
 		return nil, err
 	}
-	return c.clientFor(ctx, sel.Instance)
+	return c.clientFor(ctx, sel.Instance, c.projectDomain())
+}
+
+// projectDomain is the Astro host whose login this project's astro links use,
+// or empty for the current context's: outside a project, and in one that
+// names no host.
+func (c *cli) projectDomain() string {
+	dir, err := c.projectPath()
+	if err != nil {
+		return ""
+	}
+	m, err := manifest.Load(filepath.Join(dir, project.Marker))
+	if err != nil {
+		return ""
+	}
+	return m.Astro.LoginDomain()
 }
 
 // machineClient opens a client on the Airflow this project has running, with
@@ -151,15 +166,16 @@ func (c *cli) machineClient(ctx context.Context) (*airflowapi.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.clientFor(ctx, i)
+	return c.clientFor(ctx, i, "")
 }
 
 // clientFor is the one step that reaches the network, and the one place the
 // target is announced — so whatever picked it, the Airflow a command is about
-// to act on is never invisible, and stdout stays clean for json.
-func (c *cli) clientFor(ctx context.Context, i instances.Instance) (*airflowapi.Client, error) {
+// to act on is never invisible, and stdout stays clean for json. domain is the
+// Astro host whose login an astro link proves itself with.
+func (c *cli) clientFor(ctx context.Context, i instances.Instance, domain string) (*airflowapi.Client, error) {
 	c.announceInstance(i)
-	transport, err := i.Transport(ctx, c.instanceDeps())
+	transport, err := i.Transport(ctx, c.instanceDeps(domain))
 	if err != nil {
 		return nil, err
 	}
@@ -195,20 +211,29 @@ func (c *cli) machineInstance() (instances.Instance, error) {
 
 // instanceDeps hands resolution what it needs from the process: the login and
 // the coordinate lookups, the two reads that touch config/ and the cloud
-// clients this tree cannot import. Everything else it asks for itself.
+// clients this tree cannot import, both for domain. Everything else it asks
+// for itself.
 //
 // The Google chain rides along when the lookup exposes one, so a Composer link
 // resolves its URL and proves itself to the Airflow behind it through the same
 // credentials. Two chains would mean a run that finds an environment it cannot
 // then talk to.
-func (c *cli) instanceDeps() instances.Deps {
+func (c *cli) instanceDeps(domain string) instances.Deps {
+	var session func(ctx context.Context) (string, error)
+	if c.d.Session != nil {
+		session = func(ctx context.Context) (string, error) { return c.d.Session(ctx, domain) }
+	}
+	var locator instances.Locator
+	if c.d.Locator != nil {
+		locator = c.d.Locator(domain)
+	}
 	var google googleauth.Options
-	if chain, ok := c.d.Locator.(instancelocate.GoogleChain); ok {
+	if chain, ok := locator.(instancelocate.GoogleChain); ok {
 		google.Token, google.Account = chain.Google()
 	}
 	return instances.Deps{
-		Session: c.d.Session,
-		Locator: c.d.Locator,
+		Session: session,
+		Locator: locator,
 		Providers: instances.Providers{
 			manifest.AuthGoogle: googleauth.Provider(google),
 			manifest.AuthAWS:    awsauth.Provider(awsauth.Options{}),

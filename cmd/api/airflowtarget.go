@@ -196,7 +196,7 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 	if m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker)); err == nil {
 		set := instances.Build(m)
 		if instance, ok := set.Lookup(name); ok {
-			return linkTarget(ctx, opts, &instance)
+			return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())
 		}
 		known = set.Names()
 	}
@@ -227,8 +227,8 @@ func bearerHeader(token string) string {
 // resolution the query commands use. An MWAA link comes back with no URL at
 // all: its requests travel inside a signed AWS call, so the target carries the
 // transport and nothing else.
-func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.Instance) (*airflowTarget, error) {
-	deps := opts.instanceDeps()
+func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.Instance, domain string) (*airflowTarget, error) {
+	deps := opts.instanceDeps(domain)
 	door, err := instance.HTTPDoorFor(ctx, deps)
 	if err == nil {
 		// Strip any /api/vN the link's own url carries, the same as the --url and
@@ -250,20 +250,23 @@ func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.I
 }
 
 // instanceDeps hands resolution what it needs from the process: the login and
-// the coordinate lookups. cmd/api is a v1 package, so it wires the two
-// implementations directly rather than through a seam the way cmd/local has to.
+// the coordinate lookups, both for domain, the project's Astro host. cmd/api is
+// a v1 package, so it wires the two implementations directly rather than
+// through a seam the way cmd/local has to.
 //
 // The Google chain rides along when the lookup exposes one, so a Composer link
 // resolves its URL and proves itself to the Airflow behind it through the same
 // credentials.
-func (o *AirflowOptions) instanceDeps() instances.Deps {
-	locator := instancelocate.New(astrov1.NewV1Client(httputil.NewHTTPClient()))
+func (o *AirflowOptions) instanceDeps(domain string) instances.Deps {
+	locator := instancelocate.New(domain)
 	var google googleauth.Options
 	if chain, ok := locator.(instancelocate.GoogleChain); ok {
 		google.Token, google.Account = chain.Google()
 	}
 	return instances.Deps{
-		Session:    astrosession.Bearer,
+		Session: func(ctx context.Context) (string, error) {
+			return astrosession.BearerFor(ctx, domain)
+		},
 		Locator:    locator,
 		HTTPClient: o.GetHTTPClient(),
 		Providers: instances.Providers{

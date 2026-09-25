@@ -78,8 +78,8 @@ func TestEditManifestEditsInPlace(t *testing.T) {
 func TestEditManifestRefusesAResultThatDoesNotParse(t *testing.T) {
 	dir, path := writeEditFixture(t, editFixture, 0o644)
 
-	// A domain with no workspace names a host for nothing, which the parser
-	// refuses. Nothing short of the parser knows that.
+	// A domain with no workspace and no astro-auth link names a host for
+	// nothing, which the parser refuses. Nothing short of the parser knows that.
 	err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "domain"}, "astronomer.io"))
 
 	require.ErrorIs(t, err, ErrEditRefused)

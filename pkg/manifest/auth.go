@@ -15,7 +15,8 @@ import (
 type AuthMethod string
 
 const (
-	// AuthAstro takes the current session's bearer, or ASTRO_API_TOKEN.
+	// AuthAstro takes ASTRO_API_TOKEN, or the bearer of the login for
+	// [tool.astro] domain, or the current session's.
 	AuthAstro AuthMethod = "astro"
 	// AuthAWS takes the AWS credential chain, for MWAA's own API doors.
 	AuthAWS AuthMethod = "aws"

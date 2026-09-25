@@ -78,8 +78,8 @@ var errLoggedOut = errors.New("you are not logged in — log in with `astro logi
 //
 // A session that cannot be read is a named outage, never a stack trace — the
 // posture internal/emenv holds for the same session: the message says what
-// happened and what to do about it. Refreshing an expired session on this path
-// is the known gap, so an expired one is reported, not renewed.
+// happened and what to do about it. Which login the session reads, and whether
+// a stale one is refreshed, is the caller's choice behind Deps.Session.
 func astroCredentials(d Deps) airflowapi.CredentialSource {
 	return func(ctx context.Context) (string, string, error) {
 		if token, ok := d.credentialEnv(EnvAPIToken); ok {

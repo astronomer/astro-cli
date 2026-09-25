@@ -8,10 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // deploymentsFunc adapts a function to the one call this package makes on the
@@ -93,6 +95,36 @@ func TestAstroLinkNamesEveryOutage(t *testing.T) {
 				t.Errorf("%d: message does not name %q: %v", tc.status, want, err)
 			}
 		}
+	}
+}
+
+// A project that names its Astro host gets that host named when the control
+// plane refuses the session, with the login that fixes it.
+func TestAstroLinkNamesTheProjectsDomainWhenTheSessionIsRefused(t *testing.T) {
+	l := astroLocator(func(context.Context, string, string) (*astrov1.GetDeploymentResponse, error) {
+		return deploymentResponse(http.StatusUnauthorized, ""), nil
+	})
+	l.domain = "astronomer-dev.io"
+	_, err := l.BaseURL(context.Background(), astroInstance())
+	want := "your astronomer-dev.io session expired. Log in again with `astro login astronomer-dev.io` (looking up \"prod\")"
+	if err == nil || err.Error() != want {
+		t.Fatalf("err = %v, want %q", err, want)
+	}
+}
+
+// The organization comes from the login for the project's host, not the
+// current context, and a host with no login is named.
+func TestOrganizationReadsTheDomainsLogin(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prod := config.Context{Domain: "astronomer.io"}
+	if err := prod.SetContextKey("organization", "cl-prod-org"); err != nil {
+		t.Fatal(err)
+	}
+	if org, err := organization("astronomer.io"); err != nil || org != "cl-prod-org" {
+		t.Fatalf("org, err = %q, %v; want the astronomer.io login's org", org, err)
+	}
+	if _, err := organization("astronomer-stage.io"); err == nil || !strings.Contains(err.Error(), "astro login astronomer-stage.io") {
+		t.Fatalf("err = %v, want the missing host's login named", err)
 	}
 }
 

@@ -80,10 +80,12 @@ type Astro struct {
 	// link inherits when the link sets none. Empty if unset. It is already
 	// folded into each Link.Workspace; kept here for display.
 	Workspace string
-	// Domain is [tool.astro] domain, the Astro host Workspace lives on
-	// (astronomer.io, astronomer-dev.io, ...). Empty if unset; read it through
-	// WorkspaceDomain, which applies the default. It names the login a
-	// `source = "workspace"` value is read with — see docs/v2-workspace-link.md.
+	// Domain is [tool.astro] domain, the Astro host Workspace and the
+	// astro-auth links live on (astronomer.io, astronomer-dev.io, ...). Empty
+	// if unset; read it through WorkspaceDomain, which applies the default, or
+	// LoginDomain, which does not. It names the login a `source = "workspace"` value is read with and
+	// an astro-auth deployment link proves itself with — see
+	// docs/v2-workspace-link.md.
 	Domain string
 	// Target is [tool.astro] target, the default target every link inherits
 	// when the link sets none. Empty if unset (links then fall back to
@@ -284,9 +286,9 @@ const (
 	// CodeTargetNotAName is [tool.astro] target given a table: the old
 	// spelling of the backend-config section, which is its own block now.
 	CodeTargetNotAName ProblemCode = "target_not_a_name"
-	// CodeDomainWithoutWorkspace is [tool.astro] domain with no workspace: a
-	// host for nothing, most likely a workspace line deleted and its domain
-	// left behind.
+	// CodeDomainWithoutWorkspace is [tool.astro] domain with no workspace and
+	// no link that uses the Astro login: a host for nothing, most likely a
+	// workspace line deleted and its domain left behind.
 	CodeDomainWithoutWorkspace ProblemCode = "domain_without_workspace"
 
 	// Links: what a deployment link may be called and what it must name.
@@ -537,11 +539,22 @@ func (p *parser) astro(raw map[string]any) Astro {
 		// presence fallback and take the project's real Dockerfile away.
 		Dockerfile: strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
 	}
-	if a.Domain != "" && a.Workspace == "" {
-		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the host of a workspace, and [tool.astro] sets no workspace")
-	}
 	a.Deployments = p.links(raw["deployments"], &a)
+	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
+		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the Astro host for a workspace or an astro-auth deployment link, and the project has neither")
+	}
 	return a
+}
+
+// usesAstroLogin reports whether any link proves itself with the Astro login,
+// which is what gives [tool.astro] domain a use without a workspace.
+func usesAstroLogin(links map[string]Link) bool {
+	for name := range links {
+		if links[name].Auth.Method == AuthAstro {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultWorkspaceDomain is the host a workspace link means when the manifest
@@ -556,14 +569,22 @@ const DefaultWorkspaceDomain = "astronomer.io"
 // ASTRO_API_TOKEN and Astro Desktop reads as its own host; else
 // DefaultWorkspaceDomain.
 func (a *Astro) WorkspaceDomain() string {
+	if d := a.LoginDomain(); d != "" {
+		return d
+	}
+	return DefaultWorkspaceDomain
+}
+
+// LoginDomain is the Astro host whose login this project's Astro calls use:
+// [tool.astro] domain, else ASTRO_DOMAIN, normalized. Empty when neither names
+// one — unlike WorkspaceDomain there is no default, so a project that names no
+// host uses the current login, whichever host that is.
+func (a *Astro) LoginDomain() string {
 	d := a.Domain
 	if d == "" {
 		d = os.Getenv("ASTRO_DOMAIN")
 	}
-	if d = NormalizeDomain(d); d != "" {
-		return d
-	}
-	return DefaultWorkspaceDomain
+	return NormalizeDomain(d)
 }
 
 // NormalizeDomain reduces an Astro host as someone might write it — a copied

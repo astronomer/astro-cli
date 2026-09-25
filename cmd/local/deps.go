@@ -24,9 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
-	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/checks"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -63,12 +61,6 @@ type Deps struct {
 	// OpenURL opens a URL in the user's browser (`astro local open`).
 	OpenURL func(url string) error
 
-	// AstroV1Client is the v1 API client the Environment Manager read-through
-	// provider reads workspace-source env values through. It authenticates
-	// from the current login context per request; a logged-out user just makes
-	// the provider absent. A test injects a fake.
-	AstroV1Client astrov1.APIClient
-
 	// WorkspaceClients builds the client the Environment Manager read-through
 	// provider reads workspace-source values with, from the stored login for
 	// the manifest's domain — not the current context, so a production-linked
@@ -76,18 +68,20 @@ type Deps struct {
 	// turns workspace resolution off. A test injects a fake.
 	WorkspaceClients emenv.ClientFactory
 
-	// Session hands instance resolution the current login's bearer, for a link
-	// that proves itself with the astro auth method. It is a seam because the
-	// read touches config/, which this tree never imports directly; nil reads
-	// as logged out.
-	Session func(ctx context.Context) (string, error)
+	// Session hands instance resolution the bearer of the login for domain —
+	// the project's Astro host, or the current context when it names none — for
+	// a link that proves itself with the astro auth method. It is a seam
+	// because the read touches config/, which this tree never imports directly;
+	// nil reads as logged out.
+	Session func(ctx context.Context, domain string) (string, error)
 
-	// Locator turns a coordinate link into an Airflow base URL: a Deployment's
-	// web server from the control plane, a Composer environment's Airflow URI
-	// from the Composer API. It is a seam for the same reason Session is — the
-	// lookups touch config/ and the cloud clients — and nil means a coordinate
-	// link cannot be reached, which is what a test that declares none wants.
-	Locator instances.Locator
+	// Locator builds, for the project's Astro host, what turns a coordinate
+	// link into an Airflow base URL: a Deployment's web server from that host's
+	// control plane, a Composer environment's Airflow URI from the Composer
+	// API. It is a seam for the same reason Session is — the lookups touch
+	// config/ and the cloud clients — and nil means a coordinate link cannot be
+	// reached, which is what a test that declares none wants.
+	Locator func(domain string) instances.Locator
 
 	// LoginDomain is the Astro host the current login is for, which linking a
 	// workspace writes as its domain when none is given. A seam for the same
@@ -139,7 +133,6 @@ type Runtime interface {
 // NewDeps builds the production Deps. Call it once, from main.
 func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
-	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
 	return Deps{
 		Stdin:            os.Stdin,
 		Stdout:           os.Stdout,
@@ -150,10 +143,9 @@ func NewDeps() Deps {
 		Provisioner:      newUVProvisioner,
 		WorkingDir:       os.Getwd,
 		OpenURL:          browser.OpenURL,
-		AstroV1Client:    astroV1Client,
 		WorkspaceClients: emenv.Clients,
-		Session:          astrosession.Bearer,
-		Locator:          instancelocate.New(astroV1Client),
+		Session:          astrosession.BearerFor,
+		Locator:          instancelocate.New,
 		LoginDomain:      astrosession.Domain,
 		Interactive:      stdinIsTerminal,
 	}

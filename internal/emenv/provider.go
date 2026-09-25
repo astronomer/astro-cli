@@ -36,6 +36,10 @@ import (
 // sourceLabel is the source name a workspace-resolved value reports.
 const sourceLabel = "workspace"
 
+// login reads the stored login for a domain, refreshing a stale one. A var so
+// a test can stand in for the refresh.
+var login = astrosession.Login
+
 // provider resolves declared env values for one workspace from Environment
 // Manager. It fetches lazily on the first Lookup and caches the result for the
 // run.
@@ -137,15 +141,15 @@ func (p *provider) load() {
 		// is simply absent. What counts as logged in comes from
 		// internal/astrosession, so this and the query commands never disagree
 		// about whether there is a session.
-		ctx, err := freshLogin(p.domain)
-		if errors.Is(err, errSessionExpired) {
+		ctx, err := login(p.domain)
+		if errors.Is(err, astrosession.ErrSessionExpired) {
 			p.down = p.classify(&httpError{code: http.StatusUnauthorized})
 			return
 		}
 		if err != nil || astrosession.Credential(ctx.Token) == "" {
 			p.down = &outage{
 				short: "not logged in to " + p.domain,
-				cause: fmt.Sprintf("not logged in to %s. Log in with `astro login %s`", p.domain, p.domain),
+				cause: astrosession.NotLoggedInTo(p.domain).Error(),
 			}
 			return
 		}
@@ -340,7 +344,7 @@ func (p *provider) classify(err error) *outage {
 	if errors.As(err, &he) {
 		switch he.code {
 		case http.StatusUnauthorized:
-			return &outage{short: "session expired", cause: fmt.Sprintf("your %s session expired. Log in again with `astro login %s`", p.domain, p.domain)}
+			return &outage{short: "session expired", cause: astrosession.Rejected(p.domain).Error()}
 		case http.StatusForbidden:
 			return &outage{short: "no access", cause: fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (`astro organization switch`), or ask an org admin", p.domain)}
 		case http.StatusNotFound:

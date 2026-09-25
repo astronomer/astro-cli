@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
-	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -219,25 +219,15 @@ func TestUnavailableProvider(t *testing.T) {
 	require.Equal(t, "the reason", p.(envresolve.Diagnoser).Diagnose("X"))
 }
 
-// A stale login for the manifest's domain is refreshed before the read, saved
-// under that domain, and used — without moving the CLI's current context. The
-// CLI refreshes only its current login on its own, so without this a
-// production-linked project read while switched to dev breaks the moment the
-// production token expires.
-func TestStaleLoginForAnotherDomainIsRefreshed(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform) // current context: localhost
-	prod := config.Context{Domain: "astronomer.io"}
-	require.NoError(t, prod.SetContextKey("domain", "astronomer.io"))
-	require.NoError(t, prod.SetContextKey("token", "Bearer old"))
-	require.NoError(t, prod.SetContextKey("refreshtoken", "refresh-1"))
-	// No stored expiry reads as expired.
-
-	restore := refreshLogin
-	t.Cleanup(func() { refreshLogin = restore })
-	refreshLogin = func(domain, refreshToken string) (*astroauth.TokenResponse, error) {
-		require.Equal(t, "astronomer.io", domain)
-		require.Equal(t, "refresh-1", refreshToken)
-		return &astroauth.TokenResponse{AccessToken: "new", RefreshToken: "refresh-2", ExpiresIn: 3600}, nil
+// The read uses the login for the manifest's domain, whatever host the CLI's
+// current context names. astrosession owns refreshing it; its tests cover that.
+func TestReadUsesTheLoginForTheManifestsDomain(t *testing.T) {
+	restore := login
+	t.Cleanup(func() { login = restore })
+	var asked string
+	login = func(domain string) (config.Context, error) {
+		asked = domain
+		return config.Context{Domain: domain, Token: "Bearer prod-token", Organization: "cl-org"}, nil
 	}
 
 	mc := mockClient(okResp(envVarObj("X", "v", false)))
@@ -250,25 +240,16 @@ func TestStaleLoginForAnotherDomainIsRefreshed(t *testing.T) {
 	v, ok := p.Lookup("X")
 	require.True(t, ok)
 	require.Equal(t, "v", v)
-	require.Equal(t, "Bearer new", usedToken, "the read uses the refreshed token")
-
-	saved, err := prod.GetContext()
-	require.NoError(t, err)
-	require.Equal(t, "Bearer new", saved.Token)
-	require.Equal(t, "refresh-2", saved.RefreshToken)
-	current, err := config.GetCurrentContext()
-	require.NoError(t, err)
-	require.Equal(t, testDomain, current.Domain, "a refresh must not switch the CLI's current host")
+	require.Equal(t, "astronomer.io", asked)
+	require.Equal(t, "Bearer prod-token", usedToken)
 }
 
 // A refresh that fails reports the domain's session as expired, naming the
 // login that fixes it.
 func TestFailedRefreshReportsSessionExpired(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	require.NoError(t, (&config.Context{Domain: testDomain}).SetContextKey("refreshtoken", "refresh-1"))
-	restore := refreshLogin
-	t.Cleanup(func() { refreshLogin = restore })
-	refreshLogin = func(string, string) (*astroauth.TokenResponse, error) { return nil, errors.New("invalid_grant") }
+	restore := login
+	t.Cleanup(func() { login = restore })
+	login = func(string) (config.Context, error) { return config.Context{}, astrosession.ErrSessionExpired }
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
 	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)

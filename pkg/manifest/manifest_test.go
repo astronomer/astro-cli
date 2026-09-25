@@ -576,6 +576,23 @@ domain = "astronomer-dev.io"
 		wantKeys: []string{"tool.astro.domain"},
 	},
 	{
+		name:      "domain with only links that skip the Astro login",
+		wantCodes: []ProblemCode{CodeDomainWithoutWorkspace},
+		content: `
+[project]
+name = "p"
+
+[tool.astro]
+airflow = "3.1"
+domain = "astronomer-dev.io"
+
+[tool.astro.deployments.staging]
+url = "https://airflow.example.com"
+auth = { method = "none" }
+`,
+		wantKeys: []string{"tool.astro.domain"},
+	},
+	{
 		name:      "missing workspace at both levels",
 		wantCodes: []ProblemCode{CodeWorkspaceRequired},
 		content: `

@@ -47,7 +47,7 @@ location = 'us-central1'
 func TestUseListsEveryCloudLink(t *testing.T) {
 	dir := instanceProject(t, cloudManifest)
 	d, out, _ := instanceDeps(t, dir)
-	d.Locator = failingLocator{t}
+	d.Locator = anyDomain(failingLocator{t})
 	if err := execute(t, d, "use", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestUseAnnouncesEachCloudKind(t *testing.T) {
 	} {
 		dir := instanceProject(t, cloudManifest)
 		d, _, errOut := instanceDeps(t, dir)
-		d.Locator = failingLocator{t}
+		d.Locator = anyDomain(failingLocator{t})
 		if err := execute(t, d, "use", name); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -122,12 +122,12 @@ func TestAstroLinkTalksToTheAirflowTheLookupFound(t *testing.T) {
 
 	dir := instanceProject(t, cloudManifest)
 	d, _, _ := instanceDeps(t, dir)
-	d.Session = func(context.Context) (string, error) { return "Bearer session-token", nil }
+	d.Session = func(context.Context, string) (string, error) { return "Bearer session-token", nil }
 	asked := ""
-	d.Locator = locatorFunc(func(_ context.Context, i instances.Instance) (string, error) {
+	d.Locator = anyDomain(locatorFunc(func(_ context.Context, i instances.Instance) (string, error) {
 		asked = i.Link.Deployment
 		return airflow.URL, nil
-	})
+	}))
 
 	c := &cli{d: d}
 	client, err := c.deploymentClient(context.Background(), deploymentFlags{deployment: "prod"})
@@ -150,15 +150,64 @@ func TestAstroLinkTalksToTheAirflowTheLookupFound(t *testing.T) {
 func TestComposerLinkCarriesTheLookupsFailure(t *testing.T) {
 	dir := instanceProject(t, cloudManifest)
 	d, _, _ := instanceDeps(t, dir)
-	d.Locator = locatorFunc(func(context.Context, instances.Instance) (string, error) {
+	d.Locator = anyDomain(locatorFunc(func(context.Context, instances.Instance) (string, error) {
 		return "", googleauth.ErrNoCredentials
-	})
+	}))
 
 	c := &cli{d: d}
 	_, err := c.deploymentClient(context.Background(), deploymentFlags{deployment: "prod-composer"})
 	if err == nil || !strings.Contains(err.Error(), "gcloud auth application-default login") {
 		t.Fatalf("err = %v, want the lookup's own cause", err)
 	}
+}
+
+// TestAstroLinkUsesTheProjectsDomain: a project that names its Astro host has
+// its astro links looked up and proven with that host's login, and one that
+// names none leaves the choice to the current context.
+func TestAstroLinkUsesTheProjectsDomain(t *testing.T) {
+	airflow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"total_entries":0}`))
+	}))
+	defer airflow.Close()
+
+	for _, tc := range []struct{ name, manifest, env, want string }{
+		{"manifest", "domain = 'https://cloud.astronomer-dev.io'\n" + cloudManifest, "astronomer-stage.io", "astronomer-dev.io"},
+		{"ASTRO_DOMAIN", cloudManifest, "astronomer-stage.io", "astronomer-stage.io"},
+		{"neither", cloudManifest, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ASTRO_DOMAIN", tc.env)
+			dir := instanceProject(t, tc.manifest)
+			d, _, _ := instanceDeps(t, dir)
+			sessionDomain, locatorDomain := "unset", "unset"
+			d.Session = func(_ context.Context, domain string) (string, error) {
+				sessionDomain = domain
+				return "Bearer t", nil
+			}
+			d.Locator = func(domain string) instances.Locator {
+				locatorDomain = domain
+				return locatorFunc(func(context.Context, instances.Instance) (string, error) { return airflow.URL, nil })
+			}
+
+			c := &cli{d: d}
+			client, err := c.deploymentClient(context.Background(), deploymentFlags{deployment: "prod"})
+			if err != nil {
+				t.Fatalf("deploymentClient: %v", err)
+			}
+			if _, err := client.Do(context.Background(), airflowapi.Request{Path: "/dags"}); err != nil {
+				t.Fatalf("do: %v", err)
+			}
+			if sessionDomain != tc.want || locatorDomain != tc.want {
+				t.Fatalf("session asked for %q, lookup for %q; want %q", sessionDomain, locatorDomain, tc.want)
+			}
+		})
+	}
+}
+
+// anyDomain is a lookup seam that answers with l whatever the project's host.
+func anyDomain(l instances.Locator) func(string) instances.Locator {
+	return func(string) instances.Locator { return l }
 }
 
 // locatorFunc adapts a function to the lookup seam.
