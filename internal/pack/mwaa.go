@@ -42,7 +42,7 @@ func (t *MWAATarget) Build(_ context.Context, req Request, cb localrt.Callbacks)
 	}
 
 	emit(cb, "writing requirements.txt")
-	reqs, versionWarning := mwaaRequirements(m.Astro.AirflowVersion, m.Project.Dependencies)
+	reqs, versionWarning := mwaaRequirements(m.Airflow().Pin, m.Project.Dependencies)
 	if err := writeFile(outDir, "requirements.txt", reqs); err != nil {
 		return Result{}, fmt.Errorf("writing requirements.txt: %w", err)
 	}

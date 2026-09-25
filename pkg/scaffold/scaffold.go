@@ -32,10 +32,10 @@ import (
 // that states its Airflow asks nobody anything.
 type DefaultAirflow func() (series, requiresPython string, src runtimeversions.Source)
 
-// manifestKeyAirflow is the [tool.astro] key carrying the Airflow pin. Both
-// manifest arms write it and the starter DAG's import rule is checked against
-// it, which is three spellings of one name — the drift the file-name constants
-// below are kept for.
+// manifestKeyAirflow is the [tool.astro] key that carried the Airflow pin
+// before the apache-airflow requirement became the only place a project
+// states its version. Nothing writes it; SetAirflowVersion and
+// MigrateAirflowKey delete a leftover one.
 const manifestKeyAirflow = "airflow"
 
 // manifestKeyDockerfile is the [tool.astro] key naming the project's own
@@ -46,8 +46,9 @@ const manifestKeyDockerfile = "dockerfile"
 type Options struct {
 	// Name is the [project] name. Empty derives it from the directory name.
 	Name string
-	// AirflowVersion is the [tool.astro] airflow pin. Empty means the pin the
-	// project already states, else Default's answer.
+	// AirflowVersion is the Airflow the project pins, written as the
+	// apache-airflow requirement in [project] dependencies. Empty means the pin
+	// the project already states, else Default's answer.
 	AirflowVersion string
 	// Default resolves the Airflow a project starts on when nothing states one.
 	// nil means runtimeversions.FallbackAirflowSeries, with no lookup, reported
@@ -262,13 +263,6 @@ type manifestFacts struct {
 	// here because both the scaffold and adopt arms have to hand it back to
 	// Plan.
 	nameAdvisory string
-	// pinUnread reports that [project.dependencies] names apache-airflow in a
-	// shape no single version reads out of, while the pin written to
-	// [tool.astro] came from somewhere else — a Dockerfile's image tag, or the
-	// --airflow-version flag. Nothing reconciles the two afterwards, so the
-	// manifest can end up declaring one Airflow and running another, and the
-	// run has to say so rather than leave it to be discovered at start.
-	pinUnread bool
 	// loosePython reports that the manifest states a requires-python of its
 	// own that still admits an interpreter the pinned Airflow cannot run
 	// under. Left as the author wrote it — which interpreters a project
@@ -276,13 +270,6 @@ type manifestFacts struct {
 	// collision and the first `astro local start` is where it otherwise
 	// surfaces, from inside a dependency that names neither.
 	loosePython bool
-	// namesAirflow reports that the manifest names apache-airflow in a shape
-	// no version could be read out of — a range. With a defaulted
-	// pin that means the project may have just moved an Airflow generation.
-	namesAirflow bool
-	// dynamicDeps reports that dependencies are declared dynamic, so the
-	// Airflow requirement could not be added beside them.
-	dynamicDeps bool
 	// migrationNotes is what building the manifest could not migrate, discovered
 	// while building it rather than while reading the v1 files: extras on an
 	// apache-airflow requirement that the generated pin does not reproduce.
@@ -331,6 +318,11 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		goos = runtime.GOOS
 	}
 	marker := filepath.Join(abs, manifest.Marker)
+	// Refused with its own error, before anything is read: otherwise it would
+	// surface as a requirement the manifest cannot read.
+	if v := opts.AirflowVersion; v != "" && !manifest.ValidAirflowVersion(v) {
+		return nil, fmt.Errorf("%w: %q is not a version like 3, 3.1, or 3.1.2", ErrInvalidAirflowVersion, v)
+	}
 
 	// What the v1 files say, read before either arm, because both need it: a
 	// greenfield manifest is BUILT from them and an adopted one is extended
@@ -693,7 +685,7 @@ func migratedLabels(v1 *v1Project) []string {
 	}
 
 	if v1.airflow != "" {
-		out = append(out, manifest.Marker+" (read airflow = "+v1.airflow+" from the Dockerfile)")
+		out = append(out, manifest.Marker+" (read Airflow "+v1.airflow+" from the Dockerfile)")
 	}
 	// The declaration is the one key here that changes what gets BUILT — with it
 	// the project's own Dockerfile is the image, and the dependencies and
@@ -800,14 +792,14 @@ func defaultAirflow(def DefaultAirflow) airflowPick {
 }
 
 // renderPyproject builds the greenfield manifest. It fills the template
-// through the surgical editor, so the name, the pin, and the dependency are
-// quoted the way the manifest expects, then round-trips through the same load
-// check EditManifest applies (manifest.Parse, then envschema.ParseSchema over
-// the carried declarations), so every scaffolded project is guaranteed to
-// load. An invalid --name or --airflow-version surfaces here as the manifest's
-// own validation error. [project.dependencies] carries the Airflow the project
-// pins, derived from the same version that fills [tool.astro].airflow, so
-// init → start needs no hand-edit.
+// through the surgical editor, so the name and the dependencies are quoted the
+// way the manifest expects, then round-trips through the same load check
+// EditManifest applies (manifest.Parse, then envschema.ParseSchema over the
+// carried declarations), so every scaffolded project is guaranteed to load.
+// An invalid --name surfaces here as the manifest's own validation error; Plan
+// refuses an invalid --airflow-version before this runs. [project.dependencies]
+// leads with the requirement that states the Airflow version, the only place
+// the manifest states it, so init → start needs no hand-edit.
 func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []byte, notes []string, err error) {
 	version := pick.version
 	tmpl := "[project]\n" +
@@ -815,8 +807,7 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 		"version = '" + defaultProjectVersion + "'\n" +
 		"requires-python = ''\n" +
 		"dependencies = []\n\n" +
-		"[tool.astro]\n" +
-		"airflow = ''\n"
+		"[tool.astro]\n"
 	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
 		return nil, nil, err
@@ -825,9 +816,6 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 		return nil, nil, err
 	}
 	if err := ed.Set([]string{"project", "requires-python"}, pick.pythonBound()); err != nil {
-		return nil, nil, err
-	}
-	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
 		return nil, nil, err
 	}
 	// The Airflow requirement leads, then whatever requirements.txt carried,
@@ -840,16 +828,18 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 	// environment is unsatisfiable at the first start. Only the adopt arm
 	// guarded against it, and greenfield is the arm a real v1 project takes.
 	deps := []any{airflowRequirement(version)}
-	seen := map[string]bool{airflowDist: true}
+	seen := map[string]bool{}
 	for _, d := range v1.dependencies {
-		name := distName(d)
+		// An Airflow entry, apache-airflow or apache-airflow-core, is where
+		// `version` came from, so the generated requirement above already
+		// says it. Carrying a core entry beside it would state the version
+		// twice, which the manifest refuses.
+		if manifest.NamesAirflow(d) {
+			notes = append(notes, airflowExtrasNote(d)...)
+			continue
+		}
+		name := manifest.DistName(d)
 		if seen[name] {
-			// An apache-airflow entry is where `version` came from, so the
-			// generated requirement above already says it.
-			if name == airflowDist {
-				notes = append(notes, airflowExtrasNote(d)...)
-				continue
-			}
 			// Every other duplicate is a specifier that exists in exactly one
 			// place and is about to exist in none. requirements.txt permits two
 			// entries for one distribution and pip intersects them; PEP 621 has
@@ -1125,38 +1115,15 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// leaves defaultedPin false, and one whose tag we could not read has
 	// already said so in its own note. What is left for this warning is the
 	// case where a file named a version and we still ended up defaulting.
-	if facts.defaultedPin && (v1.statedVersion || facts.namesAirflow) {
-		out = append([]string{"airflow = '" + version + "' is the default, not this project's version: " +
-			"set it from the Airflow this project already names"}, out...)
-	}
-	// The other way a manifest ends up contradicting itself: its own
-	// dependency names an Airflow this cannot pin down, so the pin came from
-	// elsewhere and may not be the same Airflow. Said here because nothing
-	// downstream compares the two — the project simply runs the [tool.astro]
-	// one and resolves the dependency one, and the disagreement surfaces as a
-	// failure with no obvious cause.
-	if facts.pinUnread {
-		out = append([]string{"[project.dependencies] names apache-airflow in a shape no single version reads out of, " +
-			"so airflow = '" + version + "' came from elsewhere: make the two agree, or set airflow explicitly"}, out...)
+	if facts.defaultedPin && v1.statedVersion {
+		out = append([]string{"Airflow " + version + " is the default, not this project's version: " +
+			"set the " + airflowRequirement(version) + " requirement in " + manifest.Marker +
+			" to the Airflow this project already names"}, out...)
 	}
 	if facts.loosePython {
 		out = append([]string{"[project] requires-python admits a Python that Airflow " + version +
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
-	}
-	// Dependencies declared dynamic are supplied from somewhere this cannot
-	// reach, so the requirement that installs Airflow has to be put there.
-	// The version this run actually pinned, not the default. Telling someone to
-	// install apache-airflow==3.1.* under a manifest this run pinned to "2" is
-	// advice that installs the wrong Airflow generation and contradicts the file
-	// it was printed beside.
-	if facts.dynamicDeps {
-		out = append(out, "dependencies are dynamic, so the Airflow pin was not added: put "+
-			airflowRequirement(version)+" wherever this project lists its dependencies")
-		if len(v1.dependencies) > 0 {
-			out = append(out, "requirements.txt: dependencies are dynamic, so its "+
-				strconv.Itoa(len(v1.dependencies))+" requirements were not migrated either")
-		}
 	}
 	if deployNote == "" {
 		return out, out

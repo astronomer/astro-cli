@@ -25,9 +25,9 @@ import (
 
 const v2ManifestForRouting = `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 `
 
 // resetDeployFlagVars zeroes the package-level deploy flag vars so a routing
@@ -56,10 +56,9 @@ func resetDeployFlagVars() {
 // preselecting the prompt, which TestDeployV2PromptPreselectsDefault drives.
 const v2ManifestWithDefaultLink = `[project]
 name = "demo"
-dependencies = ["pandas"]
+dependencies = ["apache-airflow==3.1.*", "pandas"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "clw-ws"
 packages = ["libpq-dev"]
 
@@ -392,9 +391,9 @@ func TestDeployV2NumericLinkNameSelectsItself(t *testing.T) {
 	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}}}
 	setupV2DeployWith(t, fake, `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "clw-ws"
 
 [tool.astro.deployments."2"]
@@ -686,7 +685,7 @@ func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
 //     exporting that variable. No flag, no Dockerfile, and an error telling the
 //     user to declare one they never wanted.
 func TestDeployV2BuildSecretRefusals(t *testing.T) {
-	const manifestWithDockerfile = "[project]\nname = 'p'\nversion = '0.1.0'\n\n[tool.astro]\nairflow = '3.1'\ndockerfile = 'Dockerfile'\n"
+	const manifestWithDockerfile = "[project]\nname = 'p'\nversion = '0.1.0'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\ndockerfile = 'Dockerfile'\n"
 
 	for _, tc := range []struct {
 		name     string

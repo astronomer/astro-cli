@@ -143,8 +143,7 @@ func testRequest(t *testing.T) Request {
 				Dependencies: []string{"apache-airflow==3.1.*", "pandas"},
 			},
 			Astro: manifest.Astro{
-				AirflowVersion: "3.1",
-				Packages:       []string{"libpq-dev"},
+				Packages: []string{"libpq-dev"},
 			},
 		},
 	}
@@ -308,7 +307,7 @@ func TestTagSafe(t *testing.T) {
 
 func TestAstroBuildRejectsNonAirflow3(t *testing.T) {
 	req := testRequest(t)
-	req.Manifest.Astro.AirflowVersion = "2.9"
+	req.Manifest.Project.Dependencies = []string{"apache-airflow==2.9.*", "pandas"}
 	_, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Airflow 3")

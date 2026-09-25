@@ -16,9 +16,9 @@ func TestStartAndRestartReportUnknownTargetKeys(t *testing.T) {
 	const m = `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.targets.mwaa]
 regoin = 'us-east-1'

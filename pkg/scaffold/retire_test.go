@@ -44,17 +44,6 @@ func TestRetireKeepsAFileNothingCarried(t *testing.T) {
 		why   string
 	}{
 		{
-			name: "dependencies are dynamic, so none were carried",
-			files: map[string]string{
-				"pyproject.toml": "[project]\nname = 'theirs'\nversion = '1.0.0'\n" +
-					"dynamic = ['dependencies']\n\n" +
-					"[tool.setuptools.dynamic]\ndependencies = {file = ['requirements.txt']}\n",
-				"requirements.txt": "pandas==2.1.0\nrequests==2.31.0\n",
-			},
-			keep: "requirements.txt",
-			why:  "mergeDependencies short-circuits on dynamic, so the manifest carries nothing from it",
-		},
-		{
 			name: "extras the generated Airflow requirement does not carry",
 			files: map[string]string{
 				"requirements.txt": "apache-airflow[celery,statsd]==2.9.1\npandas\n",

@@ -3,6 +3,7 @@ package checks
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -223,6 +224,20 @@ func TestRequirementSetDropsProjectAirflow(t *testing.T) {
 	}
 	if !strings.Contains(joined, "apache-airflow-providers-standard") {
 		t.Errorf("providers must survive dropAirflow: %q", joined)
+	}
+}
+
+// A core pin is the project's Airflow too. Kept beside the platform's
+// apache-airflow it asks for two Airflows, which no resolve satisfies.
+func TestRequirementSetDropsProjectAirflowCore(t *testing.T) {
+	got := requirementSet("3.0.6", []string{"apache-airflow-core==3.3.*", "apache-airflow-providers-standard"})
+	for _, r := range got {
+		if strings.HasPrefix(r, "apache-airflow-core") {
+			t.Errorf("the project's core pin should be dropped: %q", got)
+		}
+	}
+	if !slices.Contains(got, "apache-airflow==3.0.6") || !slices.Contains(got, "apache-airflow-providers-standard") {
+		t.Errorf("want the platform's Airflow and the provider, got %q", got)
 	}
 }
 

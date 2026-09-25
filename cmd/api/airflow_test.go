@@ -323,9 +323,9 @@ func TestResolveAirflowTarget_FallsBackToBasicAuth(t *testing.T) {
 func TestResolveAirflowTarget_LinkURLDropsTheAPIPrefix(t *testing.T) {
 	writeAPIProject(t, `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "https://airflow.staging.corp.dev/api/v1"
@@ -338,6 +338,29 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 	require.NoError(t, err)
 	assert.Equal(t, "https://airflow.staging.corp.dev", target.hostRoot)
 	assert.Equal(t, "https://airflow.staging.corp.dev/api/v2", target.apiBase("3.0.3"))
+}
+
+// A manifest that is there and does not load is an error naming its problem,
+// not a project with no links: read that way, `-d staging` in a project still
+// carrying [tool.astro] airflow went to Astro as a Deployment id.
+func TestResolveAirflowTarget_AManifestThatDoesNotLoadIsAnError(t *testing.T) {
+	writeAPIProject(t, `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+airflow = "3.1"
+
+[tool.astro.deployments.staging]
+url = "https://airflow.staging.corp.dev"
+auth = { method = 'none' }
+`)
+
+	opts := &AirflowOptions{Deployment: "staging", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	_, err := resolveAirflowTarget(context.Background(), opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "tool.astro.airflow")
+	assert.Contains(t, err.Error(), "Delete the airflow line")
 }
 
 // An Astro Deployment's WebServerAirflowApiUrl comes back with no scheme, and
@@ -376,9 +399,9 @@ func TestRunAirflow_LinkWithAPrefixedURLLandsOnTheAPI(t *testing.T) {
 
 	writeAPIProject(t, `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "`+ts.URL+`/api/v1"
@@ -419,9 +442,9 @@ func TestRunAirflow_ProbeFailureOnANamedDeploymentFails(t *testing.T) {
 
 	writeAPIProject(t, `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "`+ts.URL+`"
@@ -467,9 +490,9 @@ func TestInitAirflowSpecCache_FallbackKeepsThePrefix(t *testing.T) {
 func TestRunAirflow_GenerateWithholdsTheCredential(t *testing.T) {
 	writeAPIProject(t, `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "https://airflow.staging.corp.dev"
@@ -606,9 +629,9 @@ func TestResolveAirflowTarget_RefusesTwoTargets(t *testing.T) {
 func TestResolveAirflowTarget_ManifestLink(t *testing.T) {
 	writeAPIProject(t, `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "https://airflow.staging.corp.dev"
@@ -634,9 +657,9 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 func TestMWAALinkHasNoHTTPDoor(t *testing.T) {
 	m, err := manifest.Parse([]byte(`[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "mwaa"

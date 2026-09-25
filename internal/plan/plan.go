@@ -107,7 +107,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		Plan: localrt.Plan{
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
-			AirflowVersion: m.Astro.AirflowVersion,
+			AirflowVersion: m.Airflow().Pin,
 			// Docker mode installs these into the runtime image for parity
 			// with standalone, which gets them from the uv venv sync.
 			Dependencies: m.Project.Dependencies,
@@ -133,7 +133,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// which an Airflow 2 pin cannot run under, so the fallback names
 			// a version. Astro Desktop applies the same function, so the two
 			// tools build the same interpreter for the same manifest.
-			PythonVersion:   airflowrt.PythonFallback(m.Project.RequiresPython, m.Astro.AirflowVersion),
+			PythonVersion:   airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin),
 			StopWithSession: opts.StopWithSession,
 			Env:             resolved.env,
 			// The vault's values, kept out of Env on purpose: docker mode

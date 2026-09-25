@@ -2,6 +2,9 @@ package instances
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,7 +50,10 @@ const (
 // provisioned. The token lives in memory for the run, and the refresh hook
 // re-mints when a short-lived one expires mid-command.
 func localCredentials(i Instance, baseURL string, d Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
-	username, password := localAccount(i.AirflowMajor, i.Mode, i.Project)
+	username, password, err := localAccount(i.AirflowMajor, i.Mode, i.Project)
+	if err != nil {
+		return nil, nil, err
+	}
 	minter, err := airflowapi.NewTokenMinter(baseURL, username, password, d.httpOptions()...)
 	if err != nil {
 		return nil, nil, err
@@ -73,33 +79,70 @@ const (
 // major comes from the runtime record — a fact about the process that is
 // running, which the manifest is not: the pin can be edited, or the project
 // deleted, while Airflow keeps serving. Only a record written before that field
-// existed falls back to reading the manifest, and a manifest that cannot be
-// read at all reads as Airflow 3, which is what the v2 scaffold writes.
-func localAccount(major, mode, projectPath string) (username, password string) {
+// existed falls back to reading the manifest, by pinnedAirflowMajor's rule: no
+// manifest reads as Airflow 3, and one that cannot say which generation it
+// pins is an error, rather than a guess that sends an Airflow 2 no
+// credentials and reads as a 401.
+func localAccount(major, mode, projectPath string) (username, password string, err error) {
 	if major == "" {
-		major = pinnedAirflowMajor(projectPath)
+		if major, err = pinnedAirflowMajor(projectPath); err != nil {
+			return "", "", err
+		}
 	}
 	if major != airflow2 {
-		return "", ""
+		return "", "", nil
 	}
 	if mode == modeDocker {
-		return localUsername, localPassword
+		return localUsername, localPassword, nil
 	}
-	return localUsername, localPasswordFor(projectPath)
+	return localUsername, localPasswordFor(projectPath), nil
 }
 
-// pinnedAirflowMajor reads the Airflow a project pins, for a runtime record too
-// old to carry it.
-func pinnedAirflowMajor(projectPath string) string {
+// pinnedAirflowMajor reads the Airflow generation a project pins, for a
+// runtime record too old to carry it. "" means Airflow 3.
+//
+// The rule, in order:
+//
+//  1. No pyproject.toml, or one with no [tool.astro]: "", the default before
+//     the requirement became the version, and what the v2 scaffold writes.
+//  2. A leftover [tool.astro] airflow line: its generation. A record without
+//     a stored generation was written before the requirement became the
+//     version, when the key alone decided which Airflow started, in docker
+//     mode and standalone alike, so where the two disagree the key is what
+//     the running process is.
+//  3. Otherwise the Airflow requirement's generation.
+//  4. A manifest that is not TOML, or whose requirement states no single
+//     version with no key beside it, is an error: the generation cannot be
+//     known, and a guess of 3 sends an Airflow 2 no credentials.
+//
+// Only the Airflow question is asked (manifest.ReadAirflowStatement), so an
+// unrelated problem in the manifest, which a start would refuse, does not
+// stop a command reaching an Airflow already running.
+func pinnedAirflowMajor(projectPath string) (string, error) {
 	if projectPath == "" {
-		return ""
+		return "", nil
 	}
-	m, err := manifest.Load(filepath.Join(projectPath, manifest.Marker))
+	path := filepath.Join(projectPath, manifest.Marker)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("reading which Airflow this project runs: %w", err)
 	}
-	major, _, _ := strings.Cut(m.Astro.AirflowVersion, ".")
-	return major
+	stated, err := manifest.ReadAirflowStatement(data)
+	switch {
+	case errors.Is(err, manifest.ErrNoAstroSection):
+		return "", nil
+	case err != nil:
+		return "", fmt.Errorf("reading which Airflow %s runs: %w", path, err)
+	case stated.Key != "":
+		return manifest.Airflow{Pin: stated.Key}.Major(), nil
+	case stated.Requirement != "":
+		return manifest.Airflow{Pin: stated.Requirement}.Major(), nil
+	}
+	return "", fmt.Errorf("reading which Airflow %s runs: its apache-airflow requirement in [project] dependencies "+
+		"pins no single version: pin one, like %s", path, manifest.AirflowRequirement("3.3"))
 }
 
 // localPasswordFor reads the password Airflow 2's standalone generated for this

@@ -14,9 +14,9 @@ import (
 
 const v2Manifest = `[project]
 name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 `
 
 func writeFile(t *testing.T, path, content string) {
@@ -403,10 +403,9 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 		ProjectDir: "/proj",
 		LinkName:   "prod",
 		Manifest: &manifest.Manifest{
-			Project: manifest.Project{Dependencies: []string{"pandas"}},
+			Project: manifest.Project{Dependencies: []string{"apache-airflow==3.1.*", "pandas"}},
 			Astro: manifest.Astro{
-				AirflowVersion: "3.1",
-				Packages:       []string{"libpq-dev"},
+				Packages: []string{"libpq-dev"},
 				Deployments: map[string]manifest.Link{
 					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 				},
@@ -420,7 +419,7 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 	assert.True(t, d.imgInput.IncludeDags)
 	assert.Equal(t, "dep-prod", d.imgInput.DeploymentID)
 	assert.Equal(t, "3.1", d.imgInput.AirflowVersion)
-	assert.Equal(t, []string{"pandas"}, d.imgInput.Dependencies)
+	assert.Equal(t, []string{"apache-airflow==3.1.*", "pandas"}, d.imgInput.Dependencies)
 	assert.Equal(t, []string{"libpq-dev"}, d.imgInput.Packages)
 	assert.Empty(t, d.imgInput.ImageName)
 	assert.Equal(t, "image-and-dag", res.Type)
@@ -435,7 +434,6 @@ func TestRun_ImageOnlyDropsDags(t *testing.T) {
 		Image:    true,
 		LinkName: "prod",
 		Manifest: &manifest.Manifest{Astro: manifest.Astro{
-			AirflowVersion: "3.1",
 			Deployments: map[string]manifest.Link{
 				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
 			},
@@ -454,7 +452,6 @@ func TestRun_ImageNamePassesPrebuiltRef(t *testing.T) {
 		ImageName: "astro-package/demo:3.1-2-abc",
 		LinkName:  "prod",
 		Manifest: &manifest.Manifest{Astro: manifest.Astro{
-			AirflowVersion: "3.1",
 			Deployments: map[string]manifest.Link{
 				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
 			},
@@ -472,7 +469,6 @@ func TestRun_ImageTransportErrorPropagates(t *testing.T) {
 	_, err := Run(Request{
 		LinkName: "prod",
 		Manifest: &manifest.Manifest{Astro: manifest.Astro{
-			AirflowVersion: "3.1",
 			Deployments: map[string]manifest.Link{
 				"prod": {Workspace: "ws-prod", Deployment: "dep-prod"},
 			},
@@ -625,8 +621,7 @@ func TestRun_CarriesTheDeclaredDockerfile(t *testing.T) {
 				Manifest: &manifest.Manifest{
 					Project: manifest.Project{Dependencies: []string{"pandas"}},
 					Astro: manifest.Astro{
-						AirflowVersion: "3.1",
-						Dockerfile:     tc.declared,
+						Dockerfile: tc.declared,
 						Deployments: map[string]manifest.Link{
 							"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 						},
@@ -653,8 +648,7 @@ func TestRun_CarriesBuildSecretsWithADeclaredDockerfile(t *testing.T) {
 		BuildSecrets: []string{"id=pypi,src=/tmp/pypi.txt"},
 		Manifest: &manifest.Manifest{
 			Astro: manifest.Astro{
-				AirflowVersion: "3.1",
-				Dockerfile:     "Dockerfile",
+				Dockerfile: "Dockerfile",
 				Deployments: map[string]manifest.Link{
 					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 				},
@@ -681,7 +675,6 @@ func TestRun_CarriesBuildSecretsEvenWithoutADockerfile(t *testing.T) {
 		BuildSecrets: []string{"id=pypi"},
 		Manifest: &manifest.Manifest{
 			Astro: manifest.Astro{
-				AirflowVersion: "3.1", // no dockerfile declared
 				Deployments: map[string]manifest.Link{
 					"prod": {Target: "astro", Workspace: "ws-prod", Deployment: "dep-prod"},
 				},

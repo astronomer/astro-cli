@@ -19,9 +19,8 @@ func writeManifest(t *testing.T, d *Deps, dir string) {
 	toml := "" +
 		"[project]\n" +
 		"name = 'demo'\n" +
-		"dependencies = ['pandas']\n\n" +
-		"[tool.astro]\n" +
-		"airflow = '3.1'\n"
+		"dependencies = ['apache-airflow==3.1.*', 'pandas']\n\n" +
+		"[tool.astro]\n"
 	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(toml), 0o600); err != nil {
 		t.Fatal(err)
 	}

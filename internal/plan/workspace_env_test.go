@@ -24,9 +24,9 @@ import (
 const workspaceManifest = `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 workspace = 'cmws'
 domain = 'localhost'
 
@@ -151,9 +151,9 @@ func TestBuildNoWorkspaceInManifest(t *testing.T) {
 	body := `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.env]
 DATA_WAREHOUSE_URI = { source = 'workspace' }

@@ -263,7 +263,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 	if req.Manifest != nil {
 		deps = req.Manifest.Project.Dependencies
 		packages = req.Manifest.Astro.Packages
-		airflowVersion = req.Manifest.Astro.AirflowVersion
+		airflowVersion = req.Manifest.Airflow().Pin
 		// Carried for the same reason local docker mode carries it: a project
 		// that declared its own Dockerfile means that file, not a generated
 		// image. Without this a tier-3 project deployed an image built over the

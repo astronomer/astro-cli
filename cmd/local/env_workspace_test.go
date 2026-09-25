@@ -25,9 +25,9 @@ func workspaceClients(c astrov1.APIClient) emenv.ClientFactory {
 const workspaceEnvManifest = `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 workspace = 'cmws'
 domain = 'localhost'
 

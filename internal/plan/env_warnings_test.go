@@ -22,9 +22,9 @@ func TestBuildReportsAValueWarningWithoutRefusing(t *testing.T) {
 	dir := isolatedProject(t, `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.env]
 ASTRO_TEST_PORT = { type = 'port', default = '99999' }
@@ -54,9 +54,9 @@ func TestBuildReportsNoWarningsWhenValuesConform(t *testing.T) {
 	dir := isolatedProject(t, `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.env]
 ASTRO_TEST_PORT = { type = 'port', default = '8080' }

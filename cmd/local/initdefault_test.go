@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -25,7 +26,8 @@ func stubDefault(d *Deps, rp string, src runtimeversions.Source) *int {
 }
 
 // The resolver's series and requires-python land in the manifest, and the
-// output says where they came from.
+// output says where they came from. The series is written as the requirement
+// alone: no [tool.astro] airflow key, which the manifest would refuse.
 func TestInitPinsTheCatalogsDefault(t *testing.T) {
 	d, dir, stdout := initDeps(t)
 	stubDefault(&d, ">=3.13", runtimeversions.SourceCatalog)
@@ -34,10 +36,20 @@ func TestInitPinsTheCatalogsDefault(t *testing.T) {
 		t.Fatalf("astro init: %v", err)
 	}
 	m := readManifest(t, dir)
-	for _, want := range []string{"'apache-airflow==3.50.*'", "requires-python = '>=3.13'"} {
+	for _, want := range []string{"dependencies = ['apache-airflow==3.50.*']", "requires-python = '>=3.13'"} {
 		if !strings.Contains(m, want) {
 			t.Errorf("manifest lacks %s:\n%s", want, m)
 		}
+	}
+	if strings.Contains(m, "airflow = ") {
+		t.Errorf("init wrote a [tool.astro] airflow key:\n%s", m)
+	}
+	loaded, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		t.Fatalf("the scaffolded manifest does not load: %v", err)
+	}
+	if got := loaded.Airflow().Pin; got != "3.50" {
+		t.Errorf("Airflow().Pin = %q, want the catalog's 3.50", got)
 	}
 	if out := stdout.String(); !strings.Contains(out, "(Airflow 3.50, the latest from the runtime catalog)") {
 		t.Errorf("output does not say the version came from the catalog:\n%s", out)
@@ -112,8 +124,8 @@ func TestInitAdoptingAPinnedProjectMakesNoLookup(t *testing.T) {
 	if *lookups != 0 {
 		t.Errorf("adopting a pinned project looked up the default %d times", *lookups)
 	}
-	if m := readManifest(t, dir); !strings.Contains(m, "airflow = '3.1'") {
-		t.Errorf("the project's own pin did not win:\n%s", m)
+	if m := readManifest(t, dir); !strings.Contains(m, "'apache-airflow==3.1.*'") || strings.Contains(m, "3.50") || strings.Contains(m, "airflow = ") {
+		t.Errorf("the project's own pin did not win, alone:\n%s", m)
 	}
 }
 

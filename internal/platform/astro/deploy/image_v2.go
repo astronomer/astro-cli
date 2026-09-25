@@ -25,7 +25,7 @@ import (
 type ImageDeployV2Input struct {
 	ProjectDir     string
 	DeploymentID   string
-	AirflowVersion string   // manifest [tool.astro] airflow pin; the base resolves from it
+	AirflowVersion string   // the manifest's Airflow requirement pin; the base resolves from it
 	Dependencies   []string // manifest [project] dependencies
 	Packages       []string // manifest [tool.astro] packages
 	// Dockerfile is the manifest's [tool.astro] dockerfile, slash-separated and

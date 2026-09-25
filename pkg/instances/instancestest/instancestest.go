@@ -49,9 +49,9 @@ func PreambleFor(airflow string) string {
 	return "[project]\n" +
 		"name = 'demo'\n" +
 		"requires-python = '>=3.10'\n" +
+		"dependencies = ['" + manifest.AirflowRequirement(airflow) + "']\n" +
 		"\n" +
 		"[tool.astro]\n" +
-		"airflow = '" + airflow + "'\n" +
 		"workspace = 'ws_abc123'\n"
 }
 

@@ -8,15 +8,16 @@ import (
 )
 
 // ManifestBuild is the part of a v2 project manifest that decides which image
-// the project builds. Plain fields rather than a pkg/manifest type, so this
-// module takes no dependency on the manifest parser and a caller holding its
-// own manifest read (Astro Desktop's, for one) fills it directly.
+// the project builds. Plain fields rather than a pkg/manifest type, so a
+// caller holding its own manifest read (Astro Desktop's, for one) fills it
+// directly.
 type ManifestBuild struct {
 	// ProjectDir is the project's root, absolute. A declared Dockerfile resolves
 	// against it and builds with it as the context.
 	ProjectDir string
-	// AirflowVersion is [tool.astro] airflow, the pin a generated build's
-	// runtime base resolves from. Unused when a Dockerfile is declared.
+	// AirflowVersion is the version the manifest's Airflow requirement pins
+	// (manifest.Airflow().Pin), which a generated build's runtime base
+	// resolves from. Unused when a Dockerfile is declared.
 	AirflowVersion string
 	// Dockerfile is [tool.astro] dockerfile: slash-separated and relative to
 	// ProjectDir, or empty when the project declares none.

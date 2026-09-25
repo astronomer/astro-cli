@@ -96,11 +96,11 @@ func (p stubTargetParser) ParseWith(context.Context, string, checks.ParseInput) 
 // because every spelling of check now validates the manifest before it looks at
 // the environment — an empty pyproject.toml marks a project directory but is not
 // a project the check can report on.
-const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\nairflow = '3.1'\n"
+const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\n"
 
 // brokenManifest fails manifest.Load on an unknown [tool.astro] key. Named
 // beside its valid counterpart so a change to Load's strictness is one edit.
-const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nairflow = '3.1'\nbogus_key = 'x'\n"
+const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nbogus_key = 'x'\n"
 
 func TestTargetComposerPassesCleanly(t *testing.T) {
 	d, out := targetDeps(t)

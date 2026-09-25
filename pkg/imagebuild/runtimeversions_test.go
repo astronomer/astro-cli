@@ -90,7 +90,7 @@ func TestLocalRuntimeImageAirflow3IsUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1", ref)
 	_, err = LocalRuntimeImage(t.Context(), "3", cache)
-	assert.ErrorContains(t, err, "airflow pin")
+	assert.ErrorContains(t, err, "Airflow pin")
 	assert.Zero(t, calls.count())
 }
 
@@ -114,6 +114,32 @@ func TestLocalRuntimeImageAirflow2(t *testing.T) {
 	ref, err = LocalRuntimeImage(ctx, "2", cache)
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:13.9.0", ref)
+}
+
+// An exact Airflow 2 pin selects a runtime carrying exactly that release. The
+// manifest reads ==2.9 as 2.9.0, as pip and uv do, so it no longer means the
+// newest 2.9; with no runtime for 2.9.0 the error says how to pin the series.
+// ==2 is 2.0.0, below the Docker-mode floor, and gets the same hint.
+func TestLocalRuntimeImageAirflow2ExactPins(t *testing.T) {
+	_, cache := withService(t, releasesJSON, false)
+	ctx := t.Context()
+
+	ref, err := LocalRuntimeImage(ctx, "2.9.2", cache)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:11.9.0", ref, "an exact pin takes the runtime for that release, not the newest 2.9")
+
+	_, err = LocalRuntimeImage(ctx, "2.9.0", cache)
+	require.ErrorIs(t, err, ErrNoRuntimeForAirflow)
+	assert.ErrorContains(t, err, "for the newest Airflow 2.9, pin apache-airflow==2.9.*")
+
+	_, err = LocalRuntimeImage(ctx, "2.0.0", cache)
+	assert.ErrorContains(t, err, "Airflow 2.7 or later")
+	assert.ErrorContains(t, err, "for the newest Airflow 2, pin apache-airflow==2.*")
+
+	// A patch that is not .0 was written as a patch, and gets no hint.
+	_, err = LocalRuntimeImage(ctx, "2.8.4", cache)
+	require.ErrorIs(t, err, ErrNoRuntimeForAirflow)
+	assert.NotContains(t, err.Error(), "for the newest")
 }
 
 // Docker mode's database service runs `airflow db migrate`, which arrived in

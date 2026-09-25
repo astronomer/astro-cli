@@ -102,7 +102,7 @@ func TestInitAdoptsAnExistingManifest(t *testing.T) {
 
 func TestInitRefusesAnAstroProject(t *testing.T) {
 	d, dir, _ := initDeps(t)
-	existing := "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n"
+	existing := "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"
 	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -376,7 +376,7 @@ func TestPlanConvertsAV1ProjectWithNoManifest(t *testing.T) {
 
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.Equal(t, "3.1", m.Astro.AirflowVersion, "the runtime tag names Airflow 3.1")
+	assert.Equal(t, "3.1", m.Airflow().Pin, "the runtime tag names Airflow 3.1")
 	assert.Equal(t, []string{
 		"apache-airflow==3.1.*",
 		"pandas==2.1.0",
@@ -570,7 +570,7 @@ func TestAdoptMergesRequirementsWithoutTouchingExistingPins(t *testing.T) {
 		"apache-airflow==3.1.*",
 	}, m.Project.Dependencies)
 
-	assert.Equal(t, distName("python-dateutil"), distName("Python_DateUtil==2.8.2"),
+	assert.Equal(t, manifest.DistName("python-dateutil"), manifest.DistName("Python_DateUtil==2.8.2"),
 		"the normalization the dedup relies on")
 	assert.Contains(t, strings.Join(res.Updated, "\n"), "migrated 1 from requirements.txt")
 }
@@ -600,7 +600,7 @@ func TestAdoptCarriesPackagesAlongsideAnotherToolsKey(t *testing.T) {
 	// which is why the reconciliation case cannot arise.
 	dir2 := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir2, "pyproject.toml"), []byte(
-		"[project]\nname = 'mine'\nversion = '0.1.0'\ndependencies = []\n\n[tool.astro]\nairflow = '3.1'\npackages = ['x']\n"), 0o600))
+		"[project]\nname = 'mine'\nversion = '0.1.0'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\npackages = ['x']\n"), 0o600))
 	_, err = Run(dir2, Options{})
 	assert.ErrorIs(t, err, ErrAlreadyAstroProject)
 }
@@ -622,6 +622,32 @@ func TestGreenfieldDeduplicatesRequirements(t *testing.T) {
 	require.NoError(t, err)
 	// First spelling wins, and "Flask"/"flask" are one PEP 503 name.
 	assert.Equal(t, []string{"apache-airflow==3.3.*", "pandas==1.5.0", "Flask"}, m.Project.Dependencies)
+}
+
+// An apache-airflow-core pin in requirements.txt is the project's Airflow, the
+// same as an apache-airflow one: it sets the version, and it is not carried
+// beside the generated requirement, which would state the version twice.
+func TestConversionReadsAnAirflowCorePin(t *testing.T) {
+	for _, tc := range []struct{ name, manifest string }{
+		{"greenfield", ""},
+		{"adopt", "[project]\nname = 'mine'\nversion = '0.1.0'\ndependencies = []\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.manifest != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(tc.manifest), 0o600))
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte(
+				"apache-airflow-core==3.2.*\npandas==2.1.0\n"), 0o600))
+
+			res, err := Run(dir, Options{})
+			require.NoError(t, err)
+			assert.Equal(t, "3.2", res.AirflowVersion)
+			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"apache-airflow==3.2.*", "pandas==2.1.0"}, m.Project.Dependencies)
+		})
+	}
 }
 
 // Extras on a dropped apache-airflow requirement are real dependencies and are
@@ -701,7 +727,7 @@ func TestGreenfieldReportsWhatItMigrated(t *testing.T) {
 	joined := strings.Join(res.Created, "\n")
 	assert.Contains(t, joined, "migrated 2 from requirements.txt")
 	assert.Contains(t, joined, "migrated packages.txt")
-	assert.Contains(t, joined, "read airflow = 3.1 from the Dockerfile")
+	assert.Contains(t, joined, "read Airflow 3.1 from the Dockerfile")
 }
 
 // The caller's version wins over the Dockerfile, which is what lets Plan stay
@@ -718,7 +744,7 @@ func TestOptionsAirflowVersionBeatsTheDockerfile(t *testing.T) {
 
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.Equal(t, "2.10.5", m.Astro.AirflowVersion)
+	assert.Equal(t, "2.10.5", m.Airflow().Pin)
 	assert.Equal(t, []string{"apache-airflow==2.10.5"}, m.Project.Dependencies)
 }
 

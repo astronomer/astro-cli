@@ -69,7 +69,7 @@ func TestCheckProvisionsFromTheManifestsOwnDependencies(t *testing.T) {
 func TestCheckProvisionsUnderTheManifestsRequiresPython(t *testing.T) {
 	// An Airflow 2 project, bounded the way the scaffold now writes them.
 	const manifest = "[project]\nname = 'demo'\nrequires-python = '>=3.10,<3.13'\n" +
-		"dependencies = [\"apache-airflow==2.10.*\"]\n[tool.astro]\nairflow = '2.10'\n"
+		"dependencies = [\"apache-airflow==2.10.*\"]\n[tool.astro]\n"
 
 	d, _ := targetDeps(t)
 	dir := t.TempDir()
@@ -99,7 +99,7 @@ func TestCheckProvisionsUnderTheManifestsRequiresPython(t *testing.T) {
 // for an Airflow 2 before 2.9 that is 3.11, which the pin can run.
 func TestCheckProvisionsUnderTheFallbackWhenRequiresPythonIsUnset(t *testing.T) {
 	const manifest = "[project]\nname = 'demo'\n" +
-		"dependencies = [\"apache-airflow==2.8.*\"]\n[tool.astro]\nairflow = '2.8'\n"
+		"dependencies = [\"apache-airflow==2.8.*\"]\n[tool.astro]\n"
 
 	d, _ := targetDeps(t)
 	dir := t.TempDir()

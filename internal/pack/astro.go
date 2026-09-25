@@ -78,7 +78,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if name == "" {
 		return Result{}, errors.New("the project has no name; set [project] name in pyproject.toml")
 	}
-	airflowVersion := req.Manifest.Astro.AirflowVersion
+	airflowVersion := req.Manifest.Airflow().Pin
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
 	// would build.

@@ -26,7 +26,7 @@ import (
 func envProject(t *testing.T, envBody string) (dir string) {
 	t.Helper()
 	dir = t.TempDir()
-	manifest := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\n" + envBody
+	manifest := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n" + envBody
 	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifest), 0o600); err != nil {
 		t.Fatal(err)
 	}

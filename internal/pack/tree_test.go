@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,8 +39,13 @@ func withPackages(pkgs ...string) projectOpt {
 	return func(_ string, m *manifest.Manifest) { m.Astro.Packages = pkgs }
 }
 
+// withAirflow repins the project's Airflow requirement, which is where the
+// manifest states the version.
 func withAirflow(v string) projectOpt {
-	return func(_ string, m *manifest.Manifest) { m.Astro.AirflowVersion = v }
+	return func(_ string, m *manifest.Manifest) {
+		deps := slices.DeleteFunc(slices.Clone(m.Project.Dependencies), manifest.NamesAirflow)
+		m.Project.Dependencies = append([]string{manifest.AirflowRequirement(v)}, deps...)
+	}
 }
 
 func withDeps(deps ...string) projectOpt {
@@ -63,7 +69,6 @@ func newProject(t *testing.T, opts ...projectOpt) Request {
 			Name:         "demo",
 			Dependencies: []string{"apache-airflow==3.1.*", "apache-airflow-providers-standard", "pandas"},
 		},
-		Astro: manifest.Astro{AirflowVersion: "3.1"},
 	}
 	for _, opt := range opts {
 		opt(dir, m)
@@ -351,7 +356,7 @@ func TestMWAARequirementsDropsAirflowAndPinsConstraint(t *testing.T) {
 	assert.Contains(t, reqs, "pandas")
 	// apache-airflow itself is dropped: no line is just the base distribution.
 	for _, line := range strings.Split(reqs, "\n") {
-		assert.NotEqual(t, "apache-airflow==3.1.*", strings.TrimSpace(line), "apache-airflow must be dropped")
+		assert.False(t, manifest.NamesAirflow(line), "apache-airflow must be dropped: %q", line)
 	}
 	assert.Equal(t, filepath.Join(req.OutDir, "requirements.txt"), res.DepsFile)
 }
@@ -423,7 +428,7 @@ func TestMWAANextStepsNameTheDeclaredBucket(t *testing.T) {
 		{"no bucket", "region = 'us-east-1'\n", " s3://<your-mwaa-bucket>/"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := manifest.Parse([]byte("[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '3.1'\n\n[tool.astro.targets.mwaa]\n" + tc.section))
+			m, err := manifest.Parse([]byte("[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n[tool.astro.targets.mwaa]\n" + tc.section))
 			require.NoError(t, err)
 			req := newProject(t)
 			req.Manifest.Astro.Targets = m.Astro.Targets
@@ -436,6 +441,32 @@ func TestMWAANextStepsNameTheDeclaredBucket(t *testing.T) {
 }
 
 // --- Composer ----------------------------------------------------------------
+
+// A core-only project packages without its Airflow requirement, for both
+// platforms: each ships Airflow itself, and a core pin in the upload asks it to
+// install a second one over it.
+func TestTreeTargetsDropAirflowCore(t *testing.T) {
+	for name, target := range map[string]struct {
+		build func(Request) (Result, error)
+		file  string
+	}{
+		"mwaa": {func(r Request) (Result, error) {
+			return NewMWAATarget().Build(context.Background(), r, localrt.Callbacks{})
+		}, "requirements.txt"},
+		"composer": {func(r Request) (Result, error) {
+			return NewComposerTarget().Build(context.Background(), r, localrt.Callbacks{})
+		}, composerDepsFile},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := newProject(t, withDeps("apache-airflow-core==3.1.*", "apache-airflow-providers-standard"))
+			_, err := target.build(req)
+			require.NoError(t, err)
+			body := readArtifact(t, req.OutDir, target.file)
+			assert.NotContains(t, body, "apache-airflow-core", "the core pin reached the upload")
+			assert.Contains(t, body, "apache-airflow-providers-standard")
+		})
+	}
+}
 
 func TestComposerDepsFileHasNoConstraintLine(t *testing.T) {
 	req := newProject(t)
@@ -525,9 +556,9 @@ func TestEnvChecklistHonorsOptional(t *testing.T) {
 	m, err := manifest.Parse([]byte(`[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.env]
 API_URL = {}

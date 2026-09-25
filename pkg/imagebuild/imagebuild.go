@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // RuntimeImageRepo hosts Astro Runtime 3 images (Airflow 3). The tag is the
@@ -43,7 +44,7 @@ import (
 const RuntimeImageRepo = "astrocrpublic.azurecr.io/runtime"
 
 // RuntimeImage maps an Airflow version to the runtime base image a build starts
-// FROM. The version is a manifest's `airflow` pin, reduced to its series by
+// FROM. The version is the pin a manifest's Airflow requirement states, reduced to its series by
 // AirflowSeries: "3.1" and "3.1.2" both build FROM runtime:3.1, and a pinned
 // runtime tag ("3.1-2") passes through as the tag. A bare major ("3") is
 // refused, naming the pin. Only Airflow 3 ships as Astro Runtime 3, so anything
@@ -60,12 +61,12 @@ func RuntimeImage(airflowVersion string) (string, error) {
 	}
 	series, ok := AirflowSeries(v)
 	if !ok {
-		return "", fmt.Errorf("the airflow pin %q in pyproject.toml names no minor version, so there is no runtime image to build from. Set airflow under [tool.astro] to a series such as \"3.1\"", v)
+		return "", fmt.Errorf("the Airflow pin %q in pyproject.toml names no minor version, so there is no runtime image to build from. Pin the apache-airflow requirement in [project] dependencies to a series such as apache-airflow==3.3.*", v)
 	}
 	return RuntimeImageRepo + ":" + series, nil
 }
 
-// AirflowSeries reduces a manifest's `airflow` pin to the MAJOR.MINOR series a
+// AirflowSeries reduces a manifest's Airflow pin to the MAJOR.MINOR series a
 // runtime image is published under, and reports whether the pin named one.
 //
 // pkg/manifest accepts "3", "3.1" and "3.1.2" as pins, but the runtime image
@@ -103,11 +104,6 @@ const (
 	// contextDirPerm is owner-only, matching internal/localstate.
 	contextDirPerm = 0o700
 )
-
-// airflowDist is the one distribution the runtime image forbids in
-// requirements: the base image already provides Airflow (its tag is the
-// Airflow version), so the build installs every dependency except this one.
-const airflowDist = "apache-airflow"
 
 // Commander runs the container build. It is the only path to a container
 // runtime, so callers inject one (localdocker's engine Commander satisfies it)
@@ -417,28 +413,22 @@ const (
 	quayAstronomerRepo = "quay.io/astronomer"
 )
 
-// runtimeDeps drops the apache-airflow distribution from the manifest
-// dependencies. The runtime base image is Airflow already, and its install
-// script rejects apache-airflow in requirements.txt ("change the base image
-// instead"). Every other dependency — providers, pandas, and the rest —
+// runtimeDeps drops the requirements that state the Airflow version,
+// apache-airflow and apache-airflow-core (manifest.WithoutAirflow), from the
+// manifest dependencies, because the runtime base image already is Airflow
+// (its tag is the Airflow version) and so is the one authority on it:
+//
+//   - apache-airflow the image's install script refuses outright ("Do not
+//     upgrade by specifying 'apache-airflow' in your requirements.txt, change
+//     the base image instead!").
+//   - apache-airflow-core it does not refuse. A core requirement the image's
+//     own core satisfies installs nothing, and one it does not, a different
+//     series or a different patch of the same one, fails the build with a long
+//     uv "No solution found" that names neither the base image nor the
+//     manifest.
+//
+// Every other dependency — providers, the task SDK, pandas, and the rest —
 // installs normally.
 func runtimeDeps(deps []string) []string {
-	out := make([]string, 0, len(deps))
-	for _, d := range deps {
-		if distName(d) == airflowDist {
-			continue
-		}
-		out = append(out, d)
-	}
-	return out
-}
-
-// distName extracts and normalizes the distribution name from a PEP 508
-// requirement: the leading name, before any extras, version, marker, or URL.
-func distName(req string) string {
-	s := strings.TrimSpace(req)
-	if i := strings.IndexAny(s, "[ \t<>=!~;@("); i >= 0 {
-		s = s[:i]
-	}
-	return strings.ToLower(strings.ReplaceAll(s, "_", "-"))
+	return manifest.WithoutAirflow(deps)
 }

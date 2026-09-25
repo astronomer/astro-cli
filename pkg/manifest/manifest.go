@@ -52,6 +52,32 @@ type Manifest struct {
 	// of a ValidationError: today, a [tool.astro.targets.<name>] key nothing
 	// reads. A caller shows them where it would show the manifest's errors.
 	Warnings []Problem
+
+	// repair is what ParseForRepair let through: the Airflow-version problems
+	// the manifest still has, and what a leftover [tool.astro] airflow line
+	// says. Both are zero on a manifest Parse loaded.
+	repair repairState
+}
+
+type repairState struct {
+	airflowUnclear bool
+	removedKey     string
+}
+
+// AirflowUnclear reports that the manifest's Airflow requirement does not
+// state one version: it is missing, pins no single series, or states the
+// version more than one way. Only a manifest ParseForRepair loaded can be in
+// that state; Parse refuses it.
+func (m *Manifest) AirflowUnclear() bool {
+	return m.repair.airflowUnclear
+}
+
+// RemovedAirflowKey is the version a leftover [tool.astro] airflow line
+// states, "" when there is none or it is not a version. Only a manifest
+// ParseForRepair loaded can have one; it decides nothing, and is here for the
+// edit that migrates it.
+func (m *Manifest) RemovedAirflowKey() string {
+	return m.repair.removedKey
 }
 
 // UV is the [tool.uv] table, the fields astro reads. uv applies them to the
@@ -71,12 +97,10 @@ type Project struct {
 	Dependencies   []string
 }
 
-// Astro is the [tool.astro] table.
+// Astro is the [tool.astro] table. The Airflow version is not in it: the
+// apache-airflow requirement in [project] dependencies states it, and
+// Manifest.Airflow reads it from there.
 type Astro struct {
-	// AirflowVersion pins the Airflow the project runs and locks against.
-	// It may be partial ("3", "3.1"): resolution to a concrete version
-	// happens downstream, not here.
-	AirflowVersion string
 	// Packages is [tool.astro] packages, the OS (apt) packages the project
 	// needs at the system level — v1's packages.txt. Docker mode installs
 	// them into the runtime image; standalone mode cannot and warns.
@@ -114,7 +138,7 @@ type Astro struct {
 	// project's own Dockerfile — "tier 3" in the project design, the escape
 	// hatch for a multi-stage build or anything else a manifest cannot
 	// express. Empty is the common case and means the image is generated from
-	// AirflowVersion, Packages and [project] dependencies.
+	// the Airflow requirement, Packages and [project] dependencies.
 	//
 	// DECLARED, rather than inferred from the file being on disk, and that is
 	// the whole reason this key exists. Presence answers "is there a
@@ -125,8 +149,11 @@ type Astro struct {
 	// One project, two tools, two different images — the thing sharing a disk
 	// contract is supposed to prevent.
 	//
-	// Docker mode runs this file as the build, and AirflowVersion, Packages and
-	// the dependency list stop describing the image. Standalone mode has no
+	// Docker mode runs this file as the build, and the Airflow requirement,
+	// Packages and the rest of the dependency list stop describing the image.
+	// The requirement is still required and still read: it gives standalone
+	// mode its Airflow, and the runtime its generation when the file's FROM
+	// line names none. Standalone mode has no
 	// image and ignores it.
 	Dockerfile string
 }
@@ -287,7 +314,6 @@ const (
 
 	// The project and the [tool.astro] block.
 	CodeProjectNameInvalid       ProblemCode = "project_name_invalid"
-	CodeAirflowVersionInvalid    ProblemCode = "airflow_version_invalid"
 	CodeDockerfileSeparators     ProblemCode = "dockerfile_separators"
 	CodeDockerfileOutsideProject ProblemCode = "dockerfile_outside_project"
 	// CodeTargetNotAName is [tool.astro] target given a table: the old
@@ -297,6 +323,31 @@ const (
 	// no link that uses the Astro login: a host for nothing, most likely a
 	// workspace line deleted and its domain left behind.
 	CodeDomainWithoutWorkspace ProblemCode = "domain_without_workspace"
+
+	// The Airflow requirement in [project] dependencies, the one place a
+	// project states its Airflow version.
+	//
+	// CodeAirflowMissing is a dependency list that names neither
+	// apache-airflow nor apache-airflow-core.
+	CodeAirflowMissing ProblemCode = "airflow_missing"
+	// CodeAirflowUnpinned is an Airflow requirement that pins no single
+	// series: a range, a direct URL, a bare name.
+	CodeAirflowUnpinned ProblemCode = "airflow_unpinned"
+	// CodeAirflowAmbiguous is a dependency list that states the version more
+	// than one way: both distributions, or one pinned twice differently.
+	CodeAirflowAmbiguous ProblemCode = "airflow_ambiguous"
+	// CodeAirflowCoreBeforeThree is an apache-airflow-core requirement
+	// pinning Airflow 2, which that distribution was never published for.
+	CodeAirflowCoreBeforeThree ProblemCode = "airflow_core_before_three"
+	// CodeDependenciesDynamic is [project] dynamic listing dependencies. The
+	// Airflow version is a requirement in [project] dependencies, and PEP 621
+	// forbids a static list beside a dynamic one, so there is nowhere to
+	// state it.
+	CodeDependenciesDynamic ProblemCode = "dependencies_dynamic"
+	// CodeAirflowRemoved is a leftover [tool.astro] airflow, which no longer
+	// decides anything. EditManifest still loads a manifest whose only
+	// problems carry this code, so the edit that deletes the line can run.
+	CodeAirflowRemoved ProblemCode = "airflow_removed"
 
 	// Links: what a deployment link may be called and what it must name.
 	CodeLinkNeedsName               ProblemCode = "link_needs_name"
@@ -343,9 +394,12 @@ var problemCodes = []ProblemCode{
 	CodeRequired, CodeExpectedString, CodeExpectedBool, CodeExpectedTable,
 	CodeExpectedStringArray, CodeEmptyString, CodeUnknownKey,
 
-	CodeProjectNameInvalid, CodeAirflowVersionInvalid,
+	CodeProjectNameInvalid,
 	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeTargetNotAName,
 	CodeDomainWithoutWorkspace,
+
+	CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
+	CodeAirflowCoreBeforeThree, CodeDependenciesDynamic, CodeAirflowRemoved,
 
 	CodeLinkNeedsName, CodeLinkNameReserved, CodeTargetUnusable,
 	CodeInheritedTargetUnusable, CodeTargetNeedsEnvironment,
@@ -439,6 +493,27 @@ func Load(path string) (*Manifest, error) {
 // Parse plus the file read; consumers with the bytes already in hand (an
 // editor buffer, a test) call Parse directly.
 func Parse(data []byte) (*Manifest, error) {
+	return parse(data, false)
+}
+
+// ParseForRepair is Parse for a writer about to edit the manifest: a manifest
+// whose only problems are with its Airflow version loads, so the edit that
+// repairs them can run. Those are a leftover [tool.astro] airflow line
+// (CodeAirflowRemoved) and a requirement that is missing, pins no single
+// series, states the version twice, or pins apache-airflow-core to an Airflow 2
+// (CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
+// CodeAirflowCoreBeforeThree), alone or together: a manifest the key alone pinned,
+// before the requirement became the version, has the first two. Any other
+// problem refuses it as Parse does. Readers use Parse.
+//
+// The manifest it returns may state no single Airflow, so Airflow() can be the
+// zero value here, unlike on a manifest Parse loaded. AirflowUnclear and
+// RemovedAirflowKey say what is left to repair.
+func ParseForRepair(data []byte) (*Manifest, error) {
+	return parse(data, true)
+}
+
+func parse(data []byte, repair bool) (*Manifest, error) {
 	var f wireFile
 	if err := toml.Unmarshal(data, &f); err != nil {
 		return nil, &ParseError{Err: err}
@@ -455,14 +530,45 @@ func Parse(data []byte) (*Manifest, error) {
 			RequiresPython: f.Project.RequiresPython,
 			Dependencies:   f.Project.Dependencies,
 		}
+		p.dynamicDeps = slices.Contains(f.Project.Dynamic, "dependencies")
 	}
 	p.validate(m)
 	p.sortProblems()
-	if len(p.problems) > 0 {
+	if len(p.problems) > 0 && (!repair || !onlyAirflowVersion(p.problems)) {
 		return nil, &ValidationError{Problems: p.problems}
 	}
 	m.Warnings = p.warnings
+	for _, pr := range p.problems {
+		// A core entry pinned to an Airflow 2 names the wrong distribution,
+		// not an unclear version, so it does not count here: the version it
+		// states is still the one to read.
+		if pr.Code != CodeAirflowRemoved && pr.Code != CodeAirflowCoreBeforeThree {
+			m.repair.airflowUnclear = true
+		}
+	}
+	if s, ok := p.airflowKey.(string); ok && ValidAirflowVersion(s) {
+		m.repair.removedKey = s
+	}
 	return m, nil
+}
+
+// airflowVersionCodes are the problems a repair of the Airflow version can
+// fix, and so the ones ParseForRepair lets through.
+//
+// CodeDependenciesDynamic is not among them: no edit of the requirement can
+// fix a manifest that has nowhere to put one, so a repair of it is refused
+// with the manifest's own reason, and writes nothing.
+var airflowVersionCodes = []ProblemCode{
+	CodeAirflowRemoved, CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous, CodeAirflowCoreBeforeThree,
+}
+
+func onlyAirflowVersion(problems []Problem) bool {
+	for _, pr := range problems {
+		if !slices.Contains(airflowVersionCodes, pr.Code) {
+			return false
+		}
+	}
+	return true
 }
 
 // uvTable reads the [tool.uv] fields astro uses, skipping any value that is not
@@ -503,7 +609,13 @@ const ReservedLinkName = "local"
 // returns the zero value, so the decode carries on and the caller reports
 // every finding at once.
 type parser struct {
-	problems []Problem
+	// airflowKey is the raw [tool.astro] airflow value, nil when absent. It
+	// decides nothing; validate reports it, quoting the requirement that does.
+	airflowKey any
+	// dynamicDeps is [project] dynamic listing dependencies, which leaves
+	// nowhere to state the Airflow requirement.
+	dynamicDeps bool
+	problems    []Problem
 	// warnings are findings that leave the manifest loadable; they reach the
 	// caller as Manifest.Warnings.
 	warnings []Problem
@@ -547,14 +659,14 @@ func (p *parser) warn(code ProblemCode, key, reason string) {
 // defaults the section sets above them.
 func (p *parser) astro(raw map[string]any) Astro {
 	p.unknownKeys(astroRoot, raw, astroKeys)
+	p.airflowKey = raw["airflow"]
 	a := Astro{
-		AirflowVersion: p.reqStr(astroRoot+".airflow", raw["airflow"]),
-		Packages:       p.packages(raw["packages"]),
-		Workspace:      p.str(astroRoot+".workspace", raw["workspace"]),
-		Domain:         strings.TrimSpace(p.str(astroRoot+".domain", raw["domain"])),
-		Target:         p.defaultTarget(raw["target"]),
-		Targets:        p.targets(raw["targets"]),
-		Env:            p.table(astroRoot+".env", raw["env"]),
+		Packages:  p.packages(raw["packages"]),
+		Workspace: p.str(astroRoot+".workspace", raw["workspace"]),
+		Domain:    strings.TrimSpace(p.str(astroRoot+".domain", raw["domain"])),
+		Target:    p.defaultTarget(raw["target"]),
+		Targets:   p.targets(raw["targets"]),
+		Env:       p.table(astroRoot+".env", raw["env"]),
 		// Trimmed at DECODE, not just in validate, because the stored value is
 		// what consumers branch on. `dockerfile = " "` is non-empty to a
 		// `declared != ""` test and names no file, so leaving it untrimmed here
@@ -847,15 +959,6 @@ func (p *parser) str(key string, v any) string {
 	return s
 }
 
-// reqStr decodes a string the section cannot do without.
-func (p *parser) reqStr(key string, v any) string {
-	if v == nil {
-		p.add(CodeRequired, key, "required")
-		return ""
-	}
-	return p.str(key, v)
-}
-
 func (p *parser) boolean(key string, v any) bool {
 	if v == nil {
 		return false
@@ -924,8 +1027,8 @@ var projectNameRe = regexp.MustCompile(`^(?i:[a-z0-9]|[a-z0-9][a-z0-9._-]*[a-z0-
 // airflowVersionRe accepts a full or partial version: "3", "3.1", "3.1.2".
 var airflowVersionRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
 
-// ValidAirflowVersion reports whether v is a [tool.astro] airflow value Parse
-// accepts: a full or partial version, "3", "3.1" or "3.1.2". A writer checks a
+// ValidAirflowVersion reports whether v is a version an Airflow requirement
+// can pin: a full or partial version, "3", "3.1" or "3.1.2". A writer checks a
 // pin with it before writing, so a bad one is refused with its own error.
 func ValidAirflowVersion(v string) bool {
 	return airflowVersionRe.MatchString(v)
@@ -941,9 +1044,7 @@ func (p *parser) validate(m *Manifest) {
 		p.add(CodeProjectNameInvalid, "project.name", "not a valid project name (letters, digits, -._; must start and end with a letter or digit)")
 	}
 
-	if v := m.Astro.AirflowVersion; v != "" && !ValidAirflowVersion(v) {
-		p.add(CodeAirflowVersionInvalid, astroRoot+".airflow", fmt.Sprintf("%q is not a version like 3, 3.1, or 3.1.2", v))
-	}
+	p.airflow(m)
 
 	// The path has to stay inside the project, because the consumer joins it to
 	// the project directory and hands the result to a docker build. An absolute
@@ -1029,4 +1130,5 @@ type wireProject struct {
 	Name           string   `toml:"name"`
 	RequiresPython string   `toml:"requires-python"`
 	Dependencies   []string `toml:"dependencies"`
+	Dynamic        []string `toml:"dynamic"`
 }

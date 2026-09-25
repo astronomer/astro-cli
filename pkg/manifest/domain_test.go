@@ -4,7 +4,7 @@ import "testing"
 
 func loadDomain(t *testing.T, body string) string {
 	t.Helper()
-	m, err := Load(write(t, "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n"+body))
+	m, err := Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"+body))
 	if err != nil {
 		t.Fatalf("Load(%q): %v", body, err)
 	}
@@ -64,7 +64,7 @@ func TestDomainWithoutWorkspaceServesAnAstroLink(t *testing.T) {
 		"astro link, default auth": "[tool.astro.deployments.prod]\nworkspace = \"cmws\"\ndeployment = \"dep\"\n",
 		"url link, astro auth":     "[tool.astro.deployments.prod]\nurl = \"https://airflow.example.com\"\nauth = { method = \"astro\" }\n",
 	} {
-		m, err := Load(write(t, "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndomain = \"astronomer-dev.io\"\n\n"+link))
+		m, err := Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndomain = \"astronomer-dev.io\"\n\n"+link))
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

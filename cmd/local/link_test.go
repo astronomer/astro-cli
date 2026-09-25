@@ -24,10 +24,10 @@ import (
 const linkManifest = `[project]
 name = 'orders'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 # the orders team's project
 [tool.astro]
-airflow = '3.1'
 workspace = 'ws_A'
 domain = 'astronomer.io'
 
@@ -178,7 +178,7 @@ func TestLinkAddAComposerLink(t *testing.T) {
 	assertCommentsKept(t, path)
 
 	// With no section to take them from, both are required.
-	bare, _ := linkTestProject(t, "[project]\nname = 'x'\n\n[tool.astro]\nairflow = '3.1'\n")
+	bare, _ := linkTestProject(t, "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n")
 	_, _, err := runLink(t, bare, "add", "gcp", "--target", "composer", "--environment", "orders")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Google Cloud project")
@@ -247,7 +247,7 @@ func TestLinkAddRefusesAFlagTheKindDoesNotTake(t *testing.T) {
 // In a project whose target is mwaa, an environment alone makes an mwaa link
 // and a deployment makes an astro one, which then states its target.
 func TestLinkAddFollowsTheProjectTarget(t *testing.T) {
-	body := strings.Replace(linkManifest, "airflow = '3.1'\n", "airflow = '3.1'\ntarget = 'mwaa'\n", 1)
+	body := strings.Replace(linkManifest, "workspace = 'ws_A'\n", "workspace = 'ws_A'\ntarget = 'mwaa'\n", 1)
 	body = strings.Replace(body, "stage = { deployment = 'dep-stage' }", "stage = { deployment = 'dep-stage', target = 'astro' }", 1)
 	body = strings.Replace(body, "deployment = 'dep-dev'\n", "deployment = 'dep-dev'\ntarget = 'astro'\n", 1)
 	dir, path := linkTestProject(t, body)
@@ -346,7 +346,7 @@ func TestLinkWorkspaceSwitchesAndPins(t *testing.T) {
 // With no --domain, linking takes the current login's host, and with no login
 // it asks for one rather than guessing.
 func TestLinkWorkspaceDefaultsTheDomainToTheLogin(t *testing.T) {
-	dir, path := linkTestProject(t, "[project]\nname = 'x'\n\n[tool.astro]\nairflow = '3.1'\n")
+	dir, path := linkTestProject(t, "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n")
 	_, _, err := runLink(t, dir, "workspace", "ws_A")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--domain")

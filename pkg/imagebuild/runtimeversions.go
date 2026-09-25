@@ -76,7 +76,7 @@ func LocalRuntimeImageWith(ctx context.Context, airflowVersion string, o runtime
 		}
 		runtime, ok := catalog.NewestRuntimeFor(v)
 		if !ok {
-			return "", fmt.Errorf("%w: %s", ErrNoRuntimeForAirflow, v)
+			return "", fmt.Errorf("%w: %s%s", ErrNoRuntimeForAirflow, v, seriesHint(v))
 		}
 		return airflow2ImageRepo + ":" + runtime, nil
 	default:
@@ -98,6 +98,23 @@ func checkAirflow2Floor(version string) error {
 	if err != nil || minor >= minAirflow2Minor {
 		return nil
 	}
-	return fmt.Errorf("Docker mode needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with `airflow db migrate`, which does not exist before Airflow 2.%d",
-		minAirflow2Minor, version, minAirflow2Minor)
+	return fmt.Errorf("Docker mode needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with `airflow db migrate`, which does not exist before Airflow 2.%d%s",
+		minAirflow2Minor, version, minAirflow2Minor, seriesHint(version))
+}
+
+// seriesHint is the fix for an exact pin that was likely meant as a series:
+// "==2" and "==2.10" name the releases 2.0.0 and 2.10.0 under PEP 440, not
+// the newest of a line, and the manifest reads them that way. A pin ending in
+// .0 is the one that shape produces, so it is the one given the hint. Empty
+// for any other pin.
+func seriesHint(pin string) string {
+	parts := strings.Split(pin, ".")
+	if len(parts) != 3 || parts[2] != "0" {
+		return ""
+	}
+	series := parts[0] + "." + parts[1]
+	if parts[1] == "0" {
+		series = parts[0]
+	}
+	return fmt.Sprintf(". %s is exactly Airflow %s; for the newest Airflow %s, pin apache-airflow==%s.*", pin, pin, series, series)
 }

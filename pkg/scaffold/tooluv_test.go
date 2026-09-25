@@ -103,7 +103,7 @@ func TestSetAirflowVersionLeavesToolUVAlone(t *testing.T) {
 // olderInitManifest is a manifest as init wrote it for a 3.2 pin before the
 // Airflow 3 floor followed the runtime.
 const olderInitManifest = "[project]\nname = 'x'\nversion = '0.1.0'\nrequires-python = '>=3.10'\n" +
-	"dependencies = ['apache-airflow==3.2.*']\n\n[tool.astro]\nairflow = '3.2'\n"
+	"dependencies = ['apache-airflow==3.2.*']\n\n[tool.astro]\n"
 
 // That project never had today's floor, so its old one is recognized as init's
 // and moved on the next pin change.
@@ -136,7 +136,7 @@ func TestSetAirflowVersionKeepsAChosenFloorOnAnOlderProject(t *testing.T) {
 func TestSetAirflowVersionKeepsAnOpenBoundOnAirflowTwo(t *testing.T) {
 	dir, path := writeEditFixture(t,
 		"[project]\nname = 'x'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==2.9.*']\n\n"+
-			"[tool.astro]\nairflow = '2.9'\n", 0o644)
+			"[tool.astro]\n", 0o644)
 
 	change, err := SetAirflowVersion(dir, nil, "2.10")
 	require.NoError(t, err)

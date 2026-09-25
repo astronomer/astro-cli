@@ -12,26 +12,29 @@ import (
 )
 
 // ErrInvalidAirflowVersion reports a pin SetAirflowVersion refused before
-// reading the manifest, because [tool.astro] airflow would not accept it.
+// reading the manifest, because an Airflow requirement cannot pin it.
 var ErrInvalidAirflowVersion = errors.New("not an Airflow version")
 
 // AirflowPinChange is what SetAirflowVersion did to a manifest.
 type AirflowPinChange struct {
-	// Previous is the [tool.astro] airflow the manifest had.
+	// Previous is the version the manifest's Airflow requirement pinned.
 	Previous string `json:"previous"`
 	// Version is the pin now written.
 	Version string `json:"version"`
 	// Changed reports that the file was written. An edit that changes no bytes
 	// writes nothing.
 	Changed bool `json:"changed"`
-	// Requirements lists the apache-airflow entries in [project] dependencies
+	// Requirements lists the Airflow entries in [project] dependencies
 	// rewritten to the new pin, as they now read.
 	Requirements []string `json:"requirements,omitempty"`
-	// UnreadRequirements lists the apache-airflow entries left as they were,
-	// because they pin Airflow in a shape no single version reads out of (a
-	// range, a direct URL). They are the user's to reconcile with the pin:
-	// standalone mode installs what they say.
-	UnreadRequirements []string `json:"unreadRequirements,omitempty"`
+	// CoreReplaced reports that an apache-airflow-core entry became
+	// apache-airflow, because the version is an Airflow 2 and core is
+	// published only for Airflow 3. Its extras and marker are kept.
+	CoreReplaced bool `json:"coreReplaced,omitempty"`
+	// RemovedAirflowKey reports that a leftover [tool.astro] airflow line was
+	// deleted. It decided nothing any more, and the manifest does not load
+	// while it is there.
+	RemovedAirflowKey bool `json:"removedAirflowKey,omitempty"`
 	// RequiresPython is the [project] requires-python now written, when it was
 	// the bound this package derives from the previous pin and the new pin
 	// derives a different one. Empty when it was left alone.
@@ -42,23 +45,28 @@ type AirflowPinChange struct {
 	Dockerfile string `json:"dockerfile,omitempty"`
 }
 
-// SetAirflowVersion rewrites the [tool.astro] airflow pin of the manifest in
-// dir to version, through EditManifest, so wrap and every write rule apply as
-// they do there.
+// SetAirflowVersion moves the Airflow the manifest in dir pins to version,
+// through EditManifest, so wrap and every write rule apply as they do there.
 //
-// The pin is not the only place a project states its Airflow, so it also
-// changes what has to move with it for the project to run the new version:
+// The version is the Airflow requirement in [project] dependencies, so that is
+// what changes: each apache-airflow or apache-airflow-core entry that does not
+// already pin version becomes the requirement version derives ("==3.1.*" for a
+// series, exact for a full version), keeping the name as written, its extras
+// and its marker, whatever it pinned before: a range or a URL is replaced too.
 //
-//   - Each apache-airflow entry in [project] dependencies that carries a clean
-//     "==" pin becomes the requirement the new pin derives ("==3.1.*" for a
-//     series, exact for a full version), keeping its extras and marker.
-//     Standalone mode installs from that list, so leaving it would run the old
-//     Airflow under the new pin. An entry whose version the new pin already
-//     covers ("==2.9.1" under "2.9") is left as written, unless it is the one
-//     the previous pin derives, which follows a pin that widens ("2.9" to "2"
-//     turns "==2.9.*" into "==2.*"). An entry pinned any other way is reported in
-//     UnreadRequirements and left alone, because rewriting a range would be
-//     guessing what it meant.
+// Because the caller names the version, this also repairs every manifest
+// problem about it, which EditManifest reads for that reason
+// (manifest.ParseForRepair):
+//
+//   - A leftover [tool.astro] airflow line is deleted, and RemovedAirflowKey
+//     says so.
+//   - A missing requirement is added, and a range, a URL or two pins that
+//     disagree are replaced. Previous is then what the leftover line said, or
+//     empty. Listing both apache-airflow and apache-airflow-core is a choice of
+//     distribution a version cannot make, so that result is refused.
+//
+// Alongside it:
+//
 //   - requires-python moves to the new pin's bound only when it is exactly a
 //     bound this package wrote for the previous pin, today's or the ">=3.10"
 //     init once wrote for all of Airflow 3. A bound someone chose stays theirs.
@@ -67,10 +75,10 @@ type AirflowPinChange struct {
 //
 // [tool.uv] is the project's, and a pin change never touches it.
 //
-// A declared dockerfile does not stop the write. The pin is still required and
-// still read, and a project that later drops the declaration builds from it.
-// The file's FROM line is not touched, and Dockerfile reports that it exists so
-// the caller can say the image is the user's to move.
+// A declared dockerfile does not stop the write. The requirement is still
+// read, for standalone mode and for the runtime's generation. The file's FROM
+// line is not touched, and Dockerfile reports that it exists so the caller can
+// say the image is the user's to move.
 //
 // Nothing else changes: providers, Dag code and Dockerfile steps an upgrade
 // may need are judgment, not a pin, and are left to the user or an agent.
@@ -89,7 +97,9 @@ type AirflowPinOptions struct {
 	Catalog *runtimeversions.Catalog
 }
 
-// SetAirflowVersionWith is SetAirflowVersion with options.
+// SetAirflowVersionWith is SetAirflowVersion with options, and the one
+// implementation of both: the repairs, the requirement rewrite and the
+// requires-python move are the same whichever is called.
 func SetAirflowVersionWith(dir string, wrap func(run func() error) error, version string, opts AirflowPinOptions) (AirflowPinChange, error) {
 	if !manifest.ValidAirflowVersion(version) {
 		return AirflowPinChange{}, fmt.Errorf("%w: %q is not a version like 3, 3.1, or 3.1.2", ErrInvalidAirflowVersion, version)
@@ -97,24 +107,37 @@ func SetAirflowVersionWith(dir string, wrap func(run func() error) error, versio
 	var change AirflowPinChange
 	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		change = AirflowPinChange{
-			Previous:   before.Astro.AirflowVersion,
+			Previous:   before.Airflow().Pin,
 			Version:    version,
 			Dockerfile: before.Astro.Dockerfile,
 		}
-		// Setting the value it already has can still requote it, so an
-		// unchanged pin is not set, and a repeated call writes nothing.
-		if change.Previous != version {
-			if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
-				return err
-			}
+		// A manifest whose requirement states no single version has none to
+		// read the previous one from; a leftover key is what its image ran.
+		if change.Previous == "" || before.AirflowUnclear() {
+			change.Previous = before.RemovedAirflowKey()
 		}
-		if err := setAirflowRequirements(ed, version, &change); err != nil {
+		change.RemovedAirflowKey = ed.Delete(airflowKeyPath)
+		rewritten, switched, err := repinAirflowRequirements(ed, version)
+		if err != nil {
 			return err
 		}
-		// A same-pin call never moves requires-python, so a repeated call writes
-		// nothing even when the catalog's bound differs from the one written.
+		change.Requirements, change.CoreReplaced = rewritten, switched
+		// No Airflow requirement to rewrite, which only a manifest loaded for
+		// repair can have: the requirement is written instead.
+		added, err := ensureAirflowDependency(ed, version)
+		if err != nil {
+			return err
+		}
+		if added != "" {
+			change.Requirements = append(change.Requirements, added)
+		}
+		// With no previous version, no bound can be told apart as the one
+		// this package wrote for it, so requires-python stays. A same-pin call
+		// never moves it either, so a repeated call writes nothing even when
+		// the catalog's bound differs from the one written.
 		moved := change.Previous != version
-		if rp := before.Project.RequiresPython; rp != "" && moved && initWroteRequiresPython(rp, change.Previous, moved, opts.Catalog) {
+		if rp := before.Project.RequiresPython; rp != "" && change.Previous != "" && moved &&
+			initWroteRequiresPython(rp, change.Previous, moved, opts.Catalog) {
 			if next := pythonBoundFor(version, opts.Catalog); next != rp {
 				if err := ed.Set([]string{"project", "requires-python"}, next); err != nil {
 					return err
@@ -127,8 +150,100 @@ func SetAirflowVersionWith(dir string, wrap func(run func() error) error, versio
 	if err != nil {
 		return AirflowPinChange{}, err
 	}
-	change.Changed = change.Previous != version || len(change.Requirements) > 0 || change.RequiresPython != ""
+	change.Changed = len(change.Requirements) > 0 || change.RemovedAirflowKey || change.RequiresPython != ""
 	return change, nil
+}
+
+// airflowKeyPath is the leftover [tool.astro] airflow key.
+var airflowKeyPath = []string{"tool", "astro", manifestKeyAirflow}
+
+// AirflowKeyMigration is what MigrateAirflowKey did to a manifest.
+type AirflowKeyMigration struct {
+	// Removed reports that the [tool.astro] airflow line was there and is
+	// gone. False means the manifest had none, and nothing was written.
+	Removed bool `json:"removed"`
+	// Requirements lists the Airflow requirements written from the line, as
+	// they now read, when the manifest's own did not state one version:
+	// "apache-airflow==3.1.*" added from airflow = '3.1' where there was
+	// none, or an "apache-airflow>=3" rewritten to it. Empty when the
+	// manifest already pinned one version, which is then what the project
+	// runs, and is left as it is.
+	Requirements []string `json:"requirements,omitempty"`
+	// CoreReplaced reports that an apache-airflow-core entry became
+	// apache-airflow, as AirflowPinChange.CoreReplaced does.
+	CoreReplaced bool `json:"coreReplaced,omitempty"`
+}
+
+// MigrateAirflowKey repairs a manifest carrying the leftover [tool.astro]
+// airflow line (manifest.CodeAirflowRemoved), through EditManifest, and
+// changes nothing else. It is the one call behind the desktop's fix, for every
+// shape such a manifest takes:
+//
+//   - Beside a requirement that pins one version, the line decides nothing, so
+//     it is deleted and the requirement stays what the project runs. When the
+//     line named a different series, moving the requirement to it is
+//     SetAirflowVersion's job, and the caller's to offer. An
+//     apache-airflow-core entry on an Airflow 2 moves to apache-airflow at
+//     its own version, which CoreReplaced reports.
+//   - Beside a requirement that does not (manifest.CodeAirflowMissing,
+//     CodeAirflowUnpinned, or two pins that disagree), the line was the
+//     project's statement of its version, so it moves: every Airflow
+//     requirement is rewritten to the one the line derives, keeping its name,
+//     extras and marker, or that requirement is added where there is none, and
+//     then the line is deleted. A line that is not a version cannot move, and
+//     is refused.
+//
+// Listing both apache-airflow and apache-airflow-core is not something the
+// line can settle, since it names a version and not a distribution: both are
+// moved to its version, and the result is refused, as EditManifest refuses
+// any edit that does not load, with the manifest's own "keep one of them".
+//
+// A manifest without the line is left as it is, and reports Removed false.
+func MigrateAirflowKey(dir string, wrap func(run func() error) error) (AirflowKeyMigration, error) {
+	var out AirflowKeyMigration
+	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+		out = AirflowKeyMigration{}
+		raw, ok := ed.Get(airflowKeyPath)
+		if !ok {
+			return nil
+		}
+		if before.AirflowUnclear() {
+			v := before.RemovedAirflowKey()
+			if v == "" {
+				return fmt.Errorf("[tool.astro] airflow = %v is not a version like 3, 3.1, or 3.1.2, so it cannot become the "+
+					"apache-airflow requirement: pin one in [project] dependencies and delete the airflow line", raw)
+			}
+			rewritten, switched, err := repinAirflowRequirements(ed, v)
+			if err != nil {
+				return err
+			}
+			out.CoreReplaced = switched
+			added, err := ensureAirflowDependency(ed, v)
+			if err != nil {
+				return err
+			}
+			out.Requirements = rewritten
+			if added != "" {
+				out.Requirements = append(out.Requirements, added)
+			}
+		} else {
+			// The requirement states the version and keeps it. Its one
+			// fixable fault left is an apache-airflow-core entry on an Airflow
+			// 2, which moves to apache-airflow at the same version; every
+			// other entry already says that version, and is left alone.
+			rewritten, switched, err := repinAirflowRequirements(ed, before.Airflow().Pin)
+			if err != nil {
+				return err
+			}
+			out.Requirements, out.CoreReplaced = rewritten, switched
+		}
+		out.Removed = ed.Delete(airflowKeyPath)
+		return nil
+	})
+	if err != nil {
+		return AirflowKeyMigration{}, err
+	}
+	return out, nil
 }
 
 // initWroteRequiresPython reports whether rp is a bound this package wrote for
@@ -176,76 +291,84 @@ func catalogBound(pin string, catalog *runtimeversions.Catalog) (string, bool) {
 	return catalog.RequiresPython(major + "." + minor)
 }
 
-// setAirflowRequirements rewrites each apache-airflow entry of [project]
-// dependencies that repinAirflow can read and whose version the new pin does
-// not already cover, element by element so the array keeps its layout and
-// comments, and records what it did in change.
-func setAirflowRequirements(ed tomledit.Editor, version string, change *AirflowPinChange) error {
+// repinAirflowRequirements rewrites each Airflow entry of [project]
+// dependencies that does not already pin version, pinned or not, element by
+// element so the array keeps its layout and comments, and returns the entries
+// it wrote, as they now read.
+//
+// An apache-airflow-core entry becomes apache-airflow when version is an
+// Airflow 2, since core is published only for Airflow 3; switched reports it.
+func repinAirflowRequirements(ed tomledit.Editor, version string) (rewritten []string, switched bool, err error) {
 	raw, ok := ed.Get([]string{"project", "dependencies"})
 	if !ok {
-		return nil
+		return nil, false, nil
 	}
 	deps, ok := raw.([]any)
 	if !ok {
-		return nil
+		return nil, false, nil
 	}
 	for i, d := range deps {
 		spec, ok := d.(string)
-		if !ok || !namesAirflow(spec) {
+		if !ok || !manifest.NamesAirflow(spec) {
 			continue
 		}
-		next, ok := repinAirflow(spec, version)
-		if !ok {
-			change.UnreadRequirements = append(change.UnreadRequirements, spec)
+		// An entry that already says version is left as written, so a repeated
+		// call writes nothing and does not respace it. "Says" is AirflowPin's
+		// reading, so ==3.1 (exactly 3.1.0) does not already say the series 3.1.
+		toFull := coreOnAirflow2(spec, version)
+		if stated, _ := manifest.AirflowPin(spec); stated == version && !toFull {
 			continue
 		}
-		// An entry already inside the pin says the same thing, or something
-		// narrower someone chose, like a patch under a series. Rewriting it
-		// would respace it or widen it for nothing. The exception is the entry
-		// the previous pin derives: it follows a pin that moves, including one
-		// that widens ("2.9" to "2"), or it keeps installing the old series.
-		stated, _ := pinFromSpec(spec)
-		if pinCovers(version, stated) && !followsThePin(stated, change.Previous, version) {
-			continue
-		}
+		next, _ := repinAirflow(spec, version)
 		if err := ed.Set([]string{"project", "dependencies", strconv.Itoa(i)}, next); err != nil {
-			return err
+			return nil, false, err
 		}
-		change.Requirements = append(change.Requirements, next)
+		rewritten = append(rewritten, next)
+		switched = switched || toFull
 	}
-	return nil
+	return rewritten, switched, nil
 }
 
-// repinAirflow returns an apache-airflow requirement pinned to version, keeping
-// the name as written, its extras and its environment marker. It rewrites only
-// the entries pinFromSpec reads, a clean "==" pin, which leaves out a range and
-// a direct URL.
+// coreOnAirflow2 reports whether spec is an apache-airflow-core entry and
+// version an Airflow 2, which that distribution does not publish.
+func coreOnAirflow2(spec, version string) bool {
+	return manifest.DistName(spec) == "apache-airflow-core" && (manifest.Airflow{Pin: version}).Major() == "2"
+}
+
+// repinAirflow returns an Airflow requirement pinned to version, keeping the
+// name as written, its extras and its environment marker, whatever the entry
+// pinned before: a clean "==" pin, a range, a direct URL, or nothing. An
+// apache-airflow-core entry becomes apache-airflow for an Airflow 2, which
+// core is not published for. It refuses anything that is not an Airflow
+// requirement.
 func repinAirflow(spec, version string) (string, bool) {
-	if _, ok := pinFromSpec(spec); !ok {
+	if !manifest.NamesAirflow(spec) {
 		return "", false
 	}
 	req, marker, hasMarker := strings.Cut(spec, ";")
-	head, _, _ := strings.Cut(req, "==")
-	out := strings.TrimSpace(head) + strings.TrimPrefix(airflowRequirement(version), airflowDist)
+	head := strings.TrimSpace(req)
+	// The name and its extras end where the first specifier, URL or space
+	// after the extras begins.
+	from := 0
+	if i := strings.Index(head, "]"); i >= 0 {
+		from = i + 1
+	}
+	if j := strings.IndexAny(head[from:], "<>=!~@ \t("); j >= 0 {
+		head = head[:from+j]
+	}
+	if coreOnAirflow2(spec, version) {
+		// The name as written, with its extras, swapped for the distribution
+		// Airflow 2 is published as.
+		extras := ""
+		if i := strings.Index(head, "["); i >= 0 {
+			extras = head[i:]
+		}
+		head = "apache-airflow" + extras
+	}
+	_, pin, _ := strings.Cut(airflowRequirement(version), "==")
+	out := head + "==" + pin
 	if hasMarker {
 		out += "; " + strings.TrimSpace(marker)
 	}
 	return out, true
-}
-
-// pinCovers reports whether a version an apache-airflow entry states is one the
-// pin allows: the same version, or for a series pin ("2.9"), any version in
-// that series ("2.9.1"). A full pin covers only itself, because pinFromSpec
-// reads no version with more than three parts.
-func pinCovers(pin, stated string) bool {
-	return stated == pin || strings.HasPrefix(stated, pin+".")
-}
-
-// followsThePin reports whether an entry stating stated is the requirement the
-// previous pin derives, and the pin is moving. pinFromSpec reads a derived
-// requirement back as the pin itself ("==2.9.*" as "2.9"), so comparing the
-// read versions ignores how the entry is spaced.
-func followsThePin(stated, previous, version string) bool {
-	derived, _ := pinFromSpec(airflowRequirement(previous))
-	return previous != version && stated == derived
 }

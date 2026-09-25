@@ -217,7 +217,8 @@ func TestRuntimeImageRefusesABareMajorNamingThePin(t *testing.T) {
 	for _, pin := range []string{"3", " 3 ", "3."} {
 		_, err := RuntimeImage(pin)
 		require.Error(t, err, "pin %q", pin)
-		assert.Contains(t, err.Error(), "airflow pin", "pin %q", pin)
+		assert.Contains(t, err.Error(), "Airflow pin", "pin %q", pin)
+		assert.Contains(t, err.Error(), "apache-airflow==", "pin %q", pin)
 		assert.Contains(t, err.Error(), "pyproject.toml", "pin %q", pin)
 	}
 }
@@ -268,14 +269,29 @@ func TestRuntimeDepsDropsAirflowOnly(t *testing.T) {
 		"apache-airflow[celery] >= 3",
 		"APACHE_AIRFLOW==3",
 		"apache-airflow-providers-postgres",
+		"apache-airflow-task-sdk>=1.1",
 		"pandas",
 		"requests>=2",
 	})
 	assert.Equal(t, []string{
 		"apache-airflow-providers-postgres",
+		"apache-airflow-task-sdk>=1.1",
 		"pandas",
 		"requests>=2",
 	}, got)
+}
+
+// apache-airflow-core is dropped too. The install script does not refuse it,
+// so a core requirement the image's exact core does not satisfy got as far as
+// uv and failed there, with a resolver trace that named neither the base
+// image nor the manifest.
+func TestRuntimeDepsDropsAirflowCore(t *testing.T) {
+	got := runtimeDeps([]string{
+		"apache-airflow-core==3.2.*",
+		"Apache_Airflow_Core[otel]==3.3.2 ; sys_platform == 'linux'",
+		"apache-airflow-providers-standard",
+	})
+	assert.Equal(t, []string{"apache-airflow-providers-standard"}, got)
 }
 
 // --pull is how a floating base tag picks up a new patch, so a generated build

@@ -36,6 +36,14 @@ func TestProjectRequirementsAlwaysInstallAnAirflow(t *testing.T) {
 	}
 }
 
+// A core-only project already names its Airflow. A full apache-airflow added
+// beside it would be a second Airflow requirement, which the resolve has to
+// reconcile with the first.
+func TestProjectRequirementsKeepACoreOnlyProject(t *testing.T) {
+	got := projectRequirements("3.3", []string{"apache-airflow-core==3.3.*", "pandas"})
+	assert.Equal(t, []string{"apache-airflow-core==3.3.*", "pandas"}, got)
+}
+
 // The dependency as the manifest wrote it is left alone: rebuilding it from
 // the pin would ask for "apache-airflow==3.1", which is not a release.
 func TestProjectRequirementsDoNotRewriteTheProjectsOwnPin(t *testing.T) {

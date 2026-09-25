@@ -191,9 +191,19 @@ func firstNonEmpty(vals ...string) string {
 // deploymentTarget resolves -d. The name is a deployment link the manifest
 // declares; a name no link declares is an Astro Deployment id, which is what
 // --deployment-id always meant and what CI already passes.
+//
+// Only a directory with no manifest, or a pyproject.toml that is not an Astro
+// project, has no links. A manifest that is there and does not load is an
+// error: read as "no links", a link name would go to Astro as a Deployment id
+// and fail as a missing Deployment, hiding the manifest's own error.
 func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*airflowTarget, error) {
 	var known []string
-	if m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker)); err == nil {
+	m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker))
+	switch {
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
+	case err != nil:
+		return nil, fmt.Errorf("-d %s: reading this project's deployment links: %w", name, err)
+	default:
 		set := instances.Build(m)
 		if instance, ok := set.Lookup(name); ok {
 			return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())

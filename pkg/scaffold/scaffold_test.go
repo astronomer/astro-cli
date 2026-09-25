@@ -46,7 +46,7 @@ func TestRunFreshScaffold(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, "flight-data", m.Project.Name)
-	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Astro.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Airflow().Pin)
 	// [project.dependencies] must install the pinned Airflow, so init → start
 	// works with no hand-edit. The default pin is partial, so the
 	// requirement is a prefix match.
@@ -98,9 +98,14 @@ func TestRunPinsTheDefaultTheResolverGives(t *testing.T) {
 
 	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(raw), "airflow = '3.50'")
-	assert.Contains(t, string(raw), "'apache-airflow==3.50.*'")
+	// The catalog's series becomes the requirement, the only place the
+	// version is written, and its Python the requires-python.
+	assert.NotContains(t, string(raw), "airflow = ", "init wrote a [tool.astro] airflow key beside the requirement")
+	assert.Contains(t, string(raw), "dependencies = ['apache-airflow==3.50.*']")
 	assert.Contains(t, string(raw), "requires-python = '>=3.13'")
+	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, "3.50", m.Airflow().Pin)
 }
 
 // A resolver that has no Python for the series leaves requires-python to the
@@ -114,6 +119,8 @@ func TestRunFallsBackToTheBuiltInPythonRule(t *testing.T) {
 
 	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "airflow = ", "init wrote a [tool.astro] airflow key beside the requirement")
+	assert.Contains(t, string(raw), "'apache-airflow==3.50.*'")
 	assert.Contains(t, string(raw), "requires-python = '>=3.12'")
 }
 
@@ -152,7 +159,7 @@ func TestRunHonorsNameAndAirflowVersion(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, "etl", m.Project.Name)
-	assert.Equal(t, "3.0.2", m.Astro.AirflowVersion)
+	assert.Equal(t, "3.0.2", m.Airflow().Pin)
 	// A full three-part pin becomes an exact requirement, not a prefix match.
 	assert.Equal(t, []string{"apache-airflow==3.0.2"}, m.Project.Dependencies)
 }
@@ -163,8 +170,8 @@ func TestRunRejectsInvalidNameAndVersion(t *testing.T) {
 	assert.Contains(t, err.Error(), "project.name")
 
 	_, err = Run(t.TempDir(), Options{AirflowVersion: "latest"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "tool.astro.airflow")
+	require.ErrorIs(t, err, ErrInvalidAirflowVersion)
+	assert.Contains(t, err.Error(), `"latest"`)
 }
 
 func TestDeriveName(t *testing.T) {
@@ -184,7 +191,7 @@ func TestDeriveName(t *testing.T) {
 
 func TestRunRefusesAnAstroProject(t *testing.T) {
 	dir := t.TempDir()
-	m := "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n"
+	m := "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600))
 	_, err := Run(dir, Options{})
 	require.ErrorIs(t, err, ErrAlreadyAstroProject)
@@ -217,7 +224,7 @@ func TestRunAdoptsExistingManifest(t *testing.T) {
 	assert.Contains(t, got, airflowRequirement(runtimeversions.FallbackAirflowSeries))
 	m, err := manifest.Parse(out)
 	require.NoError(t, err)
-	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Astro.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Airflow().Pin)
 
 	// The rest of the scaffold lands beside it.
 	for _, f := range []string{"dags", "include", "plugins", "tests", ".gitignore", "AGENTS.md"} {
@@ -314,7 +321,7 @@ func TestRunAdoptsPuttingTheAstroSectionsFirst(t *testing.T) {
 	m, err := manifest.Parse(out)
 	require.NoError(t, err)
 	assert.Equal(t, "orders", m.Project.Name)
-	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Astro.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Airflow().Pin)
 }
 
 // Most repos state the Airflow they run in a Dockerfile image tag, and most of
@@ -362,31 +369,32 @@ func TestRunWarnsWhenThePinIsJustTheDefault(t *testing.T) {
 }
 
 // PEP 621 forbids a static dependencies array beside a dynamic declaration,
-// and uv refuses the manifest outright — which is the shape of every repo that
-// keeps its dependencies in a requirements.txt.
-func TestRunLeavesDynamicDependenciesAlone(t *testing.T) {
+// and the Airflow version is a requirement in that array, so a manifest that
+// supplies its dependencies from a build backend has nowhere to state it. Init
+// refuses it, saying what to change, and leaves the file as it was.
+func TestRunRefusesDynamicDependencies(t *testing.T) {
 	dir := t.TempDir()
 	existing := "[project]\nname = 'a'\ndynamic = ['version', 'dependencies']\n\n" +
 		"[tool.setuptools.dynamic]\ndependencies = {file = ['requirements.txt']}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
 
-	res, err := Run(dir, Options{})
-	require.NoError(t, err)
+	_, err := Run(dir, Options{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "declares its dependencies dynamic")
+	assert.Contains(t, err.Error(), "apache-airflow=="+runtimeversions.FallbackAirflowSeries+".*")
 
 	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.NotContains(t, string(out), "apache-airflow", "a static dependency was added beside a dynamic one:\n%s", out)
-	assert.Contains(t, string(out), "dynamic = ['version', 'dependencies']")
-	// The pin still has to reach the project, so init says where to put it.
-	assert.Contains(t, strings.Join(res.Notes, "\n"), "dependencies are dynamic")
+	assert.Equal(t, existing, string(out))
 }
 
-// The adopt arm takes the resolver's default the way the greenfield arm does:
-// its series, the requires-python it gives when the manifest states none, the
-// source on the Result, and the version it chose in the "is the default" note.
+// The adopt arm takes the resolver's default the way the greenfield arm does,
+// for a manifest that names no Airflow: its series as the requirement, the
+// requires-python it gives when the manifest states none, and the source on
+// the Result. No [tool.astro] airflow key is written.
 func TestRunAdoptsWithTheResolversDefault(t *testing.T) {
 	dir := t.TempDir()
-	existing := "[project]\nname = 'a'\nversion = '0.1.0'\ndependencies = ['apache-airflow>=2.9']\n"
+	existing := "[project]\nname = 'a'\nversion = '0.1.0'\ndependencies = ['pandas']\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
 
 	res, err := Run(dir, Options{Default: func() (string, string, runtimeversions.Source) {
@@ -396,32 +404,29 @@ func TestRunAdoptsWithTheResolversDefault(t *testing.T) {
 	assert.True(t, res.Adopted)
 	assert.Equal(t, "3.50", res.AirflowVersion)
 	assert.Equal(t, runtimeversions.SourceCache, res.AirflowDefaultSource)
-	assert.Contains(t, strings.Join(res.Notes, "\n"), "airflow = '3.50' is the default, not this project's version")
 
 	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "requires-python = '>=3.13'")
+	assert.Contains(t, string(out), "'apache-airflow==3.50.*'")
+	assert.NotContains(t, string(out), "airflow = ")
 }
 
-// A range or a wildcard names an Airflow this cannot read a version out of, so
-// the default lands instead — which for a 2.x project is a whole generation.
-// Nothing else in such a repo need mention a version, so the manifest itself
-// has to trigger the warning.
-func TestRunWarnsWhenAPinnedProjectFallsBackToTheDefault(t *testing.T) {
+// A range names no single Airflow, and the requirement is the only place the
+// project states its version, so adopting it is refused, naming the line,
+// rather than landing on the default beside a requirement that says otherwise.
+func TestRunRefusesAnAirflowRangeInTheManifest(t *testing.T) {
 	dir := t.TempDir()
 	existing := "[project]\nname = 'a'\nversion = '0.1.0'\ndependencies = ['apache-airflow[celery]>=2.9,<2.10']\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
 
-	res, err := Run(dir, Options{})
-	require.NoError(t, err)
-	assert.Equal(t, runtimeversions.FallbackAirflowSeries, res.AirflowVersion)
-	assert.Contains(t, strings.Join(res.Notes, "\n"), "is the default, not this project's version")
+	_, err := Run(dir, Options{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "apache-airflow[celery]>=2.9,<2.10 does not pin an Airflow series")
 
-	// The project's own requirement is left as its author wrote it.
 	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(out), "apache-airflow[celery]>=2.9,<2.10")
-	assert.Equal(t, 1, strings.Count(string(out), "apache-airflow"))
+	assert.Equal(t, existing, string(out))
 }
 
 func TestRunConvertsAV1ProjectAndListsOnlyWhatIsLeft(t *testing.T) {
@@ -443,7 +448,7 @@ func TestRunConvertsAV1ProjectAndListsOnlyWhatIsLeft(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, "2", res.AirflowVersion, "the Dockerfile's runtime 9 is an Airflow 2 image")
-	assert.Equal(t, "2", m.Astro.AirflowVersion)
+	assert.Equal(t, "2", m.Airflow().Pin)
 	// The Airflow requirement leads and the carried pin follows it. A partial
 	// pin becomes a prefix match, the same rule the greenfield path uses.
 	assert.Equal(t, []string{"apache-airflow==2.*", "flask==2.0"}, m.Project.Dependencies)
@@ -772,4 +777,22 @@ func TestAgentsMdCarriesTheDevMapping(t *testing.T) {
 	assert.Contains(t, content, "pyproject.toml")
 	assert.NotContains(t, content, runtimeversions.FallbackAirflowSeries,
 		"AGENTS.md must reference the manifest, not duplicate its values")
+}
+
+// A manifest init is going to refuse gets no catalog request: the dynamic
+// dependencies refusal comes before the default is resolved.
+func TestRunRefusesDynamicDependenciesWithoutALookup(t *testing.T) {
+	dir := t.TempDir()
+	existing := "[project]\nname = 'a'\ndynamic = ['dependencies']\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+	lookups := 0
+
+	_, err := Run(dir, Options{Default: func() (string, string, runtimeversions.Source) {
+		lookups++
+		return "3.50", "", runtimeversions.SourceCatalog
+	}})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "declares its dependencies dynamic")
+	assert.Zero(t, lookups, "the refusal asked the catalog for a default")
 }

@@ -28,7 +28,7 @@ const (
 const pythonBeforeAirflow29 = "3.11"
 
 // PythonFallback is the interpreter to request for a project, given its
-// manifest's [project] requires-python and [tool.astro] airflow: "" when the
+// manifest's [project] requires-python and its Airflow pin: "" when the
 // manifest states requires-python, else a concrete version for the pin. It is
 // the one rule the CLI and Astro Desktop both apply, so a project whose
 // manifest states no requires-python gets the same interpreter from either.

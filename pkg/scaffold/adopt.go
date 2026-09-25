@@ -73,18 +73,23 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	}
 
 	deps := asStrings(mustGet(ed, "project", "dependencies"))
+	// The Airflow version is the requirement in [project] dependencies, and
+	// PEP 621 forbids a static list beside a dynamic one, so a manifest
+	// supplying its dependencies from a build backend has nowhere to state it.
+	// Refused before anything is written, with the line it needs, and before
+	// the default is resolved, so the refusal makes no catalog request.
+	if slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "dependencies") {
+		example := pickAirflowVersion(opts.AirflowVersion, deps, v1, nil).version
+		return nil, nil, pin, fmt.Errorf("%s declares its dependencies dynamic, and an Astro project states its Airflow version "+
+			"as the requirement in [project] dependencies: list the dependencies there, starting with %s, and drop "+
+			"dependencies from [project] dynamic", path, airflowRequirement(example))
+	}
 	pick := pickAirflowVersion(opts.AirflowVersion, deps, v1, opts.Default)
 	version, defaulted := pick.version, pick.defaulted()
-	pin = manifestFacts{
-		defaultedPin: defaulted,
-		pinUnread:    pinnedPastTheManifest(deps, defaulted, opts.AirflowVersion != ""),
-		// A manifest naming Airflow without a clean == pin — a range —
-		// states a version this cannot read, so the default that lands
-		// instead may move the project a whole generation. A wildcard is
-		// read now, so it no longer reaches this.
-		namesAirflow: defaulted && pinsAirflow(deps),
-		dynamicDeps:  slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "dependencies"),
-	}
+	// A manifest naming Airflow in a shape no version reads out of, a range,
+	// is rewritten only when --airflow-version names the version (below);
+	// otherwise the loadable check refuses it, naming the line.
+	pin = manifestFacts{defaultedPin: defaulted}
 
 	// The manifest's own validation requires a [project] name, and a repo that
 	// was never a Python package often has no [project] table at all.
@@ -106,14 +111,24 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// it is pinned: the author wrote that specifier, and a requirements.txt in
 	// the same repo is the thing being retired, so "add what is missing" is the
 	// only merge that cannot silently change a pin someone chose.
-	migrated, err := mergeDependencies(ed, v1.dependencies, pin.dynamicDeps, &pin.migrationNotes)
+	migrated, err := mergeDependencies(ed, v1.dependencies, &pin.migrationNotes)
 	if err != nil {
 		return nil, nil, pin, err
 	}
 
-	added, err := ensureAirflowDependency(ed, version, pin.dynamicDeps)
+	added, err := ensureAirflowDependency(ed, version)
 	if err != nil {
 		return nil, nil, pin, err
+	}
+	// --airflow-version is the user naming the version, and the requirement is
+	// where the version lives, so an Airflow requirement the manifest already
+	// had moves to it, pinned or a range, the rewrite SetAirflowVersion makes. Left alone, the
+	// project would keep running the old one while init reported the new.
+	var repinned []string
+	if opts.AirflowVersion != "" {
+		if repinned, _, err = repinAirflowRequirements(ed, version); err != nil {
+			return nil, nil, pin, err
+		}
 	}
 	// packages.txt is carried unconditionally, and there is no "unless one is
 	// already there" case to handle.
@@ -141,9 +156,6 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
 		return nil, nil, pin, err
 	}
-	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
-		return nil, nil, pin, err
-	}
 
 	out, err = ed.Bytes()
 	if err != nil {
@@ -162,6 +174,9 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	labels = []string{manifest.Marker + " (added [tool.astro])"}
 	if added != "" {
 		labels = append(labels, manifest.Marker+" (added "+added+" to dependencies)")
+	}
+	for _, r := range repinned {
+		labels = append(labels, manifest.Marker+" (set the Airflow requirement to "+r+")")
 	}
 	if migrated > 0 {
 		labels = append(labels, manifest.Marker+" (migrated "+strconv.Itoa(migrated)+" from requirements.txt into dependencies)")
@@ -193,12 +208,8 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 // forbids it, and pip resolves duplicates by intersecting them, so two entries
 // for one package is a resolution puzzle rather than an error. Anything already
 // named is left exactly as the manifest's author wrote it.
-//
-// A manifest declaring dependencies dynamic carries nothing: PEP 621 forbids a
-// static array beside it, so the requirements stay where they are and the
-// existing dynamic-deps note covers it.
-func mergeDependencies(ed tomledit.Editor, reqs []string, dynamic bool, extras *[]string) (int, error) {
-	if dynamic || len(reqs) == 0 {
+func mergeDependencies(ed tomledit.Editor, reqs []string, extras *[]string) (int, error) {
+	if len(reqs) == 0 {
 		return 0, nil
 	}
 	existing, ok := ed.Get([]string{"project", "dependencies"})
@@ -208,16 +219,16 @@ func mergeDependencies(ed tomledit.Editor, reqs []string, dynamic bool, extras *
 	// outranking the file, the other is the file contradicting itself.
 	fromManifest := map[string]bool{}
 	for _, d := range asStrings(existing) {
-		have[distName(d)] = true
-		fromManifest[distName(d)] = true
+		have[manifest.DistName(d)] = true
+		fromManifest[manifest.DistName(d)] = true
 	}
 
 	var add []string
 	for _, r := range reqs {
-		name := distName(r)
+		name := manifest.DistName(r)
 		// Airflow is not carried here: ensureAirflowDependency writes the
 		// requirement that matches the pin, and this would race it.
-		if name == airflowDist {
+		if manifest.NamesAirflow(r) {
 			// Where the pin came from, so ensureAirflowDependency writes the
 			// equivalent requirement. Its extras are not equivalent, though.
 			*extras = append(*extras, airflowExtrasNote(r)...)
@@ -272,18 +283,11 @@ func asAny(list []string) []any {
 	return out
 }
 
-// ensureAirflowDependency adds the requirement that installs the Airflow the
-// manifest pins, and reports what it added. A manifest that pins no Airflow
-// cannot start, so this is the same guarantee the greenfield path gives.
-//
-// A manifest listing dependencies under project.dynamic supplies them from
-// somewhere else — a requirements.txt, through a build backend — and PEP 621
-// forbids a static array beside it, so that manifest keeps its own arrangement
-// and the pin goes on the hand-off list instead.
-func ensureAirflowDependency(ed tomledit.Editor, version string, dynamic bool) (added string, err error) {
-	if dynamic {
-		return "", nil
-	}
+// ensureAirflowDependency adds the requirement that states the Airflow version,
+// when the manifest names no Airflow, and reports what it added. The
+// requirement is the only place a project states its version, so a manifest
+// without one does not load, the same guarantee the greenfield path gives.
+func ensureAirflowDependency(ed tomledit.Editor, version string) (added string, err error) {
 	// Re-read the array: its length is the index an append writes to, so it
 	// has to be the length as it stands now, not as it stood earlier.
 	deps, ok := ed.Get([]string{"project", "dependencies"})

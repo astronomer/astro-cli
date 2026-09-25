@@ -91,9 +91,9 @@ func TestAStartOnANewerDatabaseNamesReset(t *testing.T) {
 			m := `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 `
 			if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(m), 0o600); err != nil {
 				t.Fatal(err)

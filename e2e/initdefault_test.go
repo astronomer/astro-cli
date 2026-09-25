@@ -70,6 +70,11 @@ func TestInitPinsTheCatalogsSeries(t *testing.T) {
 			t.Errorf("manifest lacks %s:\n%s", want, m)
 		}
 	}
+	// The series is the requirement alone: a [tool.astro] airflow key beside it
+	// would stop the manifest loading.
+	if regexp.MustCompile(`(?m)^airflow\s*=`).MatchString(m) {
+		t.Errorf("init wrote a [tool.astro] airflow key:\n%s", m)
+	}
 	select {
 	case ua := <-agents:
 		if !strings.HasPrefix(ua, "astro-cli/") {

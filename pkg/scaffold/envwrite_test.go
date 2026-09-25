@@ -20,10 +20,9 @@ import (
 const envFixture = `# the orders team's project
 [project]
 name = 'orders'
-dependencies = []
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.env]
 # every environment starts at this level

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/platformversions"
 )
 
@@ -313,34 +314,13 @@ func sortedCopy(in []string) []string {
 	return out
 }
 
-// airflowDist is the core Airflow distribution's normalized (PEP 503) name.
-const airflowDist = "apache-airflow"
-
-// dropAirflow removes any apache-airflow pin from a dependency list; the caller
-// adds the platform's own version back. It matches the base distribution only,
-// leaving apache-airflow-providers-* in place.
+// dropAirflow removes the requirements that state the Airflow version,
+// apache-airflow and apache-airflow-core, from a dependency list; the caller
+// adds the platform's own version back. Keeping a core pin beside it would ask
+// for two Airflows, which no resolve satisfies. The providers and the task SDK
+// stay.
 func dropAirflow(deps []string) []string {
-	out := make([]string, 0, len(deps))
-	for _, d := range deps {
-		if distName(d) == airflowDist {
-			continue
-		}
-		out = append(out, d)
-	}
-	return out
-}
-
-// distName extracts and normalizes the distribution name from a PEP 508
-// requirement: the leading name, before any extras, version, marker, or URL.
-// Mirrors internal/pack.distName, pkg/scaffold.distName and
-// pkg/imagebuild.distName; the four stay separate rather than couple these
-// packages over one small helper.
-func distName(req string) string {
-	s := strings.TrimSpace(req)
-	if i := strings.IndexAny(s, "[ \t<>=!~;@("); i >= 0 {
-		s = s[:i]
-	}
-	return strings.ToLower(strings.ReplaceAll(s, "_", "-"))
+	return manifest.WithoutAirflow(deps)
 }
 
 // DefaultDagsDir is the dags/ folder under a project root.

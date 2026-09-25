@@ -315,7 +315,7 @@ func (s *ConfigSuite) chdirTempProject(name string) string {
 // look like a real project.
 func (s *ConfigSuite) chdirV2Project(name string) string {
 	dir := s.chdirTempProject(name)
-	manifest := "[tool.astro]\nairflow = '3.1'\n"
+	manifest := "[tool.astro]\n"
 	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600))
 	return dir
 }

@@ -3,7 +3,6 @@ package scaffold
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,16 +24,9 @@ func adoptable(t *testing.T, deps string) string {
 	return dir
 }
 
-// A manifest must never come out of init declaring two different Airflows.
-//
-// The dependency pin is what uv resolves and [tool.astro] airflow is what the
-// CLI installs and runs, so a disagreement is a project that runs one Airflow
-// while declaring another — and nothing downstream compares them, so it
-// surfaces much later as a failure with no obvious cause.
-//
-// Adopting a project pinned as a series produced exactly that: the series was
-// unreadable, so the pin fell through to the Dockerfile's image tag and
-// airflow = '2' landed beside apache-airflow==3.0.*.
+// Adopting a manifest keeps the Airflow its requirement pins, over a
+// Dockerfile's tag: the requirement is the project's version, and the only
+// place the adopted manifest states it.
 func TestAdoptKeepsTheManifestsOwnAirflowOverTheDockerfile(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -55,55 +47,87 @@ func TestAdoptKeepsTheManifestsOwnAirflowOverTheDockerfile(t *testing.T) {
 			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.want, m.Astro.AirflowVersion,
-				"[tool.astro] airflow must come from the manifest's own pin, not the Dockerfile")
+			assert.Equal(t, tc.want, m.Airflow().Pin,
+				"the version must come from the manifest's own pin, not the Dockerfile")
 			assert.Equal(t, tc.want, res.AirflowVersion)
 
 			// The dependency the project already had is still the one it has,
-			// so the two halves of the manifest agree.
+			// and nothing beside it states a second version.
 			raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 			require.NoError(t, err)
-			assert.Contains(t, string(raw), "apache-airflow=="+tc.want,
-				"the dependency and the [tool.astro] pin must name the same Airflow")
+			assert.Contains(t, string(raw), "apache-airflow=="+tc.want)
+			assert.NotContains(t, string(raw), "airflow = ", "adopt wrote a [tool.astro] airflow key")
 		})
 	}
 }
 
-// A range names no single version, so no pin can be read out of it and the
-// version has to come from somewhere else. That is allowed — but it is the
-// remaining way the two halves can disagree, so the run says so rather than
-// leaving it to be found at start.
-func TestAdoptSaysWhenItPinnedAnAirflowTheManifestDidNotName(t *testing.T) {
-	dir := adoptable(t, "'apache-airflow>=3.0'")
+// --airflow-version names the version, and the requirement is where it lives,
+// so a clean pin the manifest already had moves to the flag's version, keeping
+// its extras and marker. Before, the pin stayed on 3.1 while init reported
+// 3.3 and bounded requires-python for 3.3.
+func TestAdoptMovesTheManifestsPinToTheFlag(t *testing.T) {
+	dir := adoptable(t, `'pandas', "apache-airflow[celery]==3.1.* ; sys_platform == 'linux'"`)
 
-	res, err := Run(dir, Options{})
+	res, err := Run(dir, Options{AirflowVersion: "3.3"})
 	require.NoError(t, err)
+	assert.Equal(t, "3.3", res.AirflowVersion)
 
-	assert.Equal(t, "2", res.AirflowVersion, "the Dockerfile is the only readable source here")
-
-	var found string
-	for _, n := range res.Notes {
-		if strings.Contains(n, "no single version reads out of") {
-			found = n
-		}
-	}
-	require.NotEmpty(t, found, "expected a note about the unread pin, got: %v", res.Notes)
-	assert.Contains(t, found, "airflow = '2'", "the note names the pin that was written")
+	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, "3.3", m.Airflow().Pin, "the manifest still runs the old Airflow")
+	assert.Equal(t, []string{"pandas", "apache-airflow[celery]==3.3.*; sys_platform == 'linux'"}, m.Project.Dependencies)
+	assert.Contains(t, res.Updated, "pyproject.toml (set the Airflow requirement to apache-airflow[celery]==3.3.*; sys_platform == 'linux')")
 }
 
-// --airflow-version is the user stating the version themselves. Telling them
-// to "set airflow explicitly" is advice to do what they just did, so the note
-// stays quiet — the manifest's unreadable range is then their business.
-func TestAdoptSaysNothingAboutAnUnreadPinWhenTheFlagSetTheVersion(t *testing.T) {
-	dir := adoptable(t, "'apache-airflow>=3.0'")
+// The flag replaces a range too: it states the version the range did not, so
+// the requirement can say it. Without the flag the range is refused, above.
+func TestAdoptReplacesAnAirflowRangeWithTheFlag(t *testing.T) {
+	dir := adoptable(t, "'apache-airflow[celery]>=3.0'")
 
 	res, err := Run(dir, Options{AirflowVersion: "3.1"})
 	require.NoError(t, err)
-	require.Equal(t, "3.1", res.AirflowVersion)
+	assert.Equal(t, "3.1", res.AirflowVersion)
 
-	for _, n := range res.Notes {
-		assert.NotContains(t, n, "no single version reads out of",
-			"the user named the version; there is nothing to advise")
+	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"apache-airflow[celery]==3.1.*"}, m.Project.Dependencies)
+}
+
+// Without the flag, the manifest's own pin is the version, and is not touched.
+func TestAdoptLeavesTheManifestsPinWithoutTheFlag(t *testing.T) {
+	dir := adoptable(t, "'apache-airflow == 3.1.*'")
+
+	_, err := Run(dir, Options{})
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "'apache-airflow == 3.1.*'")
+}
+
+// A range names no single version, and the requirement is the only place a
+// project states its version, so adopting a manifest pinned that way is
+// refused, naming the line, whatever else could have supplied a version: the
+// Dockerfile's tag here, or --airflow-version. Nothing is written.
+func TestAdoptRefusesAnAirflowRange(t *testing.T) {
+	for name, opts := range map[string]Options{
+		"version from the Dockerfile": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := adoptable(t, "'apache-airflow>=3.0'")
+			before, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+			require.NoError(t, err)
+
+			_, err = Run(dir, opts)
+
+			var ve *manifest.ValidationError
+			require.ErrorAs(t, err, &ve)
+			assert.Contains(t, err.Error(), "apache-airflow>=3.0 does not pin an Airflow series")
+			after, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+			require.NoError(t, err)
+			assert.Equal(t, string(before), string(after), "a refused adoption changed the manifest")
+			assert.NoFileExists(t, filepath.Join(dir, "AGENTS.md"), "a refused adoption scaffolded the project")
+		})
 	}
 }
 
@@ -115,7 +139,7 @@ func TestAdoptSaysNothingWhenThePinCameFromTheManifest(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, n := range res.Notes {
-		assert.NotContains(t, n, "no single version reads out of",
+		assert.NotContains(t, n, "is the default, not this project's version",
 			"the manifest's own pin was read, so there is nothing to warn about")
 	}
 }

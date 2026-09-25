@@ -21,7 +21,7 @@ import (
 // for the plain check and for every --target alike.
 
 const constrainedManifest = "[project]\nname = 'demo'\nrequires-python = '>=3.12'\n" +
-	"dependencies = [\"apache-airflow==3.3.*\"]\n[tool.astro]\nairflow = '3.3'\n\n" +
+	"dependencies = [\"apache-airflow==3.3.*\"]\n[tool.astro]\n\n" +
 	"[tool.uv]\nconstraint-dependencies = ['pandas<3', 'numpy<2.4']\n"
 
 func TestCheckVenvsCarryTheManifestsConstraints(t *testing.T) {

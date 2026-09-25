@@ -45,8 +45,8 @@ const agentsIntro = `# Agent notes
 
 This is an Astro project: Apache Airflow DAGs, run locally with the Astro
 CLI (v2). ` + "`pyproject.toml`" + ` is the manifest — the project name, the pinned
-Airflow version (` + "`[tool.astro] airflow`" + `), and the Python dependencies live
-there. Read it rather than assuming versions.
+Airflow version (the ` + "`apache-airflow`" + ` requirement in ` + "`[project] dependencies`" + `),
+and the Python dependencies live there. Read it rather than assuming versions.
 
 Layout:
 

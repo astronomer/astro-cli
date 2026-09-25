@@ -141,22 +141,31 @@ func (c *cli) deploymentClient(ctx context.Context, f deploymentFlags) (*airflow
 	if err != nil {
 		return nil, err
 	}
-	return c.clientFor(ctx, sel.Instance, c.projectDomain())
+	domain, err := c.projectDomain()
+	if err != nil {
+		return nil, err
+	}
+	return c.clientFor(ctx, sel.Instance, domain)
 }
 
 // projectDomain is the Astro host whose login this project's astro links use,
 // or empty for the current context's: outside a project, and in one that
-// names no host.
-func (c *cli) projectDomain() string {
+// names no host. A manifest that is there and does not load is an error, not
+// "names no host": read that way, a project whose links live on another host
+// would authenticate against the current login's.
+func (c *cli) projectDomain() (string, error) {
 	dir, err := c.projectPath()
 	if err != nil {
-		return ""
+		return "", nil //nolint:nilerr // outside a project there is no host to name, which is not a failure
 	}
 	m, err := manifest.Load(filepath.Join(dir, project.Marker))
-	if err != nil {
-		return ""
+	switch {
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
+		return "", nil
+	case err != nil:
+		return "", err
 	}
-	return m.Astro.LoginDomain()
+	return m.Astro.LoginDomain(), nil
 }
 
 // machineClient opens a client on the Airflow this project has running, with

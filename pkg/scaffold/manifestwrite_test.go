@@ -25,10 +25,10 @@ import (
 const editFixture = `# the orders team's project
 [project]
 name = 'orders'
-dependencies = []
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1' # pinned on purpose
+packages = ['libpq-dev'] # pinned on purpose
 
 [tool.astro.deployments.prod]
 url = 'https://airflow.example.com'
@@ -147,11 +147,11 @@ func TestEditManifestKeepsTheFileMode(t *testing.T) {
 	for _, mode := range []fs.FileMode{0o600, 0o644, 0o640} {
 		t.Run(mode.String(), func(t *testing.T) {
 			dir, path := writeEditFixture(t, editFixture, mode)
-			require.NoError(t, EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.0")))
+			require.NoError(t, EditManifest(dir, nil, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev")))
 			info, err := os.Stat(path)
 			require.NoError(t, err)
 			assert.Equal(t, mode, info.Mode().Perm())
-			assert.Contains(t, readFile(t, path), "airflow = '3.0'")
+			assert.Contains(t, readFile(t, path), "dockerfile = 'Dockerfile.dev'")
 		})
 	}
 }
@@ -164,7 +164,7 @@ func TestEditManifestRefusesAReadOnlyFile(t *testing.T) {
 	dir, path := writeEditFixture(t, editFixture, 0o444)
 	t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
 
-	err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.0"))
+	err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "read-only")
@@ -181,18 +181,18 @@ func TestEditManifestWritesThroughASymlink(t *testing.T) {
 	link := filepath.Join(dir, manifest.Marker)
 	require.NoError(t, os.Symlink(shared, link))
 
-	require.NoError(t, EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.0")))
+	require.NoError(t, EditManifest(dir, nil, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev")))
 
 	info, err := os.Lstat(link)
 	require.NoError(t, err)
 	assert.Equal(t, fs.ModeSymlink, info.Mode()&fs.ModeSymlink, "the write replaced the symlink with a file")
-	assert.Contains(t, readFile(t, shared), "airflow = '3.0'")
+	assert.Contains(t, readFile(t, shared), "dockerfile = 'Dockerfile.dev'")
 }
 
 func TestEditManifestNeverCreatesAManifest(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
 		dir := t.TempDir()
-		err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.0"))
+		err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 		require.ErrorIs(t, err, manifest.ErrNotFound)
 		require.ErrorIs(t, err, fs.ErrNotExist)
 		assert.NoFileExists(t, filepath.Join(dir, manifest.Marker))
@@ -200,7 +200,7 @@ func TestEditManifestNeverCreatesAManifest(t *testing.T) {
 	t.Run("not an astro project", func(t *testing.T) {
 		body := "[project]\nname = 'someone-else'\n"
 		dir, path := writeEditFixture(t, body, 0o644)
-		err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.0"))
+		err := EditManifest(dir, nil, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Equal(t, body, readFile(t, path))
 	})
@@ -213,7 +213,7 @@ func TestEditManifestWritesNothingForANoOpEdit(t *testing.T) {
 	past := time.Now().Add(-time.Hour).Truncate(time.Second)
 	require.NoError(t, os.Chtimes(path, past, past))
 
-	require.NoError(t, EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.1")))
+	require.NoError(t, EditManifest(dir, nil, setKey([]string{"tool", "astro", "packages"}, []any{"libpq-dev"})))
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestEditManifestPassesOnTheEditError(t *testing.T) {
 	boom := errors.New("boom")
 
 	err := EditManifest(dir, nil, func(_ *manifest.Manifest, ed tomledit.Editor) error {
-		require.NoError(t, ed.Set([]string{"tool", "astro", "airflow"}, "3.0"))
+		require.NoError(t, ed.Set([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 		return boom
 	})
 
@@ -243,28 +243,28 @@ func TestEditManifestReadsInsideTheWrapper(t *testing.T) {
 
 	wrap := func(run func() error) error {
 		events = append(events, "lock")
-		other := strings.Replace(editFixture, "airflow = '3.1'", "airflow = '3.0'", 1)
+		other := strings.Replace(editFixture, "apache-airflow==3.1.*", "apache-airflow==3.0.*", 1)
 		require.NoError(t, os.WriteFile(path, []byte(other), 0o644))
 		err := run()
 		events = append(events, "unlock")
 		return err
 	}
 	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		events = append(events, "edit read airflow "+before.Astro.AirflowVersion)
+		events = append(events, "edit read airflow "+before.Airflow().Pin)
 		return ed.Set([]string{"tool", "astro", "env", "REGION"}, map[string]any{})
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"lock", "edit read airflow 3.0", "unlock"}, events)
 	got := readFile(t, path)
-	assert.Contains(t, got, "airflow = '3.0'", "the other writer's edit was lost")
+	assert.Contains(t, got, "apache-airflow==3.0.*", "the other writer's edit was lost")
 	assert.Contains(t, got, "REGION")
 }
 
 func TestEditManifestReportsAWrapperThatNeverRan(t *testing.T) {
 	dir, path := writeEditFixture(t, editFixture, 0o644)
 
-	err := EditManifest(dir, func(func() error) error { return nil }, setKey([]string{"tool", "astro", "airflow"}, "3.0"))
+	err := EditManifest(dir, func(func() error) error { return nil }, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "wrapper")
@@ -275,7 +275,7 @@ func TestEditManifestReturnsTheWrapperError(t *testing.T) {
 	dir, _ := writeEditFixture(t, editFixture, 0o644)
 	held := errors.New("watcher could not be held")
 
-	err := EditManifest(dir, func(func() error) error { return held }, setKey([]string{"tool", "astro", "airflow"}, "3.0"))
+	err := EditManifest(dir, func(func() error) error { return held }, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 
 	require.ErrorIs(t, err, held)
 }

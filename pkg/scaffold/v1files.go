@@ -509,9 +509,8 @@ var fromLineRe = regexp.MustCompile(`(?im)^[ \t]*FROM[ \t]+(.+)$`)
 //
 // A deliberate second copy of airflow_versions.newFormatRegex, which cannot be
 // imported here: this is a sub-module over pkg/*, and the root module already
-// depends on it, so reaching back would be a cycle. Kept small on purpose, in
-// the same spirit as distName's four copies in pins.go, and pinned by
-// TestRuntimeTagFormats so a change upstream shows up as a failure rather than
+// depends on it, so reaching back would be a cycle. Kept small on purpose, and
+// pinned by TestRuntimeTagFormats so a change upstream shows up as a failure rather than
 // as a project pinned to the wrong Airflow.
 var runtimeTagRe = regexp.MustCompile(`^(\d+)\.(\d+)-\d+(?:[.-].+)?$`)
 

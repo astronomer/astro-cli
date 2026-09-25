@@ -31,12 +31,11 @@ func TestInitScaffoldsAProject(t *testing.T) {
 	}
 }
 
-// The two Airflow versions in a scaffolded project have to agree: [tool.astro]
-// decides what the CLI installs and runs, the dependency pin is what uv
-// resolves. They are written by the same scaffold from the same input, so a
-// disagreement here is not a typo — it is the scaffold having two opinions,
-// and the failure it produces (a project running a different Airflow than it
-// declares) is a confusing one to debug from the far end.
+// A scaffolded project states its Airflow once: the apache-airflow requirement
+// in [project] dependencies, which is what every mode reads. A second line
+// beside it, the [tool.astro] airflow key init used to write, is what let a
+// project run one Airflow in Docker and another in standalone, and the
+// manifest now refuses it, so a scaffold writing it would not even load.
 func TestInitPinsOneAirflowVersion(t *testing.T) {
 	tier(t, 0)
 
@@ -45,16 +44,11 @@ func TestInitPinsOneAirflowVersion(t *testing.T) {
 
 	manifest := read(t, filepath.Join(p.Dir, "pyproject.toml"))
 
-	declared := regexp.MustCompile(`(?m)^airflow\s*=\s*['"]([^'"]+)['"]`).FindStringSubmatch(manifest)
-	if declared == nil {
-		t.Fatalf("no [tool.astro] airflow pin in:\n%s", manifest)
+	if regexp.MustCompile(`(?m)^airflow\s*=`).MatchString(manifest) {
+		t.Errorf("init wrote a [tool.astro] airflow line:\n%s", manifest)
 	}
-	pinned := regexp.MustCompile(`apache-airflow==(\d+\.\d+)`).FindStringSubmatch(manifest)
-	if pinned == nil {
-		t.Fatalf("no apache-airflow dependency pin in:\n%s", manifest)
-	}
-	if declared[1] != pinned[1] {
-		t.Errorf("[tool.astro] airflow = %q but the dependency pins %q", declared[1], pinned[1])
+	if pinned := regexp.MustCompile(`apache-airflow==\d+\.\d+\.\*`).FindAllString(manifest, -1); len(pinned) != 1 {
+		t.Errorf("want one apache-airflow series pin, got %q in:\n%s", pinned, manifest)
 	}
 }
 

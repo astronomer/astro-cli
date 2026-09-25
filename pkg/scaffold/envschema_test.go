@@ -307,7 +307,7 @@ func TestAdoptArmCarriesTheEnvSchema(t *testing.T) {
 	assert.Equal(t, envschema.TypeURL, s.EnvVars["API_URL"].Type)
 	assert.Equal(t, "snowflake", s.Connections["warehouse"].ConnType)
 	// The airflow pin is written after the env section; both have to be there.
-	assert.NotEmpty(t, m.Astro.AirflowVersion)
+	assert.NotEmpty(t, m.Airflow().Pin)
 	assert.NoFileExists(t, filepath.Join(dir, ".astro", "env.schema.yaml"))
 	assert.Contains(t, strings.Join(res.Updated, "\n"), "[tool.astro.env]")
 }

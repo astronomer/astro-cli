@@ -17,7 +17,7 @@ func TestLinkAddReplaceKeepsTheLinksOwnWorkspace(t *testing.T) {
 		"no project workspace": "",
 	} {
 		t.Run(name, func(t *testing.T) {
-			body := "[project]\nname = 'x'\n\n[tool.astro]\nairflow = '3.1'\n" + top +
+			body := "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n" + top +
 				"\n[tool.astro.deployments.prod]\ndeployment = 'd1'\nworkspace = 'ws_B'\n"
 			dir, path := linkTestProject(t, body)
 			var res linkResult
@@ -66,7 +66,7 @@ func TestLinkAddRefusesACredentialFlagTheMethodDoesNotRead(t *testing.T) {
 // Without --domain, a committed domain is kept rather than replaced by the
 // current login's host.
 func TestLinkWorkspaceKeepsTheCommittedDomain(t *testing.T) {
-	body := "[project]\nname = 'x'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_A'\ndomain = 'astronomer-dev.io'\n"
+	body := "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'ws_A'\ndomain = 'astronomer-dev.io'\n"
 	dir, path := linkTestProject(t, body)
 	d, out, _ := linkDeps(t, dir)
 	d.LoginDomain = func() (string, error) { return "astronomer.io", nil }
@@ -88,7 +88,7 @@ func TestLinkWorkspaceKeepsTheCommittedDomain(t *testing.T) {
 // writes nothing and needs no login: the link reads as the default host, and
 // the login's host written over it would move it.
 func TestLinkWorkspaceRelinkWithNoCommittedDomainIsANoOp(t *testing.T) {
-	body := "[project]\nname = 'x'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_A'\n"
+	body := "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'ws_A'\n"
 	dir, _ := linkTestProject(t, body)
 	var res workspaceLinkResult
 	linkJSON(t, dir, &res, "workspace", "ws_A")

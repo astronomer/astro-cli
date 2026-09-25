@@ -19,7 +19,7 @@ import (
 // proves nothing; 200 parses of 24 links is enough that an unstable pair shows
 // up rather than hides.
 func TestProblemOrderIsStable(t *testing.T) {
-	content := "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n"
+	content := "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"
 	for i := range 24 {
 		content += fmt.Sprintf("\n[tool.astro.deployments.l%02d]\ntarget = \"mwaa\"\ndeployment = \"d\"\n", i)
 	}

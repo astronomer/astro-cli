@@ -27,7 +27,6 @@ dependencies = ['apache-airflow==3.1.*']
 
 # A comment the user wrote, which must survive every write.
 [tool.astro]
-airflow = '3.1'
 `
 
 const userComment = "# A comment the user wrote, which must survive every write."
@@ -36,9 +35,9 @@ const userComment = "# A comment the user wrote, which must survive every write.
 const inheritingFixture = `[project]
 name = 'demo'
 version = '0.1.0'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 target = 'astro'
 workspace = 'ws-default'
 domain = 'astronomer.io'
@@ -156,7 +155,7 @@ func TestSaveLinkLeavesTheRestOfTheManifestAlone(t *testing.T) {
 	saveLink(t, dir, Link{Name: "prod", Kind: manifest.KindAstro, Workspace: "Data", Deployment: "clx123"})
 	out := readFile(t, path)
 	assert.Contains(t, out, userComment)
-	assert.Contains(t, out, "airflow = '3.1'")
+	assert.Contains(t, out, "'apache-airflow==3.1.*'")
 	assert.True(t, strings.HasPrefix(out, linkFixture), "the lines before the new link changed:\n%s", out)
 }
 
@@ -408,7 +407,7 @@ func TestSaveLinkOffTheDefaultTargetWritesIt(t *testing.T) {
 		{Name: "prod", Kind: manifest.KindAstro, Workspace: "W", Deployment: "clx1"},
 		composerLink("gcp"),
 	} {
-		dir, path := linkProject(t, strings.Replace(linkFixture, "airflow = '3.1'", "airflow = '3.1'\ntarget = 'mwaa'", 1))
+		dir, path := linkProject(t, linkFixture+"target = 'mwaa'\n")
 		saveLink(t, dir, l)
 		_, got := onlyLink(t, path)
 		assert.Equal(t, l.Kind, got.Kind(), "the project target was inherited")
@@ -446,7 +445,7 @@ func TestSaveLinkAPinnedKeyTakesTheNewValue(t *testing.T) {
 }
 
 // composerFixture sets a project workspace, so astro links in these tests load.
-const composerFixture = "[project]\nname = 'demo'\nrequires-python = '>=3.10'\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'ws_abc123'\n"
+const composerFixture = "[project]\nname = 'demo'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'ws_abc123'\n"
 
 // targetField is one field of [tool.astro.targets.<kind>] as the parser reads
 // it, which is what the CLI's address lookups read too.

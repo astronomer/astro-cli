@@ -65,7 +65,13 @@ type ManifestEdit func(before *manifest.Manifest, ed tomledit.Editor) error
 // one with no [tool.astro] reports manifest.ErrNoAstroSection, because a
 // pyproject.toml without that table is someone else's Python project. A
 // manifest that does not load already is refused as it stands, with the
-// parser's error: an edit needs the parsed manifest to work from.
+// parser's error: an edit needs the parsed manifest to work from. The one
+// exception is a manifest whose only problems are with its Airflow version: a
+// leftover [tool.astro] airflow line, or a requirement that is missing, pins
+// no single series or states the version twice (manifest.ParseForRepair). It
+// is read, so that the edit repairing it (MigrateAirflowKey,
+// SetAirflowVersion) can run. The result is still held to the full check, so
+// any other edit of it is refused, naming the problem, until it is fixed.
 //
 // An edit that changes no bytes writes nothing, so an idempotent caller does
 // not disturb the file's mtime or wake anything watching it.
@@ -125,7 +131,7 @@ func editManifest(dir string, edit ManifestEdit, ok judge) error {
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", path, err)
 	}
-	before, err := manifest.Parse(src)
+	before, err := manifest.ParseForRepair(src)
 	if err != nil {
 		return withPath(err, path)
 	}
@@ -141,12 +147,18 @@ func editManifest(dir string, edit ManifestEdit, ok judge) error {
 		return fmt.Errorf("rendering %s: %w", path, err)
 	}
 	if bytes.Equal(out, src) {
+		// Nothing to write, but the file read for repair may still not load,
+		// and an edit that repaired nothing must not report success on it:
+		// the caller would go on as if the manifest were sound.
+		if _, err := manifest.Parse(src); err != nil {
+			return withPath(err, path)
+		}
 		return nil
 	}
 	// The baseline is parsed again rather than taken from before: the edit is
 	// handed before and may change its maps in place, which would make the
 	// comparison in the judge see the edit as the file's original state.
-	baseline, err := manifest.Parse(src)
+	baseline, err := manifest.ParseForRepair(src)
 	if err != nil {
 		return withPath(err, path)
 	}

@@ -58,9 +58,9 @@ func TestEnvWriterServesTheDesktopsActions(t *testing.T) {
 	path := filepath.Join(dir, manifest.Marker)
 	require.NoError(t, os.WriteFile(path, []byte(`[project]
 name = 'orders'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 
 [tool.astro.deployments.prod]
 url = 'https://airflow.example.com'

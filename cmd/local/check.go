@@ -163,7 +163,7 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, m *manife
 	return checks.Preflight(ctx, target, checks.PreflightInput{
 		ProjectPath: project,
 		DagsDir:     checks.DefaultDagsDir(project),
-		Pin:         m.Astro.AirflowVersion,
+		Pin:         m.Airflow().Pin,
 		Deps:        m.Project.Dependencies,
 		Constraints: m.UV.ConstraintDependencies,
 	}, prov, c.d.CheckVenv, strict, progress)
@@ -175,7 +175,7 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, m *manife
 func (c *cli) checkAstroTarget(ctx context.Context, project string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
 	rep := checks.TargetReport{
 		Target:         checks.TargetAstro,
-		AirflowChecked: m.Astro.AirflowVersion,
+		AirflowChecked: m.Airflow().Pin,
 		Notes:          []string{"astro runs your project's own Airflow; this is the default `astro local check`"},
 	}
 	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict}, m)
@@ -230,14 +230,14 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 	res, err := checks.RunProvisioned(ctx, opts, checks.ProvisionInput{
 		ProjectPath: opts.ProjectPath,
 		DagsDir:     checks.DefaultDagsDir(opts.ProjectPath),
-		Pin:         m.Astro.AirflowVersion,
+		Pin:         m.Airflow().Pin,
 		Deps:        m.Project.Dependencies,
 		// The venv is built outside the project, where uv cannot read the
 		// manifest, so a stated requires-python is passed through. Without one
 		// the check takes the interpreter a start would, rather than whatever
 		// uv finds newest.
 		RequiresPython: cmp.Or(m.Project.RequiresPython,
-			airflowrt.PythonFallback(m.Project.RequiresPython, m.Astro.AirflowVersion)),
+			airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin)),
 		Constraints: m.UV.ConstraintDependencies,
 	}, prov, c.d.CheckVenv, c.progressFn(r, nameCheck))
 	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {

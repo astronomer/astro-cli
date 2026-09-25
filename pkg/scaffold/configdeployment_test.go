@@ -128,7 +128,7 @@ func TestADeployTargetNamedLikeAFileStillRetiresIt(t *testing.T) {
 // named sub-table, so Parse rejects it with CodeExpectedTable. A hand-off that
 // produces an unparseable manifest when followed is worse than no hand-off.
 func TestTheDeployTargetNoteDescribesAManifestThatParses(t *testing.T) {
-	const head = "[project]\nname = 'orders'\n\n[tool.astro]\nairflow = '3.1'\n\n"
+	const head = "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n"
 	named := head + "[tool.astro.deployments.prod]\ndeployment = 'cm1orders'\nworkspace = 'cm1ws'\n"
 	bare := head + "[tool.astro.deployments]\ndeployment = 'cm1orders'\nworkspace = 'cm1ws'\n"
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -338,16 +339,11 @@ func TestDockerModeBuildsTheProjectsOwnDockerfile(t *testing.T) {
 func runtimeImageFor(t *testing.T, p *project) string {
 	t.Helper()
 	raw := read(t, filepath.Join(p.Dir, "pyproject.toml"))
-	const anchor = "airflow = "
-	i := strings.Index(raw, anchor)
-	if i < 0 {
-		t.Fatalf("no %q in the scaffolded manifest:\n%s", anchor, raw)
+	m := regexp.MustCompile(`apache-airflow==(\d+\.\d+)\.\*`).FindStringSubmatch(raw)
+	if m == nil {
+		t.Fatalf("no apache-airflow series pin in the scaffolded manifest:\n%s", raw)
 	}
-	rest := raw[i+len(anchor):]
-	version := strings.Trim(strings.SplitN(rest, "\n", 2)[0], " '\"")
-	if version == "" {
-		t.Fatalf("could not read the airflow pin from:\n%s", raw)
-	}
+	version := m[1]
 	// The same repo imagebuild.RuntimeImage builds its tag from.
 	return "astrocrpublic.azurecr.io/runtime:" + version
 }

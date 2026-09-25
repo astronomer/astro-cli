@@ -45,8 +45,11 @@ const (
 // defaults, before this point. No manifest, config, cloud, or houston
 // (v1 Software API) types cross this boundary.
 type Plan struct {
-	ProjectPath    string
-	Mode           Mode
+	ProjectPath string
+	Mode        Mode
+	// AirflowVersion is the version the project's Airflow requirement pins,
+	// "3.3" or "3.3.2": the runtime image's series in docker mode, and the
+	// generation, and so the process layout, in both.
 	AirflowVersion string
 	PythonVersion  string
 	// Dependencies is the project's [project] dependencies (PEP 508 specs).

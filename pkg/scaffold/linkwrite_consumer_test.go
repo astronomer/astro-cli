@@ -58,10 +58,10 @@ func TestTheLinkWritersServeTheDesktop(t *testing.T) {
 	path := filepath.Join(dir, manifest.Marker)
 	require.NoError(t, os.WriteFile(path, []byte(`[project]
 name = 'orders'
+dependencies = ['apache-airflow==3.1.*']
 
 # the team's default workspace
 [tool.astro]
-airflow = '3.1'
 workspace = 'ws_A'
 domain = 'astronomer.io'
 

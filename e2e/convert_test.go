@@ -5,6 +5,7 @@ package e2e
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -125,8 +126,7 @@ func v1Cases() []v1Case {
 				"dependencies = ['apache-airflow==2.*', 'requests', 'pandas==2.1.0']",
 				"packages = ['libpq-dev', 'git']",
 			},
-			manifestHas: []string{"airflow = '2'"},
-			retired:     []string{"requirements.txt", "packages.txt"},
+			retired: []string{"requirements.txt", "packages.txt"},
 			// The most destructive deletion available, so its absence is
 			// asserted rather than assumed.
 			kept:    []string{"Dockerfile"},
@@ -145,7 +145,6 @@ func v1Cases() []v1Case {
 			},
 			airflow:       "3.1",
 			manifestLines: []string{"dependencies = ['apache-airflow==3.1.*', 'pandas==2.1.0']"},
-			manifestHas:   []string{"airflow = '3.1'"},
 			retired:       []string{"Dockerfile", "requirements.txt"},
 			// Everything carried, so the run has nothing to report.
 			noNotes: true,
@@ -267,7 +266,6 @@ func v1Cases() []v1Case {
 			manifestHas: []string{
 				"name = 'already'",
 				"dependencies = ['apache-airflow==2.9.*']",
-				"airflow = '2.9'",
 			},
 			kept: []string{"Dockerfile"},
 			// The manifest was there and gained a section, so it is an update.
@@ -291,7 +289,6 @@ func v1Cases() []v1Case {
 			airflow:       "2.8.1",
 			manifestLines: []string{"dependencies = ['apache-airflow==2.8.1', 'pandas']"},
 			manifestHas: []string{
-				"airflow = '2.8.1'",
 				"requires-python = '>=3.10,<3.12'",
 			},
 			retired: []string{"requirements.txt"},
@@ -308,7 +305,6 @@ func v1Cases() []v1Case {
 			},
 			airflow:       "3.3",
 			manifestLines: []string{"dependencies = ['apache-airflow==3.3.*', 'pandas==2.1.0']"},
-			manifestHas:   []string{"airflow = '3.3'"},
 			retired:       []string{"requirements.txt"},
 			noNotes:       true,
 		},
@@ -505,6 +501,11 @@ func checkManifest(t *testing.T, p *project, tc *v1Case) {
 		if strings.Contains(manifest, unwanted) {
 			t.Errorf("the manifest carries %q, which it cannot express\ngot:\n%s", unwanted, manifest)
 		}
+	}
+	// The requirement states the version, and a manifest with a second
+	// [tool.astro] airflow line beside it does not load.
+	if regexp.MustCompile(`(?m)^airflow\s*=`).MatchString(manifest) {
+		t.Errorf("the conversion wrote a [tool.astro] airflow line\ngot:\n%s", manifest)
 	}
 }
 

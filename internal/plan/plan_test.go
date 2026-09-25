@@ -28,9 +28,9 @@ func init() {
 const manifestTOML = `[project]
 name = 'demo'
 requires-python = '>=3.10'
+dependencies = ['apache-airflow==3.1.*']
 
 [tool.astro]
-airflow = '3.1'
 `
 
 // newProject writes a minimal manifest into a fresh dir and points the cache
@@ -396,8 +396,8 @@ func TestBuildFallsBackToAPythonOnlyWhenRequiresPythonIsUnset(t *testing.T) {
 		want     string
 	}{
 		{"stated", manifestTOML, ""},
-		{"unset, airflow 3", "[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '3.1'\n", "3.12"},
-		{"unset, airflow 2.7", "[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '2.7.3'\n", "3.11"},
+		{"unset, airflow 3", "[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n", "3.12"},
+		{"unset, airflow 2.7", "[project]\nname = 'demo'\ndependencies = ['apache-airflow==2.7.3']\n\n[tool.astro]\n", "3.11"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()

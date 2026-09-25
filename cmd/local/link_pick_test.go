@@ -76,7 +76,7 @@ func TestLinkAddPicksADeploymentAndNamesTheLink(t *testing.T) {
 // A project with no workspace lists the current login's, and with none of
 // those either it asks for a workspace first; the link then names it.
 func TestLinkAddPicksTheWorkspaceToListFrom(t *testing.T) {
-	const bare = "[project]\nname = 'x'\n\n[tool.astro]\nairflow = '3.1'\n"
+	const bare = "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"
 
 	dir, path := linkTestProject(t, bare)
 	d, run := pickDeps(t, dir, "", PickedDeployment{ID: "clx1", Name: "dev", WorkspaceID: "ws_C"}, "")

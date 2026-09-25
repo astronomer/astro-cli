@@ -20,8 +20,9 @@ import (
 	"regexp"
 	"slices"
 	"sort"
-	"strings"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Exit codes, distinct so a caller (and CI) can tell the two failure classes
@@ -245,8 +246,8 @@ func run(ctx context.Context, opts Options, parser Parser, remedy string) (Resul
 type ProvisionInput struct {
 	ProjectPath string
 	DagsDir     string
-	// Pin is the manifest's [tool.astro] airflow, used when the dependencies
-	// do not name Airflow themselves.
+	// Pin is the version the manifest's Airflow requirement pins, used when
+	// the dependencies do not name Airflow themselves.
 	Pin string
 	// Deps is the manifest's [project] dependencies.
 	Deps []string
@@ -298,9 +299,8 @@ func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov P
 // not name it.
 //
 // As written, because the manifest already states Airflow in the shape the
-// project means — "apache-airflow==3.1.*" — and rebuilding that from the pin
-// would ask for "apache-airflow==3.1", which is not a release. Added when
-// absent, because a manifest need not name Airflow at all: a docker project
+// project means — "apache-airflow==3.1.*", or an apache-airflow-core pin, which
+// a full apache-airflow beside it would contradict. Added when absent, because a manifest need not name Airflow at all: a docker project
 // declaring its own Dockerfile builds the image from that file, and the
 // dependency list stops describing it. Installing nothing called Airflow would
 // spend a long download to arrive at "Airflow is not importable".
@@ -310,23 +310,11 @@ func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov P
 // pyproject.toml's lines would otherwise miss the cache and rebuild.
 func projectRequirements(pin string, deps []string) []string {
 	out := append([]string{}, deps...)
-	if !slices.ContainsFunc(out, func(d string) bool { return distName(d) == airflowDist }) {
-		out = append(out, airflowRequirement(pin))
+	if !slices.ContainsFunc(out, manifest.NamesAirflow) {
+		out = append(out, manifest.AirflowRequirement(pin))
 	}
 	sort.Strings(out)
 	return out
-}
-
-// airflowRequirement is the requirement that installs the Airflow a pin names.
-// A partial pin ("3", "3.1") is a series, so it becomes a prefix match; a full
-// one is exact. It mirrors pkg/scaffold.airflowRequirement, which writes the
-// entry this reads back — the two stay separate rather than couple a cmd-layer
-// package to the scaffold.
-func airflowRequirement(pin string) string {
-	if strings.Count(pin, ".") < 2 {
-		return airflowDist + "==" + pin + ".*"
-	}
-	return airflowDist + "==" + pin
 }
 
 // withInterpreter adapts a TargetParser and a chosen interpreter into the

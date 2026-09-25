@@ -3,12 +3,11 @@ name = 'etl-demo'
 version = '0.1.0'
 requires-python = '>=3.10'
 dependencies = [
-    "apache-airflow==3.1.*",
+    "apache-airflow==3.1.*",  # the Airflow this project runs: the one place the version is stated
     "apache-airflow-providers-standard",  # Airflow 3's home for the classic operators (Bash, Python, Empty)
 ]
 
 [tool.astro]
-airflow = '3.1'  # Airflow version this project runs; keep the apache-airflow dependency in step
 packages = ['libpq-dev']  # OS (apt) packages; installed in Docker mode, skipped with a warning in standalone mode
 workspace = 'your-workspace-id'  # default workspace every deployment link inherits; replace with your real id
 

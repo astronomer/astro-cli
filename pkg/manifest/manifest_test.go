@@ -43,10 +43,9 @@ const full = `
 [project]
 name = "my-pipelines"
 requires-python = ">=3.11"
-dependencies = ["pandas>=2.1", "apache-airflow-providers-snowflake"]
+dependencies = ["apache-airflow==3.1.*", "pandas>=2.1", "apache-airflow-providers-snowflake"]
 
 [tool.astro]
-airflow = "3.1"
 packages = ["libpq-dev", "build-essential"]
 
 [tool.astro.targets.astro]
@@ -77,14 +76,14 @@ func TestLoadFull(t *testing.T) {
 	wantProject := Project{
 		Name:           "my-pipelines",
 		RequiresPython: ">=3.11",
-		Dependencies:   []string{"pandas>=2.1", "apache-airflow-providers-snowflake"},
+		Dependencies:   []string{"apache-airflow==3.1.*", "pandas>=2.1", "apache-airflow-providers-snowflake"},
 	}
 	if !reflect.DeepEqual(m.Project, wantProject) {
 		t.Errorf("Project = %#v, want %#v", m.Project, wantProject)
 	}
 
-	if m.Astro.AirflowVersion != "3.1" {
-		t.Errorf("AirflowVersion = %q, want %q", m.Astro.AirflowVersion, "3.1")
+	if got := m.Airflow(); got != (Airflow{Pin: "3.1"}) {
+		t.Errorf("Airflow() = %#v, want the requirement's 3.1", got)
 	}
 
 	wantPackages := []string{"libpq-dev", "build-essential"}
@@ -119,11 +118,11 @@ func TestLoadFull(t *testing.T) {
 }
 
 func TestLoadMinimal(t *testing.T) {
-	m, err := Load(write(t, "[project]\nname = \"etl\"\n\n[tool.astro]\nairflow = \"3\"\n"))
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.*\"]\n\n[tool.astro]\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.Project.Name != "etl" || m.Astro.AirflowVersion != "3" {
+	if m.Project.Name != "etl" || m.Airflow().Pin != "3" {
 		t.Errorf("got %#v", m)
 	}
 	if m.Astro.Deployments != nil || m.Astro.Env != nil || m.Astro.Targets != nil || m.Astro.Packages != nil {
@@ -144,9 +143,9 @@ func TestResolveDefaults(t *testing.T) {
 			content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-default"
 
 [tool.astro.deployments.prod]
@@ -162,9 +161,9 @@ deployment = "dep-prod"
 			content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-default"
 
 [tool.astro.deployments.prod]
@@ -181,9 +180,9 @@ deployment = "dep-prod"
 			content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-default"
 target = "mwaa"
 
@@ -206,9 +205,9 @@ environment = "orders-prod"
 			content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-default"
 
 [tool.astro.deployments.prod]
@@ -246,9 +245,9 @@ default = true
 const kindsManifest = `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.dev]
@@ -311,7 +310,7 @@ func TestLinkKinds(t *testing.T) {
 // endpointLink is one url link with the auth table under test; url links are
 // where every auth method is legal, so one shape covers the menu.
 func endpointLink(auth string) string {
-	return "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n" +
+	return "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n" +
 		"[tool.astro.deployments.staging]\nurl = \"https://airflow.corp.dev\"\n" + auth + "\n"
 }
 
@@ -380,9 +379,9 @@ func TestAuthOverridesKindDefault(t *testing.T) {
 	m, err := Load(write(t, `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.dev]
@@ -444,26 +443,89 @@ var validationCases = []struct {
 }{
 	{
 		name:      "missing project name",
-		wantCodes: []ProblemCode{CodeRequired},
-		content:   "[tool.astro]\nairflow = \"3.1\"\n",
-		wantKeys:  []string{"project.name"},
+		wantCodes: []ProblemCode{CodeAirflowMissing, CodeRequired},
+		content:   "[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies", "project.name"},
 	},
 	{
 		name:      "bad project name",
 		wantCodes: []ProblemCode{CodeProjectNameInvalid},
-		content:   "[project]\nname = \"-bad-\"\n\n[tool.astro]\nairflow = \"3.1\"\n",
+		content:   "[project]\nname = \"-bad-\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n",
 		wantKeys:  []string{"project.name"},
 	},
 	{
-		name:      "missing airflow",
-		wantCodes: []ProblemCode{CodeRequired},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\ndeployments = {}\n",
+		name:      "no airflow requirement",
+		wantCodes: []ProblemCode{CodeAirflowMissing},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"pandas\", \"apache-airflow-providers-standard\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies"},
+	},
+	{
+		name:      "airflow requirement with a range",
+		wantCodes: []ProblemCode{CodeAirflowUnpinned},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"pandas\", \"apache-airflow>=3.1\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies[1]"},
+	},
+	{
+		name:      "airflow requirement with a URL",
+		wantCodes: []ProblemCode{CodeAirflowUnpinned},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow @ https://example.com/apache_airflow-3.3.2-py3-none-any.whl\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies[0]"},
+	},
+	{
+		name:      "airflow requirement with no version",
+		wantCodes: []ProblemCode{CodeAirflowUnpinned},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow-core\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies[0]"},
+	},
+	{
+		// One entry pinned does not excuse another that is not: standalone
+		// installs both, and nothing says which the marker picks.
+		name:      "one airflow entry pinned and one a range",
+		wantCodes: []ProblemCode{CodeAirflowUnpinned},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*; python_version >= '3.12'\", \"apache-airflow>=3.1; python_version < '3.12'\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies[1]"},
+	},
+	{
+		name:      "both airflow distributions",
+		wantCodes: []ProblemCode{CodeAirflowAmbiguous},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*\", \"apache-airflow-core==3.3.*\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies"},
+	},
+	{
+		name:      "airflow pinned twice, differently",
+		wantCodes: []ProblemCode{CodeAirflowAmbiguous},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*; python_version >= '3.12'\", \"apache-airflow==3.1.*; python_version < '3.12'\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies"},
+	},
+	{
+		name:      "apache-airflow-core pinned to an Airflow 2",
+		wantCodes: []ProblemCode{CodeAirflowCoreBeforeThree},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow-core==2.10.*\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies[0]"},
+	},
+	{
+		// With or without a static list beside it, which PEP 621 forbids.
+		name:      "dependencies declared dynamic",
+		wantCodes: []ProblemCode{CodeAirflowMissing, CodeDependenciesDynamic},
+		content:   "[project]\nname = \"p\"\ndynamic = [\"dependencies\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dependencies", "project.dynamic"},
+	},
+	{
+		name:      "dependencies declared dynamic beside a static list",
+		wantCodes: []ProblemCode{CodeDependenciesDynamic},
+		content:   "[project]\nname = \"p\"\ndynamic = [\"version\", \"dependencies\"]\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n",
+		wantKeys:  []string{"project.dynamic"},
+	},
+	{
+		name:      "leftover airflow key",
+		wantCodes: []ProblemCode{CodeAirflowRemoved},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflow = \"3.1\"\n",
 		wantKeys:  []string{"tool.astro.airflow"},
 	},
 	{
-		name:      "bad airflow version",
-		wantCodes: []ProblemCode{CodeAirflowVersionInvalid},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"three\"\n",
+		name:      "leftover airflow key that is not a version",
+		wantCodes: []ProblemCode{CodeAirflowRemoved},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflow = \"three\"\n",
 		wantKeys:  []string{"tool.astro.airflow"},
 	},
 	{
@@ -472,14 +534,14 @@ var validationCases = []struct {
 		// made this case worth writing: a number in the list reported
 		// "empty_string", which is not what is wrong with it.
 		name:      "package entry of the wrong type",
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\npackages = [\"libpq-dev\", 3]\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\npackages = [\"libpq-dev\", 3]\n",
 		wantKeys:  []string{"tool.astro.packages[1]"},
 		wantCodes: []ProblemCode{CodeExpectedString},
 	},
 	{
 		name:      "empty package entry",
 		wantCodes: []ProblemCode{CodeEmptyString},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\npackages = [\"libpq-dev\", \"  \"]\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\npackages = [\"libpq-dev\", \"  \"]\n",
 		wantKeys:  []string{"tool.astro.packages[1]"},
 	},
 	{
@@ -488,13 +550,13 @@ var validationCases = []struct {
 		// rather than resolved.
 		name:      "dockerfile escaping the project",
 		wantCodes: []ProblemCode{CodeDockerfileOutsideProject},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"../../etc/Dockerfile\"\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = \"../../etc/Dockerfile\"\n",
 		wantKeys:  []string{"tool.astro.dockerfile"},
 	},
 	{
 		name:      "absolute dockerfile path",
 		wantCodes: []ProblemCode{CodeDockerfileOutsideProject},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = \"/etc/Dockerfile\"\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = \"/etc/Dockerfile\"\n",
 		wantKeys:  []string{"tool.astro.dockerfile"},
 	},
 	{
@@ -503,19 +565,19 @@ var validationCases = []struct {
 		// the machine that wrote it, not on a colleague who pulled it.
 		name:      "dockerfile with windows separators",
 		wantCodes: []ProblemCode{CodeDockerfileSeparators},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 'docker\\Dockerfile'\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = 'docker\\Dockerfile'\n",
 		wantKeys:  []string{"tool.astro.dockerfile"},
 	},
 	{
 		name:      "dockerfile of the wrong shape",
 		wantCodes: []ProblemCode{CodeExpectedString},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\ndockerfile = 3\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = 3\n",
 		wantKeys:  []string{"tool.astro.dockerfile"},
 	},
 	{
 		name:      "unknown key in [tool.astro]",
 		wantCodes: []ProblemCode{CodeUnknownKey},
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nairflw = \"3.1\"\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflw = \"3.1\"\n",
 		wantKeys:  []string{"tool.astro.airflw"},
 	},
 	{
@@ -524,9 +586,9 @@ var validationCases = []struct {
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.prod]
@@ -541,9 +603,9 @@ defaults = true
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "astro"
@@ -555,9 +617,10 @@ target = "astro"
 	},
 	{
 		name:      "several at once",
-		wantCodes: []ProblemCode{CodeRequired, CodeAirflowVersionInvalid},
+		wantCodes: []ProblemCode{CodeAirflowMissing, CodeRequired, CodeAirflowRemoved},
 		content:   "[tool.astro]\nairflow = \"v3\"\n\n[tool.astro.deployments.d]\nworkspace = \"w\"\ndeployment = \"x\"\n",
 		wantKeys: []string{
+			"project.dependencies",
 			"project.name",
 			"tool.astro.airflow",
 		},
@@ -568,9 +631,9 @@ target = "astro"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 domain = "astronomer-dev.io"
 `,
 		wantKeys: []string{"tool.astro.domain"},
@@ -581,9 +644,9 @@ domain = "astronomer-dev.io"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 domain = "astronomer-dev.io"
 
 [tool.astro.deployments.staging]
@@ -598,9 +661,9 @@ auth = { method = "none" }
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 deployment = "dep-xyz"
@@ -613,9 +676,9 @@ deployment = "dep-xyz"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.prod]
@@ -630,9 +693,9 @@ deployment = "dep-xyz"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 target = ""
 `,
 		wantKeys: []string{"tool.astro.target"},
@@ -643,9 +706,9 @@ target = ""
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.target.astro]
 image = { os = "ubi" }
@@ -658,9 +721,9 @@ image = { os = "ubi" }
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.prod]
@@ -675,9 +738,9 @@ environment = "orders-prod"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 target = "oss"
 
@@ -692,9 +755,9 @@ deployment = "dep-xyz"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.prod]
@@ -713,9 +776,9 @@ default = true
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.mixed]
@@ -731,9 +794,9 @@ auth = { method = "none" }
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "mwaa"
@@ -748,9 +811,9 @@ auth = { method = "aws" }
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.prod]
@@ -765,9 +828,9 @@ environment = "orders-prod"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "mwaa"
@@ -782,9 +845,9 @@ deployment = "dep-xyz"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "mwaa"
@@ -799,9 +862,9 @@ workspace = "ws-abc"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "composer"
@@ -814,9 +877,9 @@ target = "composer"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "airflow.staging.corp.dev"
@@ -830,9 +893,9 @@ auth = { method = "none" }
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.staging]
 url = "https://admin:hunter2@airflow.corp.dev"
@@ -849,9 +912,9 @@ auth = { method = "none" }
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.local]
@@ -865,9 +928,9 @@ deployment = "dep-xyz"
 		content: `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 workspace = "ws-abc"
 
 [tool.astro.deployments.""]
@@ -879,25 +942,25 @@ deployment = "dep-xyz"
 		// The four cases below exist so that every declared ProblemCode is
 		// raised by some manifest; see TestEveryCodeIsReachable.
 		name:      "a link default that is not a boolean",
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\nworkspace = \"ws\"\n\n[tool.astro.deployments.prod]\ndeployment = \"d\"\ndefault = \"yes\"\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nworkspace = \"ws\"\n\n[tool.astro.deployments.prod]\ndeployment = \"d\"\ndefault = \"yes\"\n",
 		wantKeys:  []string{"tool.astro.deployments.prod.default"},
 		wantCodes: []ProblemCode{CodeExpectedBool},
 	},
 	{
 		name:      "a url that will not parse",
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n[tool.astro.deployments.prod]\nurl = \"http://[::1\"\nauth = { method = \"none\" }\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deployments.prod]\nurl = \"http://[::1\"\nauth = { method = \"none\" }\n",
 		wantKeys:  []string{"tool.astro.deployments.prod.url"},
 		wantCodes: []ProblemCode{CodeURLInvalid},
 	},
 	{
 		name:      "a url that is not http",
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n[tool.astro.deployments.prod]\nurl = \"ftp://airflow.example.com\"\nauth = { method = \"none\" }\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deployments.prod]\nurl = \"ftp://airflow.example.com\"\nauth = { method = \"none\" }\n",
 		wantKeys:  []string{"tool.astro.deployments.prod.url"},
 		wantCodes: []ProblemCode{CodeURLNotHTTP},
 	},
 	{
 		name:      "a url naming no host",
-		content:   "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n\n[tool.astro.deployments.prod]\nurl = \"https:///dags\"\nauth = { method = \"none\" }\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deployments.prod]\nurl = \"https:///dags\"\nauth = { method = \"none\" }\n",
 		wantKeys:  []string{"tool.astro.deployments.prod.url"},
 		wantCodes: []ProblemCode{CodeURLNoHost},
 	},
@@ -923,7 +986,7 @@ func TestValidation(t *testing.T) {
 }
 
 func TestParseWithoutPath(t *testing.T) {
-	_, err := Parse([]byte("[tool.astro]\nairflow = \"3.1\"\n"))
+	_, err := Parse([]byte("[tool.astro]\n"))
 	ve := validationError(t, err)
 	if ve.Path != "" {
 		t.Errorf("Path should be empty for Parse, got %q", ve.Path)
@@ -936,9 +999,9 @@ func TestValidationErrorListsEveryProblem(t *testing.T) {
 	_, err := Load(write(t, `
 [project]
 name = "p"
+dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
-airflow = "3.1"
 
 [tool.astro.deployments.prod]
 target = "astro"
@@ -1176,7 +1239,7 @@ func TestParseDockerfileDeclaration(t *testing.T) {
 		{"padded", `dockerfile = "  Dockerfile  "`, "Dockerfile"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := Load(write(t, "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n"+tc.decl+"\n"))
+			m, err := Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"+tc.decl+"\n"))
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
@@ -1188,7 +1251,7 @@ func TestParseDockerfileDeclaration(t *testing.T) {
 }
 
 func TestLoadReadsUVConstraintDependencies(t *testing.T) {
-	m, err := Load(write(t, "[project]\nname = \"etl\"\n\n[tool.astro]\nairflow = \"3\"\n\n"+
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.*\"]\n\n[tool.astro]\n\n"+
 		"[tool.uv]\nconstraint-dependencies = [\"sqlalchemy<2.1\", \"pandas<3\"]\n"))
 	if err != nil {
 		t.Fatal(err)
@@ -1201,7 +1264,7 @@ func TestLoadReadsUVConstraintDependencies(t *testing.T) {
 // [tool.uv] is uv's table, so a shape uv would reject is uv's to report: the
 // project still loads, and astro reads no constraints from it.
 func TestLoadIgnoresAUVTableOfTheWrongShape(t *testing.T) {
-	m, err := Load(write(t, "[project]\nname = \"etl\"\n\n[tool.astro]\nairflow = \"3\"\n\n"+
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.*\"]\n\n[tool.astro]\n\n"+
 		"[tool.uv]\nconstraint-dependencies = \"sqlalchemy<2.1\"\n"))
 	if err != nil {
 		t.Fatalf("a [tool.uv] astro does not own must not stop the load: %v", err)

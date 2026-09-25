@@ -34,6 +34,12 @@ func TestTheModuleGraphStaysANearLeaf(t *testing.T) {
 		"github.com/astronomer/astro-cli/pkg/checks": true,
 		// The shared table of what MWAA and Composer offer, a pure leaf.
 		"github.com/astronomer/astro-cli/pkg/platformversions": true,
+		// Which requirements state the Airflow version, the rule a generated
+		// build and a package share (manifest.WithoutAirflow). A leaf whose one
+		// dependency is the TOML parser below, which every consumer of this
+		// module (the CLI, Astro Desktop) links already.
+		"github.com/astronomer/astro-cli/pkg/manifest": true,
+		"github.com/pelletier/go-toml/v2":              true,
 		// Test-only, with the transitive set go list reports for it. Written
 		// from `go list -m all` rather than from memory.
 		"github.com/stretchr/testify": true,

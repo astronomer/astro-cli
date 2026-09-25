@@ -43,7 +43,7 @@ func TestEditManifestRefusesAFileThisUserCannotWrite(t *testing.T) {
 
 	dir := t.TempDir()
 	require.NoError(t, os.Symlink(foreign, filepath.Join(dir, manifest.Marker)))
-	err = EditManifest(dir, nil, setKey([]string{"tool", "astro", "airflow"}, "3.0"))
+	err = EditManifest(dir, nil, setKey([]string{"tool", "astro", "dockerfile"}, "Dockerfile.dev"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "read-only for this user")
 }

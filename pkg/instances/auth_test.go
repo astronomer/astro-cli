@@ -255,20 +255,20 @@ func TestLocalMintsWithTheAdminAccountOnAirflow2(t *testing.T) {
 func TestLocalUsesTheGeneratedStandalonePassword(t *testing.T) {
 	project := localProject(t, "2.10.5")
 	writePasswordFile(t, project, "generated\n")
-	username, password := localAccount(airflow2, "standalone", project)
+	username, password, _ := localAccount(airflow2, "standalone", project)
 	if username != localUsername || password != "generated" {
 		t.Fatalf("account = %s/%s, want %s with the generated password", username, password, localUsername)
 	}
 
 	// No file: the password the macOS launch shim seeds.
-	username, password = localAccount(airflow2, "standalone", localProject(t, "2.10.5"))
+	username, password, _ = localAccount(airflow2, "standalone", localProject(t, "2.10.5"))
 	if username != localUsername || password != localPassword {
 		t.Fatalf("account = %s/%s, want the shim's %s/%s", username, password, localUsername, localPassword)
 	}
 
 	// Docker mode creates the account itself, so the file a previous
 	// standalone run left behind names the wrong password and is ignored.
-	username, password = localAccount(airflow2, modeDocker, project)
+	username, password, _ = localAccount(airflow2, modeDocker, project)
 	if username != localUsername || password != localPassword {
 		t.Fatalf("account = %s/%s, want docker mode's %s/%s", username, password, localUsername, localPassword)
 	}
@@ -283,13 +283,13 @@ func TestLocalAccountFollowsTheRunningProcess(t *testing.T) {
 	writePasswordFile(t, project, "generated\n")
 	// The record says the process was started for Airflow 2, and it is the
 	// process that has to be talked to.
-	username, password := localAccount(airflow2, "standalone", project)
+	username, password, _ := localAccount(airflow2, "standalone", project)
 	if username != localUsername || password != "generated" {
 		t.Fatalf("account = %s/%s, want the Airflow 2 account the record calls for", username, password)
 	}
 
 	// The reverse: a manifest edited down to 2 while an Airflow 3 runs.
-	if username, password = localAccount("3", "standalone", localProject(t, "2.10.5")); username != "" || password != "" {
+	if username, password, _ = localAccount("3", "standalone", localProject(t, "2.10.5")); username != "" || password != "" {
 		t.Fatalf("account = %s/%s, want no credentials for a running Airflow 3", username, password)
 	}
 
@@ -299,7 +299,7 @@ func TestLocalAccountFollowsTheRunningProcess(t *testing.T) {
 	if err := os.RemoveAll(gone); err != nil {
 		t.Fatal(err)
 	}
-	if username, password = localAccount(airflow2, "standalone", gone); username != localUsername || password != localPassword {
+	if username, password, _ = localAccount(airflow2, "standalone", gone); username != localUsername || password != localPassword {
 		t.Fatalf("account = %s/%s for a deleted project, want the shim's default", username, password)
 	}
 }
@@ -307,16 +307,76 @@ func TestLocalAccountFollowsTheRunningProcess(t *testing.T) {
 // TestLocalAccountFallsBackToTheManifest covers a record written before the
 // generation was stored: the manifest is the only thing left to ask.
 func TestLocalAccountFallsBackToTheManifest(t *testing.T) {
-	if username, _ := localAccount("", "standalone", localProject(t, "2.10.5")); username != localUsername {
+	if username, _, _ := localAccount("", "standalone", localProject(t, "2.10.5")); username != localUsername {
 		t.Errorf("an old record for an Airflow 2 project got %q", username)
 	}
-	if username, _ := localAccount("", "standalone", localProject(t, "3.1")); username != "" {
+	if username, _, _ := localAccount("", "standalone", localProject(t, "3.1")); username != "" {
 		t.Errorf("an old record for an Airflow 3 project got %q", username)
 	}
 	// No manifest to fall back to reads as Airflow 3: what the v2 scaffold
 	// writes.
-	if username, password := localAccount("", "standalone", t.TempDir()); username != "" || password != "" {
-		t.Fatalf("account = %s/%s, want no credentials", username, password)
+	if username, password, err := localAccount("", "standalone", t.TempDir()); err != nil || username != "" || password != "" {
+		t.Fatalf("account = %s/%s, %v; want no credentials", username, password, err)
+	}
+}
+
+// An old record for a project that has not been migrated off [tool.astro]
+// airflow still finds its generation: from the requirement beside the line, or
+// from the line when it is all the manifest has. Before, the failed load read
+// as Airflow 3, and an Airflow 2 got no credentials and answered 401.
+func TestLocalAccountReadsAnUnmigratedManifest(t *testing.T) {
+	for name, body := range map[string]string{
+		// The record predates the requirement being the version, so the key
+		// is what started the process, and wins where the two disagree.
+		"leftover key that disagrees with the requirement": "[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nairflow = '2.10'\n",
+		"leftover key and no requirement":                  "[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '2.10'\n",
+		"leftover key and a range":                         "[project]\nname = 'demo'\ndependencies = ['apache-airflow>=2.9']\n\n[tool.astro]\nairflow = '2.10'\n",
+		// No key: the requirement.
+		"no key": "[project]\nname = 'demo'\ndependencies = ['apache-airflow==2.10.*']\n\n[tool.astro]\n",
+		// A problem that has nothing to do with the Airflow version does not
+		// stop the question being answered.
+		"an unrelated problem": "[project]\nname = 'demo'\ndependencies = ['apache-airflow==2.10.*']\n\n[tool.astro]\nairflw = '2'\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			username, _, err := localAccount("", "standalone", dir)
+			if err != nil || username != localUsername {
+				t.Errorf("account = %q, %v; want the Airflow 2 account", username, err)
+			}
+		})
+	}
+}
+
+// A pyproject.toml that is not an Astro project is the same as none: the
+// default, Airflow 3, as before the requirement became the version.
+func TestLocalAccountReadsNoAstroSectionAsTheDefault(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = 'plain'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if username, password, err := localAccount("", "standalone", dir); err != nil || username != "" || password != "" {
+		t.Errorf("account = %q/%q, %v; want no credentials and no error", username, password, err)
+	}
+}
+
+// A manifest that is there and says no generation is an error, not Airflow 3.
+func TestLocalAccountRefusesToGuessTheGeneration(t *testing.T) {
+	for name, body := range map[string]string{
+		"not TOML":                    "[project\n",
+		"a range and no leftover key": "[project]\nname = 'demo'\ndependencies = ['apache-airflow>=2.9']\n\n[tool.astro]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := localAccount("", "standalone", dir); err == nil {
+				t.Error("want an error naming the manifest, got a guess")
+			}
+		})
 	}
 }
 

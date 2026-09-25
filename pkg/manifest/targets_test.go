@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const targetsHead = "[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"3.1\"\n"
+const targetsHead = "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"
 
 func warningKeys(m *Manifest) []string {
 	var keys []string
@@ -107,9 +107,9 @@ func TestTargetWarningOrderIsStable(t *testing.T) {
 // A manifest that fails validation reports its problems, not its warnings:
 // the ValidationError is the whole answer until it loads.
 func TestWarningsDoNotBecomeProblems(t *testing.T) {
-	_, err := Parse([]byte("[project]\nname = \"p\"\n\n[tool.astro]\nairflow = \"x\"\n\n[tool.astro.targets.mwaa]\nregoin = \"us-east-1\"\n"))
+	_, err := Parse([]byte("[project]\nname = \"p\"\n\n[tool.astro]\n\n[tool.astro.targets.mwaa]\nregoin = \"us-east-1\"\n"))
 	ve := validationError(t, err)
-	if got := problemKeys(ve); !reflect.DeepEqual(got, []string{"tool.astro.airflow"}) {
-		t.Errorf("problem keys = %q, want only the airflow pin", got)
+	if got := problemKeys(ve); !reflect.DeepEqual(got, []string{"project.dependencies"}) {
+		t.Errorf("problem keys = %q, want only the missing Airflow requirement", got)
 	}
 }

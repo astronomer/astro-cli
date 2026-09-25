@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // treePerm is the mode a written artifact file and directory carry: owner
@@ -22,11 +23,6 @@ const (
 	treeFilePerm = 0o644
 	treeDirPerm  = 0o755
 )
-
-// airflowDist is the distribution the managed platforms provide themselves, so
-// the derived requirements drop it — the same rule the runtime image build
-// follows (internal/imagebuild.runtimeDeps).
-const airflowDist = "apache-airflow"
 
 // checklistName is the file a tree target writes when the manifest declares
 // environment values. MWAA and Composer configure those in their own consoles,
@@ -255,31 +251,13 @@ func zipDir(root, path string) error {
 	return f.Close()
 }
 
-// dropAirflow returns the manifest dependencies with the apache-airflow
-// distribution removed: every managed platform ships Airflow itself and rejects
-// a pin of it in the requirements. This mirrors internal/imagebuild.runtimeDeps,
-// which does the same for the runtime image; the copy lives here because that
-// helper (and distName) are unexported.
+// dropAirflow returns the manifest dependencies without the requirements that
+// state the Airflow version, apache-airflow and apache-airflow-core
+// (manifest.WithoutAirflow): every managed platform ships Airflow itself, so
+// a pin of either in the uploaded requirements asks the platform to install a
+// second Airflow over its own. The same rule the runtime image build follows.
 func dropAirflow(deps []string) []string {
-	out := make([]string, 0, len(deps))
-	for _, d := range deps {
-		if distName(d) == airflowDist {
-			continue
-		}
-		out = append(out, d)
-	}
-	return out
-}
-
-// distName extracts and normalizes the distribution name from a PEP 508
-// requirement: the leading name, before any extras, version, marker, or URL.
-// Mirrors internal/imagebuild.distName.
-func distName(req string) string {
-	s := strings.TrimSpace(req)
-	if i := strings.IndexAny(s, "[ \t<>=!~;@("); i >= 0 {
-		s = s[:i]
-	}
-	return strings.ToLower(strings.ReplaceAll(s, "_", "-"))
+	return manifest.WithoutAirflow(deps)
 }
 
 // packagesWarning returns a warning when the manifest declares OS packages,

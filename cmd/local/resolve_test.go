@@ -16,6 +16,45 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
+// The project's Astro host comes from its manifest, so a manifest that does
+// not load is that error, not "no host": read as none, a project whose links
+// live on another host authenticated against the current login's. Outside a
+// project, and in a directory whose pyproject.toml is not an Astro project,
+// there is no host and no error.
+func TestProjectDomainSurfacesAManifestThatDoesNotLoad(t *testing.T) {
+	t.Setenv("ASTRO_DOMAIN", "")
+	for name, tc := range map[string]struct {
+		body    string
+		want    string
+		wantErr string
+	}{
+		"no manifest":            {"", "", ""},
+		"not an Astro project":   {"[project]\nname = 'x'\n", "", ""},
+		"a domain":               {"[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'w'\ndomain = 'astronomer-dev.io'\n", "astronomer-dev.io", ""},
+		"a leftover airflow key": {"[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nairflow = '3.1'\nworkspace = 'w'\ndomain = 'astronomer-dev.io'\n", "", "Delete the airflow line"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.body != "" {
+				if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(tc.body), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			d, _, _ := instanceDeps(t, dir)
+			c := &cli{d: d}
+			got, err := c.projectDomain()
+			switch {
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Fatalf("err = %v, want one containing %q", err, tc.wantErr)
+			case tc.wantErr == "" && err != nil:
+				t.Fatalf("err = %v", err)
+			case got != tc.want:
+				t.Errorf("domain = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestURLTargetNeedsNoProject is the escape hatch's whole point: an Airflow
 // nobody declared, reached from a directory that is not a project at all.
 func TestURLTargetNeedsNoProject(t *testing.T) {

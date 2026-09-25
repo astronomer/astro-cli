@@ -180,7 +180,7 @@ func refuseUnsupportedBase(declared string, base declaredBase) error {
 //
 // The pin alone was wrong for exactly the projects the declared tier is for. A
 // conversion writes the declaration itself and may have DEFAULTED the pin, so a
-// Dockerfile on an Airflow 2 base can sit beside `airflow = "3.1"` — and major
+// Dockerfile on an Airflow 2 base can sit beside `apache-airflow==3.1.*` — and major
 // decides the compose service set (Airflow 2 has no api-server or
 // dag-processor) and the db command. Building the AF2 file while emitting the
 // AF3 service set is a stack that cannot come up.
