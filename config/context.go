@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
@@ -13,6 +14,7 @@ var (
 
 	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or APC? Run astro login and try again")
 	errNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
+	errNotLoginField = errors.New("only a login field is shared across a tenant")
 )
 
 const (
@@ -34,7 +36,11 @@ type Context struct {
 	Token               string `mapstructure:"token"`
 	RefreshToken        string `mapstructure:"refreshtoken"`
 	UserEmail           string `mapstructure:"user_email"`
+	AuthDomain          string `mapstructure:"auth_domain"`
+	AuthClientID        string `mapstructure:"auth_client_id"`
 }
+
+var loginFields = []string{"token", "refreshtoken", "expiresin", "user_email"}
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
 func GetCurrentContext() (Context, error) {
@@ -122,7 +128,7 @@ func (c *Context) SetContext() error {
 		return err
 	}
 
-	context := map[string]string{
+	context := map[string]interface{}{
 		"token":                c.Token,
 		"domain":               c.Domain,
 		"organization":         c.Organization,
@@ -131,6 +137,8 @@ func (c *Context) SetContext() error {
 		"last_used_workspace":  c.Workspace,
 		"refreshtoken":         c.RefreshToken,
 		"user_email":           c.UserEmail,
+		"auth_domain":          c.AuthDomain,
+		"auth_client_id":       c.AuthClientID,
 	}
 
 	viperHome.Set(contextsKey+"."+key, context)
@@ -151,14 +159,56 @@ func (c *Context) SetContextKey(key, value string) error {
 	return setContextField(cKey, key, value)
 }
 
-// setContextField updates one field in the current context's map and persists
-// the config. It intentionally reads the full context map, mutates the single
-// field, and Sets the map back — rather than Set-ing the nested path directly —
-// because viper's override layer doesn't merge with the file layer on nested
-// Set. Subsequent UnmarshalKey calls on the parent key would otherwise return
-// a partial struct with every unset field zeroed out.
-// See https://github.com/spf13/viper/issues/1106.
+// SetSharedContextKey saves a login field to this context and to every other
+// context on its identity provider tenant, in the same write, so a login to one
+// PR preview is a login to all of them. Only a login that any host on the tenant
+// can use belongs here; a token for this host alone goes through SetContextKey.
+func (c *Context) SetSharedContextKey(key, value string) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	return shareContextField(cKey, key, value)
+}
+
+// SetSharedExpiresIn is SetExpiresIn for a login shared across the tenant, as
+// SetSharedContextKey is for SetContextKey.
+func (c *Context) SetSharedExpiresIn(value int64) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	return shareContextField(cKey, "expiresin", time.Now().Add(time.Duration(value)*time.Second))
+}
+
+// setContextField updates one field in one context and persists the config.
 func setContextField(cKey, field string, value interface{}) error {
+	putContextField(cKey, strings.ToLower(field), value)
+	return saveConfig(viperHome, HomeConfigFile)
+}
+
+func shareContextField(cKey, field string, value interface{}) error {
+	field = strings.ToLower(field)
+	if !slices.Contains(loginFields, field) {
+		return fmt.Errorf("%w: %s is not a login field", errNotLoginField, field)
+	}
+	for _, key := range append([]string{cKey}, contextKeysSharingLogin(cKey)...) {
+		putContextField(key, field, value)
+	}
+	return saveConfig(viperHome, HomeConfigFile)
+}
+
+// putContextField updates one field in a context's map, in memory only. It
+// intentionally reads the full context map, mutates the single field, and Sets
+// the map back — rather than Set-ing the nested path directly — because viper's
+// override layer doesn't merge with the file layer on nested Set. Subsequent
+// UnmarshalKey calls on the parent key would otherwise return a partial struct
+// with every unset field zeroed out.
+// See https://github.com/spf13/viper/issues/1106.
+//
+// field must be lowercase: GetStringMap returns lowercase keys, and a second
+// key that differs only in case collides with the first when viper folds them.
+func putContextField(cKey, field string, value interface{}) {
 	parentPath := fmt.Sprintf("%s.%s", contextsKey, cKey)
 	ctxMap := viperHome.GetStringMap(parentPath)
 	if ctxMap == nil {
@@ -166,7 +216,74 @@ func setContextField(cKey, field string, value interface{}) error {
 	}
 	ctxMap[field] = value
 	viperHome.Set(parentPath, ctxMap)
+}
+
+// contextKeysSharingLogin returns the keys of the other contexts on cKey's
+// identity provider tenant. A context that has not recorded its tenant shares
+// with none.
+func contextKeysSharingLogin(cKey string) []string {
+	authDomain, authClientID := contextTenant(cKey)
+	if authDomain == "" || authClientID == "" {
+		return nil
+	}
+	var keys []string
+	for key := range viperHome.GetStringMap(contextsKey) {
+		if strings.EqualFold(key, cKey) {
+			continue
+		}
+		if d, id := contextTenant(key); d == authDomain && id == authClientID {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+func contextTenant(cKey string) (authDomain, authClientID string) {
+	ctxMap := viperHome.GetStringMap(contextsKey + "." + cKey)
+	authDomain, _ = ctxMap["auth_domain"].(string)
+	authClientID, _ = ctxMap["auth_client_id"].(string)
+	return authDomain, authClientID
+}
+
+// SetAuthTenant records the identity provider tenant that issues this
+// context's tokens: the domain and client ID from its host's auth config.
+func (c *Context) SetAuthTenant(authDomain, authClientID string) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	if contextDomain, contextClientID := contextTenant(cKey); contextDomain == authDomain && contextClientID == authClientID {
+		return nil
+	}
+	putContextField(cKey, "auth_domain", authDomain)
+	putContextField(cKey, "auth_client_id", authClientID)
 	return saveConfig(viperHome, HomeConfigFile)
+}
+
+// ContextsSharingLogin returns the contexts whose tokens come from the given
+// identity provider tenant.
+func ContextsSharingLogin(authDomain, authClientID string) ([]Context, error) {
+	if authDomain == "" || authClientID == "" {
+		return nil, nil
+	}
+	contexts, err := GetContexts()
+	if err != nil {
+		return nil, err
+	}
+	var sharing []Context
+	for key := range contexts.Contexts {
+		c := contexts.Contexts[key]
+		if c.AuthDomain != authDomain || c.AuthClientID != authClientID {
+			continue
+		}
+		// Configs written before SetContext stored a map[string]interface{}
+		// often lack the domain field. The key still names it.
+		if c.Domain == "" {
+			c.Domain = strings.ReplaceAll(key, "_", ".")
+		}
+		sharing = append(sharing, c)
+	}
+	return sharing, nil
 }
 
 // set organization id and short name in context config

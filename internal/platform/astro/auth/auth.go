@@ -330,6 +330,21 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	return res, nil
 }
 
+const previewSeedUser = "seed@example.com"
+
+// noOrganizationPrompt asks whether to create an organization. A PR preview is
+// its own throwaway database whose seeded data belongs to one shared test user,
+// so there the prompt says how to reach that data and what a new org would be.
+func noOrganizationPrompt(domain string, out io.Writer) string {
+	pr, _ := domainutil.GetPRSubDomain(domain)
+	if pr == "" {
+		return "No organization found. Create your own free organization now"
+	}
+	fmt.Fprintf(out, "This PR preview has no organization for you. Its seeded data belongs to %s: to use it, run %s and sign in as that user. That login replaces yours on every PR preview, since they share one.\n",
+		previewSeedUser, ansi.Cyan("astro login "+pr+" --force"))
+	return "Or create a scratch organization in " + pr + " now (it is deleted with the preview)"
+}
+
 // bootstrapOrganization creates a brand-new account's first organization and
 // workspace, the same call the web onboarding makes. The org name comes from
 // the email's local part; nothing else about the account exists yet to name
@@ -471,7 +486,7 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		// preselects yes; it already declared the intent.
 		create := signup
 		if !create {
-			create, _ = input.Confirm("No organization found. Create your own free organization now") //nolint:errcheck // a read error answers no, same as declining
+			create, _ = input.Confirm(noOrganizationPrompt(c.Domain, out)) //nolint:errcheck // a read error answers no, same as declining
 		}
 		if !create {
 			return err
@@ -567,7 +582,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	if token == "" && !force && !signup {
 		if res, ok := authenticator.savedLogin(domain, authConfig); ok {
 			fmt.Printf("Using your saved login for %s\n", domain)
-			return completeLogin(domain, res, astroV1Client, out, false)
+			return completeLogin(domain, authConfig, res, astroV1Client, out, false)
 		}
 	}
 
@@ -597,7 +612,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	// set email base on userinfo so it always match with access token
 	res.UserEmail = userInfo.Email
 
-	return completeLogin(domain, res, astroV1Client, out, signup)
+	return completeLogin(domain, authConfig, res, astroV1Client, out, signup)
 }
 
 // Switch points the CLI at domain using the login saved for it, and never opens
@@ -607,7 +622,7 @@ func Switch(domain string, astroV1Client astrov1.APIClient, out io.Writer) error
 	authConfig, fetchErr := FetchDomainAuthConfig(domain)
 	if fetchErr == nil {
 		if res, ok := authenticator.savedLogin(domain, authConfig); ok {
-			return completeLogin(domain, res, astroV1Client, out, false)
+			return completeLogin(domain, authConfig, res, astroV1Client, out, false)
 		}
 	}
 	if err := context.Switch(domain); err != nil {
@@ -621,14 +636,33 @@ func Switch(domain string, astroV1Client astrov1.APIClient, out io.Writer) error
 	return nil
 }
 
-// savedLogin tries the saved access token before the refresh token. An access
+// savedLogin also looks at the other hosts on the same identity provider
+// tenant: every PR preview shares one, so a login to one works for the rest.
+func (a *Authenticator) savedLogin(domain string, authConfig Config) (Result, bool) {
+	var candidates []config.Context
+	if c, err := context.GetContext(domain); err == nil {
+		candidates = append(candidates, c)
+	}
+	sharing, _ := config.ContextsSharingLogin(authConfig.DomainURL, authConfig.ClientID) //nolint:errcheck // an unreadable config only leaves fewer logins to try
+	candidates = append(candidates, sharing...)
+	tried := map[[2]string]bool{}
+	for i := range candidates {
+		login := [2]string{candidates[i].Token, candidates[i].RefreshToken}
+		if tried[login] {
+			continue
+		}
+		tried[login] = true
+		if res, ok := a.workingLogin(&candidates[i], authConfig); ok {
+			return res, true
+		}
+	}
+	return Result{}, false
+}
+
+// workingLogin tries the saved access token before the refresh token. An access
 // token userinfo rejects, such as an API token saved from ASTRO_API_TOKEN,
 // still leaves the refresh token to try.
-func (a *Authenticator) savedLogin(domain string, authConfig Config) (Result, bool) {
-	c, err := context.GetContext(domain)
-	if err != nil {
-		return Result{}, false
-	}
+func (a *Authenticator) workingLogin(c *config.Context, authConfig Config) (Result, bool) {
 	expiry, _ := c.GetExpiresIn() //nolint:errcheck // a missing expiry reads as zero, which is expired
 	if accessToken := strings.TrimSpace(strings.TrimPrefix(c.Token, "Bearer ")); accessToken != "" && time.Now().Add(AccessTokenRefreshMargin).Before(expiry) {
 		res := Result{AccessToken: accessToken, RefreshToken: c.RefreshToken, ExpiresIn: int64(time.Until(expiry).Seconds())}
@@ -657,7 +691,7 @@ func (a *Authenticator) withOwner(authConfig Config, res *Result) bool {
 	return true
 }
 
-func completeLogin(domain string, res Result, astroV1Client astrov1.APIClient, out io.Writer, signup bool) error {
+func completeLogin(domain string, authConfig Config, res Result, astroV1Client astrov1.APIClient, out io.Writer, signup bool) error {
 	err := context.Switch(domain)
 	if err != nil {
 		return err
@@ -667,6 +701,10 @@ func completeLogin(domain string, res Result, astroV1Client astrov1.APIClient, o
 		return err
 	}
 
+	err = c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID)
+	if err != nil {
+		return err
+	}
 	err = res.writeToContext(&c)
 	if err != nil {
 		return err
@@ -688,15 +726,15 @@ func Logout(domain string, out io.Writer) {
 	domain = domainutil.FormatDomain(domain)
 	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
 
-	err := c.SetContextKey("token", "")
+	err := c.SetSharedContextKey("token", "")
 	if err != nil {
 		return
 	}
-	err = c.SetContextKey("refreshtoken", "")
+	err = c.SetSharedContextKey("refreshtoken", "")
 	if err != nil {
 		return
 	}
-	err = c.SetContextKey("user_email", "")
+	err = c.SetSharedContextKey("user_email", "")
 	if err != nil {
 		return
 	}

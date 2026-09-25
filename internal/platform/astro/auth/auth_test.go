@@ -1577,6 +1577,51 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		assert.Equal(t, "test@astronomer.test", c.UserEmail)
 	})
 
+	t.Run("a login to another host on the same tenant logs in a new host", func(t *testing.T) {
+		const loggedIn, newHost = "pr1111.astronomer-dev.io", "pr2222.astronomer-dev.io"
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, loggedIn, "Bearer expired", "sandbox-refresh", -60)
+		assert.NoError(t, (&config.Context{Domain: loggedIn}).SetAuthTenant("https://auth.example.com/", "client-id"))
+		browserLogins := browserAuthenticator(t)
+		stubRefresh(t, astroauth.TokenResponse{AccessToken: "refreshed", ExpiresIn: 3600}, nil)
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Login(newHost, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 0, *browserLogins)
+		for _, host := range []string{newHost, loggedIn} {
+			c, err := context.GetContext(host)
+			assert.NoError(t, err)
+			assert.Equal(t, "Bearer refreshed", c.Token, host)
+			assert.Equal(t, "sandbox-refresh", c.RefreshToken, host)
+			assert.Equal(t, "https://auth.example.com/", c.AuthDomain, host)
+			assert.Equal(t, "client-id", c.AuthClientID, host)
+		}
+		current, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+		assert.Equal(t, newHost, current)
+	})
+
+	t.Run("a login on another tenant is not reused", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saveLogin(t, "astronomer-stage.io", "Bearer still-good", "stage-refresh", 3600)
+		assert.NoError(t, (&config.Context{Domain: "astronomer-stage.io"}).SetAuthTenant("https://auth.astronomer-stage.io/", "stage-client"))
+		browserLogins := browserAuthenticator(t)
+		stubRefresh(t, astroauth.TokenResponse{}, errMock)
+		mockV1Client := checkUserSessionMocks()
+
+		captureStdout(t, func() {
+			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		})
+
+		assert.Equal(t, 1, *browserLogins)
+		c, err := context.GetContext("astronomer-stage.io")
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer still-good", c.Token)
+	})
+
 	for _, tc := range []struct {
 		name          string
 		token         string
@@ -1733,6 +1778,24 @@ func TestLogout(t *testing.T) {
 		_, err = config.GetCurrentDomain()
 		assert.ErrorIs(t, err, config.ErrGetHomeString)
 	})
+
+	t.Run("logs out of every host on the same tenant", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		for _, host := range []string{"pr1111.astronomer-dev.io", "pr2222.astronomer-dev.io"} {
+			assert.NoError(t, context.SetContext(host))
+			assert.NoError(t, (&config.Context{Domain: host}).SetAuthTenant("https://auth.example.com/", "client-id"))
+		}
+		for _, host := range []string{"pr1111.astronomer-dev.io", "pr2222.astronomer-dev.io"} {
+			saveLogin(t, host, "Bearer shared", "shared-refresh", 3600)
+		}
+
+		Logout("pr1111.astronomer-dev.io", io.Discard)
+
+		c, err := context.GetContext("pr2222.astronomer-dev.io")
+		assert.NoError(t, err)
+		assert.Empty(t, c.Token)
+		assert.Empty(t, c.RefreshToken)
+	})
 }
 
 func Test_writeResultToContext(t *testing.T) {
@@ -1788,4 +1851,44 @@ func Test_writeResultToContext(t *testing.T) {
 	expiry := time.Duration(res.ExpiresIn) * time.Second
 	assertConfigContents("Bearer new_token", "new_refresh_token",
 		before.Add(expiry), after.Add(expiry), "test.user@astronomer.io")
+}
+
+func TestNoOrganizationPrompt(t *testing.T) {
+	t.Run("offers a free organization on a real Astro host", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		prompt := noOrganizationPrompt("astronomer.io", out)
+		assert.Equal(t, "No organization found. Create your own free organization now", prompt)
+		assert.Empty(t, out.String())
+	})
+
+	t.Run("points a PR preview at its seeded user and offers a scratch org", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		prompt := noOrganizationPrompt("pr41517.astronomer-dev.io", out)
+		assert.Contains(t, out.String(), "seed@example.com")
+		assert.Contains(t, out.String(), "astro login pr41517 --force")
+		assert.Contains(t, out.String(), "replaces yours on every PR preview")
+		assert.Contains(t, prompt, "scratch organization in pr41517")
+	})
+}
+
+func TestWriteToContextKeepsTokenOnlyLoginOnItsOwnHost(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	for _, host := range []string{"pr1111.astronomer-dev.io", "pr3333.astronomer-dev.io"} {
+		assert.NoError(t, context.SetContext(host))
+		assert.NoError(t, (&config.Context{Domain: host}).SetAuthTenant("https://auth.example.com/", "client-id"))
+	}
+	saveLogin(t, "pr1111.astronomer-dev.io", "Bearer browser", "browser-refresh", 3600)
+
+	c := config.Context{Domain: "pr3333.astronomer-dev.io"}
+	assert.NoError(t, Result{AccessToken: "pasted", ExpiresIn: 3600, UserEmail: "user@astronomer.test"}.writeToContext(&c))
+
+	sibling, err := context.GetContext("pr1111.astronomer-dev.io")
+	assert.NoError(t, err)
+	assert.Equal(t, "Bearer browser", sibling.Token)
+	assert.Equal(t, "browser-refresh", sibling.RefreshToken)
+	own, err := context.GetContext("pr3333.astronomer-dev.io")
+	assert.NoError(t, err)
+	assert.Equal(t, "Bearer pasted", own.Token)
+	assert.Empty(t, own.RefreshToken)
+	assert.Equal(t, "user@astronomer.test", own.UserEmail)
 }

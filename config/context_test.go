@@ -196,7 +196,10 @@ func (s *Suite) TestGetContexts() {
 	initTestConfig()
 	ctxs, err := GetContexts()
 	s.NoError(err)
-	s.Equal(Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
+	context := func(domain string) Context {
+		return Context{Domain: domain, Organization: "test-org-id", Workspace: "ck05r3bor07h40d02y2hw4n4v", LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v", Token: "token"}
+	}
+	s.Equal(Contexts{Contexts: map[string]Context{"test_com": context("test.com"), "example_com": context("example.com")}}, ctxs)
 }
 
 func (s *Suite) TestSetContextKey() {
@@ -239,6 +242,137 @@ contexts:
 	s.Equal("org-id", reread.Organization)
 	s.Equal("ws-id", reread.Workspace)
 	s.Equal("example.com", reread.Domain)
+}
+
+func (s *Suite) TestSetSharedContextKey_SharesLoginAcrossTenant() {
+	fs := afero.NewMemMapFs()
+	configRaw := []byte(`
+context: pr1111.astronomer-dev.io
+contexts:
+  pr1111_astronomer-dev_io:
+    domain: pr1111.astronomer-dev.io
+    auth_domain: https://sandbox.example.com/
+    auth_client_id: sandbox-client
+    workspace: ws-1111
+    expiresin: 2000-01-01T00:00:00Z
+  pr2222_astronomer-dev_io:
+    domain: pr2222.astronomer-dev.io
+    auth_domain: https://sandbox.example.com/
+    auth_client_id: sandbox-client
+    token: Bearer old
+    workspace: ws-2222
+  astronomer-dev_io:
+    domain: astronomer-dev.io
+    auth_domain: https://auth.astronomer-dev.io/
+    auth_client_id: dev-client
+    token: Bearer dev
+  pr3333_astronomer-dev_io:
+    domain: pr3333.astronomer-dev.io
+    token: Bearer never-recorded
+`)
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777))
+	InitConfig(fs)
+
+	ctx := Context{Domain: "pr1111.astronomer-dev.io"}
+	s.Require().NoError(ctx.SetSharedContextKey("token", "Bearer shared"))
+	s.Require().NoError(ctx.SetSharedContextKey("refreshtoken", "shared-refresh"))
+	s.Require().NoError(ctx.SetSharedExpiresIn(3600))
+	s.Require().NoError(ctx.SetContextKey("workspace", "ws-new"))
+
+	InitConfig(fs)
+	contexts, err := GetContexts()
+	s.Require().NoError(err)
+	sibling := contexts.Contexts["pr2222_astronomer-dev_io"]
+	s.Equal("Bearer shared", sibling.Token)
+	s.Equal("shared-refresh", sibling.RefreshToken)
+	s.Equal("ws-2222", sibling.Workspace)
+	siblingExpiry, err := sibling.GetExpiresIn()
+	s.NoError(err)
+	ownExpiry, err := ctx.GetExpiresIn()
+	s.NoError(err)
+	s.Equal(ownExpiry, siblingExpiry)
+
+	s.Equal("Bearer dev", contexts.Contexts["astronomer-dev_io"].Token)
+	s.Equal("Bearer never-recorded", contexts.Contexts["pr3333_astronomer-dev_io"].Token)
+	s.Equal("ws-new", contexts.Contexts["pr1111_astronomer-dev_io"].Workspace)
+
+	s.Run("a new expiry replaces the old one every time", func() {
+		for i := range 20 {
+			set := ctx.SetExpiresIn
+			if i%2 == 0 {
+				set = ctx.SetSharedExpiresIn
+			}
+			s.Require().NoError(set(3600))
+			expiry, err := ctx.GetExpiresIn()
+			s.NoError(err)
+			s.True(expiry.After(time.Now()), "expiry %s is in the past", expiry)
+		}
+	})
+
+	s.Run("SetContextKey keeps a login field on its own context", func() {
+		s.Require().NoError(ctx.SetContextKey("token", "Bearer api-token"))
+		s.Require().NoError(ctx.SetExpiresIn(3600))
+		s.Require().NoError(ctx.SetContextKey("refreshtoken", ""))
+		pr1111, err := ctx.GetContext()
+		s.NoError(err)
+		s.Equal("Bearer api-token", pr1111.Token)
+		sibling, err := (&Context{Domain: "pr2222.astronomer-dev.io"}).GetContext()
+		s.NoError(err)
+		s.Equal("Bearer shared", sibling.Token)
+		s.Equal("shared-refresh", sibling.RefreshToken)
+	})
+
+	s.Run("only a login field is shared", func() {
+		s.ErrorIs(ctx.SetSharedContextKey("workspace", "ws-shared"), errNotLoginField)
+		sibling, err := (&Context{Domain: "pr2222.astronomer-dev.io"}).GetContext()
+		s.NoError(err)
+		s.Equal("ws-2222", sibling.Workspace)
+	})
+}
+
+func (s *Suite) TestContextsSharingLogin() {
+	initTestConfig()
+	s.Require().NoError((&Context{Domain: "pr1111.astronomer-dev.io"}).SetContext())
+	s.Require().NoError((&Context{Domain: "pr2222.astronomer-dev.io"}).SetContext())
+	s.Require().NoError((&Context{Domain: "pr1111.astronomer-dev.io"}).SetAuthTenant("https://sandbox.example.com/", "sandbox-client"))
+	s.Require().NoError((&Context{Domain: "pr2222.astronomer-dev.io"}).SetAuthTenant("https://sandbox.example.com/", "other-client"))
+
+	sharing, err := ContextsSharingLogin("https://sandbox.example.com/", "sandbox-client")
+	s.NoError(err)
+	s.Len(sharing, 1)
+	s.Equal("pr1111.astronomer-dev.io", sharing[0].Domain)
+
+	sharing, err = ContextsSharingLogin("", "")
+	s.NoError(err)
+	s.Empty(sharing)
+
+	s.Run("a context saved without its domain field is named by its key", func() {
+		fs := afero.NewMemMapFs()
+		configRaw := []byte(`
+contexts:
+  pr1111_astronomer-dev_io:
+    auth_domain: https://sandbox.example.com/
+    auth_client_id: sandbox-client
+`)
+		s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777))
+		InitConfig(fs)
+
+		sharing, err := ContextsSharingLogin("https://sandbox.example.com/", "sandbox-client")
+		s.NoError(err)
+		s.Require().Len(sharing, 1)
+		s.Equal("pr1111.astronomer-dev.io", sharing[0].Domain)
+	})
+}
+
+func (s *Suite) TestSetContextKey_KeepsDomainOfNewContext() {
+	initTestConfig()
+	ctx := Context{Domain: "pr1111.astronomer-dev.io"}
+	s.Require().NoError(ctx.SetContext())
+	s.Require().NoError(ctx.SetContextKey("token", "Bearer new"))
+
+	contexts, err := GetContexts()
+	s.Require().NoError(err)
+	s.Equal("pr1111.astronomer-dev.io", contexts.Contexts["pr1111_astronomer-dev_io"].Domain)
 }
 
 func (s *Suite) TestSetOrganizationContext() {

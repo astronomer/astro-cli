@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -454,6 +455,68 @@ func TestCheckToken(t *testing.T) {
 		ctx, err = context.GetCurrentContext()
 		assert.NoError(t, err)
 		assert.Equal(t, "Bearer relogin-token", ctx.Token)
+	})
+	t.Run("records the auth tenant and shares the refreshed token across it", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`{"access_token":"refreshed","expires_in":3600}`))
+		}))
+		t.Cleanup(idp.Close)
+		authConfig := auth.Config{ClientID: "client-id", DomainURL: idp.URL + "/"}
+		previous := fetchDomainAuthConfig
+		t.Cleanup(func() { fetchDomainAuthConfig = previous })
+		fetchDomainAuthConfig = func(string) (auth.Config, error) { return authConfig, nil }
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+			t.Error("a working refresh token should not need a login")
+			return nil
+		}
+		sibling := config.Context{Domain: "pr1111.astronomer-dev.io"}
+		assert.NoError(t, sibling.SetContext())
+		assert.NoError(t, sibling.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID))
+
+		assert.NoError(t, checkToken(new(astrov1_mocks.ClientWithResponsesInterface), nil))
+
+		current, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, authConfig.DomainURL, current.AuthDomain)
+		assert.Equal(t, authConfig.ClientID, current.AuthClientID)
+		assert.Equal(t, "Bearer refreshed", current.Token)
+		sibling, err = context.GetContext(sibling.Domain)
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer refreshed", sibling.Token)
+	})
+	t.Run("a refresh shares the whole login, not the access token alone", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`{"access_token":"refreshed","refresh_token":"rotated","expires_in":3600}`))
+		}))
+		t.Cleanup(idp.Close)
+		authConfig := auth.Config{ClientID: "client-id", DomainURL: idp.URL + "/"}
+		previous := fetchDomainAuthConfig
+		t.Cleanup(func() { fetchDomainAuthConfig = previous })
+		fetchDomainAuthConfig = func(string) (auth.Config, error) { return authConfig, nil }
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+			t.Error("a working refresh token should not need a login")
+			return nil
+		}
+		current, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.NoError(t, current.SetContextKey("user_email", "x@astronomer.test"))
+		sibling := config.Context{Domain: "pr1111.astronomer-dev.io"}
+		assert.NoError(t, sibling.SetContext())
+		assert.NoError(t, sibling.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID))
+		assert.NoError(t, sibling.SetContextKey("refreshtoken", "other-users-refresh"))
+		assert.NoError(t, sibling.SetContextKey("user_email", "y@astronomer.test"))
+
+		assert.NoError(t, checkToken(new(astrov1_mocks.ClientWithResponsesInterface), nil))
+
+		for _, domain := range []string{current.Domain, sibling.Domain} {
+			c, err := context.GetContext(domain)
+			assert.NoError(t, err)
+			assert.Equal(t, "Bearer refreshed", c.Token, domain)
+			assert.Equal(t, "rotated", c.RefreshToken, domain)
+			assert.Equal(t, "x@astronomer.test", c.UserEmail, domain)
+		}
 	})
 }
 

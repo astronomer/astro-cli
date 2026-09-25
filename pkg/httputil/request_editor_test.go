@@ -99,3 +99,56 @@ func TestClientVersionHeaderIsAlwaysSet(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeAPIErrorUnlinkedPRPreview(t *testing.T) {
+	forbidden := []byte(`{"message":"oauth_user with id auth0|123 is forbidden"}`)
+	for _, tc := range []struct {
+		name string
+		url  string
+		body []byte
+		want string
+	}{
+		{
+			name: "a PR preview with no user for the login yet",
+			url:  "https://pr41517.api.astronomer-dev.io/v1/organizations",
+			body: forbidden,
+			want: "you're logged in to PR previews, but pr41517 has no user for you yet. Run `astro login pr41517` to create it, then run the command again",
+		},
+		{
+			name: "the same refusal from dev",
+			url:  "https://api.astronomer-dev.io/v1/organizations",
+			body: forbidden,
+			want: "oauth_user with id auth0|123 is forbidden",
+		},
+		{
+			name: "another 403 from a PR preview",
+			url:  "https://pr41517.api.astronomer-dev.io/v1/organizations",
+			body: []byte(`{"message":"missing permission"}`),
+			want: "missing permission",
+		},
+		{
+			name: "another refusal worded is forbidden from a PR preview",
+			url:  "https://pr41517.api.astronomer-dev.io/v1/organizations",
+			body: []byte(`{"message":"deployment dep-1 is forbidden"}`),
+			want: "deployment dep-1 is forbidden",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tc.url, http.NoBody)
+			if err != nil {
+				t.Fatalf("building the request: %v", err)
+			}
+			err = NormalizeAPIError(&http.Response{StatusCode: http.StatusForbidden, Request: req}, tc.body)
+			if err == nil || err.Error() != tc.want {
+				t.Errorf("NormalizeAPIError = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	t.Run("a response with no request", func(t *testing.T) {
+		err := NormalizeAPIError(&http.Response{StatusCode: http.StatusForbidden}, forbidden)
+		if err == nil || err.Error() != "oauth_user with id auth0|123 is forbidden" {
+			t.Errorf("NormalizeAPIError = %v", err)
+		}
+	})
+}

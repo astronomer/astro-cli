@@ -488,6 +488,31 @@ func (s *Suite) TestSwitchWithContextSurfacesCredentialWriteError() {
 	s.Empty(buf.String())
 }
 
+func (s *Suite) TestSwitchWithContextKeepsAPITokenOnItsOwnHost() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	for _, host := range []string{"pr1111.astronomer-dev.io", "pr2222.astronomer-dev.io"} {
+		s.Require().NoError((&config.Context{Domain: host}).SetContext())
+		s.Require().NoError((&config.Context{Domain: host}).SetAuthTenant("https://auth.example.com/", "client-id"))
+	}
+	sibling := config.Context{Domain: "pr2222.astronomer-dev.io"}
+	s.Require().NoError(sibling.SetSharedContextKey("token", "Bearer shared"))
+	s.Require().NoError((&config.Context{Domain: "pr1111.astronomer-dev.io"}).SwitchContext())
+	current := config.Context{Domain: "pr1111.astronomer-dev.io"}
+	s.Require().NoError(current.SetContextKey("token", "Bearer api-token"))
+	CheckUserSession = func(c *config.Context, astroV1Client astrov1.APIClient, out io.Writer) error {
+		return nil
+	}
+
+	s.Require().NoError(SwitchWithContext("pr1111.astronomer-dev.io", &astrov1.Organization{Id: "org1"}, new(astrov1_mocks.ClientWithResponsesInterface), io.Discard))
+
+	sibling, err := sibling.GetContext()
+	s.NoError(err)
+	s.Equal("Bearer shared", sibling.Token)
+	current, err = current.GetContext()
+	s.NoError(err)
+	s.Equal("Bearer api-token", current.Token)
+}
+
 func (s *Suite) TestIsOrgHosted() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)

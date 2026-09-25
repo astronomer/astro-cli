@@ -14,6 +14,7 @@ const (
 var (
 	PRPreviewDomainRegex = regexp.MustCompile(`^(pr\d{4,6}).astronomer-dev\.io$`)
 	prPreviewShortName   = regexp.MustCompile(`^pr\d{4,6}$`)
+	prPreviewAPIHost     = regexp.MustCompile(`^(pr\d{4,6})\.api\.astronomer-dev\.io$`)
 
 	environmentShortNames = map[string]string{
 		"prod":  DefaultDomain,
@@ -46,6 +47,16 @@ func FormatDomain(domain string) string {
 	}
 
 	return domain
+}
+
+// PRPreviewOfAPIHost returns the PR preview, such as pr12345, that an API host
+// such as pr12345.api.astronomer-dev.io belongs to.
+func PRPreviewOfAPIHost(host string) (string, bool) {
+	m := prPreviewAPIHost.FindStringSubmatch(host)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
 }
 
 func isPrPreviewDomain(domain string) bool {

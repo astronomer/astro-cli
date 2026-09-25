@@ -45,22 +45,30 @@ type CallbackMessage struct {
 }
 
 func (res Result) writeToContext(c *config.Context) error {
-	err := c.SetContextKey("token", "Bearer "+res.AccessToken)
+	// A login with a refresh token works on every host on the tenant, so it
+	// goes to all of them. One without, such as --token-login, cannot renew
+	// itself and stays on this host rather than replacing their working login.
+	set, setExpiresIn := c.SetSharedContextKey, c.SetSharedExpiresIn
+	if res.RefreshToken == "" {
+		set, setExpiresIn = c.SetContextKey, c.SetExpiresIn
+	}
+
+	err := set("token", "Bearer "+res.AccessToken)
 	if err != nil {
 		return err
 	}
 
-	err = c.SetContextKey("refreshtoken", res.RefreshToken)
+	err = set("refreshtoken", res.RefreshToken)
 	if err != nil {
 		return err
 	}
 
-	err = c.SetExpiresIn(res.ExpiresIn)
+	err = setExpiresIn(res.ExpiresIn)
 	if err != nil {
 		return err
 	}
 
-	err = c.SetContextKey("user_email", res.UserEmail)
+	err = set("user_email", res.UserEmail)
 	if err != nil {
 		return err
 	}

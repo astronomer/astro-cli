@@ -11,7 +11,9 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/version"
 )
 
@@ -52,9 +54,24 @@ func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 				wrapped:    ErrorRequest,
 			}
 		}
+		if pr, ok := unlinkedPRPreview(httpResp, decode.Message); ok {
+			return &StatusError{StatusCode: httpResp.StatusCode, msg: fmt.Sprintf("you're logged in to PR previews, but %s has no user for you yet. Run `astro login %s` to create it, then run the command again", pr, pr)}
+		}
 		return &StatusError{StatusCode: httpResp.StatusCode, msg: decode.Message}
 	}
 	return nil
+}
+
+// unlinkedPRPreview reports the PR preview that refused a request because the
+// user is not in its database yet. One login works for every PR preview, but
+// each preview has its own database and answers 403 "oauth_user with id … is
+// forbidden" until a login there creates the user.
+func unlinkedPRPreview(httpResp *http.Response, message string) (string, bool) {
+	if httpResp.StatusCode != http.StatusForbidden || httpResp.Request == nil ||
+		!strings.HasPrefix(message, "oauth_user with id ") || !strings.HasSuffix(message, " is forbidden") {
+		return "", false
+	}
+	return domainutil.PRPreviewOfAPIHost(httpResp.Request.URL.Hostname())
 }
 
 // NewRequestEditorFn returns a request editor that sets auth headers and the

@@ -182,6 +182,17 @@ func (s *Suite) TestGetURLToEndpoint() {
 	})
 }
 
+func (s *Suite) TestPRPreviewOfAPIHost() {
+	pr, ok := PRPreviewOfAPIHost("pr41517.api.astronomer-dev.io")
+	s.True(ok)
+	s.Equal("pr41517", pr)
+
+	for _, host := range []string{"api.astronomer-dev.io", "pr41517.astronomer-dev.io", "pr41517.api.astronomer.io", "pr123.api.astronomer-dev.io"} {
+		_, ok := PRPreviewOfAPIHost(host)
+		s.False(ok, host)
+	}
+}
+
 func (s *Suite) TestExpandShortName() {
 	tests := map[string]string{
 		"prod":                     "astronomer.io",

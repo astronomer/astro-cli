@@ -44,6 +44,7 @@ const (
 
 type TokenResponse struct {
 	AccessToken      string  `json:"access_token"`
+	RefreshToken     string  `json:"refresh_token"`
 	IDToken          string  `json:"id_token"`
 	TokenType        string  `json:"token_type"`
 	ExpiresIn        int64   `json:"expires_in"`
@@ -184,6 +185,10 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+		err = c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID)
+		if err != nil {
+			return err
+		}
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
@@ -202,10 +207,24 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 
 // saveRenewedToken persists the context with the renewed access token.
 func saveRenewedToken(c *config.Context, res *TokenResponse) error {
-	if err := c.SetContextKey("token", "Bearer "+res.AccessToken); err != nil {
+	// A token renewed from the refresh token works on every host on the tenant,
+	// so the whole login goes to them: its refresh token and email with it.
+	// Sharing the access token alone would leave a host that held another
+	// user's login calling as one user while it renews as the other.
+	refreshToken := res.RefreshToken
+	if refreshToken == "" {
+		refreshToken = c.RefreshToken
+	}
+	if err := c.SetSharedContextKey("token", "Bearer "+res.AccessToken); err != nil {
 		return err
 	}
-	if err := c.SetExpiresIn(res.ExpiresIn); err != nil {
+	if err := c.SetSharedContextKey("refreshtoken", refreshToken); err != nil {
+		return err
+	}
+	if err := c.SetSharedExpiresIn(res.ExpiresIn); err != nil {
+		return err
+	}
+	if err := c.SetSharedContextKey("user_email", c.UserEmail); err != nil {
 		return err
 	}
 	if err := c.SetContextKey("workspace", c.Workspace); err != nil {
