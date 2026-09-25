@@ -229,42 +229,6 @@ func (s *Suite) TestGetAstroRuntimeTag() {
 	}
 }
 
-func (s *Suite) TestPickLatestMatchingRuntimeVersion() {
-	runtimeVersionsV3 := map[string]RuntimeVersion{
-		"3.0-1": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
-		"3.0-3": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
-		"3.0-9": {
-			Metadata: RuntimeVersionMetadata{
-				Channel:      VersionChannelStable,
-				Yanked:       true,
-				YankedReason: "broken connection extras deserialization",
-			},
-		},
-		"3.1-1": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
-		"3.1-2": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable}},
-	}
-
-	tests := []struct {
-		floatingTag string
-		output      string
-	}{
-		{floatingTag: "3.0", output: "3.0-3"},
-		{floatingTag: "3.1", output: "3.1-2"},
-		{floatingTag: "4.0", output: ""},
-	}
-
-	for _, tt := range tests {
-		s.Equal(tt.output, pickLatestMatchingRuntimeVersion(tt.floatingTag, runtimeVersionsV3), "floatingTag=%q", tt.floatingTag)
-	}
-
-	s.Run("all matching yanked returns empty", func() {
-		allYanked := map[string]RuntimeVersion{
-			"3.2-1": {Metadata: RuntimeVersionMetadata{Channel: VersionChannelStable, Yanked: true}},
-		}
-		s.Equal("", pickLatestMatchingRuntimeVersion("3.2", allYanked))
-	})
-}
-
 func (s *Suite) TestGetDefaultImageTag() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

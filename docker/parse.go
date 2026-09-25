@@ -4,7 +4,6 @@ package docker
 import (
 	"io"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -41,16 +40,6 @@ type ParseError struct {
 
 func (e ParseError) Error() string {
 	return e.Msg
-}
-
-// List all legal cmds in a dockerfile
-func AllCmds() []string {
-	ret := make([]string, 0, len(command.Commands))
-	for k := range command.Commands {
-		ret = append(ret, k)
-	}
-	sort.Strings(ret)
-	return ret
 }
 
 // Parse a Dockerfile from a reader.  A ParseError may occur.

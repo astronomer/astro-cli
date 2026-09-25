@@ -95,14 +95,6 @@ func (c *Cache) SetStripPrefix(prefix string) {
 	c.stripPrefix = prefix
 }
 
-// NewCache creates a new OpenAPI cache with default settings.
-func NewCache() *Cache {
-	return &Cache{
-		specURL:   SpecURL,
-		cachePath: filepath.Join(config.HomeConfigPath, CloudCacheFileName),
-	}
-}
-
 // NewCacheWithOptions creates a new OpenAPI cache with custom settings.
 func NewCacheWithOptions(specURL, cachePath string) *Cache {
 	return &Cache{
@@ -224,11 +216,6 @@ func (c *Cache) Load(forceRefresh bool) error {
 // GetSpecURL returns the URL used to fetch the OpenAPI spec.
 func (c *Cache) GetSpecURL() string {
 	return c.specURL
-}
-
-// GetDoc returns the loaded OpenAPI document.
-func (c *Cache) GetDoc() *v3high.Document {
-	return c.doc
 }
 
 // GetEndpoints extracts all endpoints from the loaded spec.
@@ -428,9 +415,4 @@ func parseSpec(data []byte) (*v3high.Document, *v2high.Swagger, error) {
 		return nil, nil, fmt.Errorf("building v3 model: unknown error")
 	}
 	return &model.Model, nil, nil
-}
-
-// ClearCache removes the cached spec file.
-func (c *Cache) ClearCache() error {
-	return os.Remove(c.cachePath)
 }

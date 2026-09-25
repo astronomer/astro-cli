@@ -15,12 +15,6 @@ type SchemaResolver struct {
 	registry map[string]*Schema
 }
 
-// NewSchemaResolver creates a new schema resolver without a registry. Refs are
-// reported by name but not resolved to their value.
-func NewSchemaResolver() *SchemaResolver {
-	return &SchemaResolver{}
-}
-
 // NewSchemaResolverWithSchemas creates a resolver backed by a registry of named
 // component schemas, enabling lazy resolution of $ref references.
 func NewSchemaResolverWithSchemas(registry map[string]*Schema) *SchemaResolver {

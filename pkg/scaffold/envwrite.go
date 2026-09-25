@@ -83,21 +83,6 @@ func AddEnvDeclaration(dir string, wrap func(run func() error) error, section en
 	})
 }
 
-// SetEnvDeclaration declares name in section with exactly spec's annotations,
-// or with none for a nil spec, replacing the ones it had. An annotation that
-// keeps its value is not rewritten, and the table's other lines and comments
-// stay where they are.
-func SetEnvDeclaration(dir string, wrap func(run func() error) error, section envschema.Section, name string, spec *envschema.ValueSpec) error {
-	return EditEnvDeclaration(dir, wrap, section, name, func(s *envschema.ValueSpec, _ bool) error {
-		if spec == nil {
-			*s = envschema.ValueSpec{}
-			return nil
-		}
-		*s = cloneSpec(spec)
-		return nil
-	})
-}
-
 // DeclareEnvFromWorkspace makes name resolve from the workspace's Environment
 // Manager objects: it gives the declaration source = 'workspace', declaring it
 // first if it is not declared. An existing declaration keeps every other

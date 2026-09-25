@@ -8,7 +8,6 @@ tool (
 )
 
 require (
-	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/astronomer/astro-cli/pkg/telemetry v0.0.0
 	github.com/briandowns/spinner v1.23.1
@@ -100,7 +99,6 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/chigopher/pathlib v0.19.1 // indirect
-	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/containerd/containerd/api v1.11.0 // indirect
@@ -278,7 +276,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
-	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect

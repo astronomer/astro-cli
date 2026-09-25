@@ -48,7 +48,7 @@ func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 
 func execute(t *testing.T, d Deps, args ...string) error {
 	t.Helper()
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	root.SetArgs(args)
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})

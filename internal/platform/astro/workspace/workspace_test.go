@@ -57,19 +57,6 @@ func TestWorkspace(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-func (s *Suite) TestList() {
-	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-
-	buf := new(bytes.Buffer)
-	err := List(mockClient, buf)
-	s.NoError(err)
-	expected := ` NAME               ID               
- test-workspace     workspace-id     
-`
-	s.Equal(buf.String(), expected)
-}
-
 func (s *Suite) TestGetWorkspacesPaginates() {
 	page1 := astrov1.ListWorkspacesResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
@@ -108,15 +95,6 @@ func offsetIs(want int) any {
 	return mock.MatchedBy(func(p *astrov1.ListWorkspacesParams) bool {
 		return p != nil && p.Offset != nil && *p.Offset == want
 	})
-}
-
-func (s *Suite) TestListError() {
-	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
-
-	buf := new(bytes.Buffer)
-	err := List(mockClient, buf)
-	s.ErrorIs(err, errMock)
 }
 
 func (s *Suite) TestListData() {

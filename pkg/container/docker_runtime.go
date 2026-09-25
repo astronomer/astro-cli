@@ -61,12 +61,6 @@ func newDockerRuntime(engine Engine, fb Feedback) *DockerRuntime {
 	return &DockerRuntime{Engine: de, OSChecker: CreateOSChecker(), fb: fb}
 }
 
-// CreateDockerRuntime builds a DockerRuntime from an explicit engine and OS
-// checker. It uses NoopFeedback; provided primarily for tests.
-func CreateDockerRuntime(engine DockerEngine, osChecker OSChecker) *DockerRuntime {
-	return &DockerRuntime{Engine: engine, OSChecker: osChecker, fb: NoopFeedback{}}
-}
-
 // Initialize starts Docker if it isn't already running. We only attempt this on
 // Mac today; elsewhere it's a no-op.
 func (rt *DockerRuntime) Initialize() error {

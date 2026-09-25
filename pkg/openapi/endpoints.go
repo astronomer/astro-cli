@@ -332,17 +332,6 @@ func matchesFilter(ep *Endpoint, filter string) bool {
 	return false
 }
 
-// FindEndpoint finds an endpoint by method and path.
-func FindEndpoint(endpoints []Endpoint, method, path string) *Endpoint {
-	method = strings.ToUpper(method)
-	for i := range endpoints {
-		if endpoints[i].Method == method && endpoints[i].Path == path {
-			return &endpoints[i]
-		}
-	}
-	return nil
-}
-
 // FindEndpointByPath finds endpoints matching the given path (any method).
 func FindEndpointByPath(endpoints []Endpoint, path string) []Endpoint {
 	var matches []Endpoint

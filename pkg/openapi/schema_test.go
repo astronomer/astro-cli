@@ -50,22 +50,17 @@ func TestExtractRefName(t *testing.T) {
 
 // --- NewSchemaResolver -------------------------------------------------------
 
-func TestNewSchemaResolver(t *testing.T) {
-	r := NewSchemaResolver()
-	assert.NotNil(t, r)
-}
-
 // --- ResolveSchema -----------------------------------------------------------
 
 func TestResolveSchema_Nil(t *testing.T) {
-	r := NewSchemaResolver()
+	r := &SchemaResolver{}
 	resolved, refName := r.ResolveSchema(nil)
 	assert.Nil(t, resolved)
 	assert.Empty(t, refName)
 }
 
 func TestResolveSchema_NoRef(t *testing.T) {
-	r := NewSchemaResolver()
+	r := &SchemaResolver{}
 	schema := &Schema{Type: "string"}
 	ref := &SchemaRef{Value: schema}
 	resolved, refName := r.ResolveSchema(ref)
@@ -74,7 +69,7 @@ func TestResolveSchema_NoRef(t *testing.T) {
 }
 
 func TestResolveSchema_WithRef(t *testing.T) {
-	r := NewSchemaResolver()
+	r := &SchemaResolver{}
 	resolvedSchema := &Schema{
 		Type: "object",
 		Properties: []SchemaProperty{

@@ -15,10 +15,6 @@ const (
 	spinnerColor = "cyan"
 )
 
-func Waiting(fn func() error) error {
-	return loading("", "", "", fn)
-}
-
 func Spinner(text string, fn func() error) error {
 	initialMsg := text + spinnerTextEllipsis + " "
 	doneMsg := spinnerTextDone + "\n"

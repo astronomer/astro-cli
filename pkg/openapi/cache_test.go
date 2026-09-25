@@ -27,12 +27,6 @@ func minimalSpecJSON(title string, paths map[string]map[string]map[string]any) [
 
 // --- Constructors ------------------------------------------------------------
 
-func TestNewCache(t *testing.T) {
-	cache := NewCache()
-	assert.Equal(t, SpecURL, cache.specURL)
-	assert.NotEmpty(t, cache.cachePath)
-}
-
 func TestNewCacheWithOptions(t *testing.T) {
 	cache := NewCacheWithOptions("https://example.com/spec", "/tmp/cache.json")
 	assert.Equal(t, "https://example.com/spec", cache.specURL)
@@ -101,23 +95,6 @@ func TestGetHTTPClient_Custom(t *testing.T) {
 	cache := &Cache{}
 	cache.SetHTTPClient(custom)
 	assert.Equal(t, custom, cache.getHTTPClient())
-}
-
-// --- GetDoc / IsLoaded -------------------------------------------------------
-
-func TestGetDoc_Nil(t *testing.T) {
-	cache := &Cache{}
-	assert.Nil(t, cache.GetDoc())
-	assert.False(t, cache.IsLoaded())
-}
-
-func TestGetDoc_Loaded(t *testing.T) {
-	body := minimalSpecJSON("Test", map[string]map[string]map[string]any{})
-	doc, _, err := parseSpec(body)
-	require.NoError(t, err)
-	cache := &Cache{doc: doc}
-	assert.NotNil(t, cache.GetDoc())
-	assert.True(t, cache.IsLoaded())
 }
 
 // --- GetEndpoints ------------------------------------------------------------
@@ -372,7 +349,7 @@ func TestLoad_FetchAndCache(t *testing.T) {
 	err := cache.Load(false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, fetchCount)
-	assert.Equal(t, "Load Test", cache.GetDoc().Info.Title)
+	assert.Equal(t, "Load Test", cache.doc.Info.Title)
 
 	// Second load uses cache (no additional fetch)
 	err = cache.Load(false)
@@ -430,7 +407,7 @@ func TestLoad_FetchFailWithStaleCache(t *testing.T) {
 	// Load should succeed using stale cache
 	err = cache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "Stale", cache.GetDoc().Info.Title)
+	assert.Equal(t, "Stale", cache.doc.Info.Title)
 }
 
 func TestLoad_FetchFailNoCache(t *testing.T) {
@@ -444,27 +421,6 @@ func TestLoad_FetchFailNoCache(t *testing.T) {
 
 	err := cache.Load(false)
 	require.Error(t, err)
-}
-
-// --- ClearCache --------------------------------------------------------------
-
-func TestClearCache(t *testing.T) {
-	tmpDir := t.TempDir()
-	cachePath := filepath.Join(tmpDir, "cache.json")
-	require.NoError(t, os.WriteFile(cachePath, []byte(`{}`), 0o600))
-
-	cache := &Cache{cachePath: cachePath}
-	err := cache.ClearCache()
-	require.NoError(t, err)
-
-	_, err = os.Stat(cachePath)
-	assert.True(t, os.IsNotExist(err))
-}
-
-func TestClearCache_NotFound(t *testing.T) {
-	cache := &Cache{cachePath: "/nonexistent/cache.json"}
-	err := cache.ClearCache()
-	assert.Error(t, err)
 }
 
 // --- parseSpec version detection ---------------------------------------------
@@ -686,7 +642,7 @@ func TestLoad_LocalFile(t *testing.T) {
 	err := cache.Load(false)
 	require.NoError(t, err)
 	assert.True(t, cache.IsLoaded())
-	assert.Equal(t, "Local Spec", cache.GetDoc().Info.Title)
+	assert.Equal(t, "Local Spec", cache.doc.Info.Title)
 
 	endpoints := cache.GetEndpoints()
 	require.Len(t, endpoints, 1)
@@ -720,7 +676,7 @@ func TestLoad_LocalFile_AlwaysFresh(t *testing.T) {
 	cache := NewCacheForLocalFile(tmpFile)
 	err := cache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "Version 1", cache.GetDoc().Info.Title)
+	assert.Equal(t, "Version 1", cache.doc.Info.Title)
 
 	// Overwrite with version 2
 	v2 := minimalSpecJSON("Version 2", map[string]map[string]map[string]any{})
@@ -729,7 +685,7 @@ func TestLoad_LocalFile_AlwaysFresh(t *testing.T) {
 	// Load again without forceRefresh — should still see version 2
 	err = cache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "Version 2", cache.GetDoc().Info.Title)
+	assert.Equal(t, "Version 2", cache.doc.Info.Title)
 }
 
 // --- GetSchemas --------------------------------------------------------------
@@ -791,6 +747,6 @@ func TestGetSchemas_V2(t *testing.T) {
 }
 
 func TestGetSchemas_NotLoaded(t *testing.T) {
-	cache := NewCache()
+	cache := &Cache{}
 	assert.Nil(t, cache.GetSchemas())
 }

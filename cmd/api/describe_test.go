@@ -173,7 +173,7 @@ func TestPrintRequestBody(t *testing.T) {
 				},
 			},
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printRequestBody(&buf, body, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "Request Body")
@@ -199,7 +199,7 @@ func TestPrintRequestBody(t *testing.T) {
 				},
 			},
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printRequestBody(&buf, body, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "DAG")
@@ -209,7 +209,7 @@ func TestPrintRequestBody(t *testing.T) {
 	t.Run("no content", func(t *testing.T) {
 		var buf bytes.Buffer
 		body := &openapi.RequestBody{}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printRequestBody(&buf, body, resolver)
 		assert.Contains(t, buf.String(), "Request Body")
 	})
@@ -246,7 +246,7 @@ func TestPrintResponses(t *testing.T) {
 				{Code: "500", Description: "Server error"},
 			},
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printResponses(&buf, responses, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "Responses")
@@ -264,7 +264,7 @@ func TestPrintResponses(t *testing.T) {
 				{Code: "301", Description: "Moved permanently"},
 			},
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printResponses(&buf, responses, resolver)
 		assert.Contains(t, buf.String(), "301")
 	})
@@ -276,7 +276,7 @@ func TestPrintResponses(t *testing.T) {
 				{Code: "default", Description: "Default error"},
 			},
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printResponses(&buf, responses, resolver)
 		assert.Contains(t, buf.String(), "default")
 	})
@@ -301,7 +301,7 @@ func TestPrintSchema(t *testing.T) {
 				{Name: "description", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "name")
@@ -318,7 +318,7 @@ func TestPrintSchema(t *testing.T) {
 				{Name: "name", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.NotContains(t, output, "  id")
@@ -334,7 +334,7 @@ func TestPrintSchema(t *testing.T) {
 				{Name: "name", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), responseSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "id")
@@ -353,7 +353,7 @@ func TestPrintSchema(t *testing.T) {
 				}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "Example: active")
@@ -368,7 +368,7 @@ func TestPrintSchema(t *testing.T) {
 				{Name: "limit", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "integer", Default: 100}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		assert.Contains(t, buf.String(), "Default: 100")
 	})
@@ -381,7 +381,7 @@ func TestPrintSchema(t *testing.T) {
 				{Name: "limit", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "integer", Default: 100}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), responseSchemaPrintOpts())
 		assert.NotContains(t, buf.String(), "Default:")
 	})
@@ -394,7 +394,7 @@ func TestPrintSchema(t *testing.T) {
 				{Value: &openapi.Schema{Type: "integer"}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "One of the following")
@@ -409,7 +409,7 @@ func TestPrintSchema(t *testing.T) {
 				{Value: &openapi.Schema{Type: "string"}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		assert.Contains(t, buf.String(), "Any of the following")
 	})
@@ -426,7 +426,7 @@ func TestPrintSchema(t *testing.T) {
 				}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "All of the following")
@@ -444,7 +444,7 @@ func TestPrintSchema(t *testing.T) {
 		selfRef.Value = nodeSchema
 
 		entryRef := &openapi.SchemaRef{Ref: "#/components/schemas/Node", Value: nodeSchema}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, entryRef, resolver, 2, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "see Node above")
@@ -459,7 +459,7 @@ func TestPrintSchema(t *testing.T) {
 			},
 		}
 		schemaRef := &openapi.SchemaRef{Ref: "#/components/schemas/Thing", Value: thingSchema}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		visited := map[string]bool{"Thing": true}
 		printSchema(&buf, schemaRef, resolver, 2, visited, requestSchemaPrintOpts())
 		assert.Contains(t, buf.String(), "see Thing above")
@@ -478,7 +478,7 @@ func TestPrintSchema(t *testing.T) {
 				}}},
 			},
 		}}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printSchema(&buf, schemaRef, resolver, maxSchemaIndent, make(map[string]bool), requestSchemaPrintOpts())
 		output := buf.String()
 		assert.Contains(t, output, "nested")
@@ -520,7 +520,7 @@ func TestPrintEndpointDetails(t *testing.T) {
 				},
 			},
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printEndpointDetails(&buf, ep, resolver)
 		output := buf.String()
 
@@ -537,7 +537,7 @@ func TestPrintEndpointDetails(t *testing.T) {
 	t.Run("deprecated endpoint", func(t *testing.T) {
 		var buf bytes.Buffer
 		ep := &openapi.Endpoint{Method: "GET", Path: "/old", Deprecated: true}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printEndpointDetails(&buf, ep, resolver)
 		assert.Contains(t, buf.String(), "DEPRECATED")
 	})
@@ -545,7 +545,7 @@ func TestPrintEndpointDetails(t *testing.T) {
 	t.Run("no optional fields", func(t *testing.T) {
 		var buf bytes.Buffer
 		ep := &openapi.Endpoint{Method: "GET", Path: "/health"}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printEndpointDetails(&buf, ep, resolver)
 		output := buf.String()
 		assert.Contains(t, output, "/health")
@@ -561,7 +561,7 @@ func TestPrintEndpointDetails(t *testing.T) {
 			Summary:     "Same text",
 			Description: "Same text",
 		}
-		resolver := openapi.NewSchemaResolver()
+		resolver := &openapi.SchemaResolver{}
 		printEndpointDetails(&buf, ep, resolver)
 		output := buf.String()
 		first := bytes.Index([]byte(output), []byte("Same text"))
@@ -956,7 +956,7 @@ func TestPrintSchema_NestedAllOfPlusPropertiesPrintsOnce(t *testing.T) {
 	}}
 
 	var buf bytes.Buffer
-	printSchema(&buf, root, openapi.NewSchemaResolver(), 0, map[string]bool{}, responseSchemaPrintOpts())
+	printSchema(&buf, root, &openapi.SchemaResolver{}, 0, map[string]bool{}, responseSchemaPrintOpts())
 
 	assert.Equal(t, 1, strings.Count(buf.String(), "baseField"), buf.String())
 	assert.Equal(t, 1, strings.Count(buf.String(), "ownField"), buf.String())
@@ -1033,7 +1033,7 @@ func TestPrintSchema_NullablePrimitiveUsesCompactType(t *testing.T) {
 	}}
 
 	var buf bytes.Buffer
-	printSchema(&buf, root, openapi.NewSchemaResolver(), 0, map[string]bool{}, responseSchemaPrintOpts())
+	printSchema(&buf, root, &openapi.SchemaResolver{}, 0, map[string]bool{}, responseSchemaPrintOpts())
 
 	assert.Contains(t, buf.String(), "cursor  string or null")
 	assert.Contains(t, buf.String(), "choices  array of string or null")
@@ -1101,7 +1101,7 @@ func TestReadOnly_RequestHidesButJSONShows(t *testing.T) {
 			{Name: "userName", Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: "string"}}},
 		},
 	}
-	resolver := openapi.NewSchemaResolver()
+	resolver := &openapi.SchemaResolver{}
 
 	var buf bytes.Buffer
 	printSchema(&buf, &openapi.SchemaRef{Value: schema}, resolver, 0, map[string]bool{}, requestSchemaPrintOpts())
@@ -1151,7 +1151,7 @@ func TestResolveSchemaJSON_Composition(t *testing.T) {
 
 func TestResolveSchema_LazyRefWithoutRegistry(t *testing.T) {
 	// Without a registry, a pure $ref resolves to no value but still reports its name.
-	resolver := openapi.NewSchemaResolver()
+	resolver := &openapi.SchemaResolver{}
 	resolved, refName := resolver.ResolveSchema(&openapi.SchemaRef{Ref: "#/components/schemas/DAG"})
 	assert.Nil(t, resolved)
 	assert.Equal(t, "DAG", refName)

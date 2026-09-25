@@ -23,15 +23,6 @@ type ConfigOption struct {
 	Value string `json:"value"`
 }
 
-// Config reads Airflow's configuration. Airflow refuses this with 403 unless
-// expose_config is on, which reaches the caller as ErrForbidden rather than
-// an empty answer.
-func (c *Client) Config(ctx context.Context) (Config, error) {
-	var config Config
-	err := c.get(ctx, "/config", nil, &config)
-	return config, err
-}
-
 // HealthComponent is one Airflow component's health.
 type HealthComponent struct {
 	Status string `json:"status"`

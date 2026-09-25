@@ -260,80 +260,6 @@ func (s *Suite) TestTar() {
 	}
 }
 
-func (s *Suite) TestContains() {
-	type args struct {
-		elems []string
-		param string
-	}
-	tests := []struct {
-		name         string
-		args         args
-		expectedResp bool
-		expectedPos  int
-	}{
-		{
-			name:         "should contain element case",
-			args:         args{elems: []string{"sample.yaml", "test.yaml"}, param: "test.yaml"},
-			expectedResp: true,
-			expectedPos:  1,
-		},
-		{
-			name:         "should not contain element case",
-			args:         args{elems: []string{"sample.yaml", "test.yaml"}, param: "random.yaml"},
-			expectedResp: false,
-			expectedPos:  0,
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			exist, index := Contains(tt.args.elems, tt.args.param)
-			s.Equal(exist, tt.expectedResp)
-			s.Equal(index, tt.expectedPos)
-		})
-	}
-}
-
-func (s *Suite) TestRead() {
-	filePath := "./test.out"
-	content := "testing"
-	WriteStringToFile(filePath, content)
-	defer afero.NewOsFs().Remove(filePath)
-	type args struct {
-		path string
-	}
-	tests := []struct {
-		name         string
-		args         args
-		expectedResp []string
-		errResp      string
-	}{
-		{
-			name:         "should read file contents successfully",
-			args:         args{path: filePath},
-			expectedResp: []string{content},
-			errResp:      "",
-		},
-		{
-			name:         "error on read file content",
-			args:         args{path: "incorrect-file"},
-			expectedResp: nil,
-			errResp:      "no such file or directory",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			actualResp, actualErr := Read(tt.args.path)
-			if tt.errResp != "" && actualErr != nil {
-				s.Contains(actualErr.Error(), tt.errResp)
-			} else {
-				s.NoError(actualErr)
-			}
-			s.Equal(tt.expectedResp, actualResp)
-		})
-	}
-}
-
 func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"
@@ -931,7 +857,7 @@ func (s *Suite) TestCopyDirectory() {
 		s.NoError(err)
 
 		// Copy directory
-		err = CopyDirectory(srcDir, dstDir)
+		err = CopyDirectoryFiltered(srcDir, dstDir, nil)
 		s.NoError(err)
 
 		// Verify files were copied correctly
@@ -952,7 +878,7 @@ func (s *Suite) TestCopyDirectory() {
 		srcDir := filepath.Join(tempDir, "nonexistent")
 		dstDir := filepath.Join(tempDir, "dst")
 
-		err := CopyDirectory(srcDir, dstDir)
+		err := CopyDirectoryFiltered(srcDir, dstDir, nil)
 		s.Error(err)
 	})
 
@@ -972,7 +898,7 @@ func (s *Suite) TestCopyDirectory() {
 		s.NoError(os.WriteFile(filepath.Join(srcDir, "regular.txt"), []byte("ok"), 0o644))
 		s.NoError(os.Symlink(target, filepath.Join(srcDir, "link-to-dir")))
 
-		err := CopyDirectory(srcDir, dstDir)
+		err := CopyDirectoryFiltered(srcDir, dstDir, nil)
 		s.NoError(err)
 
 		// The regular file is copied.
@@ -1017,16 +943,4 @@ func (s *Suite) TestDefaultPermissions() {
 	// world-writable paths.
 	s.Equal(os.FileMode(0o755), perm)
 	s.Equal(0o755, openPermissions)
-
-	s.Run("CreateFile makes parent dirs 0o755", func() {
-		root := s.T().TempDir()
-		target := filepath.Join(root, "nested", "child", "file.txt")
-		file, err := CreateFile(target)
-		s.NoError(err)
-		file.Close()
-
-		info, err := os.Stat(filepath.Join(root, "nested"))
-		s.NoError(err)
-		s.Equal(os.FileMode(0o755), info.Mode().Perm())
-	})
 }

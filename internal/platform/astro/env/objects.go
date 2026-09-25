@@ -42,17 +42,6 @@ func (s Scope) Validate() error {
 	return nil
 }
 
-// ScopeFromIDs builds a Scope from raw workspace/deployment IDs, applying the
-// "deployment wins when both are set" precedence used by the local-dev path.
-// Callers that want strict mutual-exclusion should construct Scope directly
-// and call Validate.
-func ScopeFromIDs(workspaceID, deploymentID string) Scope {
-	if deploymentID != "" {
-		return Scope{DeploymentID: deploymentID}
-	}
-	return Scope{WorkspaceID: workspaceID}
-}
-
 // listObjects returns env-objects of the given type within the scope.
 // resolveLinked includes inherited workspace objects when listing at deployment scope.
 // includeSecrets requests secret values from the server (subject to org policy).

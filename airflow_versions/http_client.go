@@ -47,11 +47,6 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	return api.Do(doOpts)
 }
 
-// Do executes the given HTTP request and returns the HTTP Response
-func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(NewClient(httputil.NewHTTPClient(), false, false))
-}
-
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
 func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 	switch {

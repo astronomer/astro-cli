@@ -521,7 +521,7 @@ func TestInitCloudSpecCache_SpecTokenEnvVar_Empty(t *testing.T) {
 func TestInitCloudSpecCache_LocalFile(t *testing.T) {
 	initTestConfig(t)
 
-	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"Local","version":"1"},"paths":{}}`)
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"Local","version":"1"},"paths":{"/local":{"get":{}}}}`)
 	tmpFile := filepath.Join(t.TempDir(), "spec.json")
 	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
 
@@ -535,13 +535,15 @@ func TestInitCloudSpecCache_LocalFile(t *testing.T) {
 	// Verify it can load and parse
 	err = opts.specCache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "Local", opts.specCache.GetDoc().Info.Title)
+	endpoints := opts.specCache.GetEndpoints()
+	require.Len(t, endpoints, 1)
+	assert.Equal(t, "/local", endpoints[0].Path)
 }
 
 func TestInitCloudSpecCache_LocalFile_FileURL(t *testing.T) {
 	initTestConfig(t)
 
-	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"FileURL","version":"1"},"paths":{}}`)
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"FileURL","version":"1"},"paths":{"/fileurl":{"get":{}}}}`)
 	tmpFile := filepath.Join(t.TempDir(), "spec.json")
 	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
 
@@ -554,13 +556,15 @@ func TestInitCloudSpecCache_LocalFile_FileURL(t *testing.T) {
 
 	err = opts.specCache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "FileURL", opts.specCache.GetDoc().Info.Title)
+	endpoints := opts.specCache.GetEndpoints()
+	require.Len(t, endpoints, 1)
+	assert.Equal(t, "/fileurl", endpoints[0].Path)
 }
 
 func TestInitCloudSpecCache_LocalFile_IgnoresSpecTokenEnvVar(t *testing.T) {
 	initTestConfig(t)
 
-	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"IgnoreToken","version":"1"},"paths":{}}`)
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"IgnoreToken","version":"1"},"paths":{"/ignoretoken":{"get":{}}}}`)
 	tmpFile := filepath.Join(t.TempDir(), "spec.json")
 	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
 
@@ -578,5 +582,7 @@ func TestInitCloudSpecCache_LocalFile_IgnoresSpecTokenEnvVar(t *testing.T) {
 
 	err = opts.specCache.Load(false)
 	require.NoError(t, err)
-	assert.Equal(t, "IgnoreToken", opts.specCache.GetDoc().Info.Title)
+	endpoints := opts.specCache.GetEndpoints()
+	require.Len(t, endpoints, 1)
+	assert.Equal(t, "/ignoretoken", endpoints[0].Path)
 }

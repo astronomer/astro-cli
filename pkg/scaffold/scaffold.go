@@ -160,7 +160,7 @@ func isDagsPlaceholder(name string) bool {
 //
 // The example imports airflow.sdk, which is the Airflow 3 Task SDK and does not
 // exist before it: Airflow 2 spells the same two decorators airflow.decorators,
-// which is why this repo's v1 templates keep a per-major pair
+// which is why this repo's v1 templates were a per-major pair
 // (pkg/airflowrt/include/airflow2 beside .../airflow3). The pin is not always 3.
 // pickAirflowVersion reads it from --airflow-version, the manifest, a Dockerfile
 // runtime tag or requirements.txt, and any of those can say 2 — adopting a v1

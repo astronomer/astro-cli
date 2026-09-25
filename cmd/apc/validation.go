@@ -28,22 +28,6 @@ var validGitScheme = map[string]struct{}{
 	"https": {},
 }
 
-type ErrParsingKV struct {
-	kv string
-}
-
-func (e ErrParsingKV) Error() string {
-	return fmt.Sprintf("failed to parse key value pair (%s)", e.kv)
-}
-
-type ErrInvalidArg struct {
-	key string
-}
-
-func (e ErrInvalidArg) Error() string {
-	return fmt.Sprintf("invalid update arg key specified (%s)", e.key)
-}
-
 func coalesceWorkspace() (string, error) {
 	wsFlag := workspaceID
 	wsCfg, err := workspace.GetCurrentWorkspace()

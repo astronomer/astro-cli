@@ -70,14 +70,6 @@ type HTTPDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// SetHTTPClient replaces the HTTP client used for Airflow API calls.
-// It returns the previous client so callers can restore it.
-func SetHTTPClient(c HTTPDoer) HTTPDoer {
-	prev := httpClient
-	httpClient = c
-	return prev
-}
-
 // ConfigSettings is the main builder of the settings package.
 // airflowURL is the base API URL (e.g., "http://localhost:8080/api/v1").
 // authHeader is an optional Authorization header value (e.g., "Basic ...").
@@ -768,79 +760,4 @@ func jsonString(conn *Connection) string {
 		return ""
 	}
 	return string(extraBytes)
-}
-
-// SetExecAirflowCommand replaces the function used to execute airflow CLI commands.
-// It returns the previous function so callers can restore it.
-func SetExecAirflowCommand(fn func(id, command string) (string, error)) func(id, command string) (string, error) {
-	prev := execAirflowCommand
-	execAirflowCommand = fn
-	return prev
-}
-
-func WriteAirflowSettingstoYAML(settingsFile string) error {
-	err := InitSettings(settingsFile)
-	if err != nil {
-		return err
-	}
-
-	// Connections from settings file to connection YAML file
-	connYAMLs := ConnYAMLs{}
-	connections := settings.Airflow.Connections
-	for i := range connections {
-		newConnYAML := ConnYAML{
-			ConnID:   connections[i].ConnID,
-			ConnType: connections[i].ConnType,
-			Host:     connections[i].ConnHost,
-			Schema:   connections[i].ConnSchema,
-			Login:    connections[i].ConnLogin,
-			Password: connections[i].ConnPassword,
-			Port:     connections[i].ConnPort,
-			Extra:    connections[i].ConnExtra,
-		}
-
-		connYAMLs = append(connYAMLs, newConnYAML)
-	}
-
-	connectionsYAML := DAGRunConnections{
-		ConnYAMLs: connYAMLs,
-	}
-
-	out, err := yaml.Marshal(connectionsYAML)
-	if err != nil {
-		fmt.Printf("Error creating connections from settings file: %s\n", err.Error())
-	}
-
-	err = fileutil.WriteStringToFile("./connections.yaml", string(out))
-	if err != nil {
-		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
-	}
-
-	// Variables from settings file to variables YAML file
-	varYAMLs := VarYAMLs{}
-	variables := settings.Airflow.Variables
-	for _, variable := range variables {
-		newVarYAML := VarYAML{
-			Key:   variable.VariableName,
-			Value: variable.VariableValue,
-		}
-
-		varYAMLs = append(varYAMLs, newVarYAML)
-	}
-
-	variablesYAML := DAGRunVariables{
-		VarYAMLs: varYAMLs,
-	}
-
-	out, err = yaml.Marshal(variablesYAML)
-	if err != nil {
-		fmt.Printf("Error creating variabels from settings file: %s\n", err.Error())
-	}
-
-	err = fileutil.WriteStringToFile("./variables.yaml", string(out))
-	if err != nil {
-		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
-	}
-
-	return nil
 }

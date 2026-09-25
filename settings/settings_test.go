@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -60,9 +59,9 @@ func newMockAirflowAPI(s *Suite) (*httptest.Server, *[]apiRequest) {
 		}
 		fmt.Fprint(w, "{}")
 	}))
-	origClient := SetHTTPClient(server.Client())
+	origClient := setHTTPClient(server.Client())
 	s.T().Cleanup(func() {
-		SetHTTPClient(origClient)
+		setHTTPClient(origClient)
 		server.Close()
 	})
 	return server, &requests
@@ -91,9 +90,9 @@ func newConflictAirflowAPI(s *Suite) (*httptest.Server, *[]apiRequest) {
 			fmt.Fprint(w, "{}")
 		}
 	}))
-	origClient := SetHTTPClient(server.Client())
+	origClient := setHTTPClient(server.Client())
 	s.T().Cleanup(func() {
-		SetHTTPClient(origClient)
+		setHTTPClient(origClient)
 		server.Close()
 	})
 	return server, &requests
@@ -269,8 +268,8 @@ func (s *Suite) TestAddVariableFailure() {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, `{"detail":"server error"}`)
 	}))
-	origClient := SetHTTPClient(server.Client())
-	defer func() { SetHTTPClient(origClient); server.Close() }()
+	origClient := setHTTPClient(server.Client())
+	defer func() { setHTTPClient(origClient); server.Close() }()
 
 	err := AddVariables(server.URL+"/api/v2", "")
 	s.Error(err)
@@ -286,8 +285,8 @@ func (s *Suite) TestAddConnectionsFailure() {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, `{"detail":"server error"}`)
 	}))
-	origClient := SetHTTPClient(server.Client())
-	defer func() { SetHTTPClient(origClient); server.Close() }()
+	origClient := setHTTPClient(server.Client())
+	defer func() { setHTTPClient(origClient); server.Close() }()
 
 	err := AddConnections(server.URL+"/api/v2", "", nil)
 	s.Error(err)
@@ -303,8 +302,8 @@ func (s *Suite) TestAddPoolsFailure() {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, `{"detail":"server error"}`)
 	}))
-	origClient := SetHTTPClient(server.Client())
-	defer func() { SetHTTPClient(origClient); server.Close() }()
+	origClient := setHTTPClient(server.Client())
+	defer func() { setHTTPClient(origClient); server.Close() }()
 
 	err := AddPools(server.URL+"/api/v2", "")
 	s.Error(err)
@@ -411,8 +410,8 @@ func (s *Suite) TestAuthHeaderPassedThrough() {
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "{}")
 	}))
-	origClient := SetHTTPClient(server.Client())
-	defer func() { SetHTTPClient(origClient); server.Close() }()
+	origClient := setHTTPClient(server.Client())
+	defer func() { setHTTPClient(origClient); server.Close() }()
 
 	err := AddVariables(server.URL+"/api/v2", "Basic dGVzdDp0ZXN0")
 	s.NoError(err)
@@ -605,23 +604,6 @@ func (s *Suite) TestJsonString() {
 		conn := Connection{ConnExtra: nil}
 		res := jsonString(&conn)
 		s.Equal("", res)
-	})
-}
-
-func (s *Suite) TestWriteAirflowSettingstoYAML() {
-	s.Run("success", func() {
-		err := WriteAirflowSettingstoYAML("airflow_settings.yaml")
-		s.NoError(err)
-		os.Remove("./connections.yaml")
-		os.Remove("./variables.yaml")
-	})
-
-	s.Run("invalid setttings file", func() {
-		err := WriteAirflowSettingstoYAML("airflow_settings_invalid.yaml")
-		s.Error(err)
-		s.Contains(err.Error(), "unable to decode file")
-		os.Remove("./connections.yaml")
-		os.Remove("./variables.yaml")
 	})
 }
 

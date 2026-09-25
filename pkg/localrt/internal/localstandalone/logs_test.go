@@ -18,6 +18,18 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
+// parseLogLine runs one line through each stage the OnLine path applies —
+// parseLogMeta, parseLineTime, cleanLogMessage — so their combined result can
+// be checked a line at a time.
+func parseLogLine(line string) rt.LogLine {
+	component, rest := parseLogMeta(line)
+	return rt.LogLine{
+		Component: component,
+		Time:      parseLineTime(rest),
+		Text:      cleanLogMessage(rest),
+	}
+}
+
 func TestParseLogLine(t *testing.T) {
 	t.Parallel()
 

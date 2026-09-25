@@ -34,6 +34,13 @@ func testVault(t *testing.T) secrets.Store {
 	return store
 }
 
+// newSource is Load with the store and the already-canonical scope supplied,
+// so a test can count what reaches the store or stand in a vault that fails.
+// Load is the one production path.
+func newSource(store secrets.Store, scope string) *Source {
+	return &Source{store: store, scope: scope}
+}
+
 // put writes one entry under the shared grammar.
 func put(t *testing.T, store secrets.Store, kind secrets.Kind, scope, name, value string) {
 	t.Helper()

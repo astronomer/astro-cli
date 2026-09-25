@@ -121,24 +121,6 @@ func (c *Client) ListAssetEvents(ctx context.Context, opts ListAssetEventsOption
 	return wire.list(), nil
 }
 
-// UpstreamAssetEvents lists the asset events that scheduled a run — the
-// answer to "why did this run start".
-func (c *Client) UpstreamAssetEvents(ctx context.Context, dagID, runID string) (AssetEventList, error) {
-	generation, err := c.Generation(ctx)
-	if err != nil {
-		return AssetEventList{}, err
-	}
-	tail := "/upstreamAssetEvents"
-	if generation == Airflow2 {
-		tail = "/upstreamDatasetEvents"
-	}
-	var wire assetEventListWire
-	if err := c.get(ctx, pathf("/dags/%s/dagRuns/%s", dagID, runID)+tail, nil, &wire); err != nil {
-		return AssetEventList{}, err
-	}
-	return wire.list(), nil
-}
-
 // assetPath is the collection's name in the generation that serves it.
 func assetPath(generation Generation, tail string) string {
 	if generation == Airflow2 {

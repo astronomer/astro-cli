@@ -70,15 +70,11 @@ func (w versionWire) info(generation Generation) VersionInfo {
 // concurrent use; the generation is resolved once and shared.
 type Client struct {
 	transport Transport
-	pinned    Generation
 
 	mu sync.Mutex
-	// info is the resolved generation, valid once detected is set. fetched
-	// says the /version payload was read too, which a pinned generation
-	// skips.
+	// info is the resolved generation and version, valid once detected is set.
 	info      VersionInfo
 	detected  bool
-	fetched   bool
 	detecting *detection
 }
 
@@ -91,22 +87,9 @@ type detection struct {
 	err  error
 }
 
-// Option configures a Client.
-type Option func(*Client)
-
-// WithGeneration pins the generation and skips detection, for a caller that
-// already knows — a local Airflow's state record carries its major version.
-func WithGeneration(g Generation) Option {
-	return func(c *Client) { c.pinned = g }
-}
-
 // New builds a client over a transport.
-func New(transport Transport, opts ...Option) *Client {
-	c := &Client{transport: transport}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
+func New(transport Transport) *Client {
+	return &Client{transport: transport}
 }
 
 // Generation reports the generation this client talks to, detecting it on
@@ -123,29 +106,7 @@ func (c *Client) Generation(ctx context.Context) (Generation, error) {
 // holds a client across an Airflow restart — desktop does — gets a new client
 // when it wants a fresh answer.
 func (c *Client) Version(ctx context.Context) (VersionInfo, error) {
-	info, err := c.detect(ctx)
-	if err != nil {
-		return VersionInfo{}, err
-	}
-	// Read both together: another caller may have filled the version in
-	// between the detection above and this check.
-	c.mu.Lock()
-	cached, fetched := c.info, c.fetched
-	c.mu.Unlock()
-	if fetched {
-		return cached, nil
-	}
-
-	// The generation was pinned, so the version endpoint was never read.
-	wire, err := c.readVersion(ctx, info.Generation)
-	if err != nil {
-		return VersionInfo{}, err
-	}
-	full := wire.info(info.Generation)
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.info, c.fetched = full, true
-	return full, nil
+	return c.detect(ctx)
 }
 
 // detect resolves the generation once. Only a success is cached, so an
@@ -156,11 +117,6 @@ func (c *Client) detect(ctx context.Context) (VersionInfo, error) {
 	c.mu.Lock()
 	if c.detected {
 		defer c.mu.Unlock()
-		return c.info, nil
-	}
-	if c.pinned != GenerationNone {
-		defer c.mu.Unlock()
-		c.info, c.detected = VersionInfo{Generation: c.pinned}, true
 		return c.info, nil
 	}
 	if running := c.detecting; running != nil {
@@ -180,7 +136,7 @@ func (c *Client) detect(ctx context.Context) (VersionInfo, error) {
 
 	c.mu.Lock()
 	if running.err == nil {
-		c.info, c.detected, c.fetched = running.info, true, true
+		c.info, c.detected = running.info, true
 	}
 	c.detecting = nil
 	c.mu.Unlock()

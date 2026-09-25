@@ -118,54 +118,6 @@ func (s *Suite) Test_validateDeploymentRole() {
 	}
 }
 
-func (s *Suite) Test_ErrParsingKV() {
-	type args struct {
-		kv string
-	}
-	tests := []struct {
-		name   string
-		args   args
-		result string
-	}{
-		{
-			name:   "basic valid test",
-			args:   args{kv: "test_key"},
-			result: "failed to parse key value pair (test_key)",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			err := ErrParsingKV{kv: tt.args.kv}
-			s.Error(err)
-			s.Equal(err.Error(), tt.result)
-		})
-	}
-}
-
-func (s *Suite) Test_ErrInvalidArg() {
-	type args struct {
-		key string
-	}
-	tests := []struct {
-		name   string
-		args   args
-		result string
-	}{
-		{
-			name:   "basic valid test",
-			args:   args{key: "test_key"},
-			result: "invalid update arg key specified (test_key)",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			err := ErrInvalidArg{key: tt.args.key}
-			s.Error(err)
-			s.Equal(err.Error(), tt.result)
-		})
-	}
-}
-
 func (s *Suite) TestValidateExecutorArg() {
 	type args struct {
 		executor string

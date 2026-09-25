@@ -74,39 +74,6 @@ var (
 	errNetwork = errors.New("network error")
 )
 
-func (s *Suite) TestList() {
-	// initialize empty config
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	s.Run("organization list success", func() {
-		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
-
-		buf := new(bytes.Buffer)
-		err := List(buf, mockClient)
-		s.NoError(err)
-		mockClient.AssertExpectations(s.T())
-	})
-
-	s.Run("organization network error", func() {
-		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
-		buf := new(bytes.Buffer)
-		err := List(buf, mockClient)
-		s.Contains(err.Error(), "network error")
-		mockClient.AssertExpectations(s.T())
-	})
-
-	s.Run("organization list error", func() {
-		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockErrorResponse, nil).Once()
-		buf := new(bytes.Buffer)
-		err := List(buf, mockClient)
-		s.Contains(err.Error(), "failed to fetch organizations")
-		mockClient.AssertExpectations(s.T())
-	})
-}
-
 func (s *Suite) TestListData() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

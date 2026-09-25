@@ -57,6 +57,11 @@ jobs:
       - name: Run golangci-lint on the e2e module
         run: make lint-e2e
 
+      # Exported functions nothing reaches from main(), which `unused` cannot
+      # see. Linux and Windows only: see scripts/deadcode.sh for why not darwin.
+      - name: Check for dead code
+        run: make deadcode
+
   # This runner is ubuntu, so the lint job above compiles no _windows.go or
   # _darwin.go file and therefore checks none of them. This one does.
   #

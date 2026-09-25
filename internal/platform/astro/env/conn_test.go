@@ -44,44 +44,6 @@ func (s *Suite) TestCreateConn() {
 	mc.AssertExpectations(s.T())
 }
 
-func (s *Suite) TestListConnsByKey() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	ctx, _ := config.GetCurrentContext()
-	workspaceID := cuid.New()
-	host := "db.example.com"
-	login := "admin"
-	password := "p4ss"
-	port := 5432
-
-	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
-		// The local start path needs both the secret values and inherited workspace conns.
-		return p != nil && p.ShowSecrets != nil && *p.ShowSecrets && p.ResolveLinked != nil && *p.ResolveLinked
-	})).Return(&astrov1.ListEnvironmentObjectsResponse{
-		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
-			{
-				ObjectKey: "db_main",
-				Connection: &astrov1.EnvironmentObjectConnection{
-					Type: "postgres", Host: &host, Login: &login, Password: &password, Port: &port,
-				},
-			},
-			{
-				ObjectKey: "noisy_row_without_connection_payload", // defensive: skipped by ListConnsByKey
-			},
-		}, TotalCount: 2},
-	}, nil).Once()
-
-	got, err := ListConnsByKey(Scope{WorkspaceID: workspaceID}, true, true, mc)
-	s.NoError(err)
-	s.Len(got, 1)
-	s.Contains(got, "db_main")
-	s.Equal("postgres", got["db_main"].Type)
-	s.NotNil(got["db_main"].Password)
-	s.Equal("p4ss", *got["db_main"].Password)
-	mc.AssertExpectations(s.T())
-}
-
 func (s *Suite) TestDeleteConn() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, _ := config.GetCurrentContext()

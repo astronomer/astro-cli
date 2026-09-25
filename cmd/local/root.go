@@ -4,22 +4,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewRootCmd builds the whole v2 command surface on one standalone root: the
-// `astro local` tree, `astro init`, the root aliases, and the `astro dev`
-// stub. Production mounts these on the v1 root through AddCmds (cmd/root.go);
-// this root is the self-contained entry the package tests drive.
-func NewRootCmd(d Deps) *cobra.Command {
-	root := &cobra.Command{
-		Use:           "astro",
-		Short:         "Run Apache Airflow locally and interact with Astronomer",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
-	}
-	root.AddCommand(AddCmds(d)...)
-	return root
-}
-
 // AddCmds returns every top-level v2 command, ready to register on a root.
 // Each carries the skip-pre-run annotation on all its leaves, so the v1
 // root's pre-run (config load, telemetry, network) never runs for them:

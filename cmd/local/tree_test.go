@@ -73,7 +73,7 @@ func TestLocalTreeHasEverySpecCommand(t *testing.T) {
 
 func TestRootHasAliasesInitAndDev(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	for _, name := range []string{"local", "init", "dev", "start", "stop", "logs", "use", "af"} {
 		found := false
 		for _, sub := range root.Commands() {
@@ -104,7 +104,7 @@ func afGroup(t *testing.T, root *cobra.Command, path ...string) *cobra.Command {
 // met that CLI spells it out and lands in the same place.
 func TestAfGroupAnswersToAirflow(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	for _, path := range [][]string{{}, {"local"}} {
 		spelled, _, err := root.Find(append(append([]string{}, path...), afAlias, "dags"))
 		if err != nil {
@@ -123,7 +123,7 @@ func TestAfGroupAnswersToAirflow(t *testing.T) {
 // `astro local`.
 func TestTheInstanceNamesStayUnclaimed(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	for _, name := range []string{"instance", "instances"} {
 		if cmd, _, err := root.Find([]string{name}); err == nil && cmd.Name() == name {
 			t.Errorf("astro %s still exists", name)
@@ -149,7 +149,7 @@ var querySurface = map[string][]string{
 
 func TestQuerySurfaceHasEveryCommand(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	// Both spellings carry the whole surface: the machine's under
 	// `astro local af`, a deployment's under `astro af`.
 	for _, parent := range []*cobra.Command{afGroup(t, root), afGroup(t, root, "local")} {
@@ -179,7 +179,7 @@ func TestQuerySurfaceHasEveryCommand(t *testing.T) {
 // command body shows up here as a flag, a verb, or a usage line that differs.
 func TestBothRegistrationsAreTheSameCommands(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	top, machine := afGroup(t, root), afGroup(t, root, "local")
 	// The flags the top-level registration adds and the machine's does not.
 	selectors := map[string]bool{"deployment": true, "url": true}
@@ -271,7 +271,7 @@ func equalNames(a, b []string) bool {
 // drifting into three spellings of one idea.
 func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
 	d, _ := testDeps(t)
-	top := afGroup(t, NewRootCmd(d))
+	top := afGroup(t, newRootCmd(d))
 	for _, family := range []string{"dags", "runs", "tasks", "assets", "connections", "variables", "pools", "health"} {
 		cmd, _, err := top.Find([]string{family})
 		if err != nil {
@@ -350,7 +350,7 @@ func TestShorthandsMeanOneThingEachAcrossTheV2Tree(t *testing.T) {
 // bare unknown-command error.
 func TestEveryReplacementNamesARealCommand(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	for _, m := range devReplacements() {
 		if !strings.HasPrefix(m.Replacement, "astro ") {
 			continue // uv run pytest, and anything else outside this tree

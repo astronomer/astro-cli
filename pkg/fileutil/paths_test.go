@@ -51,27 +51,3 @@ func (s *Suite) TestGetHomeDir() {
 		})
 	}
 }
-
-func (s *Suite) TestIsEmptyDir() {
-	type args struct {
-		path string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "basic case",
-			args: args{path: "."},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			if got := IsEmptyDir(tt.args.path); got != tt.want {
-				s.Fail("IsEmptyDir() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

@@ -95,6 +95,12 @@ type macChecker struct{}
 func (macChecker) IsMac() bool     { return true }
 func (macChecker) IsWindows() bool { return false }
 
+// CreateDockerRuntime builds a DockerRuntime from an explicit engine and OS
+// checker, with NoopFeedback.
+func CreateDockerRuntime(engine DockerEngine, osChecker OSChecker) *DockerRuntime {
+	return &DockerRuntime{Engine: engine, OSChecker: osChecker, fb: NoopFeedback{}}
+}
+
 type nonMacChecker struct{}
 
 func (nonMacChecker) IsMac() bool     { return false }

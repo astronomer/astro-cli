@@ -96,21 +96,6 @@ func parseLogMeta(line string) (component, rest string) {
 	return "system", line
 }
 
-// parseLogLine splits one standalone log line into a rt.LogLine, cleaned
-// display Text included. Lines without a parseable timestamp get the zero
-// Time; the caller substitutes arrival time where one is needed. cleanLogMessage
-// runs several regexes, so callers that only need Component/Time (the log
-// filters) use parseLogMeta and let deliverFunc clean the body on the OnLine
-// path.
-func parseLogLine(line string) rt.LogLine {
-	component, rest := parseLogMeta(line)
-	return rt.LogLine{
-		Component: component,
-		Time:      parseLineTime(rest),
-		Text:      cleanLogMessage(rest),
-	}
-}
-
 // parseLineTime extracts the line's own timestamp when it carries one.
 func parseLineTime(s string) time.Time {
 	m := reTimestamp.FindString(s)

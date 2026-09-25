@@ -1,7 +1,7 @@
 // Package runtimes is a thin adapter over the shared pkg/container module. The
 // container-runtime logic (engine resolution, Docker auto-start, the Podman
 // astro-machine lifecycle) lives in github.com/astronomer/astro-cli/pkg/container
-// so it can be shared with other tools (e.g. astro-desktop). This package wires
+// so it can be shared with other tools (e.g. Astro Desktop). This package wires
 // that logic to astro-cli's global config singleton and CLI spinner, preserving
 // the call surface the rest of the CLI already depends on.
 package runtimes
@@ -36,18 +36,7 @@ var GetContainerRuntimeBinary = func() (string, error) {
 	return container.GetContainerRuntimeBinary(cliConfig())
 }
 
-// GetContainerRuntime resolves the host engine and returns the matching runtime,
-// wired to the CLI spinner so the "Astro uses containers…" UX is preserved.
-func GetContainerRuntime() (ContainerRuntime, error) {
-	return container.GetContainerRuntime(cliConfig(), newSpinnerFeedback())
-}
-
 // IsPodman reports whether the given binary name is podman.
 func IsPodman(binaryName string) bool {
 	return container.IsPodman(binaryName)
-}
-
-// CreateOSChecker returns the default OSChecker.
-func CreateOSChecker() OSChecker {
-	return container.CreateOSChecker()
 }

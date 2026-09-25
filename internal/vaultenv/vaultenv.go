@@ -139,13 +139,6 @@ func Load(projectDir string) *Source {
 	return s
 }
 
-// newSource is Load with the store and the already-canonical scope supplied.
-// The seam exists for the tests, which need to count what reaches the store and
-// to stand in a vault that fails; Load is the one production path.
-func newSource(store secrets.Store, scope string) *Source {
-	return &Source{store: store, scope: scope}
-}
-
 // Providers is this source's slice of the resolution chain, project tier
 // first. The project provider is omitted when there is no project, exactly as
 // localenv omits the project file.

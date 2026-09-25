@@ -22,37 +22,6 @@ func setCache(t *testing.T) string {
 	return cache
 }
 
-func TestCacheRootXDGOverride(t *testing.T) {
-	cache := setCache(t)
-	root, err := CacheRoot()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(cache, "astro"), root)
-}
-
-func TestCacheRootIgnoresRelativeXDG(t *testing.T) {
-	if runtime.GOOS == windowsOS {
-		t.Skip("XDG fallback path is unix-shaped")
-	}
-	t.Setenv("XDG_CACHE_HOME", "relative/cache")
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	root, err := CacheRoot()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(home, ".cache", "astro"), root)
-}
-
-func TestCacheRootDefaultsToHome(t *testing.T) {
-	if runtime.GOOS == windowsOS {
-		t.Skip("XDG fallback path is unix-shaped")
-	}
-	t.Setenv("XDG_CACHE_HOME", "")
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	root, err := CacheRoot()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(home, ".cache", "astro"), root)
-}
-
 func TestDirKeyedByProjectID(t *testing.T) {
 	cache := setCache(t)
 	proj := t.TempDir()

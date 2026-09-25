@@ -38,11 +38,6 @@ func Green(text string) string {
 	return color.Sprintf(color.Green(text))
 }
 
-// Blue returns text colored blue
-func Blue(text string) string {
-	return color.Sprintf(color.Blue(text))
-}
-
 // Cyan returns text colored blue
 func Cyan(text string) string {
 	return color.Sprintf(color.Cyan(text))

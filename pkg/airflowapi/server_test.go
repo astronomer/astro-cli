@@ -6,39 +6,6 @@ import (
 	"testing"
 )
 
-func TestConfigReadsTheSections(t *testing.T) {
-	stub := newAF3Stub(t)
-	stub.route(http.MethodGet, "/api/v2/config",
-		`{"sections":[{"name":"core","options":[{"key":"dags_folder","value":"/usr/local/airflow/dags"}]}]}`)
-	client := stub.client()
-
-	config, err := client.Config(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(config.Sections) != 1 || config.Sections[0].Options[0].Key != "dags_folder" {
-		t.Fatalf("config = %+v, want the section read", config)
-	}
-}
-
-func TestConfigReportsAHiddenConfigAsForbidden(t *testing.T) {
-	// Airflow refuses this unless expose_config is on. It reaches the caller
-	// as a typed error rather than an empty answer.
-	stub := newAF2Stub(t)
-	stub.routeStatus(http.MethodGet, "/api/v1/config", http.StatusForbidden,
-		`{"detail":"Your Airflow administrator chose not to expose the configuration"}`)
-	client := stub.client()
-
-	_, err := client.Config(t.Context())
-	if !errors.Is(err, ErrForbidden) {
-		t.Fatalf("err = %v, want it to read as forbidden", err)
-	}
-	var status *StatusError
-	if !errors.As(err, &status) || status.Detail() == "" {
-		t.Errorf("err = %v, want airflow's own explanation kept", err)
-	}
-}
-
 func TestHealthPrefersTheMonitorPath(t *testing.T) {
 	stub := newStub(t)
 	stub.route(http.MethodGet, "/api/v2/monitor/health",

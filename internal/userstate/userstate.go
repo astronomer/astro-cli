@@ -90,13 +90,6 @@ func (e *DecodeError) Error() string {
 
 func (e *DecodeError) Unwrap() error { return e.Err }
 
-// CacheRoot returns the astro cache directory: $XDG_CACHE_HOME/astro when
-// set, otherwise ~/.cache/astro. It is a thin wrapper over
-// localrt.CacheRoot, which owns state locations (docs/v2-architecture.md).
-func CacheRoot() (string, error) {
-	return localrt.CacheRoot()
-}
-
 // Dir returns the state directory for a project,
 // <cache>/projects/<path-hash>. It does not create the directory. It is a
 // thin wrapper over localrt.StateDir, which owns state locations.

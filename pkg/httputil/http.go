@@ -3,24 +3,15 @@ package httputil
 import (
 	"bytes"
 	httpContext "context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
-
-	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
-const defaultHTTPTimeout = 30 * time.Second
-
 var ErrorBaseURL = errors.New("invalid baseurl")
-
-const LastSuccessfulHTTPResponseCode = 299
 
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
 type HTTPClient struct {
@@ -114,56 +105,4 @@ func newError(resp *http.Response) *Error {
 // Error implemented to match Error interface
 func (e *Error) Error() string {
 	return fmt.Sprintf("API error (%d): %s", e.Status, e.Message)
-}
-
-func DownloadResponseToFile(sourceURL, path string) {
-	file, err := fileutil.CreateFile(path)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	client := http.Client{
-		Timeout: defaultHTTPTimeout,
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
-	}
-	resp, err := client.Get(sourceURL)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	err = fileutil.WriteToFile(path, resp.Body)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer file.Close()
-	logger.Infof("Downloaded %s from %s", path, sourceURL)
-}
-
-func RequestAndGetJSONBody(route string) map[string]interface{} {
-	client := &http.Client{Timeout: defaultHTTPTimeout}
-	res, err := client.Get(route)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	if res.StatusCode > LastSuccessfulHTTPResponseCode {
-		logger.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
-	}
-
-	var bodyJSON map[string]interface{}
-	err = json.Unmarshal(body, &bodyJSON)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	logger.Debugf("%s - GET %s %s", res.Status, route, string(body))
-	return bodyJSON
 }

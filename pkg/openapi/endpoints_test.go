@@ -78,32 +78,6 @@ func TestFilterEndpoints(t *testing.T) {
 	assert.Len(t, filtered, 0)
 }
 
-func TestFindEndpoint(t *testing.T) {
-	endpoints := []Endpoint{
-		{Method: "GET", Path: "/organizations"},
-		{Method: "POST", Path: "/organizations"},
-		{Method: "GET", Path: "/deployments"},
-	}
-
-	// Find existing endpoint
-	ep := FindEndpoint(endpoints, "GET", "/organizations")
-	assert.NotNil(t, ep)
-	assert.Equal(t, "GET", ep.Method)
-	assert.Equal(t, "/organizations", ep.Path)
-
-	// Find with lowercase method
-	ep = FindEndpoint(endpoints, "get", "/organizations")
-	assert.NotNil(t, ep)
-
-	// Not found - wrong method
-	ep = FindEndpoint(endpoints, "PUT", "/organizations")
-	assert.Nil(t, ep)
-
-	// Not found - wrong path
-	ep = FindEndpoint(endpoints, "GET", "/nonexistent")
-	assert.Nil(t, ep)
-}
-
 func TestFindEndpointByPath(t *testing.T) {
 	endpoints := []Endpoint{
 		{Method: "GET", Path: "/organizations"},

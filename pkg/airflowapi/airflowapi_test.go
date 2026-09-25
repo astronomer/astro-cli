@@ -166,39 +166,6 @@ func TestDetectionIsNotCachedAfterAFailure(t *testing.T) {
 	}
 }
 
-func TestPinnedVersionSkipsDetection(t *testing.T) {
-	stub := newStub(t)
-	stub.route(http.MethodGet, "/api/v1/dags", `{"total_entries":0}`)
-	client := stub.client(WithGeneration(Airflow2))
-
-	if _, err := client.ListDAGs(t.Context(), ListDAGsOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if stub.countRequests(http.MethodGet, "/api/v1/version") != 0 {
-		t.Error("probed the version despite a pinned generation")
-	}
-}
-
-func TestPinnedVersionStillReadsTheVersionOnDemand(t *testing.T) {
-	stub := newStub(t)
-	stub.route(http.MethodGet, "/api/v1/version", `{"version":"2.9.1"}`)
-	client := stub.client(WithGeneration(Airflow2))
-
-	info, err := client.Version(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Version != "2.9.1" || info.Generation != Airflow2 {
-		t.Errorf("version = %+v, want the pinned generation's answer", info)
-	}
-	if _, err := client.Version(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if got := stub.countRequests(http.MethodGet, "/api/v1/version"); got != 1 {
-		t.Errorf("read the version %d times, want it cached", got)
-	}
-}
-
 func TestDoPassesThroughWhateverTheStatusIs(t *testing.T) {
 	stub := newAF3Stub(t)
 	stub.routeStatus(http.MethodGet, "/api/v2/dags/missing", http.StatusNotFound, `{"detail":"gone"}`)

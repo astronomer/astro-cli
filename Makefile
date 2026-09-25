@@ -101,6 +101,14 @@ lint-goos:
 		done; \
 	done
 
+# Functions no path from main() reaches, on every platform CI builds for. The
+# version matches Astro Desktop's pre-push hook; scripts/deadcode.sh says what
+# it leaves out and why.
+DEADCODE_VERSION=v0.32.0
+
+deadcode:
+	DEADCODE_VERSION=${DEADCODE_VERSION} bash scripts/deadcode.sh
+
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 

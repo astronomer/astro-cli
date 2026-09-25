@@ -4,11 +4,6 @@ import (
 	"bytes"
 )
 
-func (s *Suite) TestAllCmds() {
-	ret := AllCmds()
-	s.Equal(ret[:3], []string{"add", "arg", "cmd"})
-}
-
 func (s *Suite) TestParseReaderParseError() {
 	dockerfile := "FROM quay.io/astronomer/astro-runtime:3.0.2\nCMD [\"echo\", 1]"
 	_, err := ParseReader(bytes.NewBufferString(dockerfile))

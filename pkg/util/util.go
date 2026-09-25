@@ -2,11 +2,9 @@ package util
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 
-	"github.com/Masterminds/semver"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lucsky/cuid"
 	"github.com/pkg/errors"
@@ -25,20 +23,6 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// coerce a string into SemVer if possible
-func Coerce(version string) *semver.Version {
-	v, err := semver.NewVersion(version)
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-	coerceVer, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch()))
-	if err != nil {
-		fmt.Println(err)
-	}
-	return coerceVer
-}
-
 func Contains(elems []string, v string) bool {
 	for _, s := range elems {
 		if v == s {
@@ -46,20 +30,6 @@ func Contains(elems []string, v string) bool {
 		}
 	}
 	return false
-}
-
-func GetStringInBetweenTwoString(str, startS, endS string) (result string, found bool) {
-	s := strings.Index(str, startS)
-	if s == -1 {
-		return result, false
-	}
-	newS := str[s+len(startS):]
-	e := strings.Index(newS, endS)
-	if e == -1 {
-		return result, false
-	}
-	result = newS[:e]
-	return result, true
 }
 
 // exists returns whether the given file or directory exists

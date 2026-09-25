@@ -78,9 +78,6 @@ var ErrNotImplemented = rt.ErrNotImplemented
 // ErrImageNotBuilt reports that a project has no image to run a command in.
 var ErrImageNotBuilt = rt.ErrImageNotBuilt
 
-// OnState reports a state transition if the caller asked for one.
-func OnState(cb Callbacks, s State, err error) { rt.OnState(cb, s, err) }
-
 // CanonicalPath resolves a project path to the spelling every tool agrees on.
 func CanonicalPath(path string) (string, error) { return rt.CanonicalPath(path) }
 

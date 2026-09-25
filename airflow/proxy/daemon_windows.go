@@ -13,11 +13,6 @@ var StartDaemon = func(port string) (string, error) {
 	return "", errUnsupportedWindows
 }
 
-// IsRunning always returns false on Windows.
-func IsRunning() (int, bool) {
-	return 0, false
-}
-
 // BoundPort always returns "" on Windows.
 func BoundPort() string {
 	return ""
@@ -31,11 +26,6 @@ func EnsureRunning(port string) (string, error) {
 // Serve is not supported on Windows.
 func Serve(port string) error {
 	return errUnsupportedWindows
-}
-
-// StopDaemon is a no-op on Windows.
-func StopDaemon() error {
-	return nil
 }
 
 // StopIfEmpty is a no-op on Windows.

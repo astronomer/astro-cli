@@ -158,33 +158,6 @@ func (s *Suite) TestRemovingABrokenConfigClearsTheRecord() {
 	s.False(back)
 }
 
-// CreateConfig must not empty a file whose write is about to be refused.
-//
-// It opened the target with fs.Create — O_TRUNC — before saveConfig's
-// unreadableConfigs check could run, so calling it on a config that failed to
-// parse destroyed the contents and then declined to write, which is the exact
-// loss that check exists to prevent. Latent, in that CreateProjectConfig has
-// no caller outside tests, and three lines that were redundant once saveConfig
-// started creating the file itself.
-func (s *Suite) TestCreateConfigRefusesRatherThanTruncates() {
-	fs := afero.NewMemMapFs()
-	s.restoreConfigGlobals()
-
-	file := filepath.Join(WorkingPath, ConfigDir, ConfigFileNameWithExt)
-	const original = "project:\n  deployment: prod-1\nbroken: [unclosed\n"
-	s.NoError(afero.WriteFile(fs, file, []byte(original), 0o600))
-	s.T().Cleanup(func() { delete(unreadableConfigs, file) })
-
-	initProject(fs)
-	s.True(unreadableConfigs[file], "the fixture has to be unreadable for this to mean anything")
-
-	s.Error(CreateConfig(viperProject, fs, filepath.Dir(file), file))
-
-	after, err := afero.ReadFile(fs, file)
-	s.NoError(err)
-	s.Equal(original, string(after), "a refused write must leave the file alone")
-}
-
 // A write that fails takes its half-made file with it.
 //
 // saveConfig creates the file before viper writes it, to fix the mode while

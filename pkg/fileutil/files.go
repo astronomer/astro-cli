@@ -2,7 +2,6 @@ package fileutil
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"compress/gzip"
 	http_context "context"
@@ -184,37 +183,12 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 		})
 }
 
-// this functions reads a whole file into memory and returns a slice of its lines.
-func Read(filePath string) ([]string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	return lines, scanner.Err()
-}
-
 func ReadFileToString(filename string) (string, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
-}
-
-func Contains(elems []string, param string) (exist bool, position int) {
-	for index, elem := range elems {
-		if param == elem {
-			return true, index
-		}
-	}
-	return false, 0
 }
 
 // This function finds all files of a specific extension
@@ -273,13 +247,6 @@ func RemoveLineFromFile(filePath, lineText, commentText string) error {
 	}
 	f.Close()
 	return err
-}
-
-func CreateFile(p string) (*os.File, error) {
-	if err := os.MkdirAll(filepath.Dir(p), openPermissions); err != nil {
-		return nil, err
-	}
-	return os.Create(p)
 }
 
 func backOff(retryDelayInMS, backoffFactor int) int {
@@ -406,16 +373,6 @@ func GzipFile(srcFilePath, destFilePath string) error {
 	return err
 }
 
-func IsHidden(filePath string) bool {
-	components := strings.Split(filePath, string(filepath.Separator))
-	for _, component := range components {
-		if strings.HasPrefix(component, ".") {
-			return true
-		}
-	}
-	return false
-}
-
 // CopyFile copies a file from src to dst, preserving file permissions
 func CopyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
@@ -441,11 +398,6 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 	return os.Chmod(dst, sourceInfo.Mode())
-}
-
-// CopyDirectory recursively copies a directory from src to dst.
-func CopyDirectory(src, dst string) error {
-	return CopyDirectoryFiltered(src, dst, nil)
 }
 
 // CopyDirectoryFiltered recursively copies a directory from src to dst.

@@ -833,7 +833,7 @@ func TestEnvVerbOrderMatchesTheCloudTree(t *testing.T) {
 	defer func() { cobra.EnableCommandSorting = sorting }()
 
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 
 	names := func(path ...string) []string {
 		t.Helper()
@@ -924,7 +924,7 @@ func TestConnSetRefusesStdinTogetherWithPassword(t *testing.T) {
 // longer exists — the failure localenv.Noun exists to prevent.
 func TestNounSubcommandMatchesTheHintWord(t *testing.T) {
 	d, _ := testDeps(t)
-	root := NewRootCmd(d)
+	root := newRootCmd(d)
 	for _, kind := range []localenv.Kind{localenv.KindEnv, localenv.KindConn, localenv.KindVar} {
 		noun := localenv.Noun(kind)
 		t.Run(noun, func(t *testing.T) {

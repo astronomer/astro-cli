@@ -81,11 +81,6 @@ func ListData(client astrov1.APIClient) (*WorkspaceList, error) {
 	return result, nil
 }
 
-// List all workspaces
-func List(client astrov1.APIClient, out io.Writer) error {
-	return ListWithFormat(client, output.FormatTable, "", out)
-}
-
 // ListWithFormat lists workspaces with the specified output format
 func ListWithFormat(client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
 	return output.PrintData(

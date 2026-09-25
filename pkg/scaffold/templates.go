@@ -20,13 +20,12 @@ import (
 // third-party import would fail to load on the first `astro local start`, which
 // is a worse first run than no example at all.
 //
-// It is Airflow 3 only, because airflow.sdk is. pkg/airflowrt carries the v1
-// pair this one is not built from — include/airflow2/exampledag.py and
-// include/airflow3/exampledag.py, keyed by major and still written by the
-// Docker path — and they are where an Airflow 2 variant would be modeled from
-// if one is ever wanted. starterDagSuits is what keeps this file away from a
-// project that pins 2 in the meantime; the three copies are otherwise unrelated
-// and none of them is generated from the others.
+// It is Airflow 3 only, because airflow.sdk is. The v1 templates were a
+// per-major pair, pkg/airflowrt/include/airflow2/exampledag.py beside
+// .../airflow3; nothing wrote them once v1 init was gone and they were deleted
+// with it, so an Airflow 2 variant, if one is ever wanted, is modeled from that
+// file in git history. starterDagSuits is what keeps this file away from a
+// project that pins 2 in the meantime.
 //
 //go:embed include/exampledag.py
 var exampleDag string

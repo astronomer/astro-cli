@@ -250,43 +250,9 @@ func initProject(fs afero.Fs) {
 	}
 }
 
-// CreateProjectConfig creates a project config file
-func CreateProjectConfig(projectPath string) {
-	projectConfigDir := filepath.Join(projectPath, ConfigDir)
-	projectConfigFile := filepath.Join(projectConfigDir, ConfigFileNameWithExt)
-
-	err := CreateConfig(viperProject, afero.NewOsFs(), projectConfigDir, projectConfigFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, configCreateProjectErrorMsg, projectConfigFile, err)
-		return
-	}
-
-	// Add the new file
-	viperProject.SetConfigFile(projectConfigFile)
-}
-
 // configExists returns a boolean indicating if the config is backed by a file
 func configExists(v *viper.Viper) bool {
 	return v.ConfigFileUsed() != ""
-}
-
-// CreateConfig creates a config file in the given directory
-func CreateConfig(v *viper.Viper, fs afero.Fs, path, file string) error {
-	// No Create/Chmod here any more. It truncated the target before
-	// saveConfig's unreadableConfigs check could refuse the write, so calling
-	// this on a config that failed to parse emptied the user's file and then
-	// declined to write — the destruction that check exists to prevent.
-	// saveConfig creates the file at filePerm itself when it is absent.
-	if err := fs.MkdirAll(path, dirPerm); err != nil {
-		return fmt.Errorf("error creating config directory: %w", err)
-	}
-
-	return saveConfig(v, file)
-}
-
-// ProjectConfigExists returns a boolean indicating if a project config file exists
-func ProjectConfigExists() bool {
-	return configExists(viperProject)
 }
 
 // IsProjectDir returns a boolean depending on if path is a valid project dir

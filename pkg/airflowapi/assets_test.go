@@ -85,48 +85,6 @@ func TestListAssetEventsMapsBothSpellings(t *testing.T) {
 	}
 }
 
-func TestUpstreamAssetEventsUsesEachGenerationsPath(t *testing.T) {
-	tests := []struct {
-		name string
-		stub func(*testing.T) *airflowStub
-		path string
-	}{
-		{"airflow 2", newAF2Stub, "/api/v1/dags/etl/dagRuns/r1/upstreamDatasetEvents"},
-		{"airflow 3", newAF3Stub, "/api/v2/dags/etl/dagRuns/r1/upstreamAssetEvents"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stub := tt.stub(t)
-			stub.route(http.MethodGet, tt.path, `{"asset_events":[],"total_entries":0}`)
-			client := stub.client()
-
-			if _, err := client.UpstreamAssetEvents(t.Context(), "etl", "r1"); err != nil {
-				t.Fatal(err)
-			}
-			if got := stub.lastRequest().Path; got != tt.path {
-				t.Errorf("path = %q, want %q", got, tt.path)
-			}
-		})
-	}
-}
-
-func TestUpstreamAssetEventsReadsAMissingRunAsMissing(t *testing.T) {
-	// The path names a dag run, so a 404 is that run being absent rather
-	// than an Airflow without the endpoint.
-	stub := newAF3Stub(t)
-	stub.routeStatus(http.MethodGet, "/api/v2/dags/etl/dagRuns/norun/upstreamAssetEvents",
-		http.StatusNotFound, `{"detail":"The DagRun was not found"}`)
-	client := stub.client()
-
-	_, err := client.UpstreamAssetEvents(t.Context(), "etl", "norun")
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("err = %v, want it to read as not found", err)
-	}
-	if errors.Is(err, ErrNotServed) {
-		t.Errorf("err = %v, want a missing run not to read as a missing endpoint", err)
-	}
-}
-
 func TestAssetsAreNotServedByAnAirflowWithoutThem(t *testing.T) {
 	// Datasets arrived mid-way through Airflow 2's life. Nothing checks a
 	// minor version for that: the endpoint is asked and its refusal is read.

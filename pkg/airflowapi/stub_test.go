@@ -147,11 +147,11 @@ func (s *airflowStub) countRequests(method, path string) int {
 }
 
 // client builds a client against the stub over an HTTP transport.
-func (s *airflowStub) client(opts ...Option) *Client {
+func (s *airflowStub) client() *Client {
 	s.t.Helper()
 	transport, err := NewHTTPTransport(s.URL)
 	if err != nil {
 		s.t.Fatalf("build transport: %v", err)
 	}
-	return New(transport, opts...)
+	return New(transport)
 }

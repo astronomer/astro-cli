@@ -98,31 +98,6 @@ func (s *Suite) TestInitProject() {
 	s.Contains(viperProject.ConfigFileUsed(), "config.yaml")
 }
 
-func (s *Suite) TestProjectConfigExists() {
-	initTestConfig()
-	val := ProjectConfigExists()
-	s.Equal(false, val)
-
-	viperProject.SetConfigFile("test.yaml")
-	defer os.Remove("test.yaml")
-	val = ProjectConfigExists()
-	s.Equal(true, val)
-}
-
-func (s *Suite) TestCreateConfig() {
-	viperTest := viper.New()
-	defer os.RemoveAll("./test")
-	err := CreateConfig(viperTest, afero.NewOsFs(), "./test", "test.yaml")
-	s.NoError(err)
-}
-
-func (s *Suite) TestCreateProjectConfig() {
-	viperProject = viper.New()
-	defer os.RemoveAll("./test")
-	CreateProjectConfig("./test")
-	s.Equal("test/.astro/config.yaml", viperProject.ConfigFileUsed())
-}
-
 // TestSaveConfig_ConcurrentWritesProduceValidYAML stresses the file lock in
 // saveConfig: 20 goroutines each write a distinct key/value pair to the same
 // file. Without locking, viper.WriteConfigAs races interleave and can leave
