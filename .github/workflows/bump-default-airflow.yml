@@ -1,0 +1,76 @@
+name: Bump default Airflow
+
+# Keeps runtimeversions.FallbackAirflowSeries on the newest supported Airflow
+# series in Astronomer's runtime catalog. It is what `astro init` writes when it
+# has no current copy of the catalog, and the floor under a stale cached copy
+# (never under a fresh one), so a stale constant starts offline projects on an
+# old line. scripts/bump-default-airflow.sh
+# applies the rule and edits the constant; this opens the PR. No cooldown: a
+# series is supported once Astronomer ships a stable runtime for it.
+#
+# The PR is opened with `secrets.BUMP_PR_TOKEN` when it is set, and falls back
+# to the default `GITHUB_TOKEN`. The fallback works only while the repository
+# allows GitHub Actions to create pull requests (Settings > Actions > General),
+# and a PR it opens does NOT trigger ci.yaml: GitHub does not start workflows
+# from events the default token caused. Set BUMP_PR_TOKEN (a fine-grained PAT or
+# GitHub App token with contents and pull-requests write on this repository) so
+# the PR gets its checks.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-default-airflow
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: v2
+          token: ${{ secrets.BUMP_PR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Apply the catalog's latest series
+        id: bump
+        run: |
+          current="$(sed -n 's/^const FallbackAirflowSeries = "\(.*\)"$/\1/p' pkg/runtimeversions/default.go)"
+          next="$(scripts/bump-default-airflow.sh)"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          if git diff --quiet; then
+            echo "FallbackAirflowSeries is already $current"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open the PR
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BUMP_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.bump.outputs.current }}
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          branch="bump-default-airflow-$NEXT"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch already exists; its PR is the one to review"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "New projects start on Airflow $NEXT when offline"
+          git push origin "$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base v2 --head "$branch" \
+            --title "New projects start on Airflow $NEXT when offline" \
+            --body "The runtime catalog's newest supported Airflow series is now $NEXT, so this moves \`runtimeversions.FallbackAirflowSeries\` from $CURRENT to $NEXT. It is what \`astro init\` uses when it has no current copy of the catalog, and the floor under a stale cached copy.
+
+          Opened by \`.github/workflows/bump-default-airflow.yml\`. Check that the scaffold and e2e tests still pass: they read the constant, and a new series can change the \`requires-python\` its fallback rule writes."

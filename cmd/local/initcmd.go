@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -31,21 +33,21 @@ func newInitCmd(c *cli) *cobra.Command {
 			"Run it in the Airflow repo you already have: a directory with no pyproject.toml is scaffolded, and one that has a pyproject.toml gains a [tool.astro] section, leaving the rest of the file alone.\n\n" +
 			"Files already there are kept. What init found but could not carry over — a requirements.txt, a Dockerfile — is listed at the end, to move across by hand.",
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
 			if len(args) == 1 {
 				dir = args[0]
 			}
-			return c.runInit(dir, opts)
+			return c.runInit(cmd.Context(), dir, opts)
 		},
 	}
 	cmd.Flags().StringVar(&opts.AirflowVersion, "airflow-version", "",
-		"Airflow version to pin in the manifest (default: the pin already in the manifest, else "+scaffold.DefaultAirflowVersion+")")
+		"Airflow version to pin in the manifest (default: the pin already in the manifest, else the newest supported Airflow series)")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Project name (default: the directory name)")
 	return cmd
 }
 
-func (c *cli) runInit(dir string, opts scaffold.Options) error {
+func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
@@ -58,6 +60,14 @@ func (c *cli) runInit(dir string, opts scaffold.Options) error {
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
+	// Called by scaffold only when nothing in the project states an Airflow,
+	// so converting a pinned project makes no request. The lookup never fails
+	// init: offline, it answers the built-in series.
+	if c.d.AirflowDefault != nil {
+		opts.Default = func() (string, string, runtimeversions.Source) {
+			return c.d.AirflowDefault(ctx)
+		}
+	}
 
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {
@@ -66,6 +76,28 @@ func (c *cli) runInit(dir string, opts scaffold.Options) error {
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res)
 	})
+}
+
+// defaultSourceNote says where a defaulted Airflow came from, for the line that
+// names it: the runtime catalog, a cached copy of it, or the series built into
+// this binary, and for that last one why. Nothing when a flag or the project's
+// own pin decided it.
+func defaultSourceNote(src runtimeversions.Source) string {
+	switch src {
+	case runtimeversions.SourceCatalog:
+		return ", the latest from the runtime catalog"
+	case runtimeversions.SourceCache:
+		return ", the latest in the cached runtime catalog"
+	case runtimeversions.SourceStaleCache:
+		return ", the latest in an old cached copy of the runtime catalog; could not reach the catalog"
+	case runtimeversions.SourceFallback:
+		return ", the built-in default; could not reach the runtime catalog"
+	case runtimeversions.SourceCatalogEmpty:
+		return ", the built-in default; the runtime catalog lists no usable Airflow 3 release"
+	case runtimeversions.SourceBuiltIn:
+		return ", the built-in default"
+	}
+	return ""
 }
 
 // resolveDir turns a possibly relative directory into an absolute one against
@@ -89,7 +121,7 @@ func renderInit(w io.Writer, res *scaffold.Result) error {
 	if res.Adopted {
 		verb = "Adopted"
 	}
-	if _, err := fmt.Fprintf(w, "%s Astro project %s (Airflow %s) in %s\n", verb, res.Name, res.AirflowVersion, res.Dir); err != nil {
+	if _, err := fmt.Fprintf(w, "%s Astro project %s (Airflow %s%s) in %s\n", verb, res.Name, res.AirflowVersion, defaultSourceNote(res.AirflowDefaultSource), res.Dir); err != nil {
 		return err
 	}
 	for _, entry := range res.Updated {

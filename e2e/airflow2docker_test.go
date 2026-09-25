@@ -104,6 +104,9 @@ func TestAirflow2ComesUpInDocker(t *testing.T) {
 func airflow2DockerProject(t *testing.T, name string) *project {
 	t.Helper()
 	p := newNamedProject(t, name)
+	// An Airflow 2 image is named by runtime version, which only the real
+	// catalog can say.
+	p.catalogURL = liveCatalog
 	p.run("init", "--name", name, "--airflow-version", "2").requireSuccess()
 	t.Cleanup(func() { p.runSlow("local", "reset", "--yes").requireSuccess() })
 	return p

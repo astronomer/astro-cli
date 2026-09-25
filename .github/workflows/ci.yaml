@@ -118,6 +118,30 @@ jobs:
             ${{ steps.go-env.outputs.mod }}
           key: go-lint-goos-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
 
+  # bump-default-airflow.yml moves runtimeversions.FallbackAirflowSeries with a
+  # jq copy of the Go rule. This runs that copy on the fixture the Go tests pin
+  # the rule to, on the days they stand on, and expects the same answers
+  # (TestDefaultOnTheRecordedCatalog, TestLatestAirflowSeriesWaitsForTheReleaseDate),
+  # so the two cannot drift apart unseen.
+  bump-default-airflow-rule:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: The jq rule agrees with the Go rule on the fixture
+        run: |
+          fixture=pkg/runtimeversions/testdata/catalog.json
+          got="$(TODAY=2026-09-25 scripts/bump-default-airflow.sh --latest "$fixture")"
+          if [ "$got" != "3.3" ]; then
+            echo "::error::scripts/bump-default-airflow.sh picked '$got' from the fixture; the Go rule picks 3.3"
+            exit 1
+          fi
+          got="$(TODAY=2026-07-08 scripts/bump-default-airflow.sh --latest "$fixture")"
+          if [ "$got" != "3.2" ]; then
+            echo "::error::scripts/bump-default-airflow.sh picked '$got' the day before 3.3 shipped; the Go rule picks 3.2"
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
     steps:

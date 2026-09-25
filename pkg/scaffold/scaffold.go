@@ -18,12 +18,19 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// DefaultAirflowVersion is the Airflow version a new project pins when
-// --airflow-version is not given. Partial on purpose: resolution to a
-// concrete release happens at start time, so new projects track patches.
-const DefaultAirflowVersion = "3.3"
+// DefaultAirflow resolves the Airflow a project starts on when nothing it has
+// states one: the series, the requires-python that series' runtime ships with
+// (empty to use this package's built-in rule), and where the answer came from.
+//
+// It is how Plan stays offline. The answer lives in Astronomer's runtime
+// catalog, and reading that is the caller's business: astro init and
+// Astro Desktop pass runtimeversions.Default bound to their own cache and
+// User-Agent. Plan calls it only when no pin applies, so adopting a project
+// that states its Airflow asks nobody anything.
+type DefaultAirflow func() (series, requiresPython string, src runtimeversions.Source)
 
 // manifestKeyAirflow is the [tool.astro] key carrying the Airflow pin. Both
 // manifest arms write it and the starter DAG's import rule is checked against
@@ -39,9 +46,13 @@ const manifestKeyDockerfile = "dockerfile"
 type Options struct {
 	// Name is the [project] name. Empty derives it from the directory name.
 	Name string
-	// AirflowVersion is the [tool.astro] airflow pin. Empty means
-	// DefaultAirflowVersion.
+	// AirflowVersion is the [tool.astro] airflow pin. Empty means the pin the
+	// project already states, else Default's answer.
 	AirflowVersion string
+	// Default resolves the Airflow a project starts on when nothing states one.
+	// nil means runtimeversions.FallbackAirflowSeries, with no lookup, reported
+	// as runtimeversions.SourceBuiltIn.
+	Default DefaultAirflow
 	// GOOS overrides runtime.GOOS, so tests can check the Windows layout
 	// (no CLAUDE.md symlink) from any host.
 	GOOS string
@@ -54,10 +65,16 @@ type Options struct {
 // Result reports what Run did. It is the `astro init` output payload in
 // both text and json mode.
 type Result struct {
-	Dir            string   `json:"dir"`
-	Name           string   `json:"name"`
-	AirflowVersion string   `json:"airflow"`
-	Created        []string `json:"created"`
+	Dir            string `json:"dir"`
+	Name           string `json:"name"`
+	AirflowVersion string `json:"airflow"`
+	// AirflowDefaultSource says where AirflowVersion came from when nothing in
+	// the project stated one: "catalog", "cache", "stale-cache", "fallback",
+	// "catalog-empty" or "built-in" (see runtimeversions.Source). Empty when a
+	// flag or a pin decided it. Consumers should treat an unknown value as a
+	// built-in default: the set may grow.
+	AirflowDefaultSource runtimeversions.Source `json:"airflowDefaultSource,omitempty"`
+	Created              []string               `json:"created"`
 	// Skipped lists entries that already existed and were left untouched.
 	Skipped []string `json:"skipped,omitempty"`
 	// Updated lists files this run changed rather than created.
@@ -642,14 +659,14 @@ func namedInAny(notes []string, name string) bool {
 // writing it, so write puts every file on disk in one place.
 func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]byte, manifestFacts, error) {
 	name, nameAdvisory := chooseName(dir, opts, v1)
-	version, defaulted := pickAirflowVersion(opts.AirflowVersion, nil, v1)
-	pyproject, notes, err := renderPyproject(name, version, v1)
+	pick := pickAirflowVersion(opts.AirflowVersion, nil, v1, opts.Default)
+	pyproject, notes, err := renderPyproject(name, pick, v1)
 	if err != nil {
 		return nil, manifestFacts{}, err
 	}
-	res.Name, res.AirflowVersion = name, version
+	res.Name, res.AirflowVersion, res.AirflowDefaultSource = name, pick.version, pick.source
 	return pyproject, manifestFacts{
-		defaultedPin:   defaulted,
+		defaultedPin:   pick.defaulted(),
 		migrationNotes: notes,
 		migratedLabels: migratedLabels(v1),
 		nameAdvisory:   nameAdvisory,
@@ -690,6 +707,29 @@ func migratedLabels(v1 *v1Project) []string {
 	return out
 }
 
+// airflowPick is the Airflow a run settled on.
+type airflowPick struct {
+	version string
+	// source says where a defaulted version came from, and is empty when a
+	// flag or a pin stated it.
+	source runtimeversions.Source
+	// requiresPython is the catalog's bound for a defaulted version. Empty for
+	// a stated one, and when the catalog lists no Python for the series.
+	requiresPython string
+}
+
+// defaulted reports that nothing named an Airflow version.
+func (p airflowPick) defaulted() bool { return p.source != "" }
+
+// pythonBound is the requires-python a manifest this run writes gets: the
+// catalog's for a defaulted series when it has one, else the built-in rule.
+func (p airflowPick) pythonBound() string {
+	if p.requiresPython != "" {
+		return p.requiresPython
+	}
+	return requiresPython(p.version)
+}
+
 // pickAirflowVersion resolves the pin from every source that can state one, in
 // precedence order, and reports whether the answer is only the default.
 //
@@ -697,7 +737,11 @@ func migratedLabels(v1 *v1Project) []string {
 //	  → an apache-airflow pin in the MANIFEST's [project.dependencies]
 //	    → the Dockerfile's runtime tag
 //	      → an apache-airflow pin in requirements.txt
-//	        → DefaultAirflowVersion
+//	        → Options.Default (the runtime catalog, its cache, or
+//	          runtimeversions.FallbackAirflowSeries)
+//
+// The default is resolved last and only when reached, so a project that states
+// its Airflow never causes a catalog request.
 //
 // Two of those orderings were wrong before, and both produced a project pinned a
 // whole Airflow generation from where it actually was.
@@ -724,20 +768,35 @@ func migratedLabels(v1 *v1Project) []string {
 // The Dockerfile sits above a requirements.txt pin because the image tag is what
 // the project runs today, while a pin in requirements.txt is what pip was asked
 // to install INTO that image.
-func pickAirflowVersion(flag string, manifestDeps []string, v1 *v1Project) (version string, defaulted bool) {
+func pickAirflowVersion(flag string, manifestDeps []string, v1 *v1Project, def DefaultAirflow) airflowPick {
 	if flag != "" {
-		return flag, false
+		return airflowPick{version: flag}
 	}
 	if v, ok := pinFromDeps(manifestDeps); ok {
-		return v, false
+		return airflowPick{version: v}
 	}
 	if v1.airflow != "" {
-		return v1.airflow, false
+		return airflowPick{version: v1.airflow}
 	}
 	if v, ok := pinFromDeps(v1.dependencies); ok {
-		return v, false
+		return airflowPick{version: v}
 	}
-	return DefaultAirflowVersion, true
+	return defaultAirflow(def)
+}
+
+// defaultAirflow asks the caller's resolver, and answers the built-in series
+// when there is none or it names nothing. With no resolver no lookup was
+// tried, so the source says built-in rather than claiming a failed one.
+func defaultAirflow(def DefaultAirflow) airflowPick {
+	if def != nil {
+		if series, rp, src := def(); series != "" {
+			if src == "" {
+				src = runtimeversions.SourceBuiltIn
+			}
+			return airflowPick{version: series, source: src, requiresPython: rp}
+		}
+	}
+	return airflowPick{version: runtimeversions.FallbackAirflowSeries, source: runtimeversions.SourceBuiltIn}
 }
 
 // renderPyproject builds the greenfield manifest. It fills the template
@@ -749,19 +808,23 @@ func pickAirflowVersion(flag string, manifestDeps []string, v1 *v1Project) (vers
 // own validation error. [project.dependencies] carries the Airflow the project
 // pins, derived from the same version that fills [tool.astro].airflow, so
 // init → start needs no hand-edit.
-func renderPyproject(name, version string, v1 *v1Project) (pyproject []byte, notes []string, err error) {
+func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []byte, notes []string, err error) {
+	version := pick.version
 	tmpl := "[project]\n" +
 		"name = 'astro-project'\n" +
 		"version = '" + defaultProjectVersion + "'\n" +
-		"requires-python = '" + requiresPython(version) + "'\n" +
+		"requires-python = ''\n" +
 		"dependencies = []\n\n" +
 		"[tool.astro]\n" +
-		"airflow = '" + DefaultAirflowVersion + "'\n"
+		"airflow = ''\n"
 	ed, err := tomledit.NewSurgical([]byte(tmpl))
 	if err != nil {
 		return nil, nil, err
 	}
 	if err := ed.Set([]string{"project", "name"}, name); err != nil {
+		return nil, nil, err
+	}
+	if err := ed.Set([]string{"project", "requires-python"}, pick.pythonBound()); err != nil {
 		return nil, nil, err
 	}
 	if err := ed.Set([]string{"tool", "astro", manifestKeyAirflow}, version); err != nil {
@@ -1063,7 +1126,7 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// already said so in its own note. What is left for this warning is the
 	// case where a file named a version and we still ended up defaulting.
 	if facts.defaultedPin && (v1.statedVersion || facts.namesAirflow) {
-		out = append([]string{"airflow = '" + DefaultAirflowVersion + "' is the default, not this project's version: " +
+		out = append([]string{"airflow = '" + version + "' is the default, not this project's version: " +
 			"set it from the Airflow this project already names"}, out...)
 	}
 	// The other way a manifest ends up contradicting itself: its own

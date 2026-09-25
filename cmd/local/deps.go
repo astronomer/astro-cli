@@ -29,6 +29,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // Deps is everything the v2 commands need from the process. The composition
@@ -106,6 +107,14 @@ type Deps struct {
 	// path without a pty. nil means non-interactive, which is the safe default:
 	// a run that cannot be asked is never blocked waiting for an answer.
 	Interactive func() bool
+
+	// AirflowDefault is the Airflow `astro init` gives a project that states
+	// none: the series, the requires-python its runtime ships with (empty for
+	// the built-in rule), and where the answer came from. Production reads the
+	// runtime catalog through runtimeversions.Default, which never fails. A
+	// seam so a test never reaches the network; nil answers the built-in
+	// series with no lookup.
+	AirflowDefault func(ctx context.Context) (series, requiresPython string, src runtimeversions.Source)
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -148,6 +157,7 @@ func NewDeps() Deps {
 		Locator:          instancelocate.New,
 		LoginDomain:      astrosession.Domain,
 		Interactive:      stdinIsTerminal,
+		AirflowDefault:   catalogDefault,
 	}
 }
 
@@ -312,29 +322,26 @@ func healthTimeout() time.Duration {
 // because imagebuild imports the localrt contract, so localrt cannot import it
 // back; this is the field-for-field copy that costs.
 type imageBuilder struct {
-	// versionCacheDir is where the Astro Runtime version lookup keeps the
-	// service's answer. The CLI names it, because the CLI is what knows where
-	// its cache lives.
-	versionCacheDir string
+	// catalog is how the Astro Runtime version lookup reads the runtime
+	// catalog: where its copy is cached, and the User-Agent it sends. The CLI
+	// names both, because the CLI is what knows where its cache lives and what
+	// it is called.
+	catalog runtimeversions.Options
 }
 
-// newImageBuilder resolves the cache directory for the version lookup. A cache
-// root that cannot be resolved is not a failure: an empty directory means the
-// lookup asks the service every time, which still works.
+// newImageBuilder reads the catalog with its default timeout: an Airflow 2
+// image lookup blocks a start and has no fallback, so it waits longer than
+// init's does.
 func newImageBuilder() imageBuilder {
-	dir, err := localrt.CacheRoot()
-	if err != nil {
-		dir = ""
-	}
-	return imageBuilder{versionCacheDir: dir}
+	return imageBuilder{catalog: catalogOptions(0)}
 }
 
-// RuntimeImage resolves through LocalRuntimeImage, not RuntimeImage: a local run
-// takes either generation, and an Airflow 2 pin needs the version service to say
-// which runtime carries it. The deploy path keeps the pure RuntimeImage, which
-// is Airflow 3 alone.
+// RuntimeImage resolves through LocalRuntimeImageWith, not RuntimeImage: a local
+// run takes either generation, and an Airflow 2 pin needs the runtime catalog to
+// say which runtime carries it. The deploy path keeps the pure RuntimeImage,
+// which is Airflow 3 alone.
 func (b imageBuilder) RuntimeImage(ctx context.Context, airflowVersion string) (string, error) {
-	return imagebuild.LocalRuntimeImage(ctx, airflowVersion, b.versionCacheDir)
+	return imagebuild.LocalRuntimeImageWith(ctx, airflowVersion, b.catalog)
 }
 
 // Build copies every field across, and the two that used to be missing are

@@ -245,7 +245,21 @@ type project struct {
 	// home backs both ASTRO_HOME and HOME, as they coincide in the real thing.
 	home  string
 	cache string
+	// catalogURL is the runtime catalog commands read, through
+	// ASTRO_RUNTIME_VERSIONS_URL. Empty means unreachableCatalog, so no case
+	// reaches Astronomer's catalog unless it asks to: `astro init` falls back
+	// to its built-in series, and a case that needs a real catalog serves one
+	// or names the live one.
+	catalogURL string
 }
+
+// unreachableCatalog refuses connections at once, so a lookup fails fast rather
+// than waiting out a timeout.
+const unreachableCatalog = "http://127.0.0.1:1/astronomer-runtime"
+
+// liveCatalog is Astronomer's real runtime catalog, for the tier 3 case that
+// needs an Airflow 2 image lookup to name a real runtime.
+const liveCatalog = "https://updates.astronomer.io/astronomer-runtime"
 
 // forT returns a view of p whose failures land on t.
 //
@@ -258,6 +272,14 @@ func (p *project) forT(t *testing.T) *project {
 	sub := *p
 	sub.t = t
 	return &sub
+}
+
+// catalog is the runtime catalog address this project's commands read.
+func (p *project) catalog() string {
+	if p.catalogURL != "" {
+		return p.catalogURL
+	}
+	return unreachableCatalog
 }
 
 // newProject returns an isolated project directory. Everything it creates is
@@ -425,6 +447,9 @@ func (p *project) env(extra map[string]string) []string {
 		// the first-run notice, which is printed from the same code path and
 		// writes to the config as a side effect.
 		"ASTRO_TELEMETRY_DISABLED=1",
+		// ASTRO_ is stripped above, so the catalog a command reads is set
+		// here, deliberately: see catalogURL.
+		"ASTRO_RUNTIME_VERSIONS_URL="+p.catalog(),
 	)
 	// See uvCache: shared on purpose. Only when there is a directory to name —
 	// an explicitly empty UV_CACHE_DIR is not the same as an unset one, and uv

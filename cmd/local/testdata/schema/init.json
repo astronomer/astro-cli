@@ -2,6 +2,7 @@
   "dir": "x",
   "name": "x",
   "airflow": "x",
+  "airflowDefaultSource": "x",
   "created": [
     "x"
   ],

@@ -8,6 +8,12 @@ go 1.26.1
 // to obtain four progress types.
 require github.com/astronomer/astro-cli/pkg/localrt v0.0.0-00010101000000-000000000000
 
+// The runtime catalog, for the Airflow 2 image lookup. A stdlib-only leaf, so it
+// brings no requires of its own; a consumer of this module still adds a
+// require + replace pair for it, since a dependency's replace lines are never
+// honoured.
+require github.com/astronomer/astro-cli/pkg/runtimeversions v0.0.0-00010101000000-000000000000
+
 require github.com/stretchr/testify v1.11.1
 
 require (
@@ -17,3 +23,5 @@ require (
 )
 
 replace github.com/astronomer/astro-cli/pkg/localrt => ../localrt
+
+replace github.com/astronomer/astro-cli/pkg/runtimeversions => ../runtimeversions

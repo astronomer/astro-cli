@@ -24,7 +24,7 @@ GOLANGCI_VERSION=$(shell sed -n 's/.*golangci-lint@\(v[0-9.]*\).*/\1/p' prek.tom
 # it, and its sibling fails on an entry missing from v2BelowCmd. So a new module
 # fails two tests on the commit that adds it, which is the cheapest place to
 # find out.
-LINT_SUBMODULES=pkg/airflowapi pkg/airflowenv pkg/airflowrt pkg/astroauth pkg/awsauth pkg/checks pkg/connmodel pkg/container pkg/emfetch pkg/envschema pkg/fsatomic pkg/googleauth pkg/imagebuild pkg/instancelocate pkg/instances pkg/localrt pkg/manifest pkg/platformversions pkg/proxy pkg/scaffold pkg/secrets pkg/telemetry pkg/uv
+LINT_SUBMODULES=pkg/airflowapi pkg/airflowenv pkg/airflowrt pkg/astroauth pkg/awsauth pkg/checks pkg/connmodel pkg/container pkg/emfetch pkg/envschema pkg/fsatomic pkg/googleauth pkg/imagebuild pkg/instancelocate pkg/instances pkg/localrt pkg/manifest pkg/platformversions pkg/proxy pkg/runtimeversions pkg/scaffold pkg/secrets pkg/telemetry pkg/uv
 
 lint-submodules:
 	@set -e; for mod in ${LINT_SUBMODULES}; do \

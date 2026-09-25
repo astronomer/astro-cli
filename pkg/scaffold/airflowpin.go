@@ -8,6 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // ErrInvalidAirflowVersion reports a pin SetAirflowVersion refused before
@@ -61,6 +62,8 @@ type AirflowPinChange struct {
 //   - requires-python moves to the new pin's bound only when it is exactly a
 //     bound this package wrote for the previous pin, today's or the ">=3.10"
 //     init once wrote for all of Airflow 3. A bound someone chose stays theirs.
+//     SetAirflowVersionWith also recognizes, and writes, the bound the runtime
+//     catalog gives.
 //
 // [tool.uv] is the project's, and a pin change never touches it.
 //
@@ -72,6 +75,22 @@ type AirflowPinChange struct {
 // Nothing else changes: providers, Dag code and Dockerfile steps an upgrade
 // may need are judgment, not a pin, and are left to the user or an agent.
 func SetAirflowVersion(dir string, wrap func(run func() error) error, version string) (AirflowPinChange, error) {
+	return SetAirflowVersionWith(dir, wrap, version, AirflowPinOptions{})
+}
+
+// AirflowPinOptions adjust SetAirflowVersionWith.
+type AirflowPinOptions struct {
+	// Catalog is the runtime catalog, when the caller has one loaded. With it,
+	// a requires-python that init derived from the catalog (">=" and the
+	// lowest Python an Airflow 3 series' runtime ships) counts as one this
+	// package wrote, so it moves with the pin, and the new bound comes from
+	// the catalog too. nil means only the built-in rule is known, and a
+	// catalog-derived bound that differs from it reads as the user's.
+	Catalog *runtimeversions.Catalog
+}
+
+// SetAirflowVersionWith is SetAirflowVersion with options.
+func SetAirflowVersionWith(dir string, wrap func(run func() error) error, version string, opts AirflowPinOptions) (AirflowPinChange, error) {
 	if !manifest.ValidAirflowVersion(version) {
 		return AirflowPinChange{}, fmt.Errorf("%w: %q is not a version like 3, 3.1, or 3.1.2", ErrInvalidAirflowVersion, version)
 	}
@@ -92,9 +111,11 @@ func SetAirflowVersion(dir string, wrap func(run func() error) error, version st
 		if err := setAirflowRequirements(ed, version, &change); err != nil {
 			return err
 		}
+		// A same-pin call never moves requires-python, so a repeated call writes
+		// nothing even when the catalog's bound differs from the one written.
 		moved := change.Previous != version
-		if rp := before.Project.RequiresPython; rp != "" && initWroteRequiresPython(rp, change.Previous, moved) {
-			if next := requiresPython(version); next != rp {
+		if rp := before.Project.RequiresPython; rp != "" && moved && initWroteRequiresPython(rp, change.Previous, moved, opts.Catalog) {
+			if next := pythonBoundFor(version, opts.Catalog); next != rp {
 				if err := ed.Set([]string{"project", "requires-python"}, next); err != nil {
 					return err
 				}
@@ -112,15 +133,47 @@ func SetAirflowVersion(dir string, wrap func(run func() error) error, version st
 
 // initWroteRequiresPython reports whether rp is a bound this package wrote for
 // the previous pin, and so one a pin change may move. That is today's
-// requiresPython, and, once the pin moves, the ">=3.10" init wrote for every
-// Airflow 3 before its floor followed the runtime. A same-pin call only
+// requiresPython; the bound the catalog gives the previous series, when the
+// caller has the catalog; and, once the pin moves, the ">=3.10" init wrote for
+// every Airflow 3 before its floor followed the runtime. A same-pin call only
 // recognizes today's, so it stays a no-op.
-func initWroteRequiresPython(rp, previous string, moved bool) bool {
+func initWroteRequiresPython(rp, previous string, moved bool, catalog *runtimeversions.Catalog) bool {
 	if rp == requiresPython(previous) {
+		return true
+	}
+	if bound, ok := catalogBound(previous, catalog); ok && rp == bound {
 		return true
 	}
 	major, _, _ := strings.Cut(previous, ".")
 	return moved && major != "2" && rp == ">=3.10"
+}
+
+// pythonBoundFor is the requires-python a pin gets: the catalog's for an
+// Airflow 3 series it lists, else the built-in rule.
+func pythonBoundFor(version string, catalog *runtimeversions.Catalog) string {
+	if bound, ok := catalogBound(version, catalog); ok {
+		return bound
+	}
+	return requiresPython(version)
+}
+
+// catalogBound is the catalog's requires-python for the series an Airflow 3
+// pin names. Airflow 2 keeps the built-in rule whatever the catalog says: its
+// ceilings exist for a real failure, and the catalog lists no Python for it. A
+// bare "3" names no series, so it has no catalog bound either.
+func catalogBound(pin string, catalog *runtimeversions.Catalog) (string, bool) {
+	if catalog == nil {
+		return "", false
+	}
+	major, rest, ok := strings.Cut(pin, ".")
+	if !ok || major != "3" {
+		return "", false
+	}
+	minor, _, _ := strings.Cut(rest, ".")
+	if minor == "" {
+		return "", false
+	}
+	return catalog.RequiresPython(major + "." + minor)
 }
 
 // setAirflowRequirements rewrites each apache-airflow entry of [project]

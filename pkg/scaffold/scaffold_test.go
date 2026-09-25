@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
@@ -22,7 +23,7 @@ func TestRunFreshScaffold(t *testing.T) {
 
 	assert.Equal(t, dir, res.Dir)
 	assert.Equal(t, "flight-data", res.Name)
-	assert.Equal(t, DefaultAirflowVersion, res.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, res.AirflowVersion)
 	assert.Empty(t, res.Skipped)
 
 	for _, d := range []string{"dags", "include", "plugins", "tests"} {
@@ -45,7 +46,7 @@ func TestRunFreshScaffold(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, "flight-data", m.Project.Name)
-	assert.Equal(t, DefaultAirflowVersion, m.Astro.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Astro.AirflowVersion)
 	// [project.dependencies] must install the pinned Airflow, so init → start
 	// works with no hand-edit. The default pin is partial, so the
 	// requirement is a prefix match.
@@ -83,18 +84,62 @@ func TestScaffoldedProjectLocksWithRealUv(t *testing.T) {
 	require.NoError(t, err, "uv lock must write a lockfile")
 }
 
-// The default is spelled out rather than read from DefaultAirflowVersion, so
-// the assertion can fail when the constant moves.
-func TestRunPinsAirflowThreePointThreeByDefault(t *testing.T) {
+// The resolver's answer is what a new project pins, with the requires-python it
+// gives, and the Result says where it came from. Spelled out as literals, so
+// the assertions can fail.
+func TestRunPinsTheDefaultTheResolverGives(t *testing.T) {
 	dir := t.TempDir()
-	_, err := Run(dir, Options{})
+	res, err := Run(dir, Options{Default: func() (string, string, runtimeversions.Source) {
+		return "3.50", ">=3.13", runtimeversions.SourceCatalog
+	}})
+	require.NoError(t, err)
+	assert.Equal(t, "3.50", res.AirflowVersion)
+	assert.Equal(t, runtimeversions.SourceCatalog, res.AirflowDefaultSource)
+
+	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "airflow = '3.50'")
+	assert.Contains(t, string(raw), "'apache-airflow==3.50.*'")
+	assert.Contains(t, string(raw), "requires-python = '>=3.13'")
+}
+
+// A resolver that has no Python for the series leaves requires-python to the
+// built-in rule, which gives every Airflow 3 from 3.2 on >=3.12.
+func TestRunFallsBackToTheBuiltInPythonRule(t *testing.T) {
+	dir := t.TempDir()
+	_, err := Run(dir, Options{Default: func() (string, string, runtimeversions.Source) {
+		return "3.50", "", runtimeversions.SourceStaleCache
+	}})
 	require.NoError(t, err)
 
 	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(raw), "airflow = '3.3'")
-	assert.Contains(t, string(raw), "'apache-airflow==3.3.*'")
 	assert.Contains(t, string(raw), "requires-python = '>=3.12'")
+}
+
+// With no resolver at all, the project pins the built-in series, and says so.
+func TestRunWithoutAResolverPinsTheFallback(t *testing.T) {
+	dir := t.TempDir()
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, res.AirflowVersion)
+	assert.Equal(t, runtimeversions.SourceBuiltIn, res.AirflowDefaultSource)
+
+	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "requires-python = '"+requiresPython(runtimeversions.FallbackAirflowSeries)+"'")
+}
+
+// A stated version never asks the resolver, and reports no default source.
+func TestRunWithAFlagAsksNoResolver(t *testing.T) {
+	dir := t.TempDir()
+	res, err := Run(dir, Options{AirflowVersion: "3.1", Default: func() (string, string, runtimeversions.Source) {
+		t.Error("the resolver was called for a project whose version was given")
+		return "3.50", "", runtimeversions.SourceCatalog
+	}})
+	require.NoError(t, err)
+	assert.Equal(t, "3.1", res.AirflowVersion)
+	assert.Empty(t, res.AirflowDefaultSource)
 }
 
 func TestRunHonorsNameAndAirflowVersion(t *testing.T) {
@@ -159,7 +204,7 @@ func TestRunAdoptsExistingManifest(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	assert.Equal(t, "orders", res.Name)
-	assert.Equal(t, DefaultAirflowVersion, res.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, res.AirflowVersion)
 	assert.NotEmpty(t, res.Updated)
 
 	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
@@ -169,10 +214,10 @@ func TestRunAdoptsExistingManifest(t *testing.T) {
 	assert.Contains(t, got, "# http")
 	assert.Contains(t, got, "requests==2.31.0")
 	assert.Contains(t, got, "requires-python = '>=3.11'")
-	assert.Contains(t, got, airflowRequirement(DefaultAirflowVersion))
+	assert.Contains(t, got, airflowRequirement(runtimeversions.FallbackAirflowSeries))
 	m, err := manifest.Parse(out)
 	require.NoError(t, err)
-	assert.Equal(t, DefaultAirflowVersion, m.Astro.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Astro.AirflowVersion)
 
 	// The rest of the scaffold lands beside it.
 	for _, f := range []string{"dags", "include", "plugins", "tests", ".gitignore", "AGENTS.md"} {
@@ -269,7 +314,7 @@ func TestRunAdoptsPuttingTheAstroSectionsFirst(t *testing.T) {
 	m, err := manifest.Parse(out)
 	require.NoError(t, err)
 	assert.Equal(t, "orders", m.Project.Name)
-	assert.Equal(t, DefaultAirflowVersion, m.Astro.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, m.Astro.AirflowVersion)
 }
 
 // Most repos state the Airflow they run in a Dockerfile image tag, and most of
@@ -336,6 +381,28 @@ func TestRunLeavesDynamicDependenciesAlone(t *testing.T) {
 	assert.Contains(t, strings.Join(res.Notes, "\n"), "dependencies are dynamic")
 }
 
+// The adopt arm takes the resolver's default the way the greenfield arm does:
+// its series, the requires-python it gives when the manifest states none, the
+// source on the Result, and the version it chose in the "is the default" note.
+func TestRunAdoptsWithTheResolversDefault(t *testing.T) {
+	dir := t.TempDir()
+	existing := "[project]\nname = 'a'\nversion = '0.1.0'\ndependencies = ['apache-airflow>=2.9']\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600))
+
+	res, err := Run(dir, Options{Default: func() (string, string, runtimeversions.Source) {
+		return "3.50", ">=3.13", runtimeversions.SourceCache
+	}})
+	require.NoError(t, err)
+	assert.True(t, res.Adopted)
+	assert.Equal(t, "3.50", res.AirflowVersion)
+	assert.Equal(t, runtimeversions.SourceCache, res.AirflowDefaultSource)
+	assert.Contains(t, strings.Join(res.Notes, "\n"), "airflow = '3.50' is the default, not this project's version")
+
+	out, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "requires-python = '>=3.13'")
+}
+
 // A range or a wildcard names an Airflow this cannot read a version out of, so
 // the default lands instead — which for a 2.x project is a whole generation.
 // Nothing else in such a repo need mention a version, so the manifest itself
@@ -347,7 +414,7 @@ func TestRunWarnsWhenAPinnedProjectFallsBackToTheDefault(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Equal(t, DefaultAirflowVersion, res.AirflowVersion)
+	assert.Equal(t, runtimeversions.FallbackAirflowSeries, res.AirflowVersion)
 	assert.Contains(t, strings.Join(res.Notes, "\n"), "is the default, not this project's version")
 
 	// The project's own requirement is left as its author wrote it.
@@ -703,6 +770,6 @@ func TestAgentsMdCarriesTheDevMapping(t *testing.T) {
 		assert.Contains(t, content, row)
 	}
 	assert.Contains(t, content, "pyproject.toml")
-	assert.NotContains(t, content, DefaultAirflowVersion,
+	assert.NotContains(t, content, runtimeversions.FallbackAirflowSeries,
 		"AGENTS.md must reference the manifest, not duplicate its values")
 }

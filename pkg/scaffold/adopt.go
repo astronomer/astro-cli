@@ -73,7 +73,8 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	}
 
 	deps := asStrings(mustGet(ed, "project", "dependencies"))
-	version, defaulted := pickAirflowVersion(opts.AirflowVersion, deps, v1)
+	pick := pickAirflowVersion(opts.AirflowVersion, deps, v1, opts.Default)
+	version, defaulted := pick.version, pick.defaulted()
 	pin = manifestFacts{
 		defaultedPin: defaulted,
 		pinUnread:    pinnedPastTheManifest(deps, defaulted, opts.AirflowVersion != ""),
@@ -95,7 +96,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// Read before ensureProjectKeys, which fills a missing one: after it, an
 	// absent key and one this run just wrote look the same.
 	pin.loosePython = statedPythonTooLoose(ed, version)
-	requiresPythonLabel, err := ensureProjectKeys(ed, version)
+	requiresPythonLabel, err := ensureProjectKeys(ed, pick.pythonBound())
 	if err != nil {
 		return nil, nil, pin, err
 	}
@@ -154,7 +155,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	}
 
 	res.Name = m.Project.Name
-	res.AirflowVersion = version
+	res.AirflowVersion, res.AirflowDefaultSource = version, pick.source
 	res.Adopted = true
 	// Returned rather than appended to a list beside the change: these lines
 	// describe the manifest write, so they belong to it.
@@ -332,15 +333,15 @@ func ensureProjectVersion(ed tomledit.Editor) error {
 // reporting. requires-python is reportable because it decides which
 // interpreters the project may ever use; the version placeholder has no
 // behavioral consequence, so it stays quiet.
-func ensureProjectKeys(ed tomledit.Editor, version string) (label string, err error) {
+func ensureProjectKeys(ed tomledit.Editor, bound string) (label string, err error) {
 	if err := ensureProjectVersion(ed); err != nil {
 		return "", err
 	}
-	wrote, err := ensureRequiresPython(ed, version)
+	wrote, err := ensureRequiresPython(ed, bound)
 	if err != nil || !wrote {
 		return "", err
 	}
-	return manifest.Marker + " (set requires-python to " + requiresPython(version) + ")", nil
+	return manifest.Marker + " (set requires-python to " + bound + ")", nil
 }
 
 // statedPythonTooLoose reports that the manifest already states a
@@ -385,7 +386,7 @@ func appendLabel(labels []string, label string) []string {
 // It reports whether it wrote, so the run can say so: this key decides which
 // interpreters the project may ever use, and a change performed but unreported
 // cannot be reviewed.
-func ensureRequiresPython(ed tomledit.Editor, version string) (wrote bool, err error) {
+func ensureRequiresPython(ed tomledit.Editor, bound string) (wrote bool, err error) {
 	if v, ok := ed.Get([]string{"project", "requires-python"}); ok && v != "" {
 		return false, nil
 	}
@@ -396,7 +397,7 @@ func ensureRequiresPython(ed tomledit.Editor, version string) (wrote bool, err e
 	if slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "requires-python") {
 		return false, nil
 	}
-	if err := ed.Set([]string{"project", "requires-python"}, requiresPython(version)); err != nil {
+	if err := ed.Set([]string{"project", "requires-python"}, bound); err != nil {
 		return false, err
 	}
 	return true, nil

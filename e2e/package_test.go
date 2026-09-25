@@ -74,9 +74,10 @@ func TestPackageMWAAWritesTheBucketLayout(t *testing.T) {
 	// the platform cannot run.
 	//
 	// The precondition is data: pkg/platformversions.MWAA is a hand-maintained
-	// list, and the pin is scaffold.DefaultAirflowVersion. Should MWAA come to
-	// list it, there is no mismatch to warn about and this case needs a
-	// different pin — so say so here rather than in a bug report.
+	// list, and the pin is runtimeversions.FallbackAirflowSeries, since the
+	// harness keeps init offline. Should MWAA come to list it, there is no
+	// mismatch to warn about and this case needs a different pin — so say so
+	// here rather than in a bug report.
 	if !strings.Contains(r.Stdout, "which MWAA does not list") {
 		t.Errorf("expected a version-mismatch warning. If MWAA now lists the "+
 			"scaffold's pinned Airflow, this case needs a pin that it does "+

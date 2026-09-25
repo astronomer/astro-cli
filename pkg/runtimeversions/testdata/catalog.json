@@ -1,0 +1,362 @@
+{
+  "_fixture": "Cut from https://updates.astronomer.io/astronomer-runtime on 2026-09-25 (schemaVersion 1.8), keeping real entries that exercise the rule: a yanked build in a series that still qualifies (3.2-1), a backport dated after the newest series shipped (3.0-18), and Airflow 2 runtimes including yanked (13.5.0) and deprecated ones. Three Airflow 3 entries are SYNTHETIC decoys that must never be the default: 3.4-1 releases in 2099, 3.5-1 is yanked, 3.6-1 is deprecated. This key is not part of the catalog; it also shows unknown fields are tolerated.",
+  "schemaVersion": "1.8",
+  "features": {
+    "stellar": {
+      "introducedVersion": "6.0.0"
+    },
+    "triggerer": {
+      "introducedVersion": "4.0.0"
+    }
+  },
+  "runtimeVersions": {
+    "9.1.0": {
+      "metadata": {
+        "airflowVersion": "2.7.1",
+        "channel": "deprecated",
+        "releaseDate": "2023-09-07",
+        "endOfSupport": "2025-01-31",
+        "yanked": true,
+        "yankedReason": "This version has issues with CeleryExecutor workers not terminating properly.",
+        "LTS": true
+      },
+      "migrations": {
+        "airflowDatabase": false,
+        "stellarDatabase": false
+      }
+    },
+    "11.0.0": {
+      "metadata": {
+        "airflowVersion": "2.9.0",
+        "channel": "deprecated",
+        "releaseDate": "2024-04-08",
+        "endOfSupport": "2025-10-31",
+        "yanked": true,
+        "yankedReason": "This version has db migration issues when you have running triggers.",
+        "LTS": true
+      },
+      "migrations": {
+        "airflowDatabase": true,
+        "stellarDatabase": false
+      }
+    },
+    "12.12.0": {
+      "metadata": {
+        "airflowVersion": "2.10.5",
+        "channel": "deprecated",
+        "releaseDate": "2026-03-09",
+        "endOfSupport": "2026-02-28",
+        "LTS": true
+      },
+      "migrations": {
+        "airflowDatabase": false,
+        "stellarDatabase": false
+      }
+    },
+    "13.5.0": {
+      "metadata": {
+        "airflowVersion": "2.11.1",
+        "channel": "stable",
+        "releaseDate": "2026-02-23",
+        "endOfSupport": "2027-04-30",
+        "yanked": true,
+        "yankedReason": "Webserver throwing 500s for existing user sessions when upgrading from previous versions",
+        "LTS": true
+      },
+      "migrations": {
+        "airflowDatabase": false,
+        "stellarDatabase": false
+      }
+    },
+    "13.10.0": {
+      "metadata": {
+        "airflowVersion": "2.11.2",
+        "channel": "stable",
+        "releaseDate": "2026-08-22",
+        "endOfSupport": "2027-04-30",
+        "LTS": true
+      },
+      "migrations": {
+        "airflowDatabase": false,
+        "stellarDatabase": false
+      }
+    },
+    "13.11.0": {
+      "metadata": {
+        "airflowVersion": "2.11.2",
+        "channel": "stable",
+        "releaseDate": "2026-09-17",
+        "endOfSupport": "2027-04-30",
+        "LTS": true
+      },
+      "migrations": {
+        "airflowDatabase": false,
+        "stellarDatabase": false
+      }
+    }
+  },
+  "runtimeVersionsV3": {
+    "3.0-17": {
+      "metadata": {
+        "airflowVersion": "3.0.6",
+        "channel": "stable",
+        "releaseDate": "2026-08-26",
+        "endOfMaintenance": "2027-04-30",
+        "endOfBasicSupport": "2027-10-30",
+        "endOfSupport": "2027-04-30",
+        "LTS": false,
+        "pythonVersions": [
+          "3.11",
+          "3.12"
+        ],
+        "defaultPythonVersion": "3.12"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.0-18": {
+      "metadata": {
+        "airflowVersion": "3.0.6",
+        "channel": "stable",
+        "releaseDate": "2026-09-15",
+        "endOfMaintenance": "2027-04-30",
+        "endOfBasicSupport": "2027-10-30",
+        "endOfSupport": "2027-04-30",
+        "LTS": false,
+        "pythonVersions": [
+          "3.11",
+          "3.12"
+        ],
+        "defaultPythonVersion": "3.12"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.1-8": {
+      "metadata": {
+        "airflowVersion": "3.1.4",
+        "channel": "stable",
+        "releaseDate": "2025-12-10",
+        "endOfMaintenance": "2027-09-30",
+        "endOfBasicSupport": "2028-03-30",
+        "endOfSupport": "2027-09-30",
+        "yanked": true,
+        "yankedReason": "This version is based on Airflow 3.1.4, which has been yanked by Apache Airflow.",
+        "LTS": false,
+        "pythonVersions": [
+          "3.11",
+          "3.12"
+        ],
+        "defaultPythonVersion": "3.12"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.1-21": {
+      "metadata": {
+        "airflowVersion": "3.1.8",
+        "channel": "stable",
+        "releaseDate": "2026-09-10",
+        "endOfMaintenance": "2027-09-30",
+        "endOfBasicSupport": "2028-03-30",
+        "endOfSupport": "2027-09-30",
+        "LTS": false,
+        "pythonVersions": [
+          "3.11",
+          "3.12"
+        ],
+        "defaultPythonVersion": "3.12"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.2-1": {
+      "metadata": {
+        "airflowVersion": "3.2.0",
+        "channel": "stable",
+        "releaseDate": "2026-04-14",
+        "endOfMaintenance": "2028-04-30",
+        "endOfBasicSupport": "2028-10-30",
+        "endOfSupport": "2028-04-30",
+        "yanked": true,
+        "yankedReason": "This version has issues with environment manager connections not being found.",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.13"
+      },
+      "migrations": {
+        "airflowDatabase": true
+      }
+    },
+    "3.2-2": {
+      "metadata": {
+        "airflowVersion": "3.2.0",
+        "channel": "stable",
+        "releaseDate": "2026-04-16",
+        "endOfMaintenance": "2028-04-30",
+        "endOfBasicSupport": "2028-10-30",
+        "endOfSupport": "2028-04-30",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.13"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.2-10": {
+      "metadata": {
+        "airflowVersion": "3.2.2",
+        "channel": "stable",
+        "releaseDate": "2026-09-24",
+        "endOfMaintenance": "2028-04-30",
+        "endOfBasicSupport": "2028-10-30",
+        "endOfSupport": "2028-04-30",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.13"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.3-1": {
+      "metadata": {
+        "airflowVersion": "3.3.0",
+        "channel": "stable",
+        "releaseDate": "2026-07-09",
+        "endOfMaintenance": "2028-07-31",
+        "endOfBasicSupport": "2029-01-31",
+        "endOfSupport": "2028-07-31",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.14"
+      },
+      "migrations": {
+        "airflowDatabase": true
+      }
+    },
+    "3.3-2": {
+      "metadata": {
+        "airflowVersion": "3.3.0",
+        "channel": "stable",
+        "releaseDate": "2026-07-09",
+        "endOfMaintenance": "2028-07-31",
+        "endOfBasicSupport": "2029-01-31",
+        "endOfSupport": "2028-07-31",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.14"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.3-8": {
+      "metadata": {
+        "airflowVersion": "3.3.2",
+        "channel": "stable",
+        "releaseDate": "2026-09-23",
+        "endOfMaintenance": "2028-07-31",
+        "endOfBasicSupport": "2029-01-31",
+        "endOfSupport": "2028-07-31",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.14"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.4-1": {
+      "metadata": {
+        "airflowVersion": "3.4.0",
+        "channel": "stable",
+        "releaseDate": "2099-01-01",
+        "endOfMaintenance": "2028-07-31",
+        "endOfBasicSupport": "2029-01-31",
+        "endOfSupport": "2028-07-31",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.14"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.5-1": {
+      "metadata": {
+        "airflowVersion": "3.5.0",
+        "channel": "stable",
+        "releaseDate": "2026-09-01",
+        "endOfMaintenance": "2028-07-31",
+        "endOfBasicSupport": "2029-01-31",
+        "endOfSupport": "2028-07-31",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.14",
+        "yanked": true,
+        "yankedReason": "Synthetic decoy: yanked."
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    },
+    "3.6-1": {
+      "metadata": {
+        "airflowVersion": "3.6.0",
+        "channel": "deprecated",
+        "releaseDate": "2026-09-01",
+        "endOfMaintenance": "2028-07-31",
+        "endOfBasicSupport": "2029-01-31",
+        "endOfSupport": "2028-07-31",
+        "LTS": false,
+        "pythonVersions": [
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "defaultPythonVersion": "3.14"
+      },
+      "migrations": {
+        "airflowDatabase": false
+      }
+    }
+  }
+}

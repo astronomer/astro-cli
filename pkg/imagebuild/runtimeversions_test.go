@@ -1,15 +1,17 @@
 package imagebuild
 
 import (
-	"context"
-	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
-	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // releasesJSON is a trimmed copy of the version service's answer: two Airflow
@@ -29,31 +31,58 @@ const releasesJSON = `{
   }
 }`
 
-// withService points the resolver at canned bytes and hands back an empty cache
-// directory to resolve against, so no test reaches the network or the user's
-// home. The count is how many times the service was asked.
-func withService(t *testing.T, body string, err error) (calls *int, cacheDir string) {
-	t.Helper()
-	n := 0
-	prev := fetchReleases
-	fetchReleases = func(context.Context) ([]byte, error) {
-		n++
-		if err != nil {
-			return nil, err
-		}
-		return []byte(body), nil
+// service is a fake runtime catalog, reached through the catalog's URL
+// override, so no test touches the network or the user's home.
+type service struct {
+	mu        sync.Mutex
+	body      string
+	fail      bool
+	calls     int
+	userAgent string
+}
+
+func (s *service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls++
+	s.userAgent = r.UserAgent()
+	if s.fail {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
-	t.Cleanup(func() { fetchReleases = prev })
-	return &n, t.TempDir()
+	_, _ = w.Write([]byte(s.body))
+}
+
+func (s *service) count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
+}
+
+func (s *service) setFail() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fail = true
+}
+
+// withService serves body as the catalog and hands back an empty cache
+// directory to resolve against. The service counts how often it was asked.
+func withService(t *testing.T, body string, fail bool) (svc *service, cacheDir string) {
+	t.Helper()
+	svc = &service{body: body, fail: fail}
+	srv := httptest.NewServer(svc)
+	t.Cleanup(srv.Close)
+	t.Setenv(runtimeversions.URLEnv, srv.URL)
+	return svc, t.TempDir()
 }
 
 func TestLocalRuntimeImageAirflow3IsUnchanged(t *testing.T) {
-	calls, cache := withService(t, releasesJSON, nil)
+	calls, cache := withService(t, releasesJSON, false)
 
 	ref, err := LocalRuntimeImage(t.Context(), "3.1", cache)
 	require.NoError(t, err)
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1", ref)
-	assert.Zero(t, *calls, "Airflow 3 resolves from the pin alone, with no lookup")
+	assert.Zero(t, calls.count(), "Airflow 3 resolves from the pin alone, with no lookup")
 
 	// Docker-mode local start takes the series rule with deploy: a patch pin
 	// builds FROM its series and a bare major is refused.
@@ -62,11 +91,11 @@ func TestLocalRuntimeImageAirflow3IsUnchanged(t *testing.T) {
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1", ref)
 	_, err = LocalRuntimeImage(t.Context(), "3", cache)
 	assert.ErrorContains(t, err, "airflow pin")
-	assert.Zero(t, *calls)
+	assert.Zero(t, calls.count())
 }
 
 func TestLocalRuntimeImageAirflow2(t *testing.T) {
-	_, cache := withService(t, releasesJSON, nil)
+	_, cache := withService(t, releasesJSON, false)
 	ctx := t.Context()
 
 	// The newest runtime carrying the pinned Airflow wins, and 11.12.0 beats
@@ -92,7 +121,7 @@ func TestLocalRuntimeImageAirflow2(t *testing.T) {
 // sentence instead of a container that exits 2, and a pin naming no minor is
 // not refused at all — it means the newest Airflow 2.
 func TestLocalRuntimeImageAirflow2Floor(t *testing.T) {
-	calls, cache := withService(t, releasesJSON, nil)
+	calls, cache := withService(t, releasesJSON, false)
 	ctx := t.Context()
 
 	ref, err := LocalRuntimeImage(ctx, "2.7.1", cache)
@@ -108,10 +137,10 @@ func TestLocalRuntimeImageAirflow2Floor(t *testing.T) {
 	_, err = LocalRuntimeImage(ctx, "2.6", cache)
 	assert.ErrorContains(t, err, "Airflow 2.7 or later")
 
-	before := *calls
+	before := calls.count()
 	_, err = LocalRuntimeImage(ctx, "2.0.2", cache)
 	require.Error(t, err)
-	assert.Equal(t, before, *calls, "a pin below the floor is refused without a lookup")
+	assert.Equal(t, before, calls.count(), "a pin below the floor is refused without a lookup")
 
 	// A bare major means the newest Airflow 2, which is above the floor.
 	ref, err = LocalRuntimeImage(ctx, "2", cache)
@@ -120,7 +149,7 @@ func TestLocalRuntimeImageAirflow2Floor(t *testing.T) {
 }
 
 func TestLocalRuntimeImageUnknownAirflow(t *testing.T) {
-	_, cache := withService(t, releasesJSON, nil)
+	_, cache := withService(t, releasesJSON, false)
 
 	// Above the 2.7 floor, so this reaches the lookup and finds nothing.
 	_, err := LocalRuntimeImage(t.Context(), "2.8.4", cache)
@@ -129,7 +158,7 @@ func TestLocalRuntimeImageUnknownAirflow(t *testing.T) {
 }
 
 func TestLocalRuntimeImageRejectsOtherMajors(t *testing.T) {
-	_, cache := withService(t, releasesJSON, nil)
+	_, cache := withService(t, releasesJSON, false)
 
 	_, err := LocalRuntimeImage(t.Context(), "1.10.15", cache)
 	assert.ErrorContains(t, err, "Airflow 2 or Airflow 3")
@@ -139,20 +168,20 @@ func TestLocalRuntimeImageRejectsOtherMajors(t *testing.T) {
 }
 
 func TestLocalRuntimeImageCachesTheAnswer(t *testing.T) {
-	calls, cache := withService(t, releasesJSON, nil)
+	calls, cache := withService(t, releasesJSON, false)
 	ctx := t.Context()
 
 	_, err := LocalRuntimeImage(ctx, "2.9.3", cache)
 	require.NoError(t, err)
 	_, err = LocalRuntimeImage(ctx, "2.11.2", cache)
 	require.NoError(t, err)
-	assert.Equal(t, 1, *calls, "the second lookup should read the cache")
+	assert.Equal(t, 1, calls.count(), "the second lookup should read the cache")
 }
 
 // A caller that names no cache directory gets no cache: every lookup asks the
 // service, and nothing is written anywhere.
 func TestLocalRuntimeImageWithoutACache(t *testing.T) {
-	calls, _ := withService(t, releasesJSON, nil)
+	calls, _ := withService(t, releasesJSON, false)
 	ctx := t.Context()
 
 	ref, err := LocalRuntimeImage(ctx, "2.9.3", "")
@@ -161,24 +190,21 @@ func TestLocalRuntimeImageWithoutACache(t *testing.T) {
 
 	_, err = LocalRuntimeImage(ctx, "2.9.3", "")
 	require.NoError(t, err)
-	assert.Equal(t, 2, *calls, "with no cache directory every lookup asks the service")
+	assert.Equal(t, 2, calls.count(), "with no cache directory every lookup asks the service")
 }
 
 func TestLocalRuntimeImageFallsBackToAStaleCache(t *testing.T) {
 	// A good answer lands in the cache first.
-	_, dir := withService(t, releasesJSON, nil)
+	svc, dir := withService(t, releasesJSON, false)
 	_, err := LocalRuntimeImage(t.Context(), "2.9.3", dir)
 	require.NoError(t, err)
 
 	// Age it past the TTL, then take the network away. An old copy still names
 	// every runtime that existed when it was written, so the start proceeds.
-	path := filepath.Join(dir, versionsCacheFile)
-	old := time.Now().Add(-2 * versionsCacheTTL)
+	path := runtimeversions.CachePath(dir)
+	old := time.Now().Add(-2 * runtimeversions.CacheTTL)
 	require.NoError(t, os.Chtimes(path, old, old))
-
-	prevFetch := fetchReleases
-	fetchReleases = func(context.Context) ([]byte, error) { return nil, errors.New("no network") }
-	t.Cleanup(func() { fetchReleases = prevFetch })
+	svc.setFail()
 
 	ref, err := LocalRuntimeImage(t.Context(), "2.9.3", dir)
 	require.NoError(t, err)
@@ -186,17 +212,29 @@ func TestLocalRuntimeImageFallsBackToAStaleCache(t *testing.T) {
 }
 
 func TestLocalRuntimeImageReportsAFailedLookup(t *testing.T) {
-	_, cache := withService(t, "", errors.New("dial tcp: no route to host"))
+	_, cache := withService(t, "", true)
 
 	_, err := LocalRuntimeImage(t.Context(), "2.9.3", cache)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "Astro Runtime versions")
-	assert.ErrorContains(t, err, "no route to host")
+	assert.ErrorContains(t, err, "HTTP 503")
 }
 
 func TestLocalRuntimeImageRejectsAnEmptyServiceAnswer(t *testing.T) {
-	_, cache := withService(t, `{"runtimeVersions": {}}`, nil)
+	_, cache := withService(t, `{"runtimeVersions": {}}`, false)
 
 	_, err := LocalRuntimeImage(t.Context(), "2.9.3", cache)
 	assert.ErrorContains(t, err, "listed no runtimes")
+}
+
+// The caller's User-Agent reaches the catalog, so Astronomer can tell which
+// client read it.
+func TestLocalRuntimeImageWithSendsTheUserAgent(t *testing.T) {
+	svc, cache := withService(t, releasesJSON, false)
+
+	_, err := LocalRuntimeImageWith(t.Context(), "2.9.3", runtimeversions.Options{CacheDir: cache, UserAgent: "astro-cli/9.9.9"})
+	require.NoError(t, err)
+	svc.mu.Lock()
+	defer svc.mu.Unlock()
+	assert.Equal(t, "astro-cli/9.9.9", svc.userAgent)
 }

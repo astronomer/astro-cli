@@ -302,10 +302,11 @@ func TestCheckAgainstAPlatformTarget(t *testing.T) {
 	//
 	// That precondition is data, not logic: pkg/platformversions.MWAA is a
 	// hand-maintained list its own comment calls "data to refresh", and the pin
-	// comes from scaffold.DefaultAirflowVersion. If MWAA ever lists the pinned
-	// version there is nothing to map down from and this stops being the case
-	// it is — so the failure says that, rather than leaving the next person to
-	// work out why a passing feature looks broken.
+	// comes from runtimeversions.FallbackAirflowSeries, since the harness keeps
+	// init offline. If MWAA ever lists the pinned version there is nothing to
+	// map down from and this stops being the case it is — so the failure says
+	// that, rather than leaving the next person to work out why a passing
+	// feature looks broken.
 	if !strings.Contains(r.Stdout, "mapped down from the manifest pin") {
 		t.Errorf("expected the version-mapping note. If MWAA now lists the "+
 			"scaffold's pinned Airflow, this case needs a pin that it does "+

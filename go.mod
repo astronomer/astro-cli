@@ -46,6 +46,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/imagebuild v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/localrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/proxy v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/runtimeversions v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/secrets v0.0.0
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
 	github.com/compose-spec/compose-go/v2 v2.9.1
@@ -334,6 +335,8 @@ replace github.com/astronomer/astro-cli/pkg/localrt => ./pkg/localrt
 replace github.com/astronomer/astro-cli/pkg/fsatomic => ./pkg/fsatomic
 
 replace github.com/astronomer/astro-cli/pkg/imagebuild => ./pkg/imagebuild
+
+replace github.com/astronomer/astro-cli/pkg/runtimeversions => ./pkg/runtimeversions
 
 replace github.com/astronomer/astro-cli/pkg/manifest => ./pkg/manifest
 

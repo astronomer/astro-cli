@@ -55,6 +55,7 @@ var v2BelowCmd = []string{
 	"pkg/localrt",
 	"pkg/manifest",
 	"pkg/platformversions",
+	"pkg/runtimeversions",
 	"pkg/scaffold",
 	"pkg/secrets",
 	"pkg/uv",
