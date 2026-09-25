@@ -115,21 +115,18 @@ func (p *provider) Diagnose(key string) string {
 	if p.down != nil {
 		return p.down.cause
 	}
-	if obj, ok := p.objects[key]; ok && obj.isSecret && obj.value == "" {
-		if !p.secretsIncluded {
-			return causeSecretsWithheld
-		}
-		return causeNoValue
+	if obj, ok := p.objects[key]; ok && emfetch.Withheld(emfetch.Object{Secret: obj.isSecret, Value: obj.value}, p.secretsIncluded) {
+		return p.cause(emfetch.CauseSecretsWithheld)
 	}
-	return causeNoValue
+	return p.cause(emfetch.CauseNoValue)
 }
 
-// The causes docs/v2-workspace-link.md lists, worded as it words them. Astro
-// Desktop shows the same text, so a failure reads the same from either app.
-const (
-	causeSecretsWithheld = `your org disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally`
-	causeNoValue         = "the workspace holds no value for it"
-)
+// cause is c's text for this provider's domain and workspace, worded as
+// docs/v2-workspace-link.md words it. The words are pkg/emfetch's, so Astro
+// Desktop shows the same text and a failure reads the same from either app.
+func (p *provider) cause(c emfetch.Cause) string {
+	return c.Text(p.domain, p.workspaceID)
+}
 
 // load fetches the workspace's objects once, recording a whole-provider outage
 // on any failure so Lookup stays silent and Label/Diagnose explain.
@@ -149,7 +146,7 @@ func (p *provider) load() {
 		if err != nil || astrosession.Credential(ctx.Token) == "" {
 			p.down = &outage{
 				short: "not logged in to " + p.domain,
-				cause: astrosession.NotLoggedInTo(p.domain).Error(),
+				cause: p.cause(emfetch.CauseNotLoggedIn),
 			}
 			return
 		}
@@ -257,7 +254,7 @@ func indexObject(out map[string]objectValue, obj *astrov1.EnvironmentObject, sho
 		if !ok {
 			return
 		}
-		if !showSecrets {
+		if emfetch.Withheld(emfetch.Object{Connection: true}, showSecrets) {
 			// Read without secrets, the password and the values in extra arrive
 			// blank, and nothing in the object says which were blanked: "no
 			// password" and "password withheld" look the same. Encoding what is
@@ -335,22 +332,32 @@ func statusError(wantSecrets bool, resp *astrov1.ListEnvironmentObjectsResponse)
 }
 
 // classify turns a fetch error into the outage a user sees: each named failure
-// mode gets its own short label and remediation cause, worded as
-// docs/v2-workspace-link.md words them. Each names the domain, because the
+// mode gets its own short label, and the remediation cause pkg/emfetch words
+// as docs/v2-workspace-link.md does. Each names the domain, because the
 // commonest wrong answer — a production workspace asked of a dev host — is
 // fixed by the login, not by the manifest.
 func (p *provider) classify(err error) *outage {
 	var he *httpError
 	if errors.As(err, &he) {
-		switch he.code {
-		case http.StatusUnauthorized:
-			return &outage{short: "session expired", cause: astrosession.Rejected(p.domain).Error()}
-		case http.StatusForbidden:
-			return &outage{short: "no access", cause: fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (`astro organization switch`), or ask an org admin", p.domain)}
-		case http.StatusNotFound:
-			return &outage{short: "workspace not found", cause: fmt.Sprintf("workspace %s was not found on %s. Check `workspace` and `domain` in pyproject.toml, and your current organization", p.workspaceID, p.domain)}
+		if he.code == http.StatusUnauthorized {
+			// astrosession.Rejected is emfetch's session-expired cause, unless
+			// ASTRO_API_TOKEN is set: then that token is the one refused, and
+			// `astro login` cannot fix it, so the variable is named instead.
+			return &outage{short: shortLabels[emfetch.CauseSessionExpired], cause: astrosession.Rejected(p.domain).Error()}
 		}
-		return &outage{short: "unreachable", cause: fmt.Sprintf("%s returned an error: %v", p.domain, he.err)}
+		short := "unreachable"
+		if c, named := emfetch.StatusCause(he.code); named {
+			short = shortLabels[c]
+		}
+		return &outage{short: short, cause: emfetch.StatusText(he.code, p.domain, p.workspaceID, he.err)}
 	}
-	return &outage{short: "offline", cause: fmt.Sprintf("could not reach %s. Check your connection, or set the value locally", p.domain)}
+	return &outage{short: "offline", cause: p.cause(emfetch.CauseOffline)}
+}
+
+// shortLabels is the `list` label suffix for each cause a platform status
+// names. The labels are the CLI's own; the causes they abbreviate are shared.
+var shortLabels = map[emfetch.Cause]string{
+	emfetch.CauseSessionExpired: "session expired",
+	emfetch.CauseNoAccess:       "no access",
+	emfetch.CauseNotFound:       "workspace not found",
 }

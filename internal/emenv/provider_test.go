@@ -205,7 +205,7 @@ func TestNoWorkspaceUnavailable(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Contains(t, p.Label(), "unavailable: the manifest sets no `workspace`")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "add `workspace =")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "Add `workspace =")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -296,6 +296,32 @@ func TestOfflineProviderAbsent(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: offline)", p.Label())
+	require.Equal(t, "could not reach localhost. Check your connection, or set the value locally", p.(envresolve.Diagnoser).Diagnose("X"))
+}
+
+// A status the contract gives no cause of its own names the domain and passes
+// the platform's account through, rather than borrowing a cause that is not it.
+func TestUnnamedStatusIsUnreachable(t *testing.T) {
+	mc := mockClient(errResp(http.StatusInternalServerError, "boom"))
+	p := loggedInProvider(t, mc, true)
+
+	_, ok := p.Lookup("X")
+	require.False(t, ok)
+	require.Equal(t, "workspace (unavailable: unreachable)", p.Label())
+	require.Regexp(t, `^localhost returned an error: `, p.(envresolve.Diagnoser).Diagnose("X"))
+}
+
+// With ASTRO_API_TOKEN set, a 401 blames the variable rather than the login,
+// since `astro login` cannot fix a rejected token.
+func TestUnauthorizedWithAPITokenNamesTheVariable(t *testing.T) {
+	mc := mockClient(errResp(http.StatusUnauthorized, "token rejected"))
+	p := loggedInProvider(t, mc, true)
+	t.Setenv(astrosession.EnvAPIToken, "ci-token")
+
+	_, ok := p.Lookup("X")
+	require.False(t, ok)
+	require.Equal(t, "workspace (unavailable: session expired)", p.Label())
+	require.Equal(t, "localhost rejected the token in ASTRO_API_TOKEN. Check it, or unset it to use your `astro login` session", p.(envresolve.Diagnoser).Diagnose("X"))
 }
 
 // A secret value the org will not release is a hard miss whose cause names the

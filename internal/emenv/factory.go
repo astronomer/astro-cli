@@ -3,6 +3,7 @@ package emenv
 import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/emfetch"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -39,7 +40,7 @@ func Clients(l Login) astrov1.APIClient {
 // domain is the manifest's, already defaulted (manifest.Astro.WorkspaceDomain).
 func NewProvider(workspaceID, domain string, clientFor ClientFactory, reveal bool) envresolve.Provider {
 	if workspaceID == "" {
-		return Unavailable("the manifest sets no `workspace`; add `workspace = \"<id>\"` under [tool.astro]")
+		return Unavailable(emfetch.CauseNoWorkspace.Text(domain, ""))
 	}
 	return &provider{workspaceID: workspaceID, domain: domain, clientFor: clientFor, reveal: reveal}
 }

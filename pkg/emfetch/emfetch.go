@@ -1,7 +1,8 @@
 // Package emfetch holds the decisions behind reading Astronomer Environment
 // Manager objects: how a list endpoint is paged, how the organization-level
-// refusal of secret values is recognized, and what a caller does when that
-// refusal arrives.
+// refusal of secret values is recognized, what a caller does when that refusal
+// arrives, which values a read counts as withheld, and the words a missing
+// workspace value is reported in (docs/v2-workspace-link.md's causes).
 //
 // It holds no object model and no transport. The Environment Manager response
 // model reaches each consumer through that consumer's own generated client,

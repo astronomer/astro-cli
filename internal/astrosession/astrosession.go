@@ -21,6 +21,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
+	"github.com/astronomer/astro-cli/pkg/emfetch"
 )
 
 // EnvAPIToken is the Astro API token CI supplies instead of a login on the
@@ -45,15 +46,16 @@ var ErrSessionExpired = errors.New("session expired")
 
 // NotLoggedInTo is the outage for a domain with no stored login, worded as
 // docs/v2-workspace-link.md words it, so a workspace read and a deployment link
-// fail with the same sentence.
+// fail with the same sentence. The words are pkg/emfetch's, which Astro Desktop
+// reports too.
 func NotLoggedInTo(domain string) error {
-	return fmt.Errorf("not logged in to %s. Log in with `astro login %s`", domain, domain)
+	return errors.New(emfetch.CauseNotLoggedIn.Text(domain, ""))
 }
 
 // ExpiredOn is the outage for a domain whose login has expired, worded the
 // same way.
 func ExpiredOn(domain string) error {
-	return fmt.Errorf("your %s session expired. Log in again with `astro login %s`", domain, domain)
+	return errors.New(emfetch.CauseSessionExpired.Text(domain, ""))
 }
 
 // Rejected is the outage for a 401 from domain. With EnvAPIToken set, that

@@ -440,18 +440,42 @@ func (p *schemaParser) str(key string, v any) (string, bool) {
 // Environment Manager. The AIRFLOW_VAR_/AIRFLOW_CONN_ encoding is applied here
 // so no consumer re-derives it.
 func DeclaredEnvKeys(schema *Schema) []string {
+	return envKeys(schema, func(ValueSpec) bool { return true })
+}
+
+// WorkspaceEnvKeys is the Airflow env-var name of every declaration marked
+// `source = "workspace"`, sorted: the keys a workspace's Environment Manager
+// objects must map to for a start to pull them. Connections come back as
+// AIRFLOW_CONN_<ID> and Airflow variables as AIRFLOW_VAR_<KEY>, upper-cased the
+// way Airflow reads them, and plain env vars as declared.
+//
+// Both apps pull only these names (docs/v2-workspace-link.md), so the set is
+// derived once here rather than by each; a nil schema declares none.
+func WorkspaceEnvKeys(schema *Schema) []string {
+	return envKeys(schema, func(spec ValueSpec) bool { return spec.Source == SourceWorkspace })
+}
+
+// envKeys is the Airflow env-var name of every declaration keep accepts,
+// sorted, with the AIRFLOW_VAR_/AIRFLOW_CONN_ encoding applied.
+func envKeys(schema *Schema, keep func(ValueSpec) bool) []string {
 	if schema == nil {
 		return nil
 	}
 	keys := make([]string, 0, len(schema.EnvVars)+len(schema.AirflowVariables)+len(schema.Connections))
-	for name := range schema.EnvVars {
-		keys = append(keys, name)
+	for name, spec := range schema.EnvVars {
+		if keep(spec) {
+			keys = append(keys, name)
+		}
 	}
-	for key := range schema.AirflowVariables {
-		keys = append(keys, airflowenv.EnvKeyForVarKey(key))
+	for key, spec := range schema.AirflowVariables {
+		if keep(spec) {
+			keys = append(keys, airflowenv.EnvKeyForVarKey(key))
+		}
 	}
-	for id := range schema.Connections {
-		keys = append(keys, airflowenv.EnvKeyForConnID(id))
+	for id, spec := range schema.Connections {
+		if keep(spec) {
+			keys = append(keys, airflowenv.EnvKeyForConnID(id))
+		}
 	}
 	sort.Strings(keys)
 	return keys
