@@ -342,14 +342,24 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 }
 
 // valueMeta annotates a checklist entry with where its value comes from: a
-// committed default, the workspace's Environment Manager, or neither (a value
-// the platform operator must supply).
+// committed default, the workspace's Environment Manager, or neither. A value
+// with neither is one the platform operator must supply, unless it is
+// declared optional.
+//
+// The workspace case is tested first, even for an optional value, because
+// where a value comes from is the more useful thing to say, and an optional
+// workspace value still has to be set there to take effect. A default outranks
+// optional for a similar reason: a value with one is satisfied either way.
+// Only a value with neither falls to optional, so a Dag's nice-to-have
+// setting does not read as something the environment cannot run without.
 func valueMeta(spec envschema.ValueSpec) string {
 	switch {
 	case spec.Source == envschema.SourceWorkspace:
 		return " (from workspace)"
 	case spec.HasDefault:
 		return " (has a default)"
+	case spec.Optional:
+		return " (optional)"
 	default:
 		return " (required)"
 	}

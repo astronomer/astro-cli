@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -65,6 +66,10 @@ type Built struct {
 	// was allowed past them (Options.AllowMissing). Empty otherwise: without
 	// the option, a missing value is *MissingEnvError and there is no Built.
 	StartedWithout []envresolve.Missing
+	// ManifestWarnings are the manifest's own findings that do not stop a
+	// load (manifest.Manifest.Warnings), carried out for the same reason as
+	// EnvWarnings.
+	ManifestWarnings []manifest.Problem
 }
 
 // Build discovers the project containing workingDir, loads and validates its
@@ -95,9 +100,10 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	}
 
 	return &Built{
-		Project:        proj,
-		EnvWarnings:    resolved.warnings,
-		StartedWithout: resolved.startedWithout,
+		Project:          proj,
+		EnvWarnings:      resolved.warnings,
+		StartedWithout:   resolved.startedWithout,
+		ManifestWarnings: m.Warnings,
 		Plan: localrt.Plan{
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
@@ -120,15 +126,14 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// thing. Same project, two tools, two different images, and the one
 			// that dropped the user's RUN steps was this one.
 			Dockerfile: m.Astro.Dockerfile,
-			// PythonVersion is left empty on purpose: the venv is built
-			// inside the project, so uv reads requires-python from the
-			// manifest itself and there is nothing to pass.
-			//
-			// Not because a specifier could not be passed — uv accepts one as
-			// an interpreter request, and checks.RunProvisioned relies on that
-			// for the venv it builds OUTSIDE a project, where uv cannot see
-			// the manifest. Here it would only restate what uv is about to
-			// read.
+			// Empty when the manifest states requires-python: the venv is
+			// built inside the project, so uv reads it from the manifest
+			// itself and passing it would only restate what uv is about to
+			// read. Without one, uv would pick the newest CPython it knows of,
+			// which an Airflow 2 pin cannot run under, so the fallback names
+			// a version. Astro Desktop applies the same function, so the two
+			// tools build the same interpreter for the same manifest.
+			PythonVersion:   airflowrt.PythonFallback(m.Project.RequiresPython, m.Astro.AirflowVersion),
 			StopWithSession: opts.StopWithSession,
 			Env:             resolved.env,
 			// The vault's values, kept out of Env on purpose: docker mode

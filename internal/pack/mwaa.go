@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/platformversions"
 )
 
@@ -84,7 +85,7 @@ func (t *MWAATarget) Build(_ context.Context, req Request, cb localrt.Callbacks)
 		}
 	}
 
-	res.NextSteps = mwaaNextSteps(outDir, hasPlugins)
+	res.NextSteps = mwaaNextSteps(outDir, hasPlugins, mwaaBucket(m))
 	if err := saveTree(req, outDir, &res, cb); err != nil {
 		return Result{}, err
 	}
@@ -118,12 +119,31 @@ func mwaaRequirements(airflowPin string, deps []string) (content, warning string
 	return header + body, warning
 }
 
+// mwaaBucketKey is the [tool.astro.targets.mwaa] field naming the S3 bucket
+// the environment reads its source from. The upload command names it when it
+// is set; nothing else reads it.
+const mwaaBucketKey = "bucket"
+
+// mwaaBucket is the bucket from [tool.astro.targets.mwaa], as the s3:// URL the
+// sync command takes, or a placeholder when the manifest names none. It takes
+// the bucket with or without its s3:// scheme, since the docs write it with
+// one and the console shows it without.
+func mwaaBucket(m *manifest.Manifest) string {
+	const placeholder = "s3://<your-mwaa-bucket>/"
+	name, _ := m.Astro.Targets[TargetMWAA][mwaaBucketKey].(string)
+	name = strings.Trim(strings.TrimPrefix(strings.TrimSpace(name), "s3://"), "/")
+	if name == "" {
+		return placeholder
+	}
+	return "s3://" + name + "/"
+}
+
 // mwaaNextSteps is the upload hand-off: sync the tree to the environment's S3
 // bucket, then point the environment at the new requirements.txt (and
 // plugins.zip) object version, which MWAA tracks by S3 version id.
-func mwaaNextSteps(outDir string, hasPlugins bool) []string {
+func mwaaNextSteps(outDir string, hasPlugins bool, bucket string) []string {
 	steps := []string{
-		fmt.Sprintf("aws s3 sync %s/ s3://<your-mwaa-bucket>/", outDir),
+		fmt.Sprintf("aws s3 sync %s/ %s", outDir, bucket),
 		"Point the environment at the new requirements.txt object version (MWAA console, or `aws mwaa update-environment --requirements-s3-object-version <ver>`).",
 	}
 	if hasPlugins {

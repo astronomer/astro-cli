@@ -197,12 +197,12 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				failed["default"] = true
 			}
 		case "optional":
-			// Recorded the same way as sensitive below, though no Check
-			// rule reads Optional today, so nothing can observe it: a
-			// mutant that drops this line passes every test. Kept for
-			// symmetry rather than effect — the two bool annotations are
-			// handled identically, and the first rule to read Optional
-			// would otherwise silently reacquire the double-problem the
+			// Recorded the same way as sensitive below. No Check rule reads
+			// Optional; the package checklist does (internal/pack's
+			// valueMeta), so a mutant that drops this line fails the root
+			// module's tests rather than this one's. The two bool
+			// annotations are handled identically, so a rule that starts
+			// reading Optional does not reacquire the double-problem the
 			// sensitive case had.
 			if b, ok := p.boolField(fieldKey, v); ok {
 				spec.Optional = b

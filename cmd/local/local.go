@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Command-name and replacement strings that appear in more than one place
@@ -201,6 +202,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	if err != nil {
 		return c.reportBuildError(r, err)
 	}
+	warnManifest(r, built.ManifestWarnings)
 	warnStandaloneOmissions(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
@@ -224,6 +226,21 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
+}
+
+// warnManifest reports the manifest's findings that do not stop a start: a
+// [tool.astro.targets.<name>] key nothing reads, most likely a misspelling of
+// one that is. The key and reason ride as their own fields, as an env warning's
+// do, so a json consumer need not parse the prose.
+func warnManifest(r Renderer, warnings []manifest.Problem) {
+	for _, w := range warnings {
+		emitWarning(r, event{
+			Event:  "warning",
+			Text:   fmt.Sprintf("%s: %s: %s", manifest.Marker, w.Key, w.Reason),
+			Key:    w.Key,
+			Reason: w.Reason,
+		})
+	}
 }
 
 // warnStandaloneOmissions warns, at start, about everything a project declares
@@ -434,6 +451,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
 	if err != nil {
 		return err
 	}
+	warnManifest(r, built.ManifestWarnings)
 	warnStandaloneOmissions(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)

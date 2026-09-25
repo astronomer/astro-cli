@@ -51,8 +51,9 @@ import (
 // InvokeRestApi is refused, and every request after that goes through it.
 
 // awsRegionKey is the [tool.astro.targets.mwaa] field naming the region an
-// environment lives in. Nothing else in that section is read here — the bucket
-// belongs to deploy.
+// environment lives in. Nothing else in that section is read here; its only
+// other key, bucket, is `astro package mwaa`'s, which names it in the upload
+// command it prints.
 const awsRegionKey = "region"
 
 // mwaaAPI is the slice of the MWAA client this package uses. It is an interface

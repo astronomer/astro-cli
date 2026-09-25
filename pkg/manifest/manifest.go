@@ -11,7 +11,8 @@
 //     plain data and each consumer composes the two packages one layer up.
 //   - [tool.astro.targets.*] is backend-specific by design — a target section
 //     is meaningless to other targets — so Astro.Targets stays plain data and
-//     each backend types its own section.
+//     each backend types its own section. The one check here is on the
+//     section's keys, and it warns (Manifest.Warnings) rather than refuses.
 //
 // [tool.astro] is decoded by hand rather than through struct tags, because it
 // is authored config: an unknown key, a value of the wrong shape and a
@@ -47,6 +48,10 @@ type Manifest struct {
 	Project Project
 	Astro   Astro
 	UV      UV
+	// Warnings are findings that do not stop a load, sorted like the problems
+	// of a ValidationError: today, a [tool.astro.targets.<name>] key nothing
+	// reads. A caller shows them where it would show the manifest's errors.
+	Warnings []Problem
 }
 
 // UV is the [tool.uv] table, the fields astro reads. uv applies them to the
@@ -97,7 +102,9 @@ type Astro struct {
 	// auth method already resolved from the two levels.
 	Deployments map[string]Link
 	// Targets is [tool.astro.targets.<name>], decoded but untyped: target
-	// config is backend-specific, so each backend types its own section.
+	// config is backend-specific, so each backend types its own section. The
+	// keys of the mwaa and composer sections are checked against the ones
+	// their readers use, as warnings; see targetKeys.
 	Targets map[string]map[string]any
 	// Env is the decoded [tool.astro.env] section, untyped: its schema
 	// belongs to pkg/envschema, which this package must not import.
@@ -450,10 +457,11 @@ func Parse(data []byte) (*Manifest, error) {
 		}
 	}
 	p.validate(m)
+	p.sortProblems()
 	if len(p.problems) > 0 {
-		p.sortProblems()
 		return nil, &ValidationError{Problems: p.problems}
 	}
+	m.Warnings = p.warnings
 	return m, nil
 }
 
@@ -496,6 +504,9 @@ const ReservedLinkName = "local"
 // every finding at once.
 type parser struct {
 	problems []Problem
+	// warnings are findings that leave the manifest loadable; they reach the
+	// caller as Manifest.Warnings.
+	warnings []Problem
 }
 
 // sortProblems puts the findings in a fixed order. Links are decoded out of a
@@ -507,17 +518,29 @@ type parser struct {
 // that and sort.Slice is not stable, so a second rule on some key would start
 // randomizing the pair with no other sign. Code settles it, and settles it
 // totally, since codes are unique.
+//
+// Warnings are sorted the same way, for the same reason: target sections are
+// decoded out of a map too.
 func (p *parser) sortProblems() {
-	sort.Slice(p.problems, func(i, j int) bool {
-		if p.problems[i].Key != p.problems[j].Key {
-			return p.problems[i].Key < p.problems[j].Key
+	sortByKey(p.problems)
+	sortByKey(p.warnings)
+}
+
+func sortByKey(problems []Problem) {
+	sort.Slice(problems, func(i, j int) bool {
+		if problems[i].Key != problems[j].Key {
+			return problems[i].Key < problems[j].Key
 		}
-		return p.problems[i].Code < p.problems[j].Code
+		return problems[i].Code < problems[j].Code
 	})
 }
 
 func (p *parser) add(code ProblemCode, key, reason string) {
 	p.problems = append(p.problems, Problem{Code: code, Key: key, Reason: reason})
+}
+
+func (p *parser) warn(code ProblemCode, key, reason string) {
+	p.warnings = append(p.warnings, Problem{Code: code, Key: key, Reason: reason})
 }
 
 // astro decodes [tool.astro]. Links come last: they resolve against the
@@ -613,7 +636,30 @@ func (p *parser) defaultTarget(v any) string {
 	return p.str(key, v)
 }
 
+// targetKeys is what the sections something reads may carry: the mwaa and
+// composer coordinates pkg/awsauth and pkg/instancelocate look an environment
+// up by (and pkg/scaffold writes), and the bucket `astro package mwaa` names in
+// its upload command. A key outside these is almost always a misspelling of
+// one, and a misspelled region reads as no region at all.
+//
+// astro and oss are targets too, but nothing reads their sections yet, so
+// those stay open: reserved, carried through as plain data, and never
+// warned about until a reader gives them a shape.
+var targetKeys = map[string][]string{
+	string(KindMWAA):     {"bucket", "region"},
+	string(KindComposer): {"location", "project"},
+}
+
+// reservedTargets are the targets whose sections nothing reads yet.
+var reservedTargets = []string{"astro", "oss"}
+
 // targets decodes [tool.astro.targets], one plain-data section per backend.
+//
+// An unknown key in a section with a reader, or a section named for no
+// target, is a warning rather than a problem. The rest of [tool.astro] refuses
+// an unknown key, but these sections were documented as untyped and open, and
+// a manifest that loaded yesterday must not stop loading over a key that
+// never did anything. The warning is enough to catch the misspelling.
 func (p *parser) targets(v any) map[string]map[string]any {
 	const key = astroRoot + ".targets"
 	table := p.table(key, v)
@@ -622,8 +668,23 @@ func (p *parser) targets(v any) map[string]map[string]any {
 	}
 	out := make(map[string]map[string]any, len(table))
 	for name, cfg := range table {
-		if section := p.table(key+"."+name, cfg); section != nil {
-			out[name] = section
+		sectionKey := key + "." + name
+		section := p.table(sectionKey, cfg)
+		if section == nil {
+			continue
+		}
+		out[name] = section
+		known, read := targetKeys[name]
+		switch {
+		case read:
+			for field := range section {
+				if !slices.Contains(known, field) {
+					p.warn(CodeUnknownKey, sectionKey+"."+field,
+						fmt.Sprintf("unknown key, ignored: the %s section takes %s", name, strings.Join(known, ", ")))
+				}
+			}
+		case !slices.Contains(reservedTargets, name):
+			p.warn(CodeUnknownKey, sectionKey, "not a target, ignored: the targets are astro, mwaa, composer and oss")
 		}
 	}
 	return out

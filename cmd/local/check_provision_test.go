@@ -94,6 +94,33 @@ func TestCheckProvisionsUnderTheManifestsRequiresPython(t *testing.T) {
 	}
 }
 
+// A hand-written manifest with no requires-python is checked on the
+// interpreter a start would build it with, not on whatever uv finds newest:
+// for an Airflow 2 before 2.9 that is 3.11, which the pin can run.
+func TestCheckProvisionsUnderTheFallbackWhenRequiresPythonIsUnset(t *testing.T) {
+	const manifest = "[project]\nname = 'demo'\n" +
+		"dependencies = [\"apache-airflow==2.8.*\"]\n[tool.astro]\nairflow = '2.8'\n"
+
+	d, _ := targetDeps(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.Checks = stubParser{err: checks.ErrNoInterpreter}
+
+	var got checks.VenvSpec
+	d.Provisioner = func(context.Context) (checks.Provisioner, error) {
+		return &fakeProvisioner{python: "/tmp/venv/bin/python", got: &got}, nil
+	}
+	if err := execute(t, d, "local", "check"); err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if got.Python != "3.11" {
+		t.Errorf("interpreter request = %q, want the fallback for Airflow 2.8", got.Python)
+	}
+}
+
 // When building one fails, the answer is still "the environment is not ready":
 // the same door, the same exit code, rather than a new kind of failure for
 // what is the same problem one step further on.

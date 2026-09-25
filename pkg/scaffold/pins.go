@@ -68,10 +68,13 @@ func airflowExtrasNote(spec string) []string {
 // requiresPython is the [project] requires-python for a project pinned to this
 // Airflow: the interpreters that Airflow can actually run under.
 //
-// It matters because nothing else chooses the interpreter. rt.Params leaves
-// PythonVersion empty on purpose — "uv resolves the interpreter from the
-// manifest's requires-python" — so this string is the only thing standing
-// between the pin and whatever Python the machine happens to have newest.
+// It matters because, once it is written, nothing else chooses the
+// interpreter. A start passes no PythonVersion for a manifest that states
+// requires-python — uv reads it from the manifest — so this string is the only
+// thing standing between the pin and whatever Python the machine happens to
+// have newest. airflowrt.PythonFallback covers a manifest that states none,
+// with the same ceiling as below; the two are kept in step by hand, because
+// this module does not import that one.
 //
 // Airflow 2 is the case that bites. It never supported Python 3.13, and its
 // Flask stack reaches for stdlib that 3.12 removed, but its published metadata

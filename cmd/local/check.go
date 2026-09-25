@@ -1,6 +1,7 @@
 package local
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -226,12 +228,17 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 		return checks.Result{}, errors.Join(noInterpreter(opts.ProjectPath), err)
 	}
 	res, err := checks.RunProvisioned(ctx, opts, checks.ProvisionInput{
-		ProjectPath:    opts.ProjectPath,
-		DagsDir:        checks.DefaultDagsDir(opts.ProjectPath),
-		Pin:            m.Astro.AirflowVersion,
-		Deps:           m.Project.Dependencies,
-		RequiresPython: m.Project.RequiresPython,
-		Constraints:    m.UV.ConstraintDependencies,
+		ProjectPath: opts.ProjectPath,
+		DagsDir:     checks.DefaultDagsDir(opts.ProjectPath),
+		Pin:         m.Astro.AirflowVersion,
+		Deps:        m.Project.Dependencies,
+		// The venv is built outside the project, where uv cannot read the
+		// manifest, so a stated requires-python is passed through. Without one
+		// the check takes the interpreter a start would, rather than whatever
+		// uv finds newest.
+		RequiresPython: cmp.Or(m.Project.RequiresPython,
+			airflowrt.PythonFallback(m.Project.RequiresPython, m.Astro.AirflowVersion)),
+		Constraints: m.UV.ConstraintDependencies,
 	}, prov, c.d.CheckVenv, c.progressFn(r, nameCheck))
 	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {
 		// An operational failure of the parse itself is not an environment

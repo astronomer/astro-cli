@@ -384,3 +384,35 @@ func TestBuildCarriesTheDeclaredDockerfile(t *testing.T) {
 		})
 	}
 }
+
+// The interpreter reaches the plan only when the manifest states no
+// requires-python, and then as the version airflowrt.PythonFallback picks for
+// the pin, the rule Astro Desktop applies too. Hand-written manifests, because
+// a scaffolded one always states requires-python.
+func TestBuildFallsBackToAPythonOnlyWhenRequiresPythonIsUnset(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		manifest string
+		want     string
+	}{
+		{"stated", manifestTOML, ""},
+		{"unset, airflow 3", "[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '3.1'\n", "3.12"},
+		{"unset, airflow 2.7", "[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '2.7.3'\n", "3.11"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(tc.manifest), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+			built, err := Build(dir, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if built.Plan.PythonVersion != tc.want {
+				t.Errorf("Plan.PythonVersion = %q, want %q", built.Plan.PythonVersion, tc.want)
+			}
+		})
+	}
+}

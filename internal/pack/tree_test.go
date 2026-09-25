@@ -412,6 +412,29 @@ func TestMWAANextStepsGiveUploadCommand(t *testing.T) {
 	assert.Contains(t, res.NextSteps[0], res.TreePath)
 }
 
+// The upload command names the bucket [tool.astro.targets.mwaa] declares,
+// written with or without its scheme, and keeps the placeholder otherwise.
+func TestMWAANextStepsNameTheDeclaredBucket(t *testing.T) {
+	for _, tc := range []struct {
+		name, section, want string
+	}{
+		{"with scheme", "bucket = 's3://acme-airflow-orders'\n", " s3://acme-airflow-orders/"},
+		{"bare name, trailing slash", "bucket = 'acme-airflow-orders/'\n", " s3://acme-airflow-orders/"},
+		{"no bucket", "region = 'us-east-1'\n", " s3://<your-mwaa-bucket>/"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := manifest.Parse([]byte("[project]\nname = 'demo'\n\n[tool.astro]\nairflow = '3.1'\n\n[tool.astro.targets.mwaa]\n" + tc.section))
+			require.NoError(t, err)
+			req := newProject(t)
+			req.Manifest.Astro.Targets = m.Astro.Targets
+			res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
+			require.NoError(t, err)
+			require.NotEmpty(t, res.NextSteps)
+			assert.True(t, strings.HasSuffix(res.NextSteps[0], tc.want), "%q should end with %q", res.NextSteps[0], tc.want)
+		})
+	}
+}
+
 // --- Composer ----------------------------------------------------------------
 
 func TestComposerDepsFileHasNoConstraintLine(t *testing.T) {
@@ -493,6 +516,46 @@ func TestTreeTargetsNoEnvNoChecklist(t *testing.T) {
 	require.NoError(t, err)
 	_, statErr := os.Stat(filepath.Join(res.TreePath, checklistName))
 	assert.True(t, os.IsNotExist(statErr), "no env section means no checklist")
+}
+
+// TestEnvChecklistHonorsOptional reads the annotations off a hand-written
+// manifest, one checklist line per value, because "(required)" appearing
+// somewhere in the file says nothing about which entry it belongs to.
+func TestEnvChecklistHonorsOptional(t *testing.T) {
+	m, err := manifest.Parse([]byte(`[project]
+name = 'demo'
+requires-python = '>=3.10'
+
+[tool.astro]
+airflow = '3.1'
+
+[tool.astro.env]
+API_URL = {}
+SLACK_WEBHOOK = { optional = true }
+LOG_LEVEL = { optional = true, default = 'info' }
+API_TOKEN = { optional = true, source = 'workspace' }
+NOT_OPTIONAL = { optional = false }
+
+[tool.astro.env.connections]
+reporting = { conn_type = 'postgres', optional = true }
+`))
+	require.NoError(t, err)
+	for _, target := range []Target{NewMWAATarget(), NewComposerTarget()} {
+		req := newProject(t, withEnv(m.Astro.Env))
+		res, err := target.Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err, target.Name())
+		lines := strings.Split(readArtifact(t, res.TreePath, checklistName), "\n")
+		for _, want := range []string{
+			"- [ ] API_URL (required)",
+			"- [ ] SLACK_WEBHOOK (optional)",
+			"- [ ] LOG_LEVEL (has a default)",
+			"- [ ] API_TOKEN (from workspace)",
+			"- [ ] NOT_OPTIONAL (required)",
+			"- [ ] reporting (optional)",
+		} {
+			assert.Contains(t, lines, want, target.Name())
+		}
+	}
 }
 
 func TestEnvChecklistSurfacesSchemaError(t *testing.T) {
