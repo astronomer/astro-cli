@@ -103,7 +103,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 	var domain string
 	if len(args) == 1 {
-		domain = args[0]
+		domain = domainutil.ExpandShortName(args[0])
 	} else {
 		c, err := context.GetCurrentContext()
 		if err != nil {

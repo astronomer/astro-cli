@@ -220,6 +220,17 @@ func (s *CmdSuite) TestLogout() {
 	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 }
 
+func (s *CmdSuite) TestLogoutExpandsShortNames() {
+	var loggedOut string
+	cloudLogout = func(domain string, out io.Writer) { loggedOut = domain }
+	apcLogout = func(domain string) { s.Fail("a short name must not reach the APC logout", domain) }
+
+	for short, host := range map[string]string{"prod": "astronomer.io", "dev": "astronomer-dev.io", "pr41523": "pr41523.astronomer-dev.io"} {
+		s.NoError(logout(&cobra.Command{}, []string{short}, io.Discard))
+		s.Equal(host, loggedOut)
+	}
+}
+
 func (s *CmdSuite) TestAuthToken() {
 	buf := new(bytes.Buffer)
 

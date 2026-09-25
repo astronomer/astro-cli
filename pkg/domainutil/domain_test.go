@@ -194,6 +194,10 @@ func (s *Suite) TestExpandShortName() {
 		"astronomer.io":            "astronomer.io",
 		"pr1234.astronomer-dev.io": "pr1234.astronomer-dev.io",
 		"software.example.com":     "software.example.com",
+		"Dev":                      "astronomer-dev.io",
+		"PROD":                     "astronomer.io",
+		"PR41523":                  "pr41523.astronomer-dev.io",
+		"Software.Example.com":     "Software.Example.com",
 	}
 	for name, want := range tests {
 		s.Equal(want, ExpandShortName(name), name)

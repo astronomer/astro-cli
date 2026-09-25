@@ -77,7 +77,7 @@ func newContextDeleteCmd() *cobra.Command {
 		Short:   "Delete a context",
 		Long:    "Delete a locally stored context to Astro or APC",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return context.DeleteContext(cmd, args, noPrompt)
+			return context.DeleteContext(cmd, []string{domainutil.ExpandShortName(args[0])}, noPrompt)
 		},
 		Args: cobra.ExactArgs(1),
 	}

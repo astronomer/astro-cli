@@ -555,7 +555,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		assert.Contains(t, authorizeURL, "ext-signup-source=cli")
 	})
 
-	t.Run("only force makes the identity provider ask for the password again", func(t *testing.T) {
+	t.Run("force and signup make the identity provider ask for the password again", func(t *testing.T) {
 		var authorizeURL string
 		openURL = func(url string) error {
 			authorizeURL = url
@@ -571,6 +571,10 @@ func TestAuthDeviceLogin(t *testing.T) {
 		assert.NotContains(t, authorizeURL, "prompt=login")
 
 		_, err = mockAuthenticator.authDeviceLogin(Config{}, false, false, true)
+		assert.NoError(t, err)
+		assert.Contains(t, authorizeURL, "prompt=login")
+
+		_, err = mockAuthenticator.authDeviceLogin(Config{}, false, true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, authorizeURL, "prompt=login")
 	})
@@ -1705,6 +1709,29 @@ func TestLogout(t *testing.T) {
 		c, err = context.GetContext(c.Domain)
 		assert.NoError(t, err)
 		assert.Empty(t, c.RefreshToken)
+	})
+
+	t.Run("keeps the current context when logging out of another domain", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		current, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+
+		Logout("astronomer-dev.io", io.Discard)
+
+		after, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+		assert.Equal(t, current, after)
+	})
+
+	t.Run("resets the current context when logging out of it", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		current, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+
+		Logout(current, io.Discard)
+
+		_, err = config.GetCurrentDomain()
+		assert.ErrorIs(t, err, config.ErrGetHomeString)
 	})
 }
 

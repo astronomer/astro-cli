@@ -26,11 +26,12 @@ var (
 // host: prod, stage, dev, or prNNNNN for a PR preview. Any other name comes
 // back unchanged.
 func ExpandShortName(name string) string {
-	if host, ok := environmentShortNames[name]; ok {
+	short := strings.ToLower(name)
+	if host, ok := environmentShortNames[short]; ok {
 		return host
 	}
-	if prPreviewShortName.MatchString(name) {
-		return name + ".astronomer-dev.io"
+	if prPreviewShortName.MatchString(short) {
+		return short + ".astronomer-dev.io"
 	}
 	return name
 }

@@ -12,9 +12,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/browser"
@@ -51,6 +53,7 @@ var (
 	openURL             = browser.OpenURL
 	refreshAccessToken  = astroauth.RefreshToken
 	stdinIsTerminal     = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+	exitOnInterrupt     = os.Exit
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 	errEmailNotFound    = errors.New("cannot retrieve email")
 
@@ -225,6 +228,28 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
+// quitOnInterrupt ends the process on ^C or SIGTERM while a login waits on the
+// user. main turns the first signal into a context cancel, and neither the
+// Enter prompt nor the callback server can see that context, so without this
+// the first ^C is swallowed and the login waits out its five-minute timeout.
+func quitOnInterrupt() (stop func()) {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-signals:
+			fmt.Println()
+			exitOnInterrupt(130) //nolint:mnd // the shell's exit status for a process ended by SIGINT
+		case <-done:
+		}
+	}()
+	return func() {
+		signal.Stop(signals)
+		close(done)
+	}
+}
+
 func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink, signup, force bool) (Result, error) {
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:mnd // the value is clear from context
@@ -248,7 +273,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
 
-	if force {
+	if force || signup {
 		authorizeURL += "&prompt=login"
 	}
 	if signup {
@@ -257,6 +282,9 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 		// ext-* params do, so the funnel can tell CLI signups apart.
 		authorizeURL += "&screen_hint=signup&ext-signup-source=cli"
 	}
+
+	stopWatching := quitOnInterrupt()
+	defer stopWatching()
 
 	// A run without a terminal — a coding agent's shell, CI — never answers the
 	// prompt below, so it takes the login-link path instead of blocking on stdin.
@@ -657,6 +685,7 @@ func completeLogin(domain string, res Result, astroV1Client astrov1.APIClient, o
 
 // Logout logs a user out of the docker registry. Will need to logout of Astro next.
 func Logout(domain string, out io.Writer) {
+	domain = domainutil.FormatDomain(domain)
 	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
 
 	err := c.SetContextKey("token", "")
@@ -672,11 +701,12 @@ func Logout(domain string, out io.Writer) {
 		return
 	}
 
-	// remove the current context
-	err = config.ResetCurrentContext()
-	if err != nil {
-		fmt.Fprintln(out, "Failed to reset current context: ", err.Error())
-		return
+	if current, _ := config.GetCurrentDomain(); current == domain { //nolint:errcheck // no current context means there is none to reset
+		err = config.ResetCurrentContext()
+		if err != nil {
+			fmt.Fprintln(out, "Failed to reset current context: ", err.Error())
+			return
+		}
 	}
 
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
