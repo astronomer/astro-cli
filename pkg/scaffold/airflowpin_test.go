@@ -39,8 +39,6 @@ auth = { method = 'none' }
 func TestSetAirflowVersionRewritesThePinSurgically(t *testing.T) {
 	dir, path := writeEditFixture(t, pinFixture, 0o644)
 
-	// 3.2 rather than 3.1, which would also add the SQLAlchemy cap: that has
-	// tests of its own in airflowpin_cap_test.go.
 	change, err := SetAirflowVersion(dir, nil, "3.2")
 	require.NoError(t, err)
 

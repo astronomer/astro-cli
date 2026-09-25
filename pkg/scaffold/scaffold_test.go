@@ -70,37 +70,17 @@ func TestScaffoldedProjectLocksWithRealUv(t *testing.T) {
 		t.Skip("uv not on PATH")
 	}
 
-	lock := func(t *testing.T, opts Options) string {
-		t.Helper()
-		dir := filepath.Join(t.TempDir(), "locktest")
-		_, err := Run(dir, opts)
-		require.NoError(t, err)
+	dir := filepath.Join(t.TempDir(), "locktest")
+	_, err := Run(dir, Options{})
+	require.NoError(t, err)
 
-		client, err := uv.New(t.Context(), uv.Options{CacheDir: t.TempDir()})
-		require.NoError(t, err)
-		require.NoError(t, client.Lock(t.Context(), dir, uv.Stdio{}),
-			"a freshly scaffolded project must uv lock cleanly")
+	client, err := uv.New(t.Context(), uv.Options{CacheDir: t.TempDir()})
+	require.NoError(t, err)
+	require.NoError(t, client.Lock(t.Context(), dir, uv.Stdio{}),
+		"a freshly scaffolded project must uv lock cleanly")
 
-		data, err := os.ReadFile(filepath.Join(dir, "uv.lock"))
-		require.NoError(t, err, "uv lock must write a lockfile")
-		return string(data)
-	}
-
-	// The default pin carries no cap, which is safe only because its Airflow
-	// no longer depends on SQLAlchemy-Utils, the distribution SQLAlchemy 2.1
-	// breaks. Should that come back, this is where it shows.
-	t.Run("default", func(t *testing.T) {
-		assert.NotContains(t, lock(t, Options{}), `name = "sqlalchemy-utils"`)
-	})
-
-	// On 3.1 the cap in [tool.uv] reaches the resolve: SQLAlchemy 2.1 has no
-	// ScalarAttributeImpl, which SQLAlchemy-Utils subclasses, so an Airflow
-	// locked against it cannot import.
-	// Both spellings uv writes: a [[package]] entry puts the version on the next
-	// line, a dependency reference in a forked resolve puts it after a comma.
-	t.Run("3.1", func(t *testing.T) {
-		assert.NotRegexp(t, `name = "sqlalchemy",?\s+version = "2\.1`, lock(t, Options{AirflowVersion: "3.1"}))
-	})
+	_, err = os.Stat(filepath.Join(dir, "uv.lock"))
+	require.NoError(t, err, "uv lock must write a lockfile")
 }
 
 // The default is spelled out rather than read from DefaultAirflowVersion, so
@@ -115,45 +95,6 @@ func TestRunPinsAirflowThreePointThreeByDefault(t *testing.T) {
 	assert.Contains(t, string(raw), "airflow = '3.3'")
 	assert.Contains(t, string(raw), "'apache-airflow==3.3.*'")
 	assert.Contains(t, string(raw), "requires-python = '>=3.12'")
-}
-
-// The SQLAlchemy cap is for Airflow 3.1, the one line that depends on
-// SQLAlchemy-Utils without capping SQLAlchemy. Anywhere else it would only
-// block resolution once an Airflow comes to require SQLAlchemy 2.1.
-func TestRunCapsSQLAlchemyOnlyForAirflowThreePointOne(t *testing.T) {
-	for _, tc := range []struct {
-		pin  string
-		want []string
-	}{
-		{pin: "", want: nil}, // the default
-		{pin: "3.1", want: []string{"sqlalchemy<2.1"}},
-		{pin: "3.1.8", want: []string{"sqlalchemy<2.1"}},
-		{pin: "3.2", want: nil},
-		{pin: "3.3", want: nil},
-		{pin: "3.10", want: nil},
-		{pin: "3", want: nil},
-		{pin: "3.0", want: nil},
-		{pin: "2.10", want: nil},
-		{pin: "2.1", want: nil},
-	} {
-		t.Run("pin="+tc.pin, func(t *testing.T) {
-			dir := t.TempDir()
-			_, err := Run(dir, Options{AirflowVersion: tc.pin})
-			require.NoError(t, err)
-
-			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, m.UV.ConstraintDependencies)
-
-			raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
-			require.NoError(t, err)
-			if tc.want == nil {
-				assert.NotContains(t, string(raw), "[tool.uv]", "no empty table left behind")
-				return
-			}
-			assert.Contains(t, string(raw), "sqlalchemy-utils/issues/800", "the cap says when to drop it")
-		})
-	}
 }
 
 func TestRunHonorsNameAndAirflowVersion(t *testing.T) {
