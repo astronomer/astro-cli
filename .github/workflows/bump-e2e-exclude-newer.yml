@@ -1,0 +1,76 @@
+name: Bump e2e resolution date
+
+# Moves pinnedExcludeNewer in e2e/excludenewer_test.go to the current day. It is
+# the UV_EXCLUDE_NEWER every uv in the e2e suite resolves under, so pull
+# requests test against a fixed PyPI rather than whatever was published an hour
+# ago; left alone it would pin the suite to an ever older set of packages.
+#
+# The PR's tier-1 run is the review. Green, merge it. Red means something
+# published since the last date breaks the suite; the unpinned nightly leg
+# (nightly-e2e.yaml) will already have filed an issue for it, and the date waits
+# until that is dealt with.
+#
+# Token handling is bump-default-airflow.yml's: `secrets.BUMP_PR_TOKEN` when set,
+# the default `GITHUB_TOKEN` otherwise. A PR opened by the default token does
+# NOT trigger ci.yaml, and this PR is worthless without its checks, so set
+# BUMP_PR_TOKEN or close and reopen the PR to start them.
+
+on:
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-e2e-exclude-newer
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: v2
+          token: ${{ secrets.BUMP_PR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Move the date to today
+        id: bump
+        run: |
+          current="$(sed -En 's/^const pinnedExcludeNewer = "(.*)"$/\1/p' e2e/excludenewer_test.go)"
+          next="$(scripts/bump-e2e-exclude-newer.sh)"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          if git diff --quiet; then
+            echo "pinnedExcludeNewer is already $current"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open the PR
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BUMP_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.bump.outputs.current }}
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          day="${NEXT%%T*}"
+          branch="bump-e2e-exclude-newer-$day"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch already exists; its PR is the one to review"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Resolve e2e packages as of $day"
+          git push origin "$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base v2 --head "$branch" \
+            --title "Resolve e2e packages as of $day" \
+            --body "Moves \`pinnedExcludeNewer\` in \`e2e/excludenewer_test.go\` from $CURRENT to $NEXT. Every uv the e2e suite runs, the CLI's included, resolves under it as \`UV_EXCLUDE_NEWER\`.
+
+          Opened by \`.github/workflows/bump-e2e-exclude-newer.yml\`. This PR's tier-1 e2e run is the review: green means the packages published since $CURRENT still work, and it can merge. Red means one of them broke the suite, which the unpinned nightly e2e leg will also have reported; leave this open until that is fixed."

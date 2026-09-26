@@ -221,7 +221,13 @@ func TestUnavailableProvider(t *testing.T) {
 
 // The read uses the login for the manifest's domain, whatever host the CLI's
 // current context names. astrosession owns refreshing it; its tests cover that.
+//
+// The login is stubbed, but the API URL built from it is not: load calls
+// Context.GetPublicRESTAPIURL, which reads the global config, so that config
+// has to exist before this runs rather than being left by whichever test ran
+// first.
 func TestReadUsesTheLoginForTheManifestsDomain(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	restore := login
 	t.Cleanup(func() { login = restore })
 	var asked string

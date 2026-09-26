@@ -3,7 +3,10 @@
 package e2e
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -35,6 +38,20 @@ func (p *project) sync() {
 	cmd.Env = p.env(nil)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		p.t.Fatalf("uv sync: %v\n%s", err, out)
+	}
+
+	// uv records the cutoff it resolved under in the lockfile's [options], so
+	// the lock is where to see that this run's date reached it, and that an
+	// unpinned run really was unpinned.
+	lock, err := os.ReadFile(filepath.Join(p.Dir, "uv.lock"))
+	if err != nil {
+		p.t.Fatalf("reading the lockfile uv sync wrote: %v", err)
+	}
+	recorded := strings.Contains(string(lock), "\nexclude-newer = ")
+	if cutoff := excludeNewer(); cutoff != "" && !recorded {
+		p.t.Fatalf("uv.lock records no exclude-newer, so UV_EXCLUDE_NEWER=%s did not reach uv sync:\n%s", cutoff, lock)
+	} else if cutoff == "" && recorded {
+		p.t.Fatalf("%s=none, but uv.lock records an exclude-newer:\n%s", excludeNewerEnv, lock)
 	}
 }
 

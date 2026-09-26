@@ -249,14 +249,21 @@ jobs:
         with:
           path: ${{ env.UV_CACHE_DIR }}
           # Keyed on the file that pins the Airflow tier 1 installs, so a bump
-          # fetches rather than reusing wheels for the old one.
-          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
+          # fetches rather than reusing wheels for the old one — and on the
+          # date the suite resolves as of (e2e/excludenewer_test.go), so a
+          # trunk push after a date bump saves the newer wheels instead of
+          # finding the key taken and every later run downloading them again.
+          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go', 'e2e/excludenewer_test.go') }}
           restore-keys: uv-${{ runner.os }}-
 
       # Both tiers in one run. ASTRO_E2E_MAX_TIER is a ceiling, not a
       # selection, so a separate tier-0 step before this one ran every tier-0
       # case twice. That tier 0 needs no uv is still proved, by the Windows job
       # below: it sets up none and runs tier 0 alone.
+      #
+      # Tier 1 resolves as of a fixed date rather than against live PyPI (see
+      # pinnedExcludeNewer), so an upstream release cannot turn every pull
+      # request red at once; nightly-e2e.yaml's live-pypi leg catches those.
       - name: Run e2e tests (tiers 0 and 1)
         run: make test-e2e ASTRO_E2E_MAX_TIER=1
 
@@ -264,7 +271,7 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'push' }}
         with:
           path: ${{ env.UV_CACHE_DIR }}
-          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go', 'e2e/excludenewer_test.go') }}
 
       # Last, so it holds everything the steps above built, including the
       # non-race objects the e2e binary needs.

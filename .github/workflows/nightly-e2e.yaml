@@ -6,6 +6,22 @@ name: Nightly e2e
 # A nightly nobody reads is worse than no test, so a failure opens an issue and
 # a later pass closes it. GitHub's own signal for a scheduled workflow emails
 # whoever last edited the cron line, which is nobody in particular.
+#
+# Two legs, each with an issue of its own, because they fail for different
+# reasons and want different people:
+#
+#   pinned     tiers 0-3 at the resolution date pull requests use
+#              (pinnedExcludeNewer in e2e/excludenewer_test.go). A failure is a
+#              regression in this repository, or the flakiness that keeps tiers
+#              2 and 3 off the pull-request path.
+#   live-pypi  tiers 0-2 against live PyPI (ASTRO_E2E_EXCLUDE_NEWER=none). A
+#              failure here and not in the pinned leg is an upstream release
+#              breaking the suite — the kind of break the pin keeps off every
+#              pull request, landing on this one run instead.
+#
+# live-pypi stops at tier 2 because tier 3 gains nothing from it: a docker-mode
+# build installs inside the runtime image through its ONBUILD triggers, which
+# never see UV_EXCLUDE_NEWER, so tier 3 resolves against live PyPI in both legs.
 
 on:
   schedule:
@@ -22,11 +38,42 @@ concurrency:
   group: nightly-e2e
   cancel-in-progress: false
 
-env:
-  ISSUE_TITLE: Nightly e2e (tiers 2-3) is failing
-
 jobs:
-  tiers23:
+  e2e:
+    name: ${{ matrix.leg }}
+    strategy:
+      # Independent signals: an upstream break must not cancel the leg that
+      # would say whether this repository also regressed.
+      fail-fast: false
+      matrix:
+        include:
+          - leg: pinned
+            tier: 3
+            # Empty takes the suite's own pinned date.
+            exclude_newer: ''
+            # Unchanged from before the legs split, so an issue already open
+            # under it keeps collecting nights rather than being orphaned.
+            issue_title: Nightly e2e (tiers 2-3) is failing
+            issue_lead: >-
+              Tier 2 or 3 of the e2e suite failed on the nightly run, at the
+              resolution date pull requests use. Tier 2 starts a real Airflow
+              and tier 3 starts one in Docker, so this is either a regression
+              in start/stop, port allocation, stale-record cleaning, reset, or
+              the docker image build and teardown — or the flakiness that keeps
+              these tiers off the pull-request path. The run log says which.
+          - leg: live-pypi
+            tier: 2
+            exclude_newer: none
+            issue_title: Nightly e2e against live PyPI is failing
+            issue_lead: >-
+              The e2e suite failed on the nightly run resolving against live
+              PyPI. If the pinned leg of the same run passed, a package
+              published since pinnedExcludeNewer (e2e/excludenewer_test.go)
+              breaks the suite. Pull requests are unaffected while the date
+              holds; fix the break (a constraint in the scaffold, or a code
+              change) before the weekly bump PR moves the date past it.
+    env:
+      ISSUE_TITLE: ${{ matrix.issue_title }}
     runs-on: ubuntu-latest
     # Measured at ~130s for all three tiers, so this is generous. It is here
     # because a cancelled job is neither failure() nor success(): without a
@@ -78,7 +125,7 @@ jobs:
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ env.UV_CACHE_DIR }}
-          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go') }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go', 'e2e/excludenewer_test.go') }}
           restore-keys: uv-${{ runner.os }}-
 
       # Every tier, not only the top one: the tiers below run per pull request,
@@ -89,8 +136,13 @@ jobs:
       # Airflow runtime image is 1.34 GB, and a runner starts with none of it.
       # That is a nightly's kind of minute, not a pull request's — and the cases
       # themselves run in about forty seconds once the image is down.
-      - name: Run e2e tests (tiers 0 through 3)
-        run: make test-e2e ASTRO_E2E_MAX_TIER=3
+      #
+      # The pinned leg leaves ASTRO_E2E_EXCLUDE_NEWER empty, which the suite
+      # reads as its own date; see the matrix above.
+      - name: Run e2e tests (tiers 0 through ${{ matrix.tier }})
+        env:
+          ASTRO_E2E_EXCLUDE_NEWER: ${{ matrix.exclude_newer }}
+        run: make test-e2e ASTRO_E2E_MAX_TIER=${{ matrix.tier }}
 
       # gh rather than a scripting action, because the runner already has it
       # and this repo pins every action by SHA — one fewer thing to pin and
@@ -103,6 +155,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Through the environment rather than spliced into the script, for
+          # the reason the title goes to jq that way below.
+          ISSUE_LEAD: ${{ matrix.issue_lead }}
+          REPRODUCE: ${{ matrix.exclude_newer && format('ASTRO_E2E_EXCLUDE_NEWER={0} ', matrix.exclude_newer) || '' }}make test-e2e ASTRO_E2E_MAX_TIER=${{ matrix.tier }}
         run: |
           set -uo pipefail
           # jq reads the title from the environment rather than having it
@@ -125,16 +181,14 @@ jobs:
           # printf rather than a quoted block, so the body carries no leading
           # indentation — four spaces would render the whole issue as code.
           body=$(printf '%s\n' \
-            "Tier 2 or 3 of the e2e suite failed on the nightly run." \
+            "$ISSUE_LEAD" \
             "" \
             "$RUN_URL" \
-            "" \
-            "Tier 2 starts a real Airflow and tier 3 starts one in Docker, so this is either a regression in start/stop, port allocation, stale-record cleaning, reset, or the docker image build and teardown — or the flakiness that keeps these tiers off the pull-request path. The run log says which." \
             "" \
             "Reproduce locally:" \
             "" \
             '```' \
-            "make test-e2e ASTRO_E2E_MAX_TIER=3" \
+            "$REPRODUCE" \
             '```' \
             "" \
             "This issue closes itself when a nightly passes again.")

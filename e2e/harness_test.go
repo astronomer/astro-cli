@@ -380,8 +380,9 @@ func mkdir(t *testing.T, parts ...string) string {
 // environment: an exported UV_PYTHON, UV_INDEX_URL, UV_NO_CACHE or
 // UV_PROJECT_ENVIRONMENT would steer the .venv six cases then assert against,
 // and an activated VIRTUAL_ENV would capture the install outright — which is
-// the same leak pkg/uv drops the variable for. The one UV_ setting this suite
-// does want, UV_CACHE_DIR, is put back in env below.
+// the same leak pkg/uv drops the variable for. The two UV_ settings this
+// suite does want are put back in env below: UV_CACHE_DIR, and
+// UV_EXCLUDE_NEWER at the suite's own date rather than the developer's.
 var leaky = []string{
 	"ASTRO_", "AIRFLOW_", "XDG_", "UV_",
 	"HOME", "USERPROFILE", "NO_COLOR", "VIRTUAL_ENV",
@@ -457,6 +458,11 @@ func (p *project) env(extra map[string]string) []string {
 	// inside the very project `astro package` then walks.
 	if uvCache != "" {
 		env = append(env, "UV_CACHE_DIR="+uvCache)
+	}
+	// See pinnedExcludeNewer: every uv this command reaches, the CLI's
+	// included, resolves as of one date rather than against live PyPI.
+	if cutoff := excludeNewer(); cutoff != "" {
+		env = append(env, "UV_EXCLUDE_NEWER="+cutoff)
 	}
 	for k, v := range extra {
 		env = append(env, k+"="+v)
