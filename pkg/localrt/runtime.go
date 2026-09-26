@@ -364,8 +364,11 @@ func (r *Runtime) Reset(ctx context.Context, projectPath string) (ResetReport, e
 // which is a restart under another name — a caller that wants that should ask.
 //
 // deps are the project's declared dependencies, passed in rather than read
-// here, because nothing in this package reads a manifest. Plan.Dependencies
-// arrives the same way for the same reason.
+// here: which requirements to install is the caller's decision, and
+// Plan.Dependencies arrives the same way. The engine reads the manifest for one
+// thing only, its [tool.uv] constraint-dependencies, which it hands to uv as a
+// constraints file so the install stays within what the project allows. A
+// manifest that does not load costs those constraints, not the install.
 func (r *Runtime) HotInstall(ctx context.Context, projectPath string, deps []string, cb Callbacks) error {
 	// Before anything else, including the record: a caller watching a manifest
 	// cannot know a project declares no dependencies until it asks, and

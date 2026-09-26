@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
@@ -76,6 +77,9 @@ func (e *Engine) HotInstall(ctx context.Context, projectPath string, deps []stri
 		return err
 	}
 
+	constraint, cleanup := projectConstraints(projectPath, emit)
+	defer cleanup()
+
 	// The marker is dropped for the reason EnsureSynced drops it around a sync:
 	// it is the claim that this venv finished installing, and that claim has to
 	// be false while one is in progress. Without this, an interrupted hot
@@ -87,7 +91,7 @@ func (e *Engine) HotInstall(ctx context.Context, projectPath string, deps []stri
 	// projectPath, not "": uv discovers [tool.uv] configuration by walking up
 	// from its working directory, so running anywhere else finds the caller's
 	// and a project resolving from a private index quietly gets the public one.
-	if err := client.PipInstall(ctx, projectPath, venvPython, deps, "", uv.Stdio{Out: out, Err: errW}); err != nil {
+	if err := client.PipInstall(ctx, projectPath, venvPython, deps, constraint, uv.Stdio{Out: out, Err: errW}); err != nil {
 		return fmt.Errorf("installing into the running environment: %w", err)
 	}
 	if hadMarker {
@@ -105,6 +109,57 @@ func (e *Engine) HotInstall(ctx context.Context, projectPath string, deps []stri
 		emit(rt.LogLine{Component: "uv", Text: fmt.Sprintf("installed and re-parsed %d Dag files; %d could not be touched and need a restart to pick this up", touched, skipped)})
 	}
 	return nil
+}
+
+// projectConstraints writes the manifest's [tool.uv] constraint-dependencies
+// to a constraints file for `uv pip install`, returning its path ("" when there
+// is nothing to hold the install to) and the function that removes it.
+//
+// Passed explicitly rather than left for uv to discover, because discovery does
+// not survive UVOptions.NoConfig: --no-config drops the project's [tool.uv]
+// table from `uv pip`, while `uv sync` still reads constraint-dependencies as
+// project metadata. An embedder that sets it (Astro Desktop does) would start
+// under the constraints and then hot-install past them. The explicit file holds
+// with or without the flag, and `astro local check` hands uv the same kind of
+// file for the same reason.
+//
+// Best-effort, deliberately. Hot install exists to add a package without a
+// restart, and a manifest that does not load here is one the next start will
+// refuse with its own error; failing the install on it would only move that
+// message somewhere less useful. So the install goes ahead unconstrained, and
+// says so, rather than quietly resolving as if the project declared nothing.
+func projectConstraints(projectPath string, emit func(rt.LogLine)) (path string, cleanup func()) {
+	noop := func() {}
+	unconstrained := func(why string, err error) (string, func()) {
+		emit(rt.LogLine{Component: "uv", Text: fmt.Sprintf("installing without the project's constraint-dependencies: %s: %v", why, err)})
+		return "", noop
+	}
+
+	m, err := manifest.Load(filepath.Join(projectPath, manifest.Marker))
+	if err != nil {
+		return unconstrained("the manifest did not load", err)
+	}
+	if len(m.UV.ConstraintDependencies) == 0 {
+		return "", noop
+	}
+
+	f, err := os.CreateTemp("", "astro-hotinstall-constraints-*.txt")
+	if err != nil {
+		return unconstrained("could not write them for uv", err)
+	}
+	remove := func() {
+		//nolint:errcheck // a leftover file in the temp dir is harmless
+		_ = os.Remove(f.Name())
+	}
+	_, err = f.WriteString(strings.Join(m.UV.ConstraintDependencies, "\n") + "\n")
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		remove()
+		return unconstrained("could not write them for uv", err)
+	}
+	return f.Name(), remove
 }
 
 // uvProgress builds the emitter and the writers uv's output flows through.
