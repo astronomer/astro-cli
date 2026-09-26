@@ -38,6 +38,7 @@ var v2BelowCmd = []string{
 	"internal/pack",
 	"internal/plan",
 	"internal/project",
+	"internal/runtimecatalog",
 	"internal/userstate",
 	"internal/vaultenv",
 	"pkg/airflowapi",

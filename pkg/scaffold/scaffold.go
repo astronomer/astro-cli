@@ -652,6 +652,12 @@ func namedInAny(notes []string, name string) bool {
 func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]byte, manifestFacts, error) {
 	name, nameAdvisory := chooseName(dir, opts, v1)
 	pick := pickAirflowVersion(opts.AirflowVersion, nil, v1, opts.Default)
+	if opts.AirflowVersion != "" {
+		if err := refuseKeptDockerfileOfAnotherAirflow(dir, v1, airflowRequirement(pick.version),
+			"--airflow-version "+opts.AirflowVersion); err != nil {
+			return nil, manifestFacts{}, err
+		}
+	}
 	pyproject, notes, err := renderPyproject(name, pick, v1)
 	if err != nil {
 		return nil, manifestFacts{}, err

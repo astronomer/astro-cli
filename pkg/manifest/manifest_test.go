@@ -442,6 +442,24 @@ var validationCases = []struct {
 	wantCodes []ProblemCode
 }{
 	{
+		name:      "runtime that is not a runtime tag",
+		wantCodes: []ProblemCode{CodeRuntimeInvalid},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\nruntime = 'latest'\n",
+		wantKeys:  []string{"tool.astro.runtime"},
+	},
+	{
+		name:      "runtime from another series",
+		wantCodes: []ProblemCode{CodeRuntimeMismatch},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\nruntime = '3.2-10'\n",
+		wantKeys:  []string{"tool.astro.runtime"},
+	},
+	{
+		name:      "runtime beside a dockerfile",
+		wantCodes: []ProblemCode{CodeRuntimeWithDockerfile},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\ndockerfile = 'Dockerfile'\nruntime = '3.3-8'\n",
+		wantKeys:  []string{"tool.astro.runtime"},
+	},
+	{
 		name:      "missing project name",
 		wantCodes: []ProblemCode{CodeAirflowMissing, CodeRequired},
 		content:   "[tool.astro]\n",

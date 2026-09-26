@@ -26,6 +26,7 @@ type ImageDeployV2Input struct {
 	ProjectDir     string
 	DeploymentID   string
 	AirflowVersion string   // the manifest's Airflow requirement pin; the base resolves from it
+	Runtime        string   // the manifest's [tool.astro] runtime build, "" for the series' newest
 	Dependencies   []string // manifest [project] dependencies
 	Packages       []string // manifest [tool.astro] packages
 	// Dockerfile is the manifest's [tool.astro] dockerfile, slash-separated and
@@ -231,6 +232,7 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebu
 	req, err := imagebuild.ForManifest(imagebuild.ManifestBuild{
 		ProjectDir:     in.ProjectDir,
 		AirflowVersion: in.AirflowVersion,
+		Runtime:        in.Runtime,
 		Dockerfile:     in.Dockerfile,
 		Dependencies:   in.Dependencies,
 		Packages:       in.Packages,

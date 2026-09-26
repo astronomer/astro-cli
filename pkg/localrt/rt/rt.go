@@ -51,7 +51,13 @@ type Plan struct {
 	// "3.3" or "3.3.2": the runtime image's series in docker mode, and the
 	// generation, and so the process layout, in both.
 	AirflowVersion string
-	PythonVersion  string
+	// Runtime is the manifest's [tool.astro] runtime (manifest.Airflow().Runtime),
+	// one Astro Runtime build, "3.3-8" or "13.11.0", or "" for none. Docker
+	// mode builds a generated image FROM that build rather than the newest one
+	// of AirflowVersion's series. Standalone ignores it: it installs the
+	// requirement. The manifest never sets it beside a Dockerfile.
+	Runtime       string
+	PythonVersion string
 	// Dependencies is the project's [project] dependencies (PEP 508 specs).
 	// Standalone mode ignores it — uv syncs the venv straight from the
 	// manifest — but docker mode installs these into the runtime image so

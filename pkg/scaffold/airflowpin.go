@@ -39,6 +39,16 @@ type AirflowPinChange struct {
 	// the bound this package derives from the previous pin and the new pin
 	// derives a different one. Empty when it was left alone.
 	RequiresPython string `json:"requiresPython,omitempty"`
+	// Runtime is the [tool.astro] runtime now written, when the pin moved
+	// to a series the old build is not of and the caller's catalog named the
+	// newest build carrying the new pin. Empty when the line was left alone or
+	// deleted.
+	Runtime string `json:"runtime,omitempty"`
+	// RuntimeRemoved reports that [tool.astro] runtime was deleted: the pin
+	// moved to a series the old build is not of and no catalog was given to
+	// pick a build of the new one, or it named none, or a dockerfile is
+	// declared beside it, where it picks nothing.
+	RuntimeRemoved bool `json:"runtimeRemoved,omitempty"`
 	// Dockerfile is [tool.astro] dockerfile when the project declares one.
 	// Docker mode then builds from that file, so its FROM line, not the pin,
 	// decides the image, and changing it is the user's.
@@ -53,6 +63,9 @@ type AirflowPinOptions struct {
 	// package wrote, so it moves with the pin, and the new bound comes from
 	// the catalog too. nil means only the built-in rule is known, and a
 	// catalog-derived bound that differs from it reads as the user's.
+	//
+	// It also picks the build a [tool.astro] runtime moves to when the pin
+	// leaves its series. Without it the line is deleted instead.
 	Catalog *runtimeversions.Catalog
 }
 
@@ -83,13 +96,22 @@ type AirflowPinOptions struct {
 //     init once wrote for all of Airflow 3. A bound someone chose stays theirs.
 //     With opts.Catalog it also recognizes, and writes, the bound the runtime
 //     catalog gives.
+//   - [tool.astro] runtime survives when its build still agrees with the new
+//     pin: of its series, and, when opts.Catalog is given, carrying an Airflow
+//     the pin covers, so a series pin's patch move leaves it alone while an
+//     exact pin the build does not carry moves it. Otherwise it moves to the
+//     newest non-yanked build carrying the new pin when opts.Catalog names
+//     one, and is deleted when not, and Runtime or RuntimeRemoved says which.
+//     See alignRuntime.
 //
 // [tool.uv] is the project's, and a pin change never touches it.
 //
 // A declared dockerfile does not stop the write. The requirement is still
 // read, for standalone mode and for the runtime's generation. The file's FROM
 // line is not touched, and Dockerfile reports that it exists so the caller can
-// say the image is the user's to move.
+// say the image is the user's to move: a FROM naming a runtime of the old
+// series now disagrees with the requirement, and CheckDockerfileAirflow refuses
+// the project until the FROM line moves too.
 //
 // Nothing else changes: providers, Dag code and Dockerfile steps an upgrade
 // may need are judgment, not a pin, and are left to the user or an agent.
@@ -99,51 +121,63 @@ func SetAirflowVersionWith(dir string, wrap func(run func() error) error, versio
 	}
 	var change AirflowPinChange
 	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		change = AirflowPinChange{
-			Previous:   before.Airflow().Pin,
-			Version:    version,
-			Dockerfile: before.Astro.Dockerfile,
-		}
-		// A manifest whose requirement states no single version has none to
-		// read the previous one from; a leftover key is what its image ran.
-		if change.Previous == "" || before.AirflowUnclear() {
-			change.Previous = before.RemovedAirflowKey()
-		}
-		change.RemovedAirflowKey = ed.Delete(airflowKeyPath)
-		rewritten, switched, err := repinAirflowRequirements(ed, version)
-		if err != nil {
-			return err
-		}
-		change.Requirements, change.CoreReplaced = rewritten, switched
-		// No Airflow requirement to rewrite, which only a manifest loaded for
-		// repair can have: the requirement is written instead.
-		added, err := ensureAirflowDependency(ed, version)
-		if err != nil {
-			return err
-		}
-		if added != "" {
-			change.Requirements = append(change.Requirements, added)
-		}
-		// With no previous version, no bound can be told apart as the one
-		// this package wrote for it, so requires-python stays. A same-pin call
-		// never moves it either, so a repeated call writes nothing even when
-		// the catalog's bound differs from the one written.
-		moved := change.Previous != version
-		if rp := before.Project.RequiresPython; rp != "" && change.Previous != "" && moved &&
-			initWroteRequiresPython(rp, change.Previous, moved, opts.Catalog) {
-			if next := pythonBoundFor(version, opts.Catalog); next != rp {
-				if err := ed.Set([]string{"project", "requires-python"}, next); err != nil {
-					return err
-				}
-				change.RequiresPython = next
-			}
-		}
-		return nil
+		var err error
+		change, err = setAirflowVersion(before, ed, version, opts)
+		return err
 	})
 	if err != nil {
 		return AirflowPinChange{}, err
 	}
-	change.Changed = len(change.Requirements) > 0 || change.RemovedAirflowKey || change.RequiresPython != ""
+	return change, nil
+}
+
+// setAirflowVersion is SetAirflowVersionWith's edit, for the callers that
+// decide the version inside the edit they run (MatchAirflowToDockerfile).
+func setAirflowVersion(before *manifest.Manifest, ed tomledit.Editor, version string, opts AirflowPinOptions) (AirflowPinChange, error) {
+	change := AirflowPinChange{
+		Previous:   before.Airflow().Pin,
+		Version:    version,
+		Dockerfile: before.Astro.Dockerfile,
+	}
+	// A manifest whose requirement states no single version has none to
+	// read the previous one from; a leftover key is what its image ran.
+	if change.Previous == "" || before.AirflowUnclear() {
+		change.Previous = before.RemovedAirflowKey()
+	}
+	change.RemovedAirflowKey = ed.Delete(airflowKeyPath)
+	rewritten, switched, err := repinAirflowRequirements(ed, version)
+	if err != nil {
+		return AirflowPinChange{}, err
+	}
+	change.Requirements, change.CoreReplaced = rewritten, switched
+	// No Airflow requirement to rewrite, which only a manifest loaded for
+	// repair can have: the requirement is written instead.
+	added, err := ensureAirflowDependency(ed, version)
+	if err != nil {
+		return AirflowPinChange{}, err
+	}
+	if added != "" {
+		change.Requirements = append(change.Requirements, added)
+	}
+	// With no previous version, no bound can be told apart as the one
+	// this package wrote for it, so requires-python stays. A same-pin call
+	// never moves it either, so a repeated call writes nothing even when
+	// the catalog's bound differs from the one written.
+	moved := change.Previous != version
+	if rp := before.Project.RequiresPython; rp != "" && change.Previous != "" && moved &&
+		initWroteRequiresPython(rp, change.Previous, moved, opts.Catalog) {
+		if next := pythonBoundFor(version, opts.Catalog); next != rp {
+			if err := ed.Set([]string{"project", "requires-python"}, next); err != nil {
+				return AirflowPinChange{}, err
+			}
+			change.RequiresPython = next
+		}
+	}
+	if change.Runtime, change.RuntimeRemoved, err = alignRuntime(before, ed, version, opts.Catalog); err != nil {
+		return AirflowPinChange{}, err
+	}
+	change.Changed = len(change.Requirements) > 0 || change.RemovedAirflowKey || change.RequiresPython != "" ||
+		change.Runtime != "" || change.RuntimeRemoved
 	return change, nil
 }
 

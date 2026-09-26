@@ -1,0 +1,99 @@
+package deploy
+
+import (
+	"errors"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+)
+
+// imageSourceProject writes a linked project, with a Dockerfile when from is
+// set, and returns its root and loaded manifest.
+func imageSourceProject(t *testing.T, astro, from string) (string, *manifest.Manifest) {
+	t.Helper()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "pyproject.toml"), "[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"+astro+
+		"\n[tool.astro.deployments.prod]\nworkspace = 'ws-prod'\ndeployment = 'dep-prod'\n")
+	if from != "" {
+		writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM "+from+"\n")
+	}
+	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	return dir, m
+}
+
+// An image deploy refuses a Dockerfile whose FROM names another Airflow, before
+// it asks where to ship or builds anything. A dags-only deploy and a prebuilt
+// image build nothing from the Dockerfile, and go ahead.
+func TestRunRefusesADockerfileOfAnotherAirflow(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		req     func(Request) Request
+		refused bool
+	}{
+		{name: "default", req: func(r Request) Request { return r }, refused: true},
+		{name: "--image", req: func(r Request) Request { r.Image = true; return r }, refused: true},
+		{name: "--dags", req: func(r Request) Request { r.DagsOnly = true; return r }},
+		{name: "--image-name", req: func(r Request) Request { r.ImageName = "prebuilt:1"; return r }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.3-8")
+			d := &fakeDeployer{}
+			_, err := Run(tc.req(Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}), d)
+			var ve *manifest.ValidationError
+			if !tc.refused {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorAs(t, err, &ve)
+			assert.Equal(t, manifest.CodeDockerfileAirflowMismatch, ve.Problems[0].Code)
+			assert.Zero(t, d.imgDeploys+d.deploys+d.confirms+d.resolves, "nothing was asked or shipped")
+		})
+	}
+}
+
+func TestRunChecksTheRuntimeBuild(t *testing.T) {
+	dir, m := imageSourceProject(t, "runtime = '3.1-12'\n", "")
+	var (
+		calls    [][2]string
+		warnings []string
+	)
+	req := Request{
+		ProjectDir: dir, Manifest: m, LinkName: "prod",
+		CheckRuntime: func(runtime, pin string) ([]runtimeversions.Finding, error) {
+			calls = append(calls, [2]string{runtime, pin})
+			return []runtimeversions.Finding{{Kind: runtimeversions.FindingYanked, Message: "yanked"}}, nil
+		},
+		Warn: func(s string) { warnings = append(warnings, s) },
+	}
+	d := &fakeDeployer{}
+	_, err := Run(req, d)
+	require.NoError(t, err)
+	assert.Equal(t, [][2]string{{"3.1-12", "3.1"}}, calls)
+	assert.Equal(t, []string{"yanked"}, warnings)
+	assert.Equal(t, "3.1-12", d.imgInput.Runtime, "the build reaches the transport")
+
+	// A blocking finding stops the deploy before anything is shipped.
+	blocking := errors.New("another series")
+	req.CheckRuntime = func(string, string) ([]runtimeversions.Finding, error) { return nil, blocking }
+	d = &fakeDeployer{}
+	_, err = Run(req, d)
+	require.ErrorIs(t, err, blocking)
+	assert.Zero(t, d.imgDeploys)
+
+	// A dags-only deploy builds no image, and does not ask.
+	calls = nil
+	req.CheckRuntime = func(runtime, pin string) ([]runtimeversions.Finding, error) {
+		calls = append(calls, [2]string{runtime, pin})
+		return nil, nil
+	}
+	req.DagsOnly = true
+	_, err = Run(req, &fakeDeployer{})
+	require.NoError(t, err)
+	assert.Empty(t, calls)
+}

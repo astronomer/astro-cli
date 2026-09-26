@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // fakeBuilder is an ImageBuilder that records the request and never touches a
@@ -184,6 +185,31 @@ func TestAstroBuildHandsTheManifestBuildToTheBuilder(t *testing.T) {
 	assert.Equal(t, []string{"apache-airflow==3.1.*", "pandas"}, builder.gotReq.Dependencies)
 	assert.Equal(t, []string{"libpq-dev"}, builder.gotReq.Packages)
 	assert.Empty(t, builder.gotReq.Dockerfile)
+}
+
+// A [tool.astro] runtime is checked against the catalog before the build,
+// its warnings ride on the result, and the image starts FROM that build.
+func TestAstroBuildChecksAndBuildsFromTheRuntimeBuild(t *testing.T) {
+	req := testRequest(t)
+	req.Manifest.Astro.Runtime = "3.1-12"
+	var calls [][2]string
+	req.CheckRuntime = func(_ context.Context, runtime, pin string) ([]runtimeversions.Finding, error) {
+		calls = append(calls, [2]string{runtime, pin})
+		return []runtimeversions.Finding{{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"}}, nil
+	}
+	builder := &fakeBuilder{}
+	res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-12"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, [][2]string{{"3.1-12", "3.1"}}, calls)
+	assert.Equal(t, []string{"runtime 3.1-12 is yanked"}, res.Warnings)
+	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-12", builder.gotReq.BaseImage)
+
+	blocking := errors.New("another series")
+	req.CheckRuntime = func(context.Context, string, string) ([]runtimeversions.Finding, error) { return nil, blocking }
+	builder = &fakeBuilder{}
+	_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-12"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.ErrorIs(t, err, blocking)
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
 }
 
 // With nothing to install the target still packages a single-platform image

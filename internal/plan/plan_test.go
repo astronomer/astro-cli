@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	pkgmanifest "github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 func init() {
@@ -382,6 +383,58 @@ func TestBuildCarriesTheDeclaredDockerfile(t *testing.T) {
 				t.Errorf("Plan.Dockerfile = %q, want %q", built.Plan.Dockerfile, tc.want)
 			}
 		})
+	}
+}
+
+// A declared Dockerfile whose FROM names another Airflow than the requirement
+// is refused before anything starts, in both modes: standalone installs the
+// requirement, which is exactly the Airflow the image would not run.
+func TestBuildRefusesADockerfileOfAnotherAirflow(t *testing.T) {
+	for _, mode := range []localrt.Mode{"", localrt.ModeStandalone, localrt.ModeDocker} {
+		for _, tc := range []struct {
+			from    string
+			refused bool
+		}{
+			{from: "astrocrpublic.azurecr.io/runtime:3.3-8", refused: true},
+			{from: "quay.io/astronomer/astro-runtime:13.11.0", refused: true},
+			{from: "astrocrpublic.azurecr.io/runtime:3.1-12", refused: false},
+			{from: "astrocrpublic.azurecr.io/runtime@sha256:0123", refused: false},
+		} {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML+"dockerfile = 'Dockerfile'\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM "+tc.from+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+			_, err := Build(dir, Options{Mode: mode})
+			var ve *pkgmanifest.ValidationError
+			refused := errors.As(err, &ve) && len(ve.Problems) == 1 && ve.Problems[0].Code == pkgmanifest.CodeDockerfileAirflowMismatch
+			if refused != tc.refused {
+				t.Errorf("mode %q, FROM %s: err = %v, want refused %v", mode, tc.from, err, tc.refused)
+			}
+			if !tc.refused && err != nil {
+				t.Errorf("mode %q, FROM %s: %v", mode, tc.from, err)
+			}
+		}
+	}
+}
+
+// The runtime build reaches the plan, for Docker mode to build FROM.
+func TestBuildCarriesTheRuntimeBuild(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML+"runtime = '3.1-12'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if built.Plan.Runtime != "3.1-12" || built.Plan.AirflowVersion != "3.1" {
+		t.Errorf("Plan.Runtime = %q, AirflowVersion = %q; want 3.1-12 and 3.1", built.Plan.Runtime, built.Plan.AirflowVersion)
 	}
 }
 

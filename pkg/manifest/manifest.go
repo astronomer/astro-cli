@@ -153,9 +153,19 @@ type Astro struct {
 	// Packages and the rest of the dependency list stop describing the image.
 	// The requirement is still required and still read: it gives standalone
 	// mode its Airflow, and the runtime its generation when the file's FROM
-	// line names none. Standalone mode has no
-	// image and ignores it.
+	// line names none. A FROM line naming an Astro Runtime whose Airflow
+	// disagrees with the requirement is refused wherever the project runs
+	// (DockerfileRuntimeProblem), since standalone would install one Airflow
+	// and the image run another. Standalone mode has no image and otherwise
+	// ignores it.
 	Dockerfile string
+	// Runtime is [tool.astro] runtime, one Astro Runtime build ("3.3-8",
+	// "13.11.0") the image is built from instead of the newest build of the
+	// requirement's series. Empty is the common case. It selects the image
+	// only: standalone installs the requirement, and Parse refuses a build
+	// whose Airflow the tag shows to disagree with the requirement, or one
+	// beside a Dockerfile. Read it as Manifest.Airflow().Runtime.
+	Runtime string
 }
 
 // Link is one committed deployment link: an Airflow the project talks to,
@@ -349,6 +359,26 @@ const (
 	// problems carry this code, so the edit that deletes the line can run.
 	CodeAirflowRemoved ProblemCode = "airflow_removed"
 
+	// [tool.astro] runtime, the one Astro Runtime build the image uses.
+	//
+	// CodeRuntimeInvalid is a value that is not one build: not a runtime tag,
+	// or a floating one ("3.3") that names no build.
+	CodeRuntimeInvalid ProblemCode = "runtime_invalid"
+	// CodeRuntimeMismatch is a build whose Airflow, as far as the tag shows,
+	// is not the requirement's: another series for an Airflow 3 tag, another
+	// generation for either.
+	CodeRuntimeMismatch ProblemCode = "runtime_mismatch"
+	// CodeRuntimeWithDockerfile is runtime beside a declared dockerfile, whose
+	// FROM line names the base instead, so runtime would pick nothing.
+	CodeRuntimeWithDockerfile ProblemCode = "runtime_with_dockerfile"
+	// CodeDockerfileAirflowMismatch is a declared Dockerfile whose FROM names
+	// an Astro Runtime of another Airflow than the requirement: another series
+	// for an Airflow 3 tag, another generation for an Airflow 2 one. Parse
+	// never raises it, because it needs the file: DockerfileRuntimeProblem
+	// does, and pkg/scaffold's CheckDockerfileAirflow is the reader every run
+	// path calls.
+	CodeDockerfileAirflowMismatch ProblemCode = "dockerfile_airflow_mismatch"
+
 	// Links: what a deployment link may be called and what it must name.
 	CodeLinkNeedsName               ProblemCode = "link_needs_name"
 	CodeLinkNameReserved            ProblemCode = "link_name_reserved"
@@ -400,6 +430,9 @@ var problemCodes = []ProblemCode{
 
 	CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 	CodeAirflowCoreBeforeThree, CodeDependenciesDynamic, CodeAirflowRemoved,
+
+	CodeRuntimeInvalid, CodeRuntimeMismatch, CodeRuntimeWithDockerfile,
+	CodeDockerfileAirflowMismatch,
 
 	CodeLinkNeedsName, CodeLinkNameReserved, CodeTargetUnusable,
 	CodeInheritedTargetUnusable, CodeTargetNeedsEnvironment,
@@ -503,8 +536,10 @@ func Parse(data []byte) (*Manifest, error) {
 // series, states the version twice, or pins apache-airflow-core to an Airflow 2
 // (CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 // CodeAirflowCoreBeforeThree), alone or together: a manifest the key alone pinned,
-// before the requirement became the version, has the first two. Any other
-// problem refuses it as Parse does. Readers use Parse.
+// before the requirement became the version, has the first two. So do the
+// problems of [tool.astro] runtime (CodeRuntimeInvalid, CodeRuntimeMismatch,
+// CodeRuntimeWithDockerfile), which the edits that move or delete the line
+// repair. Any other problem refuses it as Parse does. Readers use Parse.
 //
 // The manifest it returns may state no single Airflow, so Airflow() can be the
 // zero value here, unlike on a manifest Parse loaded. AirflowUnclear and
@@ -538,28 +573,26 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 		return nil, &ValidationError{Problems: p.problems}
 	}
 	m.Warnings = p.warnings
-	for _, pr := range p.problems {
-		// A core entry pinned to an Airflow 2 names the wrong distribution,
-		// not an unclear version, so it does not count here: the version it
-		// states is still the one to read.
-		if pr.Code != CodeAirflowRemoved && pr.Code != CodeAirflowCoreBeforeThree {
-			m.repair.airflowUnclear = true
-		}
-	}
+	// A core entry pinned to an Airflow 2 names the wrong distribution, and a
+	// runtime problem is about the build, not the version, so neither counts
+	// here: the version the requirement states is still the one to read.
+	m.repair.airflowUnclear = p.airflowUnclear()
 	if s, ok := p.airflowKey.(string); ok && ValidAirflowVersion(s) {
 		m.repair.removedKey = s
 	}
 	return m, nil
 }
 
-// airflowVersionCodes are the problems a repair of the Airflow version can
-// fix, and so the ones ParseForRepair lets through.
+// airflowVersionCodes are the problems a repair of the Airflow version, or of
+// the runtime build that has to agree with it, can fix, and so the ones
+// ParseForRepair lets through.
 //
 // CodeDependenciesDynamic is not among them: no edit of the requirement can
 // fix a manifest that has nowhere to put one, so a repair of it is refused
 // with the manifest's own reason, and writes nothing.
 var airflowVersionCodes = []ProblemCode{
 	CodeAirflowRemoved, CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous, CodeAirflowCoreBeforeThree,
+	CodeRuntimeInvalid, CodeRuntimeMismatch, CodeRuntimeWithDockerfile,
 }
 
 func onlyAirflowVersion(problems []Problem) bool {
@@ -592,7 +625,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "deployments", "dockerfile", "domain", "env", "packages", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "deployments", "dockerfile", "domain", "env", "packages", "runtime", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
@@ -673,6 +706,7 @@ func (p *parser) astro(raw map[string]any) Astro {
 		// would have let a whitespace declaration suppress the desktop's
 		// presence fallback and take the project's real Dockerfile away.
 		Dockerfile: strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
+		Runtime:    strings.TrimSpace(p.str(runtimeKey, raw["runtime"])),
 	}
 	a.Deployments = p.links(raw["deployments"], &a)
 	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
@@ -1045,6 +1079,7 @@ func (p *parser) validate(m *Manifest) {
 	}
 
 	p.airflow(m)
+	p.runtime(m)
 
 	// The path has to stay inside the project, because the consumer joins it to
 	// the project directory and hands the result to a docker build. An absolute

@@ -23,10 +23,12 @@ import (
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -485,6 +487,13 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		// BUILD_SECRET_INPUT keeps working across the version boundary rather
 		// than silently losing its secrets on the day the project converts.
 		BuildSecrets: util.ResolveBuildSecrets(buildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
+		// The runtime build is checked against the catalog where the image is
+		// about to be built from it. Its warnings go to stderr, so a json run's
+		// stdout stays the one result object.
+		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
+			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
+		},
+		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: pyproject.toml: tool.astro.runtime: %s\n", msg) },
 		// Two lines, once the target is settled and before anything is built.
 		// The first is the → line every resolving command prints, so a deploy
 		// says what it is about to act on the way `astro af dags list` does. The
@@ -802,6 +811,7 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		ProjectDir:     in.ProjectDir,
 		DeploymentID:   in.DeploymentID,
 		AirflowVersion: in.AirflowVersion,
+		Runtime:        in.Runtime,
 		Dependencies:   in.Dependencies,
 		Packages:       in.Packages,
 		Dockerfile:     in.Dockerfile,

@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // defaultPackagePlatform is the build platform `astro package` targets by
@@ -89,17 +87,21 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	if err != nil {
 		return err
 	}
-	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	// Every target, not only the image one: the artifact is this project, and a
+	// project whose Dockerfile and requirement name two Airflows is one no
+	// other run path accepts either.
+	m, err := loadCheckedManifest(dir)
 	if err != nil {
 		return err
 	}
 	res, err := target.Build(ctx, pack.Request{
-		ProjectDir: dir,
-		Manifest:   m,
-		Save:       opts.save,
-		Tag:        opts.tag,
-		Platform:   opts.platform,
-		OutDir:     opts.outDir,
+		ProjectDir:   dir,
+		Manifest:     m,
+		Save:         opts.save,
+		Tag:          opts.tag,
+		Platform:     opts.platform,
+		OutDir:       opts.outDir,
+		CheckRuntime: c.d.RuntimeCheck,
 	}, c.callbacks(r))
 	if err != nil {
 		return err

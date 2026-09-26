@@ -19,7 +19,12 @@ type ImageBuilder interface {
 	// runtime images by the Airflow version, but an Airflow 2 image is tagged
 	// by runtime version, so which runtime carries a given Airflow is a lookup
 	// against Astronomer's version service.
-	RuntimeImage(ctx context.Context, airflowVersion string) (string, error)
+	//
+	// runtime is the plan's Runtime, the one build the manifest's
+	// [tool.astro] runtime names, or "" for none. When set, the base is that
+	// build and no lookup is made; airflowVersion is still passed, for the
+	// checks that hold whichever build is chosen.
+	RuntimeImage(ctx context.Context, airflowVersion, runtime string) (string, error)
 	// Build layers the project's dependencies and OS packages over BaseImage and
 	// returns the image to run. With nothing to install it returns BaseImage
 	// unchanged rather than building an empty layer.

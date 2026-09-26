@@ -66,6 +66,30 @@ func RuntimeImage(airflowVersion string) (string, error) {
 	return RuntimeImageRepo + ":" + series, nil
 }
 
+// RuntimeImageFor is RuntimeImage for a manifest that may name one runtime
+// build ([tool.astro] runtime, manifest.Airflow().Runtime). With runtime empty
+// it is RuntimeImage. With it set, the base is that build, runtime:<runtime>,
+// rather than the newest build the pin's series tag serves, and the pin need
+// only be an Airflow 3: a pin naming just the generation ("3") has no series
+// tag to build from, but the build is named outright.
+//
+// The manifest has already held the build to the pin: an Airflow 3 tag of
+// another series does not load. Whether the catalog lists the build, which
+// exact Airflow it carries and whether it is yanked are
+// runtimeversions.CheckRuntime's, which the caller runs where it can report
+// them.
+func RuntimeImageFor(airflowVersion, runtime string) (string, error) {
+	runtime = strings.TrimSpace(runtime)
+	if runtime == "" {
+		return RuntimeImage(airflowVersion)
+	}
+	v := strings.TrimSpace(airflowVersion)
+	if major, _, _ := strings.Cut(v, "."); major != "3" {
+		return "", fmt.Errorf("only Airflow 3 is supported in this release, not %q", v)
+	}
+	return RuntimeImageRepo + ":" + runtime, nil
+}
+
 // AirflowSeries reduces a manifest's Airflow pin to the MAJOR.MINOR series a
 // runtime image is published under, and reports whether the pin named one.
 //

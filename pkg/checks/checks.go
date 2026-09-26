@@ -300,9 +300,12 @@ func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov P
 //
 // As written, because the manifest already states Airflow in the shape the
 // project means — "apache-airflow==3.1.*", or an apache-airflow-core pin, which
-// a full apache-airflow beside it would contradict. Added when absent, because a manifest need not name Airflow at all: a docker project
-// declaring its own Dockerfile builds the image from that file, and the
-// dependency list stops describing it. Installing nothing called Airflow would
+// a full apache-airflow beside it would contradict. A manifest that loaded
+// always names Airflow there, in every mode: the requirement is the project's
+// one statement of its version, a docker project with its own Dockerfile
+// included, and a Dockerfile whose FROM disagrees with it is refused before a
+// check runs. Added when absent anyway, for a caller whose dependency list did
+// not come from a loaded manifest: installing nothing called Airflow would
 // spend a long download to arrive at "Airflow is not importable".
 //
 // Sorted for the same reason requirementSet sorts: the provisioner's cache key

@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/astronomer/astro-cli/pkg/airflowenv v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/fsatomic v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
@@ -43,3 +44,5 @@ replace github.com/astronomer/astro-cli/pkg/airflowenv => ../airflowenv
 replace github.com/astronomer/astro-cli/pkg/connmodel => ../connmodel
 
 replace github.com/astronomer/astro-cli/pkg/secrets => ../secrets
+
+replace github.com/astronomer/astro-cli/pkg/airflowrt => ../airflowrt

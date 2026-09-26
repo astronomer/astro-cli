@@ -206,6 +206,9 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	warnStandaloneOmissions(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
+	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
+		return err
+	}
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
 		return adviseStart(err)
@@ -226,6 +229,32 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
+}
+
+// runtimeKey is the manifest key a runtime-build finding is about.
+const runtimeKey = "tool.astro.runtime"
+
+// checkRuntimeBuild holds a Docker-mode start's [tool.astro] runtime build to
+// the pin with the runtime catalog (Deps.RuntimeCheck), before anything
+// starts: a build of another Airflow series refuses the start, and a yanked
+// build, one whose exact Airflow the pin excludes, or one the check could not
+// read the catalog for is a warning. Standalone installs the requirement and
+// builds no image, so the build decides nothing there and is not checked; a
+// declared Dockerfile never has one beside it.
+func (c *cli) checkRuntimeBuild(ctx context.Context, r Renderer, p localrt.Plan) error {
+	if p.Mode != localrt.ModeDocker || p.Runtime == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+		return nil
+	}
+	warnings, err := c.d.RuntimeCheck(ctx, p.Runtime, p.AirflowVersion)
+	for _, w := range warnings {
+		emitWarning(r, event{
+			Event:  "warning",
+			Text:   fmt.Sprintf("%s: %s: %s", manifest.Marker, runtimeKey, w.Message),
+			Key:    runtimeKey,
+			Reason: w.Message,
+		})
+	}
+	return err
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a
@@ -455,6 +484,10 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
 	warnStandaloneOmissions(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
+	// Before the stop, like the build: a refusal leaves Airflow running.
+	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
+		return err
+	}
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
 		return err
 	}

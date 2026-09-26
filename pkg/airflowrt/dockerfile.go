@@ -216,3 +216,54 @@ func IsAstroRuntimeImage(image string) bool {
 func IsUnresolvedRef(image string) bool {
 	return strings.Contains(image, "$")
 }
+
+// DeclaredBase is what a project's own Dockerfile builds on, as far as the file
+// alone can say: the final stage's image and tag, read by ParseDockerfileAt.
+//
+// One reader for every caller that asks, so the refusal of a foreign base, the
+// generation a compose file describes and the check that the FROM agrees with
+// the manifest's Airflow requirement read the same line the same way.
+type DeclaredBase struct {
+	Image, Tag string
+	// Known is false when there is no declared Dockerfile, when the file could
+	// not be parsed, and when its FROM is built from a build argument. All
+	// three mean the same thing to a caller: no answer, rather than a wrong one.
+	Known bool
+}
+
+// ReadDeclaredBase reads the base out of a project's declared Dockerfile, at
+// path. An empty path is no Dockerfile.
+//
+// A file that cannot be parsed is neither an answer nor a failure here. The
+// build reports that with the path and the reason, and guessing at this depth
+// would replace a good message with a worse one.
+func ReadDeclaredBase(path string) DeclaredBase {
+	if path == "" {
+		return DeclaredBase{}
+	}
+	image, tag, err := ParseDockerfileAt(path)
+	if err != nil || IsUnresolvedRef(image) {
+		return DeclaredBase{}
+	}
+	return DeclaredBase{Image: image, Tag: tag, Known: true}
+}
+
+// RuntimeVersion is the Astro Runtime version the base names: its tag with any
+// flavor suffix stripped ("3.3-8" from "3.3-8-python-3.12"). Empty when the
+// base is unknown, is not an Astro Runtime image, or is pinned by digest, which
+// names an exact image and no version.
+func (b DeclaredBase) RuntimeVersion() string {
+	if !b.Known || !IsAstroRuntimeImage(b.Image) || b.Tag == "" {
+		return ""
+	}
+	v, _ := ParseRuntimeTagPython(b.Tag)
+	return v
+}
+
+// Ref is the base as a FROM line names it, image and tag, for a message.
+func (b DeclaredBase) Ref() string {
+	if b.Tag == "" {
+		return b.Image
+	}
+	return b.Image + ":" + b.Tag
+}

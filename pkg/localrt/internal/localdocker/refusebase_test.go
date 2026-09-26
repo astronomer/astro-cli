@@ -19,7 +19,7 @@ import (
 // cases exercise the pair Start uses rather than a hand-built struct.
 func refuseFor(t *testing.T, path string) error {
 	t.Helper()
-	return refuseUnsupportedBase(path, readDeclaredBase(path))
+	return refuseUnsupportedBase(path, airflowrt.ReadDeclaredBase(path))
 }
 
 func writeDockerfile(t *testing.T, body string) string {
@@ -185,9 +185,33 @@ func TestStartJudgesRealReferenceShapes(t *testing.T) {
 // is the failure the refusal exists to prevent, arriving by another road.
 func TestADigestPinnedRuntimeFollowsThePin(t *testing.T) {
 	path := writeDockerfile(t, "FROM astrocrpublic.azurecr.io/runtime@sha256:abc123\n")
-	base := readDeclaredBase(path)
-	require.True(t, base.known)
+	base := airflowrt.ReadDeclaredBase(path)
+	require.True(t, base.Known)
 
 	assert.Equal(t, "3", planMajor("3.1", base), "a digest carries no generation, so the pin decides")
 	assert.Equal(t, "2", planMajor("2.10.5", base))
+}
+
+// The generation comes off the FROM's runtime version, flavor stripped, when
+// the base is an Astro Runtime image with a tag, and off the pin otherwise.
+func TestPlanMajorReadsTheDeclaredBase(t *testing.T) {
+	cases := []struct {
+		from, pin, want string
+	}{
+		{from: "astrocrpublic.azurecr.io/runtime:3.3-8", pin: "2.10", want: "3"},
+		{from: "astrocrpublic.azurecr.io/runtime:3.3-8-python-3.12", pin: "2.10", want: "3"},
+		{from: "quay.io/astronomer/astro-runtime:13.11.0", pin: "3.3", want: "2"},
+		{from: "quay.io/astronomer/astro-runtime:13.7.0-slim", pin: "3.3", want: "2"},
+		// A generation-only tag reads by the check's grammar, not the loose
+		// "3." prefix rule, which would call it Airflow 2.
+		{from: "astrocrpublic.azurecr.io/runtime:3", pin: "2.10", want: "3"},
+		// Not a runtime version: the loose rule still reads Airflow 2.
+		{from: "quay.io/astronomer/ap-airflow:2.5.1", pin: "3.3", want: "2"},
+		{from: "python:3.12-slim", pin: "3.3", want: "3"},
+		{from: "python:3.12-slim", pin: "2.10", want: "2"},
+	}
+	for _, tc := range cases {
+		base := airflowrt.ReadDeclaredBase(writeDockerfile(t, "FROM "+tc.from+"\n"))
+		assert.Equal(t, tc.want, planMajor(tc.pin, base), "FROM %s beside %s", tc.from, tc.pin)
+	}
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // Kind names the shape of a packaged artifact, so one json reader handles every
@@ -65,6 +66,11 @@ type Request struct {
 	// OutDir overrides where a tree target writes its artifact directory. Empty
 	// means the default: <ProjectDir>/dist/<target>.
 	OutDir string
+	// CheckRuntime holds the manifest's [tool.astro] runtime build to its
+	// Airflow pin with the runtime catalog, for the image target, which builds
+	// FROM that build (runtimeversions.CheckRuntime's contract: warnings to
+	// report, and the blocking finding as the error). nil checks nothing.
+	CheckRuntime func(ctx context.Context, runtime, airflowPin string) ([]runtimeversions.Finding, error)
 }
 
 // Result is the packaged artifact — the value both text and json render. The

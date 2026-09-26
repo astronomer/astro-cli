@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // runtimeVersionLabel is the label the runtime base image carries with its
@@ -66,6 +67,25 @@ func NewAstroTarget(builder ImageBuilder, docker imagebuild.Commander, bin strin
 
 func (t *AstroTarget) Name() string { return TargetAstro }
 
+// checkRuntimeBuild holds the manifest's runtime build to its pin before
+// anything is built (Request.CheckRuntime): a build of another series refuses
+// the package, and what the catalog warns about comes back to ride on the
+// result.
+func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflow) ([]string, error) {
+	if req.CheckRuntime == nil || airflow.Runtime == "" {
+		return nil, nil
+	}
+	found, err := req.CheckRuntime(ctx, airflow.Runtime, airflow.Pin)
+	if err != nil {
+		return nil, err
+	}
+	var warnings []string
+	for _, f := range found {
+		warnings = append(warnings, f.Message)
+	}
+	return warnings, nil
+}
+
 // Build resolves the runtime base, builds the image, reads its runtime-version
 // label, tags it to the content-addressed name (astro-package/<name>:<version>-
 // <hash> plus a moving :latest), optionally saves it, and reports the tag so
@@ -78,13 +98,18 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if name == "" {
 		return Result{}, errors.New("the project has no name; set [project] name in pyproject.toml")
 	}
-	airflowVersion := req.Manifest.Airflow().Pin
+	airflow := req.Manifest.Airflow()
+	warnings, err := checkRuntimeBuild(ctx, req, airflow)
+	if err != nil {
+		return Result{}, err
+	}
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
 	// would build.
 	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuild{
 		ProjectDir:     req.ProjectDir,
-		AirflowVersion: airflowVersion,
+		AirflowVersion: airflow.Pin,
+		Runtime:        airflow.Runtime,
 		Dockerfile:     req.Manifest.Astro.Dockerfile,
 		Dependencies:   req.Manifest.Project.Dependencies,
 		Packages:       req.Manifest.Astro.Packages,
@@ -159,7 +184,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		runtimeVersion = airflowLabel
 	}
 	if runtimeVersion == "" {
-		runtimeVersion = airflowVersion
+		runtimeVersion = airflow.Pin
 	}
 	// A declared Dockerfile that did not produce an Astro Runtime image is
 	// REPORTED, not refused.
@@ -208,6 +233,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		Kind:           KindImage,
 		Image:          finalTag,
 		RuntimeVersion: runtimeVersion,
+		Warnings:       warnings,
 	}
 	if req.Save != "" {
 		if err := t.save(ctx, finalTag, req.Save, cb); err != nil {

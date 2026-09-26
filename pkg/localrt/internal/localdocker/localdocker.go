@@ -30,6 +30,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
@@ -122,36 +123,11 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 	return e
 }
 
-// declaredBase is what a project's own Dockerfile builds on, as far as the file
-// alone can say.
-//
-// Read once and shared by the two decisions that depend on it — whether the
-// start is refused, and which generation the compose file describes. Parsing
-// the same path twice is wasted I/O, and worse, two answers that can disagree
-// about a file edited between them.
-type declaredBase struct {
-	image, tag string
-	// known is false when there is no declared Dockerfile, when the file could
-	// not be parsed, and when its FROM is built from a build argument. All
-	// three mean the same thing to a caller: no answer, rather than a wrong one.
-	known bool
-}
-
-// readDeclaredBase reads the base out of a project's declared Dockerfile.
-//
-// A file that cannot be parsed is neither an answer nor a failure here.
-// imagebuild.Build reports that with the path and the reason a moment later,
-// and guessing at this depth would replace a good message with a worse one.
-func readDeclaredBase(declared string) declaredBase {
-	if declared == "" {
-		return declaredBase{}
-	}
-	image, tag, err := airflowrt.ParseDockerfileAt(declared)
-	if err != nil || airflowrt.IsUnresolvedRef(image) {
-		return declaredBase{}
-	}
-	return declaredBase{image: image, tag: tag, known: true}
-}
+// The declared Dockerfile's base is read once per start, by
+// airflowrt.ReadDeclaredBase, and shared by the two decisions that depend on
+// it: whether the start is refused, and which generation the compose file
+// describes. Parsing the same path twice is wasted I/O, and worse, two answers
+// that can disagree about a file edited between them.
 
 // refuseUnsupportedBase rejects a declared Dockerfile that does not build on an
 // Astro Runtime image.
@@ -164,15 +140,15 @@ func readDeclaredBase(declared string) declaredBase {
 // a daemon error about a missing unix user.
 //
 // Only what the file positively says is refused. A base that could not be read
-// at all is left alone, for the reason readDeclaredBase gives.
-func refuseUnsupportedBase(declared string, base declaredBase) error {
-	if !base.known || airflowrt.IsAstroRuntimeImage(base.image) {
+// at all is left alone, for the reason airflowrt.ReadDeclaredBase gives.
+func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
+	if !base.Known || airflowrt.IsAstroRuntimeImage(base.Image) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
 		"`astro` user and takes its service set from the runtime tag, so another base cannot start. "+
 		"Base the final stage on astrocrpublic.azurecr.io/runtime",
-		airflowrt.ErrUnsupportedBase, declared, base.image)
+		airflowrt.ErrUnsupportedBase, declared, base.Image)
 }
 
 // planMajor is the Airflow generation the compose file has to describe: read
@@ -193,13 +169,24 @@ func refuseUnsupportedBase(declared string, base declaredBase) error {
 // a file nothing could be read from, and a runtime pinned by digest — whose
 // reference names an exact image and no version at all, so there is nothing in
 // it to be read.
-func planMajor(airflowVersion string, base declaredBase) string {
-	pinned := airflowMajor(airflowVersion)
-	if !base.known || !airflowrt.IsAstroRuntimeImage(base.image) || base.tag == "" {
-		return pinned
+//
+// The version is read by airflowrt.DeclaredBase, the same reader the check
+// that the FROM agrees with the requirement uses (scaffold.CheckDockerfileAirflow),
+// and a tag that check can read (manifest.ParseRuntimeTag) takes its generation
+// from the same grammar, so for those tags the two cannot disagree, and the
+// check has already refused a start where the tag and the pin differ. Only a
+// tag the grammar does not read falls to the looser rule below: an Astronomer
+// image whose tag is not a runtime version at all (ap-airflow:2.5.1) is still
+// Airflow 2 to the compose file, where the check has nothing to compare.
+func planMajor(airflowVersion string, base airflowrt.DeclaredBase) string {
+	v := base.RuntimeVersion()
+	if v == "" {
+		return airflowMajor(airflowVersion)
 	}
-	baseTag, _ := airflowrt.ParseRuntimeTagPython(base.tag)
-	if airflowrt.IsRuntime3(baseTag) {
+	if t, ok := manifest.ParseRuntimeTag(v); ok {
+		return t.Major
+	}
+	if airflowrt.IsRuntime3(v) {
 		return "3"
 	}
 	return "2"
@@ -227,7 +214,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		// field's doc) and this may be Windows.
 		declared = filepath.Join(projectPath, filepath.FromSlash(p.Dockerfile))
 	}
-	base := readDeclaredBase(declared)
+	base := airflowrt.ReadDeclaredBase(declared)
 	// Before the engine, because it needs no engine: what a Dockerfile builds
 	// on is a property of the file. Starting a stopped Docker Desktop to then
 	// refuse is a minute of somebody's time spent on an answer already on disk.
@@ -272,9 +259,9 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		// The resolution takes a context because an Airflow 2 base image is a
 		// lookup against the version service, not a tag built from the pin. It
 		// also validates the generation, which everything below reads off the
-		// plan.
+		// plan. A [tool.astro] runtime names the build outright.
 		var err error
-		if image, err = e.images.RuntimeImage(ctx, p.AirflowVersion); err != nil {
+		if image, err = e.images.RuntimeImage(ctx, p.AirflowVersion, p.Runtime); err != nil {
 			return nil, err
 		}
 	}

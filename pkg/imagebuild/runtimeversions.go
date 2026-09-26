@@ -50,19 +50,32 @@ var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow v
 // cache at all — every call fetches, which still works and only costs the
 // request.
 //
-// This is the local start path only. The deploy path stays on RuntimeImage,
+// runtime is the manifest's [tool.astro] runtime, or "" for none. When set, the
+// base is that build and nothing is looked up: an Airflow 3 build under
+// RuntimeImageRepo, as RuntimeImageFor names it, and an Airflow 2 one under
+// quay.io/astronomer/astro-runtime. The pin is still checked, the 2.7 floor
+// included, because the manifest has already held the build to the pin's
+// generation and series as far as the tag shows. What the tag cannot show
+// (the catalog's word on an Airflow 2 build's series, a yanked build) is
+// runtimeversions.CheckRuntime's, which the caller runs where it can say so.
+//
+// This is the local start path only. The deploy path stays on RuntimeImageFor,
 // which is Airflow 3 alone.
-func LocalRuntimeImageWith(ctx context.Context, airflowVersion string, o runtimeversions.Options) (string, error) {
+func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime string, o runtimeversions.Options) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {
 		return "", errors.New("no Airflow version was given; one is needed to pick a runtime image")
 	}
+	runtime = strings.TrimSpace(runtime)
 	switch major, _, _ := strings.Cut(v, "."); major {
 	case "3":
-		return RuntimeImage(v)
+		return RuntimeImageFor(v, runtime)
 	case "2":
 		if err := checkAirflow2Floor(v); err != nil {
 			return "", err
+		}
+		if runtime != "" {
+			return airflow2ImageRepo + ":" + runtime, nil
 		}
 		catalog, _, err := runtimeversions.Load(ctx, o)
 		if err != nil {

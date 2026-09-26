@@ -17,7 +17,24 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
+
+// loadCheckedManifest loads the project's manifest the way every run path
+// does: validated, and with a declared Dockerfile's FROM held to the Airflow
+// requirement (scaffold.CheckDockerfileAirflow). A check validates the project
+// it would run, so a project that `astro local start` refuses is not one this
+// passes.
+func loadCheckedManifest(project string) (*manifest.Manifest, error) {
+	m, err := manifest.Load(filepath.Join(project, manifest.Marker))
+	if err != nil {
+		return nil, err
+	}
+	if err := scaffold.CheckDockerfileAirflow(project, m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
 
 // ExitError carries a process exit code up to main, which is the only place
 // that exits. The command has already rendered everything the user needs, so
@@ -71,7 +88,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	// problem is certain, cheap and offline, while a missing venv is expensive
 	// to fix and may not be the real problem. It also makes `--target astro` a
 	// true alias for a plain check, since that path loads the manifest too.
-	m, err := manifest.Load(filepath.Join(project, manifest.Marker))
+	m, err := loadCheckedManifest(project)
 	if err != nil {
 		return blocked(r, err)
 	}
@@ -117,7 +134,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	if err != nil {
 		return blocked(r, err)
 	}
-	m, err := manifest.Load(filepath.Join(project, manifest.Marker))
+	m, err := loadCheckedManifest(project)
 	if err != nil {
 		return blocked(r, err)
 	}

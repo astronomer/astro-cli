@@ -29,19 +29,25 @@ type Airflow struct {
 	// "3.3.0" from ==3.3. A series resolves to a concrete release downstream,
 	// not here.
 	Pin string
+	// Runtime is [tool.astro] runtime, the one Astro Runtime build the image
+	// is built from, "" when unset. It picks a build within Pin's series and
+	// never stands in for Pin: standalone installs the requirement whatever
+	// it says.
+	Runtime string
 }
 
-// Airflow returns the Airflow the manifest's requirement pins. A manifest that
-// loaded always has one, because Parse refuses a manifest whose requirement is
-// missing or pins no single series, so its callers need no empty case. A
-// Manifest built by hand without a pinned requirement returns the zero value.
+// Airflow returns the Airflow the manifest's requirement pins, and the runtime
+// build its image uses when one is set. A manifest that loaded always has a
+// pin, because Parse refuses a manifest whose requirement is missing or pins no
+// single series, so its callers need no empty case. A Manifest built by hand
+// without a pinned requirement returns an empty Pin.
 func (m *Manifest) Airflow() Airflow {
 	for _, spec := range m.Project.Dependencies {
 		if v, ok := AirflowPin(spec); ok {
-			return Airflow{Pin: v}
+			return Airflow{Pin: v, Runtime: m.Astro.Runtime}
 		}
 	}
-	return Airflow{}
+	return Airflow{Runtime: m.Astro.Runtime}
 }
 
 // Major is the pin's Airflow generation: "3" for 3.3 and for 3.3.2.

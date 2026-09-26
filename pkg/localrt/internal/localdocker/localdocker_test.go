@@ -816,6 +816,21 @@ func TestStartWithProjectDockerfileSkipsBaseImageResolution(t *testing.T) {
 	assert.Zero(t, images.runtimeImageCalls, "Dockerfile mode must not resolve a runtime image")
 }
 
+// A plan's runtime build reaches the base-image resolution, which picks that
+// build instead of the newest one of the series.
+func TestStartPassesThePlansRuntimeToTheBaseResolution(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+	p := testPlan(t)
+	p.Runtime = "3.3-8"
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"3.3-8"}, images.runtimes)
+}
+
 // The generated path is unchanged: it still resolves a base and still gets the
 // manifest's dependencies.
 func TestStartWithoutProjectDockerfileStillResolvesBase(t *testing.T) {

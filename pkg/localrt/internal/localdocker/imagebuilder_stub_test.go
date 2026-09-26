@@ -21,6 +21,9 @@ type stubImages struct {
 	// not cause one, and the count is the only way to see a lookup the engine
 	// should have skipped, since its result would be discarded either way.
 	runtimeImageCalls int
+	// runtimes is the runtime build each resolution was asked for, "" for
+	// none, so a test can see the plan's [tool.astro] runtime reach it.
+	runtimes []string
 }
 
 func newStubImages() *stubImages {
@@ -37,8 +40,9 @@ func newStubImages() *stubImages {
 // TestStartRejectsNonDockerPlanAndBadVersions checks; the rules themselves —
 // the 2.7 floor, and the version-service lookup an Airflow 2 pin needs — belong
 // to pkg/imagebuild and are tested there.
-func (s *stubImages) RuntimeImage(_ context.Context, airflowVersion string) (string, error) {
+func (s *stubImages) RuntimeImage(_ context.Context, airflowVersion, runtime string) (string, error) {
 	s.runtimeImageCalls++
+	s.runtimes = append(s.runtimes, runtime)
 	switch {
 	case strings.HasPrefix(airflowVersion, "3"):
 		return s.base, nil

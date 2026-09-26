@@ -52,6 +52,19 @@ func TestForManifestGeneratesFromTheAirflowPin(t *testing.T) {
 	assert.False(t, req.FromDeclaredDockerfile())
 }
 
+// A [tool.astro] runtime names the build the generated image starts FROM, in
+// place of the series tag.
+func TestForManifestBuildsFromTheRuntimeBuild(t *testing.T) {
+	for _, pin := range []string{"3.3", "3.3.1", "3"} {
+		req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin, Runtime: "3.3-8"})
+		require.NoError(t, err, pin)
+		assert.Equal(t, RuntimeImageRepo+":3.3-8", req.BaseImage, pin)
+	}
+	// Deploy and package stay Airflow 3 only, runtime or not.
+	_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.11", Runtime: "13.11.0"})
+	assert.ErrorContains(t, err, "only Airflow 3")
+}
+
 func TestForManifestRefusesAPinWithNoRuntimeImage(t *testing.T) {
 	for _, pin := range []string{"", "2.9"} {
 		_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin})

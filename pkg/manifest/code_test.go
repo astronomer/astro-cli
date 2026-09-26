@@ -87,6 +87,14 @@ func TestEveryCodeIsReachable(t *testing.T) {
 	for _, tc := range authCases() {
 		record(endpointLink(tc.auth))
 	}
+	// The one code Parse cannot raise, because it needs the Dockerfile: its
+	// fixtures go through the function that raises it.
+	for _, tc := range dockerfileRuntimeCases {
+		m := dockerfileManifest(t, tc.requirement)
+		if p, ok := m.DockerfileRuntimeProblem("astrocrpublic.azurecr.io/runtime:"+tc.tag, tc.tag); ok {
+			raised[p.Code] = true
+		}
+	}
 	for _, code := range problemCodes {
 		if !raised[code] {
 			t.Errorf("no fixture raises %q", code)

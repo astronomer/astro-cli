@@ -19,6 +19,11 @@ type ManifestBuild struct {
 	// (manifest.Airflow().Pin), which a generated build's runtime base
 	// resolves from. Unused when a Dockerfile is declared.
 	AirflowVersion string
+	// Runtime is [tool.astro] runtime (manifest.Airflow().Runtime), the one
+	// runtime build a generated image starts FROM instead of the newest build
+	// of AirflowVersion's series, or "" for none. The manifest never sets it
+	// beside a Dockerfile.
+	Runtime string
 	// Dockerfile is [tool.astro] dockerfile: slash-separated and relative to
 	// ProjectDir, or empty when the project declares none.
 	Dockerfile string
@@ -35,8 +40,9 @@ type ManifestBuild struct {
 // resolved against the project, and the project as its context, and no runtime
 // base is resolved, since the file names its own FROM and asking for a base it
 // would not use only adds a way to fail. Otherwise the image is generated over
-// the runtime base the Airflow pin resolves to (RuntimeImage), installing
-// Dependencies and Packages; a pin RuntimeImage refuses is the error returned.
+// the runtime base the Airflow pin and runtime build resolve to
+// (RuntimeImageFor), installing Dependencies and Packages; a pin it refuses is
+// the error returned.
 // Dependencies and Packages are carried in both cases, since Build ignores
 // them in Dockerfile mode rather than rejecting them.
 //
@@ -57,7 +63,7 @@ func ForManifest(m ManifestBuild) (Request, error) {
 		req.Context = m.ProjectDir
 		return req, nil
 	}
-	base, err := RuntimeImage(m.AirflowVersion)
+	base, err := RuntimeImageFor(m.AirflowVersion, m.Runtime)
 	if err != nil {
 		return Request{}, err
 	}

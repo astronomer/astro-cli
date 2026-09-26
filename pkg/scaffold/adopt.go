@@ -85,6 +85,9 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 			"dependencies from [project] dynamic", path, airflowRequirement(example))
 	}
 	pick := pickAirflowVersion(opts.AirflowVersion, deps, v1, opts.Default)
+	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, v1, opts.AirflowVersion, deps); err != nil {
+		return nil, nil, pin, err
+	}
 	version, defaulted := pick.version, pick.defaulted()
 	// A manifest naming Airflow in a shape no version reads out of, a range,
 	// is rewritten only when --airflow-version names the version (below);

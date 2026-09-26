@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
+	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -115,6 +116,14 @@ type Deps struct {
 	// seam so a test never reaches the network; nil answers the built-in
 	// series with no lookup.
 	AirflowDefault func(ctx context.Context) (series, requiresPython string, src runtimeversions.Source)
+
+	// RuntimeCheck holds a manifest's [tool.astro] runtime build to its Airflow
+	// pin with what the runtime catalog says about it, where an image is about
+	// to be built from it: a Docker-mode start, and `astro package`. Warnings
+	// come back to show; a blocking finding is the error. Production reads the
+	// catalog through runtimecatalog.CheckRuntime, which never fails for want
+	// of it. A seam so a test never reaches the network; nil checks nothing.
+	RuntimeCheck func(ctx context.Context, runtime, airflowPin string) ([]runtimeversions.Finding, error)
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -158,6 +167,7 @@ func NewDeps() Deps {
 		LoginDomain:      astrosession.Domain,
 		Interactive:      stdinIsTerminal,
 		AirflowDefault:   catalogDefault,
+		RuntimeCheck:     runtimecatalog.CheckRuntime,
 	}
 }
 
@@ -267,8 +277,10 @@ func adviseHealthTimeout(err error) error {
 //
 // Both places a version can come from are named, because the pin is not always
 // the answer: a project that declares a Dockerfile runs whatever its base image
-// is, whatever the pin says (see localdocker's planMajor). Advice naming only
-// the pin sends that user to edit a file that changes nothing.
+// is. A start refuses a FROM of another series than the pin
+// (scaffold.CheckDockerfileAirflow), but the build within that series, and a
+// base it cannot read, are the file's alone. Advice naming only the pin sends
+// that user to edit a file that changes nothing.
 func adviseDatabaseNewer(err error) error {
 	if !errors.Is(err, localrt.ErrDatabaseNewerThanAirflow) {
 		return err
@@ -333,15 +345,16 @@ type imageBuilder struct {
 // image lookup blocks a start and has no fallback, so it waits longer than
 // init's does.
 func newImageBuilder() imageBuilder {
-	return imageBuilder{catalog: catalogOptions(0)}
+	return imageBuilder{catalog: runtimecatalog.Options(0)}
 }
 
-// RuntimeImage resolves through LocalRuntimeImageWith, not RuntimeImage: a local
-// run takes either generation, and an Airflow 2 pin needs the runtime catalog to
-// say which runtime carries it. The deploy path keeps the pure RuntimeImage,
-// which is Airflow 3 alone.
-func (b imageBuilder) RuntimeImage(ctx context.Context, airflowVersion string) (string, error) {
-	return imagebuild.LocalRuntimeImageWith(ctx, airflowVersion, b.catalog)
+// RuntimeImage resolves through LocalRuntimeImageWith, not RuntimeImageFor: a
+// local run takes either generation, and an Airflow 2 pin needs the runtime
+// catalog to say which runtime carries it, unless the manifest names the build
+// ([tool.astro] runtime). The deploy path keeps the pure RuntimeImageFor, which
+// is Airflow 3 alone.
+func (b imageBuilder) RuntimeImage(ctx context.Context, airflowVersion, build string) (string, error) {
+	return imagebuild.LocalRuntimeImageWith(ctx, airflowVersion, build, b.catalog)
 }
 
 // Build copies every field across, and the two that used to be missing are

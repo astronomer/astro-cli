@@ -47,6 +47,9 @@ This is an Astro project: Apache Airflow DAGs, run locally with the Astro
 CLI (v2). ` + "`pyproject.toml`" + ` is the manifest — the project name, the pinned
 Airflow version (the ` + "`apache-airflow`" + ` requirement in ` + "`[project] dependencies`" + `),
 and the Python dependencies live there. Read it rather than assuming versions.
+To change the Airflow version, change that requirement: an optional
+` + "`[tool.astro] runtime`" + ` only picks one Astro Runtime build of the same series
+for the image, and a ` + "`FROM`" + ` in a declared Dockerfile has to name the same series.
 
 Layout:
 

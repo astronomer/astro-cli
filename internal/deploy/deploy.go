@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // IsV2Project reports whether dir holds a v2 project: a pyproject.toml carrying
@@ -99,6 +101,14 @@ type Request struct {
 	// question rather than before it: a deploy refused at the prompt says
 	// nothing about building anything. nil skips it.
 	Announce func(Target)
+	// CheckRuntime holds the manifest's [tool.astro] runtime build to its
+	// Airflow pin with the runtime catalog, before an image is built FROM it
+	// (runtimeversions.CheckRuntime's contract: warnings to report, and the
+	// blocking finding as the error). nil checks nothing.
+	CheckRuntime func(runtime, airflowPin string) ([]runtimeversions.Finding, error)
+	// Warn reports a finding the deploy goes ahead despite, as a sentence.
+	// nil drops it.
+	Warn func(string)
 }
 
 // Result is what a finished v2 deploy reports back to cmd for rendering. Text
@@ -146,8 +156,11 @@ type ImageDeploy struct {
 	WorkspaceID    string
 	ProjectDir     string
 	AirflowVersion string
-	Dependencies   []string
-	Packages       []string
+	// Runtime is [tool.astro] runtime, the one runtime build a generated image
+	// starts FROM, or "" for the newest build of AirflowVersion's series.
+	Runtime      string
+	Dependencies []string
+	Packages     []string
 	// Dockerfile is the project's declared Dockerfile ([tool.astro] dockerfile),
 	// slash-separated and relative to ProjectDir; "" builds a generated image.
 	// With it set the file is the build and AirflowVersion, Dependencies and
@@ -215,6 +228,11 @@ func Run(req Request, d Deployer) (Result, error) {
 	if req.DagsOnly && (req.Image || req.ImageName != "") {
 		return Result{}, errors.New("--dags deploys only your DAGs; drop --image and --image-name")
 	}
+	// Also before anything is asked: a project whose image source is refused
+	// should not first make someone pick where to ship it.
+	if err := checkImageSource(req); err != nil {
+		return Result{}, err
+	}
 
 	target, err := resolveTarget(req, d)
 	if err != nil {
@@ -228,6 +246,32 @@ func Run(req Request, d Deployer) (Result, error) {
 		return runDagsOnly(req, target, d)
 	}
 	return runImage(req, target, d)
+}
+
+// checkImageSource holds what an image deploy would build from to the Airflow
+// requirement, for a deploy that builds one from the manifest: a declared
+// Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
+// [tool.astro] runtime build (Request.CheckRuntime). A dags-only deploy and one
+// adopting a prebuilt --image-name build nothing from the manifest, and are not
+// held to it.
+func checkImageSource(req Request) error {
+	if req.DagsOnly || req.ImageName != "" || req.Manifest == nil {
+		return nil
+	}
+	if err := scaffold.CheckDockerfileAirflow(req.ProjectDir, req.Manifest); err != nil {
+		return err
+	}
+	airflow := req.Manifest.Airflow()
+	if airflow.Runtime == "" || req.CheckRuntime == nil {
+		return nil
+	}
+	warnings, err := req.CheckRuntime(airflow.Runtime, airflow.Pin)
+	if req.Warn != nil {
+		for _, w := range warnings {
+			req.Warn(w.Message)
+		}
+	}
+	return err
 }
 
 // runDagsOnly ships just the dags/ directory through the transport.
@@ -259,11 +303,12 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 // default "both" deploy. --image drops the dags.
 func runImage(req Request, target Target, d Deployer) (Result, error) {
 	var deps, packages []string
-	airflowVersion, dockerfile := "", ""
+	airflowVersion, runtime, dockerfile := "", "", ""
 	if req.Manifest != nil {
 		deps = req.Manifest.Project.Dependencies
 		packages = req.Manifest.Astro.Packages
 		airflowVersion = req.Manifest.Airflow().Pin
+		runtime = req.Manifest.Airflow().Runtime
 		// Carried for the same reason local docker mode carries it: a project
 		// that declared its own Dockerfile means that file, not a generated
 		// image. Without this a tier-3 project deployed an image built over the
@@ -288,6 +333,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		WorkspaceID:    target.WorkspaceID,
 		ProjectDir:     req.ProjectDir,
 		AirflowVersion: airflowVersion,
+		Runtime:        runtime,
 		Dependencies:   deps,
 		Packages:       packages,
 		Dockerfile:     dockerfile,

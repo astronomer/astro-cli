@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // Options carries the per-invocation choices the command line supplies. The
@@ -75,8 +76,10 @@ type Built struct {
 // Build discovers the project containing workingDir, loads and validates its
 // manifest, reads user state, resolves the local environment, and assembles a
 // localrt.Plan. A missing project (*project.NotFoundError), a manifest that
-// does not validate, or a required env value with no source on this machine
-// (*MissingEnvError) each surface as a typed error the caller renders.
+// does not validate (a declared Dockerfile whose FROM names another Airflow
+// than the requirement among them, scaffold.CheckDockerfileAirflow), or a
+// required env value with no source on this machine (*MissingEnvError) each
+// surface as a typed error the caller renders.
 func Build(workingDir string, opts Options) (*Built, error) {
 	proj, err := project.Discover(workingDir)
 	if err != nil {
@@ -84,6 +87,12 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	}
 	m, err := manifest.Load(filepath.Join(proj.Dir, project.Marker))
 	if err != nil {
+		return nil, err
+	}
+	// In both modes, and standalone most of all: standalone installs the
+	// requirement, so a declared Dockerfile whose FROM names another Airflow is
+	// exactly the silent split between the two modes this refuses.
+	if err := scaffold.CheckDockerfileAirflow(proj.Dir, m); err != nil {
 		return nil, err
 	}
 	us, err := userstate.Load(proj.Dir)
@@ -108,6 +117,9 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
 			AirflowVersion: m.Airflow().Pin,
+			// The one runtime build Docker mode builds FROM, when the manifest
+			// names one; standalone installs the requirement and ignores it.
+			Runtime: m.Airflow().Runtime,
 			// Docker mode installs these into the runtime image for parity
 			// with standalone, which gets them from the uv venv sync.
 			Dependencies: m.Project.Dependencies,
