@@ -429,8 +429,13 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	for _, name := range planRetirements(v1,
 		slices.Concat(v1.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
 		label := name + " (migrated into " + manifest.Marker + ", removed)"
-		if name == SettingsRelPath && len(cs.Secrets) > 0 {
-			label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+		if name == SettingsRelPath {
+			switch {
+			case len(cs.Secrets) > 0:
+				label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+			case !v1.settings.declares():
+				label = name + " (nothing to carry, removed)"
+			}
 		}
 		cs.Changes = append(cs.Changes, Change{
 			Kind:   Delete,

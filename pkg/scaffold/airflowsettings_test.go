@@ -842,3 +842,137 @@ func TestAURIConnectionIsDeclaredAsItsScheme(t *testing.T) {
 	require.Contains(t, string(manifest), "pg = {conn_type = 'postgres'}")
 	require.Contains(t, writer.stored, "pg")
 }
+
+// v1StockSettings is the airflow_settings.yaml v1's `astro dev init` wrote,
+// byte for byte. The v1 project template kept it out of git, so most v1
+// checkouts still hold it untouched.
+const v1StockSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
+# NOTE: json dicts can be added to the conn_extra field as yaml key value pairs. See the example below.
+
+# For more information, refer to our docs: https://www.astronomer.io/docs/astro/cli/develop-project#configure-airflow_settingsyaml-local-development-only
+# For questions, reach out to: https://support.astronomer.io
+# For issues create an issue ticket here: https://github.com/astronomer/astro-cli/issues
+
+airflow:
+  connections:
+    - conn_id:
+      conn_type:
+      conn_host:
+      conn_schema:
+      conn_login:
+      conn_password:
+      conn_port:
+      conn_extra:
+        example_extra_field: example-value
+  pools:
+    - pool_name:
+      pool_slot:
+      pool_description:
+  variables:
+    - variable_name:
+      variable_value:
+`
+
+// The untouched template carries nothing, so it is removed with no note, and
+// the report says there was nothing in it rather than that it was migrated.
+func TestTheStockV1SettingsFileIsRetired(t *testing.T) {
+	dir := v1WithSettings(t, v1StockSettings)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.Contains(t, res.Deleted, SettingsRelPath+" (nothing to carry, removed)")
+	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
+	require.Empty(t, res.Advisories)
+	require.Empty(t, writer.stored)
+	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	require.NotContains(t, string(manifest), "tool.astro.env")
+}
+
+// A real entry beside the template's blank ones carries as it would alone, and
+// the blank ones are skipped rather than blocking it.
+func TestTheStockTemplatesBlankEntriesDoNotBlockARealOne(t *testing.T) {
+	dir := v1WithSettings(t, v1StockSettings+`    - variable_name: API_TOKEN
+      variable_value: tok-123
+`)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.Equal(t, "tok-123", writer.stored["API_TOKEN"])
+	require.Len(t, writer.stored, 1)
+	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.Contains(t, res.Deleted, SettingsRelPath+" (migrated into the encrypted vault and pyproject.toml, removed)")
+	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
+}
+
+// An entry that has values but no id is a mistake, not a placeholder: the
+// file is kept and the note says which entry to fix, without its secrets.
+func TestAnEntryWithValuesButNoIDIsReported(t *testing.T) {
+	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id: warehouse
+      conn_type: snowflake
+    - conn_id:
+      conn_type: postgres
+      conn_host: db.example.com
+      conn_password: hunter2
+  variables:
+    - variable_name:
+      variable_value: tok-123
+`)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.Empty(t, writer.stored)
+	require.Contains(t, res.Notes,
+		SettingsRelPath+": connection 2 (conn_type postgres, conn_host db.example.com) has no conn_id. Add one, or delete the entry")
+	require.Contains(t, res.Notes, SettingsRelPath+": variable 1 has a variable_value but no variable_name. Add one, or delete the entry")
+	require.False(t, anyContains(res.Notes, "hunter2"), "%v", res.Notes)
+	require.False(t, anyContains(res.Notes, "tok-123"), "%v", res.Notes)
+}
+
+// Only the template's own placeholders count as blank. An id-less entry with a
+// real extra, or a nameless pool with slots, holds something the user wrote,
+// so the file is kept and the entry named rather than removed with it.
+func TestAnEntryWithNoIDIsBlankOnlyWithTheTemplatesPlaceholders(t *testing.T) {
+	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id:
+      conn_extra:
+        key_path: /keys/sa.json
+  pools:
+    - pool_name:
+      pool_slot: 4
+`)
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.Contains(t, res.Notes, SettingsRelPath+": connection 1 has no conn_id. Add one, or delete the entry")
+	require.Contains(t, res.Notes, SettingsRelPath+": pool 1 has no pool_name. Add one, or delete the entry")
+}
+
+// The stock template does not share a blocked env schema's fate: it declares
+// nothing, so no note says it was not carried.
+func TestTheStockTemplateIsNotHeldByABlockedEnvSchema(t *testing.T) {
+	dir := v1WithSettings(t, v1StockSettings)
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "env.schema.yaml"), []byte("connections: [\n"), 0o600))
+
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+	require.False(t, anyContains(cs.Notes, SettingsRelPath), "%v", cs.Notes)
+}

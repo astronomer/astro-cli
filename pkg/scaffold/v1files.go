@@ -712,7 +712,7 @@ func allImages(stages [][]string) []string {
 // All-or-nothing per file survives this: a blocker from either side already
 // emptied that side's schema before it got here.
 func (v1 *v1Project) mergeDeclarationSources() {
-	if v1.settings.schema == nil {
+	if !v1.settings.declares() {
 		return
 	}
 	if v1.envSchema.schema == nil {

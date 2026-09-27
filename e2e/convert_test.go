@@ -99,6 +99,35 @@ type v1Case struct {
 	noNotes    bool
 }
 
+// v1StockSettings is the airflow_settings.yaml v1's `astro dev init` wrote,
+// byte for byte.
+const v1StockSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
+# NOTE: json dicts can be added to the conn_extra field as yaml key value pairs. See the example below.
+
+# For more information, refer to our docs: https://www.astronomer.io/docs/astro/cli/develop-project#configure-airflow_settingsyaml-local-development-only
+# For questions, reach out to: https://support.astronomer.io
+# For issues create an issue ticket here: https://github.com/astronomer/astro-cli/issues
+
+airflow:
+  connections:
+    - conn_id:
+      conn_type:
+      conn_host:
+      conn_schema:
+      conn_login:
+      conn_password:
+      conn_port:
+      conn_extra:
+        example_extra_field: example-value
+  pools:
+    - pool_name:
+      pool_slot:
+      pool_description:
+  variables:
+    - variable_name:
+      variable_value:
+`
+
 func v1Cases() []v1Case {
 	// A pre-3 runtime tag names a runtime and not an Airflow minor, so it
 	// always earns a note — which, because a file a note names is never
@@ -331,6 +360,19 @@ func v1Cases() []v1Case {
 			manifestLacks: []string{"default"},
 			retired:       []string{"airflow_settings.yaml"},
 			advisories:    []string{"region: declared as an optional Airflow variable"},
+		},
+		{
+			// The file v1's `astro dev init` wrote, untouched. Its entries
+			// have blank ids, which v1 skipped, so nothing carries and the
+			// file goes without a note.
+			name: "the stock v1 settings file",
+			files: map[string]string{
+				"requirements.txt":      "pandas==2.1.0\n",
+				"airflow_settings.yaml": v1StockSettings,
+			},
+			manifestLacks: []string{"tool.astro.env"},
+			retired:       []string{"requirements.txt", "airflow_settings.yaml"},
+			noNotes:       true,
 		},
 		{
 			// Pools have nowhere to go: neither `astro local start` nor the app

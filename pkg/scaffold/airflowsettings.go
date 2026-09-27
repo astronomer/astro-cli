@@ -3,6 +3,7 @@ package scaffold
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -120,7 +121,9 @@ type settingsVar struct {
 }
 
 type settingsPool struct {
-	Name string `yaml:"pool_name"`
+	Name        string `yaml:"pool_name"`
+	Slot        any    `yaml:"pool_slot"`
+	Description string `yaml:"pool_description"`
 }
 
 // readAirflowSettings decides what the file can carry, and reports every reason
@@ -144,9 +147,14 @@ func readAirflowSettings(data []byte) carriedSettings {
 	}}
 	out.readConnections(doc.Airflow.Connections)
 	out.readVariables(doc.Airflow.Variables)
-	for _, p := range doc.Airflow.Pools {
-		if strings.TrimSpace(p.Name) != "" {
+	for i := range doc.Airflow.Pools {
+		p := &doc.Airflow.Pools[i]
+		switch {
+		case strings.TrimSpace(p.Name) != "":
 			out.pools = append(out.pools, p.Name)
+		case !blankPool(p):
+			out.blockers = append(out.blockers, SettingsRelPath+": pool "+strconv.Itoa(i+1)+
+				" has no pool_name. Add one, or delete the entry")
 		}
 	}
 
@@ -167,7 +175,10 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 		sc := &conns[i]
 		id := strings.TrimSpace(sc.ConnID)
 		if id == "" {
-			c.blockers = append(c.blockers, SettingsRelPath+": a connection has no conn_id")
+			if !blankConn(sc) {
+				c.blockers = append(c.blockers, SettingsRelPath+": connection "+strconv.Itoa(i+1)+
+					connClues(sc)+" has no conn_id. Add one, or delete the entry")
+			}
 			continue
 		}
 		if first, dup := seen[strings.ToUpper(id)]; dup {
@@ -247,10 +258,13 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 	// Uppercased for the same reason as a conn_id: a Variable reaches Airflow
 	// as AIRFLOW_VAR_<KEY>.
 	seen := map[string]string{}
-	for _, v := range vars {
+	for i, v := range vars {
 		name := strings.TrimSpace(v.Name)
 		if name == "" {
-			c.blockers = append(c.blockers, SettingsRelPath+": a variable has no variable_name")
+			if v.Value != "" {
+				c.blockers = append(c.blockers, SettingsRelPath+": variable "+strconv.Itoa(i+1)+
+					" has a variable_value but no variable_name. Add one, or delete the entry")
+			}
 			continue
 		}
 		if first, dup := seen[strings.ToUpper(name)]; dup {
@@ -289,6 +303,48 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			value: v.Value,
 		})
 	}
+}
+
+// blankConn reports that an entry with no conn_id has nothing else filled in
+// either. v1 skipped such an entry, and the airflow_settings.yaml that v1's
+// `astro dev init` wrote holds one, so it is skipped here too. That template's
+// placeholder conn_extra counts as blank; any other extra does not.
+func blankConn(sc *settingsConn) bool {
+	fields := []string{sc.ConnType, sc.ConnHost, sc.ConnSchema, sc.ConnLogin, sc.ConnPassword, sc.ConnURI}
+	if slices.ContainsFunc(fields, func(v string) bool { return strings.TrimSpace(v) != "" }) {
+		return false
+	}
+	if port, err := connPort(sc.ConnPort); err != nil || port != 0 {
+		return false
+	}
+	extra, err := connExtra(sc.ConnExtra)
+	if err != nil {
+		return false
+	}
+	return len(extra) == 0 || maps.Equal(extra, map[string]any{"example_extra_field": "example-value"})
+}
+
+// blankPool reports that an entry with no pool_name has nothing else filled
+// in either, as in the template blankConn describes.
+func blankPool(p *settingsPool) bool {
+	return (p.Slot == nil || p.Slot == "") && strings.TrimSpace(p.Description) == ""
+}
+
+// connClues names what an entry with no conn_id does have, so the report can
+// point at it: " (conn_type postgres, conn_host db.example.com)", or "" when
+// neither is set.
+func connClues(sc *settingsConn) string {
+	var clues []string
+	if t := strings.TrimSpace(sc.ConnType); t != "" {
+		clues = append(clues, "conn_type "+t)
+	}
+	if h := strings.TrimSpace(sc.ConnHost); h != "" {
+		clues = append(clues, "conn_host "+h)
+	}
+	if len(clues) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(clues, ", ") + ")"
 }
 
 // connValue is the vault payload for one connection: the canonical JSON, or
