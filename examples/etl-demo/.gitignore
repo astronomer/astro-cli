@@ -4,12 +4,20 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Local Airflow runtime state, written by `astro local start`
-.astro/
-
 # Resolver lockfile, regenerated on the first `astro local start`
 uv.lock
 
 # Local-only files
 .env
 .DS_Store
+
+# Per-machine files Astro tools write into the project: local Airflow
+# state, credentials and tokens. .astro/config.yaml is shared; keep committing it.
+.astro/standalone/
+.astro/worktrees/
+.astro/*.local.yaml
+.astro/*.local.yml
+.astro/otto/*.local.json
+.astro/otto/mcp.json
+# Airflow 2 on macOS: the standalone engine regenerates this plugin.
+plugins/fix_local_executor_pickle.py

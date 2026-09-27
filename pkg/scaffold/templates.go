@@ -37,6 +37,17 @@ __pycache__/
 # Local-only files
 .env
 .DS_Store
+
+# Per-machine files Astro tools write into the project: local Airflow
+# state, credentials and tokens. .astro/config.yaml is shared; keep committing it.
+.astro/standalone/
+.astro/worktrees/
+.astro/*.local.yaml
+.astro/*.local.yml
+.astro/otto/*.local.json
+.astro/otto/mcp.json
+# Airflow 2 on macOS: the standalone engine regenerates this plugin.
+plugins/fix_local_executor_pickle.py
 `
 
 // agentsIntro is the static half of AGENTS.md. It references the manifest

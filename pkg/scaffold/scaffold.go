@@ -924,18 +924,18 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 		})
 	}
 
-	// Local env values must never be committed, so a .gitignore lacking the rule
-	// gets it added. Computed here rather than performed, so the bytes can be
-	// shown before they land.
+	// Local env values and per-machine .astro/ files must never be committed, so
+	// a .gitignore lacking those rules gets them added. Computed here rather
+	// than performed, so the bytes can be shown before they land.
 	//
 	// Run unconditionally, deliberately. Guarding it on "we are not writing the
 	// template" reads like an optimization and is a dependency: it makes the
 	// heal rely on gitignoreTemplate containing a .env line, so an edit to that
 	// template would ship every new project with .env tracked by git and nothing
-	// would notice. Unguarded, planEnvIgnored reads whatever is on disk — which
+	// would notice. Unguarded, planIgnoreRules reads whatever is on disk — which
 	// during Plan is still the pre-scaffold state — and returns nil when there
 	// is nothing to do.
-	healed, err := planEnvIgnored(dir)
+	healed, err := planIgnoreRules(dir)
 	if err != nil {
 		return err
 	}
