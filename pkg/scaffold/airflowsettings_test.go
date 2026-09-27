@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/envschema"
+	manifestpkg "github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -70,8 +73,8 @@ const settingsWithEverything = `airflow:
       pool_slot: 4
 `
 
-// The whole of it: a credential goes to the vault, a Variable stays in the
-// manifest, and the pool keeps the file alive.
+// The whole of it: a connection and a Variable go to the vault, the manifest
+// declares both without their values, and the pool keeps the file alive.
 func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 	dir := v1WithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
@@ -97,11 +100,13 @@ func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 	require.Contains(t, string(manifest), "warehouse = {conn_type = 'snowflake'}")
 	require.NotContains(t, string(manifest), "optional")
 
-	// The Variable stayed put, value and all: it is committed config, not a
-	// credential, and vaulting it would delete it from every teammate's copy.
-	require.Contains(t, string(manifest), "batch_size")
-	require.Contains(t, string(manifest), "batch_size = {default = '50'}")
-	require.NotContains(t, writer.stored, "batch_size")
+	// The Variable's value is in the vault too, and the manifest declares it
+	// sensitive with no default. v1 projects kept this file out of version
+	// control, so a default here would commit a token that never was.
+	require.Equal(t, secrets.KindVar, writer.kinds["batch_size"])
+	require.Equal(t, "50", writer.stored["batch_size"])
+	require.Contains(t, string(manifest), "batch_size = {sensitive = true}")
+	require.NotContains(t, string(manifest), "'50'")
 
 	// The file is kept, and the note says why.
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
@@ -198,18 +203,39 @@ func TestNoWriterLeavesTheValuesInTheFileAndSaysSo(t *testing.T) {
 	settings, err := os.ReadFile(filepath.Join(dir, SettingsRelPath))
 	require.NoError(t, err)
 	require.Contains(t, string(settings), "hunter2")
-	require.True(t, anyContains(res.Notes, "left in the file"),
+	require.True(t, anyContains(res.Notes, "stayed in the file"),
 		"nothing said the credentials were not moved: %v", res.Notes)
 }
 
-// A project with no connections needs no writer, so the common case does not
-// have to supply one.
-func TestNoWriterIsNeededWhenNothingIsCarried(t *testing.T) {
+// With no writer, a file with no pools still stays: the values in it went
+// nowhere else, so it is their only copy. The note names both commands.
+func TestNoWriterKeepsAFileWithNoPools(t *testing.T) {
 	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id: warehouse
+      conn_type: snowflake
+      conn_password: hunter2
   variables:
-    - variable_name: batch_size
-      variable_value: "50"
+    - variable_name: API_TOKEN
+      variable_value: tok
 `)
+	cs, err := Plan(dir, Options{})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.False(t, anyContains(res.Deleted, SettingsRelPath), "%v", res.Deleted)
+	require.Contains(t, res.Notes, SettingsRelPath+": the values of its 1 connection and 1 Airflow variable "+
+		"stayed in the file. Convert this project in Astro Desktop, or run "+
+		"`astro local env connection set <id> --secret` and `astro local env airflow-variable set <key> --secret`, "+
+		"to move them into the encrypted vault")
+}
+
+// A project with no values needs no writer, so the common case does not have
+// to supply one.
+func TestNoWriterIsNeededWhenNothingIsCarried(t *testing.T) {
+	dir := v1WithSettings(t, "airflow:\n  pools:\n    - pool_name: p\n      pool_slot: 1\n")
 	cs, err := Plan(dir, Options{})
 	require.NoError(t, err)
 	_, err = cs.Apply()
@@ -344,6 +370,60 @@ func TestAValueAlreadyInTheVaultIsNotOverwritten(t *testing.T) {
 		"nothing said the committed value was not carried: %v", res.Advisories)
 }
 
+// The file's value for a name the vault already held was not carried, so the
+// file is its only copy and stays, even with no pools to keep it.
+func TestAFileWhoseValueTheVaultHeldIsKept(t *testing.T) {
+	dir := v1WithSettings(t, settingsNoPools)
+	writer := newRecordingWriter()
+	writer.held["API_TOKEN"] = "the-one-the-user-set"
+
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.Equal(t,
+		SettingsRelPath+" still contains API_TOKEN and warehouse in plaintext, and is kept because the vault "+
+			"already held API_TOKEN, so the file's value was not carried over it",
+		findAdvisory(t, res.Advisories, "plaintext"))
+	require.Equal(t, "1 connection from "+SettingsRelPath+": values stored in this machine's encrypted vault, "+
+		"scoped to this project. pyproject.toml declares them without their values",
+		findAdvisory(t, res.Advisories, "values stored"))
+}
+
+// Plan retired the file because the vault held none of its names. If one
+// arrives before Apply, the file would be the only copy of its value, so Apply
+// refuses before it stores or deletes anything.
+func TestAValueThatReachesTheVaultAfterPlanStopsTheRetirement(t *testing.T) {
+	dir := v1WithSettings(t, settingsNoPools)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	require.True(t, anyContains(cs.Deleted, SettingsRelPath), "%v", cs.Deleted)
+
+	writer.held["API_TOKEN"] = "set-in-the-app-meanwhile"
+	_, err = cs.Apply()
+	require.ErrorIs(t, err, ErrChangedOnDisk)
+	require.Empty(t, writer.stored)
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+}
+
+// A vault that cannot be asked keeps the file. Plan does not fail over it:
+// Apply asks the same question and fails there.
+func TestAVaultThatCannotBeAskedKeepsTheFile(t *testing.T) {
+	dir := v1WithSettings(t, settingsNoPools)
+	writer := newRecordingWriter()
+	writer.hasErr = errors.New("keyring locked")
+
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	require.False(t, anyContains(cs.Deleted, SettingsRelPath), "%v", cs.Deleted)
+	_, err = cs.Apply()
+	require.ErrorContains(t, err, "keyring locked")
+	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
+}
+
 // The declarations and the values are one carry. Anything that stops the
 // declarations reaching the manifest has to stop the values reaching the vault
 // — otherwise a project's credentials are written to a shared store while the
@@ -422,27 +502,127 @@ func TestTwoConnectionsThatDifferOnlyInCaseAreRefused(t *testing.T) {
 		"the collision was not named: %v", res.Notes)
 }
 
-// The file is never retired, carried or not: pools have nowhere to go, so it is
-// the only record of them that survives. Kept by name rather than by whether a
-// note happens to mention it — this deletes files, and prose is not a guard.
-func TestTheSettingsFileIsNeverDeleted(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+// settingsNoPools is the shape a real project has: connections and Variables
+// holding tokens, and no pools.
+const settingsNoPools = `airflow:
+  connections:
+    - conn_id: warehouse
+      conn_type: snowflake
+      conn_password: hunter2
   variables:
-    - variable_name: batch_size
-      variable_value: "50"
-`)
-	cs, err := Plan(dir, Options{})
+    - variable_name: API_TOKEN
+      variable_value: tok-123
+`
+
+// With no pools and every value in the vault, nothing in the file stays
+// behind, so it is retired like any other carried v1 file. No note keeps it
+// and no advisory says it still holds plaintext.
+func TestASettingsFileWithNoPoolsIsRetired(t *testing.T) {
+	dir := v1WithSettings(t, settingsNoPools)
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
 	res, err := cs.Apply()
 	require.NoError(t, err)
 
-	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.False(t, anyContains(res.Deleted, SettingsRelPath),
-		"the settings file was deleted: %v", res.Deleted)
-	// And the stale hand-off note is gone: it is read now, so telling the user
-	// to move its contents by hand describes work this run already did.
-	require.False(t, anyContains(res.Notes, SettingsRelPath+": move"),
-		"a note still asks for work the conversion did: %v", res.Notes)
+	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
+	require.Contains(t, res.Deleted, SettingsRelPath+" (migrated into the encrypted vault and pyproject.toml, removed)")
+	require.Equal(t, "tok-123", writer.stored["API_TOKEN"])
+	require.False(t, anyContains(res.Advisories, "plaintext"), "%v", res.Advisories)
+	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
+	require.Equal(t, "1 connection and 1 Airflow variable from "+SettingsRelPath+
+		": values stored in this machine's encrypted vault, scoped to this project. pyproject.toml declares them without their values",
+		findAdvisory(t, res.Advisories, "encrypted vault"))
+}
+
+// No value from the file reaches the manifest, whatever its kind: a Variable
+// is declared sensitive with nothing after it, a connection by its conn_type.
+func TestNoSettingsValueReachesTheManifest(t *testing.T) {
+	dir := v1WithSettings(t, `airflow:
+  connections:
+    - conn_id: warehouse
+      conn_type: postgres
+      conn_host: db.internal.example.com
+      conn_login: loader
+      conn_password: hunter2
+      conn_port: 5433
+      conn_extra: '{"sslmode": "require", "token": "extra-secret"}'
+    - conn_id: by_uri
+      conn_uri: 'mysql://u:uri-secret@mysql.example.com/db'
+  variables:
+    - variable_name: CHRONOSPHERE_TOKEN
+      variable_value: chrono-secret
+    - variable_name: SPLUNK_API_KEY
+      variable_value: splunk-secret
+`)
+	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	require.NoError(t, err)
+	_, err = cs.Apply()
+	require.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	for _, value := range []string{
+		"hunter2", "db.internal.example.com", "loader", "5433", "sslmode", "extra-secret",
+		"uri-secret", "mysql.example.com", "chrono-secret", "splunk-secret", "default",
+	} {
+		require.NotContains(t, string(manifest), value)
+	}
+	require.Contains(t, string(manifest), "CHRONOSPHERE_TOKEN = {sensitive = true}")
+	require.Contains(t, string(manifest), "SPLUNK_API_KEY = {sensitive = true}")
+}
+
+// An empty Variable has nothing to store, and v1 skipped it rather than create
+// it, so a Dag reading it with a fallback ran. It is declared optional, not
+// required: the converted project starts with it unset, and the run says how to
+// set it.
+func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
+	dir := v1WithSettings(t, "airflow:\n  variables:\n    - variable_name: region\n      variable_value: \"\"\n")
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	res, err := cs.Apply()
+	require.NoError(t, err)
+
+	require.Empty(t, writer.stored)
+	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	require.Contains(t, string(raw), "region = {optional = true, sensitive = true}")
+	require.Contains(t, res.Advisories,
+		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with `astro local env airflow-variable set region --secret`")
+	for _, a := range res.Advisories {
+		require.NotContains(t, a, "required")
+	}
+
+	// The gate `astro local start` runs: with nothing set, nothing is missing.
+	m, err := manifestpkg.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	s, err := envschema.ParseSchema(m.Astro.Env)
+	require.NoError(t, err)
+	require.True(t, s.AirflowVariables["region"].Optional)
+	require.True(t, s.AirflowVariables["region"].Sensitive)
+	require.Empty(t, envschema.Validate(s, envschema.Values{}),
+		"an empty v1 variable must not stop the converted project starting")
+}
+
+// A Variable with a value stays required: whoever converts has it in the vault,
+// and a teammate without it is told which one is missing.
+func TestAStoredVariableStaysRequired(t *testing.T) {
+	dir := v1WithSettings(t, "airflow:\n  variables:\n    - variable_name: region\n      variable_value: us-east-1\n")
+	writer := newRecordingWriter()
+	cs, err := Plan(dir, Options{SecretWriter: writer})
+	require.NoError(t, err)
+	_, err = cs.Apply()
+	require.NoError(t, err)
+
+	require.Equal(t, "us-east-1", writer.stored["region"])
+	m, err := manifestpkg.Load(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	s, err := envschema.ParseSchema(m.Astro.Env)
+	require.NoError(t, err)
+	require.False(t, s.AirflowVariables["region"].Optional)
+	require.Len(t, envschema.Validate(s, envschema.Values{}), 1,
+		"a carried variable left unset must still be reported missing")
 }
 
 // A changeset that has been through JSON is not the one Plan built, and must
@@ -525,9 +705,8 @@ func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
 	// behind rather than saying "it", and says why the file stays.
 	got := findAdvisory(t, cs.Advisories, "plaintext")
 	require.Equal(t,
-		SettingsRelPath+" still contains warehouse in plaintext, and is kept "+
-			"rather than retired because it can carry pools, which neither the "+
-			"manifest nor the vault stores",
+		SettingsRelPath+" still contains batch_size and warehouse in plaintext, and is kept "+
+			"for its pool `heavy`, which neither pyproject.toml nor the vault stores",
 		got)
 
 	// It does NOT instruct a deletion. Apply may decline to overwrite a name
@@ -562,12 +741,20 @@ func TestThePlaintextAdvisoryNamesEveryConnection(t *testing.T) {
     - conn_id: billing
       conn_type: mysql
       conn_host: billing.example.com
+  pools:
+    - pool_name: heavy
+      pool_slot: 4
+    - pool_name: default_pool
+      pool_slot: 128
 `)
 	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
 	require.NoError(t, err)
 
 	got := findAdvisory(t, cs.Advisories, "plaintext")
 	require.Contains(t, got, "billing and warehouse")
+	require.Contains(t, got, "for its pools `default_pool` and `heavy`")
+	require.Contains(t, cs.Notes, SettingsRelPath+": kept for its pools `default_pool` and `heavy`. "+
+		"`astro local start` does not create pools, and neither pyproject.toml nor the vault stores them, so create them in Airflow")
 }
 
 // A settings file with no connections has no carried value to describe, so the

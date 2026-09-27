@@ -56,7 +56,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
-	// A v1 airflow_settings.yaml's connections are credentials, and they go to
+	// A v1 airflow_settings.yaml's connection and variable values go to
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
@@ -195,16 +195,17 @@ func renderLeftToDo(w io.Writer, notes []string) error {
 	return nil
 }
 
-// lazyVaultWriter opens the vault on the first value it is asked to store,
-// rather than when init starts.
+// lazyVaultWriter opens the vault on the first value it is asked about or
+// asked to store, rather than when init starts.
 //
 // `astro init pipelines` scaffolds a directory that does not exist yet, and a
 // vault scope is the CANONICAL path of the project directory — which cannot be
 // resolved until there is a directory to resolve. Opening eagerly turned every
 // init-into-a-new-directory into a failure about symlinks.
 //
-// By the time a value is stored, Apply has created the directory. A project
-// with nothing to carry never opens the vault at all, which is most of them.
+// A value is asked about only when a v1 airflow_settings.yaml holds one, so the
+// directory already exists. A project with nothing to carry never opens the
+// vault at all, which is most of them.
 type lazyVaultWriter struct {
 	dir string
 	w   *vaultenv.Writer

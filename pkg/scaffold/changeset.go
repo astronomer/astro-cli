@@ -11,11 +11,10 @@ import (
 // Kind is what Apply does for one change.
 //
 // Delete is produced by planRetirements, for the v1 files whose entire contents
-// reached the manifest. airflow_settings.yaml is NOT among them, and no longer
-// because this package cannot read it — it can, into the vault and the env
-// schema both. Pools are why: neither tool stores them, so the file is the only
-// record of a project's pools that survives, and planRetirements skips it by
-// name rather than by whether some note happens to mention it.
+// reached the manifest, or for airflow_settings.yaml the manifest and the
+// vault. That file is kept by an explicit rule, not by whether some note
+// happens to mention it, whenever it names pools, which neither tool stores,
+// or holds a value the vault did not take: see carriedSettings.retirable.
 type Kind string
 
 const (
@@ -133,8 +132,8 @@ func (cs *Changeset) Apply() (*Result, error) {
 		return nil, err
 	}
 	// Values first, files after. See applySecrets: a manifest that declares
-	// connections whose values did not land leaves a project that will not
-	// start, while a store that succeeded and a manifest that did not leaves a
+	// values that did not land leaves a project that will not start, while a
+	// store that succeeded and a manifest that did not leaves a
 	// vault holding values nothing yet declares, which the next run overwrites.
 	if err := cs.applySecrets(); err != nil {
 		return nil, err

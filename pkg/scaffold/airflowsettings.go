@@ -3,7 +3,7 @@ package scaffold
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,7 +19,7 @@ import (
 const SettingsRelPath = "airflow_settings.yaml"
 
 // A v1 project declares its Airflow connections, Variables and pools in
-// airflow_settings.yaml, in cleartext, in a file that is normally committed.
+// airflow_settings.yaml, in cleartext, in a file v1 kept out of version control.
 // v2 splits that content by what it is rather than where it came from.
 //
 // # Connections go to the vault, and are declared
@@ -35,22 +35,23 @@ const SettingsRelPath = "airflow_settings.yaml"
 // the connection is missing and the project says which one and refuses to
 // start, instead of quietly running against the author's committed password.
 //
-// # Variables stay in the manifest
+// # Variables go to the vault too
 //
-// An Airflow Variable in this file is committed config with no credential
-// semantics, and the file offers no way to mark one secret. It is carried as a
-// declared default, which keeps it exactly as shared as it is today.
-//
-// Routing them to the vault instead would read as the safer choice and is the
-// more destructive one: the value would leave the repository, every teammate's
-// converted project would have a required declaration with nothing behind it,
-// and a Variable that was never a secret would have become a startup failure on
-// every machine but one.
+// An Airflow Variable's value takes the same path as a connection's: the vault
+// at the project's scope, and a declaration in the manifest that carries no
+// value and is marked sensitive. The v1 file offers no way to mark a Variable
+// secret, it routinely holds API tokens, and v1's project template kept the
+// file out of version control — so a declared default would commit tokens that
+// were never committed before. Every one is marked sensitive rather than
+// guessed at from its name, so the declaration says where the value lives and
+// a later `set --secret=false` cannot move it into a plain file.
 //
 // # Pools do not move
 //
-// Neither tool persists pools — v2 has nowhere to put them and v1 only replayed
-// them into a running Airflow — so they are reported and the file is kept.
+// Neither tool persists pools — v2 has nowhere to put them, v1 only replayed
+// them into a running Airflow, and `astro local start` does not read this file
+// — so they are reported and the file is kept for them. A file with no pools
+// is retired once everything else in it is carried.
 
 // carriedSettings is what airflow_settings.yaml yielded.
 //
@@ -67,6 +68,12 @@ type carriedSettings struct {
 	secrets []SecretWrite
 	// pools names the pools found, so the note can say which ones stay behind.
 	pools []string
+	// held names the carried values the vault already holds. Apply does not
+	// write over them, so the file stays as the only copy of its own values.
+	held []string
+	// unstored reports that the values stay only in the file: the caller gave
+	// no writer, or the vault could not be asked.
+	unstored bool
 
 	blockers   []string
 	advisories []string
@@ -257,14 +264,30 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			c.blockers = append(c.blockers, SettingsRelPath+": "+err.Error())
 			continue
 		}
-		spec := envschema.ValueSpec{Default: v.Value, HasDefault: true}
-		if problems := spec.Check(envschema.SectionAirflowVariable); len(problems) > 0 {
-			for _, p := range problems {
-				c.blockers = append(c.blockers, SettingsRelPath+": "+name+" cannot be carried. "+p.Reason)
-			}
+		if _, err := secrets.Key(secrets.KindVar, secrets.GlobalScope, name); err != nil {
+			c.blockers = append(c.blockers, SettingsRelPath+": "+name+" cannot be a vault key. "+err.Error())
 			continue
 		}
-		c.schema.AirflowVariables[name] = spec
+		if v.Value == "" {
+			// Nothing to store, and nothing to require either. v1 skipped an
+			// empty Variable rather than create it, so a Dag that reads it with
+			// a fallback ran as if it were unset. Declaring it required would
+			// turn that working project into one that refuses to start, so it
+			// is declared optional: the name is recorded, and start resolves it
+			// as absent until someone sets it.
+			c.schema.AirflowVariables[name] = envschema.ValueSpec{Sensitive: true, HasSensitive: true, Optional: true}
+			c.advisories = append(c.advisories, name+
+				": declared as an optional Airflow variable, since it had no value to carry. "+
+				"Set it with `astro local env airflow-variable set "+name+" --secret`")
+			continue
+		}
+		c.schema.AirflowVariables[name] = envschema.ValueSpec{Sensitive: true, HasSensitive: true}
+		c.secrets = append(c.secrets, SecretWrite{
+			Kind:  secrets.KindVar,
+			Name:  name,
+			Label: "Airflow variable " + name,
+			value: v.Value,
+		})
 	}
 }
 
@@ -403,12 +426,91 @@ func (c *carriedSettings) notes() []string {
 	if len(c.pools) == 0 {
 		return nil
 	}
-	sorted := append([]string(nil), c.pools...)
-	sort.Strings(sorted)
-	return []string{fmt.Sprintf(
-		"%s: %s kept for its pools (%s). Neither `astro local start` nor the app stores pools, so set them in Airflow",
-		SettingsRelPath, plural(len(sorted), "pool", "pools"), strings.Join(sorted, ", "),
-	)}
+	return []string{SettingsRelPath + ": kept for its " + c.poolList() +
+		". `astro local start` does not create pools, and neither pyproject.toml nor the vault stores them, so create them in Airflow"}
+}
+
+// poolList names the pools as prose: "pool `heavy`", "pools `default` and `heavy`".
+func (c *carriedSettings) poolList() string {
+	quoted := make([]string, len(c.pools))
+	for i, p := range c.pools {
+		quoted[i] = "`" + p + "`"
+	}
+	if len(quoted) == 1 {
+		return "pool " + quoted[0]
+	}
+	return "pools " + joinNames(quoted)
+}
+
+// retirable reports that the conversion leaves nothing behind in the file: it
+// was carried, it names no pools, and every value in it reaches the vault.
+func (c *carriedSettings) retirable() bool {
+	return c.schema != nil && len(c.pools) == 0 && len(c.held) == 0 && !c.unstored
+}
+
+// keptFor says why a carried file stays, for the advisory that says its
+// plaintext is still on disk. Empty when the file is retired.
+func (c *carriedSettings) keptFor() string {
+	switch {
+	case c.retirable():
+		return ""
+	case len(c.pools) > 0:
+		return "for its " + c.poolList() + ", which neither pyproject.toml nor the vault stores"
+	case len(c.held) > 0:
+		return "because the vault already held " + joinNames(c.held) + ", so the file's value was not carried over it"
+	}
+	return "because the vault could not be read"
+}
+
+// checkVault asks which carried values the vault already holds. Apply keeps
+// those rather than write the file's over them, which leaves the file as the
+// only copy of its own, so Plan has to know before it retires the file. A
+// vault that cannot be asked keeps the file too, and Apply then fails on the
+// same question.
+func (c *carriedSettings) checkVault(w SecretWriter) {
+	for i := range c.secrets {
+		held, err := w.HasSecret(c.secrets[i].Kind, c.secrets[i].Name)
+		if err != nil {
+			c.unstored = true
+			return
+		}
+		if held {
+			c.held = append(c.held, c.secrets[i].Name)
+		}
+	}
+}
+
+// valueCount counts the values a run stores, by kind, as prose: "1 connection",
+// "2 connections and 1 Airflow variable".
+func valueCount(writes []SecretWrite) string {
+	var conns, vars int
+	for _, w := range writes {
+		if w.Kind == secrets.KindConn {
+			conns++
+		} else {
+			vars++
+		}
+	}
+	var parts []string
+	if conns > 0 {
+		parts = append(parts, plural(conns, "connection", "connections"))
+	}
+	if vars > 0 {
+		parts = append(parts, plural(vars, "Airflow variable", "Airflow variables"))
+	}
+	return strings.Join(parts, " and ")
+}
+
+// setCommands names the command that stores each kind of value writes holds.
+func setCommands(writes []SecretWrite) string {
+	var cmds []string
+	if slices.ContainsFunc(writes, func(w SecretWrite) bool { return w.Kind == secrets.KindConn }) {
+		cmds = append(cmds, "`astro local env connection set <id> --secret`")
+	}
+	if slices.ContainsFunc(writes, func(w SecretWrite) bool { return w.Kind == secrets.KindVar }) {
+		cmds = append(cmds, "`astro local env airflow-variable set <key> --secret`")
+	}
+	return strings.Join(cmds, " and ")
 }
 
 func plural(n int, one, many string) string {

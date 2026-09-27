@@ -51,3 +51,22 @@ func TestRefusalTellsTheThreeConditionsApart(t *testing.T) {
 		t.Errorf("refusal rewrote an unrelated error: %v", got)
 	}
 }
+
+// A conversion asks about a name as the v1 file spells it. A value stored under
+// another spelling of the same Airflow key is the one Airflow reads, so it
+// counts as held.
+func TestHasSecretMatchesOnTheEnvKey(t *testing.T) {
+	store := testVault(t)
+	scope := t.TempDir()
+	put(t, store, secrets.KindVar, scope, "api_token", "set-by-hand")
+	w := &Writer{store: store, scope: scope}
+
+	held, err := w.HasSecret(secrets.KindVar, "API_TOKEN")
+	if err != nil || !held {
+		t.Fatalf("HasSecret(API_TOKEN) = %v, %v; want true for a value stored as api_token", held, err)
+	}
+	held, err = w.HasSecret(secrets.KindConn, "API_TOKEN")
+	if err != nil || held {
+		t.Fatalf("HasSecret for another kind = %v, %v; want false", held, err)
+	}
+}

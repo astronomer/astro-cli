@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -56,8 +57,13 @@ type SecretWriter interface {
 //
 // Runs before any file is written. A conversion that stores nothing and writes
 // no manifest is a conversion that did not happen; one that writes a manifest
-// full of required connections and then fails to store their values has left a
+// full of required declarations and then fails to store their values has left a
 // project that will not start, with nothing on screen saying why.
+//
+// A SetSecret that fails partway leaves the values stored before it in the
+// vault, and a rerun counts those as already held, so it keeps
+// airflow_settings.yaml and says the vault already held them. Nothing is lost:
+// the plaintext file stays until the user deletes it.
 //
 // Values with no writer cannot reach here: Plan clears them and says so in a
 // note, because a caller without one is declining the carry rather than
@@ -66,6 +72,8 @@ func (cs *Changeset) applySecrets() error {
 	if len(cs.Secrets) == 0 || cs.secrets == nil {
 		return nil
 	}
+	held := make([]bool, len(cs.Secrets))
+	var heldNames []string
 	for i := range cs.Secrets {
 		w := &cs.Secrets[i]
 		if w.value == "" {
@@ -82,20 +90,34 @@ func (cs *Changeset) applySecrets() error {
 				ErrChangedOnDisk, w.Label)
 		}
 		// A value already in the vault is not overwritten, and this is the one
-		// place the two credentials for one connection are ever compared.
+		// place the two values for one name are ever compared.
 		//
-		// What is carried here is whatever was committed to a v1 file, which
+		// What is carried here is whatever was written into a v1 file, which
 		// may be months stale or a placeholder. What is already in the vault
 		// was put there deliberately, by this user, through `astro local env
 		// <noun> set --secret` or the app. Writing the committed one over it destroys
 		// the good credential unrecoverably and leaves the project running
 		// against exactly the value this transform exists to get out of version
 		// control.
-		held, err := cs.secrets.HasSecret(w.Kind, w.Name)
+		has, err := cs.secrets.HasSecret(w.Kind, w.Name)
 		if err != nil {
 			return fmt.Errorf("check %s: %w", w.Label, err)
 		}
-		if held {
+		if has {
+			held[i] = true
+			heldNames = append(heldNames, w.Name)
+		}
+	}
+	// Plan retires the file only when the vault held none of these. A name that
+	// arrived since would leave the file as the only copy of its value, and
+	// deleting it anyway is not what the preview described.
+	if len(heldNames) > 0 && cs.retires(SettingsRelPath) {
+		return fmt.Errorf("%w: the vault now holds %s, so %s has to stay; convert again",
+			ErrChangedOnDisk, joinNames(heldNames), SettingsRelPath)
+	}
+	for i := range cs.Secrets {
+		w := &cs.Secrets[i]
+		if held[i] {
 			cs.Advisories = append(cs.Advisories, w.Name+
 				": kept the value already in your vault. "+SettingsRelPath+
 				" holds one too, which was not carried over it")
@@ -106,4 +128,9 @@ func (cs *Changeset) applySecrets() error {
 		}
 	}
 	return nil
+}
+
+// retires reports whether this changeset deletes path.
+func (cs *Changeset) retires(path string) bool {
+	return slices.ContainsFunc(cs.Changes, func(c Change) bool { return c.Kind == Delete && c.Path == path })
 }

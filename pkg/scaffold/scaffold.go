@@ -57,9 +57,9 @@ type Options struct {
 	// GOOS overrides runtime.GOOS, so tests can check the Windows layout
 	// (no CLAUDE.md symlink) from any host.
 	GOOS string
-	// SecretWriter stores the connection values a v1 airflow_settings.yaml
-	// carries, at the project scope the writer itself decides. Required only
-	// when that file holds values: Apply refuses rather than dropping them.
+	// SecretWriter stores the connection and Airflow variable values a v1
+	// airflow_settings.yaml carries, at the project scope the writer itself
+	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
 }
 
@@ -381,6 +381,42 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, v1)
 	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, lefts)
 
+	// The values airflow_settings.yaml supplied. They ride the changeset rather
+	// than being written here because Plan writes nothing, and they are a
+	// separate list rather than Changes because a vault write is neither a path
+	// in the project nor bytes a preview may show.
+	//
+	// Settled before the retirements, because whether every value reaches the
+	// vault decides whether the file may go.
+	cs.Secrets = v1.settings.secrets
+	cs.secrets = opts.SecretWriter
+	switch {
+	case len(cs.Secrets) == 0:
+	case cs.secrets == nil:
+		// No writer is a caller declining to move credentials, not a caller who
+		// forgot. It carries the declarations and leaves the values in the file,
+		// with a note saying so.
+		//
+		// This used to be an error, on the reasoning that a changeset which
+		// cannot be applied must not first be approved. The reasoning assumed
+		// every caller intends the carry. Failing would make a v1 directory
+		// unopenable; carrying silently would move credentials nobody was shown.
+		//
+		// So the writer IS the consent, and its absence is a decision the note
+		// reports rather than a fault.
+		n, values := len(cs.Secrets), "values"
+		if n == 1 {
+			values = "value"
+		}
+		cs.Notes = append(cs.Notes, SettingsRelPath+": the "+values+" of its "+valueCount(cs.Secrets)+
+			" stayed in the file. Convert this project in Astro Desktop, or run "+
+			setCommands(cs.Secrets)+", to move "+pronoun(n)+" into the encrypted vault")
+		cs.Secrets = nil
+		v1.settings.unstored = true
+	default:
+		v1.settings.checkVault(cs.secrets)
+	}
+
 	// And the deletions go last of all. Apply walks this slice in order and
 	// stops at the first failure, so removing requirements.txt before the
 	// manifest that replaces it means a run dying in between has taken the
@@ -392,10 +428,14 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// whose dependencies are intact is the better half of the trade.
 	for _, name := range planRetirements(v1,
 		slices.Concat(v1.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
+		label := name + " (migrated into " + manifest.Marker + ", removed)"
+		if name == SettingsRelPath && len(cs.Secrets) > 0 {
+			label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+		}
 		cs.Changes = append(cs.Changes, Change{
 			Kind:   Delete,
 			Path:   name,
-			Labels: []string{name + " (migrated into " + manifest.Marker + ", removed)"},
+			Labels: []string{label},
 		})
 	}
 
@@ -413,36 +453,6 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		cs.Advisories = append(cs.Advisories, pin.nameAdvisory)
 	}
 
-	// The connection values airflow_settings.yaml supplied. They ride the
-	// changeset rather than being written here because Plan writes nothing, and
-	// they are a separate list rather than Changes because a vault write is
-	// neither a path in the project nor bytes a preview may show.
-	cs.Secrets = v1.settings.secrets
-	cs.secrets = opts.SecretWriter
-
-	// No writer is a caller declining to move credentials, not a caller who
-	// forgot. It carries the declarations and leaves the values in the file,
-	// with a note saying so.
-	//
-	// This used to be an error, on the reasoning that a changeset which cannot
-	// be applied must not first be approved. The reasoning assumed every caller
-	// intends the carry. `astro init` over an existing directory does not: it
-	// makes a directory a project, which is not the reviewed, previewed
-	// operation that moving someone's credentials into a keychain has to be.
-	// Failing there would make a v1 directory unopenable; carrying silently
-	// would move credentials nobody was shown.
-	//
-	// So the writer IS the consent, and its absence is a decision the note
-	// reports rather than a fault.
-	if len(cs.Secrets) > 0 && cs.secrets == nil {
-		cs.Notes = append(cs.Notes, SettingsRelPath+": its "+
-			plural(len(cs.Secrets), "connection was", "connections were")+
-			" left in the file. Convert this project in Astro Desktop, or run "+
-			"`astro local env connection set <id> --secret`, to move "+
-			pronoun(len(cs.Secrets))+" into the encrypted vault")
-		cs.Secrets = nil
-	}
-
 	// Created, Updated and Deleted are derived from the changes rather than
 	// appended beside them, so a change that is performed but unreported — or
 	// reported but not performed — cannot be constructed.
@@ -451,7 +461,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// An ADVISORY, not an entry in Updated.
 	//
 	// Reporting it is not optional: a preview showing only file changes shows a
-	// manifest full of required connections and says nothing about where their
+	// manifest full of required declarations and says nothing about where their
 	// values went, and what this describes is a credential leaving the project
 	// for a keychain. Advisories are the list for "something this run did that
 	// you would not otherwise see", and they are the list every consumer
@@ -461,46 +471,32 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// Updated is the wrong home twice over: it is derived from Changes by
 	// report(), so an appended line has to dodge that rebuild, and a vault write
 	// is not a Change and never appears there. Nothing in the app read it.
-	if n := len(cs.Secrets); n > 0 {
-		// Two halves of one disclosure: where the value went, and what stayed
-		// behind. The first on its own reads as though the value MOVED. It was
-		// copied — the plaintext original is still on disk, in a file this run
-		// deliberately keeps (planRetirements: pools have nowhere else to go, so
-		// the file is their only surviving record).
+	if len(cs.Secrets) > 0 {
+		stored := slices.DeleteFunc(slices.Clone(cs.Secrets), func(w SecretWrite) bool {
+			return slices.Contains(v1.settings.held, w.Name)
+		})
+		if len(stored) > 0 {
+			cs.Advisories = append(cs.Advisories,
+				valueCount(stored)+" from "+SettingsRelPath+": values stored in this machine's encrypted vault, "+
+					"scoped to this project. "+manifest.Marker+" declares them without their values")
+		}
+		// When the file stays, the first line on its own reads as though the
+		// values MOVED. They were copied, so the run says the plaintext original
+		// is still on disk and why the file was kept.
 		//
-		// Both state a fact and stop. Neither tells the reader to delete the
-		// entries, for three reasons:
+		// It states a fact and stops. It does not tell the reader to delete
+		// the entries: when the vault already held a name, the file's copy is
+		// the only one, and a connection is carried whenever it has a host,
+		// schema, login, port or extra, not only a password — a warning that
+		// fires on a hostname is one people stop reading.
 		//
-		//   - Apply may decline to overwrite a name the vault already holds, and
-		//     says so in an advisory of its own. There the file's copy is the
-		//     ONLY copy, and deleting it loses the value. This runs at Plan
-		//     time, before that decision exists, so it cannot know which case it
-		//     is in.
-		//   - The projects most likely to be converted already ignore this file
-		//     — pkg/airflowrt's v1 .gitignore lists it, and a conversion
-		//     preserves an existing .gitignore — so advice to keep it out of
-		//     version control is advice to do what is done.
-		//   - A connection is carried whenever it has a host, schema, login,
-		//     port or extra, not only a password. A warning that fires on a
-		//     hostname is one people stop reading before the run where it means
-		//     a credential.
-		//
-		// Advisories is also the wrong home for an instruction: its contract
-		// (see Result) is "something this run DID that now behaves differently",
-		// and cmd/local/initcmd renders it under "What changed" rather than
-		// "Left to do".
-		//
-		// The connections are named rather than pronouned for the same contract
-		// reason: every consumer renders this list its own way, so a line whose
-		// "it" resolves against a neighboring advisory dangles wherever the two
-		// are shown apart.
-		cs.Advisories = append(cs.Advisories,
-			plural(n, "connection", "connections")+
-				" from "+SettingsRelPath+": stored in this machine's encrypted vault, "+
-				"scoped to this project, and no longer read from the file",
-			SettingsRelPath+" still contains "+carriedNames(cs.Secrets)+
-				" in plaintext, and is kept rather than retired because it can "+
-				"carry pools, which neither the manifest nor the vault stores")
+		// The names are spelled out rather than pronouned: every consumer renders
+		// this list its own way, so a line whose "it" resolves against a
+		// neighboring advisory dangles wherever the two are shown apart.
+		if kept := v1.settings.keptFor(); kept != "" {
+			cs.Advisories = append(cs.Advisories,
+				SettingsRelPath+" still contains "+carriedNames(cs.Secrets)+" in plaintext, and is kept "+kept)
+		}
 	}
 	return cs, nil
 }
@@ -529,14 +525,14 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 		if name == "Dockerfile" && !dockerfileIsSpent(v1, pinned) {
 			continue
 		}
-		// airflow_settings.yaml is never retired, carried or not. Pools have
-		// nowhere to go — neither tool stores them — so the file is the only
-		// record of them that survives a conversion.
+		// airflow_settings.yaml is retired only when nothing in it stays
+		// behind: no pools, which neither tool stores, and no value the vault
+		// did not take.
 		//
-		// Explicit, and not left to the note that used to mention it: this
-		// deletes files, the note is prose, and "is that string still in the
+		// Explicit, and not left to the notes that mention those cases: this
+		// deletes files, a note is prose, and "is that string still in the
 		// list" is not what should stand between a project's pools and rm.
-		if name == SettingsRelPath {
+		if name == SettingsRelPath && !v1.settings.retirable() {
 			continue
 		}
 		out = append(out, name)
@@ -1180,8 +1176,7 @@ func plainDeployID(s string) bool {
 	return true
 }
 
-// pronoun keeps the left-in-the-file note grammatical for one connection or
-// several, which is the only place this package needs one.
+// pronoun is "it" for one thing and "them" for several.
 func pronoun(n int) string {
 	if n == 1 {
 		return "it"
@@ -1189,16 +1184,20 @@ func pronoun(n int) string {
 	return "them"
 }
 
-// carriedNames lists the connection ids a run stored, as prose: "warehouse",
-// "warehouse and orders", "billing, orders and warehouse". Sorted, because the
-// ids come from a map walk and an advisory that reorders itself between runs
-// looks like a change.
+// carriedNames lists the names a run stored, as prose.
 func carriedNames(writes []SecretWrite) string {
 	names := make([]string, 0, len(writes))
 	for _, w := range writes {
 		names = append(names, w.Name)
 	}
-	slices.Sort(names)
+	return joinNames(names)
+}
+
+// joinNames lists names as prose: "warehouse", "orders and warehouse",
+// "billing, orders and warehouse". Sorted, because the names come from a map
+// walk and an advisory that reorders itself between runs looks like a change.
+func joinNames(names []string) string {
+	names = slices.Sorted(slices.Values(names))
 	switch len(names) {
 	case 0:
 		return ""

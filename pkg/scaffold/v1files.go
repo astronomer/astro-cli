@@ -61,7 +61,7 @@ type v1Project struct {
 	// defaulted pin.
 	statedVersion bool
 	// settings is what airflow_settings.yaml yielded: declarations that join
-	// envSchema's, and the connection values that go to the vault.
+	// envSchema's, and the connection and variable values that go to the vault.
 	settings carriedSettings
 	// envSchema is what .astro/env.schema.yaml declared, split into what the
 	// manifest grammar accepts and what it does not.

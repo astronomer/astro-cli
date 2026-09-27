@@ -301,17 +301,8 @@ func (w *Writer) SetSecret(kind secrets.Kind, name, value string) error {
 
 // HasSecret reports whether this scope already holds a value for (kind, name),
 // which is what pkg/scaffold's SecretWriter asks so a conversion can decline to
-// overwrite a credential the user set deliberately.
+// overwrite a credential the user set deliberately. It matches on the env-var
+// key, as Has does, so a file's "API_TOKEN" finds a vault's "api_token".
 func (w *Writer) HasSecret(kind secrets.Kind, name string) (bool, error) {
-	key, err := secrets.Key(kind, w.scope, name)
-	if err != nil {
-		return false, err
-	}
-	if _, err := w.store.Get(key); err != nil {
-		if errors.Is(err, secrets.ErrNotFound) {
-			return false, nil
-		}
-		return false, refusal(err)
-	}
-	return true, nil
+	return w.Has(localKind(kind), name)
 }

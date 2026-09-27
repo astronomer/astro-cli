@@ -31,8 +31,9 @@ import (
 // thing that has happened, or hides a change they did not ask for.
 //
 // One shape is missing on purpose. A v1 airflow_settings.yaml with a
-// connection carries a VALUE, and values go to the vault, which opens the OS
-// keyring — the one thing no environment variable relocates, per doc.go.
+// connection or a variable carries a VALUE, and values go to the vault, which
+// opens the OS keyring — the one thing no environment variable relocates, per
+// doc.go.
 // Converting such a project does not fail, it BLOCKS on a keyring prompt, so
 // it cannot live in a tier that runs unattended on every pull request. It needs
 // a case gated on a real keyring, and the suite has none yet. Every fixture
@@ -309,38 +310,34 @@ func v1Cases() []v1Case {
 			noNotes:       true,
 		},
 		{
-			// airflow_settings.yaml is never retired, and this is the shape
-			// that proves it: variables carry in full, so nothing is left to
-			// say about the file and no note mentions it. Its survival can only
-			// be the explicit rule that keeps it.
-			//
-			// Which matters because that rule is what stands between a
-			// project's pools and rm. A file kept because prose happens to name
-			// it is kept by accident, and the case below is the one where the
-			// prose exists.
+			// A settings file with no pools and nothing left in it is retired
+			// like any other carried v1 file. The variable is empty so the
+			// case stores nothing and stays off the keyring. An empty variable
+			// is declared optional, since v1 skipped it rather than create it,
+			// and the manifest carries no value for it.
 			name: "a settings file whose contents all carry",
 			files: map[string]string{
 				"Dockerfile": runtime2,
 				"airflow_settings.yaml": "airflow:\n" +
 					"  variables:\n" +
 					"    - variable_name: region\n" +
-					"      variable_value: us-east-1\n",
+					"      variable_value: \"\"\n",
 			},
 			airflow: "2",
 			manifestHas: []string{
 				"[tool.astro.env.airflow_variables]",
-				"region",
-				"default = 'us-east-1'",
+				"region = {optional = true, sensitive = true}",
 			},
-			kept:    []string{"airflow_settings.yaml"},
-			keptHas: map[string]string{"airflow_settings.yaml": "variable_name: region"},
+			manifestLacks: []string{"default"},
+			retired:       []string{"airflow_settings.yaml"},
+			advisories:    []string{"region: declared as an optional Airflow variable"},
 		},
 		{
 			// Pools have nowhere to go: neither `astro local start` nor the app
-			// stores them, so the file is the only record of them that
-			// survives. It is kept and the run says why — and the pool must NOT
-			// appear in the manifest, because a key nothing downstream reads
-			// would swallow it silently.
+			// creates or stores them, so the file is the only record of them
+			// that survives. It is kept and the run says why — and the pool
+			// must NOT appear in the manifest, because a key nothing downstream
+			// reads would swallow it silently.
 			name: "a settings file with pools",
 			files: map[string]string{
 				"Dockerfile": runtime2,
@@ -354,8 +351,8 @@ func v1Cases() []v1Case {
 			kept:          []string{"airflow_settings.yaml"},
 			keptHas:       map[string]string{"airflow_settings.yaml": "pool_name: heavy"},
 			notes: []string{
-				"kept for its pools (heavy)",
-				"Neither `astro local start` nor the app stores pools",
+				"kept for its pool `heavy`",
+				"`astro local start` does not create pools",
 			},
 		},
 		{
