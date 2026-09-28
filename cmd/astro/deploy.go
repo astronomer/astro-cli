@@ -439,7 +439,9 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		case imageName != "":
 			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --image-name: the image is already built"))
 		case m.Astro.Dockerfile == "":
-			return deployV2Err(cmd, format, util.ErrBuildSecretNeedsDockerfile)
+			if err := util.CheckGeneratedBuildSecrets(buildSecrets); err != nil {
+				return deployV2Err(cmd, format, err)
+			}
 		}
 	}
 

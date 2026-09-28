@@ -596,7 +596,7 @@ var validationCases = []struct {
 	{
 		name:      "build-secrets without a dockerfile",
 		wantCodes: []ProblemCode{CodeBuildSecretsWithoutDockerfile},
-		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nbuild-secrets = ['id=netrc,env=NETRC_CONTENT']\n",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nbuild-secrets = ['id=netrc,env=NETRC_CONTENT', 'id=pip,src=/etc/pip.conf']\n",
 		wantKeys:  []string{"tool.astro.build-secrets"},
 	},
 	{

@@ -229,7 +229,7 @@ func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {
 
 func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 	const waitNote = "--wait is now the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable, a Go duration: ASTRO_LOCAL_HEALTH_TIMEOUT="
-	const restartNote = "With nothing running, restart starts in standalone mode, which does not build the Dockerfile; use `astro local start --docker` then"
+	const restartNote = "With nothing running, restart starts in standalone mode, which builds no image; use `astro local start --docker` then"
 	withDockerfile := devContext{dockerfile: true, buildSecret: true, packageBuildSecret: true}
 	cases := []struct {
 		name  string
@@ -286,11 +286,25 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 			notes: []string{waitNote + "10m astro local start --docker"},
 		},
 		{
-			name:  "no Dockerfile, so no Docker mode and no build secret",
-			args:  []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			name:  "no Dockerfile, so no Docker mode and no build secret but netrc",
+			args:  []string{"start", "--build-secret", "id=pip,src=/etc/pip.conf"},
 			dc:    devContext{buildSecret: true},
 			want:  "astro local start",
-			notes: []string{"--build-secret applies only to a project that declares [tool.astro] dockerfile"},
+			notes: []string{"Without [tool.astro] dockerfile, only the netrc --build-secret reaches the build"},
+		},
+		{
+			name:  "no Dockerfile keeps the netrc secret in Docker mode",
+			args:  []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT", "--build-secret", "id=pip,src=/etc/pip.conf"},
+			dc:    devContext{buildSecret: true},
+			want:  "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
+			notes: []string{"Without [tool.astro] dockerfile, only the netrc --build-secret reaches the build"},
+		},
+		{
+			name:  "a restart without a Dockerfile keeps the netrc secret and notes the mode",
+			args:  []string{"restart", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:    devContext{buildSecret: true},
+			want:  "astro local restart --build-secret id=netrc,env=NETRC_CONTENT",
+			notes: []string{restartNote},
 		},
 		{
 			name: "a v1 project with a build secret converts to a Docker-mode build",

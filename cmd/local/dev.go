@@ -196,12 +196,13 @@ var buildSecretSpecRe = regexp.MustCompile(`^[A-Za-z0-9_.,=/~:@+-]+$`)
 // value, and a --wait value that parses as a duration are repeated.
 func devStartReplacement(replacement string, args []string, dc devContext) (command string, notes []string) {
 	cmd := []string{replacement}
-	if dc.dockerfile && replacement == replaceStart {
+	builds := dc.dockerfile || (dc.buildSecret && slices.ContainsFunc(devFlagValues(args, "--build-secret", "--build-secrets"), isRuntimeSecret))
+	if builds && replacement == replaceStart {
 		cmd = append(cmd, "--docker")
 	}
 	cmd, notes = withBuildSecrets(cmd, args, dc.buildSecret, dc)
-	if dc.dockerfile && replacement == replaceRestart {
-		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which does not build the Dockerfile; use `%s --docker` then", replaceStart))
+	if builds && replacement == replaceRestart {
+		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which builds no image; use `%s --docker` then", replaceStart))
 	}
 	if slices.ContainsFunc(args, isWaitFlag) {
 		example := "10m"
@@ -225,15 +226,19 @@ func devBuildReplacement(args []string, dc devContext) (command string, notes []
 }
 
 // withBuildSecrets appends the --build-secret specs in args to cmd when the
-// replacement takes the flag, or returns a note when the project declares no
-// Dockerfile for them to reach.
+// replacement takes the flag. Without a Dockerfile only the netrc secret
+// reaches the build, and a note says the rest were left out.
 func withBuildSecrets(cmd, args []string, takes bool, dc devContext) (withSecrets, notes []string) {
 	secrets := devFlagValues(args, "--build-secret", "--build-secrets")
-	switch {
-	case len(secrets) == 0 || !takes:
+	if len(secrets) == 0 || !takes {
 		return cmd, nil
-	case !dc.dockerfile:
-		return cmd, []string{"--build-secret applies only to a project that declares [tool.astro] dockerfile"}
+	}
+	if !dc.dockerfile {
+		kept := slices.DeleteFunc(slices.Clone(secrets), func(spec string) bool { return !isRuntimeSecret(spec) })
+		if len(kept) < len(secrets) {
+			notes = []string{"Without [tool.astro] dockerfile, only the netrc --build-secret reaches the build"}
+		}
+		secrets = kept
 	}
 	for _, spec := range secrets {
 		if !buildSecretSpecRe.MatchString(spec) {
@@ -241,7 +246,12 @@ func withBuildSecrets(cmd, args []string, takes bool, dc devContext) (withSecret
 		}
 		cmd = append(cmd, "--build-secret", spec)
 	}
-	return cmd, nil
+	return cmd, notes
+}
+
+func isRuntimeSecret(spec string) bool {
+	s, err := manifest.ParseBuildSecret(spec)
+	return err == nil && s.ID == manifest.RuntimeSecretID
 }
 
 func isWaitFlag(arg string) bool { return arg == "--wait" || strings.HasPrefix(arg, "--wait=") }

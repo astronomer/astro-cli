@@ -47,8 +47,8 @@ type BuildRequest struct {
 	// and Packages are then that file's business rather than the runtime's.
 	Dockerfile string
 	Context    string
-	// Secrets are docker build --secret specs for the Dockerfile build; a
-	// generated build has no step of the project's to mount them into.
+	// Secrets are docker build --secret specs. A generated build passes on
+	// only the netrc one, which the runtime image mounts while it installs.
 	Secrets []string
 	// Tag is the image reference the build produces.
 	Tag string

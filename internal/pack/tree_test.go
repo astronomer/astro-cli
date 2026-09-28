@@ -222,6 +222,20 @@ func TestMWAAPluginsZipIsNeverEmptyWhenAdvertised(t *testing.T) {
 	}
 }
 
+// MWAA installs requirements.txt with pip, which cannot read
+// [tool.uv.sources], so a git source goes in as a direct reference.
+func TestMWAARequirementsCarryAGitSource(t *testing.T) {
+	req := newProject(t, func(_ string, m *manifest.Manifest) {
+		m.Project.Dependencies = append(m.Project.Dependencies, "example-lib")
+		m.UV.DirectURLs = map[string]string{"example-lib": "git+https://github.com/example-org/example-lib.git@abc123"}
+	})
+	_, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	data, err := os.ReadFile(filepath.Join(req.OutDir, "requirements.txt"))
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "example-lib @ git+https://github.com/example-org/example-lib.git@abc123\n")
+}
+
 // A symlink is not a regular file, so zipDir drops it — which means a plugins/
 // whose only entry is one must not be advertised either. Same failure as the
 // cache mismatch, by a different route.

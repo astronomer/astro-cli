@@ -284,14 +284,12 @@ func checkImageSource(req Request) (util.MissingSecrets, error) {
 	if warn == nil {
 		warn = func(string) {}
 	}
-	if dockerfile := req.Manifest.Astro.Dockerfile; dockerfile != "" {
-		var err error
-		if missing, err = util.CheckBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets); err != nil {
-			return missing, err
-		}
-		for _, w := range missing.Warnings() {
-			warn(w)
-		}
+	var err error
+	if missing, err = util.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets); err != nil {
+		return missing, err
+	}
+	for _, w := range missing.Warnings() {
+		warn(w)
 	}
 	if w := scaffold.LocalFilesWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
 		warn(w)
@@ -339,7 +337,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 	var deps, packages []string
 	airflowVersion, runtime, dockerfile := "", "", ""
 	if req.Manifest != nil {
-		deps = req.Manifest.Project.Dependencies
+		deps = req.Manifest.Requirements()
 		packages = req.Manifest.Astro.Packages
 		airflowVersion = req.Manifest.Airflow().Pin
 		runtime = req.Manifest.Airflow().Runtime
@@ -360,8 +358,8 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 	//
 	// An earlier version refused here on `len(req.BuildSecrets) > 0 && dockerfile
 	// == ""`, which turned an exported BUILD_SECRET_INPUT into a hard failure for
-	// every project that generates its image. imagebuild drops them in generated
-	// mode regardless, so carrying them costs nothing.
+	// every project that generates its image. imagebuild passes a generated build
+	// only the netrc secret, and checkImageSource has warned about the rest.
 	includeDags := !req.Image
 	img, err := d.DeployImage(&ImageDeploy{
 		DeploymentID:   target.DeploymentID,

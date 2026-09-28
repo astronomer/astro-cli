@@ -9,12 +9,18 @@ import (
 )
 
 // [tool.astro] build-secrets lists docker build --secret specs for the
-// declared Dockerfile's build, the same specs --build-secret takes. A spec
+// image's build, the same specs --build-secret takes. Without a declared
+// Dockerfile only RuntimeSecretID reaches the build. A spec
 // names where a secret comes from, an environment variable or a file, and
 // never holds the secret, so the list is safe to commit. A --build-secret flag
 // replaces the list, and so does BUILD_SECRET_INPUT when no flag is given.
 
 const buildSecretsKey = astroRoot + ".build-secrets"
+
+// RuntimeSecretID is the one build secret the runtime image mounts, as
+// /root/.netrc, while it installs a project's requirements. It is the only
+// secret a generated image's build can read.
+const RuntimeSecretID = "netrc"
 
 // typeEnv is both the key naming a variable and the type that makes src=
 // name one.

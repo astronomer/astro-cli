@@ -828,7 +828,9 @@ func TestStartHandsBuildSecretsToTheDockerfileBuild(t *testing.T) {
 	assert.Equal(t, p.BuildSecrets, images.requests[0].Secrets)
 }
 
-func TestStartDropsBuildSecretsFromAGeneratedBuild(t *testing.T) {
+// The builder keeps the netrc secret for a generated build, which the runtime
+// image's install step mounts, so the engine hands the secrets on.
+func TestStartPassesBuildSecretsToAGeneratedBuild(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
 	images, ok := e.images.(*stubImages)
@@ -841,7 +843,7 @@ func TestStartDropsBuildSecretsFromAGeneratedBuild(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, images.requests, 1)
-	assert.Empty(t, images.requests[0].Secrets)
+	assert.Equal(t, p.BuildSecrets, images.requests[0].Secrets)
 }
 
 // Resolving a base image we would discard turns a working start into a

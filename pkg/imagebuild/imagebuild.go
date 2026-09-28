@@ -166,11 +166,9 @@ type Request struct {
 	// or "id=mysecret,env=ENV_VAR"),
 	// one per entry, forwarded verbatim in the order given.
 	//
-	// Only meaningful in Dockerfile mode: a generated build's Dockerfile is
-	// `FROM <base>` and the install happens in the runtime image's own ONBUILD
-	// triggers, so there is no RUN of the project's for a secret to be mounted
-	// into. Callers refuse the combination rather than passing secrets that
-	// could not be read; FromDeclaredDockerfile is the check.
+	// A generated build forwards only the manifest.RuntimeSecretID spec: its
+	// Dockerfile is `FROM <base>`, and the runtime image's install step, which
+	// mounts that one secret, is the only step it runs.
 	//
 	// The SPEC is forwarded, never a secret value: docker reads the value itself
 	// from the src file or the named env var. So these strings are safe in a
@@ -339,16 +337,8 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	if shouldPull(req.Dockerfile, dockerfile) {
 		args = append(args, "--pull")
 	}
-	// Gated on Dockerfile mode, not just left to the caller. build() is shared,
-	// and a generated build's Dockerfile is one this package wrote — `FROM
-	// <base>`, with the install in the runtime image's ONBUILD triggers — so a
-	// secret has nothing of the project's to be mounted into. Callers refuse the
-	// combination; this makes the invariant hold whether or not they do, rather
-	// than handing docker a flag that cannot work.
-	if req.FromDeclaredDockerfile() {
-		for _, secret := range req.Secrets {
-			args = append(args, "--secret", secret)
-		}
+	for _, secret := range req.buildSecrets() {
+		args = append(args, "--secret", secret)
 	}
 	if req.Platform != "" {
 		args = append(args, "--platform", req.Platform)
@@ -362,9 +352,42 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		if req.Dockerfile != "" {
 			return "", fmt.Errorf("%w: %w", ErrDockerfileBuild, err)
 		}
-		return "", fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)
+		err = fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)
+		if len(req.buildSecrets()) > 0 && !b.mountsRuntimeSecret(ctx, req) {
+			err = fmt.Errorf("%w. The runtime image %s does not mount the %s build secret while it installs requirements; build from a newer runtime, or declare a dockerfile that mounts it", err, req.BaseImage, manifest.RuntimeSecretID)
+		}
+		return "", err
 	}
 	return req.Tag, nil
+}
+
+// buildSecrets are the Secrets the build can read. A declared Dockerfile
+// mounts whichever it names. A generated build's Dockerfile is `FROM <base>`,
+// and the only step that runs is the runtime image's install, which mounts
+// manifest.RuntimeSecretID alone, so any other secret is dropped rather than
+// handed to docker, which would read its source for nothing.
+func (r *Request) buildSecrets() []string {
+	if r.FromDeclaredDockerfile() {
+		return r.Secrets
+	}
+	var out []string
+	for _, spec := range r.Secrets {
+		if s, err := manifest.ParseBuildSecret(spec); err == nil && s.ID == manifest.RuntimeSecretID {
+			out = append(out, spec)
+		}
+	}
+	return out
+}
+
+// mountsRuntimeSecret reports whether the runtime base's build triggers mount
+// manifest.RuntimeSecretID; runtime images older than the mount install
+// without it. A base that cannot be read is given the benefit of the doubt.
+func (b *Builder) mountsRuntimeSecret(ctx context.Context, req Request) bool {
+	var out strings.Builder
+	if err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &out}, req.Bin, "image", "inspect", "--format", "{{json .Config.OnBuild}}", req.BaseImage); err != nil {
+		return true
+	}
+	return strings.Contains(out.String(), "id="+manifest.RuntimeSecretID)
 }
 
 // shouldPull reports whether the build may force-refresh its base images.

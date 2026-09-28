@@ -47,9 +47,8 @@ type ManifestBuild struct {
 // them in Dockerfile mode rather than rejecting them.
 //
 // The caller fills the rest: WorkDir, Tag, Platform ("linux/amd64" for a
-// deploy), Bin, Env, and Secrets. Secrets only reach a build from a declared
-// Dockerfile; see Request.FromDeclaredDockerfile for the check a caller
-// accepting secrets applies before building.
+// deploy), Bin, Env, and Secrets. A generated build reads only the
+// manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
@@ -73,12 +72,6 @@ func ForManifest(m ManifestBuild) (Request, error) {
 
 // FromDeclaredDockerfile reports whether the request builds the project's own
 // Dockerfile rather than an image generated over the runtime base.
-//
-// It is also the build-secret rule. A generated build's Dockerfile is
-// `FROM <base>` with the install in the runtime image's ONBUILD triggers, so
-// no step of the project's exists for a secret to be mounted into, and Build
-// drops Secrets there. A caller offering secrets refuses them when this is
-// false, rather than accepting values the build cannot read.
 func (r *Request) FromDeclaredDockerfile() bool {
 	return r.Dockerfile != ""
 }

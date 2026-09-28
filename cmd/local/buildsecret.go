@@ -19,7 +19,9 @@ func checkBuildSecrets(r Renderer, flag []string, p localrt.Plan) error {
 		return nil
 	}
 	if p.Dockerfile == "" {
-		return util.ErrBuildSecretNeedsDockerfile
+		if err := util.CheckGeneratedBuildSecrets(flag); err != nil {
+			return err
+		}
 	}
 	if p.Mode != localrt.ModeDocker {
 		emitWarning(r, event{Event: "warning", Text: "standalone mode builds no image, so --build-secret is not used. Run in Docker mode (--docker) to build with it"})
@@ -27,12 +29,12 @@ func checkBuildSecrets(r Renderer, flag []string, p localrt.Plan) error {
 	return nil
 }
 
-// warnMissingBuildSecrets runs before a Docker-mode start builds the project's
-// own Dockerfile. It refuses a build secret whose variable is unset, and warns
-// about each secret the file mounts that no build secret supplies, returning
-// those for the start to name again if the build fails.
+// warnMissingBuildSecrets runs before a Docker-mode start builds the image. It
+// refuses a build secret whose variable is unset, and warns about each secret
+// a project Dockerfile mounts that no build secret supplies, returning those
+// for the start to name again if the build fails.
 func warnMissingBuildSecrets(r Renderer, p localrt.Plan) (util.MissingSecrets, error) {
-	if p.Mode != localrt.ModeDocker || p.Dockerfile == "" {
+	if p.Mode != localrt.ModeDocker {
 		return util.MissingSecrets{}, nil
 	}
 	missing, err := util.CheckBuildSecrets(p.ProjectPath, p.Dockerfile, p.BuildSecrets)

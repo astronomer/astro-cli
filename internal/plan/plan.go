@@ -135,7 +135,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			Runtime: m.Airflow().Runtime,
 			// Docker mode installs these into the runtime image for parity
 			// with standalone, which gets them from the uv venv sync.
-			Dependencies: m.Project.Dependencies,
+			Dependencies: m.Requirements(),
 			// OS packages: docker mode bakes them into the image; standalone
 			// mode has no image and is warned about them (cmd/local start).
 			Packages: m.Astro.Packages,

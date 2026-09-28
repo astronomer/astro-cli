@@ -94,6 +94,9 @@ type UV struct {
 	// Sources maps a package to the [[tool.uv.index]] URL its
 	// [tool.uv.sources] entry names, for the entries that name an index.
 	Sources map[string]string
+	// DirectURLs maps a package to the PEP 508 URL its [tool.uv.sources]
+	// entry stands for, for the entries that name a git repository or a URL.
+	DirectURLs map[string]string
 }
 
 // IndexPages are the per-package pages of the indexes Sources names, the
@@ -361,9 +364,9 @@ const (
 	// CodeBuildSecretInvalid is a build-secrets entry that is not a docker
 	// --secret spec naming an id and one source.
 	CodeBuildSecretInvalid ProblemCode = "build_secret_invalid"
-	// CodeBuildSecretsWithoutDockerfile is build-secrets with no dockerfile
-	// declared: a generated image has no build step of the project's to
-	// mount a secret into.
+	// CodeBuildSecretsWithoutDockerfile is a build-secrets id other than
+	// netrc with no dockerfile declared: a generated image has no build step
+	// of the project's to mount it into.
 	CodeBuildSecretsWithoutDockerfile ProblemCode = "build_secrets_without_dockerfile"
 	// CodeTargetNotAName is [tool.astro] target given a table: the old
 	// spelling of the backend-config section, which is its own block now.
@@ -678,6 +681,12 @@ func uvTable(t map[string]any) UV {
 				out.Sources = map[string]string{}
 			}
 			out.Sources[pkg] = address
+		}
+		if address, ok := directURL(source); ok {
+			if out.DirectURLs == nil {
+				out.DirectURLs = map[string]string{}
+			}
+			out.DirectURLs[DistName(pkg)] = address
 		}
 	}
 	return out
@@ -1215,9 +1224,14 @@ func (p *parser) validate(m *Manifest) {
 			p.add(CodeDockerfileOutsideProject, astroRoot+".dockerfile", fmt.Sprintf("%q has to be a path inside the project", v))
 		}
 	}
-	if len(m.Astro.BuildSecrets) > 0 && m.Astro.Dockerfile == "" {
-		p.add(CodeBuildSecretsWithoutDockerfile, buildSecretsKey, "needs a declared dockerfile that mounts the secrets in a RUN step. "+
-			"A generated image installs your dependencies through the runtime image and has no build step of yours for a secret to reach")
+	if m.Astro.Dockerfile == "" {
+		for _, spec := range m.Astro.BuildSecrets {
+			if s, err := ParseBuildSecret(spec); err == nil && s.ID != "" && s.ID != RuntimeSecretID {
+				p.add(CodeBuildSecretsWithoutDockerfile, buildSecretsKey, fmt.Sprintf("names secret %q, which only a declared dockerfile can mount in a RUN step. "+
+					"A generated image installs your dependencies through the runtime image, which mounts only a secret with id %s", s.ID, RuntimeSecretID))
+				break
+			}
+		}
 	}
 
 	var defaults []string

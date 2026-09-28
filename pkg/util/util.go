@@ -87,9 +87,26 @@ const BuildSecretInputEnv = "BUILD_SECRET_INPUT"
 // BuildSecretUsage is the help text of every --build-secret flag.
 const BuildSecretUsage = "Secret to expose to the build. See https://docs.docker.com/build/building/secrets/. Repeat to specify multiple secrets. (format: \"id=mysecret[,src=/local/secret]\" or \"id=mysecret,env=ENV_VAR\")"
 
-// ErrBuildSecretNeedsDockerfile refuses --build-secret for a project whose
-// image is generated rather than built from its own Dockerfile.
-var ErrBuildSecretNeedsDockerfile = errors.New("--build-secret needs a project Dockerfile to read it. Declare one with `dockerfile` under [tool.astro] in pyproject.toml and mount the secret in a RUN step; a generated image installs your dependencies through the runtime image and has no build step of yours for a secret to reach")
+// ErrBuildSecretNeedsDockerfile refuses a --build-secret other than netrc for
+// a project whose image is generated rather than built from its own
+// Dockerfile.
+var ErrBuildSecretNeedsDockerfile = errors.New("a generated image reads only the netrc build secret, which the runtime image mounts as /root/.netrc while it installs your requirements. To use another secret, declare a Dockerfile with `dockerfile` under [tool.astro] in pyproject.toml and mount the secret in a RUN step")
+
+// CheckGeneratedBuildSecrets refuses a --build-secret that a generated
+// image's build cannot read: a spec that does not parse, and any id but
+// manifest.RuntimeSecretID.
+func CheckGeneratedBuildSecrets(specs []string) error {
+	for _, spec := range specs {
+		s, err := manifest.ParseBuildSecret(spec)
+		if err != nil {
+			return fmt.Errorf("a build secret spec %w", err)
+		}
+		if s.ID != manifest.RuntimeSecretID {
+			return ErrBuildSecretNeedsDockerfile
+		}
+	}
+	return nil
+}
 
 // ResolveBuildSecrets returns the Docker build secrets to use: the secrets
 // given on the command line if there are any, otherwise the first fallback
@@ -119,11 +136,27 @@ func ResolveProjectBuildSecrets(flagSecrets, declared []string) []string {
 	return declared
 }
 
-// CheckBuildSecrets runs before a build of the project's own Dockerfile. It
-// refuses a secret spec that names an unset or empty environment variable:
-// Docker would mount nothing for it, and the build would fail later, in
-// whatever step read the secret. Otherwise it returns MissingBuildSecrets.
+// CheckBuildSecrets runs before an image build. It refuses a secret spec that
+// names an unset or empty environment variable: Docker would mount nothing for
+// it, and the build would fail later, in whatever step read the secret.
+// Otherwise it returns MissingBuildSecrets. dockerfile is "" for a generated
+// build, which passes on only the manifest.RuntimeSecretID spec: it checks
+// that spec and any spec that does not parse, and names the ids it drops.
 func CheckBuildSecrets(projectDir, dockerfile string, secrets []string) (MissingSecrets, error) {
+	if dockerfile == "" {
+		var read []string
+		var missing MissingSecrets
+		for _, spec := range secrets {
+			s, err := manifest.ParseBuildSecret(spec)
+			switch {
+			case err != nil || s.ID == manifest.RuntimeSecretID:
+				read = append(read, spec)
+			default:
+				missing.Dropped = append(missing.Dropped, s.ID)
+			}
+		}
+		return missing, checkBuildSecretEnv(read)
+	}
 	if err := checkBuildSecretEnv(secrets); err != nil {
 		return MissingSecrets{}, err
 	}
@@ -160,6 +193,9 @@ func checkBuildSecretEnv(secrets []string) error {
 type MissingSecrets struct {
 	Dockerfile string
 	Mounts     []airflowrt.SecretMount
+	// Dropped are the ids a generated build does not pass on, since the
+	// runtime image mounts only manifest.RuntimeSecretID.
+	Dropped []string
 }
 
 // MissingBuildSecrets finds each secret the project's Dockerfile mounts that
@@ -191,6 +227,9 @@ func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) Missin
 // unless it says required=true.
 func (m MissingSecrets) Warnings() []string {
 	var warnings []string
+	for _, id := range m.Dropped {
+		warnings = append(warnings, fmt.Sprintf("build secret %q is not used: an image built without a Dockerfile reads only the %s secret", id, manifest.RuntimeSecretID))
+	}
 	for _, mount := range m.Mounts {
 		warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given; pass %s or set %s",
 			m.Dockerfile, mount.ID, mount.Line, buildSecretFlag(mount.ID), BuildSecretInputEnv))

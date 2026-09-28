@@ -98,6 +98,27 @@ func TestBuildFillsPlanFromManifest(t *testing.T) {
 	}
 }
 
+// A Docker-mode image installs from a generated requirements file, which
+// cannot read [tool.uv.sources], so a git source reaches it as a direct
+// reference.
+func TestBuildWritesAGitSourceIntoTheDependencies(t *testing.T) {
+	dir := t.TempDir()
+	body := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*', 'example-lib']\n\n[tool.astro]\n\n" +
+		"[tool.uv.sources]\ncorona = { git = 'https://github.com/example-org/example-lib.git', rev = 'abc123' }\n"
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"apache-airflow==3.1.*", "example-lib @ git+https://github.com/example-org/example-lib.git@abc123"}
+	if !slices.Equal(built.Plan.Dependencies, want) {
+		t.Errorf("Dependencies = %q, want %q", built.Plan.Dependencies, want)
+	}
+}
+
 // --build-secret replaces BUILD_SECRET_INPUT, which replaces the manifest's
 // build-secrets: the first source that gives any is the whole list.
 func TestBuildSecretPrecedence(t *testing.T) {

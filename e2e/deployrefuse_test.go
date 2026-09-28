@@ -90,14 +90,14 @@ func TestDeployRefusesTheFlagsAV2ProjectIgnores(t *testing.T) {
 
 // `--build-secret` is the one that depends on the project, not just the flag.
 //
-// It is refused for a project with no declared Dockerfile, because a
-// generated image has no build step of the user's for a secret to reach —
-// and accepted for one that declares a Dockerfile, where mounting it in a RUN
-// step is exactly what it is for.
+// Without a declared Dockerfile only the netrc secret is accepted, because
+// the runtime image's install step is the one build step and it mounts only
+// that. With one declared, any secret is accepted, since a RUN step of the
+// user's mounts it.
 func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 	tier(t, 0)
 
-	const needsOne = "needs a project Dockerfile"
+	const needsOne = "reads only the netrc build secret"
 	// A fragment unique to the message. "[tool.astro]" alone would pass on
 	// the usage block cobra prints underneath, whose --deployment help quotes
 	// it back.
@@ -217,4 +217,19 @@ func addAstroKey(t *testing.T, p *project, line string) {
 		t.Fatalf("no [tool.astro] in the scaffolded manifest:\n%s", raw)
 	}
 	write(t, path, strings.Replace(raw, anchor, anchor+line+"\n", 1))
+}
+
+// The runtime image's install step mounts a netrc secret, so a generated
+// build takes one without a declared Dockerfile.
+func TestDeployTakesANetrcBuildSecretWithoutADockerfile(t *testing.T) {
+	tier(t, 0)
+
+	p := v2ProjectForDeploy(t).forT(t)
+	r := p.run("deploy", "--build-secret", "id=netrc,src=/dev/null")
+	if strings.Contains(r.output(), "reads only the netrc build secret") {
+		t.Fatalf("the runtime image mounts netrc, so a generated build takes it\n%s", r.output())
+	}
+	if !strings.Contains(r.output(), "workspace is required") {
+		t.Errorf("expected it to get past the build-secret gate and stop at the workspace\n%s", r.output())
+	}
 }

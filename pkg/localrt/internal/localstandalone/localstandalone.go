@@ -496,7 +496,7 @@ func (e *Engine) syncVenv(ctx context.Context, projectPath, python string, cb rt
 // prepDarwinAF2 writes avoid the fork paths entirely.
 func launchCommand(goos, airflowMajor, projectPath string) (bin string, args []string, needsAF2Prep bool) {
 	venvBin := filepath.Join(projectPath, ".venv", "bin")
-	if airflowMajor == "2" && goos == "darwin" {
+	if airflowMajor == "2" && goos == goosDarwin {
 		return filepath.Join(venvBin, "python"), []string{filepath.Join(venvBin, af2ShimName)}, true
 	}
 	return filepath.Join(venvBin, "airflow"), []string{"standalone"}, false

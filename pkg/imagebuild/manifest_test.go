@@ -115,11 +115,10 @@ func TestForManifestGeneratedRequestInstallsDependenciesAndPackages(t *testing.T
 	assert.Equal(t, "FROM "+RuntimeImageRepo+":3.1\n", string(df))
 }
 
-// FromDeclaredDockerfile is the build-secret rule: a secret reaches the build
-// exactly when it reports true, which is exactly when a Dockerfile is declared.
-// Both sides are asserted against the fixed expectation rather than against
-// each other, since Build's own gate reads FromDeclaredDockerfile and the two
-// would move together if it were wrong.
+// A secret other than netrc reaches the build exactly when a Dockerfile is
+// declared. Both sides are asserted against the fixed expectation rather than
+// against each other, since Build's own gate reads FromDeclaredDockerfile and
+// the two would move together if it were wrong.
 func TestFromDeclaredDockerfileMatchesWhereSecretsReachTheBuild(t *testing.T) {
 	cases := []struct {
 		name     string

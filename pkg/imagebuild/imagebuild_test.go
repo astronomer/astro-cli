@@ -3,6 +3,7 @@ package imagebuild
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -583,20 +584,50 @@ func TestBuildForwardsSecretsToDocker(t *testing.T) {
 	}
 }
 
-// A generated build passes no secret, because there is nothing of the project's
-// to mount one into: its Dockerfile is `FROM <base>` and the install happens in
-// the runtime image's own ONBUILD triggers. Callers refuse the combination, and
-// this pins that nothing here smuggles it through anyway.
-func TestBuildGeneratedModeIgnoresSecrets(t *testing.T) {
+// A generated build passes the netrc secret, the one the runtime image's
+// install step mounts, and drops any other, which no step of the build reads.
+func TestBuildGeneratedModePassesOnlyTheNetrcSecret(t *testing.T) {
 	cmd := &fakeCmd{}
 	req := testRequest(t)
 	req.Dependencies = []string{"pandas"}
-	req.Secrets = []string{"id=pypi,src=/tmp/pypi.txt"}
+	req.Secrets = []string{"id=pypi,src=/tmp/pypi.txt", "id=netrc,env=NETRC_CONTENT"}
 
 	if _, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{}); err != nil {
 		t.Fatal(err)
 	}
-	if hasCall(cmd.calls, "--secret") {
-		t.Errorf("calls = %v, want no --secret on a generated build", cmd.calls)
+	if !hasCall(cmd.calls, "--secret id=netrc,env=NETRC_CONTENT") {
+		t.Errorf("calls = %v, want the netrc secret on a generated build", cmd.calls)
+	}
+	if hasCall(cmd.calls, "id=pypi") {
+		t.Errorf("calls = %v, want no other secret on a generated build", cmd.calls)
+	}
+}
+
+// A generated build that fails with the netrc secret on a runtime image whose
+// install step does not mount it says so, since the build output shows only
+// an authentication failure.
+func TestGeneratedBuildFailureNamesARuntimeWithoutTheNetrcMount(t *testing.T) {
+	for name, onBuild := range map[string]string{
+		"without the mount": `["RUN /usr/local/bin/install-python-dependencies"]`,
+		"with the mount":    `["RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false /usr/local/bin/install-python-dependencies"]`,
+	} {
+		cmd := &fakeCmd{run: func(call string, s rt.Stdio) error {
+			if strings.Contains(call, "image inspect") {
+				_, err := io.WriteString(s.Out, onBuild)
+				return err
+			}
+			return errors.New("exit status 1")
+		}}
+		req := testRequest(t)
+		req.Dependencies = []string{"example-lib @ git+https://github.com/example-org/example-lib.git"}
+		req.Secrets = []string{"id=netrc,env=NETRC_CONTENT"}
+
+		_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+		if err == nil {
+			t.Fatalf("%s: want the build to fail", name)
+		}
+		if got, want := strings.Contains(err.Error(), "does not mount the netrc build secret"), name == "without the mount"; got != want {
+			t.Errorf("%s: err = %v, want the missing mount named: %v", name, err, want)
+		}
 	}
 }

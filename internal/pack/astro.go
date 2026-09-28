@@ -88,15 +88,18 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	return warnings, nil
 }
 
-// checkSecrets runs before a build of the declared Dockerfile. It refuses a
-// build secret whose variable is unset, and warns about each secret the
-// Dockerfile mounts that no build secret supplies, returning those for a
-// failed build to name again. It also warns about the per-machine files the
-// build context would carry into the image. A generated build has nothing to
-// check.
+// checkSecrets runs before the image build. It refuses a build secret whose
+// variable is unset, and warns about each secret a declared Dockerfile mounts
+// that no build secret supplies, returning those for a failed build to name
+// again. It also warns about the per-machine files a declared Dockerfile's
+// build context would carry into the image.
 func checkSecrets(req Request, cb localrt.Callbacks) (util.MissingSecrets, error) {
 	if req.Manifest.Astro.Dockerfile == "" {
-		return util.MissingSecrets{}, nil
+		missing, err := util.CheckBuildSecrets(req.ProjectDir, "", req.BuildSecrets)
+		for _, w := range missing.Warnings() {
+			emit(cb, "warning: "+w)
+		}
+		return missing, err
 	}
 	missing, err := util.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
 	for _, w := range missing.Warnings() {
@@ -133,7 +136,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
 		Dockerfile:     req.Manifest.Astro.Dockerfile,
-		Dependencies:   req.Manifest.Project.Dependencies,
+		Dependencies:   req.Manifest.Requirements(),
 		Packages:       req.Manifest.Astro.Packages,
 	})
 	if err != nil {

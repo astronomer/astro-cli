@@ -100,7 +100,7 @@ func TestBuildSecretInputDoesNotRefuseAGeneratedBuild(t *testing.T) {
 	var plans []localrt.Plan
 	d.Runtime = planRecorder{plans: &plans}
 	wiringProject(t, &d, "", "")
-	t.Setenv(util.BuildSecretInputEnv, "id=netrc,env=NETRC_CONTENT")
+	t.Setenv(util.BuildSecretInputEnv, "id=pip,src=/tmp/pip.conf")
 
 	err := execute(t, d, "local", "start", "--docker")
 	if errors.Is(err, util.ErrBuildSecretNeedsDockerfile) {
@@ -128,7 +128,7 @@ func TestBuildSecretIsRefusedWithoutADockerfile(t *testing.T) {
 			d.Runtime = planRecorder{plans: &plans, mode: tc.mode}
 			wiringProject(t, &d, "", "")
 
-			err := execute(t, d, append(tc.args, "--build-secret", "id=netrc,env=NETRC_CONTENT")...)
+			err := execute(t, d, append(tc.args, "--build-secret", "id=pip,src=/tmp/pip.conf")...)
 			if !errors.Is(err, util.ErrBuildSecretNeedsDockerfile) {
 				t.Fatalf("err = %v, want %v", err, util.ErrBuildSecretNeedsDockerfile)
 			}
@@ -136,6 +136,24 @@ func TestBuildSecretIsRefusedWithoutADockerfile(t *testing.T) {
 				t.Error("the start reached the runtime")
 			}
 		})
+	}
+}
+
+// The runtime image mounts a netrc secret while it installs requirements, so a
+// generated build takes one.
+func TestNetrcBuildSecretReachesAGeneratedBuild(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
+	d, _ := testDeps(t)
+	var plans []localrt.Plan
+	d.Runtime = planRecorder{plans: &plans}
+	wiringProject(t, &d, "", "")
+
+	_ = execute(t, d, "local", "start", "--docker", "--build-secret", "id=netrc,env=NETRC_CONTENT")
+	if len(plans) != 1 {
+		t.Fatalf("started %d times, want 1", len(plans))
+	}
+	if want := []string{"id=netrc,env=NETRC_CONTENT"}; !slices.Equal(plans[0].BuildSecrets, want) {
+		t.Errorf("BuildSecrets = %q, want %q", plans[0].BuildSecrets, want)
 	}
 }
 
@@ -181,7 +199,7 @@ func TestPackageRefusesABuildSecretItCannotUse(t *testing.T) {
 			d, _ := testDeps(t)
 			wiringProject(t, &d, tc.astro, tc.from)
 
-			err := execute(t, d, "package", tc.target, "--out-dir", t.TempDir(), "--build-secret", "id=netrc,env=NETRC_CONTENT")
+			err := execute(t, d, "package", tc.target, "--out-dir", t.TempDir(), "--build-secret", "id=pip,src=/tmp/pip.conf")
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
 			}

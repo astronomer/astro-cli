@@ -108,7 +108,9 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		case target.Name() != pack.TargetAstro:
 			return fmt.Errorf("--build-secret has no effect with the %s target: it builds no image", target.Name())
 		case m.Astro.Dockerfile == "":
-			return util.ErrBuildSecretNeedsDockerfile
+			if err := util.CheckGeneratedBuildSecrets(opts.buildSecrets); err != nil {
+				return err
+			}
 		}
 	}
 	res, err := target.Build(ctx, pack.Request{

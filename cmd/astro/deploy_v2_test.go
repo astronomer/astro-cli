@@ -797,7 +797,7 @@ func TestDeployV2BuildSecretRefusals(t *testing.T) {
 			name:    "no dockerfile declared",
 			body:    v2ManifestForRouting,
 			args:    []string{"--build-secret", "id=pypi"},
-			wantErr: "needs a project Dockerfile",
+			wantErr: "reads only the netrc build secret",
 		},
 		{
 			name:    "with --dags",

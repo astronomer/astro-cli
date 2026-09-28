@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -114,8 +115,11 @@ func DistName(req string) string {
 	if i := strings.IndexAny(s, "[ \t<>=!~;@("); i >= 0 {
 		s = s[:i]
 	}
-	return strings.ToLower(strings.ReplaceAll(s, "_", "-"))
+	return distSeparators.ReplaceAllString(strings.ToLower(s), "-")
 }
+
+// distSeparators are the runs PEP 503 folds to one "-" in a name.
+var distSeparators = regexp.MustCompile(`[-_.]+`)
 
 // NamesAirflow reports whether a requirement is one of the two distributions
 // that state the Airflow version, however it is pinned, or whether it is

@@ -186,11 +186,17 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 	if err != nil {
 		return checks.TargetReport{Target: target, OpError: err.Error()}
 	}
+	// Composer installs the requirements `astro package composer` writes, which
+	// keep the bare names, since gcloud takes no direct references.
+	deps := m.Requirements()
+	if target == checks.TargetComposer {
+		deps = m.Project.Dependencies
+	}
 	return checks.Preflight(ctx, target, checks.PreflightInput{
 		ProjectPath: project,
 		DagsDir:     checks.DefaultDagsDir(project),
 		Pin:         m.Airflow().Pin,
-		Deps:        m.Project.Dependencies,
+		Deps:        deps,
 		// Without the pins to Astronomer's build of Airflow: a platform runs
 		// Apache's own, at its own version.
 		Constraints: manifest.WithoutAstroPins(m.UV.ConstraintDependencies),
@@ -260,7 +266,7 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 		ProjectPath: opts.ProjectPath,
 		DagsDir:     checks.DefaultDagsDir(opts.ProjectPath),
 		Pin:         m.Airflow().Pin,
-		Deps:        m.Project.Dependencies,
+		Deps:        m.Requirements(),
 		// The venv is built outside the project, where uv cannot read the
 		// manifest, so a stated requires-python is passed through. Without one
 		// the check takes the interpreter a start would, rather than whatever
