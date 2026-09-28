@@ -3,6 +3,8 @@ package local
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -111,6 +113,47 @@ func TestLocalAPIReadsABodyFromStdin(t *testing.T) {
 	}
 	if got := stub.request(http.MethodPost, "/api/v2/dags/etl/dagRuns").Body; !strings.Contains(got, "stdin") {
 		t.Errorf("body = %q, want the one read from stdin", got)
+	}
+}
+
+// --input is the flag `astro api airflow` reads a body from, so the two
+// passthroughs take a body file the same way.
+func TestLocalAPIReadsABodyFromAnInputFile(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodPost, "/api/v2/dags/etl/dagRuns", `{"dag_run_id":"manual__1"}`)
+	file := filepath.Join(t.TempDir(), "run.json")
+	if err := os.WriteFile(file, []byte(`{"conf":{"from":"file"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := runLocalQuery(t, stub, "local", "api", "/dags/etl/dagRuns", "-X", "POST", "--input", file); err != nil {
+		t.Fatalf("local api --input: %v", err)
+	}
+	if got := stub.request(http.MethodPost, "/api/v2/dags/etl/dagRuns").Body; !strings.Contains(got, "file") {
+		t.Errorf("body = %q, want the one read from the file", got)
+	}
+}
+
+func TestLocalAPIRefusesAnInputFileThatIsNotJSON(t *testing.T) {
+	stub := newAirflowStub(t)
+	file := filepath.Join(t.TempDir(), "run.json")
+	if err := os.WriteFile(file, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := runLocalQuery(t, stub, "local", "api", "/dags", "--input", file)
+	if err == nil || !strings.Contains(err.Error(), "--input is not valid json") {
+		t.Fatalf("err = %v, want --input named as the bad body", err)
+	}
+}
+
+func TestLocalAPIRefusesBodyAndInputTogether(t *testing.T) {
+	stub := newAirflowStub(t)
+	_, _, err := runLocalQuery(t, stub, "local", "api", "/dags", "--body", "{}", "--input", "-")
+	if err == nil || !strings.Contains(err.Error(), "[body input]") {
+		t.Fatalf("err = %v, want the two body flags refused together", err)
+	}
+	if len(stub.requests()) != 0 {
+		t.Errorf("a request went out: %v", stub.requests())
 	}
 }
 

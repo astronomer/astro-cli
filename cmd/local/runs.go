@@ -80,10 +80,15 @@ func newRunsListCmd(q *query) *cobra.Command {
 		startDateLTE string
 	}
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:   "list [DAG_ID]",
 		Short: "List runs, most recent first",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Long:  "List runs, most recent first: those of one DAG when it is named, every DAG's otherwise.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dagID, err := dagIDArg(args, opts.dagID)
+			if err != nil {
+				return err
+			}
 			from, err := parseBound("--start-date-gte", opts.startDateGTE)
 			if err != nil {
 				return err
@@ -92,7 +97,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return q.runRunsList(cmd.Context(), opts.dagID, airflowapi.ListDAGRunsOptions{
+			return q.runRunsList(cmd.Context(), dagID, airflowapi.ListDAGRunsOptions{
 				ListOptions:   list.options(),
 				States:        opts.states,
 				StartDateFrom: from,
@@ -103,11 +108,23 @@ func newRunsListCmd(q *query) *cobra.Command {
 	// Most recent first without being asked: a bare `astro af runs list` is nearly
 	// always "what just happened", and Airflow's own default order is not that.
 	addListFlags(cmd, &list, "-start_date")
-	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this DAG (default: every DAG)")
+	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this DAG, the same as naming it as the argument (default: every DAG)")
 	cmd.Flags().StringSliceVarP(&opts.states, "state", "s", nil, "Only runs in these states, such as running or failed (repeatable)")
 	cmd.Flags().StringVar(&opts.startDateGTE, "start-date-gte", "", "Only runs that started at or after this RFC 3339 time")
 	cmd.Flags().StringVar(&opts.startDateLTE, "start-date-lte", "", "Only runs that started at or before this RFC 3339 time")
 	return cmd
+}
+
+// dagIDArg is the DAG a list is narrowed to, named either as the argument or
+// with --dag-id. Both may be given as long as they agree.
+func dagIDArg(args []string, flag string) (string, error) {
+	if len(args) == 0 {
+		return flag, nil
+	}
+	if flag != "" && flag != args[0] {
+		return "", fmt.Errorf("the DAG_ID argument %q and --dag-id %q name different DAGs; give one", args[0], flag)
+	}
+	return args[0], nil
 }
 
 // parseBound reads a time flag, naming the flag when it cannot. An empty value

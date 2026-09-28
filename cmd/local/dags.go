@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 
@@ -225,16 +226,17 @@ func (q *query) runDagsSource(ctx context.Context, dagID string) error {
 func newDagsStatsCmd(q *query) *cobra.Command {
 	var dagIDs []string
 	cmd := &cobra.Command{
-		Use:   "stats",
+		Use:   "stats [DAG_ID]...",
 		Short: "Count each DAG's runs by state",
-		Long: "Count the runs of each DAG by state. With no --dag-id it covers every DAG, which on Airflow 2 means " +
-			"listing the DAGs first because that generation refuses the endpoint without ids.",
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return q.runDagsStats(cmd.Context(), dagIDs)
+		Long: "Count the runs of each DAG by state, for the DAGs named as arguments or with --dag-id. With none " +
+			"named it covers every DAG, which on Airflow 2 means listing the DAGs first because that generation " +
+			"refuses the endpoint without ids.",
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return q.runDagsStats(cmd.Context(), slices.Compact(slices.Sorted(slices.Values(append(dagIDs, args...)))))
 		},
 	}
-	cmd.Flags().StringSliceVar(&dagIDs, "dag-id", nil, "Count only these DAGs (repeatable)")
+	cmd.Flags().StringSliceVar(&dagIDs, "dag-id", nil, "Count only these DAGs, the same as naming them as arguments (repeatable)")
 	return cmd
 }
 

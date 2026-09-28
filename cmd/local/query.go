@@ -148,10 +148,61 @@ func newQueryCmd(d Deps, t target, cmd *cobra.Command, builders ...func(*query) 
 	}
 	// Every leaf is built over the one query, so they share the family's flags.
 	for _, build := range builders {
-		cmd.AddCommand(build(q))
+		leaf := build(q)
+		refuseEmptyArgs(leaf)
+		cmd.AddCommand(leaf)
 	}
 	attachTarget(q, cmd)
 	return cmd
+}
+
+// refuseEmptyArgs fails a leaf given an empty positional argument, naming it
+// from the leaf's usage line. An empty id does not narrow a request, it widens
+// it: "" is dropped from a request body or collapses a path segment, so a
+// `tasks clear` with an empty RUN_ID — what a shell variable that failed to
+// fill passes — clears the task in every run of the DAG.
+func refuseEmptyArgs(cmd *cobra.Command) {
+	validate := cmd.Args
+	names := argNames(cmd.Use)
+	cmd.Args = func(cmd *cobra.Command, args []string) error {
+		if validate != nil {
+			if err := validate(cmd, args); err != nil {
+				return err
+			}
+		}
+		for i, arg := range args {
+			if strings.TrimSpace(arg) == "" {
+				return fmt.Errorf("%s is empty", argName(names, i))
+			}
+		}
+		return nil
+	}
+}
+
+// argNames reads the placeholders off a usage line: `clear <DAG_ID> <RUN_ID>
+// <TASK_ID>...` gives DAG_ID, RUN_ID, TASK_ID.
+func argNames(use string) []string {
+	var names []string
+	for _, word := range strings.Fields(use)[1:] {
+		name := strings.Trim(word, "<>[].")
+		if name != word {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// argName is the placeholder for the argument at index i. Past the end it is
+// the last one, which is where a trailing `...` repeats.
+func argName(names []string, i int) string {
+	switch {
+	case len(names) == 0:
+		return fmt.Sprintf("argument %d", i+1)
+	case i >= len(names):
+		return names[len(names)-1]
+	default:
+		return names[i]
+	}
 }
 
 // attachTarget wires a command to the Airflow it acts on: the target's flags,

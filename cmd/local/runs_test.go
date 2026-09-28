@@ -67,6 +67,33 @@ func TestRunsListFiltersByStateAndDAG(t *testing.T) {
 	}
 }
 
+// The DAG can be named as the argument, as `runs get` and `runs trigger` take
+// it, or with --dag-id; naming two different ones is refused.
+func TestRunsListTakesTheDAGAsAnArgument(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns", twoRunsAF3)
+
+	out, _, err := runQuery(t, stub, "runs", "list", "orders_etl")
+	if err != nil {
+		t.Fatalf("runs list orders_etl: %v", err)
+	}
+	if !strings.Contains(out, "manual__2024-05-01") {
+		t.Errorf("stdout = %q", out)
+	}
+	if _, _, err := runQuery(t, stub, "runs", "list", "orders_etl", "--dag-id", "orders_etl"); err != nil {
+		t.Errorf("the argument and a matching --dag-id: %v", err)
+	}
+
+	before := len(stub.requests())
+	_, _, err = runQuery(t, stub, "runs", "list", "orders_etl", "--dag-id", "billing")
+	if err == nil || !strings.Contains(err.Error(), "different DAGs") {
+		t.Fatalf("err = %v, want the two DAGs refused", err)
+	}
+	if len(stub.requests()) != before {
+		t.Error("a request went out for a DAG the command could not settle on")
+	}
+}
+
 func TestRunsListFiltersByStartDate(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags/~/dagRuns", twoRunsAF3)

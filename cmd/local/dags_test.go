@@ -147,6 +147,31 @@ func TestDagsStatsCountsRunsByState(t *testing.T) {
 	}
 }
 
+// DAGs named as arguments count the same as --dag-id, so stats reads like the
+// other commands that take a DAG_ID.
+func TestDagsStatsTakesDAGsAsArguments(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[],"total_entries":0}`)
+
+	if _, _, err := runQuery(t, stub, "dags", "stats", "orders_etl", "billing", "--dag-id", "reports", "--dag-id", "billing"); err != nil {
+		t.Fatalf("dags stats with arguments: %v", err)
+	}
+	var asked []string
+	for _, req := range stub.requests() {
+		if req.Path == "/api/v2/dagStats" {
+			asked = append(asked, req.Query)
+		}
+	}
+	for _, want := range []string{"dag_ids=orders_etl", "dag_ids=billing", "dag_ids=reports"} {
+		if !strings.Contains(strings.Join(asked, " "), want) {
+			t.Errorf("queries = %v, want one carrying %s", asked, want)
+		}
+	}
+	if len(asked) != 3 {
+		t.Errorf("queries = %v, want billing asked once though it was named twice", asked)
+	}
+}
+
 // An Airflow with no dagStats endpoint gets a sentence, not a status dump.
 func TestDagsStatsSaysSoWhenNotServed(t *testing.T) {
 	stub := newAirflowStub(t)

@@ -3,11 +3,11 @@ package local
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -48,6 +48,8 @@ func newAPICmd(c *cli) *cobra.Command {
 			"  astro local api /config\n\n" +
 			"  # Trigger a run\n" +
 			"  astro local api /dags/etl/dagRuns -X POST --body '{\"logical_date\": null}'\n\n" +
+			"  # The same, with the body in a file\n" +
+			"  astro local api /dags/etl/dagRuns -X POST --input run.json\n\n" +
 			"  # A path below the version prefix\n" +
 			"  astro local api --root /health",
 		Args: cobra.ExactArgs(1),
@@ -57,6 +59,8 @@ func newAPICmd(c *cli) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&opts.method, "method", "X", http.MethodGet, "HTTP method")
 	cmd.Flags().StringVar(&opts.body, "body", "", "JSON request body, or - to read it from stdin")
+	cmd.Flags().StringVar(&opts.input, "input", "", "File holding the JSON request body, or - to read it from stdin")
+	cmd.MarkFlagsMutuallyExclusive("body", "input")
 	cmd.Flags().BoolVar(&opts.root, "root", false, "Address the server root, below the API version prefix")
 	return cmd
 }
@@ -65,6 +69,7 @@ func newAPICmd(c *cli) *cobra.Command {
 type apiOptions struct {
 	method string
 	body   string
+	input  string
 	root   bool
 }
 
@@ -135,21 +140,40 @@ func writeBody(w io.Writer, body []byte) error {
 // payload is the request body: nothing at all unless one was given, because no
 // body and an empty object are different requests.
 func (o apiOptions) payload(stdin io.Reader) (any, error) {
-	if o.body == "" {
+	flag, raw := "--body", []byte(o.body)
+	var err error
+	switch {
+	case o.input != "":
+		flag = "--input"
+		raw, err = readBody(o.input, stdin)
+	case o.body == "-":
+		raw, err = readBody(o.body, stdin)
+	case o.body == "":
 		return nil, nil
 	}
-	raw := o.body
-	if raw == "-" {
-		read, err := io.ReadAll(stdin)
-		if err != nil {
-			return nil, fmt.Errorf("read the request body from stdin: %w", err)
-		}
-		raw = string(read)
+	if err != nil {
+		return nil, err
 	}
-	if !json.Valid([]byte(raw)) {
-		return nil, errors.New("--body is not valid json")
+	if !json.Valid(raw) {
+		return nil, fmt.Errorf("%s is not valid json", flag)
 	}
 	return json.RawMessage(raw), nil
+}
+
+// readBody reads a request body from a file, or from stdin for "-".
+func readBody(source string, stdin io.Reader) ([]byte, error) {
+	if source != "-" {
+		read, err := os.ReadFile(source)
+		if err != nil {
+			return nil, fmt.Errorf("read the request body: %w", err)
+		}
+		return read, nil
+	}
+	read, err := io.ReadAll(stdin)
+	if err != nil {
+		return nil, fmt.Errorf("read the request body from stdin: %w", err)
+	}
+	return read, nil
 }
 
 // splitQuery separates a path from the query string typed onto it, so

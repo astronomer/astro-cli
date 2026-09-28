@@ -128,6 +128,31 @@ func TestTasksLogsAlwaysFetchTheWholeLog(t *testing.T) {
 	}
 }
 
+// An empty id widens a request rather than narrowing it: a clear with no
+// dag_run_id clears the task in every run of the DAG. A shell variable that
+// failed to fill passes exactly that, so every leaf refuses it by name before
+// anything is sent.
+func TestAnEmptyArgumentIsRefusedBeforeAnyRequest(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"tasks", "clear", "orders_etl", "", "load", "--dry-run"}, "RUN_ID is empty"},
+		{[]string{"tasks", "clear", "orders_etl", "run_1", "load", " ", "--yes"}, "TASK_ID is empty"},
+		{[]string{"runs", "get", "", "run_1"}, "DAG_ID is empty"},
+		{[]string{"runs", "list", ""}, "DAG_ID is empty"},
+	} {
+		stub := newAirflowStub(t)
+		_, _, err := runQuery(t, stub, tc.args...)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%v: err = %v, want %q", tc.args, err, tc.want)
+		}
+		if got := stub.requests(); len(got) != 0 {
+			t.Errorf("%v: requests went out: %v", tc.args, got)
+		}
+	}
+}
+
 // A clear that leaves the run in a terminal state never re-runs anything, so
 // the run is reset by default and the flag is how you decline.
 func TestTasksClearResetsTheRunAndNeedsConsent(t *testing.T) {
