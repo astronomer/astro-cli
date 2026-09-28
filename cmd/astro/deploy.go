@@ -483,10 +483,11 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		WaitTime:         waitTime,
 		NoDagsBaseDir:    noDagsBaseDir,
 		Interactive:      interactive,
-		// Same resolution the v1 path uses, so a CI job setting
-		// BUILD_SECRET_INPUT keeps working across the version boundary rather
-		// than silently losing its secrets on the day the project converts.
-		BuildSecrets: util.ResolveBuildSecrets(buildSecrets, os.Getenv(util.BuildSecretInputEnv)),
+		// The v1 path's resolution, so a CI job setting BUILD_SECRET_INPUT
+		// keeps working across the version boundary rather than silently
+		// losing its secrets on the day the project converts. With neither the
+		// flag nor the variable, the manifest's build-secrets apply.
+		BuildSecrets: util.ResolveProjectBuildSecrets(buildSecrets, m.Astro.BuildSecretSpecs()),
 		// The runtime build is checked against the catalog where the image is
 		// about to be built from it. Its warnings go to stderr, so a json run's
 		// stdout stays the one result object.

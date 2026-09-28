@@ -117,7 +117,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		Save:         opts.save,
 		Tag:          opts.tag,
 		Platform:     opts.platform,
-		BuildSecrets: resolveBuildSecrets(opts.buildSecrets),
+		BuildSecrets: util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
 		OutDir:       opts.outDir,
 		CheckRuntime: c.d.RuntimeCheck,
 	}, c.callbacks(r))

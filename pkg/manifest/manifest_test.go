@@ -593,6 +593,31 @@ var validationCases = []struct {
 		wantKeys:  []string{"tool.astro.dockerfile"},
 	},
 	{
+		name:      "build-secrets without a dockerfile",
+		wantCodes: []ProblemCode{CodeBuildSecretsWithoutDockerfile},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nbuild-secrets = ['id=netrc,env=NETRC_CONTENT']\n",
+		wantKeys:  []string{"tool.astro.build-secrets"},
+	},
+	{
+		name: "build-secrets entries that are not specs",
+		wantCodes: []ProblemCode{
+			CodeBuildSecretInvalid, CodeBuildSecretInvalid, CodeBuildSecretInvalid,
+			CodeBuildSecretInvalid, CodeBuildSecretInvalid, CodeExpectedString, CodeEmptyString,
+		},
+		content: "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = 'Dockerfile'\n" +
+			"build-secrets = ['hunter2', 'id=netrc,value=hunter2', 'env=NETRC_CONTENT', 'id=netrc,env=A,src=/b', 'id=netrc,src=.netrc', 3, ' ']\n",
+		wantKeys: []string{
+			"tool.astro.build-secrets[0]", "tool.astro.build-secrets[1]", "tool.astro.build-secrets[2]",
+			"tool.astro.build-secrets[3]", "tool.astro.build-secrets[4]", "tool.astro.build-secrets[5]", "tool.astro.build-secrets[6]",
+		},
+	},
+	{
+		name:      "build-secrets of the wrong shape",
+		wantCodes: []ProblemCode{CodeExpectedStringArray},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = 'Dockerfile'\nbuild-secrets = 'id=netrc,env=NETRC_CONTENT'\n",
+		wantKeys:  []string{"tool.astro.build-secrets"},
+	},
+	{
 		name:      "unknown key in [tool.astro]",
 		wantCodes: []ProblemCode{CodeUnknownKey},
 		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflw = \"3.1\"\n",

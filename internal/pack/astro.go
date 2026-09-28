@@ -87,15 +87,19 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	return warnings, nil
 }
 
-// warnMissingSecrets reports, before the build, each secret the declared
-// Dockerfile mounts that no build secret supplies, and returns them for a
-// failed build to name again.
-func warnMissingSecrets(req Request, cb localrt.Callbacks) util.MissingSecrets {
-	missing := util.MissingBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
+// checkSecrets runs before a build of the declared Dockerfile. It refuses a
+// build secret whose variable is unset, and warns about each secret the
+// Dockerfile mounts that no build secret supplies, returning those for a
+// failed build to name again. A generated build has nothing to check.
+func checkSecrets(req Request, cb localrt.Callbacks) (util.MissingSecrets, error) {
+	if req.Manifest.Astro.Dockerfile == "" {
+		return util.MissingSecrets{}, nil
+	}
+	missing, err := util.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
 	for _, w := range missing.Warnings() {
 		emit(cb, "warning: "+w)
 	}
-	return missing
+	return missing, err
 }
 
 // Build resolves the runtime base, builds the image, reads its runtime-version
@@ -130,9 +134,9 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
-	var missingSecrets util.MissingSecrets
-	if declared != "" {
-		missingSecrets = warnMissingSecrets(req, cb)
+	missingSecrets, err := checkSecrets(req, cb)
+	if err != nil {
+		return Result{}, err
 	}
 
 	// The astro artifact is an image, so Docker is required. Probe the engine up

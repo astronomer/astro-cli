@@ -709,6 +709,24 @@ func TestDockerfileBuildStepsAreReported(t *testing.T) {
 	assert.NotContains(t, strings.Join(res.Notes, "\n"), "instructions were not read")
 }
 
+// A secret the Dockerfile mounts gets a note with the build-secrets entry to
+// add, and no entry is written, since the file does not say where the secret
+// comes from.
+func TestDockerfileSecretMountsAreReported(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(
+		"FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"+
+			"RUN --mount=type=secret,id=netrc,dst=/root/.netrc pip install private\n"), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	assert.Contains(t, res.Notes, `Dockerfile: line 2 mounts build secret "netrc". To build without --build-secret each time, `+
+		`add 'id=netrc,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it`)
+	pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(pyproject), "build-secrets")
+}
+
 // The greenfield conversion says what it absorbed.
 //
 // A real v1 project has no pyproject.toml, so it takes this arm, where Plan

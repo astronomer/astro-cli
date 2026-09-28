@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 type CustomClaims struct {
@@ -106,6 +108,53 @@ func ResolveBuildSecrets(flagSecrets []string, fallbacks ...string) []string {
 	return nil
 }
 
+// ResolveProjectBuildSecrets returns the build secrets for a build of a v2
+// project's own Dockerfile: the --build-secret flags, else BUILD_SECRET_INPUT,
+// else declared, the project's [tool.astro] build-secrets (Astro.BuildSecretSpecs). Each source replaces the ones
+// after it rather than adding to them.
+func ResolveProjectBuildSecrets(flagSecrets, declared []string) []string {
+	if secrets := ResolveBuildSecrets(flagSecrets, os.Getenv(BuildSecretInputEnv)); len(secrets) > 0 {
+		return secrets
+	}
+	return declared
+}
+
+// CheckBuildSecrets runs before a build of the project's own Dockerfile. It
+// refuses a secret spec that names an unset or empty environment variable:
+// Docker would mount nothing for it, and the build would fail later, in
+// whatever step read the secret. Otherwise it returns MissingBuildSecrets.
+func CheckBuildSecrets(projectDir, dockerfile string, secrets []string) (MissingSecrets, error) {
+	if err := checkBuildSecretEnv(secrets); err != nil {
+		return MissingSecrets{}, err
+	}
+	return MissingBuildSecrets(projectDir, dockerfile, secrets), nil
+}
+
+// conventionalEnvName is the only shape of env= an error repeats. A token the
+// shell put where the name belongs can still be a valid name, but tokens mix
+// in lower case where variable names rarely do.
+var conventionalEnvName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+
+// checkBuildSecretEnv refuses a spec that does not parse, since docker would
+// echo it in its own error, and one whose env= variable is empty or unset.
+func checkBuildSecretEnv(secrets []string) error {
+	for _, spec := range secrets {
+		s, err := manifest.ParseBuildSecret(spec)
+		if err != nil {
+			return fmt.Errorf("a build secret spec %w", err)
+		}
+		if s.Env == "" || os.Getenv(s.Env) != "" {
+			continue
+		}
+		variable := "the environment variable its env= names"
+		if conventionalEnvName.MatchString(s.Env) {
+			variable = "the environment variable " + s.Env
+		}
+		return fmt.Errorf("build secret %q reads %s, which is empty or not set. Set it before the build, or give the secret another source", s.ID, variable)
+	}
+	return nil
+}
+
 // MissingSecrets are the build secrets a project's Dockerfile mounts that no
 // spec supplies.
 type MissingSecrets struct {
@@ -124,10 +173,8 @@ func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) Missin
 	}
 	given := map[string]bool{}
 	for _, spec := range secrets {
-		for _, kv := range strings.Split(spec, ",") {
-			if k, v, _ := strings.Cut(kv, "="); strings.EqualFold(strings.TrimSpace(k), "id") {
-				given[strings.TrimSpace(v)] = true
-			}
+		if s, err := manifest.ParseBuildSecret(spec); err == nil {
+			given[s.ID] = true
 		}
 	}
 	missing := MissingSecrets{Dockerfile: dockerfile}

@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -233,6 +234,7 @@ func readV1Project(dir string) (*v1Project, error) {
 		v1.notes = append(v1.notes, notes...)
 		v1.notes = append(v1.notes, build...)
 		v1.notes = append(v1.notes, pipInstallNote(data)...)
+		v1.notes = append(v1.notes, buildSecretNotes(filepath.Join(dir, "Dockerfile"))...)
 		if stated {
 			v1.statedVersion = true
 		}
@@ -897,6 +899,22 @@ func isPackageSpec(arg string) bool {
 		return false
 	}
 	return !strings.HasSuffix(name, ".whl") && !strings.HasSuffix(name, ".tar.gz") && !strings.HasSuffix(name, ".zip")
+}
+
+// buildSecretNotes suggests a [tool.astro] build-secrets entry for each secret
+// the Dockerfile mounts. Where each secret comes from is not in the file, so
+// the conversion writes no entry itself.
+func buildSecretNotes(path string) []string {
+	mounts, err := airflowrt.SecretMounts(path)
+	if err != nil {
+		return nil
+	}
+	notes := make([]string, 0, len(mounts))
+	for _, m := range mounts {
+		notes = append(notes, fmt.Sprintf("Dockerfile: line %d mounts build secret %q. To build without --build-secret each time, "+
+			"add 'id=%s,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it", m.Line, m.ID, m.ID))
+	}
+	return notes
 }
 
 // splitImageRef turns the text after FROM into an image reference and its tag,

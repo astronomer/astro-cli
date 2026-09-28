@@ -169,6 +169,10 @@ type Astro struct {
 	// whose Airflow the tag shows to disagree with the requirement, or one
 	// beside a Dockerfile. Read it as Manifest.Airflow().Runtime.
 	Runtime string
+	// BuildSecrets is [tool.astro] build-secrets, docker build --secret specs
+	// for Dockerfile's build, as written. Parse refuses it without a
+	// Dockerfile. Read it through BuildSecretSpecs.
+	BuildSecrets []string
 }
 
 // Link is one committed deployment link: an Airflow the project talks to,
@@ -330,6 +334,13 @@ const (
 	CodeProjectNameInvalid       ProblemCode = "project_name_invalid"
 	CodeDockerfileSeparators     ProblemCode = "dockerfile_separators"
 	CodeDockerfileOutsideProject ProblemCode = "dockerfile_outside_project"
+	// CodeBuildSecretInvalid is a build-secrets entry that is not a docker
+	// --secret spec naming an id and one source.
+	CodeBuildSecretInvalid ProblemCode = "build_secret_invalid"
+	// CodeBuildSecretsWithoutDockerfile is build-secrets with no dockerfile
+	// declared: a generated image has no build step of the project's to
+	// mount a secret into.
+	CodeBuildSecretsWithoutDockerfile ProblemCode = "build_secrets_without_dockerfile"
 	// CodeTargetNotAName is [tool.astro] target given a table: the old
 	// spelling of the backend-config section, which is its own block now.
 	CodeTargetNotAName ProblemCode = "target_not_a_name"
@@ -436,8 +447,8 @@ var problemCodes = []ProblemCode{
 	CodeExpectedStringArray, CodeEmptyString, CodeUnknownKey,
 
 	CodeProjectNameInvalid,
-	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeTargetNotAName,
-	CodeDomainWithoutWorkspace,
+	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeBuildSecretInvalid,
+	CodeBuildSecretsWithoutDockerfile, CodeTargetNotAName, CodeDomainWithoutWorkspace,
 
 	CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 	CodeAirflowCoreBeforeThree, CodeDependenciesDynamic, CodeAirflowRemoved,
@@ -638,7 +649,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "deployments", "dockerfile", "domain", "env", "packages", "pools", "runtime", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "packages", "pools", "runtime", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
@@ -719,8 +730,9 @@ func (p *parser) astro(raw map[string]any) Astro {
 		// `declared != ""` test and names no file, so leaving it untrimmed here
 		// would have let a whitespace declaration suppress the desktop's
 		// presence fallback and take the project's real Dockerfile away.
-		Dockerfile: strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
-		Runtime:    strings.TrimSpace(p.str(runtimeKey, raw["runtime"])),
+		Dockerfile:   strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
+		Runtime:      strings.TrimSpace(p.str(runtimeKey, raw["runtime"])),
+		BuildSecrets: p.buildSecrets(raw["build-secrets"]),
 	}
 	a.Deployments = p.links(raw["deployments"], &a)
 	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
@@ -1030,11 +1042,15 @@ func (p *parser) table(key string, v any) map[string]any {
 	return t
 }
 
-// packages decodes [tool.astro] packages, an array of OS package names. Each
-// entry is checked in place so a problem carries the index of the entry that
-// caused it.
+// packages decodes [tool.astro] packages, an array of OS package names.
 func (p *parser) packages(v any) []string {
-	const key = astroRoot + ".packages"
+	return p.stringArray(astroRoot+".packages", v, nil)
+}
+
+// stringArray decodes an optional array of non-empty strings. Each entry is
+// checked in place so a problem carries the index of the entry that caused
+// it, and check, when set, sees each entry with that indexed key.
+func (p *parser) stringArray(key string, v any, check func(key, s string)) []string {
 	if v == nil {
 		return nil
 	}
@@ -1045,14 +1061,18 @@ func (p *parser) packages(v any) []string {
 	}
 	out := make([]string, 0, len(items))
 	for i, item := range items {
+		itemKey := fmt.Sprintf("%s[%d]", key, i)
 		s, ok := item.(string)
 		if !ok {
-			p.add(CodeExpectedString, fmt.Sprintf("%s[%d]", key, i), "expected a string")
+			p.add(CodeExpectedString, itemKey, "expected a string")
 			continue
 		}
 		if strings.TrimSpace(s) == "" {
-			p.add(CodeEmptyString, fmt.Sprintf("%s[%d]", key, i), "must be a non-empty string")
+			p.add(CodeEmptyString, itemKey, "must be a non-empty string")
 			continue
+		}
+		if check != nil {
+			check(itemKey, s)
 		}
 		out = append(out, s)
 	}
@@ -1141,6 +1161,10 @@ func (p *parser) validate(m *Manifest) {
 			// something is there. See pkg/localrt.
 			p.add(CodeDockerfileOutsideProject, astroRoot+".dockerfile", fmt.Sprintf("%q has to be a path inside the project", v))
 		}
+	}
+	if len(m.Astro.BuildSecrets) > 0 && m.Astro.Dockerfile == "" {
+		p.add(CodeBuildSecretsWithoutDockerfile, buildSecretsKey, "needs a declared dockerfile that mounts the secrets in a RUN step. "+
+			"A generated image installs your dependencies through the runtime image and has no build step of yours for a secret to reach")
 	}
 
 	var defaults []string

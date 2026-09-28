@@ -103,6 +103,7 @@ func TestRunChecksTheRuntimeBuild(t *testing.T) {
 // An image deploy warns about a secret the declared Dockerfile mounts that no
 // --build-secret supplies, before it builds, and still ships.
 func TestRunWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
 	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
 	var warnings []string
@@ -145,4 +146,22 @@ func TestRunFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
 	other := errors.New("pushing the image: unauthorized")
 	_, err = Run(req, &fakeDeployer{imgErr: other})
 	assert.Equal(t, other, err, "only a failed Dockerfile build gets the hint")
+}
+
+// An image deploy whose build secret names an unset variable stops before it
+// builds or ships anything.
+func TestRunRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "")
+	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
+	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
+	req := Request{ProjectDir: dir, Manifest: m, LinkName: "prod", BuildSecrets: []string{"id=netrc,env=NETRC_CONTENT"}}
+
+	d := &fakeDeployer{}
+	_, err := Run(req, d)
+	require.ErrorContains(t, err, "reads the environment variable NETRC_CONTENT")
+	assert.Zero(t, d.imgDeploys)
+
+	req.DagsOnly = true
+	_, err = Run(req, &fakeDeployer{})
+	require.NoError(t, err, "a dags-only deploy builds nothing")
 }

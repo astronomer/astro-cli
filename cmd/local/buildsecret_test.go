@@ -48,6 +48,7 @@ const (
 )
 
 func TestBuildSecretReachesTheDockerfileBuild(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	secrets := []string{"id=netrc,env=NETRC_CONTENT", "id=pip,src=/tmp/pip.conf"}
 	flags := []string{"--build-secret", secrets[0], "--build-secret", secrets[1]}
 	for _, tc := range []struct {
@@ -77,6 +78,7 @@ func TestBuildSecretReachesTheDockerfileBuild(t *testing.T) {
 }
 
 func TestBuildSecretInputIsReadWhenTheFlagIsNotGiven(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	d, _ := testDeps(t)
 	var plans []localrt.Plan
 	d.Runtime = planRecorder{plans: &plans}
@@ -191,6 +193,7 @@ func TestPackageRefusesABuildSecretItCannotUse(t *testing.T) {
 // Dockerfile mounts that nothing supplies, and names the flag that would. The
 // start goes ahead: a secret mount can be optional.
 func TestStartWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	for _, tc := range []struct {
 		name  string
 		args  []string
@@ -227,6 +230,7 @@ func TestStartWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 // The warning prints before the build, and a failed build's output pushes it
 // out of sight, so the final error names the unsupplied secret again.
 func TestFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	const hint = `Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`
 	buildErr := fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)
 	for _, tc := range []struct {
@@ -261,5 +265,97 @@ func TestFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
 				t.Errorf("hinted = %v, want %v; err: %v", got, tc.hints, err)
 			}
 		})
+	}
+}
+
+const declaredBuildSecrets = declaredDockerfile + "build-secrets = ['id=netrc,env=NETRC_CONTENT']\n"
+
+// A Docker-mode start builds with the manifest's build-secrets when no flag or
+// BUILD_SECRET_INPUT gives any, and counts their ids as given. Standalone
+// builds nothing and says nothing about them.
+func TestManifestBuildSecretsReachTheDockerfileBuild(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		mode localrt.Mode
+	}{
+		{name: "start", args: []string{"local", "start", "--docker"}},
+		{name: "restart", args: []string{"local", "restart"}, mode: localrt.ModeDocker},
+		{name: "standalone", args: []string{"local", "start"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(util.BuildSecretInputEnv, "")
+			t.Setenv("NETRC_CONTENT", "machine example.com")
+			d, out := testDeps(t)
+			var plans []localrt.Plan
+			d.Runtime = planRecorder{plans: &plans, mode: tc.mode}
+			wiringProject(t, &d, declaredBuildSecrets, "")
+			dir, _ := d.WorkingDir()
+			dockerfile := "FROM " + matchingBase + "\nRUN --mount=type=secret,id=netrc pip install private\n"
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			_ = execute(t, d, tc.args...)
+			if len(plans) != 1 {
+				t.Fatalf("started %d times, want 1", len(plans))
+			}
+			if want := []string{"id=netrc,env=NETRC_CONTENT"}; !slices.Equal(plans[0].BuildSecrets, want) {
+				t.Errorf("BuildSecrets = %q, want %q", plans[0].BuildSecrets, want)
+			}
+			if strings.Contains(out.String(), "secret") {
+				t.Errorf("warned about a secret: %q", out.String())
+			}
+		})
+	}
+}
+
+// A Docker-mode build whose secret names an unset variable stops before it
+// builds, naming the secret and the variable. Standalone builds nothing, so
+// it starts.
+func TestStartRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		args    []string
+		mode    localrt.Mode
+		refuses bool
+	}{
+		{name: "start", args: []string{"local", "start", "--docker"}, refuses: true},
+		{name: "restart", args: []string{"local", "restart"}, mode: localrt.ModeDocker, refuses: true},
+		{name: "flag", args: []string{"local", "start", "--docker", "--build-secret", "id=pip,env=PIP_CONF"}, refuses: true},
+		{name: "standalone", args: []string{"local", "start"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(util.BuildSecretInputEnv, "")
+			t.Setenv("NETRC_CONTENT", "")
+			t.Setenv("PIP_CONF", "")
+			d, _ := testDeps(t)
+			var plans []localrt.Plan
+			d.Runtime = planRecorder{plans: &plans, mode: tc.mode}
+			wiringProject(t, &d, declaredBuildSecrets, matchingBase)
+
+			err := execute(t, d, tc.args...)
+			refused := err != nil && strings.Contains(err.Error(), "reads the environment variable")
+			if refused != tc.refuses {
+				t.Fatalf("refused = %v, want %v; err: %v", refused, tc.refuses, err)
+			}
+			if tc.refuses && len(plans) != 0 {
+				t.Error("the start reached the runtime")
+			}
+		})
+	}
+}
+
+// astro package astro reads the manifest's build-secrets too, and refuses one
+// whose variable is unset before it looks for Docker.
+func TestPackageReadsManifestBuildSecrets(t *testing.T) {
+	t.Setenv(util.BuildSecretInputEnv, "")
+	t.Setenv("NETRC_CONTENT", "")
+	d, _ := testDeps(t)
+	wiringProject(t, &d, declaredBuildSecrets, matchingBase)
+
+	err := execute(t, d, "package", "astro")
+	if err == nil || !strings.Contains(err.Error(), `build secret "netrc" reads the environment variable NETRC_CONTENT`) {
+		t.Fatalf("err = %v, want the unset variable named", err)
 	}
 }

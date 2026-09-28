@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // Options carries the per-invocation choices the command line supplies. The
@@ -49,10 +50,11 @@ type Options struct {
 	// Start anyway. The missing values come back on Built.StartedWithout for
 	// the caller to warn about. Nothing is invented for them.
 	AllowMissing bool
-	// BuildSecrets are docker build --secret specs for a declared Dockerfile's
-	// build (--build-secret, or BUILD_SECRET_INPUT). Carried onto the Plan as
-	// given; whether asking for them makes sense is cmd's to decide.
-	BuildSecrets []string
+	// BuildSecretFlags are the --build-secret specs for a declared
+	// Dockerfile's build. Build resolves them against BUILD_SECRET_INPUT and
+	// the manifest's build-secrets (util.ResolveProjectBuildSecrets); whether
+	// asking for them makes sense is cmd's to decide.
+	BuildSecretFlags []string
 }
 
 // Built is a resolved plan plus the discovered project, so cmd can persist the
@@ -149,7 +151,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// thing. Same project, two tools, two different images, and the one
 			// that dropped the user's RUN steps was this one.
 			Dockerfile:   m.Astro.Dockerfile,
-			BuildSecrets: opts.BuildSecrets,
+			BuildSecrets: util.ResolveProjectBuildSecrets(opts.BuildSecretFlags, m.Astro.BuildSecretSpecs()),
 			// Empty when the manifest states requires-python: the venv is
 			// built inside the project, so uv reads it from the manifest
 			// itself and passing it would only restate what uv is about to

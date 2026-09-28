@@ -214,7 +214,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
-	opts.BuildSecrets = resolveBuildSecrets(buildSecretFlag)
+	opts.BuildSecretFlags = buildSecretFlag
 	built, err := plan.Build(wd, opts)
 	if err != nil {
 		return c.reportBuildError(r, err)
@@ -224,7 +224,10 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
 	}
-	missingSecrets := warnMissingBuildSecrets(r, built.Plan)
+	missingSecrets, err := warnMissingBuildSecrets(r, built.Plan)
+	if err != nil {
+		return err
+	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWithout(r, "started", built.StartedWithout)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
@@ -538,11 +541,11 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	// restart picks up edits — but keep the running mode, port, and session
 	// tie. Build before stopping: a build failure leaves Airflow untouched.
 	built, err := plan.Build(wd, plan.Options{
-		Mode:            st.Mode,
-		RequestedPort:   st.Port,
-		StopWithSession: st.StopWithSession,
-		AllowMissing:    allowMissing,
-		BuildSecrets:    resolveBuildSecrets(buildSecretFlag),
+		Mode:             st.Mode,
+		RequestedPort:    st.Port,
+		StopWithSession:  st.StopWithSession,
+		AllowMissing:     allowMissing,
+		BuildSecretFlags: buildSecretFlag,
 
 		WorkspaceProvider: c.workspaceProvider(),
 	})
@@ -558,7 +561,10 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
 	}
-	missingSecrets := warnMissingBuildSecrets(r, built.Plan)
+	missingSecrets, err := warnMissingBuildSecrets(r, built.Plan)
+	if err != nil {
+		return err
+	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWithout(r, "started", built.StartedWithout)
 	// Before the stop, like the build: a refusal leaves Airflow running.

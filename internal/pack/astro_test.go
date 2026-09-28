@@ -412,6 +412,7 @@ func TestAstroBuildUsesADeclaredDockerfile(t *testing.T) {
 }
 
 func TestAstroBuildHandsBuildSecretsToTheBuilder(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	builder := &fakeBuilder{}
 	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nRUN echo hi\n")
 	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT", "id=pip,src=/tmp/pip.conf"}
@@ -525,6 +526,7 @@ func TestAstroBuildWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 // A failed package build names the unsupplied secret again in its error, since
 // the build output has pushed the warning out of sight.
 func TestAstroBuildFailureNamesTheUnsuppliedSecretMount(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "machine example.com")
 	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nRUN --mount=type=secret,id=netrc pip install private\n")
 	builder := &fakeBuilder{err: fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)}
 
@@ -536,4 +538,16 @@ func TestAstroBuildFailureNamesTheUnsuppliedSecretMount(t *testing.T) {
 	_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.ErrorIs(t, err, imagebuild.ErrDockerfileBuild)
 	assert.NotContains(t, err.Error(), "which was not given")
+}
+
+// A package build whose secret names an unset variable stops before it builds.
+func TestAstroBuildRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
+	t.Setenv("NETRC_CONTENT", "")
+	builder := &fakeBuilder{}
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nRUN --mount=type=secret,id=netrc pip install private\n")
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT"}
+
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.ErrorContains(t, err, "reads the environment variable NETRC_CONTENT")
+	assert.Empty(t, builder.gotReq.Tag, "the build ran")
 }

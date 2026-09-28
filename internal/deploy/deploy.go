@@ -78,7 +78,9 @@ type Request struct {
 	// ImageName is --image-name: a prebuilt local image to deploy instead of
 	// building from the manifest. "" means build.
 	ImageName string
-	// BuildSecrets are --build-secret specs forwarded to the image build.
+	// BuildSecrets are docker build --secret specs forwarded to the image
+	// build: --build-secret, BUILD_SECRET_INPUT or the manifest's
+	// build-secrets, as util.ResolveProjectBuildSecrets picked them.
 	//
 	// Only a project that declared its own Dockerfile can use one: a generated
 	// build's Dockerfile is `FROM <base>` and the install happens in the runtime
@@ -271,7 +273,10 @@ func checkImageSource(req Request) (util.MissingSecrets, error) {
 		warn = func(string) {}
 	}
 	if dockerfile := req.Manifest.Astro.Dockerfile; dockerfile != "" {
-		missing = util.MissingBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets)
+		var err error
+		if missing, err = util.CheckBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets); err != nil {
+			return missing, err
+		}
 		for _, w := range missing.Warnings() {
 			warn(w)
 		}
@@ -330,8 +335,9 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		// Deployment on a missing driver.
 		dockerfile = req.Manifest.Astro.Dockerfile
 	}
-	// Secrets are carried, not validated. Whether asking for one is a mistake
-	// depends on whether the USER asked — ResolveBuildSecrets also reads
+	// Secrets are carried here; checkImageSource has already checked that
+	// their variables are set. Whether asking for one is a mistake depends on
+	// whether the USER asked — ResolveProjectBuildSecrets also reads
 	// BUILD_SECRET_INPUT from the environment — and this package cannot see the
 	// difference between a flag and an ambient variable. cmd/astro can, and
 	// refuses there, before anything is resolved or prompted for.

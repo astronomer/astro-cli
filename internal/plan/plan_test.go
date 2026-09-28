@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	pkgmanifest "github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 func init() {
@@ -68,7 +69,7 @@ func TestChoosePortPrecedence(t *testing.T) {
 func TestBuildFillsPlanFromManifest(t *testing.T) {
 	dir := newProject(t)
 	secrets := []string{"id=netrc,env=NETRC_CONTENT"}
-	built, err := Build(dir, Options{Mode: localrt.ModeDocker, RequestedPort: 8080, StopWithSession: true, BuildSecrets: secrets})
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker, RequestedPort: 8080, StopWithSession: true, BuildSecretFlags: secrets})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +95,44 @@ func TestBuildFillsPlanFromManifest(t *testing.T) {
 	wantStateDir, _ := localrt.StateDir(dir)
 	if p.StateDir != wantStateDir {
 		t.Errorf("StateDir = %q, want %q", p.StateDir, wantStateDir)
+	}
+}
+
+// --build-secret replaces BUILD_SECRET_INPUT, which replaces the manifest's
+// build-secrets: the first source that gives any is the whole list.
+func TestBuildSecretPrecedence(t *testing.T) {
+	declared := []string{"id=netrc,env=NETRC_CONTENT"}
+	input := []string{"id=pip,env=PIP_CONF"}
+	flag := []string{"id=ca,src=/etc/ca.pem"}
+	for _, tc := range []struct {
+		name  string
+		flag  []string
+		input string
+		want  []string
+	}{
+		{name: "manifest", want: declared},
+		{name: "BUILD_SECRET_INPUT over the manifest", input: input[0], want: input},
+		{name: "flag over both", flag: flag, input: input[0], want: flag},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newProject(t)
+			pyproject := manifestTOML + "dockerfile = 'Dockerfile'\nbuild-secrets = ['" + declared[0] + "']\n"
+			if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(pyproject), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv(util.BuildSecretInputEnv, tc.input)
+
+			built, err := Build(dir, Options{BuildSecretFlags: tc.flag})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(built.Plan.BuildSecrets, tc.want) {
+				t.Errorf("BuildSecrets = %q, want %q", built.Plan.BuildSecrets, tc.want)
+			}
+		})
 	}
 }
 
