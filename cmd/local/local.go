@@ -347,6 +347,8 @@ func omissionText(o localrt.Omission) string {
 		return "this project declares its own Dockerfile (" + o.Dockerfile + "); standalone mode builds no image, so nothing that file installs or copies is applied. Run in Docker mode (--docker) to build it"
 	case localrt.OmissionPackages:
 		return "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself"
+	case localrt.OmissionComposeOverride:
+		return "this project has a " + localrt.ComposeOverrideFile + "; standalone mode runs no containers, so none of its services run and nothing it sets is applied. Run in Docker mode (--docker) to use it"
 	default:
 		return "this project declares " + string(o.Kind) + ", which standalone mode does not apply. Run in Docker mode (--docker) to apply it"
 	}

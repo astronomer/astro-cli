@@ -20,7 +20,9 @@ import (
 // of it is re-derived here. Re-deriving would mean naming the built image by a
 // rule only this package knows, and that rule has a case a second copy would
 // get wrong: with nothing extra to install the builder builds nothing and hands
-// back the base runtime image, so the per-project tag never exists.
+// back the base runtime image, so the per-project tag never exists. The
+// project's override is merged over it as it is now, not as it was at that
+// start, so an override the up would reject fails this too.
 //
 // That file is also what makes this work while the project is down. A plain
 // stop removes the state record and leaves the compose file and the image in
@@ -90,7 +92,7 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	}
 	line := composeLine{
 		conn:       conn,
-		file:       path,
+		files:      composeFiles(path, projectPath),
 		name:       name,
 		projectDir: projectPath,
 		// The caller's environment reaches the compose process too, not only

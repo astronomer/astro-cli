@@ -375,7 +375,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// declarations at all — see passEnv.
 	up := composeLine{
 		conn:       conn,
-		file:       composePath,
+		files:      composeFiles(composePath, projectPath),
 		name:       name,
 		projectDir: projectPath,
 		extraEnv:   secretEnviron(p.SecretEnv),
@@ -1031,7 +1031,7 @@ func (e *Engine) writeComposeFile(dir string, in composeInput) (string, error) {
 // composeLine is the invariant part of a compose invocation.
 type composeLine struct {
 	conn       engineConn
-	file       string
+	files      []string
 	name       string
 	projectDir string
 	// extraEnv is added to the compose process environment on top of the engine
@@ -1050,8 +1050,11 @@ type composeLine struct {
 // looks for the project's .env to resolve the valueless entries passEnv wrote.
 func (l composeLine) argv(args ...string) []string {
 	full := []string{"compose"}
-	if l.file != "" {
-		full = append(full, "--file", l.file, "--project-directory", l.projectDir)
+	if len(l.files) > 0 {
+		for _, f := range l.files {
+			full = append(full, "--file", f)
+		}
+		full = append(full, "--project-directory", l.projectDir)
 	}
 	return append(append(full, "--project-name", l.name), args...)
 }

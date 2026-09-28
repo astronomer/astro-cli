@@ -23,6 +23,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -238,6 +240,17 @@ type Stdio struct {
 // container will resolve, not host paths. Declared here so that caller does not
 // hardcode a second copy of the mount layout.
 const ProjectDirInImage = "/usr/local/airflow"
+
+// ComposeOverrideFile is the project-relative compose file docker mode merges
+// over the one it generates, as v1 did. Standalone mode cannot honor one;
+// StandaloneOmissions reports it.
+const ComposeOverrideFile = "docker-compose.override.yml"
+
+// HasComposeOverride reports whether projectPath holds a ComposeOverrideFile.
+func HasComposeOverride(projectPath string) bool {
+	info, err := os.Stat(filepath.Join(projectPath, ComposeOverrideFile))
+	return err == nil && info.Mode().IsRegular()
+}
 
 // ImageRun is one command to run in a project's own image with no Airflow
 // running: the offline counterpart to Airflow.Run, which execs into a live

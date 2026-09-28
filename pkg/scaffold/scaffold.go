@@ -1139,8 +1139,8 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
-		{"docker-compose.override.yml", "not read — move any service your dags need into your own setup"},
-		{"docker-compose.override.yaml", "not read — move any service your dags need into your own setup"},
+		{"docker-compose.override.yml", "read in Docker mode — `astro local start --docker` merges it over the services it generates; standalone mode does not run it"},
+		{"docker-compose.override.yaml", "not read — Docker mode merges docker-compose.override.yml, so rename it to use it there"},
 	}
 	for _, c := range checks {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(c.file))); err != nil {

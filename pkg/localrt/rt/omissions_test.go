@@ -1,6 +1,8 @@
 package rt
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -53,6 +55,39 @@ func TestStandaloneOmissions(t *testing.T) {
 	}
 }
 
+func TestStandaloneOmissionsComposeOverride(t *testing.T) {
+	withOverride := t.TempDir()
+	if err := os.WriteFile(filepath.Join(withOverride, ComposeOverrideFile), []byte("services: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dirNamedLikeIt := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dirNamedLikeIt, ComposeOverrideFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		plan Plan
+		want []Omission
+	}{
+		{"an override file", Plan{ProjectPath: withOverride}, []Omission{{Kind: OmissionComposeOverride}}},
+		{
+			"after the Dockerfile",
+			Plan{ProjectPath: withOverride, Dockerfile: "Dockerfile"},
+			[]Omission{{Kind: OmissionDockerfile, Dockerfile: "Dockerfile"}, {Kind: OmissionComposeOverride}},
+		},
+		{"no override file", Plan{ProjectPath: t.TempDir()}, nil},
+		{"a directory by that name", Plan{ProjectPath: dirNamedLikeIt}, nil},
+		{"docker mode merges it", Plan{ProjectPath: withOverride, Mode: ModeDocker}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.plan.StandaloneOmissions(); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("StandaloneOmissions() = %#v, want %#v", got, tc.want)
+			}
+		})
+	}
+}
+
 // The returned list is the caller's to keep: changing it must not reach back
 // into the Plan that is about to be started.
 func TestStandaloneOmissionsCopiesPackages(t *testing.T) {
@@ -67,7 +102,7 @@ func TestStandaloneOmissionsCopiesPackages(t *testing.T) {
 // The kinds are strings a consumer keys its own copy off, so they are part of
 // the contract.
 func TestOmissionKindValues(t *testing.T) {
-	if OmissionDockerfile != "dockerfile" || OmissionPackages != "packages" {
-		t.Errorf("omission kinds changed: %q, %q", OmissionDockerfile, OmissionPackages)
+	if OmissionDockerfile != "dockerfile" || OmissionPackages != "packages" || OmissionComposeOverride != "compose_override" {
+		t.Errorf("omission kinds changed: %q, %q, %q", OmissionDockerfile, OmissionPackages, OmissionComposeOverride)
 	}
 }

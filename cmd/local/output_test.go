@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -314,26 +316,32 @@ func TestOmissionTextUnknownKind(t *testing.T) {
 // Astro Desktop's logs match on this text, so a rewording is a deliberate change
 // to this test rather than a side effect.
 func TestWarnStandaloneOmissionsExactText(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, localrt.ComposeOverrideFile), []byte("services: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	plan := localrt.Plan{
-		Dockerfile: "docker/Dockerfile",
-		Packages:   []string{"libpq-dev"},
+		ProjectPath: dir,
+		Dockerfile:  "docker/Dockerfile",
+		Packages:    []string{"libpq-dev"},
 	}
 	const dockerfileText = "this project declares its own Dockerfile (docker/Dockerfile); standalone mode builds no image, so nothing that file installs or copies is applied. Run in Docker mode (--docker) to build it"
 	const packagesText = "this project declares OS packages; standalone mode cannot install them, run in Docker mode (--docker) or install them yourself"
+	const overrideText = "this project has a docker-compose.override.yml; standalone mode runs no containers, so none of its services run and nothing it sets is applied. Run in Docker mode (--docker) to use it"
 
 	text := &bytes.Buffer{}
 	warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, plan)
-	if want := "warning: " + dockerfileText + "\nwarning: " + packagesText + "\n"; text.String() != want {
+	if want := "warning: " + dockerfileText + "\nwarning: " + packagesText + "\nwarning: " + overrideText + "\n"; text.String() != want {
 		t.Errorf("text output:\n got %q\nwant %q", text.String(), want)
 	}
 
 	jsonOut := &bytes.Buffer{}
 	warnStandaloneOmissions(Renderer{Format: FormatJSON, Out: jsonOut}, plan)
 	lines := strings.Split(strings.TrimSpace(jsonOut.String()), "\n")
-	if len(lines) != 2 {
-		t.Fatalf("want two JSON warning lines, got %q", jsonOut.String())
+	if len(lines) != 3 {
+		t.Fatalf("want three JSON warning lines, got %q", jsonOut.String())
 	}
-	for i, want := range []string{dockerfileText, packagesText} {
+	for i, want := range []string{dockerfileText, packagesText, overrideText} {
 		var e event
 		if err := json.Unmarshal([]byte(lines[i]), &e); err != nil {
 			t.Fatalf("line %d is not JSON: %v: %q", i, err, lines[i])

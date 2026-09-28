@@ -53,6 +53,10 @@ type (
 // image, for a RunInImage caller building container-side arguments.
 const ProjectDirInImage = rt.ProjectDirInImage
 
+// ComposeOverrideFile is the project file docker mode merges over its own
+// compose file.
+const ComposeOverrideFile = rt.ComposeOverrideFile
+
 const (
 	ModeStandalone = rt.ModeStandalone
 	ModeDocker     = rt.ModeDocker
@@ -66,8 +70,9 @@ const (
 
 // The kinds of Omission Plan.StandaloneOmissions reports.
 const (
-	OmissionDockerfile = rt.OmissionDockerfile
-	OmissionPackages   = rt.OmissionPackages
+	OmissionDockerfile      = rt.OmissionDockerfile
+	OmissionPackages        = rt.OmissionPackages
+	OmissionComposeOverride = rt.OmissionComposeOverride
 )
 
 // ErrNotImplemented marks a contract entry point with no engine behind it. Still

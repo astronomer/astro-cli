@@ -145,3 +145,19 @@ func TestRetireRemovesWhatWasCarriedWhole(t *testing.T) {
 	assert.Len(t, cs.Deleted, 3)
 	assert.NotContains(t, strings.Join(cs.Updated, "\n"), "requirements.txt")
 }
+
+// Docker mode merges docker-compose.override.yml and no other spelling, and the
+// notes say which mode runs it.
+func TestTheComposeOverrideNotesNameDockerMode(t *testing.T) {
+	dir := t.TempDir()
+	writeAll(t, dir, map[string]string{
+		"Dockerfile":                   pinOnlyDockerfile,
+		"docker-compose.override.yml":  "services: {}\n",
+		"docker-compose.override.yaml": "services: {}\n",
+	})
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+
+	assert.Contains(t, res.Notes, "docker-compose.override.yml: read in Docker mode — `astro local start --docker` merges it over the services it generates; standalone mode does not run it")
+	assert.Contains(t, res.Notes, "docker-compose.override.yaml: not read — Docker mode merges docker-compose.override.yml, so rename it to use it there")
+}

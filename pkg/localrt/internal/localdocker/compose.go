@@ -373,6 +373,14 @@ func projectMounts(projectPath string) []mount {
 	return out
 }
 
+// composeFiles lists the files compose reads for this project, in merge order.
+func composeFiles(generated, projectPath string) []string {
+	if !rt.HasComposeOverride(projectPath) {
+		return []string{generated}
+	}
+	return []string{generated, filepath.Join(projectPath, rt.ComposeOverrideFile)}
+}
+
 // generateCompose renders the compose file for a plan with all ports and
 // the image already resolved.
 func generateCompose(in composeInput) (string, error) {
