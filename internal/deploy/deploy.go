@@ -87,6 +87,10 @@ type Request struct {
 	// question rather than before it: a deploy refused at the prompt says
 	// nothing about building anything. nil skips it.
 	Announce func(Target)
+	// OnBuild runs just before an image build starts, after the deployment
+	// has cleared the deploy. A dags-only deploy and a prebuilt --image-name
+	// build nothing and never call it. nil skips it.
+	OnBuild func()
 	// CheckRuntime holds the manifest's [tool.astro] runtime build to its
 	// Airflow pin with the runtime catalog, before an image is built FROM it
 	// (runtimeversions.CheckRuntime's contract: warnings to report, and the
@@ -174,8 +178,10 @@ type ImageDeploy struct {
 	// BuildSecrets are docker build --secret specs to expose to that file's
 	// build. Only a declared Dockerfile has a RUN of the project's own to
 	// consume one; a generated build drops them.
-	BuildSecrets  []string
-	ImageName     string
+	BuildSecrets []string
+	ImageName    string
+	// OnBuild is Request.OnBuild, for the transport to call.
+	OnBuild       func()
 	IncludeDags   bool
 	Description   string
 	NoDagsBaseDir bool
@@ -367,6 +373,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		Dockerfile:     dockerfile,
 		BuildSecrets:   req.BuildSecrets,
 		ImageName:      req.ImageName,
+		OnBuild:        req.OnBuild,
 		IncludeDags:    includeDags,
 		Description:    req.Description,
 		NoDagsBaseDir:  req.NoDagsBaseDir,

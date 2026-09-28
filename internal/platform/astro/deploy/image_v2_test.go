@@ -93,13 +93,13 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false) // STANDARD, runtime 7.0.0, dag deploy on
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false) // STANDARD, runtime 3.1-2, dag deploy on
+	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
-	cmd, handler := withImageSeams(t, "7.0.0")
+	cmd, handler := withImageSeams(t, "3.1-2")
 
 	res, err := DeployImageV2(ImageDeployV2Input{
 		ProjectDir:     v2ProjectDir(t),
@@ -112,7 +112,7 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "test-ws-id", res.WorkspaceID)
-	assert.Equal(t, "7.0.0", res.RuntimeVersion)
+	assert.Equal(t, "3.1-2", res.RuntimeVersion)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 	assert.Equal(t, "tarball-v1", res.DagTarballVersion)
 	assert.NotEmpty(t, res.URL)
@@ -129,12 +129,12 @@ func TestDeployImageV2_ImageOnlySkipsDags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "") // image-only: no upload URL needed
 	mockFinalizeDeploy(client)
 
-	_, handler := withImageSeams(t, "7.0.0")
+	_, handler := withImageSeams(t, "3.1-2")
 
 	res, err := DeployImageV2(ImageDeployV2Input{
 		ProjectDir:     v2ProjectDir(t),
@@ -154,12 +154,12 @@ func TestDeployImageV2_ImageNameSkipsBuild(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
-	cmd, _ := withImageSeams(t, "7.0.0")
+	cmd, _ := withImageSeams(t, "3.1-2")
 
 	res, err := DeployImageV2(ImageDeployV2Input{
 		ProjectDir:   v2ProjectDir(t),
@@ -212,12 +212,12 @@ func TestDeployImageV2_NothingToInstallBuildsASinglePlatformImage(t *testing.T) 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
-	cmd, handlers := containerdStore(t, "7.0.0")
+	cmd, handlers := containerdStore(t, "3.1-2")
 
 	dir := v2ProjectDir(t)
 	res, err := DeployImageV2(ImageDeployV2Input{
@@ -243,11 +243,11 @@ func TestDeployImageV2_RuntimeVersionRejected(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false) // deployment at 7.0.0
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false) // deployment at 3.1-2
+	mockDeploymentOptions(client, "3.1-2")
 
-	// The built image reports 6.0.0 — a downgrade the deployment must refuse.
-	withImageSeams(t, "6.0.0")
+	// The built image reports 3.1-1 — a downgrade the deployment must refuse.
+	withImageSeams(t, "3.1-1")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
 		ProjectDir:     v2ProjectDir(t),
@@ -285,13 +285,156 @@ func TestDeployImageV2_NoDockerFailsEarly(t *testing.T) {
 
 func TestCheckRuntimeVersion(t *testing.T) {
 	// No current version: nothing to check.
-	require.NoError(t, checkRuntimeVersion("", "7.0.0", nil))
+	require.NoError(t, checkRuntimeVersion("", "7.0.0", nil, nil))
 	// Supported and equal: fine.
-	require.NoError(t, checkRuntimeVersion("7.0.0", "7.0.0", []string{"7.0.0"}))
+	require.NoError(t, checkRuntimeVersion("7.0.0", "7.0.0", []string{"7.0.0"}, nil))
 	// Downgrade.
-	assert.ErrorContains(t, checkRuntimeVersion("7.0.0", "6.0.0", []string{"6.0.0", "7.0.0"}), "downgrade")
+	assert.ErrorContains(t, checkRuntimeVersion("7.0.0", "6.0.0", []string{"6.0.0", "7.0.0"}, nil), "downgrade")
 	// Not in the allowed set.
-	assert.ErrorContains(t, checkRuntimeVersion("7.0.0", "8.0.0", []string{"7.0.0"}), "unsupported")
+	assert.ErrorContains(t, checkRuntimeVersion("7.0.0", "8.0.0", []string{"7.0.0"}, nil), "unsupported")
+	// A downgrade names the fix when the caller knows it.
+	err := checkRuntimeVersion("3.3-8", "3.3-7", []string{"3.3-7", "3.3-8"}, func(minimum string) string { return "use " + minimum })
+	assert.EqualError(t, err, "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, use 3.3-8")
+}
+
+func TestCheckPlannedRuntime(t *testing.T) {
+	offered := []string{"3.2-10", "3.3-7", "3.3-8", "3.10-1"}
+	raise := func(minimum string) string { return "raise to " + minimum }
+	tests := []struct {
+		name    string
+		current string
+		planned plannedRuntime
+		wantErr string
+	}{
+		{name: "nothing planned", current: "3.3-8", planned: plannedRuntime{}},
+		{name: "no current version", current: "", planned: plannedRuntime{version: "3.2", series: true}},
+		{name: "older series", current: "3.3-8", planned: plannedRuntime{version: "3.2", series: true, raise: raise}, wantErr: "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, raise to 3.3-8"},
+		{name: "same series leaves the patch to the label", current: "3.3-8", planned: plannedRuntime{version: "3.3", series: true}},
+		{name: "series not offered", current: "3.3-8", planned: plannedRuntime{version: "3.5", series: true}, wantErr: "unsupported"},
+		{name: "series compared as numbers", current: "3.9-1", planned: plannedRuntime{version: "3.10", series: true}},
+		{name: "series over an Airflow 2 deployment below the floor", current: "11.0.0", planned: plannedRuntime{version: "3.3", series: true}, wantErr: "Airflow 2 to Airflow 3"},
+		{name: "series over an Airflow 2 deployment at the floor", current: "12.1.0", planned: plannedRuntime{version: "3.3", series: true}},
+		{name: "exact downgrade", current: "3.3-8", planned: plannedRuntime{version: "3.3-7", raise: raise}, wantErr: "downgrade from the deployment's current 3.3-8; to deploy, raise to 3.3-8"},
+		{name: "exact not offered", current: "3.3-8", planned: plannedRuntime{version: "3.3-9"}, wantErr: "unsupported"},
+		{name: "exact fine", current: "3.3-7", planned: plannedRuntime{version: "3.3-8"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkPlannedRuntime(tt.current, &tt.planned, offered)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+// A deploy the deployment would refuse for its runtime is refused before the
+// build, which is minutes for a real project, and names what to change.
+func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
+	tests := []struct {
+		name       string
+		in         ImageDeployV2Input
+		dockerfile string
+		wantErr    string
+	}{
+		{
+			name:    "an older Airflow pin",
+			in:      ImageDeployV2Input{AirflowVersion: "3.2"},
+			wantErr: "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, pin apache-airflow to 3.3 or newer in pyproject.toml",
+		},
+		{
+			name:    "an older runtime build in another series",
+			in:      ImageDeployV2Input{AirflowVersion: "3.2", Runtime: "3.2-10"},
+			wantErr: "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, pin apache-airflow to 3.3 and set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml",
+		},
+		{
+			name:    "an older runtime build",
+			in:      ImageDeployV2Input{AirflowVersion: "3.3", Runtime: "3.3-7"},
+			wantErr: "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml",
+		},
+		{
+			name:       "a Dockerfile FROM an older runtime",
+			in:         ImageDeployV2Input{AirflowVersion: "3.2", Dockerfile: "Dockerfile"},
+			dockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.2-10-python-3.12\n",
+			wantErr:    "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, change the FROM line in Dockerfile to Astro Runtime 3.3-8 or newer, and pin apache-airflow to 3.3 in pyproject.toml",
+		},
+		{
+			name:       "a Dockerfile whose final stage is FROM an older series tag",
+			in:         ImageDeployV2Input{AirflowVersion: "3.2", Dockerfile: "Dockerfile"},
+			dockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.3 AS deps\nFROM astrocrpublic.azurecr.io/runtime:3.2\n",
+			wantErr:    "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, change the FROM line in Dockerfile to Astro Runtime 3.3-8 or newer, and pin apache-airflow to 3.3 in pyproject.toml",
+		},
+		{
+			name:    "a series the deployment does not offer",
+			in:      ImageDeployV2Input{AirflowVersion: "3.5"},
+			wantErr: "cannot deploy unsupported Astro Runtime 3.5; supported versions: 3.2-10, 3.3-8",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			client := new(astrov1_mocks.ClientWithResponsesInterface)
+			mockV2DeploymentAt(client, "3.3-8", true, false)
+			mockDeploymentOptions(client, "3.2-10", "3.3-8")
+			cmd, _ := withImageSeams(t, "3.2-10")
+
+			in := tt.in
+			in.OnBuild = func() { t.Error("a refused deploy must not announce a build") }
+			in.ProjectDir = v2ProjectDir(t)
+			in.DeploymentID = "test-deployment-id"
+			if tt.dockerfile != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(in.ProjectDir, "Dockerfile"), []byte(tt.dockerfile), 0o600))
+			}
+
+			_, err := DeployImageV2(in, client)
+			require.EqualError(t, err, tt.wantErr)
+			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing should be built, got %v", cmd.calls)
+			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// The pin's series tag can serve an older build than the deployment runs. Only
+// the label shows that, and the pin is already right, so the fix is a runtime
+// build rather than a newer pin.
+func TestDeployImageV2_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV2DeploymentAt(client, "3.3-8", true, false)
+	mockDeploymentOptions(client, "3.3-7", "3.3-8")
+	cmd, _ := withImageSeams(t, "3.3-7")
+
+	built := false
+	_, err := DeployImageV2(ImageDeployV2Input{
+		ProjectDir:     v2ProjectDir(t),
+		DeploymentID:   "test-deployment-id",
+		AirflowVersion: "3.3",
+		OnBuild:        func() { built = true },
+	}, client)
+	require.EqualError(t, err, "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml")
+	assert.True(t, built, "the build was announced before it ran")
+	assert.True(t, hasImageCall(cmd.calls, "build --tag"), "a same-series pin is built, got %v", cmd.calls)
+	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A prebuilt image is only known by its label, and the refusal names how to
+// rebuild it.
+func TestDeployImageV2_ImageNameDowngradeNamesTheFix(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV2DeploymentAt(client, "3.3-8", true, false)
+	mockDeploymentOptions(client, "3.2-10", "3.3-8")
+	withImageSeams(t, "3.2-10")
+
+	_, err := DeployImageV2(ImageDeployV2Input{
+		ProjectDir:   v2ProjectDir(t),
+		DeploymentID: "test-deployment-id",
+		ImageName:    "astro-package/demo:3.2-10-abc",
+	}, client)
+	require.EqualError(t, err, "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, rebuild astro-package/demo:3.2-10-abc FROM Astro Runtime 3.3-8 or newer")
+	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestDeployImageTag(t *testing.T) {
@@ -332,13 +475,13 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
-	cmd, _ := withImageSeams(t, "7.0.0")
+	cmd, _ := withImageSeams(t, "3.1-2")
 
 	dir := v2ProjectDir(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docker"), 0o750))
@@ -377,10 +520,10 @@ func TestDeployImageV2_RefusesAnUnreadableDeclaration(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 
-	cmd, _ := withImageSeams(t, "7.0.0")
+	cmd, _ := withImageSeams(t, "3.1-2")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
 		ProjectDir:     v2ProjectDir(t),

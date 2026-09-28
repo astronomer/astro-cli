@@ -77,12 +77,15 @@ deployment = "clx-dev"
 // fakeCmdDeployer stands in for the real transport so a cmd-level test drives
 // flag parsing, selection, and rendering without a daemon, registry, or API.
 type fakeCmdDeployer struct {
-	dag      v2deploy.DagResult
-	img      v2deploy.ImageResult
-	dagErr   error
-	imgErr   error
-	dagInput *v2deploy.DagDeploy
-	imgInput *v2deploy.ImageDeploy
+	dag    v2deploy.DagResult
+	img    v2deploy.ImageResult
+	dagErr error
+	imgErr error
+	// refuseBeforeBuild returns imgErr the way the transport refuses a deploy
+	// the deployment will not take: before the build starts.
+	refuseBeforeBuild bool
+	dagInput          *v2deploy.DagDeploy
+	imgInput          *v2deploy.ImageDeploy
 }
 
 func (f *fakeCmdDeployer) ConfirmTarget([]v2deploy.Choice, v2deploy.Preselect) (string, error) {
@@ -98,6 +101,12 @@ func (f *fakeCmdDeployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult
 
 func (f *fakeCmdDeployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
 	f.imgInput = in
+	if f.refuseBeforeBuild {
+		return v2deploy.ImageResult{}, f.imgErr
+	}
+	if in.ImageName == "" && in.OnBuild != nil {
+		in.OnBuild()
+	}
 	return f.img, f.imgErr
 }
 
@@ -578,6 +587,16 @@ func TestDeployV2AbortedPromptSaysNothingAboutBuilding(t *testing.T) {
 	assert.NotContains(t, out, "Building your project image")
 	assert.Nil(t, fake.imgInput)
 	assert.Nil(t, fake.dagInput)
+}
+
+// A deploy the deployment refuses before the build builds nothing, so it says
+// nothing about building.
+func TestDeployV2RefusedBeforeTheBuildSaysNothingAboutBuilding(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{imgErr: errors.New("cannot deploy Astro Runtime 3.2"), refuseBeforeBuild: true})
+
+	out, err := execDeployCapture("--deployment", "prod")
+	require.ErrorContains(t, err, "cannot deploy Astro Runtime 3.2")
+	assert.NotContains(t, out, "Building your project image")
 }
 
 func TestDeployV2NonInteractiveMustNameTheTarget(t *testing.T) {

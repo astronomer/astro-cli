@@ -1,21 +1,27 @@
 package deploy
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+
+	"golang.org/x/mod/semver"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // ImageDeployV2Input is the resolved input for a v2 project's image deploy. The
@@ -33,9 +39,13 @@ type ImageDeployV2Input struct {
 	// relative to ProjectDir. Set means the project's own file is the build.
 	Dockerfile string
 	// BuildSecrets are docker build --secret specs for that file's build.
-	BuildSecrets  []string
-	ImageName     string // a prebuilt local image (--image-name); "" builds from the manifest
-	IncludeDags   bool   // also upload dags/ — a "both" deploy
+	BuildSecrets []string
+	ImageName    string // a prebuilt local image (--image-name); "" builds from the manifest
+	// OnBuild runs once the deployment has cleared the deploy and just before
+	// the image build starts, so a refused deploy says nothing about building.
+	// A prebuilt image is not built and never calls it. nil skips it.
+	OnBuild       func()
+	IncludeDags   bool // also upload dags/ — a "both" deploy
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -99,16 +109,42 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		gitInfo, commitMessage = readDeployGitV2(in.ProjectDir)
 	}
 
-	// Build or adopt the image and read its runtime-version label.
-	localImage, runtimeVersion, err := prepareDeployImage(ctx, &in, cmd, bin, env)
+	var req imagebuild.Request
+	if in.ImageName == "" {
+		// Which image the manifest builds is imagebuild's rule, shared with
+		// every other consumer that builds from a manifest.
+		req, err = imagebuild.ForManifest(imagebuild.ManifestBuild{
+			ProjectDir:     in.ProjectDir,
+			AirflowVersion: in.AirflowVersion,
+			Runtime:        in.Runtime,
+			Dockerfile:     in.Dockerfile,
+			Dependencies:   in.Dependencies,
+			Packages:       in.Packages,
+		})
+		if err != nil {
+			return ImageDeployV2Result{}, err
+		}
+	}
+	planned := planRuntime(&in, &req)
+
+	// The deployment's rules are checked before the build, which can take
+	// minutes, and again on the built image's label, which is the authority.
+	dep, allowed, err := checkDeployment(ctx, &c, &in, astroV1Client)
 	if err != nil {
 		return ImageDeployV2Result{}, err
 	}
+	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
+		return ImageDeployV2Result{}, err
+	}
 
-	// Read the deployment's server-side facts and check the deploy is allowed:
-	// cicd enforcement, dag-deploy for a "both" deploy, and the runtime version.
-	dep, err := checkDeployment(ctx, &c, &in, runtimeVersion, astroV1Client)
+	if in.ImageName == "" && in.OnBuild != nil {
+		in.OnBuild()
+	}
+	localImage, runtimeVersion, err := prepareDeployImage(ctx, &in, &req, cmd, bin, env)
 	if err != nil {
+		return ImageDeployV2Result{}, err
+	}
+	if err := checkRuntimeVersion(dep.AstroRuntimeVersion, runtimeVersion, allowed, planned.raise); err != nil {
 		return ImageDeployV2Result{}, err
 	}
 
@@ -171,25 +207,25 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 }
 
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
-// cicd enforcement, dag-deploy enablement for a "both" deploy, and that the
-// image's runtime version is one the deployment accepts.
-func checkDeployment(ctx context.Context, c *config.Context, in *ImageDeployV2Input, runtimeVersion string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+// cicd enforcement and dag-deploy enablement for a "both" deploy. It also
+// returns the runtime versions the deployment offers, which the image's
+// runtime is checked against.
+func checkDeployment(ctx context.Context, c *config.Context, in *ImageDeployV2Input, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
-		return astrov1.Deployment{}, err
+		return astrov1.Deployment{}, nil, err
 	}
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
-		return astrov1.Deployment{}, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
+		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
 	if in.IncludeDags && !dep.IsDagDeployEnabled {
-		return astrov1.Deployment{}, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
+		return astrov1.Deployment{}, nil, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
 	}
-	// Check the image's runtime against the versions the deployment allows,
-	// which we fetch from the server (the print-free sibling of ValidRuntimeVersion).
-	if err := validateDeployRuntimeVersion(ctx, dep.OrganizationId, dep.AstroRuntimeVersion, runtimeVersion, astroV1Client); err != nil {
-		return astrov1.Deployment{}, err
+	allowed, err := offeredRuntimeVersions(ctx, dep.OrganizationId, astroV1Client)
+	if err != nil {
+		return astrov1.Deployment{}, nil, err
 	}
-	return dep, nil
+	return dep, allowed, nil
 }
 
 // uploadDeployDags tars and uploads a v2 project's dags/ directory to the
@@ -221,9 +257,9 @@ func uploadDeployDags(projectDir, deploymentID string, dep *astrov1.Deployment, 
 
 // prepareDeployImage returns the local image to push and its runtime version.
 // With a prebuilt image (--image-name) it validates the image exists locally and
-// carries a runtime label; otherwise it builds linux/amd64 from the manifest
-// through pkg/imagebuild's ForManifest.
-func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebuild.Commander, bin string, env []string) (localImage, runtimeVersion string, err error) {
+// carries a runtime label; otherwise it builds req, ForManifest's request, at
+// linux/amd64.
+func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, req *imagebuild.Request, cmd imagebuild.Commander, bin string, env []string) (localImage, runtimeVersion string, err error) {
 	if in.ImageName != "" {
 		// A registry image name says nothing about its base, so read the label
 		// off the local image: docker inspect fails when it is not present, which
@@ -238,19 +274,6 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebu
 		return in.ImageName, version, nil
 	}
 
-	// Which image the manifest builds is imagebuild's rule, shared with every
-	// other consumer that builds from a manifest.
-	req, err := imagebuild.ForManifest(imagebuild.ManifestBuild{
-		ProjectDir:     in.ProjectDir,
-		AirflowVersion: in.AirflowVersion,
-		Runtime:        in.Runtime,
-		Dockerfile:     in.Dockerfile,
-		Dependencies:   in.Dependencies,
-		Packages:       in.Packages,
-	})
-	if err != nil {
-		return "", "", err
-	}
 	workDir, err := os.MkdirTemp("", "astro-deploy-build-*")
 	if err != nil {
 		return "", "", fmt.Errorf("creating a build directory: %w", err)
@@ -266,7 +289,7 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, cmd imagebu
 	// BuildLocal, not Build: the image is inspected, tagged and pushed next, so
 	// it has to be a single-platform image in the local store even when there
 	// is nothing to install. See BuildLocal for why a pulled base is not.
-	built, err := imagebuild.New(cmd, buildNow).BuildLocal(ctx, req, localrt.Callbacks{})
+	built, err := imagebuild.New(cmd, buildNow).BuildLocal(ctx, *req, localrt.Callbacks{})
 	if err != nil {
 		return "", "", err
 	}
@@ -303,21 +326,117 @@ func deployImageTag(projectDir string) string {
 	return "astro-deploy/" + label
 }
 
-// validateDeployRuntimeVersion fetches the deployment's allowed runtime versions
-// and checks the image's version against them.
-func validateDeployRuntimeVersion(ctx context.Context, organizationID, currentVersion, tag string, astroV1Client astrov1.APIClient) error {
+// offeredRuntimeVersions fetches the runtime versions the organization's
+// deployments offer.
+func offeredRuntimeVersions(ctx context.Context, organizationID string, astroV1Client astrov1.APIClient) ([]string, error) {
 	resp, err := astroV1Client.GetDeploymentOptionsWithResponse(ctx, organizationID, &astrov1.GetDeploymentOptionsParams{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return nil, err
 	}
 	allowed := make([]string, 0, len(resp.JSON200.RuntimeReleases))
 	for _, r := range resp.JSON200.RuntimeReleases {
 		allowed = append(allowed, r.Version)
 	}
-	return checkRuntimeVersion(currentVersion, tag, allowed)
+	return allowed, nil
+}
+
+// plannedRuntime is the Astro Runtime a deploy's image will carry, as far as
+// the project says before anything is built, and the change that moves it.
+type plannedRuntime struct {
+	// version is an exact runtime ("3.3-8"), a series whose moving tag the
+	// build resolves ("3.2", with series set), or "" when only the built
+	// image can say.
+	version string
+	series  bool
+	// raise names the change that gives the image runtime minimum or newer.
+	raise func(minimum string) string
+}
+
+// planRuntime reads the runtime the image will carry from what decides it: the
+// runtime base of a generated build, or the final FROM of a declared
+// Dockerfile. A prebuilt image, an Airflow 2 base and a FROM this cannot read
+// plan no version.
+//
+// A runtime build and a FROM have to agree with the apache-airflow pin's
+// series, so a fix that moves either to another series names the pin too.
+func planRuntime(in *ImageDeployV2Input, req *imagebuild.Request) plannedRuntime {
+	switch {
+	case in.ImageName != "":
+		return plannedRuntime{raise: func(minimum string) string {
+			return fmt.Sprintf("rebuild %s FROM Astro Runtime %s or newer", in.ImageName, minimum)
+		}}
+	case req.FromDeclaredDockerfile():
+		v := airflowrt.ReadDeclaredBase(req.Dockerfile).RuntimeVersion()
+		p := plannedRuntime{raise: func(minimum string) string {
+			fix := fmt.Sprintf("change the FROM line in %s to Astro Runtime %s or newer", in.Dockerfile, minimum)
+			if s := runtimeSeries(minimum); s != "" && s != runtimeSeries(v) {
+				fix += fmt.Sprintf(", and pin apache-airflow to %s in pyproject.toml", s)
+			}
+			return fix
+		}}
+		if tag, ok := manifest.ParseRuntimeTag(v); ok && tag.Series != "" {
+			p.version, p.series = v, !tag.Build
+		}
+		return p
+	case in.Runtime != "":
+		return plannedRuntime{version: in.Runtime, raise: func(minimum string) string {
+			if s := runtimeSeries(minimum); s != "" && s != runtimeSeries(in.Runtime) {
+				return fmt.Sprintf("pin apache-airflow to %s and set [tool.astro] runtime to %s or newer in pyproject.toml", s, minimum)
+			}
+			return fmt.Sprintf("set [tool.astro] runtime to %s or newer in pyproject.toml", minimum)
+		}}
+	default:
+		_, tag, _ := strings.Cut(req.BaseImage, ":")
+		return plannedRuntime{version: tag, series: true, raise: func(minimum string) string {
+			s := runtimeSeries(minimum)
+			if s == tag {
+				// The pin is already the deployment's series; only its
+				// moving tag served an older build.
+				return fmt.Sprintf("set [tool.astro] runtime to %s or newer in pyproject.toml", minimum)
+			}
+			return fmt.Sprintf("pin apache-airflow to %s or newer in pyproject.toml", cmp.Or(s, minimum))
+		}}
+	}
+}
+
+// checkPlannedRuntime runs checkRuntimeVersion's rules on the runtime the image
+// will carry, before it is built. An exact version takes the rules as they are.
+// A series refuses only what no build of it can pass: a series older than the
+// deployment's, or one the deployment offers no build of. Its patch is left to
+// the check on the built image.
+func checkPlannedRuntime(currentVersion string, p *plannedRuntime, allowed []string) error {
+	if currentVersion == "" || p.version == "" {
+		return nil
+	}
+	if !p.series {
+		return checkRuntimeVersion(currentVersion, p.version, allowed, p.raise)
+	}
+	if current := runtimeSeries(currentVersion); current != "" && semver.Compare("v"+p.version, "v"+current) < 0 {
+		return downgradeError(p.version, currentVersion, p.raise)
+	}
+	if !slices.ContainsFunc(allowed, func(v string) bool { return runtimeSeries(v) == p.version }) {
+		return fmt.Errorf("cannot deploy unsupported Astro Runtime %s; supported versions: %s", p.version, strings.Join(allowed, ", "))
+	}
+	return checkAirflow3Floor(currentVersion, p.version+"-0")
+}
+
+// runtimeSeries is the Airflow series an Airflow 3 runtime version belongs to:
+// "3.3" for "3.3-8" and for "3.3". It is "" for an Airflow 2 runtime, whose
+// version does not show its Airflow series.
+func runtimeSeries(version string) string {
+	tag, _ := manifest.ParseRuntimeTag(version)
+	return tag.Series
+}
+
+func downgradeError(tag, currentVersion string, raise func(string) string) error {
+	msg := fmt.Sprintf("cannot deploy Astro Runtime %s: it is a downgrade from the deployment's current %s", tag, currentVersion)
+	if raise != nil {
+		msg += "; to deploy, " + raise(currentVersion)
+	}
+	return errors.New(msg)
 }
 
 // checkRuntimeVersion is v1's ValidRuntimeVersion without the prints: it returns
@@ -325,14 +444,15 @@ func validateDeployRuntimeVersion(ctx context.Context, organizationID, currentVe
 // exit), so the v2 path stays print-free below cmd — the same move
 // finalizeDeployV2 makes for finalize. The rules are identical: no downgrade,
 // the version must be one the deployment allows, and an Airflow 2-to-3 jump
-// needs the deployment at Runtime 12.0.0 or higher.
-func checkRuntimeVersion(currentVersion, tag string, allowed []string) error {
+// needs the deployment at Runtime 12.0.0 or higher. raise, when set, names the
+// fix for a downgrade.
+func checkRuntimeVersion(currentVersion, tag string, allowed []string, raise func(string) string) error {
 	// Old deployments carry no runtime version; nothing to check against.
 	if currentVersion == "" {
 		return nil
 	}
 	if airflowversions.CompareRuntimeVersions(tag, currentVersion) < 0 {
-		return fmt.Errorf("cannot deploy Astro Runtime %s: it is a downgrade from the deployment's current %s", tag, currentVersion)
+		return downgradeError(tag, currentVersion, raise)
 	}
 	supported := false
 	for _, v := range allowed {
@@ -344,6 +464,10 @@ func checkRuntimeVersion(currentVersion, tag string, allowed []string) error {
 	if !supported {
 		return fmt.Errorf("cannot deploy unsupported Astro Runtime %s; supported versions: %s", tag, strings.Join(allowed, ", "))
 	}
+	return checkAirflow3Floor(currentVersion, tag)
+}
+
+func checkAirflow3Floor(currentVersion, tag string) error {
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion) == "2" &&
 		airflowversions.AirflowMajorVersionForRuntimeVersion(tag) == "3" &&
 		airflowversions.CompareRuntimeVersions(currentVersion, "12.0.0") < 0 {

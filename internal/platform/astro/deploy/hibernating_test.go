@@ -112,10 +112,10 @@ func TestDeployImageV2_HibernatingSaysHowToWakeIt(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 	mockCreateDeployRefused(client, blockedByHibernation)
-	_, handler := withImageSeams(t, "7.0.0")
+	_, handler := withImageSeams(t, "3.1-2")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
 		ProjectDir:     v2ProjectDir(t),

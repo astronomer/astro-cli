@@ -135,15 +135,15 @@ func TestDeployDagsV2_OutsideAGitCheckoutRecordsNoCommit(t *testing.T) {
 func imageDeployWithCapture(t *testing.T, in *ImageDeployV2Input) (ImageDeployV2Result, *astrov1.CreateDeployRequest) {
 	t.Helper()
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV2Deployment(client, true, false)
-	mockDeploymentOptions(client, "7.0.0")
+	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
 	req := captureCreateDeploy(client, &astrov1.Deploy{
 		Id:              "test-deploy-id",
 		ImageRepository: "registry.astro/test-deployment",
 		ImageTag:        "deploy-2026-07-24",
 	})
 	mockFinalizeDeploy(client)
-	withImageSeams(t, "7.0.0")
+	withImageSeams(t, "3.1-2")
 
 	in.DeploymentID = "test-deployment-id"
 	res, err := DeployImageV2(*in, client)

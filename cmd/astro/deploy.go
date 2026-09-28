@@ -497,30 +497,28 @@ func deployV2(cmd *cobra.Command, args []string) error {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
-		// Two lines, once the target is settled and before anything is built.
-		// The first is the → line every resolving command prints, so a deploy
-		// says what it is about to act on the way `astro af dags list` does. The
-		// second says an image build can run for minutes with no transport
-		// output yet; the transport itself stays silent (v2 layer rules).
+		// Two lines. The first is the → line every resolving command prints,
+		// once the target is settled, so a deploy says what it is about to act
+		// on the way `astro af dags list` does. The second says an image build
+		// can run for minutes with no transport output yet; the transport
+		// itself stays silent (v2 layer rules). It prints only once the
+		// deployment has cleared the deploy, so a deploy refused before the
+		// build claims no build.
 		//
-		// Both fire after the target is settled, so a deploy refused at the
-		// prompt claims nothing. They go to stderr and stdout respectively —
-		// the announce line is context, the progress line is this command's
-		// own output — and json mode drops both, so the single result object is
-		// all it adds.
+		// They go to stderr and stdout respectively — the announce line is
+		// context, the progress line is this command's own output — and json
+		// mode drops both, so the single result object is all it adds.
 		Announce: func(target v2deploy.Target) {
 			if format != formatText {
 				return
 			}
 			announceDeployTarget(errOut, target)
-			if dags {
-				// A dags-only deploy builds nothing, so there is no wait to
-				// explain.
-				return
-			}
-			if imageName != "" {
+			if !dags && imageName != "" {
 				fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
-			} else {
+			}
+		},
+		OnBuild: func() {
+			if format == formatText {
 				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 			}
 		},
@@ -841,6 +839,7 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		Dockerfile:     in.Dockerfile,
 		BuildSecrets:   in.BuildSecrets,
 		ImageName:      in.ImageName,
+		OnBuild:        in.OnBuild,
 		IncludeDags:    in.IncludeDags,
 		Description:    in.Description,
 		NoDagsBaseDir:  in.NoDagsBaseDir,

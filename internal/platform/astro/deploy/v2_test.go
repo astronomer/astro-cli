@@ -30,6 +30,10 @@ func v2ProjectDir(t *testing.T) string {
 // deployment.GetDeploymentByID) with a STANDARD deployment, so the dags
 // transport skips the monitoring-DAG injection.
 func mockV2Deployment(client *astrov1_mocks.ClientWithResponsesInterface, dagDeployEnabled, cicdEnforced bool) {
+	mockV2DeploymentAt(client, "7.0.0", dagDeployEnabled, cicdEnforced)
+}
+
+func mockV2DeploymentAt(client *astrov1_mocks.ClientWithResponsesInterface, runtimeVersion string, dagDeployEnabled, cicdEnforced bool) {
 	standard := astrov1.DeploymentTypeSTANDARD
 	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -38,7 +42,7 @@ func mockV2Deployment(client *astrov1_mocks.ClientWithResponsesInterface, dagDep
 			Name:                "test-deployment",
 			OrganizationId:      "test-org-id",
 			WorkspaceId:         "test-ws-id",
-			AstroRuntimeVersion: "7.0.0",
+			AstroRuntimeVersion: runtimeVersion,
 			Type:                &standard,
 			IsDagDeployEnabled:  dagDeployEnabled,
 			IsCicdEnforced:      cicdEnforced,
