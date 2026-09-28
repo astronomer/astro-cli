@@ -75,7 +75,7 @@ func TestRunChecksTheRuntimeBuild(t *testing.T) {
 	_, err := Run(req, d)
 	require.NoError(t, err)
 	assert.Equal(t, [][2]string{{"3.1-12", "3.1"}}, calls)
-	assert.Equal(t, []string{"yanked"}, warnings)
+	assert.Equal(t, []string{"pyproject.toml: tool.astro.runtime: yanked"}, warnings)
 	assert.Equal(t, "3.1-12", d.imgInput.Runtime, "the build reaches the transport")
 
 	// A blocking finding stops the deploy before anything is shipped.
@@ -96,4 +96,34 @@ func TestRunChecksTheRuntimeBuild(t *testing.T) {
 	_, err = Run(req, &fakeDeployer{})
 	require.NoError(t, err)
 	assert.Empty(t, calls)
+}
+
+// An image deploy warns about a secret the declared Dockerfile mounts that no
+// --build-secret supplies, before it builds, and still ships.
+func TestRunWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
+	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
+	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
+	var warnings []string
+	req := Request{ProjectDir: dir, Manifest: m, LinkName: "prod", Warn: func(s string) { warnings = append(warnings, s) }}
+
+	d := &fakeDeployer{}
+	_, err := Run(req, d)
+	require.NoError(t, err)
+	assert.Equal(t, []string{`Dockerfile mounts build secret "netrc" (line 2) but none was given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`}, warnings)
+	assert.Equal(t, 1, d.imgDeploys)
+
+	warnings = nil
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT"}
+	_, err = Run(req, &fakeDeployer{})
+	require.NoError(t, err)
+	assert.Empty(t, warnings)
+
+	// Neither of these builds the Dockerfile, so neither warns.
+	req.BuildSecrets = nil
+	for _, r := range []Request{{DagsOnly: true}, {ImageName: "prebuilt:1"}} {
+		r.ProjectDir, r.Manifest, r.LinkName, r.Warn = req.ProjectDir, req.Manifest, req.LinkName, req.Warn
+		_, err = Run(r, &fakeDeployer{})
+		require.NoError(t, err)
+	}
+	assert.Empty(t, warnings)
 }

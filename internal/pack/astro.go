@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // runtimeVersionLabel is the label the runtime base image carries with its
@@ -86,6 +87,14 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	return warnings, nil
 }
 
+// warnMissingSecrets reports, before the build, each secret the declared
+// Dockerfile mounts that no build secret supplies.
+func warnMissingSecrets(req Request, cb localrt.Callbacks) {
+	for _, w := range util.MissingBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets) {
+		emit(cb, "warning: "+w)
+	}
+}
+
 // Build resolves the runtime base, builds the image, reads its runtime-version
 // label, tags it to the content-addressed name (astro-package/<name>:<version>-
 // <hash> plus a moving :latest), optionally saves it, and reports the tag so
@@ -118,6 +127,9 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
+	if declared != "" {
+		warnMissingSecrets(req, cb)
+	}
 
 	// The astro artifact is an image, so Docker is required. Probe the engine up
 	// front for a plain message rather than an opaque build failure.

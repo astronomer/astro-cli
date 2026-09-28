@@ -3,6 +3,8 @@ package local
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -174,6 +176,43 @@ func TestPackageRefusesABuildSecretItCannotUse(t *testing.T) {
 			err := execute(t, d, "package", tc.target, "--out-dir", t.TempDir(), "--build-secret", "id=netrc,env=NETRC_CONTENT")
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// A Docker-mode start warns, before it builds, about each secret the declared
+// Dockerfile mounts that nothing supplies, and names the flag that would. The
+// start goes ahead: a secret mount can be optional.
+func TestStartWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		args  []string
+		warns bool
+	}{
+		{name: "none given", args: []string{"local", "start", "--docker"}, warns: true},
+		{name: "given", args: []string{"local", "start", "--docker", "--build-secret", "id=netrc,env=NETRC_CONTENT"}},
+		{name: "standalone builds nothing", args: []string{"local", "start"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(util.BuildSecretInputEnv, "")
+			d, out := testDeps(t)
+			var plans []localrt.Plan
+			d.Runtime = planRecorder{plans: &plans}
+			wiringProject(t, &d, declaredDockerfile, "")
+			dir, _ := d.WorkingDir()
+			dockerfile := "FROM " + matchingBase + "\nRUN --mount=type=secret,id=netrc,dst=/root/.netrc \\\n  pip install private\n"
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			_ = execute(t, d, tc.args...)
+			if len(plans) != 1 {
+				t.Fatalf("started %d times, want 1", len(plans))
+			}
+			want := `warning: Dockerfile mounts build secret "netrc" (line 2) but none was given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`
+			if got := strings.Contains(out.String(), want); got != tc.warns {
+				t.Errorf("warned = %v, want %v; output:\n%s", got, tc.warns, out.String())
 			}
 		})
 	}

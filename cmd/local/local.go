@@ -215,6 +215,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
 	}
+	warnMissingBuildSecrets(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
@@ -533,6 +534,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
 	}
+	warnMissingBuildSecrets(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
 	// Before the stop, like the build: a refusal leaves Airflow running.

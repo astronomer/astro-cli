@@ -32,3 +32,15 @@ func checkBuildSecrets(r Renderer, flag []string, p localrt.Plan) error {
 	}
 	return nil
 }
+
+// warnMissingBuildSecrets warns before a Docker-mode start builds the project's
+// own Dockerfile, for each secret the file mounts that no --build-secret or
+// BUILD_SECRET_INPUT supplies.
+func warnMissingBuildSecrets(r Renderer, p localrt.Plan) {
+	if p.Mode != localrt.ModeDocker || p.Dockerfile == "" {
+		return
+	}
+	for _, w := range util.MissingBuildSecrets(p.ProjectPath, p.Dockerfile, p.BuildSecrets) {
+		emitWarning(r, event{Event: "warning", Text: w})
+	}
+}

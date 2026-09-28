@@ -507,3 +507,16 @@ func TestAstroBuildDoesNotWarnForAGeneratedImage(t *testing.T) {
 	assert.NotContains(t, strings.Join(lines, "\n"), "not based on Astro Runtime")
 	assert.Contains(t, res.Image, "3.1", "the manifest pin names the tag when the label is absent")
 }
+
+// A package build warns, before it builds, about a secret the declared
+// Dockerfile mounts that no --build-secret supplies.
+func TestAstroBuildWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nRUN --mount=type=secret,id=netrc pip install private\n")
+	var lines []string
+	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
+	require.NoError(t, err)
+
+	assert.Contains(t, lines, `warning: Dockerfile mounts build secret "netrc" (line 2) but none was given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`)
+}

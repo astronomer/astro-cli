@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // IsV2Project reports whether dir holds a v2 project: a pyproject.toml carrying
@@ -261,15 +262,22 @@ func checkImageSource(req Request) error {
 	if err := scaffold.CheckDockerfileAirflow(req.ProjectDir, req.Manifest); err != nil {
 		return err
 	}
+	warn := req.Warn
+	if warn == nil {
+		warn = func(string) {}
+	}
+	if dockerfile := req.Manifest.Astro.Dockerfile; dockerfile != "" {
+		for _, w := range util.MissingBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets) {
+			warn(w)
+		}
+	}
 	airflow := req.Manifest.Airflow()
 	if airflow.Runtime == "" || req.CheckRuntime == nil {
 		return nil
 	}
 	warnings, err := req.CheckRuntime(airflow.Runtime, airflow.Pin)
-	if req.Warn != nil {
-		for _, w := range warnings {
-			req.Warn(w.Message)
-		}
+	for _, w := range warnings {
+		warn(manifest.Marker + ": tool.astro.runtime: " + w.Message)
 	}
 	return err
 }

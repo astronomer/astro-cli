@@ -493,7 +493,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
-		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: pyproject.toml: tool.astro.runtime: %s\n", msg) },
+		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
 		// Two lines, once the target is settled and before anything is built.
 		// The first is the → line every resolving command prints, so a deploy
 		// says what it is about to act on the way `astro af dags list` does. The

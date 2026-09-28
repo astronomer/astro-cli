@@ -2,13 +2,16 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lucsky/cuid"
 	"github.com/pkg/errors"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 )
 
@@ -99,6 +102,35 @@ func ResolveBuildSecrets(flagSecrets []string, fallbacks ...string) []string {
 		}
 	}
 	return nil
+}
+
+// MissingBuildSecrets returns a warning for each secret the project's
+// Dockerfile mounts that no spec in secrets supplies, for a caller to print
+// before the build. A warning and not a refusal, because a secret mount is
+// optional unless it says required=true. dockerfile is the project-relative
+// path the manifest declares; a file that cannot be read gives no warnings,
+// since the build reports that itself.
+func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) []string {
+	mounts, err := airflowrt.SecretMounts(filepath.Join(projectDir, dockerfile))
+	if err != nil {
+		return nil
+	}
+	given := map[string]bool{}
+	for _, spec := range secrets {
+		for _, kv := range strings.Split(spec, ",") {
+			if k, v, _ := strings.Cut(kv, "="); strings.EqualFold(strings.TrimSpace(k), "id") {
+				given[strings.TrimSpace(v)] = true
+			}
+		}
+	}
+	var warnings []string
+	for _, m := range mounts {
+		if !given[m.ID] {
+			warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given; pass --build-secret id=%s,env=<VAR> or set %s",
+				dockerfile, m.ID, m.Line, m.ID, BuildSecretInputEnv))
+		}
+	}
+	return warnings
 }
 
 func splitBuildSecretLines(value string) (secrets []string) {
