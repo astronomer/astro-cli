@@ -135,16 +135,21 @@ func TestTheInstanceNamesStayUnclaimed(t *testing.T) {
 // is a table rather than a walk because these exact spellings are the contract,
 // and a walk would pass whatever the tree happened to hold.
 var querySurface = map[string][]string{
-	"dags":        {"list", "get", "source", "stats", "pause", "unpause"},
-	"runs":        {"list", "get", "tasks", "trigger", "delete", "clear"},
+	"dags":        {"list", "get", "source", "explore", "stats", "errors", "warnings", "pause", "unpause"},
+	"runs":        {"list", "get", "tasks", "trigger", "trigger-wait", "diagnose", "delete", "clear"},
 	"tasks":       {"list", "get", "instance", "logs", "clear"},
-	"assets":      {"list", "events"},
+	"assets":      {"list", "events", "triggers"},
 	"connections": {"list", "get"},
 	"variables":   {"list", "get"},
 	"pools":       {"list", "get"},
 	// health is a leaf rather than a family: it reads four things and prints
-	// one report.
-	"health": nil,
+	// one report. The four below it are leaves too, each one read of the
+	// Airflow itself.
+	"health":    nil,
+	"version":   nil,
+	"providers": nil,
+	"plugins":   nil,
+	"config":    nil,
 }
 
 func TestQuerySurfaceHasEveryCommand(t *testing.T) {
@@ -272,7 +277,10 @@ func equalNames(a, b []string) bool {
 func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
 	d, _ := testDeps(t)
 	top := afGroup(t, newRootCmd(d))
-	for _, family := range []string{"dags", "runs", "tasks", "assets", "connections", "variables", "pools", "health"} {
+	for _, family := range []string{
+		"dags", "runs", "tasks", "assets", "connections", "variables", "pools", "health",
+		"version", "providers", "plugins", "config",
+	} {
 		cmd, _, err := top.Find([]string{family})
 		if err != nil {
 			t.Errorf("astro af %s is missing", family)

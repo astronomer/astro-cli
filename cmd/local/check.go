@@ -787,7 +787,7 @@ func isIndented(line string) bool {
 func checkSummaryLine(s checkSummary) string {
 	verdict := "passed"
 	if !s.Passed {
-		verdict = "failed"
+		verdict = verdictFailed
 	}
 	tail := ""
 	if s.Strict {
@@ -927,7 +927,7 @@ func renderConstraintOutcome(w io.Writer, c *checks.ConstraintOutcome) error {
 func targetVerdictLine(rep *checks.TargetReport, strict bool) string {
 	verdict := "passed"
 	if rep.ExitCode(strict) != checks.ExitOK {
-		verdict = "failed"
+		verdict = verdictFailed
 	}
 	tail := ""
 	if strict {
@@ -939,3 +939,6 @@ func targetVerdictLine(rep *checks.TargetReport, strict bool) string {
 	}
 	return fmt.Sprintf("check %s%s for %s: %s%d DAGs, %d errors, %d warnings", verdict, tail, rep.Target, why, rep.DagCount, rep.Errors, rep.Warnings)
 }
+
+// verdictFailed is a check's verdict when it did not pass.
+const verdictFailed = "failed"

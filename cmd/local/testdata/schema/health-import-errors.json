@@ -2,6 +2,7 @@
   "count": -1,
   "errors": [
     {
+      "import_error_id": -1,
       "filename": "x",
       "stack_trace": "x",
       "bundle_name": "x",

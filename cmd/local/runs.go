@@ -18,12 +18,15 @@ func newRunsCmd(d Deps, t target) *cobra.Command {
 		Use:   "runs",
 		Short: "List, trigger, and clear DAG runs on an Airflow",
 		Long: "Work with the runs on " + t.which() + ": list them, read one, see what its " +
-			"tasks did, start one, and delete or clear one.",
+			"tasks did, start one and optionally wait for it to finish, diagnose a failed one, and delete or " +
+			"clear one.",
 	},
 		newRunsListCmd,
 		newRunsGetCmd,
 		newRunsTasksCmd,
 		newRunsTriggerCmd,
+		newRunsTriggerWaitCmd,
+		newRunsDiagnoseCmd,
 		newRunsDeleteCmd,
 		newRunsClearCmd,
 	)
@@ -262,14 +265,46 @@ func renderConf(conf map[string]any) string {
 	return string(encoded)
 }
 
-func newRunsTriggerCmd(q *query) *cobra.Command {
-	var opts struct {
-		conf          string
-		runID         string
-		logicalDate   string
-		note          string
-		noAutoUnpause bool
+// triggerFlags is what starting a run takes. `runs trigger` and
+// `runs trigger-wait` both register it, so a run started either way is started
+// the same way.
+type triggerFlags struct {
+	conf          string
+	runID         string
+	logicalDate   string
+	note          string
+	noAutoUnpause bool
+}
+
+func (f *triggerFlags) register(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&f.conf, "conf", "c", "", "Run configuration as a JSON object")
+	cmd.Flags().StringVar(&f.runID, "run-id", "", "Name the run instead of letting Airflow generate one")
+	cmd.Flags().StringVar(&f.logicalDate, "logical-date", "", "The run's logical date, as RFC 3339")
+	cmd.Flags().StringVar(&f.note, "note", "", "A note to attach to the run")
+	cmd.Flags().BoolVar(&f.noAutoUnpause, "no-auto-unpause", false, "Fail if the DAG is paused instead of unpausing it first")
+}
+
+// options validates the flags into a trigger, before anything reaches Airflow.
+func (f *triggerFlags) options() (airflowapi.TriggerDAGRunOptions, error) {
+	trigger := airflowapi.TriggerDAGRunOptions{
+		DAGRunID: f.runID,
+		Note:     f.note,
 	}
+	if f.conf != "" {
+		if err := json.Unmarshal([]byte(f.conf), &trigger.Conf); err != nil {
+			return trigger, fmt.Errorf("--conf is not valid JSON: %w", err)
+		}
+	}
+	at, err := parseBound("--logical-date", f.logicalDate)
+	if err != nil {
+		return trigger, err
+	}
+	trigger.LogicalDate = at
+	return trigger, nil
+}
+
+func newRunsTriggerCmd(q *query) *cobra.Command {
+	var opts triggerFlags
 	cmd := &cobra.Command{
 		Use:   "trigger <DAG_ID>",
 		Short: "Start a run of a DAG",
@@ -279,28 +314,14 @@ func newRunsTriggerCmd(q *query) *cobra.Command {
 			"--no-auto-unpause to fail instead.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			trigger := airflowapi.TriggerDAGRunOptions{
-				DAGRunID: opts.runID,
-				Note:     opts.note,
-			}
-			if opts.conf != "" {
-				if err := json.Unmarshal([]byte(opts.conf), &trigger.Conf); err != nil {
-					return fmt.Errorf("--conf is not valid JSON: %w", err)
-				}
-			}
-			at, err := parseBound("--logical-date", opts.logicalDate)
+			trigger, err := opts.options()
 			if err != nil {
 				return err
 			}
-			trigger.LogicalDate = at
 			return q.runRunsTrigger(cmd.Context(), args[0], trigger, !opts.noAutoUnpause)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.conf, "conf", "c", "", "Run configuration as a JSON object")
-	cmd.Flags().StringVar(&opts.runID, "run-id", "", "Name the run instead of letting Airflow generate one")
-	cmd.Flags().StringVar(&opts.logicalDate, "logical-date", "", "The run's logical date, as RFC 3339")
-	cmd.Flags().StringVar(&opts.note, "note", "", "A note to attach to the run")
-	cmd.Flags().BoolVar(&opts.noAutoUnpause, "no-auto-unpause", false, "Fail if the DAG is paused instead of unpausing it first")
+	opts.register(cmd)
 	return cmd
 }
 
@@ -318,17 +339,8 @@ func (q *query) runRunsTrigger(ctx context.Context, dagID string, opts airflowap
 	if err != nil {
 		return err
 	}
-	unpaused, err := q.ensureUnpaused(ctx, client, dagID, autoUnpause)
+	run, unpaused, err := q.trigger(ctx, client, dagID, opts, autoUnpause)
 	if err != nil {
-		return err
-	}
-	run, err := client.TriggerDAGRun(ctx, dagID, opts)
-	if err != nil {
-		if unpaused {
-			// The unpause already happened and outlives this failure, so say so
-			// rather than leave the DAG changed by a command that reported none.
-			return fmt.Errorf("%w\n%s is now unpaused; pause it again with `%s`", err, dagID, q.t.suggest("dags pause "+dagID))
-		}
 		return err
 	}
 	result := triggeredRun{runRow: newRunRow(run), Unpaused: unpaused}
@@ -336,6 +348,25 @@ func (q *query) runRunsTrigger(ctx context.Context, dagID string, opts airflowap
 		_, werr := fmt.Fprintf(w, "triggered %s run %s (%s)\n", result.DAGID, result.RunID, result.State)
 		return werr
 	})
+}
+
+// trigger starts a run, unpausing the DAG first when it has to, and reports
+// whether it did.
+func (q *query) trigger(ctx context.Context, client *airflowapi.Client, dagID string, opts airflowapi.TriggerDAGRunOptions, autoUnpause bool) (airflowapi.DAGRun, bool, error) {
+	unpaused, err := q.ensureUnpaused(ctx, client, dagID, autoUnpause)
+	if err != nil {
+		return airflowapi.DAGRun{}, false, err
+	}
+	run, err := client.TriggerDAGRun(ctx, dagID, opts)
+	if err != nil {
+		if unpaused {
+			// The unpause already happened and outlives this failure, so say so
+			// rather than leave the DAG changed by a command that reported none.
+			return airflowapi.DAGRun{}, true, fmt.Errorf("%w\n%s is now unpaused; pause it again with `%s`", err, dagID, q.t.suggest("dags pause "+dagID))
+		}
+		return airflowapi.DAGRun{}, false, err
+	}
+	return run, unpaused, nil
 }
 
 // ensureUnpaused makes the DAG able to run before triggering it, and says so.

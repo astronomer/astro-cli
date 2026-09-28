@@ -74,15 +74,28 @@ type AssetEventList struct {
 	TotalEntries int          `json:"total_entries"`
 }
 
+// ListAssetsOptions filters an asset listing.
+type ListAssetsOptions struct {
+	ListOptions
+	// URIPattern keeps only assets whose URI matches it. Both generations
+	// read it as a SQL LIKE pattern: % matches any run of characters, and a
+	// pattern without one matches as a substring.
+	URIPattern string
+}
+
 // ListAssets lists assets, reading Airflow 2's datasets endpoint when that is
 // the generation.
-func (c *Client) ListAssets(ctx context.Context, opts ListOptions) (AssetList, error) {
+func (c *Client) ListAssets(ctx context.Context, opts ListAssetsOptions) (AssetList, error) {
 	generation, err := c.Generation(ctx)
 	if err != nil {
 		return AssetList{}, err
 	}
+	query := opts.query()
+	if opts.URIPattern != "" {
+		query.Set("uri_pattern", opts.URIPattern)
+	}
 	var wire assetListWire
-	if err := c.getCollection(ctx, assetPath(generation, ""), opts.query(), &wire); err != nil {
+	if err := c.getCollection(ctx, assetPath(generation, ""), query, &wire); err != nil {
 		return AssetList{}, err
 	}
 	return wire.list(), nil
@@ -116,6 +129,25 @@ func (c *Client) ListAssetEvents(ctx context.Context, opts ListAssetEventsOption
 
 	var wire assetEventListWire
 	if err := c.getCollection(ctx, assetPath(generation, "/events"), query, &wire); err != nil {
+		return AssetEventList{}, err
+	}
+	return wire.list(), nil
+}
+
+// UpstreamAssetEvents lists the asset events that started a run: the updates
+// a data-aware DAG was waiting on. A run the schedule or a person started has
+// none, and answers with an empty list rather than an error.
+func (c *Client) UpstreamAssetEvents(ctx context.Context, dagID, runID string) (AssetEventList, error) {
+	generation, err := c.Generation(ctx)
+	if err != nil {
+		return AssetEventList{}, err
+	}
+	tail := "/upstreamAssetEvents"
+	if generation == Airflow2 {
+		tail = "/upstreamDatasetEvents"
+	}
+	var wire assetEventListWire
+	if err := c.get(ctx, pathf("/dags/%s/dagRuns/%s", dagID, runID)+tail, nil, &wire); err != nil {
 		return AssetEventList{}, err
 	}
 	return wire.list(), nil

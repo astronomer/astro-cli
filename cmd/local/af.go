@@ -33,7 +33,8 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 		// scanning `astro --help` for the Airflow commands is the reader this
 		// group was added for. Which Airflow is the Long's job.
 		Short: "Talk to an Airflow: dags, runs, tasks, and more",
-		Long: "Query and control an Airflow: its dags, runs, tasks, assets, connections, variables, pools, and health.\n\n" +
+		Long: "Query and control an Airflow: its dags, runs, tasks, assets, connections, variables, pools, and health, " +
+			"and its version, providers, plugins, and configuration.\n\n" +
 			"These commands act on " + newTarget().which() + ".",
 		Args: cobra.ArbitraryArgs,
 		// A bare `astro af` prints help and succeeds; an unknown subcommand

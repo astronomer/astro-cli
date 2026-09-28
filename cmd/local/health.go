@@ -27,8 +27,9 @@ func newHealthCmd(d Deps, t target) *cobra.Command {
 			"runs are distributed across states.\n\nEach part is read on its own and a part that fails is reported " +
 			"as failed rather than ending the command, so an Airflow that serves three of the four still gives " +
 			"you three. The command itself succeeds whenever it could produce a report; overall_status is the " +
-			"verdict.\n\nFor the raw configuration this Airflow runs with, ask its /config endpoint: `" +
-			rawAPIForm(t) + " /config`.",
+			"verdict.\n\nEach part is also a command of its own, for when one of them is the question: `" +
+			t.suggest("version") + "`, `" + t.suggest("dags errors") + "`, `" + t.suggest("dags warnings") + "`, and `" +
+			t.suggest("dags stats") + "`. The configuration it runs with is `" + t.suggest("config") + "`.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runHealth(cmd.Context())
@@ -136,8 +137,11 @@ type healthDAGStats struct {
 	Error        string `json:"error,omitempty"`
 }
 
-// importErrorRow is a DAG file the scheduler could not parse.
+// importErrorRow is a DAG file the scheduler could not parse. `dags errors`
+// lists these and the health report carries them, in the one shape.
 type importErrorRow struct {
+	// ID is Airflow's handle on the error. Both generations send it.
+	ID         int    `json:"import_error_id,omitempty"`
 	Filename   string `json:"filename"`
 	StackTrace string `json:"stack_trace,omitempty"`
 	Bundle     string `json:"bundle_name,omitempty"`
@@ -151,6 +155,25 @@ type dagWarningRow struct {
 	WarningType string `json:"warning_type,omitempty"`
 	Message     string `json:"message,omitempty"`
 	Timestamp   string `json:"timestamp,omitempty"`
+}
+
+func newImportErrorRow(e airflowapi.ImportError) importErrorRow {
+	return importErrorRow{
+		ID:         e.ImportErrorID,
+		Filename:   e.Filename,
+		StackTrace: e.StackTrace,
+		Bundle:     e.Bundle,
+		Timestamp:  stamp(e.Timestamp),
+	}
+}
+
+func newDAGWarningRow(w airflowapi.DAGWarning) dagWarningRow {
+	return dagWarningRow{
+		DAGID:       w.DAGID,
+		WarningType: w.WarningType,
+		Message:     w.Message,
+		Timestamp:   stamp(w.Timestamp),
+	}
 }
 
 func (q *query) runHealth(ctx context.Context) error {
@@ -211,41 +234,24 @@ func readHealthVersion(ctx context.Context, client *airflowapi.Client) healthVer
 	return healthVersion{versionRow: newVersionRow(info)}
 }
 
-//nolint:dupl // see the note on readHealthDAGWarnings
 func readHealthImportErrors(ctx context.Context, client *airflowapi.Client) healthImportErrors {
 	list, err := client.ListImportErrors(ctx, airflowapi.ListOptions{})
 	if err != nil {
 		return healthImportErrors{Error: sectionFailure(err)}
 	}
-	rows := mapRows(list.ImportErrors, func(e airflowapi.ImportError) importErrorRow {
-		return importErrorRow{
-			Filename:   e.Filename,
-			StackTrace: e.StackTrace,
-			Bundle:     e.Bundle,
-			Timestamp:  stamp(e.Timestamp),
-		}
-	})
+	rows := mapRows(list.ImportErrors, newImportErrorRow)
 	return healthImportErrors{Count: sectionCount(list.TotalEntries, len(rows)), Errors: rows}
 }
 
-// This and readHealthImportErrors are the same five moves over different types.
+// This and readHealthImportErrors are the same moves over different types.
 // They stay apart: the shapes they build are what the report promises its
 // readers, and "errors" and "warnings" are different words to whoever reads it.
-//
-//nolint:dupl // see above
 func readHealthDAGWarnings(ctx context.Context, client *airflowapi.Client) healthDAGWarnings {
 	list, err := client.ListDAGWarnings(ctx, airflowapi.ListOptions{})
 	if err != nil {
 		return healthDAGWarnings{Error: sectionFailure(err)}
 	}
-	rows := mapRows(list.DAGWarnings, func(w airflowapi.DAGWarning) dagWarningRow {
-		return dagWarningRow{
-			DAGID:       w.DAGID,
-			WarningType: w.WarningType,
-			Message:     w.Message,
-			Timestamp:   stamp(w.Timestamp),
-		}
-	})
+	rows := mapRows(list.DAGWarnings, newDAGWarningRow)
 	return healthDAGWarnings{Count: sectionCount(list.TotalEntries, len(rows)), Warnings: rows}
 }
 

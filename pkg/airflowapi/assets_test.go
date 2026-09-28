@@ -12,7 +12,7 @@ func TestListAssetsReadsAirflow2Datasets(t *testing.T) {
 		`{"datasets":[{"id":1,"uri":"s3://orders","consuming_dags":[{"dag_id":"etl"}]}],"total_entries":1}`)
 	client := stub.client()
 
-	list, err := client.ListAssets(t.Context(), ListOptions{})
+	list, err := client.ListAssets(t.Context(), ListAssetsOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestListAssetsReadsAirflow3Assets(t *testing.T) {
 		`{"assets":[{"id":1,"name":"orders","uri":"s3://orders","scheduled_dags":[{"dag_id":"etl"}]}],"total_entries":1}`)
 	client := stub.client()
 
-	list, err := client.ListAssets(t.Context(), ListOptions{Limit: 2})
+	list, err := client.ListAssets(t.Context(), ListAssetsOptions{ListOptions: ListOptions{Limit: 2}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestAssetsAreNotServedByAnAirflowWithoutThem(t *testing.T) {
 	stub := newAF2Stub(t)
 	client := stub.client()
 
-	_, err := client.ListAssets(t.Context(), ListOptions{})
+	_, err := client.ListAssets(t.Context(), ListAssetsOptions{})
 	if !errors.Is(err, ErrNotServed) {
 		t.Errorf("err = %v, want it to read as not served", err)
 	}

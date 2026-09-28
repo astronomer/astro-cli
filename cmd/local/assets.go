@@ -16,11 +16,13 @@ func newAssetsCmd(d Deps, t target) *cobra.Command {
 	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "assets",
 		Short: "List the data assets an Airflow tracks, and their updates",
-		Long: "Read the data assets on " + t.which() + ", and the events that update " +
-			"them. Airflow 2 calls the same thing a dataset; both answer here.",
+		Long: "Read the data assets on " + t.which() + ", the events that update " +
+			"them, and the events that started a given run. Airflow 2 calls the same thing a dataset; both " +
+			"answer here.",
 	},
 		newAssetsListCmd,
 		newAssetsEventsCmd,
+		newAssetsTriggersCmd,
 	)
 }
 
@@ -58,25 +60,31 @@ func newAssetRow(a airflowapi.Asset) assetRow {
 
 func newAssetsListCmd(q *query) *cobra.Command {
 	var list listFlags
+	var uriPattern string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the assets this Airflow tracks",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return q.runAssetsList(cmd.Context(), list.options())
+			return q.runAssetsList(cmd.Context(), airflowapi.ListAssetsOptions{
+				ListOptions: list.options(),
+				URIPattern:  uriPattern,
+			})
 		},
 	}
 	addListFlags(cmd, &list, "")
+	cmd.Flags().StringVar(&uriPattern, "uri-pattern", "",
+		"Keep only assets whose URI contains this; % matches any run of characters")
 	return cmd
 }
 
-func (q *query) runAssetsList(ctx context.Context, opts airflowapi.ListOptions) error {
+func (q *query) runAssetsList(ctx context.Context, opts airflowapi.ListAssetsOptions) error {
 	r, client, err := q.open(ctx)
 	if err != nil {
 		return err
 	}
-	return notServed("assets", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Asset, int, error) {
-		list, err := client.ListAssets(ctx, page)
+	return notServed("assets", emitList(q, r, opts.ListOptions, func(page airflowapi.ListOptions) ([]airflowapi.Asset, int, error) {
+		list, err := client.ListAssets(ctx, airflowapi.ListAssetsOptions{ListOptions: page, URIPattern: opts.URIPattern})
 		return list.Assets, list.TotalEntries, err
 	}, newAssetRow, renderAssetTable))
 }
@@ -169,7 +177,38 @@ func (q *query) runAssetsEvents(ctx context.Context, opts airflowapi.ListAssetEv
 }
 
 func renderAssetEventTable(w io.Writer, rows []assetEventRow) error {
-	return renderTable(w, rows, "No asset events on this Airflow.",
+	return renderAssetEvents(w, rows, "No asset events on this Airflow.")
+}
+
+func newAssetsTriggersCmd(q *query) *cobra.Command {
+	return &cobra.Command{
+		Use:   "triggers <DAG_ID> <RUN_ID>",
+		Short: "List the asset updates that started a run",
+		Long: "List the asset events a run was waiting on: the updates that made the scheduler start this run of " +
+			"a data-aware DAG. A run the schedule or a person started lists none.",
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return q.runAssetsTriggers(cmd.Context(), args[0], args[1])
+		},
+	}
+}
+
+func (q *query) runAssetsTriggers(ctx context.Context, dagID, runID string) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	list, err := client.UpstreamAssetEvents(ctx, dagID, runID)
+	if err != nil {
+		return notServed("the asset events behind a run", err)
+	}
+	return emitRows(r, mapRows(list.AssetEvents, newAssetEventRow), func(w io.Writer, rows []assetEventRow) error {
+		return renderAssetEvents(w, rows, "No asset events started this run.")
+	})
+}
+
+func renderAssetEvents(w io.Writer, rows []assetEventRow, empty string) error {
+	return renderTable(w, rows, empty,
 		[]string{"TIMESTAMP", "URI", "SOURCE", "STARTED"},
 		func(row assetEventRow) []string {
 			source := row.SourceDAGID

@@ -52,6 +52,10 @@ func queryFamilies(d Deps, newTarget func() target) []*cobra.Command {
 		newVariablesCmd,
 		newPoolsCmd,
 		newHealthCmd,
+		newVersionCmd,
+		newProvidersCmd,
+		newPluginsCmd,
+		newConfigCmd,
 	}
 	cmds := make([]*cobra.Command, 0, len(builders))
 	for _, build := range builders {

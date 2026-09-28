@@ -38,6 +38,11 @@ type stubRoute struct {
 	status  int
 	body    string
 	respond func(url.Values) string
+	// sequence, when set, answers successive calls in turn and then keeps
+	// answering with its last entry: a run that is queued, then running, then
+	// done.
+	sequence []string
+	served   int
 }
 
 type stubRequest struct {
@@ -78,6 +83,14 @@ func (s *airflowStub) routeStatus(method, path string, status int, body string) 
 	s.routes[method+" "+path] = stubRoute{status: status, body: body}
 }
 
+// routeSequence answers successive calls to one path with each body in turn,
+// holding on the last.
+func (s *airflowStub) routeSequence(method, path string, bodies ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.routes[method+" "+path] = stubRoute{status: http.StatusOK, sequence: bodies}
+}
+
 // routeFunc answers a path with a body built from the request's query, for a
 // case whose answer depends on it, such as the page an offset names.
 func (s *airflowStub) routeFunc(method, path string, respond func(url.Values) string) {
@@ -98,7 +111,13 @@ func (s *airflowStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Query:  r.URL.RawQuery,
 		Body:   string(body),
 	})
-	route, ok := s.routes[r.Method+" "+r.URL.Path]
+	key := r.Method + " " + r.URL.Path
+	route, ok := s.routes[key]
+	if ok && len(route.sequence) > 0 {
+		route.body = route.sequence[min(route.served, len(route.sequence)-1)]
+		route.served++
+		s.routes[key] = route
+	}
 	s.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -131,6 +150,17 @@ func (s *airflowStub) request(method, path string) stubRequest {
 	}
 	s.t.Fatalf("stub never received %s %s; it saw %v", method, path, s.requests())
 	return stubRequest{}
+}
+
+// requestsTo is every call to one method and path, in order.
+func (s *airflowStub) requestsTo(method, path string) []stubRequest {
+	var out []stubRequest
+	for _, req := range s.requests() {
+		if req.Method == method && req.Path == path {
+			out = append(out, req)
+		}
+	}
+	return out
 }
 
 // sawRequest reports whether a call was made at all.

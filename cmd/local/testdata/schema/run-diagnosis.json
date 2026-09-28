@@ -1,0 +1,65 @@
+{
+  "run": {
+    "dag_id": "x",
+    "dag_run_id": "x",
+    "state": "x",
+    "run_type": "x",
+    "logical_date": "x",
+    "queued_at": "x",
+    "start_date": "x",
+    "end_date": "x",
+    "duration_seconds": 1.5,
+    "triggered_by": "x",
+    "note": "x",
+    "conf": {
+      "x": null
+    }
+  },
+  "task_instances": [
+    {
+      "task_id": "x",
+      "dag_id": "x",
+      "dag_run_id": "x",
+      "state": "x",
+      "map_index": -1,
+      "try_number": -1,
+      "max_tries": -1,
+      "operator": "x",
+      "pool": "x",
+      "queue": "x",
+      "hostname": "x",
+      "note": "x",
+      "logical_date": "x",
+      "start_date": "x",
+      "end_date": "x",
+      "duration_seconds": 1.5
+    }
+  ],
+  "summary": {
+    "total_tasks": -1,
+    "state_counts": {
+      "x": -1
+    },
+    "failed_tasks": [
+      {
+        "task_id": "x",
+        "dag_id": "x",
+        "dag_run_id": "x",
+        "state": "x",
+        "map_index": -1,
+        "try_number": -1,
+        "max_tries": -1,
+        "operator": "x",
+        "pool": "x",
+        "queue": "x",
+        "hostname": "x",
+        "note": "x",
+        "logical_date": "x",
+        "start_date": "x",
+        "end_date": "x",
+        "duration_seconds": 1.5
+      }
+    ]
+  },
+  "task_instances_error": "x"
+}

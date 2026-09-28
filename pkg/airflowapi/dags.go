@@ -69,6 +69,12 @@ type ListDAGsOptions struct {
 	DAGIDPattern string
 	// Paused keeps only paused or only unpaused DAGs; nil means both.
 	Paused *bool
+	// OnlyActive keeps only DAGs whose file the scheduler still sees (true),
+	// or includes the ones it no longer does (false). Nil sends nothing, and
+	// both generations then default to active DAGs only. Airflow 2 spells the
+	// filter only_active and Airflow 3 spells its opposite exclude_stale; the
+	// meaning is the same, so the value passes straight through.
+	OnlyActive *bool
 }
 
 // ListDAGs lists DAGs.
@@ -82,6 +88,17 @@ func (c *Client) ListDAGs(ctx context.Context, opts ListDAGsOptions) (DAGList, e
 	}
 	if opts.Paused != nil {
 		query.Set("paused", strconv.FormatBool(*opts.Paused))
+	}
+	if opts.OnlyActive != nil {
+		generation, err := c.Generation(ctx)
+		if err != nil {
+			return DAGList{}, err
+		}
+		name := "only_active"
+		if generation == Airflow3 {
+			name = "exclude_stale"
+		}
+		query.Set(name, strconv.FormatBool(*opts.OnlyActive))
 	}
 	var list DAGList
 	err := c.getCollection(ctx, "/dags", query, &list)

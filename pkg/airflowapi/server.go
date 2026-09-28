@@ -6,23 +6,6 @@ import (
 	"net/http"
 )
 
-// Config is Airflow's running configuration, as sections of key/value pairs.
-type Config struct {
-	Sections []ConfigSection `json:"sections"`
-}
-
-// ConfigSection is one airflow.cfg section.
-type ConfigSection struct {
-	Name    string         `json:"name"`
-	Options []ConfigOption `json:"options"`
-}
-
-// ConfigOption is one setting.
-type ConfigOption struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 // HealthComponent is one Airflow component's health.
 type HealthComponent struct {
 	Status string `json:"status"`

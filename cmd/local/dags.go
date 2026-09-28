@@ -19,12 +19,16 @@ func newDagsCmd(d Deps, t target) *cobra.Command {
 		Use:   "dags",
 		Short: "List and control the DAGs on an Airflow",
 		Long: "Read and control the DAGs on " + t.which() + ": list them, read one, " +
-			"print its source, count its runs by state, and pause or unpause it.",
+			"print its source, explore it, count its runs by state, list the files that failed to parse and " +
+			"the scheduler's warnings, and pause or unpause it.",
 	},
 		newDagsListCmd,
 		newDagsGetCmd,
 		newDagsSourceCmd,
+		newDagsExploreCmd,
 		newDagsStatsCmd,
+		newDagsErrorsCmd,
+		newDagsWarningsCmd,
 		newDagsPauseCmd,
 		newDagsUnpauseCmd,
 	)
@@ -81,10 +85,12 @@ func newDAGRow(d airflowapi.DAG) dagRow {
 func newDagsListCmd(q *query) *cobra.Command {
 	var list listFlags
 	var opts struct {
-		tags      []string
-		pattern   string
-		paused    bool
-		notPaused bool
+		tags            []string
+		pattern         string
+		paused          bool
+		notPaused       bool
+		onlyActive      bool
+		includeInactive bool
 	}
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -107,6 +113,16 @@ func newDagsListCmd(q *query) *cobra.Command {
 				no := false
 				o.Paused = &no
 			}
+			// Three-valued for the same reason. Unset leaves Airflow's own
+			// default, which on both generations is active DAGs only.
+			switch {
+			case opts.onlyActive:
+				yes := true
+				o.OnlyActive = &yes
+			case opts.includeInactive:
+				no := false
+				o.OnlyActive = &no
+			}
 			return q.runDagsList(cmd.Context(), o)
 		},
 	}
@@ -116,6 +132,11 @@ func newDagsListCmd(q *query) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.paused, "paused", false, "Keep only paused DAGs")
 	cmd.Flags().BoolVar(&opts.notPaused, "not-paused", false, "Keep only DAGs that are not paused")
 	cmd.MarkFlagsMutuallyExclusive("paused", "not-paused")
+	cmd.Flags().BoolVar(&opts.onlyActive, "only-active", false,
+		"Keep only DAGs whose file the scheduler still sees (Airflow's default)")
+	cmd.Flags().BoolVar(&opts.includeInactive, "include-inactive", false,
+		"Also list DAGs whose file is gone, which Airflow otherwise leaves out")
+	cmd.MarkFlagsMutuallyExclusive("only-active", "include-inactive")
 	return cmd
 }
 
