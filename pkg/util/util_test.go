@@ -1,10 +1,15 @@
 package util
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 )
 
 type Suite struct {
@@ -330,4 +335,23 @@ func (s *Suite) TestIsCUID() {
 			s.Equal(tt.expect, IsCUID(tt.input))
 		})
 	}
+}
+
+func (s *Suite) TestMissingSecretsExplain() {
+	buildErr := fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)
+	netrc := airflowrt.SecretMount{ID: "netrc", Line: 5}
+	pip := airflowrt.SecretMount{ID: "pip", Line: 9}
+
+	one := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{netrc}}
+	err := one.Explain(buildErr)
+	s.ErrorIs(err, imagebuild.ErrDockerfileBuild)
+	s.Equal(`building the project's Dockerfile failed; see the build output above: exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`, err.Error())
+
+	two := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{netrc, pip}}
+	s.Equal(`building the project's Dockerfile failed; see the build output above: exit status 1 — Dockerfile mounts build secrets "netrc", "pip", which were not given; pass --build-secret id=netrc,env=<VAR> --build-secret id=pip,env=<VAR> or set BUILD_SECRET_INPUT`, two.Explain(buildErr).Error())
+
+	other := errors.New("docker is not running")
+	s.Equal(other, one.Explain(other), "only a failed Dockerfile build gets the hint")
+	s.Equal(buildErr, MissingSecrets{}.Explain(buildErr), "nothing missing, nothing added")
+	s.NoError(one.Explain(nil))
 }

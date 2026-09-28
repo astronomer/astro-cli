@@ -114,6 +114,10 @@ func AirflowSeries(pin string) (series string, ok bool) {
 	return parts[0] + "." + parts[1], true
 }
 
+// ErrDockerfileBuild reports that the build of the project's own Dockerfile
+// failed, rather than the install of a generated build.
+var ErrDockerfileBuild = errors.New("building the project's Dockerfile failed; see the build output above")
+
 const (
 	// dockerfileName is the one-line `FROM <base>` Dockerfile the build runs;
 	// the runtime image's ONBUILD triggers do the install.
@@ -356,7 +360,7 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		// The two modes fail for different reasons and a user reading this has
 		// to know which file to open: ours, or theirs.
 		if req.Dockerfile != "" {
-			return "", fmt.Errorf("building the project's Dockerfile failed; see the build output above: %w", err)
+			return "", fmt.Errorf("%w: %w", ErrDockerfileBuild, err)
 		}
 		return "", fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)
 	}

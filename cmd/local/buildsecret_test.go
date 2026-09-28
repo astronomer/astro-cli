@@ -3,27 +3,33 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // planRecorder is a runtime that records each plan a start hands it, and
 // reports a running Airflow in mode for restart to find, or none when mode is
-// empty.
+// empty. A start fails with startErr, or ErrNotImplemented when it is nil.
 type planRecorder struct {
 	fakeRuntime
-	plans *[]localrt.Plan
-	mode  localrt.Mode
+	plans    *[]localrt.Plan
+	mode     localrt.Mode
+	startErr error
 }
 
 func (s planRecorder) Start(_ context.Context, p localrt.Plan, _ localrt.Callbacks) (localrt.Airflow, error) {
 	*s.plans = append(*s.plans, p)
+	if s.startErr != nil {
+		return nil, s.startErr
+	}
 	return nil, localrt.ErrNotImplemented
 }
 
@@ -213,6 +219,46 @@ func TestStartWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 			want := `warning: Dockerfile mounts build secret "netrc" (line 2) but none was given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`
 			if got := strings.Contains(out.String(), want); got != tc.warns {
 				t.Errorf("warned = %v, want %v; output:\n%s", got, tc.warns, out.String())
+			}
+		})
+	}
+}
+
+// The warning prints before the build, and a failed build's output pushes it
+// out of sight, so the final error names the unsupplied secret again.
+func TestFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
+	const hint = `Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`
+	buildErr := fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)
+	for _, tc := range []struct {
+		name     string
+		args     []string
+		mode     localrt.Mode
+		startErr error
+		hints    bool
+	}{
+		{name: "start", args: []string{"local", "start", "--docker"}, startErr: buildErr, hints: true},
+		{name: "restart", args: []string{"local", "restart"}, mode: localrt.ModeDocker, startErr: buildErr, hints: true},
+		{name: "secret given", args: []string{"local", "start", "--docker", "--build-secret", "id=netrc,env=NETRC_CONTENT"}, startErr: buildErr},
+		{name: "not a build failure", args: []string{"local", "start", "--docker"}, startErr: errors.New("airflow never became healthy")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(util.BuildSecretInputEnv, "")
+			d, _ := testDeps(t)
+			var plans []localrt.Plan
+			d.Runtime = planRecorder{plans: &plans, mode: tc.mode, startErr: tc.startErr}
+			wiringProject(t, &d, declaredDockerfile, "")
+			dir, _ := d.WorkingDir()
+			dockerfile := "FROM " + matchingBase + "\nRUN --mount=type=secret,id=netrc,dst=/root/.netrc \\\n  pip install private\n"
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			err := execute(t, d, tc.args...)
+			if err == nil {
+				t.Fatal("the start should fail")
+			}
+			if got := strings.Contains(err.Error(), hint); got != tc.hints {
+				t.Errorf("hinted = %v, want %v; err: %v", got, tc.hints, err)
 			}
 		})
 	}

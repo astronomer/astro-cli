@@ -88,11 +88,14 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 }
 
 // warnMissingSecrets reports, before the build, each secret the declared
-// Dockerfile mounts that no build secret supplies.
-func warnMissingSecrets(req Request, cb localrt.Callbacks) {
-	for _, w := range util.MissingBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets) {
+// Dockerfile mounts that no build secret supplies, and returns them for a
+// failed build to name again.
+func warnMissingSecrets(req Request, cb localrt.Callbacks) util.MissingSecrets {
+	missing := util.MissingBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
+	for _, w := range missing.Warnings() {
 		emit(cb, "warning: "+w)
 	}
+	return missing
 }
 
 // Build resolves the runtime base, builds the image, reads its runtime-version
@@ -127,8 +130,9 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
+	var missingSecrets util.MissingSecrets
 	if declared != "" {
-		warnMissingSecrets(req, cb)
+		missingSecrets = warnMissingSecrets(req, cb)
 	}
 
 	// The astro artifact is an image, so Docker is required. Probe the engine up
@@ -167,7 +171,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	breq.Env = t.env
 	built, err := t.builder.BuildLocal(ctx, breq, cb)
 	if err != nil {
-		return Result{}, err
+		return Result{}, missingSecrets.Explain(err)
 	}
 	// Drop the working tag once the final names point at the image, so package
 	// leaves a clean set of tags. Best effort; an orphaned tag is harmless.

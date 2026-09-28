@@ -435,8 +435,14 @@ func TestBuildDockerfileModeFailureNamesTheProjectFile(t *testing.T) {
 
 	_, err := testBuilder(cmd).Build(context.Background(), dockerfileRequest(t), rt.Callbacks{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "building the project's Dockerfile failed")
-	assert.NotContains(t, err.Error(), "installing the project's dependencies")
+	assert.ErrorIs(t, err, ErrDockerfileBuild)
+	assert.Equal(t, "building the project's Dockerfile failed; see the build output above: exit status 1", err.Error())
+
+	req := dockerfileRequest(t)
+	req.Dockerfile, req.Context = "", ""
+	_, err = testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrDockerfileBuild, "a generated build's failure is not the project's Dockerfile")
 }
 
 func TestBuildDockerfileModeStillPinsPlatform(t *testing.T) {

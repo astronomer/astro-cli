@@ -2,12 +2,14 @@ package deploy
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
@@ -126,4 +128,21 @@ func TestRunWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 		require.NoError(t, err)
 	}
 	assert.Empty(t, warnings)
+}
+
+// A failed image build names the unsupplied secret again in the deploy's
+// error, since the build output has pushed the warning out of sight.
+func TestRunFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
+	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
+	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
+	req := Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}
+	buildErr := fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)
+
+	_, err := Run(req, &fakeDeployer{imgErr: buildErr})
+	require.ErrorIs(t, err, imagebuild.ErrDockerfileBuild)
+	assert.Contains(t, err.Error(), `exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`)
+
+	other := errors.New("pushing the image: unauthorized")
+	_, err = Run(req, &fakeDeployer{imgErr: other})
+	assert.Equal(t, other, err, "only a failed Dockerfile build gets the hint")
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 )
 
 type CustomClaims struct {
@@ -104,16 +106,21 @@ func ResolveBuildSecrets(flagSecrets []string, fallbacks ...string) []string {
 	return nil
 }
 
-// MissingBuildSecrets returns a warning for each secret the project's
-// Dockerfile mounts that no spec in secrets supplies, for a caller to print
-// before the build. A warning and not a refusal, because a secret mount is
-// optional unless it says required=true. dockerfile is the project-relative
-// path the manifest declares; a file that cannot be read gives no warnings,
-// since the build reports that itself.
-func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) []string {
+// MissingSecrets are the build secrets a project's Dockerfile mounts that no
+// spec supplies.
+type MissingSecrets struct {
+	Dockerfile string
+	Mounts     []airflowrt.SecretMount
+}
+
+// MissingBuildSecrets finds each secret the project's Dockerfile mounts that
+// no spec in secrets supplies. dockerfile is the project-relative path the
+// manifest declares; a file that cannot be read finds none, since the build
+// reports that itself.
+func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) MissingSecrets {
 	mounts, err := airflowrt.SecretMounts(filepath.Join(projectDir, dockerfile))
 	if err != nil {
-		return nil
+		return MissingSecrets{}
 	}
 	given := map[string]bool{}
 	for _, spec := range secrets {
@@ -123,14 +130,48 @@ func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) []stri
 			}
 		}
 	}
-	var warnings []string
+	missing := MissingSecrets{Dockerfile: dockerfile}
 	for _, m := range mounts {
 		if !given[m.ID] {
-			warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given; pass --build-secret id=%s,env=<VAR> or set %s",
-				dockerfile, m.ID, m.Line, m.ID, BuildSecretInputEnv))
+			missing.Mounts = append(missing.Mounts, m)
 		}
 	}
+	return missing
+}
+
+// Warnings are the lines a caller prints before the build, one per missing
+// secret. A warning and not a refusal, because a secret mount is optional
+// unless it says required=true.
+func (m MissingSecrets) Warnings() []string {
+	var warnings []string
+	for _, mount := range m.Mounts {
+		warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given; pass %s or set %s",
+			m.Dockerfile, mount.ID, mount.Line, buildSecretFlag(mount.ID), BuildSecretInputEnv))
+	}
 	return warnings
+}
+
+func buildSecretFlag(id string) string {
+	return "--build-secret id=" + id + ",env=<VAR>"
+}
+
+// Explain adds the missing secrets to a failed build of the project's
+// Dockerfile, where the warning printed before the build has scrolled out of
+// sight. Any other error comes back as it is.
+func (m MissingSecrets) Explain(err error) error {
+	if len(m.Mounts) == 0 || !errors.Is(err, imagebuild.ErrDockerfileBuild) {
+		return err
+	}
+	ids := make([]string, len(m.Mounts))
+	flags := make([]string, len(m.Mounts))
+	for i, mount := range m.Mounts {
+		ids[i] = strconv.Quote(mount.ID)
+		flags[i] = buildSecretFlag(mount.ID)
+	}
+	if len(ids) == 1 {
+		return fmt.Errorf("%w — %s mounts build secret %s, which was not given; pass %s or set %s", err, m.Dockerfile, ids[0], flags[0], BuildSecretInputEnv)
+	}
+	return fmt.Errorf("%w — %s mounts build secrets %s, which were not given; pass %s or set %s", err, m.Dockerfile, strings.Join(ids, ", "), strings.Join(flags, " "), BuildSecretInputEnv)
 }
 
 func splitBuildSecretLines(value string) (secrets []string) {

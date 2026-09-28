@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -519,4 +520,20 @@ func TestAstroBuildWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, lines, `warning: Dockerfile mounts build secret "netrc" (line 2) but none was given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`)
+}
+
+// A failed package build names the unsupplied secret again in its error, since
+// the build output has pushed the warning out of sight.
+func TestAstroBuildFailureNamesTheUnsuppliedSecretMount(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nRUN --mount=type=secret,id=netrc pip install private\n")
+	builder := &fakeBuilder{err: fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)}
+
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.ErrorIs(t, err, imagebuild.ErrDockerfileBuild)
+	assert.Contains(t, err.Error(), `exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`)
+
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT"}
+	_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.ErrorIs(t, err, imagebuild.ErrDockerfileBuild)
+	assert.NotContains(t, err.Error(), "which was not given")
 }

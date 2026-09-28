@@ -231,7 +231,8 @@ func Run(req Request, d Deployer) (Result, error) {
 	}
 	// Also before anything is asked: a project whose image source is refused
 	// should not first make someone pick where to ship it.
-	if err := checkImageSource(req); err != nil {
+	missingSecrets, err := checkImageSource(req)
+	if err != nil {
 		return Result{}, err
 	}
 
@@ -246,7 +247,8 @@ func Run(req Request, d Deployer) (Result, error) {
 	if req.DagsOnly {
 		return runDagsOnly(req, target, d)
 	}
-	return runImage(req, target, d)
+	res, err := runImage(req, target, d)
+	return res, missingSecrets.Explain(err)
 }
 
 // checkImageSource holds what an image deploy would build from to the Airflow
@@ -254,32 +256,35 @@ func Run(req Request, d Deployer) (Result, error) {
 // Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
 // [tool.astro] runtime build (Request.CheckRuntime). A dags-only deploy and one
 // adopting a prebuilt --image-name build nothing from the manifest, and are not
-// held to it.
-func checkImageSource(req Request) error {
+// held to it. It returns the build secrets the declared Dockerfile mounts and
+// nobody gave, for a failed build to name again.
+func checkImageSource(req Request) (util.MissingSecrets, error) {
+	var missing util.MissingSecrets
 	if req.DagsOnly || req.ImageName != "" || req.Manifest == nil {
-		return nil
+		return missing, nil
 	}
 	if err := scaffold.CheckDockerfileAirflow(req.ProjectDir, req.Manifest); err != nil {
-		return err
+		return missing, err
 	}
 	warn := req.Warn
 	if warn == nil {
 		warn = func(string) {}
 	}
 	if dockerfile := req.Manifest.Astro.Dockerfile; dockerfile != "" {
-		for _, w := range util.MissingBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets) {
+		missing = util.MissingBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets)
+		for _, w := range missing.Warnings() {
 			warn(w)
 		}
 	}
 	airflow := req.Manifest.Airflow()
 	if airflow.Runtime == "" || req.CheckRuntime == nil {
-		return nil
+		return missing, nil
 	}
 	warnings, err := req.CheckRuntime(airflow.Runtime, airflow.Pin)
 	for _, w := range warnings {
 		warn(manifest.Marker + ": tool.astro.runtime: " + w.Message)
 	}
-	return err
+	return missing, err
 }
 
 // runDagsOnly ships just the dags/ directory through the transport.
