@@ -13,7 +13,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zalando/go-keyring"
+
+	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // runAirflow is a fake localrt.Airflow whose Run returns a fixed error, so a
@@ -126,6 +130,104 @@ func TestRunInADockerProjectWhoseProbeMissedAttaches(t *testing.T) {
 	}
 	if calls.stopped.ProjectPath != "" {
 		t.Error("a docker project fell back to the stopped standalone handle")
+	}
+}
+
+// stoppedWorkspaceProject is a stopped standalone project whose manifest
+// declares workspace-source values, with the Environment Manager faked by
+// warehouseClient. A test picks the login with testUtil.InitTestConfig first.
+func stoppedWorkspaceProject(t *testing.T, manifest string) (d Deps, stderr *bytes.Buffer, calls *stoppedCalls) {
+	t.Helper()
+	d, _, calls = stoppedProject(t, "")
+	isolateEnvSources(t, "API_TOKEN", "DATA_WAREHOUSE_URI")
+	dir, _ := d.WorkingDir()
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ASTRO_HOME", t.TempDir())
+	keyring.MockInit()
+	t.Cleanup(keyring.MockInit)
+	d.WorkspaceClients = workspaceClients(warehouseClient())
+	return d, d.Stderr.(*bytes.Buffer), calls
+}
+
+// Offline by default: every workspace-source value the run goes without is
+// named on one warning line that says how to fetch them.
+func TestRunOfflineNamesSkippedWorkspaceValuesOnOneLine(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	manifest := workspaceEnvManifest + "API_TOKEN = { source = 'workspace' }\n"
+	for _, cmd := range [][]string{{"local", "run", "pytest"}, {"local", "shell"}} {
+		t.Run(cmd[1], func(t *testing.T) {
+			d, stderr, calls := stoppedWorkspaceProject(t, manifest)
+			if err := execute(t, d, cmd...); err != nil {
+				t.Fatalf("offline %s: %v", cmd[1], err)
+			}
+			want := "warning: running without env var API_TOKEN, env var DATA_WAREHOUSE_URI: declared source = \"workspace\"; pass --with-workspace to fetch them\n"
+			if got := stderr.String(); got != want {
+				t.Errorf("stderr = %q, want %q", got, want)
+			}
+			if _, ok := calls.stopped.SecretEnv["DATA_WAREHOUSE_URI"]; ok {
+				t.Error("an offline run fetched a workspace value")
+			}
+		})
+	}
+}
+
+// --with-workspace fetches the values the way a start does.
+func TestRunWithWorkspaceFetchesWorkspaceValues(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	for _, cmd := range [][]string{{"local", "run", "--with-workspace", "pytest"}, {"local", "shell", "--with-workspace"}} {
+		t.Run(cmd[1], func(t *testing.T) {
+			d, stderr, calls := stoppedWorkspaceProject(t, workspaceEnvManifest)
+			if err := execute(t, d, cmd...); err != nil {
+				t.Fatalf("%s --with-workspace: %v", cmd[1], err)
+			}
+			if got := calls.stopped.SecretEnv["DATA_WAREHOUSE_URI"]; got != "postgres://cloud" {
+				t.Errorf("DATA_WAREHOUSE_URI = %q, want the workspace value", got)
+			}
+			if stderr.Len() != 0 {
+				t.Errorf("stderr = %q, want nothing", stderr.String())
+			}
+		})
+	}
+}
+
+// The flag asks for workspace values only: a required local value with no
+// source still warns, and the command runs.
+func TestRunWithWorkspaceStillRunsWithoutALocalValue(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	isolateEnvSources(t, "ASTRO_TEST_LOCAL_ONLY")
+	manifest := workspaceEnvManifest + "ASTRO_TEST_LOCAL_ONLY = { sensitive = true }\n"
+	d, stderr, calls := stoppedWorkspaceProject(t, manifest)
+	if err := execute(t, d, "local", "run", "--with-workspace", "pytest"); err != nil {
+		t.Fatalf("run --with-workspace: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "warning: running without env var ASTRO_TEST_LOCAL_ONLY") {
+		t.Errorf("stderr = %q, want a warning for the local value", stderr.String())
+	}
+	if calls.stopped.SecretEnv["DATA_WAREHOUSE_URI"] != "postgres://cloud" {
+		t.Error("the workspace value was not fetched")
+	}
+}
+
+// Asked for explicitly, a workspace value that cannot be fetched fails the run
+// with the report a start gives, and nothing runs.
+func TestRunWithWorkspaceFailsWhenAValueCannotBeFetched(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.Initial)
+	d, _, calls := stoppedWorkspaceProject(t, workspaceEnvManifest)
+	err := execute(t, d, "local", "run", "--with-workspace", "pytest")
+	var missing *plan.MissingEnvError
+	if !errors.As(err, &missing) {
+		t.Fatalf("want *plan.MissingEnvError, got %T: %v", err, err)
+	}
+	if len(missing.Missing) != 1 || missing.Missing[0].Name != "DATA_WAREHOUSE_URI" {
+		t.Errorf("missing = %+v, want DATA_WAREHOUSE_URI alone", missing.Missing)
+	}
+	if !strings.Contains(err.Error(), "leave off `--with-workspace`") {
+		t.Errorf("error does not name the way out:\n%v", err)
+	}
+	if calls.stopped.ProjectPath != "" {
+		t.Error("the command ran although a requested value was missing")
 	}
 }
 

@@ -41,7 +41,11 @@ const (
 	replacePackage = "astro package"
 	replaceLogs    = "astro local logs"
 	replaceInit    = "astro init"
+
+	flagWithWorkspace = "with-workspace"
 )
+
+const withWorkspaceHelp = "With Airflow stopped, fetch the values declared source = \"workspace\" from the Environment Manager, as a start does (needs network and astro login)"
 
 // cli carries one command family's invocation state: the deps and the value
 // of its --output flag. Built per family in the constructors below, never
@@ -876,17 +880,19 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 }
 
 func newRunCmd(c *cli) *cobra.Command {
+	var withWorkspace bool
 	cmd := &cobra.Command{
 		Use:   nameRun + " [command] [args...]",
 		Short: "Run a command inside this project's Airflow environment",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.runExec(cmd.Context(), args)
+			return c.runExec(cmd.Context(), args, withWorkspace)
 		},
 	}
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cmd.Flags().SetInterspersed(false)
+	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
 	return cmd
 }
 
@@ -896,7 +902,11 @@ func newRunCmd(c *cli) *cobra.Command {
 // environment a start would give it, so `astro local run pytest` needs no
 // Airflow. Docker mode runs commands inside its containers, which have to be
 // up.
-func (c *cli) environment() (localrt.Airflow, error) {
+//
+// A stopped run stays offline unless withWorkspace asks for the values only
+// the Environment Manager holds. Then it resolves them as a start does, and a
+// value it cannot fetch fails the run the way it fails a start.
+func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 	dir, err := c.projectPath()
 	if err != nil {
 		return nil, err
@@ -917,15 +927,58 @@ func (c *cli) environment() (localrt.Airflow, error) {
 		}
 		return a, err
 	}
-	// No WorkspaceProvider, so a command run this way stays offline: a value
-	// only the Environment Manager holds is warned about like any missing one.
-	built, err := plan.Build(dir, plan.Options{AllowMissing: true})
+	opts := plan.Options{AllowMissing: true}
+	if withWorkspace {
+		opts.WorkspaceProvider = c.workspaceProvider()
+	}
+	built, err := plan.Build(dir, opts)
 	if err != nil {
 		return nil, err
 	}
+	var local, workspace []envresolve.Missing
+	for _, m := range built.StartedWithout {
+		if m.Workspace {
+			workspace = append(workspace, m)
+		} else {
+			local = append(local, m)
+		}
+	}
+	if withWorkspace && len(workspace) > 0 {
+		r, err := c.renderer()
+		if err != nil {
+			return nil, err
+		}
+		return nil, c.reportBuildError(r, &plan.MissingEnvError{
+			Project: built.Project.Dir,
+			Missing: workspace,
+			Next:    "provide them, then run the command again — or run it without them: leave off `--" + flagWithWorkspace + "`.",
+		})
+	}
 	// On stderr: stdout belongs to the command being run.
-	warnWithout(Renderer{Format: FormatText, Out: c.d.Stderr}, "running", built.StartedWithout)
+	stderr := Renderer{Format: FormatText, Out: c.d.Stderr}
+	warnWithout(stderr, "running", local)
+	warnWorkspaceSkipped(stderr, workspace)
 	return c.d.Runtime.Stopped(built.Plan)
+}
+
+// warnWorkspaceSkipped reports, in one line, the required values an offline
+// run went without because only the Environment Manager holds them.
+func warnWorkspaceSkipped(r Renderer, missing []envresolve.Missing) {
+	if len(missing) == 0 {
+		return
+	}
+	names := make([]string, len(missing))
+	for i, m := range missing {
+		names[i] = sectionLabel(m.Section) + " " + m.Name
+	}
+	pronoun := "it"
+	if len(missing) > 1 {
+		pronoun = "them"
+	}
+	emitWarning(r, event{
+		Event: "warning",
+		Text:  fmt.Sprintf("running without %s: declared source = \"workspace\"; pass --%s to fetch %s", strings.Join(names, ", "), flagWithWorkspace, pronoun),
+	})
 }
 
 // errDockerDown reports a docker-mode project whose containers are down, which
@@ -939,8 +992,8 @@ func (e notRunning) Error() string { return string(e) }
 
 func (e notRunning) Is(target error) bool { return target == localrt.ErrNotRunning }
 
-func (c *cli) runExec(ctx context.Context, argv []string) error {
-	af, err := c.environment()
+func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace bool) error {
+	af, err := c.environment(withWorkspace)
 	if err != nil {
 		return err
 	}
@@ -955,20 +1008,22 @@ func (c *cli) runExec(ctx context.Context, argv []string) error {
 }
 
 func newShellCmd(c *cli) *cobra.Command {
+	var withWorkspace bool
 	cmd := &cobra.Command{
 		Use:   "shell",
 		Short: "Open a shell inside this project's Airflow environment",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return c.runShell(cmd.Context())
+			return c.runShell(cmd.Context(), withWorkspace)
 		},
 	}
 	cmd.Flags().String("shell", "", "Shell to launch instead of your login shell (not built yet)")
+	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
 	return cmd
 }
 
-func (c *cli) runShell(ctx context.Context) error {
-	af, err := c.environment()
+func (c *cli) runShell(ctx context.Context, withWorkspace bool) error {
+	af, err := c.environment(withWorkspace)
 	if err != nil {
 		return err
 	}

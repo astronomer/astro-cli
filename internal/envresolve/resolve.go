@@ -40,6 +40,10 @@ type Missing struct {
 	// so the missing-value message names the cause and the fix. Empty for a
 	// plain local miss.
 	SourceNote string `json:"source_note,omitempty"`
+	// Workspace marks a name declared source = "workspace" that nothing
+	// local held, so a caller can tell a value the Environment Manager should
+	// have supplied from a plain local miss.
+	Workspace bool `json:"-"`
 }
 
 // SourceDefault is the source label a name carries when the manifest default
@@ -93,7 +97,7 @@ func Resolve(in Inputs) (*Result, error) {
 		return res, nil
 	}
 
-	r := &resolver{in: in, injected: map[string]string{}, notes: map[nameRef]string{}}
+	r := &resolver{in: in, injected: map[string]string{}, notes: map[nameRef]string{}, workspace: map[nameRef]bool{}}
 	res.Values.EnvVars = r.values(in.Schema.EnvVars, envschema.SectionEnvVar, func(name string) string { return name })
 	res.Values.AirflowVariables = r.values(in.Schema.AirflowVariables, envschema.SectionAirflowVariable, airflowenv.EnvKeyForVarKey)
 	res.Values.Connections = r.connTypes(in.Schema.Connections)
@@ -137,7 +141,9 @@ type resolver struct {
 	// notes holds the SourceNote for a workspace-source name that could not be
 	// fetched, keyed by section+name, joined into Missing.
 	notes map[nameRef]string
-	errs  []error
+	// workspace holds every workspace-source name that nothing local held.
+	workspace map[nameRef]bool
+	errs      []error
 	// extraViolations holds findings the validator can't see, e.g. a stored
 	// connection whose value isn't valid connection JSON.
 	extraViolations []envschema.Violation
@@ -252,6 +258,7 @@ func (r *resolver) resolveWorkspace(section envschema.Section, name, key string)
 	if v, src, ok := lookup(r.in.Providers, key); ok {
 		return v, src, true
 	}
+	r.workspace[nameRef{section, name}] = true
 	wp := r.in.WorkspaceProvider
 	if wp == nil {
 		// No workspace resolution wired for this run. Report the name
@@ -278,7 +285,8 @@ func (r *resolver) missingReport(violations []envschema.Violation) []Missing {
 		if v.Kind != envschema.ViolationMissing {
 			continue
 		}
-		m := Missing{Section: v.Section, Name: v.Key, SourceNote: r.notes[nameRef{v.Section, v.Key}]}
+		ref := nameRef{v.Section, v.Key}
+		m := Missing{Section: v.Section, Name: v.Key, SourceNote: r.notes[ref], Workspace: r.workspace[ref]}
 		switch v.Section {
 		case envschema.SectionEnvVar:
 			m.EnvKey = v.Key

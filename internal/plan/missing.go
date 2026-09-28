@@ -13,10 +13,14 @@ import (
 // values this machine has no source for. It is the clone-and-run gate: its
 // message names each missing value and the exact `astro local env <noun> set`
 // command that fills it, and Payload backs the same report in --output json.
-// cmd decides how to render it.
+// cmd decides how to render it. `run` and `shell --with-workspace` return it
+// too, for the workspace values they could not fetch.
 type MissingEnvError struct {
 	Project string
 	Missing []envresolve.Missing
+	// Next replaces the message's closing line. Empty keeps a start's
+	// `--allow-missing` advice.
+	Next string
 }
 
 func (e *MissingEnvError) Error() string {
@@ -29,7 +33,11 @@ func (e *MissingEnvError) Error() string {
 		}
 		fmt.Fprintf(&b, "      provide it:  %s\n", setHint(&m))
 	}
-	b.WriteString("provide them, then run `astro local start` again — or start without them: `astro local start --allow-missing`.")
+	if e.Next == "" {
+		b.WriteString("provide them, then run `astro local start` again — or start without them: `astro local start --allow-missing`.")
+	} else {
+		b.WriteString(e.Next)
+	}
 	return b.String()
 }
 
