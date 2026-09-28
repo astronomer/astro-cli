@@ -119,12 +119,12 @@ func Load(projectDir string) *Source {
 	s := &Source{}
 	dir, err := secrets.DefaultDir()
 	if err != nil {
-		s.down = &outage{short: "no home directory", cause: "your home directory could not be resolved, so the shared vault has no location"}
+		s.down = &outage{short: "no home directory", cause: "your home directory could not be resolved, so the encrypted vault has no location"}
 		return s
 	}
 	store, err := secrets.NewKeyringStore(secrets.Config{Service: secrets.DefaultService, Dir: dir})
 	if err != nil {
-		s.down = &outage{short: "unavailable", cause: fmt.Sprintf("the shared vault could not be opened: %v", err)}
+		s.down = &outage{short: "unavailable", cause: fmt.Sprintf("the encrypted vault could not be opened: %v", err)}
 		return s
 	}
 	s.store = store
@@ -164,7 +164,7 @@ func (s *Source) load() {
 		if err != nil {
 			s.down = &outage{
 				short: "unreadable",
-				cause: fmt.Sprintf("the shared vault could not be read: %v", err),
+				cause: fmt.Sprintf("the encrypted vault could not be read: %v", err),
 			}
 			return
 		}
@@ -438,16 +438,16 @@ func (p *provider) Diagnose(key string) string {
 		// "unlock your keychain" is useless advice for a key that is gone.
 		switch {
 		case errors.Is(err, secrets.ErrVaultOrphaned):
-			return "the shared vault holds it but the master key that decrypts it is gone, so it cannot be " +
+			return "the encrypted vault holds it but the master key that decrypts it is gone, so it cannot be " +
 				"recovered — a keychain reset or a new login keychain does this"
 		case errors.Is(err, secrets.ErrMasterKeyUnusable):
-			return "the shared vault holds it but this machine's stored master key is not usable, so it cannot " +
+			return "the encrypted vault holds it but this machine's stored master key is not usable, so it cannot " +
 				"be decrypted"
 		case errors.Is(err, secrets.ErrKeyringUnavailable):
-			return "the shared vault holds it but this machine's keyring is unreachable, so it cannot be decrypted — " +
+			return "the encrypted vault holds it but this machine's keyring is unreachable, so it cannot be decrypted — " +
 				"unlock your keychain, or supply the value in the environment instead"
 		}
-		return fmt.Sprintf("the shared vault holds it but it could not be read: %v", err)
+		return fmt.Sprintf("the encrypted vault holds it but it could not be read: %v", err)
 	}
 	return ""
 }

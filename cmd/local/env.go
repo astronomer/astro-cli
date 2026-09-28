@@ -28,7 +28,7 @@ import (
 // each register the flag and must describe it identically. Named for the vault
 // rather than the flag so gosec's hardcoded-credential heuristic does not read
 // a help string as a password.
-const vaultFlagHelp = "Use the encrypted vault shared with Astro Desktop instead of a plain file"
+const vaultFlagHelp = "Use the encrypted vault instead of a plain file"
 
 // scopeFlags carries the shared --project/--global choice and the --secret
 // store choice. It is filled by cobra before any RunE runs, so every env leaf
@@ -116,7 +116,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 		Long: "Manage environment values for local Airflow: environment variables,\n" +
 			"connections, and Airflow variables.\n\n" +
 			"Values live in the project's .env, or ~/.astro/env with --global. Pass --secret\n" +
-			"to use the encrypted vault shared with Astro Desktop instead.\n\n" +
+			"to use the encrypted vault instead.\n\n" +
 			"At start, each value comes from the first of: shell env, project .env, project\n" +
 			"vault, global vault, ~/.astro/env, the workspace's Environment Manager.",
 		Args:                       cobra.ArbitraryArgs,
@@ -227,7 +227,7 @@ func envKinds() []envKind {
   # set a variable (prompts for the value, echo off)
   astro local env variable set API_TOKEN
 
-  # read the value from a pipe, or keep it in the vault shared with Astro Desktop
+  # read the value from a pipe, or keep it in the encrypted vault
   echo "$TOKEN" | astro local env variable set API_TOKEN --stdin
   astro local env variable set API_TOKEN --secret
 
@@ -321,8 +321,8 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	fields := &connFields{}
 	long := "Set " + k.article + " " + k.label + ", creating it if it does not exist.\n\n" +
 		"The value comes from a prompt with echo off, --stdin, or --value; never a bare\n" +
-		"argument, which would land in shell history. --secret stores it in the vault\n" +
-		"shared with Astro Desktop, which needs an OS keyring.\n\n" +
+		"argument, which would land in shell history. --secret stores it in the\n" +
+		"encrypted vault, which needs an OS keyring.\n\n" +
 		"Connections and Airflow variables go to the vault by default; --secret=false\n" +
 		"keeps one in a plain file. An environment variable goes to the vault when\n" +
 		"the project's pyproject.toml declares it sensitive. --secret=false is refused\n" +
@@ -614,10 +614,10 @@ func kindPhrase(kind localenv.Kind) string {
 func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
 	if kind == localenv.KindConn {
 		return fmt.Errorf("connection %s is declared in %s, and a declared connection is always sensitive, "+
-			"so it can only be stored in the vault shared with Astro Desktop. Drop --secret=false to store it there",
+			"so it can only be stored in the encrypted vault. Drop --secret=false to store it there",
 			name, manifestPath)
 	}
-	return fmt.Errorf("%s %s is declared sensitive in %s, so it can only be stored in the vault shared with Astro Desktop. "+
+	return fmt.Errorf("%s %s is declared sensitive in %s, so it can only be stored in the encrypted vault. "+
 		"Drop --secret=false to store it there, or remove `sensitive = true` from its declaration to keep it in a plain file",
 		localenv.Noun(kind), name, manifestPath)
 }
@@ -849,7 +849,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	if ok {
 		return emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
 	}
-	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, the shared vault, or global ~/.astro/env)", localenv.Noun(kind), name)
+	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, the encrypted vault, or global ~/.astro/env)", localenv.Noun(kind), name)
 }
 
 // getFromWorkspace resolves a workspace-source name from Environment Manager

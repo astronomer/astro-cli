@@ -42,7 +42,7 @@ func NewWriter(projectDir string) (*Writer, error) {
 	}
 	store, err := secrets.NewKeyringStore(secrets.Config{Service: secrets.DefaultService, Dir: dir})
 	if err != nil {
-		return nil, fmt.Errorf("open the shared vault: %w", err)
+		return nil, fmt.Errorf("open the encrypted vault: %w", err)
 	}
 	w := &Writer{store: store, scope: secrets.GlobalScope, label: SourceGlobal}
 	if projectDir != "" {
@@ -73,7 +73,7 @@ func (w *Writer) DotenvPath() string { return "" }
 // Location is where the value lives, for the same message. Not a file path: the
 // vault holds one file per key under a name derived from a hash, and pointing a
 // user at it would invite hand-editing something only the master key can read.
-func (w *Writer) Location() string { return "the vault shared with Astro Desktop" }
+func (w *Writer) Location() string { return "the encrypted vault" }
 
 // Set stores value for the (kind, name) pair and returns the Airflow env-var
 // key it will resolve under.
@@ -180,7 +180,7 @@ func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
 func (w *Writer) sameEnvKey(kind localenv.Kind, envKey string) ([]string, error) {
 	metas, err := w.store.ListMeta()
 	if err != nil {
-		return nil, fmt.Errorf("list the shared vault: %w", err)
+		return nil, fmt.Errorf("list the encrypted vault: %w", err)
 	}
 	type entry struct{ vaultKey, name string }
 	var found []entry
