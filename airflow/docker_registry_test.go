@@ -1,15 +1,19 @@
 package airflow
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"os"
 
 	"github.com/docker/docker/api/types/registry"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/airflow/runtimes"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 func (s *Suite) TestDockerRegistryInit() {
@@ -34,6 +38,28 @@ func (s *Suite) TestRegistryLogin() {
 		mockClient.AssertExpectations(s.T())
 	})
 
+	s.Run("debug log hides the token", func() {
+		const fakeToken = "fake-secret-token-9d3a7b"
+		mockClient := new(mocks.DockerRegistryAPI)
+		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
+		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
+
+		prevLevel := logger.GetLevel()
+		var out bytes.Buffer
+		logger.SetLevel(logrus.DebugLevel)
+		logger.SetOutput(&out)
+		defer func() {
+			logger.SetLevel(prevLevel)
+			logger.SetOutput(os.Stderr)
+		}()
+
+		handler := DockerRegistry{registry: "test", cli: mockClient}
+		err := handler.Login("testuser", fakeToken)
+		s.ErrorIs(err, errMockDocker)
+		s.Contains(out.String(), "secret set: true")
+		s.NotContains(out.String(), fakeToken)
+	})
+
 	s.Run("registry error", func() {
 		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
@@ -51,87 +77,43 @@ func (s *Suite) TestRegistryLogin() {
 }
 
 func (s *Suite) TestDockerLogin() {
-	// Store original cmdExec to restore after tests
-	originalCmdExec := cmdExec
-	defer func() {
-		cmdExec = originalCmdExec
-	}()
+	type loginCall struct{ runtime, server, username, password string }
 
 	s.Run("success with credentials", func() {
-		var capturedCmd string
-		var capturedArgs []string
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			capturedCmd = cmd
-			capturedArgs = args
+		var calls []loginCall
+		registryLogin = func(containerRuntime, server, username, password string, _, _ io.Writer) error {
+			calls = append(calls, loginCall{containerRuntime, server, username, password})
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "testuser", "testtoken")
 		s.NoError(err)
-		s.Equal("bash", capturedCmd)
-		s.Equal([]string{"-c", "echo \"testtoken\" | docker login test.registry.com -u testuser --password-stdin"}, capturedArgs)
+		s.Equal([]loginCall{{"docker", "test.registry.com", "testuser", "testtoken"}}, calls)
 	})
 
-	s.Run("success with bearer token", func() {
-		var capturedCmd string
-		var capturedArgs []string
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			capturedCmd = cmd
-			capturedArgs = args
-			return nil
-		}
+	for _, tc := range []struct{ name, username, token string }{
+		{"no operation with empty credentials", "", ""},
+		{"no operation with empty username", "", "testtoken"},
+		{"no operation with empty token", "testuser", ""},
+	} {
+		s.Run(tc.name, func() {
+			loginCalled := false
+			registryLogin = func(_, _, _, _ string, _, _ io.Writer) error {
+				loginCalled = true
+				return nil
+			}
 
-		err := DockerLogin("test.registry.com", "testuser", "Bearer testtoken123")
-		s.NoError(err)
-		s.Equal("bash", capturedCmd)
-		// Should strip Bearer prefix
-		s.Equal([]string{"-c", "echo \"testtoken123\" | docker login test.registry.com -u testuser --password-stdin"}, capturedArgs)
-	})
-
-	s.Run("no operation with empty credentials", func() {
-		cmdExecCalled := false
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			cmdExecCalled = true
-			return nil
-		}
-
-		err := DockerLogin("test.registry.com", "", "")
-		s.NoError(err)
-		s.False(cmdExecCalled, "cmdExec should not be called with empty credentials")
-	})
-
-	s.Run("no operation with empty username", func() {
-		cmdExecCalled := false
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			cmdExecCalled = true
-			return nil
-		}
-
-		err := DockerLogin("test.registry.com", "", "testtoken")
-		s.NoError(err)
-		s.False(cmdExecCalled, "cmdExec should not be called with empty username")
-	})
-
-	s.Run("no operation with empty token", func() {
-		cmdExecCalled := false
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			cmdExecCalled = true
-			return nil
-		}
-
-		err := DockerLogin("test.registry.com", "testuser", "")
-		s.NoError(err)
-		s.False(cmdExecCalled, "cmdExec should not be called with empty token")
-	})
+			err := DockerLogin("test.registry.com", tc.username, tc.token)
+			s.NoError(err)
+			s.False(loginCalled)
+		})
+	}
 
 	s.Run("docker login command fails", func() {
-		expectedErr := errors.New("docker login failed")
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return expectedErr
-		}
+		registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return errMockDocker }
 
 		err := DockerLogin("test.registry.com", "testuser", "testtoken")
-		s.Error(err)
+		s.ErrorIs(err, errMockDocker)
 		s.Contains(err.Error(), "docker login failed")
 	})
 

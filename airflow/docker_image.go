@@ -329,12 +329,12 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		authConfig.ServerAddress = registry
 	}
 
-	logger.Debugf("Exec Push %s creds %v \n", containerRuntime, authConfig)
+	logger.Debugf("Exec Push %s creds %s", containerRuntime, describeAuth(&authConfig))
 
 	err = d.pushWithClient(&authConfig, remoteImage)
 	if err != nil {
-		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
-		err = pushWithBash(&authConfig, remoteImage)
+		// if it does not work with the go library use the container runtime's CLI. Support for (old?) versions of Colima
+		err = pushWithCLI(&authConfig, remoteImage)
 		if err != nil {
 			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
@@ -408,7 +408,6 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 	responseBody, err := cli.ImagePush(ctx, remoteImage, image.PushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
 		logger.Debugf("Error pushing image to docker: %v", err)
-		// if NewClientWithOpt does not work use bash to run docker commands
 		return err
 	}
 	defer responseBody.Close()
@@ -456,10 +455,7 @@ func (d *DockerImage) Pull(remoteImage, username, token string) error {
 		if registry, err = d.getRegistryToAuth(remoteImage); err != nil {
 			return err
 		}
-		pass := token
-		pass = strings.TrimPrefix(pass, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registry + " -u " + username + " --password-stdin"
-		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		err = registryLogin(containerRuntime, registry, username, token, os.Stdout, os.Stderr)
 	}
 	if err != nil {
 		return err
@@ -684,6 +680,28 @@ func (d *DockerImage) RunCommand(args []string, mountDirs map[string]string, std
 	return cmdExec(containerRuntime, stdout, stderr, args...)
 }
 
+var registryLogin = func(containerRuntime, server, username, password string, stdout, stderr io.Writer) error {
+	loginCmd := registryLoginCmd(containerRuntime, server, username, password)
+	loginCmd.Stdout = stdout
+	loginCmd.Stderr = stderr
+	if err := loginCmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute cmd: %w", err)
+	}
+	return nil
+}
+
+// registryLoginCmd passes the password on stdin, so it never shows in a process listing.
+func registryLoginCmd(containerRuntime, server, username, password string) *exec.Cmd {
+	loginCmd := exec.Command(containerRuntime, "login", server, "-u", username, "--password-stdin")
+	loginCmd.Stdin = strings.NewReader(strings.TrimPrefix(password, prefix))
+	return loginCmd
+}
+
+func describeAuth(authConfig *cliTypes.AuthConfig) string {
+	hasSecret := authConfig.Password != "" || authConfig.Auth != "" || authConfig.IdentityToken != "" || authConfig.RegistryToken != ""
+	return fmt.Sprintf("{server: %q, username: %q, secret set: %t}", authConfig.ServerAddress, authConfig.Username, hasSecret)
+}
+
 // Exec executes a docker command
 var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	_, lookErr := exec.LookPath(cmd)
@@ -703,19 +721,16 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	return nil
 }
 
-// When login and push do not work use bash to run docker commands, this function is for users using colima
-func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
+// pushWithCLI is the fallback for runtimes, such as older Colima, that reject the Go client's push.
+func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
 
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		pass := authConfig.Password
-		pass = strings.TrimPrefix(pass, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		var stderr bytes.Buffer
-		err = cmdExec("bash", os.Stdout, &stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		err = registryLogin(containerRuntime, authConfig.ServerAddress, authConfig.Username, authConfig.Password, os.Stdout, &stderr)
 		if err != nil {
 			stderrOutput := stderr.String()
 			if stderrOutput != "" {

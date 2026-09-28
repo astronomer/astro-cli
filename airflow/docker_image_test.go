@@ -15,12 +15,14 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -342,8 +344,10 @@ func (s *Suite) TestDockerPull() {
 	})
 
 	s.Run("login error", func() {
+		registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return errMock }
+		defer func() { registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return nil } }()
 		err := handler.Pull("", "username", "")
-		s.Error(err)
+		s.ErrorIs(err, errMock)
 	})
 
 	for _, tc := range []struct {
@@ -362,19 +366,16 @@ func (s *Suite) TestDockerPull() {
 			testUtil.InitTestConfig(tc.platform)
 			pullSeen := false
 			loginSeen := false
+			registryLogin = func(_, server, _, _ string, _, _ io.Writer) error {
+				s.Contains(server, tc.expectedLogin)
+				loginSeen = true
+				return nil
+			}
 			cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-				switch cmd {
-				case "bash":
-					// The _current_ way we log in.
-					s.Contains(args[1], tc.expectedLogin)
-					loginSeen = true
+				if cmd == "docker" && args[0] == "pull" {
+					s.Contains(args, tc.expected)
+					pullSeen = true
 					return nil
-				case "docker":
-					if args[0] == "pull" {
-						s.Contains(args, tc.expected)
-						pullSeen = true
-						return nil
-					}
 				}
 				return fmt.Errorf("unexpected command %q %q", cmd, args)
 			}
@@ -475,7 +476,7 @@ func (s *Suite) TestDockerImagePush() {
 
 	s.Run("docker library failure", func() {
 		// This path is used to support running Colima whichn is "docker-cli compatible" but wasn't 100% library compatible in the past.
-		// That was 3 years ago though, so we should re-test and work out if this fallback to using bash is still needed or not
+		// That was 3 years ago though, so we should re-test and work out if this CLI fallback is still needed or not
 		getDockerClient = func() (client.APIClient, error) { return nil, fmt.Errorf("foreced error") }
 		_, err := handler.Push("repo/test/image", "username", "", false)
 		s.NoError(err)
@@ -725,14 +726,23 @@ func (s *Suite) TestExecCmd() {
 	})
 }
 
-func (s *Suite) TestUseBash() {
+func (s *Suite) TestPushWithCLI() {
 	s.Run("success", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains([]string{"-c", "push", "rmi"}, args[0])
+		loginSeen := false
+		registryLogin = func(_, server, username, password string, _, _ io.Writer) error {
+			s.Equal("registry.test", server)
+			s.Equal("testing", username)
+			s.Equal("pass", password)
+			loginSeen = true
 			return nil
 		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains([]string{"push", "rmi"}, args[0])
+			return nil
+		}
+		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: "pass", ServerAddress: "registry.test"}, "test")
 		s.NoError(err)
+		s.True(loginSeen)
 	})
 
 	s.Run("exec failure", func() {
@@ -740,18 +750,48 @@ func (s *Suite) TestUseBash() {
 			s.Contains(args[0], "push")
 			return errMockDocker
 		}
-		err := pushWithBash(&types.AuthConfig{}, "test")
+		err := pushWithCLI(&types.AuthConfig{}, "test")
 		s.ErrorIs(err, errMockDocker)
 	})
 
 	s.Run("login exec failure", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(cmd, "bash")
-			return errMockDocker
-		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing"}, "test")
+		registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return errMockDocker }
+		err := pushWithCLI(&types.AuthConfig{Username: "testing"}, "test")
 		s.ErrorIs(err, errMockDocker)
 	})
+}
+
+func (s *Suite) TestRegistryLoginCmdPassesPasswordOnStdin() {
+	loginCmd := registryLoginCmd("docker", "registry.test", "cli", "Bearer fake-secret-token")
+
+	s.Equal([]string{"docker", "login", "registry.test", "-u", "cli", "--password-stdin"}, loginCmd.Args)
+	stdin, err := io.ReadAll(loginCmd.Stdin)
+	s.NoError(err)
+	s.Equal("fake-secret-token", string(stdin))
+}
+
+func (s *Suite) TestDockerImagePushDebugLogHidesCredentials() {
+	const fakeToken = "fake-secret-token-6f1c2e"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error { return nil }
+	getDockerClient = func() (client.APIClient, error) { return nil, errMockDocker }
+
+	prevLevel := logger.GetLevel()
+	var out bytes.Buffer
+	logger.SetLevel(logrus.DebugLevel)
+	logger.SetOutput(&out)
+	defer func() {
+		logger.SetLevel(prevLevel)
+		logger.SetOutput(os.Stderr)
+	}()
+
+	handler := DockerImage{imageName: "testing"}
+	_, err := handler.Push("images.astronomer.io/foo/bar:123", "cli", "Bearer "+fakeToken, false)
+	s.NoError(err)
+
+	s.Contains(out.String(), "images.astronomer.io")
+	s.Contains(out.String(), "secret set: true")
+	s.NotContains(out.String(), fakeToken)
 }
 
 func (s *Suite) TestDockerImageRun() {
@@ -837,7 +877,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 		s.Contains(err.Error(), "https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push")
 	})
 
-	s.Run("403 forbidden error from pushWithBash fallback", func() {
+	s.Run("403 forbidden error from the CLI fallback", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			if args[0] == "tag" {
 				return nil

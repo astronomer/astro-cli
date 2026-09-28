@@ -306,7 +306,7 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeplo
 	}
 	repoURL, err := git.ParseRemoteURL(remoteURL)
 	if err != nil {
-		logger.Debugf("Failed to parse remote repository URL, skipping Git metadata retrieval: %s", err)
+		logger.Debug("Failed to parse remote repository URL, skipping Git metadata retrieval")
 		return nil, ""
 	}
 

@@ -565,7 +565,6 @@ func ExportConnections(id string) error {
 	if err != nil {
 		return fmt.Errorf("error listing connections: %w", err)
 	}
-	logger.Debugf("Export Connections logs:\n%s", out)
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text

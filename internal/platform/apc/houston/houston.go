@@ -185,7 +185,6 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	if ctx.Token != "" {
 		doOpts.Headers["authorization"] = ctx.Token
 	}
-	newLogger.Debugf("Request Data: %v\n", string(doOpts.Data))
 	doOpts.Method = http.MethodPost
 	doOpts.Path = ctx.GetSoftwareAPIURL()
 	var response httputil.HTTPResponse
@@ -210,7 +209,6 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to JSON decode Houston response: %w", err)
 	}
-	newLogger.Debugf("Response Data: %v\n", string(body))
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		errMsg := decode.Errors[0].Message

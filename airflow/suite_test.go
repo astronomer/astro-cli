@@ -16,6 +16,7 @@ import (
 type Suite struct {
 	suite.Suite
 	origCmdExec              func(cmd string, stdout, stderr io.Writer, args ...string) error
+	origRegistryLogin        func(containerRuntime, server, username, password string, stdout, stderr io.Writer) error
 	origGetDockerClient      func() (client.APIClient, error)
 	origInitSettings         func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error
 	origCheckWebserverHealth func(url string, timeout time.Duration, component string) error
@@ -36,6 +37,7 @@ func TestAirflow(t *testing.T) {
 
 func (s *Suite) SetupSuite() {
 	s.origCmdExec = cmdExec
+	s.origRegistryLogin = registryLogin
 	s.origGetDockerClient = getDockerClient
 	s.origStdout = os.Stdout
 	s.origInitSettings = initSettings
@@ -46,10 +48,12 @@ func (s *Suite) SetupSuite() {
 func (s *Suite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	openURL = func(url string) error { return nil }
+	registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return nil }
 }
 
 func (s *Suite) TearDownTest() {
 	cmdExec = s.origCmdExec
+	registryLogin = s.origRegistryLogin
 	getDockerClient = s.origGetDockerClient
 	initSettings = s.origInitSettings
 }
