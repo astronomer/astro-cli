@@ -27,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/git"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -724,10 +725,7 @@ func (d v2Deployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.
 		}
 		fmt.Fprintf(d.errOut, "  %d) %s (%s)%s\n", i+1, choice.Name, choice.Where, marker)
 	}
-	prompt := fmt.Sprintf("Choose 1-%d: ", len(choices))
-	if chosen > 0 {
-		prompt = fmt.Sprintf("Choose 1-%d [%d]: ", len(choices), chosen)
-	}
+	prompt := input.ChoicePrompt(len(choices), chosen)
 	in := bufio.NewReader(d.in)
 	for attempt := 0; attempt < deployPromptAttempts; attempt++ {
 		fmt.Fprintf(d.errOut, "%s", prompt)

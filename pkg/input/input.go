@@ -19,6 +19,19 @@ func Text(promptText string) string {
 	return strings.Trim(text, "\r\n")
 }
 
+// ChoicePrompt is the line that asks for a pick from a numbered list of count
+// entries, with the one Enter takes in brackets when preselected is above 0.
+func ChoicePrompt(count, preselected int) string {
+	numbers := "1"
+	if count > 1 {
+		numbers = fmt.Sprintf("1-%d", count)
+	}
+	if preselected > 0 {
+		return fmt.Sprintf("Choose %s [%d]: ", numbers, preselected)
+	}
+	return fmt.Sprintf("Choose %s: ", numbers)
+}
+
 // Confirm requests a user to confirm their input
 func Confirm(promptText string) (bool, error) {
 	reader := bufio.NewReader(os.Stdin)

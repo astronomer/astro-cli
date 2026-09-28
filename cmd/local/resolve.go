@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/awsauth"
 	"github.com/astronomer/astro-cli/pkg/googleauth"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -351,7 +352,7 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 	}
 	in := bufio.NewReader(c.d.Stdin)
 	for attempt := 0; attempt < promptAttempts; attempt++ {
-		fmt.Fprintf(c.d.Stderr, "Choose 1-%d: ", len(choices))
+		fmt.Fprintf(c.d.Stderr, "%s", input.ChoicePrompt(len(choices), 0))
 		line, err := in.ReadString('\n')
 		answer := strings.TrimSpace(line)
 		if err != nil && answer == "" {

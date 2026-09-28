@@ -67,7 +67,7 @@ func DeployBundle(input *DeployBundleInput) error {
 	// initialize the deploy
 	deploy, err := createBundleDeploy(c.Organization, input, deployGit, input.AstroV1Client)
 	if err != nil {
-		return err
+		return explainHibernating(err, &currentDeployment)
 	}
 
 	// check we received an upload URL

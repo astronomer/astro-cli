@@ -64,7 +64,7 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		Type:        astrov1.CreateDeployRequestTypeDAGONLY,
 	}, astroV1Client)
 	if err != nil {
-		return DagDeployV2Result{}, err
+		return DagDeployV2Result{}, explainHibernating(err, &dep)
 	}
 
 	tarballVersion, err := uploadDeployDags(in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)

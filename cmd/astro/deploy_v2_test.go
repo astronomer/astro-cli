@@ -475,6 +475,21 @@ func TestDeployV2PromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
 }
 
+func TestDeployV2PromptWithOneLinkOffersOneNumber(t *testing.T) {
+	var errOut bytes.Buffer
+	prompt := v2Deployer{in: strings.NewReader("\n"), errOut: &errOut}
+
+	name, err := prompt.ConfirmTarget(
+		[]v2deploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
+		v2deploy.Preselect{Name: "test", From: "default = true"},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test", name)
+	assert.Contains(t, errOut.String(), "Choose 1 [1]: ")
+	assert.NotContains(t, errOut.String(), "1-1")
+}
+
 func TestDeployV2PromptTakesTheOtherLink(t *testing.T) {
 	interactiveDeploy(t)
 	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})

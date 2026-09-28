@@ -113,7 +113,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		Type:        deployType,
 	}, astroV1Client)
 	if err != nil {
-		return ImageDeployV2Result{}, err
+		return ImageDeployV2Result{}, explainHibernating(err, &dep)
 	}
 	if created.ImageRepository == "" || created.ImageTag == "" {
 		return ImageDeployV2Result{}, errors.New("no image repository or tag received from Astro")
