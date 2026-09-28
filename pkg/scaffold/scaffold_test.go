@@ -101,7 +101,7 @@ func TestRunPinsTheDefaultTheResolverGives(t *testing.T) {
 	// The catalog's series becomes the requirement, the only place the
 	// version is written, and its Python the requires-python.
 	assert.NotContains(t, string(raw), "airflow = ", "init wrote a [tool.astro] airflow key beside the requirement")
-	assert.Contains(t, string(raw), "dependencies = ['apache-airflow==3.50.*']")
+	assert.Contains(t, string(raw), "dependencies = [\n    'apache-airflow==3.50.*',\n]")
 	assert.Contains(t, string(raw), "requires-python = '>=3.13'")
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)

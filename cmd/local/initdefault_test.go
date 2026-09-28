@@ -36,7 +36,7 @@ func TestInitPinsTheCatalogsDefault(t *testing.T) {
 		t.Fatalf("astro init: %v", err)
 	}
 	m := readManifest(t, dir)
-	for _, want := range []string{"dependencies = ['apache-airflow==3.50.*']", "requires-python = '>=3.13'"} {
+	for _, want := range []string{"dependencies = [\n    'apache-airflow==3.50.*',\n]", "requires-python = '>=3.13'"} {
 		if !strings.Contains(m, want) {
 			t.Errorf("manifest lacks %s:\n%s", want, m)
 		}

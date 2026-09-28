@@ -167,27 +167,13 @@ func TestInitAdoptsAnExistingManifest(t *testing.T) {
 	}
 }
 
-// A comment has to stay with the line it documents.
-//
-// Adopting a manifest whose dependency list is multiline and commented appends
-// the airflow pin onto the last element's line, ahead of that element's
-// trailing comment:
-//
-//	'requests==2.31.0', # pinned, upstream broke us      (before)
-//	'requests==2.31.0', 'apache-airflow==3.1.*' # pinned, upstream broke us
-//
-// Both parse, which is why nothing complains. But the note explaining why
-// requests is pinned now reads as a note about airflow, and the reader it
-// misleads is the one deciding whether the pin is still needed. Nothing is
-// lost, which is why it is worth a skipped case rather than a fix here.
-//
-// The placement is not this repo's to correct: appending to an array is
-// go-toml's edit.Document.Set, which pkg/manifest/tomledit delegates to, and
-// it inserts ahead of the trailing comment. The case stays so that a library
-// version placing the element after the comment is noticed here first.
+// A comment has to stay with the line it documents. Adopting a manifest whose
+// dependency list is multiline and commented puts the airflow pin on a line of
+// its own after the last element and its trailing comment. On that element's
+// line, ahead of the comment, the note explaining why requests is pinned
+// would read as a note about airflow.
 func TestInitKeepsACommentWithItsOwnDependency(t *testing.T) {
 	tier(t, 0)
-	t.Skip("known: the appended pin lands ahead of the last element's comment")
 
 	p := newProject(t)
 	write(t, filepath.Join(p.Dir, "pyproject.toml"), strings.Join([]string{
@@ -202,7 +188,7 @@ func TestInitKeepsACommentWithItsOwnDependency(t *testing.T) {
 	p.run("init").requireSuccess()
 
 	got := read(t, filepath.Join(p.Dir, "pyproject.toml"))
-	if !strings.Contains(got, "'requests==2.31.0', # pinned, upstream broke us") {
+	if !strings.Contains(got, "'requests==2.31.0', # pinned, upstream broke us\n    'apache-airflow==") {
 		t.Errorf("the comment no longer trails the dependency it documents:\n%s", got)
 	}
 }

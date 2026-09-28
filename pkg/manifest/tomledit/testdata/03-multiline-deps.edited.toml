@@ -6,7 +6,8 @@ dependencies = [
     "dbt-core~=1.8",
     "pandas>=2.1",
     # kept for the legacy S3 sensors; drop with AIRFLOW-1893
-    "boto3", 'polars'
+    "boto3",
+    'polars',
 ]
 
 [tool.astro]

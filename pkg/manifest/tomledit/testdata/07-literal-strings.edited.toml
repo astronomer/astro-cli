@@ -7,7 +7,11 @@ dependencies = ['apache-airflow-providers-common-sql']
 airflow = '3.2'
 
 [tool.astro.target.astro]
-system-packages = ['libaio', 'unixodbc', 'msodbcsql18']
+system-packages = [
+    'libaio',
+    'unixodbc',
+    'msodbcsql18',
+]
 
 [tool.pytest.ini_options]
 addopts = '-ra --strict-markers'

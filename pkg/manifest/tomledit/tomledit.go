@@ -28,7 +28,9 @@ type Editor interface {
 	// missing intermediate tables. A path element stepping into an array is
 	// a 0-based decimal index; an index equal to the array's length appends.
 	// Setting over an existing table (or array of tables) is an error:
-	// delete it first to replace it wholesale.
+	// delete it first to replace it wholesale. The surgical editor writes a
+	// []any of scalars that is the value of a key-value line one element per
+	// line, as uv does, including one an append lands in.
 	Set(key []string, value any) error
 	// EnsureTablesAtTop creates each table of keys the document does not
 	// have yet, empty and in the order given, at the top of the document:

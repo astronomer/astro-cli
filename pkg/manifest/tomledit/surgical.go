@@ -31,10 +31,28 @@ func (s *surgical) Get(key []string) (any, bool) {
 }
 
 func (s *surgical) Set(key []string, value any) error {
-	if err := s.doc.Set(key, value); err != nil {
+	done, err := s.setArray(key, value)
+	if !done && err == nil {
+		err = s.doc.Set(key, value)
+	}
+	if err != nil {
 		return &KeyError{Key: key, Err: err}
 	}
 	return nil
+}
+
+// setArray is Set for the two edits that write an array of scalars on a
+// key-value line, which it writes one element per line. It reports false
+// when the edit is neither.
+func (s *surgical) setArray(key []string, value any) (bool, error) {
+	if n := len(key); n > 1 {
+		if idx, err := arrayIndex(key[n-1], key); err == nil {
+			if done, err := s.appendLine(key[:n-1], idx, value); done || err != nil {
+				return done, err
+			}
+		}
+	}
+	return s.setLines(key, value)
 }
 
 func (s *surgical) EnsureTablesAtTop(keys [][]string) error {
@@ -81,13 +99,7 @@ func (s *surgical) EnsureTablesAtTop(keys [][]string) error {
 		buf.Write(newline)
 	}
 	buf.Write(data[at:])
-
-	doc, err := edit.Parse(buf.Bytes())
-	if err != nil {
-		return &ParseError{Err: err}
-	}
-	s.doc = doc
-	return nil
+	return s.reparse(buf.Bytes())
 }
 
 func (s *surgical) Delete(key []string) bool {

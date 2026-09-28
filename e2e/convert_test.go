@@ -153,8 +153,8 @@ func v1Cases() []v1Case {
 			},
 			airflow: "2",
 			manifestLines: []string{
-				"dependencies = ['apache-airflow==2.*', 'requests', 'pandas==2.1.0']",
-				"packages = ['libpq-dev', 'git']",
+				"dependencies = [\n    'apache-airflow==2.*',\n    'requests',\n    'pandas==2.1.0',\n]",
+				"packages = [\n    'libpq-dev',\n    'git',\n]",
 			},
 			retired: []string{"requirements.txt", "packages.txt"},
 			// The most destructive deletion available, so its absence is
@@ -174,7 +174,7 @@ func v1Cases() []v1Case {
 				"requirements.txt": "pandas==2.1.0\n",
 			},
 			airflow:       "3.1",
-			manifestLines: []string{"dependencies = ['apache-airflow==3.1.*', 'pandas==2.1.0']"},
+			manifestLines: []string{"dependencies = [\n    'apache-airflow==3.1.*',\n    'pandas==2.1.0',\n]"},
 			retired:       []string{"Dockerfile", "requirements.txt"},
 			// Everything carried, so the run has nothing to report.
 			noNotes: true,
@@ -196,8 +196,8 @@ func v1Cases() []v1Case {
 				"packages.txt":     "libpq-dev\n",
 			},
 			airflow:       "2",
-			manifestLines: []string{"dependencies = ['apache-airflow==2.*', 'pandas==2.1.0']"},
-			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = ['libpq-dev']"},
+			manifestLines: []string{"dependencies = [\n    'apache-airflow==2.*',\n    'pandas==2.1.0',\n]"},
+			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = [\n    'libpq-dev',\n]"},
 			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt"},
 			keptHas: map[string]string{
 				"requirements.txt": "pandas==2.1.0",
@@ -207,6 +207,20 @@ func v1Cases() []v1Case {
 				"its RUN instructions were not read here",
 				"kept, because your Dockerfile's base image reads it during the build",
 			},
+		},
+		{
+			// A declared build whose base names its Python. The manifest pins
+			// that minor, so uv locks for, and standalone mode runs, the Python
+			// the image runs rather than every one after the runtime's floor.
+			name: "a declared Dockerfile whose base names its Python",
+			files: map[string]string{
+				"Dockerfile":       "FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\nRUN pip install --no-cache-dir uv\n",
+				"requirements.txt": "pandas==2.1.0\n",
+			},
+			airflow:     "3.3",
+			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'"},
+			kept:        []string{"Dockerfile", "requirements.txt"},
+			notes:       []string{"its RUN instructions were not read here"},
 		},
 		{
 			// Four kinds of line [project.dependencies] cannot express. Each
@@ -222,7 +236,7 @@ func v1Cases() []v1Case {
 					"./local-wheel.whl\n",
 			},
 			airflow:       "2",
-			manifestLines: []string{"dependencies = ['apache-airflow==2.*', 'pandas==2.1.0']"},
+			manifestLines: []string{"dependencies = [\n    'apache-airflow==2.*',\n    'pandas==2.1.0',\n]"},
 			// None of the four reached the manifest in any form.
 			manifestLacks: []string{"-e .", "example.com", "local-wheel"},
 			kept:          []string{"requirements.txt"},
@@ -317,7 +331,7 @@ func v1Cases() []v1Case {
 				"requirements.txt": "apache-airflow==2.8.1\npandas\n",
 			},
 			airflow:       "2.8.1",
-			manifestLines: []string{"dependencies = ['apache-airflow==2.8.1', 'pandas']"},
+			manifestLines: []string{"dependencies = [\n    'apache-airflow==2.8.1',\n    'pandas',\n]"},
 			manifestHas: []string{
 				"requires-python = '>=3.10,<3.12'",
 			},
@@ -334,7 +348,7 @@ func v1Cases() []v1Case {
 				"requirements.txt": "pandas==2.1.0\n",
 			},
 			airflow:       "3.3",
-			manifestLines: []string{"dependencies = ['apache-airflow==3.3.*', 'pandas==2.1.0']"},
+			manifestLines: []string{"dependencies = [\n    'apache-airflow==3.3.*',\n    'pandas==2.1.0',\n]"},
 			retired:       []string{"requirements.txt"},
 			noNotes:       true,
 		},

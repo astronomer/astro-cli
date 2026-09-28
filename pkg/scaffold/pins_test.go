@@ -92,7 +92,7 @@ func TestPickAirflowVersionWithoutACatalog(t *testing.T) {
 	p := pickAirflowVersion("", nil, &v1Project{}, nil)
 	assert.Equal(t, runtimeversions.FallbackAirflowSeries, p.version)
 	assert.Equal(t, runtimeversions.SourceBuiltIn, p.source)
-	assert.Equal(t, requiresPython(runtimeversions.FallbackAirflowSeries), p.pythonBound())
+	assert.Equal(t, requiresPython(runtimeversions.FallbackAirflowSeries), p.pythonBound(&v1Project{}))
 
 	empty := func() (string, string, runtimeversions.Source) { return "", "", runtimeversions.SourceCatalog }
 	p = pickAirflowVersion("", nil, &v1Project{}, empty)
@@ -102,5 +102,5 @@ func TestPickAirflowVersionWithoutACatalog(t *testing.T) {
 	// A stated pin reports no source, so a caller can tell it from a default.
 	p = pickAirflowVersion("3.1", nil, &v1Project{}, nil)
 	assert.Empty(t, p.source)
-	assert.Equal(t, ">=3.10", p.pythonBound())
+	assert.Equal(t, ">=3.10", p.pythonBound(&v1Project{}))
 }

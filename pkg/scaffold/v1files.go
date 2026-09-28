@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
@@ -55,6 +56,9 @@ type v1Project struct {
 	// airflow is the Airflow version the Dockerfile's runtime tag names, or ""
 	// when there was no Dockerfile or its tag said nothing usable.
 	airflow string
+	// basePython is the Python the Dockerfile's Astro Runtime base runs, when
+	// its tag names one ("3.13" from runtime:3.3-2-python-3.13), or "".
+	basePython string
 	// statedVersion reports that a file named an Airflow version, whether or
 	// not it could be used. It is what separates "this project never said"
 	// from "this project said and we could not read it" when warning about a
@@ -216,6 +220,9 @@ func readV1Project(dir string) (*v1Project, error) {
 		v1.present = append(v1.present, "Dockerfile")
 		v1.dockerfilePinOnly = dockerfileIsPinOnly(data)
 		v1.dockerfileBody = data
+		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
+			_, v1.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
+		}
 		// Two sources for one list, so say it rather than let someone find out.
 		//
 		// A declared Dockerfile is the build, and imagebuild ignores the

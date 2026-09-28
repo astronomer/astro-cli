@@ -601,6 +601,17 @@ func declaresDockerfile(v1 *v1Project) bool {
 	return len(v1.dockerfileBody) > 0 && !v1.dockerfilePinOnly
 }
 
+// buildPython is the Python this project's image runs when its Dockerfile is
+// the build and the base's tag names one, or "". A Dockerfile that is only a
+// pin gives nothing here: the image is then generated from the runtime series
+// and runs that runtime's default Python.
+func (v1 *v1Project) buildPython() string {
+	if !declaresDockerfile(v1) {
+		return ""
+	}
+	return v1.basePython
+}
+
 // setDockerfileDeclaration records the project's own Dockerfile in the manifest,
 // for a Dockerfile that IS the build. A no-op otherwise.
 //
@@ -721,8 +732,17 @@ type airflowPick struct {
 func (p airflowPick) defaulted() bool { return p.source != "" }
 
 // pythonBound is the requires-python a manifest this run writes gets: the
+// minor a declared Dockerfile's base runs, when its tag names one; else the
 // catalog's for a defaulted series when it has one, else the built-in rule.
-func (p airflowPick) pythonBound() string {
+//
+// The image's minor is pinned whole rather than given a floor, because uv
+// locks for every Python requires-python allows and, with no other hint, runs
+// the newest it finds: a floor resolves for interpreters the image never runs,
+// can fail on one of them, and can start standalone on another.
+func (p airflowPick) pythonBound(v1 *v1Project) string {
+	if python := v1.buildPython(); python != "" {
+		return "==" + python + ".*"
+	}
 	if p.requiresPython != "" {
 		return p.requiresPython
 	}
@@ -822,7 +842,7 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 	if err := ed.Set([]string{"project", "name"}, name); err != nil {
 		return nil, nil, err
 	}
-	if err := ed.Set([]string{"project", "requires-python"}, pick.pythonBound()); err != nil {
+	if err := ed.Set([]string{"project", "requires-python"}, pick.pythonBound(v1)); err != nil {
 		return nil, nil, err
 	}
 	// The Airflow requirement leads, then whatever requirements.txt carried,

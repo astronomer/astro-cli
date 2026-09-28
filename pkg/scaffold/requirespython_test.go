@@ -119,3 +119,99 @@ func TestAdoptOnlyFillsAMissingRequiresPython(t *testing.T) {
 		assert.Equal(t, ">=3.11", m.Project.RequiresPython, "the author's own bound stands")
 	})
 }
+
+// A Dockerfile that stays the build runs the Python its base's tag names, so
+// the manifest pins that minor: uv then locks for, and standalone mode runs,
+// the interpreter the image runs, and no other.
+func TestADeclaredDockerfilesPythonIsTheProjects(t *testing.T) {
+	for _, tc := range []struct{ name, dockerfile, want string }{
+		{
+			"an Airflow 3 base naming its Python",
+			"FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\nRUN pip install --no-cache-dir uv\n",
+			"==3.13.*",
+		},
+		{
+			"an Airflow 2 base naming its Python",
+			"FROM quay.io/astronomer/astro-runtime:12.1.0-python-3.11\nUSER root\n",
+			"==3.11.*",
+		},
+		{
+			"a base naming none keeps the rule",
+			"FROM astrocrpublic.azurecr.io/runtime:3.3-2\nRUN pip install --no-cache-dir uv\n",
+			">=3.12",
+		},
+		{
+			// The file goes, and the generated image runs the runtime's
+			// default Python rather than the tag's.
+			"a Dockerfile that is only a pin keeps the rule",
+			"FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\n",
+			">=3.12",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(tc.dockerfile), 0o600))
+			require.NoError(t, os.Mkdir(filepath.Join(dir, "dags"), 0o700))
+
+			_, err := Run(dir, Options{})
+			require.NoError(t, err)
+
+			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, m.Project.RequiresPython)
+		})
+	}
+}
+
+// Adoption leaves a stated requires-python alone here too, and says so when
+// it is not the image's.
+func TestAdoptNotesARequiresPythonThatIsNotTheImages(t *testing.T) {
+	const dockerfile = "FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\nRUN pip install --no-cache-dir uv\n"
+	for _, tc := range []struct{ name, stated, want, note string }{
+		{"absent, so the image's is written", "", "==3.13.*", ""},
+		{"the image's, so nothing is said", "requires-python = '==3.13.*'\n", "==3.13.*", ""},
+		{
+			"another, so it stays and is noted", "requires-python = '>=3.12'\n", ">=3.12",
+			"[project] requires-python is >=3.12, and the Dockerfile's base image runs Python 3.13: " +
+				"uv locks for every Python requires-python allows, and standalone mode can run one the image does not. " +
+				"Set it to ==3.13.* to match the image",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
+				[]byte("[project]\nname = 'x'\nversion = '1.0'\n"+tc.stated), 0o600))
+
+			res, err := Run(dir, Options{})
+			require.NoError(t, err)
+
+			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, m.Project.RequiresPython)
+			if tc.note == "" {
+				for _, n := range res.Notes {
+					assert.NotContains(t, n, "requires-python")
+				}
+				return
+			}
+			assert.Contains(t, res.Notes, tc.note)
+		})
+	}
+}
+
+// An Airflow 2 bound with no "<" is too loose only when nothing names the
+// Python: the image's own minor, written by its author, is not.
+func TestAnAirflowTwoImagesPythonIsNotTooLoose(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+		[]byte("FROM quay.io/astronomer/astro-runtime:12.1.0-python-3.11\nUSER root\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
+		[]byte("[project]\nname = 'x'\nversion = '1.0'\nrequires-python = '==3.11.*'\n"), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	for _, n := range res.Notes {
+		assert.NotContains(t, n, "requires-python")
+	}
+}

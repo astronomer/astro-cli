@@ -103,8 +103,12 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	pin.nameAdvisory = nameAdvisory
 	// Read before ensureProjectKeys, which fills a missing one: after it, an
 	// absent key and one this run just wrote look the same.
-	pin.loosePython = statedPythonTooLoose(ed, version)
-	requiresPythonLabel, err := ensureProjectKeys(ed, pick.pythonBound())
+	// A kept Dockerfile's Python is the sharper test of a stated bound, and
+	// the note below makes it.
+	pin.loosePython = v1.buildPython() == "" && statedPythonTooLoose(ed, version)
+	bound := pick.pythonBound(v1)
+	pin.migrationNotes = append(pin.migrationNotes, statedPythonNotTheImagesNote(ed, v1.buildPython(), bound)...)
+	requiresPythonLabel, err := ensureProjectKeys(ed, bound)
 	if err != nil {
 		return nil, nil, pin, err
 	}
@@ -372,6 +376,22 @@ func statedPythonTooLoose(ed tomledit.Editor, version string) bool {
 	}
 	stated, _ := v.(string)
 	return stated != "" && !strings.Contains(stated, "<")
+}
+
+// statedPythonNotTheImagesNote says that the manifest already states a
+// requires-python other than bound, the one the Python a declared
+// Dockerfile's base runs gives. The author's value stays, as with
+// statedPythonTooLoose, but uv locks for every Python it allows, so a range
+// wider than the image's can fail to resolve on a Python the image never
+// runs.
+func statedPythonNotTheImagesNote(ed tomledit.Editor, python, bound string) []string {
+	stated, _ := mustGet(ed, "project", "requires-python").(string)
+	if python == "" || stated == "" || stated == bound {
+		return nil
+	}
+	return []string{"[project] requires-python is " + stated + ", and the Dockerfile's base image runs Python " + python +
+		": uv locks for every Python requires-python allows, and standalone mode can run one the image does not. " +
+		"Set it to " + bound + " to match the image"}
 }
 
 // appendLabel adds a label unless it is empty, so a caller assembling a list
