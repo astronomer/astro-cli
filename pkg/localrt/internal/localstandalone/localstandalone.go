@@ -17,6 +17,7 @@
 package localstandalone
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -242,6 +243,8 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		if err := e.prepAF2(projectPath); err != nil {
 			return nil, err
 		}
+	} else if err := clearDarwinAF2(projectPath); err != nil {
+		return nil, err
 	}
 	if _, err := os.Stat(filepath.Join(projectPath, ".venv", "bin", "airflow")); err != nil {
 		return nil, errors.New("the project environment has no airflow command; add an Airflow distribution (e.g. apache-airflow) to pyproject.toml and retry")
@@ -501,6 +504,10 @@ func launchCommand(goos, airflowMajor, projectPath string) (bin string, args []s
 
 const af2ShimName = "_standalone_macos.py"
 
+// pickleFixName is the AF2 LocalExecutor plugin prepDarwinAF2 writes into
+// the project's plugins directory.
+const pickleFixName = "fix_local_executor_pickle.py"
+
 // prepDarwinAF2 writes the three macOS AF2 fork-safety pieces into place:
 // the standalone shim, the site-packages fork/setproctitle patch, and the
 // LocalExecutor pickle-fix plugin.
@@ -516,10 +523,41 @@ func prepDarwinAF2(projectPath string) error {
 	if err := os.MkdirAll(pluginsDir, airflowrt.DirPermissions); err != nil {
 		return fmt.Errorf("creating %s: %w", pluginsDir, err)
 	}
-	pickleFix := filepath.Join(pluginsDir, "fix_local_executor_pickle.py")
+	pickleFix := filepath.Join(pluginsDir, pickleFixName)
 	if _, err := os.Stat(pickleFix); errors.Is(err, os.ErrNotExist) {
 		if err := os.WriteFile(pickleFix, airflowrt.AF2PickleFixPlugin, airflowrt.FilePermissions); err != nil {
 			return fmt.Errorf("writing the LocalExecutor pickle fix plugin: %w", err)
+		}
+	}
+	return nil
+}
+
+// clearDarwinAF2 removes what prepDarwinAF2 wrote, for a project that no
+// longer launches through the shim: one upgraded from AF2 to AF3 on macOS
+// keeps its .venv, and the fork-safety patch in it deletes the os.fork that
+// AF3's Dag processor needs. It runs on every such start, not only after an
+// upgrade, because nothing records that a project used to be AF2. The plugin
+// goes only while it is still byte-for-byte ours: prepDarwinAF2 never
+// overwrites a file at that path, so anything else there is the user's.
+func clearDarwinAF2(projectPath string) error {
+	venv := filepath.Join(projectPath, ".venv")
+	if err := airflowrt.RemoveDarwinForkSafetyPatch(venv); err != nil {
+		return fmt.Errorf("removing the macOS AF2 fork-safety patch: %w", err)
+	}
+	if err := os.Remove(filepath.Join(venv, "bin", af2ShimName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("removing the macOS AF2 standalone shim: %w", err)
+	}
+	pickleFix := filepath.Join(projectPath, "plugins", pickleFixName)
+	data, err := os.ReadFile(pickleFix)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", pickleFix, err)
+	}
+	if bytes.Equal(data, airflowrt.AF2PickleFixPlugin) {
+		if err := os.Remove(pickleFix); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("removing the LocalExecutor pickle fix plugin: %w", err)
 		}
 	}
 	return nil

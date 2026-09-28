@@ -1,7 +1,9 @@
 package airflowrt
 
 import (
+	"bytes"
 	_ "embed"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +79,67 @@ func WriteDarwinForkSafetyPatch(venvPath string) error {
 		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.pth"), darwinForkSafetyPth, FilePermissions); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// RemoveDarwinForkSafetyPatch undoes WriteDarwinForkSafetyPatch. A venv that
+// once ran AF2 on macOS keeps the patch through a later `uv sync`, because uv
+// removes only files it installed, and the patch's missing os.fork breaks
+// AF3: the task SDK supervisor forks unconditionally to parse each Dag file
+// and to run each task. Removing a patch that is not there is not an error.
+//
+// Each file goes only while it is byte-for-byte the payload we write:
+// WriteDarwinForkSafetyPatch skips a venv that already has the .pth, so a
+// file of the same name need not be ours. The payloads have not changed
+// since the patch was introduced, so every venv it patched still matches.
+func RemoveDarwinForkSafetyPatch(venvPath string) error {
+	entries, err := os.ReadDir(filepath.Join(venvPath, "lib"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), "python") {
+			continue
+		}
+		sitePackages := filepath.Join(venvPath, "lib", e.Name(), "site-packages")
+		// The .pth goes first: it is what runs at startup, so a failure
+		// between the two removals leaves an inert module, not a live hook
+		// importing a missing one.
+		for _, f := range []struct {
+			name    string
+			payload []byte
+		}{
+			{"_fix_setproctitle.pth", darwinForkSafetyPth},
+			{"_fix_setproctitle.py", darwinForkSafetyPy},
+		} {
+			if err := removeIfPayload(filepath.Join(sitePackages, f.name), f.payload); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// removeIfPayload removes path only while its contents are exactly payload.
+// A missing file is not an error.
+func removeIfPayload(path string, payload []byte) error {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(data, payload) {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
 }

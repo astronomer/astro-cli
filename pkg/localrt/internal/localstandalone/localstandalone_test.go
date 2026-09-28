@@ -569,3 +569,50 @@ func TestLaunchCommandPicksTheAF2DarwinShim(t *testing.T) {
 	assert.Equal(t, "/proj/.venv/bin/airflow", bin)
 	assert.False(t, prep)
 }
+
+// A project that ran AF2 on macOS and was then upgraded to AF3 keeps its
+// .venv, and with it the fork-safety patch that deletes os.fork, which AF3's
+// Dag processor calls to parse every file. The AF3 start has to take the AF2
+// prep back out; through Start rather than on clearDarwinAF2 alone, since the
+// cleanup is only as good as the launch path that reaches it.
+func TestStartOnAF3ClearsTheAF2DarwinPrep(t *testing.T) {
+	e, procs, _ := testEngine(t)
+	e.goos = "darwin"
+	e.prepAF2 = prepDarwinAF2
+	p := testPlan(t)
+	sitePackages := filepath.Join(p.ProjectPath, ".venv", "lib", "python3.12", "site-packages")
+	require.NoError(t, os.MkdirAll(sitePackages, 0o755))
+
+	written := []string{
+		filepath.Join(sitePackages, "_fix_setproctitle.pth"),
+		filepath.Join(sitePackages, "_fix_setproctitle.py"),
+		filepath.Join(p.ProjectPath, ".venv", "bin", af2ShimName),
+		filepath.Join(p.ProjectPath, "plugins", pickleFixName),
+	}
+
+	p.AirflowVersion = "2.11.0"
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	for _, f := range written {
+		require.FileExists(t, f, "the AF2 start writes the prep this test expects AF3 to clear")
+	}
+	procs.alive[fakePID] = false
+
+	p.AirflowVersion = "3.1.0"
+	_, err = e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	for _, f := range written {
+		assert.NoFileExists(t, f)
+	}
+}
+
+func TestClearDarwinAF2KeepsAPluginThatIsNotOurs(t *testing.T) {
+	t.Parallel()
+	project := t.TempDir()
+	plugin := filepath.Join(project, "plugins", pickleFixName)
+	require.NoError(t, os.MkdirAll(filepath.Dir(plugin), 0o755))
+	require.NoError(t, os.WriteFile(plugin, []byte("# the user's own\n"), 0o644))
+
+	require.NoError(t, clearDarwinAF2(project), "no .venv at all is fine")
+	assert.FileExists(t, plugin)
+}
