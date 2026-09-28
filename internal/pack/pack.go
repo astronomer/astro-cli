@@ -60,6 +60,9 @@ type Request struct {
 	Tag string
 	// Platform is the build platform for image targets (e.g. "linux/amd64").
 	Platform string
+	// BuildSecrets are docker build --secret specs for an image target's build
+	// of the project's own Dockerfile.
+	BuildSecrets []string
 	// WorkDir is a scratch directory for the build context. Empty means the
 	// target makes and removes its own temp dir.
 	WorkDir string

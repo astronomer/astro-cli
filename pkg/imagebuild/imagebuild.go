@@ -158,7 +158,8 @@ type Request struct {
 	// (astrocrpublic.azurecr.io/runtime:<version>). Empty in Dockerfile mode:
 	// the project's own file declares what it builds on.
 	BaseImage string
-	// Secrets are docker build --secret specs ("id=mysecret[,src=/local/secret]"),
+	// Secrets are docker build --secret specs ("id=mysecret[,src=/local/secret]"
+	// or "id=mysecret,env=ENV_VAR"),
 	// one per entry, forwarded verbatim in the order given.
 	//
 	// Only meaningful in Dockerfile mode: a generated build's Dockerfile is

@@ -92,7 +92,7 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		Path:         config.WorkingPath,
 		ImageName:    remoteImageName,
 		Platform:     remotePlatform,
-		BuildSecrets: util.ResolveBuildSecrets(remoteBuildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
+		BuildSecrets: util.ResolveBuildSecrets(remoteBuildSecrets, os.Getenv(util.BuildSecretInputEnv)),
 		DeploymentID: remoteDeploymentID,
 	}
 

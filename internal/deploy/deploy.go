@@ -82,8 +82,8 @@ type Request struct {
 	// Only a project that declared its own Dockerfile can use one: a generated
 	// build's Dockerfile is `FROM <base>` and the install happens in the runtime
 	// image's ONBUILD triggers, so there is no RUN of the project's for a secret
-	// to be mounted into. runImage refuses the combination rather than accepting
-	// secrets nothing could read.
+	// to be mounted into. cmd/astro refuses a --build-secret for any other
+	// project rather than accepting secrets nothing could read.
 	BuildSecrets []string
 	// Description is recorded on the deploy.
 	Description string
@@ -167,8 +167,8 @@ type ImageDeploy struct {
 	// Packages stop describing the image.
 	Dockerfile string
 	// BuildSecrets are docker build --secret specs to expose to that file's
-	// build. Empty unless the project declared a Dockerfile, which is the only
-	// build with a RUN of the project's own to consume one.
+	// build. Only a declared Dockerfile has a RUN of the project's own to
+	// consume one; a generated build drops them.
 	BuildSecrets  []string
 	ImageName     string
 	IncludeDags   bool
@@ -320,7 +320,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 	// Secrets are carried, not validated. Whether asking for one is a mistake
 	// depends on whether the USER asked — ResolveBuildSecrets also reads
 	// BUILD_SECRET_INPUT from the environment — and this package cannot see the
-	// difference between a flag and an ambient variable. cmd/cloud can, and
+	// difference between a flag and an ambient variable. cmd/astro can, and
 	// refuses there, before anything is resolved or prompted for.
 	//
 	// An earlier version refused here on `len(req.BuildSecrets) > 0 && dockerfile

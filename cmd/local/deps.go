@@ -373,6 +373,7 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 		BaseImage:    req.BaseImage,
 		Dockerfile:   req.Dockerfile,
 		Context:      req.Context,
+		Secrets:      req.Secrets,
 		Tag:          req.Tag,
 		Dependencies: req.Dependencies,
 		Packages:     req.Packages,

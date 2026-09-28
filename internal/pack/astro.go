@@ -150,6 +150,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	breq.WorkDir = workDir
 	breq.Tag = workingTag
 	breq.Platform = req.Platform
+	breq.Secrets = req.BuildSecrets
 	breq.Bin = t.bin
 	breq.Env = t.env
 	built, err := t.builder.BuildLocal(ctx, breq, cb)

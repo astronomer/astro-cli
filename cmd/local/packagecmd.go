@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // defaultPackagePlatform is the build platform `astro package` targets by
@@ -31,10 +32,11 @@ func NewPackageCmd(d Deps) *cobra.Command {
 
 func newPackageCmd(c *cli) *cobra.Command {
 	var opts struct {
-		save     string
-		tag      string
-		platform string
-		outDir   string
+		save         string
+		tag          string
+		platform     string
+		outDir       string
+		buildSecrets []string
 	}
 	cmd := &cobra.Command{
 		Use:   "package [target]",
@@ -50,10 +52,11 @@ func newPackageCmd(c *cli) *cobra.Command {
 				target = args[0]
 			}
 			return c.runPackage(cmd.Context(), target, packageOptions{
-				save:     opts.save,
-				tag:      opts.tag,
-				platform: opts.platform,
-				outDir:   opts.outDir,
+				save:         opts.save,
+				tag:          opts.tag,
+				platform:     opts.platform,
+				outDir:       opts.outDir,
+				buildSecrets: opts.buildSecrets,
 			})
 		},
 	}
@@ -61,15 +64,17 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd.Flags().StringVar(&opts.tag, "tag", "", "Image reference for image targets (default astro-package/<name>:<runtime>-<hash>)")
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
 	cmd.Flags().StringVar(&opts.outDir, "out-dir", "", "Artifact directory for bucket targets (default dist/<target>)")
+	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
 
 // packageOptions carries the flag values into the run function.
 type packageOptions struct {
-	save     string
-	tag      string
-	platform string
-	outDir   string
+	save         string
+	tag          string
+	platform     string
+	outDir       string
+	buildSecrets []string
 }
 
 func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOptions) error {
@@ -94,12 +99,21 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	if err != nil {
 		return err
 	}
+	if len(opts.buildSecrets) > 0 {
+		switch {
+		case target.Name() != pack.TargetAstro:
+			return fmt.Errorf("--build-secret has no effect with the %s target: it builds no image", target.Name())
+		case m.Astro.Dockerfile == "":
+			return util.ErrBuildSecretNeedsDockerfile
+		}
+	}
 	res, err := target.Build(ctx, pack.Request{
 		ProjectDir:   dir,
 		Manifest:     m,
 		Save:         opts.save,
 		Tag:          opts.tag,
 		Platform:     opts.platform,
+		BuildSecrets: resolveBuildSecrets(opts.buildSecrets),
 		OutDir:       opts.outDir,
 		CheckRuntime: c.d.RuntimeCheck,
 	}, c.callbacks(r))

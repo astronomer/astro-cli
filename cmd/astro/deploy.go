@@ -316,7 +316,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		WaitTime:       waitTime,
 		DagsPath:       dagsPath,
 		Description:    deployDescription,
-		BuildSecrets:   util.ResolveBuildSecrets(buildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
+		BuildSecrets:   util.ResolveBuildSecrets(buildSecrets, os.Getenv(util.BuildSecretInputEnv)),
 		Force:          forceDeploy,
 		DagBundleName:  dagBundleName,
 	}
@@ -432,7 +432,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		case imageName != "":
 			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --image-name: the image is already built"))
 		case m.Astro.Dockerfile == "":
-			return deployV2Err(cmd, format, errors.New("--build-secret needs a project Dockerfile to read it. Declare one with `dockerfile` under [tool.astro] in pyproject.toml and mount the secret in a RUN step; a generated image installs your dependencies through the runtime image and has no build step of yours for a secret to reach"))
+			return deployV2Err(cmd, format, util.ErrBuildSecretNeedsDockerfile)
 		}
 	}
 
@@ -486,7 +486,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		// Same resolution the v1 path uses, so a CI job setting
 		// BUILD_SECRET_INPUT keeps working across the version boundary rather
 		// than silently losing its secrets on the day the project converts.
-		BuildSecrets: util.ResolveBuildSecrets(buildSecrets, os.Getenv("BUILD_SECRET_INPUT")),
+		BuildSecrets: util.ResolveBuildSecrets(buildSecrets, os.Getenv(util.BuildSecretInputEnv)),
 		// The runtime build is checked against the catalog where the image is
 		// about to be built from it. Its warnings go to stderr, so a json run's
 		// stdout stays the one result object.

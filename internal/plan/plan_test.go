@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -66,7 +67,8 @@ func TestChoosePortPrecedence(t *testing.T) {
 
 func TestBuildFillsPlanFromManifest(t *testing.T) {
 	dir := newProject(t)
-	built, err := Build(dir, Options{Mode: localrt.ModeDocker, RequestedPort: 8080, StopWithSession: true})
+	secrets := []string{"id=netrc,env=NETRC_CONTENT"}
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker, RequestedPort: 8080, StopWithSession: true, BuildSecrets: secrets})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +84,9 @@ func TestBuildFillsPlanFromManifest(t *testing.T) {
 	}
 	if p.Mode != localrt.ModeDocker || !p.StopWithSession || p.RequestedPort != 8080 {
 		t.Errorf("flags not carried: mode=%q stopWithSession=%v port=%d", p.Mode, p.StopWithSession, p.RequestedPort)
+	}
+	if !slices.Equal(p.BuildSecrets, secrets) {
+		t.Errorf("BuildSecrets = %q, want %q", p.BuildSecrets, secrets)
 	}
 	if !strings.HasSuffix(p.Hostname, ".localhost") {
 		t.Errorf("Hostname = %q, want a .localhost label", p.Hostname)

@@ -86,6 +86,12 @@ type Plan struct {
 	// writes, and reading that back out of a user's Dockerfile would be a
 	// guess.
 	Dockerfile string
+	// BuildSecrets are docker build --secret specs ("id=mysecret,src=/path" or
+	// "id=mysecret,env=VAR") for the build of Dockerfile. Only the spec is
+	// carried: the container CLI reads each value from the file or the variable
+	// it names. Never recorded, so a later start that rebuilds needs them again.
+	// Standalone mode and a generated image ignore them.
+	BuildSecrets []string
 	// StopWithSession ties Airflow's lifetime to the process that starts
 	// it: true means Airflow is killed when that process exits; false (the
 	// default) means Airflow keeps running and any tool can reconnect to

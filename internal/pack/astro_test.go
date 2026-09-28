@@ -410,6 +410,17 @@ func TestAstroBuildUsesADeclaredDockerfile(t *testing.T) {
 		"a declared Dockerfile names its own FROM, so resolving a base would be a version-service call for an image nobody uses")
 }
 
+func TestAstroBuildHandsBuildSecretsToTheBuilder(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nRUN echo hi\n")
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT", "id=pip,src=/tmp/pip.conf"}
+
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+
+	assert.Equal(t, req.BuildSecrets, builder.gotReq.Secrets)
+}
+
 // The content address covers the Dockerfile's BYTES, not just its path.
 //
 // In Dockerfile mode the file is the whole build and imagebuild ignores base,

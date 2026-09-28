@@ -157,6 +157,7 @@ func newStartCmd(c *cli) *cobra.Command {
 		docker          bool
 		stopWithSession bool
 		allowMissing    bool
+		buildSecrets    []string
 	}
 	cmd := &cobra.Command{
 		Use:   nameStart,
@@ -179,17 +180,18 @@ func newStartCmd(c *cli) *cobra.Command {
 				RequestedPort:   opts.port,
 				StopWithSession: opts.stopWithSession,
 				AllowMissing:    opts.allowMissing,
-			})
+			}, opts.buildSecrets)
 		},
 	}
 	cmd.Flags().IntVar(&opts.port, "port", 0, "Preferred API server port (0 lets the runtime pick)")
 	cmd.Flags().BoolVar(&opts.docker, "docker", false, "Run Airflow in Docker instead of the default standalone mode")
 	cmd.Flags().BoolVar(&opts.stopWithSession, "stop-with-session", false, "Stop Airflow when this process exits instead of leaving it running")
 	cmd.Flags().BoolVar(&opts.allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
+	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
 
-func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
+func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag []string) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
@@ -200,12 +202,16 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options) error {
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
+	opts.BuildSecrets = resolveBuildSecrets(buildSecretFlag)
 	built, err := plan.Build(wd, opts)
 	if err != nil {
 		return c.reportBuildError(r, err)
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnStandaloneOmissions(r, built.Plan)
+	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
+		return err
+	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
@@ -432,20 +438,22 @@ func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
 
 func newRestartCmd(c *cli) *cobra.Command {
 	var force, allowMissing bool
+	var buildSecrets []string
 	cmd := &cobra.Command{
 		Use:   nameRestart,
 		Short: "Restart local Airflow for this project",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return c.runRestart(cmd.Context(), force, allowMissing)
+			return c.runRestart(cmd.Context(), force, allowMissing, buildSecrets)
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Skip the graceful shutdown window when stopping")
 	cmd.Flags().BoolVar(&allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
+	addBuildSecretFlag(cmd, &buildSecrets)
 	return cmd
 }
 
-func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
+func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSecretFlag []string) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
@@ -462,7 +470,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
 		// Nothing is running (the record is gone), so there is nothing to stop
 		// and no prior mode or port to carry: restart falls back to a plain
 		// start with the defaults.
-		return c.runStart(ctx, plan.Options{AllowMissing: allowMissing})
+		return c.runStart(ctx, plan.Options{AllowMissing: allowMissing}, buildSecretFlag)
 	}
 	// Rebuild the plan from the manifest and env as they are now, so a
 	// restart picks up edits — but keep the running mode, port, and session
@@ -472,6 +480,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
 		RequestedPort:   st.Port,
 		StopWithSession: st.StopWithSession,
 		AllowMissing:    allowMissing,
+		BuildSecrets:    resolveBuildSecrets(buildSecretFlag),
 
 		WorkspaceProvider: c.workspaceProvider(),
 	})
@@ -484,6 +493,9 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool) error {
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnStandaloneOmissions(r, built.Plan)
+	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
+		return err
+	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnStartedWithout(r, built.StartedWithout)
 	// Before the stop, like the build: a refusal leaves Airflow running.

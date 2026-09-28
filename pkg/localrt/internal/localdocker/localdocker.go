@@ -323,6 +323,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		// of that guard would be two messages for one mistake.
 		build.Dockerfile = declared
 		build.Context = projectPath
+		build.Secrets = p.BuildSecrets
 	}
 	if image, err = e.images.Build(ctx, build, cb); err != nil {
 		return nil, err

@@ -49,6 +49,10 @@ type Options struct {
 	// Start anyway. The missing values come back on Built.StartedWithout for
 	// the caller to warn about. Nothing is invented for them.
 	AllowMissing bool
+	// BuildSecrets are docker build --secret specs for a declared Dockerfile's
+	// build (--build-secret, or BUILD_SECRET_INPUT). Carried onto the Plan as
+	// given; whether asking for them makes sense is cmd's to decide.
+	BuildSecrets []string
 }
 
 // Built is a resolved plan plus the discovered project, so cmd can persist the
@@ -139,7 +143,8 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			// being present, and got a generated image here, which read no such
 			// thing. Same project, two tools, two different images, and the one
 			// that dropped the user's RUN steps was this one.
-			Dockerfile: m.Astro.Dockerfile,
+			Dockerfile:   m.Astro.Dockerfile,
+			BuildSecrets: opts.BuildSecrets,
 			// Empty when the manifest states requires-python: the venv is
 			// built inside the project, so uv reads it from the manifest
 			// itself and passing it would only restate what uv is about to

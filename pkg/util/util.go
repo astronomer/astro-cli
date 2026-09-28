@@ -73,6 +73,17 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	return claims, nil
 }
 
+// BuildSecretInputEnv holds newline-separated build secret specs, read when
+// no --build-secret is given.
+const BuildSecretInputEnv = "BUILD_SECRET_INPUT"
+
+// BuildSecretUsage is the help text of every --build-secret flag.
+const BuildSecretUsage = "Secret to expose to the build. See https://docs.docker.com/build/building/secrets/. Repeat to specify multiple secrets. (format: \"id=mysecret[,src=/local/secret]\" or \"id=mysecret,env=ENV_VAR\")"
+
+// ErrBuildSecretNeedsDockerfile refuses --build-secret for a project whose
+// image is generated rather than built from its own Dockerfile.
+var ErrBuildSecretNeedsDockerfile = errors.New("--build-secret needs a project Dockerfile to read it. Declare one with `dockerfile` under [tool.astro] in pyproject.toml and mount the secret in a RUN step; a generated image installs your dependencies through the runtime image and has no build step of yours for a secret to reach")
+
 // ResolveBuildSecrets returns the Docker build secrets to use: the secrets
 // given on the command line if there are any, otherwise the first fallback
 // that provides any. Each element is one complete `docker build --secret`

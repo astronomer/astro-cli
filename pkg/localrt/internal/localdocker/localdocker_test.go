@@ -802,6 +802,37 @@ func TestStartWithProjectDockerfileBuildsThatFile(t *testing.T) {
 	assert.Empty(t, req.BaseImage, "the project's own FROM decides the base")
 }
 
+func TestStartHandsBuildSecretsToTheDockerfileBuild(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+	p := dockerfilePlan(t)
+	p.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT", "id=pip,src=/tmp/pip.conf"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	require.Len(t, images.requests, 1)
+	assert.Equal(t, p.BuildSecrets, images.requests[0].Secrets)
+}
+
+func TestStartDropsBuildSecretsFromAGeneratedBuild(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+	p := testPlan(t)
+	p.Dependencies = []string{"pandas"}
+	p.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	require.Len(t, images.requests, 1)
+	assert.Empty(t, images.requests[0].Secrets)
+}
+
 // Resolving a base image we would discard turns a working start into a
 // dependency on the version service, which is exactly what an air-gapped or
 // offline Dockerfile project should not need.
