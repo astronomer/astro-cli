@@ -2,6 +2,7 @@ package local
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -50,6 +51,38 @@ func TestTasksInstanceShowsWhatOneRunDid(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("detail is missing %q:\n%s", want, out)
 		}
+	}
+}
+
+// A mapped task has no single instance, so Airflow only answers for one
+// expansion, addressed by its index in the path.
+func TestTasksInstanceReadsOneExpansionOfAMappedTask(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/greeter/dagRuns/run_1/taskInstances/greet/2",
+		`{"task_id":"greet","dag_id":"greeter","dag_run_id":"run_1","state":"success","map_index":2,"try_number":1}`)
+
+	out, _, err := runQuery(t, stub, "tasks", "instance", "greeter", "run_1", "greet", "--map-index", "2")
+	if err != nil {
+		t.Fatalf("tasks instance --map-index: %v", err)
+	}
+	if !regexp.MustCompile(`(?m)^\s*map index:\s+2$`).MatchString(out) {
+		t.Errorf("detail is missing the map index:\n%s", out)
+	}
+}
+
+// Airflow 2's clear answer carries no map_index, which must not read as a
+// mapped task.
+func TestTasksClearOnAirflow2HasNoMapIndexColumn(t *testing.T) {
+	stub := newAirflow2Stub(t)
+	stub.route(http.MethodPost, "/api/v1/dags/orders_etl/clearTaskInstances",
+		`{"task_instances":[{"task_id":"load","dag_id":"orders_etl","dag_run_id":"run_1"}]}`)
+
+	out, _, err := runQuery(t, stub, "tasks", "clear", "orders_etl", "run_1", "load", "--dry-run")
+	if err != nil {
+		t.Fatalf("tasks clear --dry-run: %v", err)
+	}
+	if strings.Contains(out, "MAP_INDEX") {
+		t.Errorf("an unmapped clear has no MAP_INDEX column:\n%s", out)
 	}
 }
 

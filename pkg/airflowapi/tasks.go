@@ -32,6 +32,19 @@ type TaskInstance struct {
 	EndDate     time.Time `json:"end_date"`
 }
 
+// UnmarshalJSON reads a task instance with no map_index as unmapped (-1)
+// rather than as expansion 0. Airflow 2 answers a task clear with references
+// that carry no map_index at all.
+func (t *TaskInstance) UnmarshalJSON(data []byte) error {
+	type plain TaskInstance
+	p := plain{MapIndex: -1}
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	*t = TaskInstance(p)
+	return nil
+}
+
 // TaskInstanceList is a page of task instances.
 type TaskInstanceList struct {
 	TaskInstances []TaskInstance `json:"task_instances"`
@@ -51,6 +64,15 @@ func (c *Client) ListTaskInstances(ctx context.Context, dagID, runID string, opt
 func (c *Client) GetTaskInstance(ctx context.Context, dagID, runID, taskID string) (TaskInstance, error) {
 	var instance TaskInstance
 	err := c.get(ctx, pathf("/dags/%s/dagRuns/%s/taskInstances/%s", dagID, runID, taskID), nil, &instance)
+	return instance, err
+}
+
+// GetMappedTaskInstance reads one expansion of a mapped task. GetTaskInstance
+// cannot: a mapped task has no single instance for Airflow to return.
+func (c *Client) GetMappedTaskInstance(ctx context.Context, dagID, runID, taskID string, mapIndex int) (TaskInstance, error) {
+	var instance TaskInstance
+	path := pathf("/dags/%s/dagRuns/%s/taskInstances/%s", dagID, runID, taskID) + "/" + strconv.Itoa(mapIndex)
+	err := c.get(ctx, path, nil, &instance)
 	return instance, err
 }
 

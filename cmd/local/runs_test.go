@@ -2,6 +2,7 @@ package local
 
 import (
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -327,6 +328,64 @@ func TestRunsTasksListsWhatEachTaskDid(t *testing.T) {
 	}
 	if strings.Contains(out, "RUN_ID") {
 		t.Errorf("table repeats the run id, which is already on the command line:\n%s", out)
+	}
+}
+
+// The expansions of a mapped task are otherwise identical rows, so a run with
+// one gains a MAP_INDEX column, and each task's expansions sit together in
+// index order.
+func TestRunsTasksTellsMappedExpansionsApart(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/greeter/dagRuns/run_1/taskInstances",
+		`{"task_instances":[
+			{"task_id":"get_names","state":"success","map_index":-1,"try_number":1},
+			{"task_id":"greet","state":"success","map_index":2,"try_number":1},
+			{"task_id":"say_bye","state":"success","map_index":-1,"try_number":1},
+			{"task_id":"greet","state":"success","map_index":0,"try_number":1},
+			{"task_id":"greet","state":"failed","map_index":1,"try_number":1}
+		],"total_entries":5}`)
+
+	out, _, err := runQuery(t, stub, "runs", "tasks", "greeter", "run_1")
+	if err != nil {
+		t.Fatalf("runs tasks: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	var got [][]string
+	for _, line := range lines {
+		got = append(got, strings.Fields(line)[:3])
+	}
+	want := [][]string{
+		{"TASK_ID", "MAP_INDEX", "STATE"},
+		{"get_names", "-", "success"},
+		{"greet", "0", "success"},
+		{"greet", "1", "failed"},
+		{"greet", "2", "success"},
+		{"say_bye", "-", "success"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rows = %v, want %v\n%s", got, want, out)
+	}
+
+	out, _, err = runQuery(t, stub, "runs", "tasks", "greeter", "run_1", "--order-by", "-start_date")
+	if err != nil {
+		t.Fatalf("runs tasks --order-by: %v", err)
+	}
+	if first := strings.Fields(strings.Split(out, "\n")[2])[1]; first != "2" {
+		t.Errorf("an explicit --order-by keeps Airflow's order, got second row index %q:\n%s", first, out)
+	}
+}
+
+func TestRunsTasksKeepsItsColumnsWithoutAMappedTask(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/run_1/taskInstances",
+		`{"task_instances":[{"task_id":"extract","state":"success","map_index":-1,"try_number":1}],"total_entries":1}`)
+
+	out, _, err := runQuery(t, stub, "runs", "tasks", "orders_etl", "run_1")
+	if err != nil {
+		t.Fatalf("runs tasks: %v", err)
+	}
+	if strings.Contains(out, "MAP_INDEX") {
+		t.Errorf("a run with no mapped task has no MAP_INDEX column:\n%s", out)
 	}
 }
 

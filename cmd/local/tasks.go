@@ -1,9 +1,11 @@
 package local
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -185,22 +187,30 @@ func taskFields(row taskRow) []field {
 }
 
 func newTasksInstanceCmd(q *query) *cobra.Command {
-	return &cobra.Command{
+	var mapIndex int
+	cmd := &cobra.Command{
 		Use:   "instance <DAG_ID> <RUN_ID> <TASK_ID>",
 		Short: "Show what one run of a task did",
 		Args:  cobra.ExactArgs(taskInstanceArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return q.runTasksInstance(cmd.Context(), args[0], args[1], args[2])
+			return q.runTasksInstance(cmd.Context(), args[0], args[1], args[2], mapIndex)
 		},
 	}
+	cmd.Flags().IntVarP(&mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to show (-1 for an unmapped task)")
+	return cmd
 }
 
-func (q *query) runTasksInstance(ctx context.Context, dagID, runID, taskID string) error {
+func (q *query) runTasksInstance(ctx context.Context, dagID, runID, taskID string, mapIndex int) error {
 	r, client, err := q.open(ctx)
 	if err != nil {
 		return err
 	}
-	instance, err := client.GetTaskInstance(ctx, dagID, runID, taskID)
+	var instance airflowapi.TaskInstance
+	if mapIndex >= 0 {
+		instance, err = client.GetMappedTaskInstance(ctx, dagID, runID, taskID, mapIndex)
+	} else {
+		instance, err = client.GetTaskInstance(ctx, dagID, runID, taskID)
+	}
 	if err != nil {
 		return err
 	}
@@ -228,11 +238,40 @@ func taskInstanceFields(row taskInstanceRow) []field {
 }
 
 func renderTaskInstanceTable(w io.Writer, rows []taskInstanceRow) error {
-	return renderTable(w, rows, "No task instances.",
+	headers, cells := withMapIndexColumn(rows,
 		[]string{"DAG_ID", "RUN_ID", "TASK_ID", "STATE", "TRY", "START", "DURATION"},
 		func(row taskInstanceRow) []string {
 			return []string{row.DAGID, row.RunID, row.TaskID, row.State, count(row.TryNumber), row.StartDate, formatDuration(row.Duration)}
 		})
+	return renderTable(w, rows, "No task instances.", headers, cells)
+}
+
+// withMapIndexColumn adds MAP_INDEX after TASK_ID when any row is one
+// expansion of a mapped task. Without it, the expansions of a task print as
+// identical rows. A table with no mapped task keeps its columns as they were.
+func withMapIndexColumn(rows []taskInstanceRow, headers []string, cells func(taskInstanceRow) []string) (withHeaders []string, withCells func(taskInstanceRow) []string) {
+	if !slices.ContainsFunc(rows, func(row taskInstanceRow) bool { return row.MapIndex >= 0 }) {
+		return headers, cells
+	}
+	at := slices.Index(headers, "TASK_ID") + 1
+	return slices.Insert(slices.Clone(headers), at, "MAP_INDEX"), func(row taskInstanceRow) []string {
+		return slices.Insert(cells(row), at, onlyIf(row.MapIndex >= 0, count(row.MapIndex)))
+	}
+}
+
+// groupMappedInstances puts the expansions of each mapped task together, in
+// map index order, where the task first appears. Airflow's own order scatters
+// them.
+func groupMappedInstances(rows []taskInstanceRow) {
+	first := make(map[string]int, len(rows))
+	for i := range rows {
+		if _, seen := first[rows[i].TaskID]; !seen {
+			first[rows[i].TaskID] = i
+		}
+	}
+	slices.SortStableFunc(rows, func(a, b taskInstanceRow) int {
+		return cmp.Or(cmp.Compare(first[a.TaskID], first[b.TaskID]), cmp.Compare(a.MapIndex, b.MapIndex))
+	})
 }
 
 func newTasksLogsCmd(q *query) *cobra.Command {

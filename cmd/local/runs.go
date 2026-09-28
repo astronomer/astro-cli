@@ -197,21 +197,30 @@ func (q *query) runRunsTasks(ctx context.Context, dagID, runID string, f listFla
 	if err != nil {
 		return err
 	}
-	return emitList(q, r, f.options(), func(page airflowapi.ListOptions) ([]airflowapi.TaskInstance, int, error) {
+	wire, total, err := listPages(f.options(), func(page airflowapi.ListOptions) ([]airflowapi.TaskInstance, int, error) {
 		list, err := client.ListTaskInstances(ctx, dagID, runID, page)
 		return list.TaskInstances, list.TotalEntries, err
-	}, newTaskInstanceRow, renderRunTaskTable)
+	})
+	if err != nil {
+		return err
+	}
+	rows := mapRows(wire, newTaskInstanceRow)
+	if f.orderBy == "" {
+		groupMappedInstances(rows)
+	}
+	return emitListed(q, r, f.options(), rows, total, renderRunTaskTable)
 }
 
 // renderRunTaskTable drops the dag and run columns renderTaskInstanceTable
 // carries: both are on the command line, and repeating a long run id on every
 // row pushes the states off the right of a terminal.
 func renderRunTaskTable(w io.Writer, rows []taskInstanceRow) error {
-	return renderTable(w, rows, "This run has no task instances.",
+	headers, cells := withMapIndexColumn(rows,
 		[]string{"TASK_ID", "STATE", "TRY", "START", "DURATION"},
 		func(row taskInstanceRow) []string {
 			return []string{row.TaskID, row.State, count(row.TryNumber), row.StartDate, formatDuration(row.Duration)}
 		})
+	return renderTable(w, rows, "This run has no task instances.", headers, cells)
 }
 
 func (q *query) runRunsGet(ctx context.Context, dagID, runID string) error {

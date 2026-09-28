@@ -2,6 +2,7 @@ package airflowapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,6 +40,33 @@ func TestGetTaskInstanceReadsOne(t *testing.T) {
 	}
 	if instance.TryNumber != 2 || instance.Duration != 1.5 {
 		t.Errorf("instance = %+v, want the reported try and duration", instance)
+	}
+}
+
+func TestGetMappedTaskInstanceAddressesOneExpansion(t *testing.T) {
+	stub := newAF3Stub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/etl/dagRuns/r1/taskInstances/greet/3",
+		`{"task_id":"greet","dag_id":"etl","map_index":3,"state":"success"}`)
+	client := stub.client()
+
+	instance, err := client.GetMappedTaskInstance(t.Context(), "etl", "r1", "greet", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instance.MapIndex != 3 || instance.State != "success" {
+		t.Errorf("instance = %+v, want expansion 3", instance)
+	}
+}
+
+// Airflow 2 answers a clear with references that carry no map_index. Read as
+// 0, every one of them would look like the first expansion of a mapped task.
+func TestTaskInstanceWithoutAMapIndexIsUnmapped(t *testing.T) {
+	var list TaskInstanceList
+	if err := json.Unmarshal([]byte(`{"task_instances":[{"task_id":"load"},{"task_id":"greet","map_index":0}]}`), &list); err != nil {
+		t.Fatal(err)
+	}
+	if got := []int{list.TaskInstances[0].MapIndex, list.TaskInstances[1].MapIndex}; got[0] != -1 || got[1] != 0 {
+		t.Errorf("map indexes = %v, want [-1 0]", got)
 	}
 }
 

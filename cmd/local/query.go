@@ -290,12 +290,20 @@ func emitList[Wire, Row any](q *query, r Renderer, opts airflowapi.ListOptions,
 	if err != nil {
 		return err
 	}
-	if err := emitRows(r, mapRows(wire, row), text); err != nil {
+	return emitListed(q, r, opts, mapRows(wire, row), total, text)
+}
+
+// emitListed renders rows listPages collected, for a command that rearranges
+// them first.
+func emitListed[Row any](q *query, r Renderer, opts airflowapi.ListOptions, rows []Row, total int,
+	text func(io.Writer, []Row) error,
+) error {
+	if err := emitRows(r, rows, text); err != nil {
 		return err
 	}
-	next := opts.Offset + len(wire)
+	next := opts.Offset + len(rows)
 	if r.Format == FormatText && next < total {
-		fmt.Fprintf(q.d.Stderr, "showing %d of %d; use --offset %d or --limit %d\n", len(wire), total, next, total-opts.Offset)
+		fmt.Fprintf(q.d.Stderr, "showing %d of %d; use --offset %d or --limit %d\n", len(rows), total, next, total-opts.Offset)
 	}
 	return nil
 }
