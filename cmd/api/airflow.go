@@ -64,12 +64,16 @@ The argument can be either:
   - A path of an Airflow API endpoint (e.g., /dags, /dags/my_dag)
   - An operation ID from the API spec (e.g., get_dags, get_dag)
 
-By default, requests go to the Airflow on localhost:8080. Pass -d/--deployment
-to talk to a deployment your project links in pyproject.toml — an Astro
-Deployment, an MWAA or Composer environment, or a plain URL, each reached with
-the credentials that deployment's link calls for. A name no link declares is
-read as an Astro Deployment id. Pass --url to reach an Airflow no project
-declares.
+A request needs a target; there is no default. Pass -d/--deployment to talk to
+a deployment your project links in pyproject.toml — an Astro Deployment, an
+MWAA or Composer environment, or a plain URL, each reached with the
+credentials that deployment's link calls for. A name no link declares is read
+as an Astro Deployment id. Pass --url to reach an Airflow no project declares.
+For this project's local Airflow, use 'astro local api' instead.
+
+The ls and describe subcommands only read the API spec, so they need no
+target: without one they read the spec for --airflow-version, or for Airflow
+` + defaultAirflowVersion + `.
 
 The API generation is detected from the instance itself, so /dags reaches
 /api/v2/dags on Airflow 3 and /api/v1/dags on Airflow 2. The version it reports
@@ -95,35 +99,35 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 		Example: `  # List Airflow API endpoints
   astro api airflow ls
 
-  # Get all DAGs from local Airflow (default: localhost:8080)
-  astro api airflow /dags
+  # Get all DAGs from a deployment this project links in pyproject.toml
+  astro api airflow -d prod /dags
 
   # Get a specific DAG by path
-  astro api airflow /dags/example_dag
+  astro api airflow -d prod /dags/example_dag
 
   # Use operation ID (path params supplied via -p)
-  astro api airflow get_dag -p dag_id=example_dag
+  astro api airflow -d prod get_dag -p dag_id=example_dag
 
   # Pause a DAG via operation ID
-  astro api airflow patch_dag -p dag_id=example_dag -F is_paused=true
+  astro api airflow -d prod patch_dag -p dag_id=example_dag -F is_paused=true
 
   # Use jq filter on response
-  astro api airflow /dags --jq '.dags[].dag_id'
+  astro api airflow -d prod /dags --jq '.dags[].dag_id'
 
   # Use an Airflow no project declares
   astro api airflow --url http://airflow.example.com:8080 /dags
-
-  # Use a deployment this project links in pyproject.toml
-  astro api airflow -d prod /dags
 
   # Use an Astro Deployment by id
   astro api airflow -d clxyz123 /dags
 
   # Generate curl command instead of executing
-  astro api airflow /dags --generate
+  astro api airflow -d prod /dags --generate
 
-  # Use a specific Airflow version (skip auto-detection)
-  astro api airflow --airflow-version 2.10.0 /dags`,
+  # List the endpoints of a specific Airflow version (no target needed)
+  astro api airflow ls --airflow-version 2.10.0
+
+  # This project's local Airflow
+  astro local api /dags`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RequestMethodPassed = cmd.Flags().Changed("method")
@@ -152,8 +156,8 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	cmd.PersistentFlags().MarkDeprecated("deployment-id", "use -d/--deployment")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace-id", "W", "", "Override workspace ID for deployment lookup")
-	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (local only)")
-	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (local only)")
+	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
+	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
 
 	// Request flags
@@ -197,10 +201,10 @@ func runAirflow(opts *AirflowOptions) error {
 	// operation id: the generation decides the path, so carrying on would send
 	// the request somewhere this run could not work out — and report success.
 	//
-	// The one survivor is the fallback initAirflowSpecCache makes for a target
-	// nobody named: the localhost default may simply not be running, so it warns
-	// and assumes the current generation. That still yields a base with a prefix
-	// on it, never the bare host root.
+	// The one survivor is the fallback initAirflowSpecCache makes for a bare
+	// --url: it may simply not be running, so it warns and assumes the current
+	// generation. That still yields a base with a prefix on it, never the bare
+	// host root.
 	baseURL, err := initAirflowSpecCache(ctx, opts, target)
 	if err != nil {
 		// An instance that never answered is unreachable, not mysterious. Say
@@ -350,10 +354,9 @@ func airflowConnectionError(requestURL string) error {
 	host := airflowHostRoot(requestURL)
 	if isLocalhostURL(host) {
 		return fmt.Errorf("could not connect to Airflow at %s\n\n"+
-			"Is Airflow running? Try one of:\n"+
-			"  astro local start            Start a local Airflow environment\n"+
-			"  --url <url>                  Use a different Airflow instance\n"+
-			"  -d <name or id>              Use a deployment this project links, or an Astro Deployment id", host)
+			"Is Airflow running? For this project's local Airflow, try one of:\n"+
+			"  astro local start            Start it\n"+
+			"  astro local api <endpoint>   Reach it on whatever port it runs on", host)
 	}
 	return fmt.Errorf("could not connect to Airflow at %s\n\n"+
 		"Check that the URL is correct and the server is running", host)
@@ -370,14 +373,7 @@ func apiPrefixForVersion(version string) string {
 
 // runAirflowInteractive runs the airflow API command in interactive mode.
 func runAirflowInteractive(opts *AirflowOptions) error {
-	ctx := stdctx.Background()
-	target, err := resolveAirflowTarget(ctx, opts)
-	if err != nil {
-		return err
-	}
-
-	// Initialize the spec cache
-	if _, err = initAirflowSpecCache(ctx, opts, target); err != nil {
+	if err := loadAirflowSpec(stdctx.Background(), opts); err != nil {
 		return err
 	}
 
@@ -393,7 +389,7 @@ func runAirflowInteractive(opts *AirflowOptions) error {
 
 	// Show endpoint selection
 	fmt.Fprintf(opts.Out, "\nFound %d endpoints. Use '%s' to list them.\n", len(endpoints), ansi.Bold("astro api airflow ls"))
-	fmt.Fprintf(opts.Out, "Run '%s' to make a request.\n\n", ansi.Bold("astro api airflow <endpoint>"))
+	fmt.Fprintf(opts.Out, "Run '%s' to make a request.\n\n", ansi.Bold("astro api airflow -d <deployment> <endpoint>"))
 
 	return nil
 }
@@ -413,9 +409,9 @@ func runAirflowInteractive(opts *AirflowOptions) error {
 // An error here ends the run, whatever the caller was going to ask for. The
 // generation decides the path, so a run that could not work it out has nowhere
 // to send the request — and a request sent to the wrong path that reports
-// success is worse than a refusal. The one target that falls back instead is
-// the one nobody named: the localhost default may simply not be running, so it
-// warns and assumes the current generation, which still yields a prefixed base.
+// success is worse than a refusal. The one target that falls back instead is a
+// bare --url: it may simply not be running, so it warns and assumes the current
+// generation, which still yields a prefixed base.
 func initAirflowSpecCache(ctx stdctx.Context, opts *AirflowOptions, target *airflowTarget) (string, error) {
 	// Skip if already initialized
 	if opts.specCache != nil {
@@ -435,9 +431,9 @@ func initAirflowSpecCache(ctx stdctx.Context, opts *AirflowOptions, target *airf
 			// fallback.
 			return "", fmt.Errorf("could not detect Airflow version from %s: %w. Use --airflow-version to specify manually", target.name, err)
 		default:
-			// The localhost default and a bare --url may simply not be running.
-			// Warn and fall back — except on a connection failure, which the
-			// request itself is about to report far better.
+			// A bare --url may simply not be running. Warn and fall back —
+			// except on a connection failure, which the request itself is
+			// about to report far better.
 			if !isConnectionError(err) {
 				fmt.Fprintf(opts.RequestOptions.GetErrOut(), "Warning: Could not detect Airflow version (%v), using default %s. Use --airflow-version to override.\n", err, defaultAirflowVersion)
 			}
@@ -445,16 +441,38 @@ func initAirflowSpecCache(ctx stdctx.Context, opts *AirflowOptions, target *airf
 		}
 	}
 
-	// Create the spec cache for this version
+	if err := opts.useSpecFor(version); err != nil {
+		return "", err
+	}
+	return target.apiBase(version), nil
+}
+
+// useSpecFor sets up the spec cache for one Airflow version.
+func (o *AirflowOptions) useSpecFor(version string) error {
 	cache, err := openapi.NewAirflowCacheForVersion(version)
 	if err != nil {
-		return "", fmt.Errorf("creating spec cache for Airflow %s: %w", version, err)
+		return fmt.Errorf("creating spec cache for Airflow %s: %w", version, err)
 	}
+	cache.SetHTTPClient(o.GetHTTPClient())
+	o.specCache = cache
+	o.detectedVersion = openapi.NormalizeAirflowVersion(version)
+	return nil
+}
 
-	cache.SetHTTPClient(opts.GetHTTPClient())
-	opts.specCache = cache
-	opts.detectedVersion = openapi.NormalizeAirflowVersion(version)
-	return target.apiBase(version), nil
+// loadAirflowSpec sets up the spec for the commands that only read it: ls,
+// describe, and the bare command with no endpoint. A named target is asked for
+// its version, as a request would. With none there is nothing to ask, so the
+// spec is --airflow-version's, or the default's.
+func loadAirflowSpec(ctx stdctx.Context, opts *AirflowOptions) error {
+	if !opts.hasTarget() {
+		return opts.useSpecFor(firstNonEmpty(opts.AirflowVersion, defaultAirflowVersion))
+	}
+	target, err := resolveAirflowTarget(ctx, opts)
+	if err != nil {
+		return err
+	}
+	_, err = initAirflowSpecCache(ctx, opts, target)
+	return err
 }
 
 // NewAirflowListCmd creates the 'astro api airflow ls' command.
@@ -489,14 +507,7 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 				filter = args[0]
 			}
 
-			ctx := cmd.Context()
-			target, err := resolveAirflowTarget(ctx, parentOpts)
-			if err != nil {
-				return err
-			}
-
-			// Initialize the spec cache
-			if _, err := initAirflowSpecCache(ctx, parentOpts, target); err != nil {
+			if err := loadAirflowSpec(cmd.Context(), parentOpts); err != nil {
 				return err
 			}
 
@@ -551,14 +562,7 @@ The endpoint can be specified as a path or as an operation ID.`,
   astro api airflow describe get_dag`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			target, err := resolveAirflowTarget(ctx, parentOpts)
-			if err != nil {
-				return err
-			}
-
-			// Initialize the spec cache
-			if _, err := initAirflowSpecCache(ctx, parentOpts, target); err != nil {
+			if err := loadAirflowSpec(cmd.Context(), parentOpts); err != nil {
 				return err
 			}
 

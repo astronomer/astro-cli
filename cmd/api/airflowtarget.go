@@ -32,10 +32,12 @@ import (
 // Airflow is reachable here for free. The old flags stay as deprecated aliases
 // for one release.
 //
-// The localhost default stays for a bare `astro api airflow /dags` — it is this
-// command's documented behavior — but it goes through the same primitives as
-// everything else: pkg/airflowapi's TokenMinter for the credential, and the
-// client's own generation detection for the version.
+// There is no default target. The command used to fall back to
+// http://localhost:8080, but each local project now gets its own port, so 8080
+// may be another project's Airflow or nothing at all. A request with neither
+// flag fails before it is sent, and names the ways to pick a target —
+// `astro local api` among them, which already reaches this project's own local
+// Airflow. Commands that only read the spec (ls, describe) need no target.
 
 // airflowTarget is the Airflow one run acts on: how to reach it, and what to
 // call it in a message.
@@ -90,14 +92,13 @@ func (t *airflowTarget) client() *airflowapi.Client {
 	return t.airflow
 }
 
-// resolveAirflowTarget settles which Airflow this run talks to, in the order the
-// flags rank: --url (or its --api-url alias), then -d/--deployment (or its
-// --deployment-id alias), then the localhost default.
+// resolveAirflowTarget settles which Airflow this run talks to: --url (or its
+// --api-url alias), or -d/--deployment (or its --deployment-id alias). With
+// neither, it fails with errNoTarget.
 //
 // Unlike the query commands there is no ambient layer here — no pin, no
-// ASTRO_DEPLOYMENT. This command's documented default is localhost, and a raw
-// API escape hatch that silently redirected itself at a deployment because a
-// pin was set would be a worse surprise than typing -d.
+// ASTRO_DEPLOYMENT. A raw API escape hatch that silently redirected itself at a
+// deployment because a pin was set would be a worse surprise than typing -d.
 func resolveAirflowTarget(ctx context.Context, opts *AirflowOptions) (*airflowTarget, error) {
 	url, err := opts.targetURL()
 	if err != nil {
@@ -122,14 +123,45 @@ func resolveAirflowTarget(ctx context.Context, opts *AirflowOptions) (*airflowTa
 	case url != "":
 		return opts.urlTarget(ctx, url, url)
 	default:
-		return opts.urlTarget(ctx, airflowLocalhost, "the Airflow on localhost")
+		return nil, errNoTarget(opts.RequestPath)
 	}
+}
+
+// hasTarget reports whether any of the four targeting flags was passed.
+func (o *AirflowOptions) hasTarget() bool {
+	return firstNonEmpty(o.URL, o.APIURL, o.Deployment, o.DeploymentID) != ""
+}
+
+// errNoTarget names the ways to pick an Airflow, with the links this project
+// declares when there is a project to read them from.
+func errNoTarget(endpoint string) error {
+	deployments := "a deployment this project links, or an Astro Deployment id"
+	if links := projectLinkNames(); len(links) > 0 {
+		deployments = fmt.Sprintf("a deployment this project links (%s), or an Astro Deployment id", strings.Join(links, ", "))
+	}
+	if !strings.HasPrefix(endpoint, "/") {
+		endpoint = "<endpoint>"
+	}
+	return fmt.Errorf("no Airflow to send this request to. Pass one of:\n"+
+		"  -d <link>              %s\n"+
+		"  --url <airflow url>    any other Airflow\n"+
+		"or, for this project's local Airflow, run: astro local api %s", deployments, endpoint)
+}
+
+// projectLinkNames lists the deployment links the working directory's manifest
+// declares. A missing or unreadable manifest lists none: the caller is already
+// reporting a different problem.
+func projectLinkNames() []string {
+	m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker))
+	if err != nil {
+		return nil
+	}
+	return instances.Build(m).Names()
 }
 
 // named marks a deployment the user asked for by name. A deployment resolves
 // through a control plane that says it exists, so it should be reachable; a URL
-// — the localhost default included — is a guess someone typed, and may simply
-// have nothing running behind it.
+// is a guess someone typed, and may simply have nothing running behind it.
 func named(t *airflowTarget, err error) (*airflowTarget, error) {
 	if err != nil {
 		return nil, err
@@ -137,10 +169,6 @@ func named(t *airflowTarget, err error) (*airflowTarget, error) {
 	t.named = true
 	return t, nil
 }
-
-// airflowLocalhost is the bare command's target, below the API prefix — this
-// command's documented default since it shipped.
-const airflowLocalhost = "http://localhost:8080"
 
 // targetURL folds --api-url into --url. The two mean the same thing, so passing
 // both is a contradiction rather than a precedence question.
@@ -288,11 +316,11 @@ func (o *AirflowOptions) instanceDeps(domain string) instances.Deps {
 	}
 }
 
-// urlTarget opens a bare Airflow URL: the localhost default and --url. Neither
-// is declared anywhere, so the credential is minted from the username and
-// password this command has always taken — through pkg/airflowapi's TokenMinter,
-// which asks the instance's own /auth/token and falls back to basic auth on an
-// Airflow that serves none.
+// urlTarget opens a bare Airflow URL, from --url. It is not declared anywhere,
+// so the credential is minted from the username and password this command has
+// always taken — through pkg/airflowapi's TokenMinter, which asks the
+// instance's own /auth/token and falls back to basic auth on an Airflow that
+// serves none.
 func (o *AirflowOptions) urlTarget(ctx context.Context, hostRoot, name string) (*airflowTarget, error) {
 	// A caller who set their own Authorization header has said how to prove
 	// themselves; minting a second credential would only overwrite it.

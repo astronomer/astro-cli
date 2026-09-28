@@ -135,7 +135,6 @@ func TestNewAirflowDescribeCmd(t *testing.T) {
 
 func TestAirflowConstants(t *testing.T) {
 	// Verify the constants are set correctly
-	assert.Equal(t, "http://localhost:8080", airflowLocalhost)
 	assert.Equal(t, "3.0.3", defaultAirflowVersion)
 }
 
@@ -273,19 +272,85 @@ func TestInitAirflowSpecCache_PatchedAirflow2GetsV1(t *testing.T) {
 
 // --- targeting ---------------------------------------------------------------
 
-func TestResolveAirflowTarget_DefaultsToLocalhost(t *testing.T) {
-	// A supplied Authorization header means nothing is minted, which is what
-	// keeps this test off the network — whatever is listening on this machine's
-	// port 8080 is nobody's business here.
+// With no target there is no request: 8080 may be another project's Airflow,
+// so the command names the ways to pick one instead of guessing.
+func TestRunAirflow_RequiresATarget(t *testing.T) {
+	writeAPIProject(t, `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.staging]
+url = "https://airflow.staging.corp.dev"
+auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
+
+[tool.astro.deployments.prod]
+url = "https://airflow.prod.corp.dev"
+auth = { method = 'token', token-env = 'PROD_AIRFLOW_TOKEN' }
+`)
 	opts := &AirflowOptions{RequestOptions: RequestOptions{
-		ErrOut:         new(bytes.Buffer),
-		RequestHeaders: []string{"Authorization: Bearer supplied"},
+		Out: new(bytes.Buffer), ErrOut: new(bytes.Buffer),
+		RequestPath: "/dags", RequestMethod: "GET",
 	}}
-	target, err := resolveAirflowTarget(context.Background(), opts)
-	require.NoError(t, err)
-	assert.Equal(t, airflowLocalhost, target.hostRoot)
-	assert.True(t, target.isHTTP())
-	assert.False(t, target.isNamedDeployment())
+	err := runAirflow(opts)
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, "-d <link>")
+	assert.Contains(t, msg, "prod, staging")
+	assert.Contains(t, msg, "--url <airflow url>")
+	assert.Contains(t, msg, "astro local api /dags")
+	assert.NotContains(t, msg, "localhost")
+}
+
+func TestErrNoTarget_OutsideAProject(t *testing.T) {
+	orig := config.WorkingPath
+	config.WorkingPath = t.TempDir()
+	t.Cleanup(func() { config.WorkingPath = orig })
+
+	msg := errNoTarget("get_dags").Error()
+	assert.Contains(t, msg, "a deployment this project links, or an Astro Deployment id")
+	assert.Contains(t, msg, "astro local api <endpoint>", "an operation id is not a path astro local api can take")
+}
+
+func TestRunAirflow_GenerateWithoutATargetPrintsNothing(t *testing.T) {
+	out := new(bytes.Buffer)
+	opts := &AirflowOptions{RequestOptions: RequestOptions{
+		Out: out, ErrOut: new(bytes.Buffer),
+		RequestPath: "/dags", RequestMethod: "GET", GenerateCurl: true,
+	}}
+	err := runAirflow(opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no Airflow to send this request to")
+	assert.Empty(t, out.String())
+}
+
+// ls, describe, and the bare command only read the spec, so they need no
+// target — and with none they ask no Airflow for its version.
+func TestLoadAirflowSpec_WithoutATargetReadsTheDefaultSpec(t *testing.T) {
+	opts := &AirflowOptions{}
+	require.NoError(t, loadAirflowSpec(context.Background(), opts))
+	assert.NotNil(t, opts.specCache)
+	assert.Equal(t, defaultAirflowVersion, opts.detectedVersion)
+
+	opts = &AirflowOptions{AirflowVersion: "2.10.0"}
+	require.NoError(t, loadAirflowSpec(context.Background(), opts))
+	assert.Equal(t, "2.10.0", opts.detectedVersion)
+}
+
+func TestLoadAirflowSpec_WithATargetAsksItsVersion(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/version") {
+			_, _ = w.Write([]byte(`{"version":"2.10.5"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	opts := &AirflowOptions{URL: ts.URL, RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer), HTTPClient: http.DefaultClient}}
+	require.NoError(t, loadAirflowSpec(context.Background(), opts))
+	assert.Equal(t, "2.10.5", opts.detectedVersion)
 }
 
 // The credential for a bare URL is minted at the instance's own /auth/token,
@@ -465,8 +530,8 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 	assert.NotContains(t, paths, "/dags", "a request went out under no API prefix at all")
 }
 
-// The localhost default is allowed to fall back — it may simply not be running
-// — but the fallback still carries a generation prefix.
+// A bare --url is allowed to fall back — it may simply not be running — but
+// the fallback still carries a generation prefix.
 func TestInitAirflowSpecCache_FallbackKeepsThePrefix(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -475,8 +540,7 @@ func TestInitAirflowSpecCache_FallbackKeepsThePrefix(t *testing.T) {
 
 	errOut := new(bytes.Buffer)
 	opts := &AirflowOptions{RequestOptions: RequestOptions{ErrOut: errOut, HTTPClient: http.DefaultClient}}
-	// A target nobody named, pointed at a server that refuses the probe.
-	target, err := opts.httpTarget("the Airflow on localhost", ts.URL, "")
+	target, err := opts.httpTarget(ts.URL, ts.URL, "")
 	require.NoError(t, err)
 
 	base, err := initAirflowSpecCache(context.Background(), opts, target)
@@ -759,8 +823,7 @@ func TestAirflowConnectionError_Localhost(t *testing.T) {
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
 	assert.Contains(t, err.Error(), "localhost:8080")
 	assert.Contains(t, err.Error(), "astro local start")
-	assert.Contains(t, err.Error(), "--url")
-	assert.Contains(t, err.Error(), "-d <name or id>")
+	assert.Contains(t, err.Error(), "astro local api")
 }
 
 func TestAirflowConnectionError_Loopback(t *testing.T) {

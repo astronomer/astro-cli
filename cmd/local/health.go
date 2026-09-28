@@ -46,7 +46,7 @@ func rawAPIForm(t target) string {
 	if _, machine := t.(machineTarget); machine {
 		return "astro local api"
 	}
-	return "astro api airflow"
+	return "astro api airflow -d <deployment>"
 }
 
 // versionRow is an Airflow's own account of itself, as the health report's
