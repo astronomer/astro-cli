@@ -229,10 +229,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, err
 	}
 
-	airflowHome := p.AirflowHome
-	if airflowHome == "" {
-		airflowHome = filepath.Join(projectPath, airflowrt.StandaloneDir)
-	}
+	airflowHome := planAirflowHome(p, projectPath)
 	if err := os.MkdirAll(airflowHome, airflowrt.DirPermissions); err != nil {
 		return nil, fmt.Errorf("creating %s: %w", airflowHome, err)
 	}
@@ -556,6 +553,42 @@ func (e *Engine) Attach(projectPath string) (rt.Airflow, error) {
 	return &airflow{eng: e, rec: rec}, nil
 }
 
+// Stopped returns a handle for running commands in a project whose Airflow is
+// not running: the venv the last start or sync built, under the environment a
+// start of p would give Airflow. Built from the plan rather than a record, it
+// carries the plan's Env and SecretEnv layers, which a handle from Attach
+// cannot. It provisions nothing, so a project with no venv is refused with a
+// pointer at a start, which builds one.
+func (e *Engine) Stopped(p rt.Plan) (rt.Airflow, error) {
+	projectPath, err := filepath.Abs(p.ProjectPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
+	}
+	if _, err := os.Stat(filepath.Join(projectPath, ".venv", "bin", "python")); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("%w, and it has no environment yet: `astro local start` builds one, or `astro local start --docker` runs it in Docker", localstate.ErrNotRunning)
+		}
+		return nil, err
+	}
+	stateDir, err := planStateDir(p, projectPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(stateDir, stateDirPerm); err != nil {
+		return nil, fmt.Errorf("creating %s: %w", stateDir, err)
+	}
+	port := p.RequestedPort
+	if port <= 0 {
+		port = defaultAPIServerPort
+	}
+	env := e.buildEnv(p, projectPath, stateDir, planAirflowHome(p, projectPath), port)
+	return &airflow{
+		eng: e,
+		rec: localstate.Record{ProjectPath: projectPath, Mode: rt.ModeStandalone},
+		env: append(env, "VIRTUAL_ENV="+filepath.Join(projectPath, ".venv")),
+	}, nil
+}
+
 // LogHandle returns a handle for reading a stopped project's persisted log
 // file, without a live record: the standalone log file outlives the record
 // (Stop removes the record but not the log), and its path derives from the
@@ -768,6 +801,9 @@ func (e *Engine) recordRegisteredHostname(rec *localstate.Record, registered str
 type airflow struct {
 	eng *Engine
 	rec localstate.Record
+	// env is the environment Stopped built from a plan. Nil on every other
+	// handle, whose Run rebuilds it from the record.
+	env []string
 }
 
 func (a *airflow) Status() (rt.Status, error) {
@@ -863,13 +899,13 @@ func (e *Engine) Clean(projectPath string) error {
 
 // Run executes argv inside the project's Airflow environment: the same env
 // the Airflow process runs with, venv-activated, so `airflow` and `python`
-// resolve to the project venv and share the running metadata DB (v1's
+// resolve to the project venv and share Airflow's metadata DB (v1's
 // seven-line Run paired with desktop's ShellEnv).
 func (a *airflow) Run(ctx context.Context, argv []string, s rt.Stdio) error {
 	if len(argv) == 0 {
 		return errors.New("no command given")
 	}
-	env, err := a.eng.shellEnv(a.rec)
+	env, err := a.Env()
 	if err != nil {
 		return err
 	}
@@ -880,6 +916,9 @@ func (a *airflow) Run(ctx context.Context, argv []string, s rt.Stdio) error {
 // Env hands out the environment Run and Shell use, for a caller that runs
 // its own process in it rather than asking the engine to.
 func (a *airflow) Env() ([]string, error) {
+	if a.env != nil {
+		return a.env, nil
+	}
 	return a.eng.shellEnv(a.rec)
 }
 
@@ -932,6 +971,15 @@ func planStateDir(p rt.Plan, projectPath string) (string, error) {
 		return p.StateDir, nil
 	}
 	return rt.StateDir(projectPath)
+}
+
+// planAirflowHome resolves AIRFLOW_HOME: the plan's when set, the project's
+// standalone directory otherwise.
+func planAirflowHome(p rt.Plan, projectPath string) string {
+	if p.AirflowHome != "" {
+		return p.AirflowHome
+	}
+	return filepath.Join(projectPath, airflowrt.StandaloneDir)
 }
 
 // airflowMajor extracts the major version from a plan's Airflow version;

@@ -131,6 +131,10 @@ type Deps struct {
 type Runtime interface {
 	Start(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) (localrt.Airflow, error)
 	Attach(projectPath string) (localrt.Airflow, error)
+	// Stopped returns a handle for running commands in a standalone project's
+	// venv while no Airflow runs on it, under the environment a start of p
+	// would give Airflow. It backs `astro local run` and `shell` offline.
+	Stopped(p localrt.Plan) (localrt.Airflow, error)
 	// LogSource returns a handle for reading a project's logs. Unlike Attach
 	// it also serves a stopped standalone project, whose log file outlives its
 	// record; the handle's Logs reads that file.

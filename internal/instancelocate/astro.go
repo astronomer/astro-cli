@@ -59,7 +59,7 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 		return nil, fmt.Errorf("could not reach Astro to look up %q — check your connection: %w", i.Name, err)
 	}
 	if resp.JSON200 == nil {
-		return nil, deploymentOutage(l.domain, i.Name, deploymentID, resp)
+		return nil, deploymentOutage(l.domain, i, deploymentID, resp)
 	}
 	return resp.JSON200, nil
 }
@@ -155,7 +155,8 @@ func bearer(token string) astrov1.RequestEditorFn {
 // deploymentOutage names what the control plane said. Each status has its own
 // fix, and a status with none still carries Astro's own words rather than a
 // bare number.
-func deploymentOutage(domain, name, deploymentID string, resp *astrov1.GetDeploymentResponse) error {
+func deploymentOutage(domain string, i instances.Instance, deploymentID string, resp *astrov1.GetDeploymentResponse) error {
+	name := i.Name
 	status := 0
 	if resp.HTTPResponse != nil {
 		status = resp.HTTPResponse.StatusCode
@@ -166,6 +167,9 @@ func deploymentOutage(domain, name, deploymentID string, resp *astrov1.GetDeploy
 	case http.StatusForbidden:
 		return fmt.Errorf("you do not have access to Astro Deployment %s (%q) — ask a workspace admin to grant it", deploymentID, name)
 	case http.StatusNotFound:
+		if i.Source == instances.SourceDeploymentID {
+			return fmt.Errorf("Astro Deployment %s does not exist", deploymentID)
+		}
 		return fmt.Errorf("Astro Deployment %s (%q) does not exist — check the `deployment` on this link in pyproject.toml", deploymentID, name)
 	}
 	detail := ""

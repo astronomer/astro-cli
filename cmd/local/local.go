@@ -219,7 +219,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	missingSecrets := warnMissingBuildSecrets(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
-	warnStartedWithout(r, built.StartedWithout)
+	warnWithout(r, "started", built.StartedWithout)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err
 	}
@@ -380,10 +380,11 @@ func warnEnvValues(r Renderer, warnings []envschema.Violation) {
 	}
 }
 
-// warnStartedWithout reports each required value a start was allowed past
-// (--allow-missing), with the cause the resolver found, so a Dag that fails on
-// one later is not a mystery.
-func warnStartedWithout(r Renderer, missing []envresolve.Missing) {
+// warnWithout reports each required value a start (--allow-missing) or a
+// command in a stopped project was allowed past, with the cause the resolver
+// found, so a Dag that fails on one later is not a mystery. doing names what
+// went ahead: "started" or "running".
+func warnWithout(r Renderer, doing string, missing []envresolve.Missing) {
 	for _, m := range missing {
 		reason := "no source on this machine"
 		if m.SourceNote != "" {
@@ -391,7 +392,7 @@ func warnStartedWithout(r Renderer, missing []envresolve.Missing) {
 		}
 		emitWarning(r, event{
 			Event:   "warning",
-			Text:    fmt.Sprintf("started without %s %s: %s", sectionLabel(m.Section), m.Name, reason),
+			Text:    fmt.Sprintf("%s without %s %s: %s", doing, sectionLabel(m.Section), m.Name, reason),
 			Section: string(m.Section),
 			Key:     m.Name,
 			Reason:  reason,
@@ -464,6 +465,18 @@ func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
 		return err
 	}
 	af, err := c.attach()
+	if errors.Is(err, localrt.ErrNotRunning) {
+		if opts.Clean {
+			return fmt.Errorf("%w; `astro local reset` removes a stopped project's derived state", err)
+		}
+		// Nothing to stop is the state the caller asked for, so it succeeds,
+		// the way `docker compose stop` does.
+		e := event{Event: "state", State: localrt.StateStopped, AlreadyStopped: true}
+		return r.Emit(e, func(w io.Writer) error {
+			_, werr := fmt.Fprintln(w, "airflow: already stopped")
+			return werr
+		})
+	}
 	if err != nil {
 		return err
 	}
@@ -508,10 +521,9 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 		return err
 	}
 	if st.State != localrt.StateRunning {
-		// Nothing is running (the record is gone), so there is nothing to stop
-		// and no prior mode or port to carry: restart falls back to a plain
-		// start with the defaults.
-		return c.runStart(ctx, plan.Options{AllowMissing: allowMissing}, buildSecretFlag)
+		// Nothing is running, so there is nothing to stop: restart falls back
+		// to a plain start, in the mode a leftover record names, if any.
+		return c.runStart(ctx, plan.Options{Mode: st.Mode, AllowMissing: allowMissing}, buildSecretFlag)
 	}
 	// Rebuild the plan from the manifest and env as they are now, so a
 	// restart picks up edits — but keep the running mode, port, and session
@@ -539,7 +551,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	}
 	missingSecrets := warnMissingBuildSecrets(r, built.Plan)
 	warnEnvValues(r, built.EnvWarnings)
-	warnStartedWithout(r, built.StartedWithout)
+	warnWithout(r, "started", built.StartedWithout)
 	// Before the stop, like the build: a refusal leaves Airflow running.
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err
@@ -873,12 +885,60 @@ func newRunCmd(c *cli) *cobra.Command {
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cmd.Flags().SetInterspersed(false)
-	cmd.Flags().Bool("no-wait", false, "Do not wait for Airflow to be healthy first (not built yet)")
 	return cmd
 }
 
+// environment is the handle `run` and `shell` work through. A running Airflow
+// is attached, so a command shares its port and metadata DB. With nothing
+// running, a standalone project's command runs in its venv under the
+// environment a start would give it, so `astro local run pytest` needs no
+// Airflow. Docker mode runs commands inside its containers, which have to be
+// up.
+func (c *cli) environment() (localrt.Airflow, error) {
+	dir, err := c.projectPath()
+	if err != nil {
+		return nil, err
+	}
+	st, err := c.d.Runtime.ReadStatus(dir)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case st.State == localrt.StateRunning:
+		return c.d.Runtime.Attach(dir)
+	case st.Mode == localrt.ModeDocker:
+		// A busy engine can miss the probe's deadline, which reads as stopped,
+		// so a docker record is still attached and the exec says if it is down.
+		a, err := c.d.Runtime.Attach(dir)
+		if errors.Is(err, localrt.ErrNotRunning) {
+			return nil, errDockerDown
+		}
+		return a, err
+	}
+	// No WorkspaceProvider, so a command run this way stays offline: a value
+	// only the Environment Manager holds is warned about like any missing one.
+	built, err := plan.Build(dir, plan.Options{AllowMissing: true})
+	if err != nil {
+		return nil, err
+	}
+	// On stderr: stdout belongs to the command being run.
+	warnWithout(Renderer{Format: FormatText, Out: c.d.Stderr}, "running", built.StartedWithout)
+	return c.d.Runtime.Stopped(built.Plan)
+}
+
+// errDockerDown reports a docker-mode project whose containers are down, which
+// `run` and `shell` execute inside. It is a not_running failure, but a record
+// does exist, so it does not carry the sentinel's own text.
+var errDockerDown = notRunning("this project's Docker containers are not running; start them first: `astro local start --docker`")
+
+type notRunning string
+
+func (e notRunning) Error() string { return string(e) }
+
+func (e notRunning) Is(target error) bool { return target == localrt.ErrNotRunning }
+
 func (c *cli) runExec(ctx context.Context, argv []string) error {
-	af, err := c.attach()
+	af, err := c.environment()
 	if err != nil {
 		return err
 	}
@@ -906,7 +966,7 @@ func newShellCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runShell(ctx context.Context) error {
-	af, err := c.attach()
+	af, err := c.environment()
 	if err != nil {
 		return err
 	}

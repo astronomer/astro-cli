@@ -32,6 +32,10 @@ func (fakeRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
 	return localrt.ResetReport{}, localrt.ErrNotImplemented
 }
 
+func (fakeRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) {
+	return nil, localrt.ErrNotImplemented
+}
+
 func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 	t.Helper()
 	stdout = &bytes.Buffer{}

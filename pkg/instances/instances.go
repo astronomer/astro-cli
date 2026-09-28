@@ -56,6 +56,9 @@ type Source string
 const (
 	SourceManifest Source = "manifest"
 	SourceRunning  Source = "running"
+	// SourceDeploymentID is an Astro Deployment named on the command line by
+	// its id, which no link declares.
+	SourceDeploymentID Source = "deployment_id"
 	// SourceURL is the stateless --url target: declared nowhere, discovered
 	// from nothing, alive only for the command that named it.
 	SourceURL Source = "url"

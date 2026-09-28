@@ -962,10 +962,21 @@ func (a *airflow) Env() ([]string, error) {
 	return nil, fmt.Errorf("%w: a docker-mode project's environment lives in its container", rt.ErrNotImplemented)
 }
 
+// errContainersDown is an exec into a project whose record is left but whose
+// containers are down. It matches localstate.ErrNotRunning, so a caller reports
+// it as not running, without that sentinel's "nothing recorded" text.
+var errContainersDown = containersDown("this project's Docker containers are not running; start them first: `astro local start --docker`")
+
+type containersDown string
+
+func (e containersDown) Error() string { return string(e) }
+
+func (e containersDown) Is(target error) bool { return target == localstate.ErrNotRunning }
+
 func (a *airflow) exec(ctx context.Context, argv []string, s rt.Stdio) error {
 	conn, name := a.project(ctx)
 	if name == "" {
-		return errors.New("this project's containers are not running; run `astro local start` first")
+		return errContainersDown
 	}
 	args := append([]string{"compose", "-p", name, "exec", execService}, argv...)
 	return a.eng.cmd.Run(ctx, conn.env, s, conn.bin, args...)

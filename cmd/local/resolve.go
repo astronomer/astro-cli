@@ -130,7 +130,7 @@ type deploymentFlags struct {
 // for --deployment, and --url is the escape hatch for an Airflow no project
 // declares.
 func addDeploymentFlags(cmd *cobra.Command, f *deploymentFlags) {
-	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under")
+	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, or a Deployment id")
 	cmd.PersistentFlags().StringVar(&f.url, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 }
 
@@ -145,7 +145,18 @@ func (c *cli) deploymentClient(ctx context.Context, f deploymentFlags) (*airflow
 	if err != nil {
 		return nil, err
 	}
-	return c.clientFor(ctx, sel.Instance, domain)
+	client, err := c.clientFor(ctx, sel.Instance, domain)
+	if err != nil && sel.Instance.Source == instances.SourceDeploymentID {
+		// A name that matched no link is more often a typo than an id, so the
+		// names it could have been travel with the failure, as they do for
+		// `astro api airflow -d`.
+		if _, set, serr := c.deploymentSet(); serr == nil {
+			if names := set.Names(); len(names) > 0 {
+				return nil, fmt.Errorf("%w\nDeployments this project links: %s", err, strings.Join(names, ", "))
+			}
+		}
+	}
+	return client, err
 }
 
 // projectDomain is the Astro host whose login this project's astro links use,

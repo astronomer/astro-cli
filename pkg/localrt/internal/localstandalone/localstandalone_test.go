@@ -499,6 +499,48 @@ func TestRunExecsInProjectEnv(t *testing.T) {
 	assert.ErrorContains(t, err, "no command given")
 }
 
+// A command in a stopped project runs in its venv under the plan's own env and
+// the project's .env, with no record and nothing started.
+func TestStoppedRunsInTheVenvUnderThePlanEnv(t *testing.T) {
+	e, _, launches := testEngine(t)
+	p := testPlan(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(p.ProjectPath, ".venv", "bin"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, ".venv", "bin", "python"), nil, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, ".env"), []byte("FROM_DOTENV=yes\n"), 0o600))
+
+	var gotDir, gotCall string
+	var gotEnv []string
+	e.cmd = commanderFunc(func(_ context.Context, dir string, env []string, _ rt.Stdio, name string, args ...string) error {
+		gotDir, gotEnv = dir, env
+		gotCall = name + " " + strings.Join(args, " ")
+		return nil
+	})
+
+	af, err := e.Stopped(p)
+	require.NoError(t, err)
+	require.NoError(t, af.Run(context.Background(), []string{"python", "-V"}, rt.Stdio{}))
+
+	assert.Empty(t, *launches, "running a command must not start Airflow")
+	assert.Equal(t, p.ProjectPath, gotDir)
+	assert.Equal(t, filepath.Join(p.ProjectPath, ".venv", "bin", "python")+" -V", gotCall)
+	assert.Contains(t, gotEnv, "FOO=bar")
+	assert.Contains(t, gotEnv, "FROM_DOTENV=yes")
+	assert.Contains(t, gotEnv, "VIRTUAL_ENV="+filepath.Join(p.ProjectPath, ".venv"))
+	env, err := af.Env()
+	require.NoError(t, err)
+	assert.Equal(t, gotEnv, env)
+}
+
+// A project with no venv is refused with the command that builds one.
+func TestStoppedRefusesAProjectWithNoVenv(t *testing.T) {
+	e, _, _ := testEngine(t)
+	p := testPlan(t)
+
+	_, err := e.Stopped(p)
+	require.ErrorIs(t, err, localstate.ErrNotRunning)
+	assert.ErrorContains(t, err, "astro local start")
+}
+
 type commanderFunc func(ctx context.Context, dir string, env []string, s rt.Stdio, name string, args ...string) error
 
 func (f commanderFunc) Run(ctx context.Context, dir string, env []string, s rt.Stdio, name string, args ...string) error {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // twoLinks is the shape that reaches every layer: a default link and a second
@@ -95,7 +96,6 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 		req  Request
 		want string
 	}{
-		{Request{Flag: "nope"}, `no deployment named "nope"; known deployments: dev, prod`},
 		{Request{Env: "nope"}, `no deployment named "nope" (from ASTRO_DEPLOYMENT); known deployments: dev, prod`},
 		{Request{Pin: "nope"}, `no deployment named "nope" (pinned for this project; clear it with ` + "`astro use --unset`" + `); known deployments: dev, prod`},
 	}
@@ -108,6 +108,31 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 		if err.Error() != tc.want {
 			t.Errorf("message =\n  %s\nwant\n  %s", err, tc.want)
 		}
+	}
+}
+
+// -d takes a Deployment id as well as a link name, as `astro deploy
+// --deployment` does. A link pointing at that Deployment answers for it; an id
+// no link carries is the Deployment alone, reached with the Astro login.
+func TestFlagFallsThroughToADeploymentID(t *testing.T) {
+	set := fullSet(t)
+
+	sel, err := set.Select(Request{Flag: "clm2xk9dq000108l7a2b3c4d6"})
+	if err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if sel.Instance.Name != "prod" || sel.From != LayerFlag {
+		t.Fatalf("selected %s from %s, want the prod link from the flag", sel.Instance.Name, sel.From)
+	}
+
+	sel, err = set.Select(Request{Flag: "cexampledeployment0000002"})
+	if err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	got := sel.Instance
+	if got.Name != "cexampledeployment0000002" || got.Kind != KindAstro || got.Source != SourceDeploymentID ||
+		got.Link.Deployment != "cexampledeployment0000002" || got.Link.Auth.Method != manifest.AuthAstro {
+		t.Fatalf("an unlinked id resolved to %+v", got)
 	}
 }
 

@@ -98,6 +98,20 @@ func TestAstroLinkNamesEveryOutage(t *testing.T) {
 	}
 }
 
+// A Deployment id typed on the command line has no link to check, so its 404
+// does not point at pyproject.toml.
+func TestAstroDeploymentIDNotFoundDoesNotBlameALink(t *testing.T) {
+	l := astroLocator(func(context.Context, string, string) (*astrov1.GetDeploymentResponse, error) {
+		return deploymentResponse(http.StatusNotFound, ""), nil
+	})
+	i := astroInstance()
+	i.Source = instances.SourceDeploymentID
+	_, err := l.BaseURL(context.Background(), i)
+	if err == nil || !strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "pyproject.toml") {
+		t.Fatalf("err = %v, want a not-found error that names no link", err)
+	}
+}
+
 // A project that names its Astro host gets that host named when the control
 // plane refuses the session, with the login that fixes it.
 func TestAstroLinkNamesTheProjectsDomainWhenTheSessionIsRefused(t *testing.T) {

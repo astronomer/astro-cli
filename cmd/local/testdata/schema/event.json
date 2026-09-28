@@ -7,5 +7,6 @@
   "error": "x",
   "section": "x",
   "key": "x",
-  "reason": "x"
+  "reason": "x",
+  "already_stopped": true
 }

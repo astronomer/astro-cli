@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Layer is one level of the resolution rule, in precedence order:
@@ -162,6 +164,9 @@ func (s Set) Select(req Request) (Selection, error) {
 			continue
 		}
 		it, ok := s.Lookup(named.name)
+		if !ok && named.layer == LayerFlag && named.name != LocalName {
+			it, ok = s.DeploymentByID(named.name), true
+		}
 		if !ok {
 			return Selection{}, s.Unknown(named.layer, named.name)
 		}
@@ -201,6 +206,20 @@ func (s Set) defaultInstance() (Instance, bool) {
 // bare URL says nothing about how its Airflow checks callers.
 func URLInstance(url string) Instance {
 	return Instance{Name: url, Kind: KindEndpoint, Source: SourceURL, URL: url}
+}
+
+// DeploymentByID reads id as an Astro Deployment id, the way `astro deploy
+// --deployment` reads a name no link carries. A link pointing at that
+// Deployment answers for it, so its name and auth apply; otherwise the
+// instance is the Deployment alone, reached with the Astro login.
+func (s Set) DeploymentByID(id string) Instance {
+	for i := range s.items {
+		if s.items[i].Kind == KindAstro && s.items[i].Link.Deployment == id {
+			return s.items[i]
+		}
+	}
+	link := manifest.Link{Deployment: id, Auth: manifest.Auth{Method: manifest.AuthAstro}}
+	return Instance{Name: id, Kind: KindAstro, Source: SourceDeploymentID, Where: linkWhere(link), Link: link}
 }
 
 // Row is one layer of the resolution rule and what it currently holds — the

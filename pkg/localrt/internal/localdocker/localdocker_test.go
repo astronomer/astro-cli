@@ -637,6 +637,17 @@ func TestAttachRefusesForeignRecords(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotDockerMode)
 }
 
+func TestRunWithContainersDownSaysHowToStartThem(t *testing.T) {
+	e := testEngine(t, &fakeCmd{output: noProjects})
+	project := t.TempDir()
+	require.NoError(t, localstate.Save(localstate.Record{ProjectPath: project, Mode: rt.ModeDocker}))
+	af, err := e.Attach(project)
+	require.NoError(t, err)
+	err = af.Run(context.Background(), []string{"pytest"}, rt.Stdio{})
+	assert.ErrorIs(t, err, localstate.ErrNotRunning)
+	assert.ErrorContains(t, err, "astro local start --docker")
+}
+
 func TestLogsStreamsParsedLines(t *testing.T) {
 	logOutput := strings.Join([]string{
 		`scheduler-1  | 2026-07-21T10:00:00.500Z scheduler heartbeat`,

@@ -199,6 +199,9 @@ type event struct {
 	Section string `json:"section,omitempty"`
 	Key     string `json:"key,omitempty"`
 	Reason  string `json:"reason,omitempty"`
+	// AlreadyStopped marks the state event of a stop that found nothing
+	// running.
+	AlreadyStopped bool `json:"already_stopped,omitempty"`
 }
 
 // callbacks bridges localrt progress into the renderer. Write errors are

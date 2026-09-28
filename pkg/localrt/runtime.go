@@ -478,6 +478,21 @@ func (r *Runtime) Attach(projectPath string) (Airflow, error) {
 	return r.standalone.Attach(projectPath)
 }
 
+// Stopped returns a handle whose Run, Shell and Env work in a standalone
+// project's venv while no Airflow is running on it, under the environment a
+// start of p would give Airflow. Commands that need only the project's Python —
+// pytest, a script — then work with nothing started.
+//
+// It takes no lock and reads no record: the caller has already seen that
+// nothing is running. Docker mode has no environment outside its containers,
+// so a docker plan is refused.
+func (r *Runtime) Stopped(p Plan) (Airflow, error) {
+	if planMode(p) == ModeDocker {
+		return nil, fmt.Errorf("%w: running a command in a stopped docker-mode project", ErrNotImplemented)
+	}
+	return r.standalone.Stopped(p)
+}
+
 func (r *Runtime) LogSource(projectPath string) (Airflow, error) {
 	rec, err := localstate.Load(projectPath)
 	if err == nil {
