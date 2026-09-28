@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
@@ -18,15 +19,17 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/git"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -445,10 +448,10 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		linkName = args[0]
 	}
 
-	// The workspace from the current context is the fallback when neither
-	// --workspace nor a link carries one. An empty context is not an error here;
-	// internal/deploy decides when a workspace is actually required.
-	contextWorkspace, _ := workspace.GetCurrentWorkspace() //nolint:errcheck // absent context is handled downstream
+	login, err := loginForDeploy(cmd.Context(), m.Astro.LoginDomain())
+	if err != nil {
+		return deployV2Err(cmd, format, err)
+	}
 
 	// --workspace wins over the legacy --workspace-id when both are set.
 	overrideWorkspace := v2Workspace
@@ -476,7 +479,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		Preselect:        preselect,
 		PreselectFrom:    preselectFrom,
 		WorkspaceID:      overrideWorkspace,
-		ContextWorkspace: contextWorkspace,
+		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
 		Image:            image,
 		ImageName:        imageName,
@@ -522,7 +525,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 			}
 		},
-	}, newV2Deployer(astroV1Client, cmd.InOrStdin(), errOut))
+	}, newV2Deployer(&login, cmd.InOrStdin(), errOut))
 	if err != nil {
 		return deployV2Err(cmd, format, err)
 	}
@@ -692,17 +695,60 @@ func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
 	return err
 }
 
+// deployLogin is the Astro login a v2 deploy runs under, and the client bound
+// to its host and token.
+type deployLogin struct {
+	context config.Context
+	client  astrov1.APIClient
+	// current reports the login is the current context's, which the v1
+	// deployment picker assumes.
+	current bool
+}
+
+// loginForDeploy picks the login a v2 deploy runs under from domain, the
+// project's Astro host (manifest.Astro.LoginDomain): the login stored for that
+// host, even while the CLI is switched to another, the same one `astro af`
+// reads an astro link with. Every Deployment the deploy reaches, a link's or a
+// bare id's, is looked up on that host. A project that names no host, or names
+// the current one, deploys under the current context.
+func loginForDeploy(ctx context.Context, domain string) (deployLogin, error) {
+	current, _ := config.GetCurrentContext() //nolint:errcheck // with no context, the transport reports it as it always has
+	if domain == "" || manifest.NormalizeDomain(current.Domain) == domain {
+		return deployLogin{context: current, client: astroV1Client, current: true}, nil
+	}
+	token, err := astrosession.BearerFor(ctx, domain)
+	if err != nil {
+		return deployLogin{}, err
+	}
+	org, err := instancelocate.Organization(domain)
+	if err != nil {
+		return deployLogin{}, err
+	}
+	login, err := (&config.Context{Domain: domain}).GetContext()
+	if err != nil {
+		return deployLogin{}, err
+	}
+	if !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+	login.Token, login.Organization = token, org
+	return deployLogin{
+		context: login,
+		client:  astrov1.NewV1ClientForLogin(httputil.NewHTTPClient(), token, login.GetPublicRESTAPIURL("v1")),
+	}, nil
+}
+
 // newV2Deployer builds the transport the v2 deploy path drives. It is a var so a
 // test can swap in a fake and exercise the whole cmd path — flag parsing,
 // selection, and rendering — with no real daemon, registry, or API.
-var newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-	return v2Deployer{client: client, in: in, errOut: errOut}
+var newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+	return v2Deployer{login: login, in: in, errOut: errOut}
 }
 
 // v2Deployer wires internal/deploy's transport seam to the v1 cloud/deploy
 // transport and the deployment selection flow.
 type v2Deployer struct {
-	client astrov1.APIClient
+	login *deployLogin
 	// in and errOut carry the deploy prompt. It asks on stderr and reads stdin,
 	// so stdout stays the deploy's own output.
 	in     io.Reader
@@ -783,7 +829,10 @@ func matchDeployChoice(choices []v2deploy.Choice, answer string) (string, bool) 
 // ResolveUnlinked runs v1's workspace-level pick/create flow and returns the
 // chosen deployment id.
 func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
-	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.client)
+	if !d.login.current {
+		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
+	}
+	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {
 		return "", err
 	}
@@ -793,13 +842,14 @@ func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
 // DeployDags reuses the v1 dags-only transport for the v2 project's dags/.
 func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, error) {
 	res, err := astrodeploy.DeployDagsV2(astrodeploy.DagDeployV2Input{
+		Login:         &d.login.context,
 		ProjectDir:    in.ProjectDir,
 		DeploymentID:  in.DeploymentID,
 		Description:   in.Description,
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
-	}, d.client)
+	}, d.login.client)
 	if err != nil {
 		return v2deploy.DagResult{}, err
 	}
@@ -830,6 +880,7 @@ func toV2DeployGit(g astrodeploy.DeployGitV2) v2deploy.Git {
 // cloud/deploy transport.
 func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
 	res, err := astrodeploy.DeployImageV2(astrodeploy.ImageDeployV2Input{
+		Login:          &d.login.context,
 		ProjectDir:     in.ProjectDir,
 		DeploymentID:   in.DeploymentID,
 		AirflowVersion: in.AirflowVersion,
@@ -845,7 +896,7 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		NoDagsBaseDir:  in.NoDagsBaseDir,
 		Wait:           in.Wait,
 		WaitTime:       in.WaitTime,
-	}, d.client)
+	}, d.login.client)
 	if err != nil {
 		return v2deploy.ImageResult{}, err
 	}

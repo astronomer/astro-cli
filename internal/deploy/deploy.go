@@ -52,7 +52,8 @@ type Request struct {
 	PreselectFrom string
 	// WorkspaceID is the --workspace override, "" if unset.
 	WorkspaceID string
-	// ContextWorkspace is the workspace from the current context, the fallback.
+	// ContextWorkspace is the workspace of the login the deploy runs under,
+	// the fallback.
 	ContextWorkspace string
 	// DagsOnly is --dags: ship only the dags/ directory, no image, no Docker.
 	DagsOnly bool

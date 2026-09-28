@@ -29,6 +29,9 @@ import (
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
 // "both" deploy (IncludeDags) also ships the dags/ tarball.
 type ImageDeployV2Input struct {
+	// Login is the Astro login the deploy runs under, whose host the
+	// Deployment and its registry live on; nil is the current context.
+	Login          *config.Context
 	ProjectDir     string
 	DeploymentID   string
 	AirflowVersion string   // the manifest's Airflow requirement pin; the base resolves from it
@@ -97,7 +100,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		return ImageDeployV2Result{}, err
 	}
 
-	c, err := config.GetCurrentContext()
+	c, err := loginOrCurrent(in.Login)
 	if err != nil {
 		return ImageDeployV2Result{}, err
 	}
@@ -175,7 +178,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	// A "both" deploy also ships the dags tarball, fitting the image just pushed.
 	var tarballVersion string
 	if in.IncludeDags {
-		tarballVersion, err = uploadDeployDags(in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
+		tarballVersion, err = uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
 			return ImageDeployV2Result{}, err
 		}
@@ -186,14 +189,9 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPoll(dep.Id, dep.WorkspaceId, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(dep.OrganizationId, c.Token, dep.Id, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return ImageDeployV2Result{}, err
 		}
-	}
-
-	url, err := dashboardURL(dep.Id, dep.WorkspaceId)
-	if err != nil {
-		return ImageDeployV2Result{}, err
 	}
 
 	return ImageDeployV2Result{
@@ -201,7 +199,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		RuntimeVersion:    runtimeVersion,
 		ImageTag:          created.ImageTag,
 		DagTarballVersion: tarballVersion,
-		URL:               url,
+		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
 	}, nil
 }
@@ -232,7 +230,7 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ImageDeployV2In
 // created deploy's upload URL and returns the tarball version. Both v2 paths use
 // it: the dags-only deploy and a "both" image deploy, which ships the tarball to
 // fit the image just pushed.
-func uploadDeployDags(projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, noDagsBaseDir bool) (string, error) {
+func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, noDagsBaseDir bool) (string, error) {
 	uploadURL := ""
 	if created.DagsUploadUrl != nil {
 		uploadURL = *created.DagsUploadUrl
@@ -245,7 +243,8 @@ func uploadDeployDags(projectDir, deploymentID string, dep *astrov1.Deployment, 
 		deploymentType = *dep.Type
 	}
 	dagsPath := filepath.Join(projectDir, "dags")
-	tarballVersion, err := deployDags(projectDir, dagsPath, uploadURL, dep.AstroRuntimeVersion, deploymentType, noDagsBaseDir)
+	monitoringDag := includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
+	tarballVersion, err := uploadDags(projectDir, dagsPath, uploadURL, dep.AstroRuntimeVersion, monitoringDag, noDagsBaseDir)
 	if err != nil {
 		if strings.Contains(err.Error(), dagDeployDisabled) {
 			return "", fmt.Errorf(enableDagDeployMsg, deploymentID)

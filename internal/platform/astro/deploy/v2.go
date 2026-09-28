@@ -15,6 +15,9 @@ import (
 // The deployment is already chosen; this reuses the v1 dags transport (create
 // deploy, upload the tarball, finalize) against the project's dags/ directory.
 type DagDeployV2Input struct {
+	// Login is the Astro login the deploy runs under, whose host the
+	// Deployment lives on; nil is the current context.
+	Login *config.Context
 	// ProjectDir is the v2 project root; dags/ sits under it.
 	ProjectDir    string
 	DeploymentID  string
@@ -72,7 +75,7 @@ func descriptionOrCommitMessage(description, commitMessage string) string {
 // reuses createDeploy and deployDags as they are, and finalizes through a
 // print-free helper rather than the v1 finalizeDeploy, which prints.
 func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDeployV2Result, error) {
-	c, err := config.GetCurrentContext()
+	c, err := loginOrCurrent(in.Login)
 	if err != nil {
 		return DagDeployV2Result{}, err
 	}
@@ -102,7 +105,7 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		return DagDeployV2Result{}, explainHibernating(err, &dep)
 	}
 
-	tarballVersion, err := uploadDeployDags(in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
+	tarballVersion, err := uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 	if err != nil {
 		return DagDeployV2Result{}, err
 	}
@@ -112,36 +115,33 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPoll(dep.Id, dep.WorkspaceId, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return DagDeployV2Result{}, err
 		}
-	}
-
-	url, err := dashboardURL(dep.Id, dep.WorkspaceId)
-	if err != nil {
-		return DagDeployV2Result{}, err
 	}
 
 	return DagDeployV2Result{
 		WorkspaceID:       dep.WorkspaceId,
 		RuntimeVersion:    dep.AstroRuntimeVersion,
 		DagTarballVersion: tarballVersion,
-		URL:               url,
+		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
 	}, nil
 }
 
-func dashboardURL(deploymentID, workspaceID string) (string, error) {
-	url, err := deployment.GetDeploymentURL(deploymentID, workspaceID)
-	if err != nil {
-		return "", err
+// loginOrCurrent is the login a v2 deploy runs under: the one cmd picked for
+// the project's host, else the current context.
+func loginOrCurrent(login *config.Context) (config.Context, error) {
+	if login != nil {
+		return *login, nil
 	}
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return "", err
+	return config.GetCurrentContext()
+}
+
+func dashboardURL(domain, deploymentID, workspaceID string) string {
+	url := deployment.DeploymentURLOn(domain, deploymentID, workspaceID)
+	if domain == domainutil.LocalDomain {
+		return "http://" + url
 	}
-	if c.Domain == domainutil.LocalDomain {
-		return "http://" + url, nil
-	}
-	return "https://" + url, nil
+	return "https://" + url
 }

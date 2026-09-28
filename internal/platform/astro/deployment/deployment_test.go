@@ -2670,7 +2670,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {
 	s.Run("wake-up names the Airflow when only it is missing at the timeout", func() {
 		origAnswering := airflowAnswering
 		s.T().Cleanup(func() { airflowAnswering = origAnswering })
-		airflowAnswering = func(astrov1.Deployment) bool { return false }
+		airflowAnswering = func(astrov1.Deployment, string) bool { return false }
 		reports(astrov1.DeploymentStatusHIBERNATING, astrov1.DeploymentStatusHEALTHY)
 		s.ErrorIs(override(false, 2*time.Second), ErrAirflowNotAnswering)
 	})
@@ -2679,7 +2679,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {
 		origAnswering := airflowAnswering
 		s.T().Cleanup(func() { airflowAnswering = origAnswering })
 		probes := 0
-		airflowAnswering = func(astrov1.Deployment) bool {
+		airflowAnswering = func(astrov1.Deployment, string) bool {
 			probes++
 			return probes == 2
 		}
@@ -2708,17 +2708,25 @@ func (s *Suite) TestAirflowAnswering() {
 			path, auth = r.URL.Path, r.Header.Get("Authorization")
 			w.WriteHeader(status)
 		}))
-		got := airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: server.URL + "/abc123/api/v2"})
+		got := airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: server.URL + "/abc123/api/v2"}, "")
 		server.Close()
 		s.Equal(want, got, "status %d", status)
 		s.Equal("/abc123/api/v2/version", path, "status %d", status)
 		s.Equal(login.Token, auth, "status %d", status)
 	}
-	s.True(airflowAnswering(astrov1.Deployment{}), "a Deployment with no Airflow API URL should not hold up the wait")
+	s.True(airflowAnswering(astrov1.Deployment{}, ""), "a Deployment with no Airflow API URL should not hold up the wait")
 
 	unreachable := httptest.NewServer(http.NotFoundHandler())
 	unreachable.Close()
-	s.True(airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: unreachable.URL}), "an Airflow host this machine cannot reach should not hold up the wait")
+	s.True(airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: unreachable.URL}, ""), "an Airflow host this machine cannot reach should not hold up the wait")
+
+	var auth string
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("Authorization")
+	}))
+	defer other.Close()
+	airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: other.URL}, "Bearer other-login")
+	s.Equal("Bearer other-login", auth, "a given token should replace the current context's")
 }
 
 func (s *Suite) TestDeleteDeploymentHibernationOverride() {

@@ -134,10 +134,10 @@ func TestOrganizationReadsTheDomainsLogin(t *testing.T) {
 	if err := prod.SetContextKey("organization", "cl-prod-org"); err != nil {
 		t.Fatal(err)
 	}
-	if org, err := organization("astronomer.io"); err != nil || org != "cl-prod-org" {
+	if org, err := Organization("astronomer.io"); err != nil || org != "cl-prod-org" {
 		t.Fatalf("org, err = %q, %v; want the astronomer.io login's org", org, err)
 	}
-	if _, err := organization("astronomer-stage.io"); err == nil || !strings.Contains(err.Error(), "astro login astronomer-stage.io") {
+	if _, err := Organization("astronomer-stage.io"); err == nil || !strings.Contains(err.Error(), "astro login astronomer-stage.io") {
 		t.Fatalf("err = %v, want the missing host's login named", err)
 	}
 }

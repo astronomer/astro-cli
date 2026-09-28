@@ -832,10 +832,17 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 }
 
 func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+	return HealthPollIn("", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
+}
+
+// HealthPollIn is HealthPoll for a Deployment in orgID, which need not be the
+// current context's, with token authorizing the check that its Airflow
+// answers. An empty orgID or token is the current context's.
+func HealthPollIn(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
 	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
 	// This covers for the case when the deployment is created and straight away goes into hibernation.
-	d, err := pollStatus(deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
+	d, err := pollStatus(orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
 		astrov1.DeploymentStatusHEALTHY, astrov1.DeploymentStatusHIBERNATING)
 	if err != nil {
 		return err
@@ -849,7 +856,7 @@ func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, ast
 // timeoutNum seconds pass first. A Deployment reporting HEALTHY also has to
 // have an Airflow that answers, and ErrAirflowNotAnswering is the timeout when
 // that was all that was missing.
-func pollStatus(deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
+func pollStatus(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
@@ -860,7 +867,7 @@ func pollStatus(deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1
 		case <-timeout:
 			return astrov1.Deployment{}, missing
 		case <-ticker.C:
-			currentDeployment, err := GetDeploymentByID("", deploymentID, astroV1Client)
+			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, astroV1Client)
 			if err != nil {
 				return astrov1.Deployment{}, err
 			}
@@ -868,7 +875,7 @@ func pollStatus(deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1
 			if !slices.Contains(statuses, currentDeployment.Status) {
 				continue
 			}
-			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(currentDeployment) {
+			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(currentDeployment, token) {
 				return currentDeployment, nil
 			}
 			missing = ErrAirflowNotAnswering
@@ -884,7 +891,8 @@ const airflowProbeTimeout = 10 * time.Second
 // anything but the 502, 503 or 504 its ingress gives while no Airflow is
 // behind it. Astro reports a Deployment HEALTHY some seconds before that
 // after a wake-up. A Deployment with no Airflow API URL has nothing to probe.
-var airflowAnswering = func(d astrov1.Deployment) bool {
+// An empty token is the current context's.
+var airflowAnswering = func(d astrov1.Deployment, token string) bool {
 	apiURL := d.WebServerAirflowApiUrl
 	if apiURL == "" {
 		return true
@@ -898,8 +906,13 @@ var airflowAnswering = func(d astrov1.Deployment) bool {
 	if err != nil {
 		return true
 	}
-	if c, err := config.GetCurrentContext(); err == nil && c.Token != "" {
-		req.Header.Set("Authorization", c.Token)
+	if token == "" {
+		if c, err := config.GetCurrentContext(); err == nil {
+			token = c.Token
+		}
+	}
+	if token != "" {
+		req.Header.Set("Authorization", token)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1645,7 +1658,7 @@ func waitForHibernationOverride(deploymentID string, isHibernating bool, waitTim
 		status, timedOut, waiting, done = astrov1.DeploymentStatusHIBERNATING, ErrTimedOutHibernating, "hibernate", "hibernating"
 	}
 	fmt.Printf("\nWaiting for the Deployment to %s…\n", waiting)
-	d, err := pollStatus(deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
+	d, err := pollStatus("", "", deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
 	if err != nil {
 		return err
 	}
@@ -2109,24 +2122,21 @@ func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, dep
 // GetDeploymentURL takes a deploymentID, WorkspaceID as parameters
 // and returns a deploymentURL
 func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
-	var (
-		deploymentURL string
-		ctx           config.Context
-		err           error
-	)
-
-	ctx, err = config.GetCurrentContext()
+	ctx, err := config.GetCurrentContext()
 	if err != nil {
 		return "", err
 	}
-	switch ctx.Domain {
-	case domainutil.LocalDomain:
-		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID
-	default:
-		_, domain := domainutil.GetPRSubDomain(ctx.Domain)
-		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
+	return DeploymentURLOn(ctx.Domain, deploymentID, workspaceID), nil
+}
+
+// DeploymentURLOn is GetDeploymentURL for a Deployment on domain, which need
+// not be the current context's.
+func DeploymentURLOn(domain, deploymentID, workspaceID string) string {
+	if domain == domainutil.LocalDomain {
+		return domain + ":5000/" + workspaceID + "/deployments/" + deploymentID
 	}
-	return deploymentURL, nil
+	_, domain = domainutil.GetPRSubDomain(domain)
+	return "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
 }
 
 func GetCoreCloudProvider(cloudProvider string) astrov1.GetDeploymentOptionsParamsCloudProvider {

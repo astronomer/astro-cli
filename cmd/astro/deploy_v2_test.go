@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
@@ -132,7 +133,7 @@ func setupV2DeployWith(t *testing.T, d v2deploy.Deployer, toml string) {
 	t.Cleanup(func() { config.WorkingPath = origPath })
 
 	origDeployer := newV2Deployer
-	newV2Deployer = func(astrov1.APIClient, io.Reader, io.Writer) v2deploy.Deployer { return d }
+	newV2Deployer = func(*deployLogin, io.Reader, io.Writer) v2deploy.Deployer { return d }
 	t.Cleanup(func() { newV2Deployer = origDeployer })
 }
 
@@ -474,8 +475,8 @@ deployment = "clx-two"
 deployment = "clx-prod"
 `)
 	origDeployer := newV2Deployer
-	newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-		fake.prompt = v2Deployer{client: client, in: in, errOut: errOut}
+	newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+		fake.prompt = v2Deployer{login: login, in: in, errOut: errOut}
 		return fake
 	}
 	t.Cleanup(func() { newV2Deployer = origDeployer })
@@ -520,8 +521,8 @@ func newPromptDeploy(t *testing.T, img *v2deploy.ImageResult) {
 	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: *img}}
 	setupV2Deploy(t, fake)
 	orig := newV2Deployer
-	newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-		fake.prompt = v2Deployer{client: client, in: in, errOut: errOut}
+	newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+		fake.prompt = v2Deployer{login: login, in: in, errOut: errOut}
 		return fake
 	}
 	t.Cleanup(func() { newV2Deployer = orig })
@@ -575,8 +576,8 @@ func TestDeployV2AbortedPromptSaysNothingAboutBuilding(t *testing.T) {
 	fake := &promptDeployer{}
 	setupV2Deploy(t, fake)
 	origDeployer := newV2Deployer
-	newV2Deployer = func(client astrov1.APIClient, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-		fake.prompt = v2Deployer{client: client, in: in, errOut: errOut}
+	newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
+		fake.prompt = v2Deployer{login: login, in: in, errOut: errOut}
 		return fake
 	}
 	t.Cleanup(func() { newV2Deployer = origDeployer })
@@ -937,4 +938,107 @@ func TestDeployV2DeployActionInvocations(t *testing.T) {
 			}
 		})
 	}
+}
+
+const v2ManifestOnProd = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+domain = 'astronomer.io'
+workspace = "clw-ws"
+
+[tool.astro.deployments]
+test = {deployment = 'clx-prod', default = true}
+`
+
+// setupDeployOnStage is a v2 project on astronomer.io deployed while the CLI is
+// switched to astronomer-stage.io. It returns where the login the deploy picked
+// is recorded.
+func setupDeployOnStage(t *testing.T, toml string) *deployLogin {
+	t.Helper()
+	t.Setenv(astrosession.EnvAPIToken, "")
+	t.Setenv("ASTRO_DOMAIN", "")
+	fake := &fakeCmdDeployer{dag: v2deploy.DagResult{DagTarballVersion: "v1"}}
+	setupV2DeployWith(t, fake, toml)
+	testUtil.InitTestConfig(testUtil.CloudStagePlatform)
+
+	picked := new(deployLogin)
+	newV2Deployer = func(login *deployLogin, _ io.Reader, _ io.Writer) v2deploy.Deployer {
+		*picked = *login
+		return fake
+	}
+	return picked
+}
+
+func logInTo(t *testing.T, domain, token, org string) {
+	t.Helper()
+	login := config.Context{Domain: domain}
+	require.NoError(t, login.SetContextKey("token", token))
+	require.NoError(t, login.SetContextKey("organization", org))
+	require.NoError(t, login.SetContextKey("workspace", "clw-prod-ws"))
+}
+
+// The project names astronomer.io, so the deploy runs under that login even
+// while the CLI is switched to stage: a link and a bare Deployment id alike.
+func TestDeployV2UsesTheManifestDomainsLogin(t *testing.T) {
+	for _, args := range [][]string{{"test", "--dags"}, {"--deployment", "clx-bare", "--dags"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			picked := setupDeployOnStage(t, v2ManifestOnProd)
+			logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+
+			_, err := execDeployCapture(args...)
+			require.NoError(t, err)
+
+			assert.False(t, picked.current)
+			assert.Equal(t, "astronomer.io", picked.context.Domain)
+			assert.Equal(t, "Bearer prod-token", picked.context.Token)
+			assert.Equal(t, "prod-org", picked.context.Organization)
+			assert.IsType(t, &astrov1.ClientWithResponses{}, picked.client)
+		})
+	}
+}
+
+// ASTRO_API_TOKEN outranks the stored login, and goes out with its scheme like
+// a stored token, since the deploy's CI/CD check splits it off.
+func TestDeployV2SendsTheAPITokenToTheManifestDomain(t *testing.T) {
+	picked := setupDeployOnStage(t, v2ManifestOnProd)
+	logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+	t.Setenv(astrosession.EnvAPIToken, "ci-token")
+
+	_, err := execDeployCapture("test", "--dags")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer ci-token", picked.context.Token)
+	assert.Equal(t, "prod-org", picked.context.Organization)
+}
+
+// With no login for the project's host the deploy stops before anything is
+// built or uploaded, and names the login that fixes it.
+func TestDeployV2WithNoLoginForTheManifestDomain(t *testing.T) {
+	setupDeployOnStage(t, v2ManifestOnProd)
+
+	_, err := execDeployCapture("test", "--dags")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not logged in to astronomer.io. Log in with `astro login astronomer.io`")
+}
+
+// A project that names the host the CLI is already on deploys under the
+// current context, as it did before the manifest's domain was read.
+func TestDeployV2OnTheCurrentDomainUsesTheCurrentContext(t *testing.T) {
+	picked := setupDeployOnStage(t, strings.Replace(v2ManifestOnProd, "'astronomer.io'", "'https://cloud.astronomer-stage.io/'", 1))
+
+	_, err := execDeployCapture("test", "--dags")
+	require.NoError(t, err)
+	assert.True(t, picked.current)
+	assert.Equal(t, "astronomer-stage.io", picked.context.Domain)
+}
+
+// The workspace-level picker lists Deployments under the current context, so a
+// project on another host is told to name one instead.
+func TestDeployV2PickerRefusesAnotherHost(t *testing.T) {
+	d := v2Deployer{login: &deployLogin{context: config.Context{Domain: "astronomer.io"}}}
+	_, err := d.ResolveUnlinked("clw-ws")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--deployment <id>")
+	assert.Contains(t, err.Error(), "astro context switch astronomer.io")
 }

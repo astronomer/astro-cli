@@ -99,7 +99,7 @@ func New(domain string) instances.Locator {
 		session: func(ctx context.Context) (string, error) {
 			return astrosession.BearerFor(ctx, domain)
 		},
-		organization:  func() (string, error) { return organization(domain) },
+		organization:  func() (string, error) { return Organization(domain) },
 		googleToken:   googleauth.AccessToken,
 		googleAccount: googleauth.Account,
 	}
@@ -167,19 +167,20 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 	return "", fmt.Errorf("cannot look up the Airflow URL of a %s deployment", i.Kind)
 }
 
-// organization reads the org out of the login for domain, or out of the
+// Organization reads the org out of the login for domain, or out of the
 // current login context when domain is empty. It is the same read
-// internal/emenv makes for the same reason.
+// internal/emenv makes for the same reason, and the one a v2 deploy makes to
+// reach a Deployment on the project's host.
 // The organization is the piece ASTRO_API_TOKEN alone cannot supply: it lives
 // in the login context, and a CI machine that never ran `astro login` has none.
 // Reaching an astro link there needs a Deployment lookup, and the lookup needs
 // an org, so the message says which half is missing rather than reporting the
 // whole machine as logged out.
-func organization(domain string) (string, error) {
+func Organization(domain string) (string, error) {
 	if domain == "" {
 		ctx, err := config.GetCurrentContext()
 		if err != nil {
-			return "", fmt.Errorf("no Astro organization on this machine, and looking up a Deployment's URL needs one: run `astro login`, or set ASTRO_DOMAIN and log in once so the organization is on disk")
+			return "", fmt.Errorf("no Astro organization on this machine, and reaching a Deployment needs one: run `astro login`, or set ASTRO_DOMAIN and log in once so the organization is on disk")
 		}
 		if ctx.Organization == "" {
 			return "", fmt.Errorf("your login is not scoped to an organization — pick one with `astro organization switch`")
@@ -189,7 +190,7 @@ func organization(domain string) (string, error) {
 	c := config.Context{Domain: domain}
 	ctx, err := c.GetContext()
 	if err != nil {
-		return "", fmt.Errorf("no Astro organization for %s on this machine, and looking up a Deployment's URL needs one: run `astro login %s` once so the organization is on disk", domain, domain)
+		return "", fmt.Errorf("no Astro organization for %s on this machine, and reaching a Deployment needs one: run `astro login %s` once so the organization is on disk", domain, domain)
 	}
 	if ctx.Organization == "" {
 		return "", fmt.Errorf("your %s login is not scoped to an organization — log in with `astro login %s` and pick one", domain, domain)

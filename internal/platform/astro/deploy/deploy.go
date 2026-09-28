@@ -171,11 +171,21 @@ func removeDagsFromDockerIgnore(fullpath string) error {
 }
 
 func shouldIncludeMonitoringDag(deploymentType astrov1.DeploymentType) bool {
-	return !organization.IsOrgHosted() && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
+	return includeMonitoringDag(organization.IsOrgHosted(), deploymentType)
+}
+
+// includeMonitoringDag is shouldIncludeMonitoringDag for an org whose product
+// is already known, which need not be the current context's.
+func includeMonitoringDag(orgHosted bool, deploymentType astrov1.DeploymentType) bool {
+	return !orgHosted && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
 func deployDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, deploymentType astrov1.DeploymentType, noDagsBaseDir bool) (string, error) {
-	if shouldIncludeMonitoringDag(deploymentType) {
+	return uploadDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion, shouldIncludeMonitoringDag(deploymentType), noDagsBaseDir)
+}
+
+func uploadDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir bool) (string, error) {
+	if monitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 		var monitoringDag string
