@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"slices"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -231,12 +234,46 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if opts.RequestedPort > 0 && st.Port != opts.RequestedPort {
 		fmt.Fprintf(c.d.Stderr, "requested port %d is in use; started on %d instead\n", opts.RequestedPort, st.Port)
 	}
+	c.noteSchedulesOff(r, built.Plan, st.Mode)
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
 		return err
 	}
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
+}
+
+// useJobSchedule is the Airflow setting both engines default to False, so
+// the local scheduler creates no runs of its own.
+const useJobSchedule = "AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE"
+
+const schedulesOffNote = "Schedules are off locally: DAGs run only when you trigger them. " +
+	"To run them on their schedules, set " + useJobSchedule + "=True in .env"
+
+// noteSchedulesOff tells a text-mode user that DAGs will not run on their
+// schedules, unless the project turned them back on. On stderr, like the port
+// notice, so stdout stays the status.
+func (c *cli) noteSchedulesOff(r Renderer, p localrt.Plan, mode localrt.Mode) {
+	if r.Format == FormatJSON || schedulesOn(p, mode) {
+		return
+	}
+	fmt.Fprintln(c.d.Stderr, schedulesOffNote)
+}
+
+// schedulesOn reports whether the project set use_job_schedule to true where
+// the engine running it reads the setting: SecretEnv over Env in both modes,
+// then, in standalone only, the shell the Airflow process inherits. Docker's
+// compose file keeps the default over a shell value of the same key. True is
+// what Airflow's getboolean takes as true.
+func schedulesOn(p localrt.Plan, mode localrt.Mode) bool {
+	v, ok := p.SecretEnv[useJobSchedule]
+	if !ok {
+		v, ok = p.Env[useJobSchedule]
+	}
+	if !ok && mode != localrt.ModeDocker {
+		v, ok = os.LookupEnv(useJobSchedule)
+	}
+	return ok && slices.Contains([]string{"t", "true", "1"}, strings.ToLower(strings.TrimSpace(v)))
 }
 
 // runtimeKey is the manifest key a runtime-build finding is about.
@@ -513,6 +550,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err != nil {
 		return err
 	}
+	c.noteSchedulesOff(r, built.Plan, st.Mode)
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
 		return err
 	}

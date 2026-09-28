@@ -113,18 +113,24 @@ func devEnv(env []string) []string {
 // every file in a tight loop and holds about 45% of a core on an idle
 // one-DAG project; at 3 it idles at 1-2% and a saved change shows within ~5s.
 //
-// DAGs are created UNPAUSED, which reverses what decision 13 originally said;
-// docs/v2-architecture.md carries the amended wording.
+// DAGs are created UNPAUSED but the scheduler creates no runs of its own,
+// which reverses what decision 13 originally said; docs/v2-architecture.md
+// carries the amended wording.
 //
 // Paused-at-creation is a deployment default. It stops a DAG that lands on a
 // shared scheduler from running before anyone has looked at it. Locally there
 // is nothing to protect from: the person who wrote the file is watching the
 // UI, started Airflow themselves, and is waiting to see it run. Left paused,
-// the first-run experience is a DAG sitting still while its next scheduled
-// time slides past, and the remedy is a toggle nothing pointed at. astro-
-// desktop has forced False for its whole life for that reason, so this is
-// also what local users already have — and matching it is what lets the
-// desktop provision through this engine without changing their experience.
+// a run they trigger from the UI or the API sits queued behind a toggle
+// nothing pointed at. Astro Desktop has forced False for its whole life for
+// that reason, so this is also what local users already have.
+//
+// With use_job_schedule off, nothing runs on a cron clock and asset-triggered
+// DAGs do not cascade, while a triggered run still starts at once. Left on, a
+// repo's schedules queue runs, catchup included, against whatever its DAGs
+// talk to the moment Airflow starts; local dev is for running what you
+// trigger. Astro Desktop leaves schedules on today, so its users lose them
+// once it provisions through this engine.
 var devDefaults = []string{
 	"AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=2",
 	"AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL=3",
@@ -132,6 +138,7 @@ var devDefaults = []string{
 	"AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL=3",
 	"AIRFLOW__CORE__DEFAULT_TASK_RETRIES=0",
 	"AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
+	"AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE=False",
 	// The log file is not a terminal, so nothing in it should be colored.
 	// `airflow standalone` colors the component name it prefixes each line
 	// with and structlog colors the body, which costs about forty wasted bytes

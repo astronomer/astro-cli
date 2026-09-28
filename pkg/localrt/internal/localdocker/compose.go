@@ -181,12 +181,17 @@ func composeProjectName(projectPath string) (string, error) {
 	return "astro-" + label + "-" + id[:6], nil
 }
 
-// airflowEnv layers the template's baseline Airflow settings under the
-// Plan's fully layered environment, so anything the user sets wins. The
-// settings both generations share are here; the rest come from
-// generationEnv.
+// devDefaults start DAGs unpaused with the scheduler's own runs off, as
+// internal/localstandalone.devDefaults explains: they run when triggered, not
+// on their schedules. A project value from Env or SecretEnv replaces them.
+var devDefaults = map[string]string{
+	"AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION": "False",
+	"AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE":       "False",
+}
+
 // airflowEnv layers the plan's environment over the baseline and returns what the
-// compose file records. secretEnv keys are deliberately absent from the result:
+// compose file records. The settings both generations share are here; the rest
+// come from generationEnv. secretEnv keys are deliberately absent from the result:
 // they are declared through passEnv instead, so the file names them without their
 // values. A key in both maps is treated as secret.
 func airflowEnv(projectName string, webPort int, major string, planEnv, secretEnv map[string]string) []envVar {
@@ -201,12 +206,16 @@ func airflowEnv(projectName string, webPort int, major string, planEnv, secretEn
 	for k, v := range generationEnv(projectName, webPort, major) {
 		m[k] = v
 	}
-	// Track what the plan contributed, so a secret can displace the caller's own
-	// value without displacing the engine's.
-	fromPlan := make(map[string]bool, len(planEnv))
+	// Track what the caller may replace — its own values and the dev defaults —
+	// so a secret can displace those without displacing the engine's.
+	yields := make(map[string]bool, len(devDefaults)+len(planEnv))
+	for k, v := range devDefaults {
+		m[k] = v
+		yields[k] = true
+	}
 	for k, v := range planEnv {
 		m[k] = v
-		fromPlan[k] = true
+		yields[k] = true
 	}
 	// A secret is declared, not recorded — but only where the value was the
 	// caller's to give. A SecretEnv key colliding with a baseline or
@@ -216,7 +225,7 @@ func airflowEnv(projectName string, webPort int, major string, planEnv, secretEn
 	// would make one plan produce two different Airflow configurations depending
 	// on mode, with nothing reporting it.
 	for k := range secretEnv {
-		if fromPlan[k] {
+		if yields[k] {
 			delete(m, k)
 		}
 	}

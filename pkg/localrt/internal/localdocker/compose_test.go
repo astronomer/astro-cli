@@ -272,6 +272,35 @@ func TestSecretEnvIsDeclaredButNotRecorded(t *testing.T) {
 	}
 }
 
+// DAGs start unpaused with the scheduler's own runs off, in both generations,
+// and a project that sets either key, plainly or as a secret, keeps its own
+// value.
+func TestAirflowEnvRunsDAGsOnlyWhenTriggered(t *testing.T) {
+	const paused, schedule = "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION", "AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE"
+	value := func(env []envVar, key string) string {
+		for _, e := range env {
+			if e.Name == key {
+				return e.Value
+			}
+		}
+		return ""
+	}
+	for _, major := range []string{airflow2, airflow3} {
+		env := airflowEnv("proj", 8080, major, nil, nil)
+		assert.Equal(t, "'False'", value(env, paused), major)
+		assert.Equal(t, "'False'", value(env, schedule), major)
+
+		env = airflowEnv("proj", 8080, major, map[string]string{paused: "True", schedule: "True"}, nil)
+		assert.Equal(t, "'True'", value(env, paused), major)
+		assert.Equal(t, "'True'", value(env, schedule), major)
+
+		secret := map[string]string{schedule: "True"}
+		env = airflowEnv("proj", 8080, major, nil, secret)
+		assert.Empty(t, value(env, schedule), "a secret value must replace the default, not lose to it")
+		assert.Contains(t, passEnv(nil, secret, env), schedule)
+	}
+}
+
 // A caller that puts the same key in both maps is contradicting itself. Secret
 // wins, because the other reading writes a secret to disk.
 func TestSecretEnvWinsOverEnv(t *testing.T) {

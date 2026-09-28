@@ -59,9 +59,9 @@ func TestBuildEnvAppliesTheDevSettings(t *testing.T) {
 	web, _ := envValue(env, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST")
 	assert.Equal(t, "127.0.0.1", web)
 
-	// Fast rescan and zero retries are on, and DAGs are created unpaused: a
-	// local DAG is being watched by the person who just wrote it, so leaving
-	// it paused means it sits still while its next run time slides past.
+	// Fast rescan and zero retries are on, and DAGs are created unpaused with
+	// the scheduler's own runs off: a local DAG runs when the person who just
+	// wrote it triggers it, and not on its schedule.
 	rescan, _ := envValue(env, "AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL")
 	assert.Equal(t, "2", rescan)
 	refresh, _ := envValue(env, "AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL")
@@ -75,6 +75,8 @@ func TestBuildEnvAppliesTheDevSettings(t *testing.T) {
 	paused, found := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
 	assert.True(t, found, "a local start should decide this rather than inherit Airflow's deployment default")
 	assert.Equal(t, "False", paused)
+	schedule, _ := envValue(env, "AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE")
+	assert.Equal(t, "False", schedule)
 
 	// Color off, because the destination is a capped file rather than a
 	// terminal. Left on, `airflow standalone` colors the component name it
@@ -97,7 +99,7 @@ func TestBuildEnvLetsTheProjectOverrideDevDefaults(t *testing.T) {
 	unsetDevDefaults(t)
 	e, _, _ := testEngine(t)
 	project := t.TempDir()
-	dotenv := "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
+	dotenv := "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True\nAIRFLOW__SCHEDULER__USE_JOB_SCHEDULE=True\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
 	require.NoError(t, os.WriteFile(filepath.Join(project, ".env"), []byte(dotenv), 0o600))
 	p := rt.Plan{ProjectPath: project, Mode: rt.ModeStandalone, AirflowVersion: "3.0.2", Env: map[string]string{
 		"AIRFLOW__CORE__DEFAULT_TASK_RETRIES": "2",
@@ -106,6 +108,8 @@ func TestBuildEnvLetsTheProjectOverrideDevDefaults(t *testing.T) {
 
 	paused, _ := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
 	assert.Equal(t, "True", paused)
+	schedule, _ := envValue(env, "AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE")
+	assert.Equal(t, "True", schedule)
 	retries, _ := envValue(env, "AIRFLOW__CORE__DEFAULT_TASK_RETRIES")
 	assert.Equal(t, "2", retries)
 	rescan, _ := envValue(env, "AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL")

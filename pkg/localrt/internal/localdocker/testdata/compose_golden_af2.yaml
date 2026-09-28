@@ -1,5 +1,6 @@
 x-common-env: &common-env
   AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth'
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'False'
   AIRFLOW__CORE__EXECUTOR: 'LocalExecutor'
   AIRFLOW__CORE__FERNET_KEY: 'd6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw='
   AIRFLOW__CORE__LOAD_EXAMPLES: 'True'
@@ -7,6 +8,7 @@ x-common-env: &common-env
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: 'postgresql://postgres:postgres@postgres:5432'
   AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: '2'
   AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: '3'
+  AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE: 'False'
   AIRFLOW__WEBSERVER__BASE_URL: 'http://localhost:8081'
   AIRFLOW__WEBSERVER__RBAC: 'True'
   AIRFLOW__WEBSERVER__SECRET_KEY: 'astro-demo-abc123'

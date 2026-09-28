@@ -4,6 +4,7 @@ x-common-env: &common-env
   AIRFLOW__API__PORT: '8080'
   AIRFLOW__API__SECRET_KEY: 'astro-demo-abc123'
   AIRFLOW__CORE__AUTH_MANAGER: 'airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager'
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'False'
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://api-server:8080/execution/'
   AIRFLOW__CORE__EXECUTOR: 'LocalExecutor'
   AIRFLOW__CORE__FERNET_KEY: 'd6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw='
@@ -14,6 +15,7 @@ x-common-env: &common-env
   AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: '2'
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: 'postgresql://postgres:postgres@postgres:5432'
   AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: 'True'
+  AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE: 'False'
   ASTRONOMER_ENVIRONMENT: 'local'
   MY_SECRET: 'it''s quoted'
   'SHELL_ONLY_TOKEN':
