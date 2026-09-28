@@ -454,6 +454,22 @@ func v1Cases() []v1Case {
 			},
 		},
 		{
+			// The `instances:` list an early v2 build wrote, which keeps each
+			// deployment id under `auth:`. The link command names that id.
+			name: "a config with instances",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: example-project\n" +
+					"instances:\n" +
+					"  - auth:\n      deployment_id: cexampledeployment0000001\n      kind: astro_pat\n" +
+					"    name: example-dev\n    source: astro\n",
+				"Dockerfile": runtime2,
+			},
+			airflow:     "2",
+			projectName: "example-project",
+			kept:        []string{"Dockerfile", ".astro/config.yaml"},
+			notes:       []string{"`astro link add example-dev --deployment cexampledeployment0000001`"},
+		},
+		{
 			// A stated name that cannot be a [project] name as written is
 			// respelled, and the respelling is reported: the project said what
 			// it was called and this is not quite that.

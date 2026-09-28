@@ -163,3 +163,19 @@ func TestConfigInstancesAreReported(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, m.Astro.Deployments, "the links are reported, not converted")
 }
+
+// The build that wrote `instances:` kept each deployment id under `auth:`, and
+// the command has to print that id rather than a placeholder. An entry with no
+// id anywhere keeps the placeholder, and a top-level id wins over one in auth.
+func TestConfigInstancesReadTheIDUnderAuth(t *testing.T) {
+	res, about := convertWithConfig(t, "project:\n  name: example-project\n"+
+		"instances:\n"+
+		"  - auth:\n      context: astronomer.io\n      deployment_id: cexampledeployment0000001\n      kind: astro_pat\n"+
+		"    name: example-dev\n    source: astro\n    url: https://cexampledeployment0000001.wl.astronomer.run/dy1rw0wl\n"+
+		"  - auth:\n      kind: astro_pat\n    name: example\n    source: astro\n"+
+		"  - auth:\n      deployment_id: cm1auth\n    deployment_id: cm1top\n    name: both\n    source: astro\n")
+	require.Len(t, about, 1, "notes: %v", res.Notes)
+	assert.Equal(t, ".astro/config.yaml: its `instances` list names deployment links this run did not carry into pyproject.toml. "+
+		"Link each one with `astro link add example-dev --deployment cexampledeployment0000001`, "+
+		"`astro link add example --deployment <id>`, `astro link add both --deployment cm1top`", about[0])
+}

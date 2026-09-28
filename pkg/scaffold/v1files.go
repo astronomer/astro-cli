@@ -353,7 +353,9 @@ func readV1Config(dir string) (facts v1ConfigFacts, note string, err error) {
 
 // yamlInstances reads the `instances:` list loosely, for the reason v1Config
 // decodes its ids as any: a shape this does not expect costs the entry, not
-// the file. An entry whose source is not astro keeps its name only.
+// the file. An entry whose source is not astro keeps its name only. The
+// deployment id is read from the entry or, failing that, from its `auth:`
+// table, which is where the early v2 build that wrote `instances:` keeps it.
 func yamlInstances(v any) []v1Instance {
 	entries, _ := v.([]any)
 	var out []v1Instance
@@ -366,6 +368,11 @@ func yamlInstances(v any) []v1Instance {
 			name:         yamlString(fields["name"]),
 			source:       yamlString(fields["source"]),
 			deploymentID: yamlString(fields["deployment_id"]),
+		}
+		if inst.deploymentID == "" {
+			if auth, ok := fields["auth"].(map[string]any); ok {
+				inst.deploymentID = yamlString(auth["deployment_id"])
+			}
 		}
 		if inst.name != "" {
 			out = append(out, inst)
