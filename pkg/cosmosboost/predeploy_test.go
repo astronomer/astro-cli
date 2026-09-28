@@ -101,6 +101,22 @@ func TestSlimManifestEnabled(t *testing.T) {
 	}
 }
 
+// TestPreDeployRespectsManifestNameEnvVar: a manifest.json-only discovery
+// misses a differently-named file, but stamps it once the env var names it.
+func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest_full.json"), []byte(manifest), 0o644))
+
+	require.NoError(t, PreDeploy(dir))
+	_, err := os.Stat(filepath.Join(dir, ".astro"))
+	require.True(t, os.IsNotExist(err), "a non-manifest.json name is invisible to discovery without the override")
+
+	t.Setenv(manifestNameEnvVar, "manifest_full.json")
+	require.NoError(t, PreDeploy(dir))
+	require.FileExists(t, filepath.Join(dir, artifactRelPath))
+}
+
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('hi')"), 0o644))
