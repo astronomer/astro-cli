@@ -33,8 +33,8 @@ func autoLinkPtr(cmd *cobra.Command) *bool {
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
 func addScopePersistentFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the current workspace)")
-	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace")
+	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace in a v2 project, else the current one)")
+	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name in a v2 project")
 	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Show secret values (org policy must allow it)")
 	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 }
@@ -135,8 +135,8 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// --include-secrets is deliberately absent: it asks the platform to unmask
 	// values, and this listing has no column to put one in.
-	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the current workspace)")
-	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace")
+	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace in a v2 project, else the current one)")
+	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name in a v2 project")
 	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd
 }
@@ -184,6 +184,7 @@ Airflow variables, and metrics exports, scoped to a workspace or a deployment.
 Objects here can be shared across deployments. To change one deployment
 directly, use 'astro deployment variable' or 'astro deployment connection'.`,
 	}
+	cmd.PersistentPreRunE = followProjectPreRun(cmd)
 	cmd.SetOut(out)
 	cmd.AddCommand(
 		newEnvVarRootCmd(out),

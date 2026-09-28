@@ -843,6 +843,9 @@ func coalesceWorkspace() (string, error) {
 	if wsFlag := workspaceID; wsFlag != "" {
 		return wsFlag, nil
 	}
+	if projectWorkspaceID != "" {
+		return projectWorkspaceID, nil
+	}
 
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {

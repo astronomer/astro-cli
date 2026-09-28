@@ -127,7 +127,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage your Deployments running on Astronomer",
 		Long:    "Create or manage Deployments running on Astro according to your Organization and Workspace permissions.",
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
+	cmd.PersistentPreRunE = followProjectPreRun(cmd)
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment (default: the project's workspace in a v2 project, else the current one)")
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
 		newDeploymentDeleteCmd(),
@@ -147,6 +148,15 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
 	)
+	for _, c := range cmd.Commands() {
+		switch c.Name() {
+		case "inspect", "logs", "update", "delete", "hibernate", "wake-up":
+			if c.Annotations == nil {
+				c.Annotations = map[string]string{}
+			}
+			c.Annotations[deploymentArgAnnotation] = "true"
+		}
+	}
 	return cmd
 }
 
