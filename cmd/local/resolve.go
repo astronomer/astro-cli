@@ -195,6 +195,7 @@ func (c *cli) machineClient(ctx context.Context) (*airflowapi.Client, error) {
 // Astro host whose login an astro link proves itself with.
 func (c *cli) clientFor(ctx context.Context, i instances.Instance, domain string) (*airflowapi.Client, error) {
 	c.announceInstance(i)
+	c.opened = i
 	transport, err := i.Transport(ctx, c.instanceDeps(domain))
 	if err != nil {
 		return nil, err

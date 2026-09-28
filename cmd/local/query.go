@@ -41,6 +41,10 @@ type target interface {
 	// Airflow that just errored rather than on whatever resolution would pick
 	// next time.
 	suggest(command string) string
+	// envList spells the command that lists one `env` noun's values, the ones
+	// the opened Airflow receives as environment variables rather than from its
+	// database. Empty when no command here manages that Airflow's values.
+	envList(noun string, opened instances.Instance) string
 	// open returns a client on the Airflow this target names.
 	open(ctx context.Context, c *cli) (*airflowapi.Client, error)
 }
@@ -89,6 +93,21 @@ func (t *deploymentTarget) suggest(command string) string {
 // so the two cannot drift.
 func (t *deploymentTarget) localForm() string { return "astro local " + afName + " " + t.family }
 
+// envList names the deployment scope explicitly: without it `astro env` lists
+// the current workspace, which misses values scoped to the deployment. Only an
+// astro link has values `astro env` manages; MWAA, Composer, endpoint links and
+// --url get theirs some other way.
+func (*deploymentTarget) envList(noun string, opened instances.Instance) string {
+	if opened.Kind != instances.KindAstro {
+		return ""
+	}
+	id := opened.Link.Deployment
+	if id == "" {
+		id = "<id>"
+	}
+	return "astro env " + noun + " list --deployment-id " + id
+}
+
 func (t *deploymentTarget) open(ctx context.Context, c *cli) (*airflowapi.Client, error) {
 	client, err := c.deploymentClient(ctx, t.f)
 	if err != nil {
@@ -124,6 +143,10 @@ func (machineTarget) note() string {
 }
 
 func (machineTarget) suggest(command string) string { return "astro local " + afName + " " + command }
+
+func (machineTarget) envList(noun string, _ instances.Instance) string {
+	return "astro local env " + noun + " list"
+}
 
 func (machineTarget) open(ctx context.Context, c *cli) (*airflowapi.Client, error) {
 	return c.machineClient(ctx)

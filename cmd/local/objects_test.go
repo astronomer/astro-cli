@@ -1,9 +1,14 @@
 package local
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
 // The password is not omitted here — it is never decoded at all, one layer
@@ -129,5 +134,94 @@ func TestPoolsListAndGet(t *testing.T) {
 	v := decodeJSON(t, out)
 	if v["name"] != "default_pool" || v["open_slots"] != float64(124) {
 		t.Errorf("json = %v", v)
+	}
+}
+
+// runAstroLinkQuery drives a top-level query command at the manifest's astro
+// link, whose Airflow the stub stands in for.
+func runAstroLinkQuery(t *testing.T, stub *airflowStub, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+	d, out, errOut := instanceDeps(t, instanceProject(t, cloudManifest))
+	d.Session = func(context.Context, string) (string, error) { return "Bearer session-token", nil }
+	d.Locator = anyDomain(locatorFunc(func(context.Context, instances.Instance) (string, error) {
+		return stub.URL, nil
+	}))
+	err = execute(t, d, append(append([]string{afName}, args...), "-d", "prod")...)
+	return out.String(), errOut.String(), err
+}
+
+// Airflow's API lists only what its database holds, and every value `env ...
+// set` stores reaches Airflow as an environment variable instead. So right
+// after a set, the list is missing the value and get answers 404; both have to
+// say where the value is, naming the command for the surface the reader is on.
+// An Airflow that is neither an astro link nor this machine's gets its values
+// some other way, so the note names no command there.
+func TestEnvSourcedValuesArePointedAt(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/connections", `{"connections":[],"total_entries":0}`)
+	stub.route(http.MethodGet, "/api/v2/variables",
+		`{"variables":[{"key":"api_key","value":"s3cret"}],"total_entries":1}`)
+
+	cases := []struct {
+		run     func(t *testing.T, stub *airflowStub, args ...string) (string, string, error)
+		prefix  []string
+		family  string
+		want    string
+		notWant string
+	}{
+		{runAstroLinkQuery, nil, "connections", "`astro env connection list --deployment-id clm2xk9dq000108l7a2b3c4d5`", ""},
+		{runAstroLinkQuery, nil, "variables", "`astro env airflow-variable list --deployment-id clm2xk9dq000108l7a2b3c4d5`", ""},
+		{runQuery, nil, "connections", "not in Airflow's database", "astro env"},
+		{runQuery, nil, "variables", "not in Airflow's database", "astro env"},
+		{runLocalQuery, []string{"local", afName}, "connections", "`astro local env connection list`", ""},
+		{runLocalQuery, []string{"local", afName}, "variables", "`astro local env airflow-variable list`", ""},
+	}
+	for _, tc := range cases {
+		args := append(append([]string(nil), tc.prefix...), tc.family)
+
+		out, errOut, err := tc.run(t, stub, append(args, "list")...)
+		if err != nil {
+			t.Fatalf("%v list: %v", args, err)
+		}
+		if !strings.Contains(errOut, tc.want) {
+			t.Errorf("%v list stderr = %q, want it to name %s", args, errOut, tc.want)
+		}
+		if tc.notWant != "" && strings.Contains(errOut, tc.notWant) {
+			t.Errorf("%v list stderr = %q, want no %s", args, errOut, tc.notWant)
+		}
+		if strings.Contains(out, tc.want) {
+			t.Errorf("%v list put the note on stdout:\n%s", args, out)
+		}
+
+		out, errOut, err = tc.run(t, stub, append(args, "list", "-o", "json")...)
+		if err != nil {
+			t.Fatalf("%v list -o json: %v", args, err)
+		}
+		if strings.Contains(errOut, tc.want) || strings.Contains(out, tc.want) {
+			t.Errorf("%v list -o json added the note: stdout %q, stderr %q", args, out, errOut)
+		}
+
+		_, _, err = tc.run(t, stub, append(args, "get", "missing")...)
+		if !errors.Is(err, airflowapi.ErrNotFound) {
+			t.Fatalf("%v get missing: err = %v, want it to stay a not-found", args, err)
+		}
+		if !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%v get missing: err = %q, want it to name %s", args, err, tc.want)
+		}
+		if tc.notWant != "" && strings.Contains(err.Error(), tc.notWant) {
+			t.Errorf("%v get missing: err = %q, want no %s", args, err, tc.notWant)
+		}
+	}
+}
+
+// Only a not-found earns the note. Any other failure is about reaching the
+// Airflow, and where env values live has nothing to do with it.
+func TestEnvSourcedNoteOnlyOnNotFound(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.routeStatus(http.MethodGet, "/api/v2/connections/warehouse", http.StatusForbidden, `{"detail":"Forbidden"}`)
+
+	_, _, err := runQuery(t, stub, "connections", "get", "warehouse")
+	if err == nil || strings.Contains(err.Error(), "environment variables") {
+		t.Errorf("err = %v, want a forbidden error with no env note", err)
 	}
 }

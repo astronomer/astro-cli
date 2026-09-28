@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -55,6 +56,8 @@ type cli struct {
 	output string
 	// outage watches the astro link this run opened, if it opened one.
 	outage *outageWatch
+	// opened is the Airflow this run opened a client on.
+	opened instances.Instance
 }
 
 func (c *cli) renderer() (Renderer, error) {

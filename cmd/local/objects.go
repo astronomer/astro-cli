@@ -2,12 +2,50 @@ package local
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/airflowenv"
 )
+
+// envSourcedNote says why a connection or Variable can work in a task and still
+// be missing here. Airflow's API reads only its database, and `astro local env`
+// and the platform both hand values to Airflow as environment variables, so a
+// value someone just set is exactly the one these commands cannot see.
+func (q *query) envSourcedNote(kind localenv.Kind) string {
+	what, prefix := "Connections", airflowenv.ConnPrefix
+	if kind == localenv.KindVar {
+		what, prefix = "Airflow variables", airflowenv.VarPrefix
+	}
+	note := fmt.Sprintf("%s set as environment variables (%s*) are not in Airflow's database, so they do not "+
+		"appear here.", what, prefix)
+	list := q.t.envList(localenv.Noun(kind), q.opened)
+	if list == "" {
+		return note
+	}
+	return note + " To see the ones this CLI manages, run `" + list + "`"
+}
+
+// noteEnvSourced closes a text listing with envSourcedNote on stderr.
+func (q *query) noteEnvSourced(r Renderer, kind localenv.Kind) {
+	if r.Format == FormatText {
+		fmt.Fprintln(q.d.Stderr, "note: "+q.envSourcedNote(kind))
+	}
+}
+
+// notFoundEnvSourced adds envSourcedNote to a not-found from a get, keeping the
+// error it wraps.
+func (q *query) notFoundEnvSourced(err error, kind localenv.Kind) error {
+	if !errors.Is(err, airflowapi.ErrNotFound) {
+		return err
+	}
+	return fmt.Errorf("%w\n%s", err, q.envSourcedNote(kind))
+}
 
 // newConnectionsCmd builds the `connections` family over whichever Airflow the
 // target names. It and the two
@@ -83,10 +121,15 @@ func (q *query) runConnectionsList(ctx context.Context, opts airflowapi.ListOpti
 	if err != nil {
 		return err
 	}
-	return emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Connection, int, error) {
+	err = emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Connection, int, error) {
 		list, err := client.ListConnections(ctx, page)
 		return list.Connections, list.TotalEntries, err
 	}, newConnectionListRow, renderConnectionTable)
+	if err != nil {
+		return err
+	}
+	q.noteEnvSourced(r, localenv.KindConn)
+	return nil
 }
 
 func renderConnectionTable(w io.Writer, rows []connectionListRow) error {
@@ -115,7 +158,7 @@ func (q *query) runConnectionsGet(ctx context.Context, id string) error {
 	}
 	conn, err := client.GetConnection(ctx, id)
 	if err != nil {
-		return err
+		return q.notFoundEnvSourced(err, localenv.KindConn)
 	}
 	row := connectionRow{connectionListRow: newConnectionListRow(conn), Extra: conn.Extra}
 	return emitDetail(r, row, func(row connectionRow) []field {
@@ -182,12 +225,17 @@ func (q *query) runVariablesList(ctx context.Context, opts airflowapi.ListOption
 	if err != nil {
 		return err
 	}
-	return emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Variable, int, error) {
+	err = emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Variable, int, error) {
 		list, err := client.ListVariables(ctx, page)
 		return list.Variables, list.TotalEntries, err
 	}, func(v airflowapi.Variable) variableListRow {
 		return variableListRow{Key: v.Key, Description: v.Description, IsEncrypted: v.IsEncrypted}
 	}, renderVariableTable)
+	if err != nil {
+		return err
+	}
+	q.noteEnvSourced(r, localenv.KindVar)
+	return nil
 }
 
 func renderVariableTable(w io.Writer, rows []variableListRow) error {
@@ -216,7 +264,7 @@ func (q *query) runVariablesGet(ctx context.Context, key string) error {
 	}
 	variable, err := client.GetVariable(ctx, key)
 	if err != nil {
-		return err
+		return q.notFoundEnvSourced(err, localenv.KindVar)
 	}
 	row := variableRow{
 		Key:         variable.Key,
