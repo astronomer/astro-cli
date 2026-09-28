@@ -68,3 +68,35 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 		t.Errorf("list --project showed a vault entry:\n%s", out.String())
 	}
 }
+
+// An undeclared value in the global vault is left out of the project at start,
+// the same as one in ~/.astro/env, so list marks it not applied.
+func TestListMarksUndeclaredGlobalVaultEntryNotApplied(t *testing.T) {
+	dir := secretEnvProject(t, "")
+	d, _, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "connection", "set", "shared_db", "--value", "postgres://u:p@h/db", "--global"); err != nil {
+		t.Fatal(err)
+	}
+
+	d, out, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	var row localenv.ListItem
+	dec := json.NewDecoder(strings.NewReader(out.String()))
+	for dec.More() {
+		var it localenv.ListItem
+		if err := dec.Decode(&it); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if it.Name == "shared_db" {
+			row = it
+		}
+	}
+	if row.Source != vaultenv.SourceGlobal || row.Applied == nil || *row.Applied {
+		t.Errorf("shared_db row = %+v, want a global vault row marked not applied", row)
+	}
+	if row.DeclareHint != "astro local env connection declare shared_db" {
+		t.Errorf("declare hint = %q", row.DeclareHint)
+	}
+}

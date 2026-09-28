@@ -247,8 +247,12 @@ func TestListSourceAndOrphans(t *testing.T) {
 	if it := byName["STRAY_PROJECT"]; !it.Orphan || it.RemoveHint == "" || it.DeclareHint != "astro local env variable declare STRAY_PROJECT" {
 		t.Errorf("STRAY_PROJECT = %+v, want orphan with a remove and a declare hint", it)
 	}
-	if it := byName["STRAY_GLOBAL"]; !it.Orphan {
-		t.Errorf("STRAY_GLOBAL = %+v, want orphan", it)
+	if it := byName["STRAY_GLOBAL"]; !it.Orphan || it.Applied == nil || *it.Applied ||
+		it.DeclareHint != "astro local env variable declare STRAY_GLOBAL" {
+		t.Errorf("STRAY_GLOBAL = %+v, want an orphan marked not applied, with a declare hint", it)
+	}
+	if it := byName["STRAY_PROJECT"]; it.Applied != nil {
+		t.Errorf("STRAY_PROJECT = %+v, want no applied mark: the project .env passes through", it)
 	}
 	// list never carries a value.
 	for _, it := range items {
@@ -288,6 +292,10 @@ func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
 			if it.Orphan || it.RemoveHint != "" || it.Kind != KindEnv {
 				t.Errorf("%s = %+v, want a plain env row with no orphan note", it.Name, it)
 			}
+			global := it.Name == "AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT"
+			if marked := it.Applied != nil && !*it.Applied; marked != global {
+				t.Errorf("%s = %+v, want the not-applied mark only on the global setting", it.Name, it)
+			}
 		case "warehouse", "region":
 			if !it.Orphan {
 				t.Errorf("%s = %+v, want the undeclared connection or Variable still an orphan", it.Name, it)
@@ -302,6 +310,81 @@ func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
 	}
 	if seen["AIRFLOW__CORE__LOAD_EXAMPLES"] != 0 {
 		t.Errorf("another project's Airflow setting is no orphan of this one, got %v", seen)
+	}
+}
+
+// A global value the project .env also holds is shadowed rather than left out:
+// the project copy reaches Airflow undeclared, so declaring the name would not
+// bring the global value in, and the row carries no not-applied mark.
+func TestListLeavesAShadowedGlobalUnmarked(t *testing.T) {
+	t.Setenv("ASTRO_HOME", t.TempDir())
+	writeGlobalEnv(t, "BOTH=g\n")
+	projDir := t.TempDir()
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("BOTH=p\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	items, err := List(nil, projDir, nil, ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range items {
+		if it.Applied != nil {
+			t.Errorf("%+v carries an applied mark, want none", it)
+		}
+	}
+}
+
+// A copy in the project vault shadows a global value the same way the project
+// .env does. A copy in the shell does not count: docker mode passes through
+// only declared shell names, and what the listing shell exports is not what a
+// start sees.
+func TestListMarksAGlobalByProjectCopiesOnly(t *testing.T) {
+	t.Setenv("ASTRO_HOME", t.TempDir())
+	writeGlobalEnv(t, "IN_VAULT=g\nIN_SHELL=g\n")
+	projDir := t.TempDir()
+	tiers := []VaultTier{
+		{Label: "project vault", Scope: ScopeProject, Entries: []VaultEntry{{Kind: KindEnv, Name: "IN_VAULT", EnvKey: "IN_VAULT"}}},
+		{Label: "global vault", Scope: ScopeGlobal, Entries: []VaultEntry{
+			{Kind: KindVar, Name: "token", EnvKey: "AIRFLOW_VAR_TOKEN"},
+			{Kind: KindEnv, Name: "AIRFLOW__SECRETS__BACKEND_KWARGS", EnvKey: "AIRFLOW__SECRETS__BACKEND_KWARGS"},
+		}},
+	}
+	items, err := List([]string{"IN_SHELL=s"}, projDir, nil, ListOptions{VaultTiers: tiers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked := map[string]string{}
+	for _, it := range items {
+		if it.Applied != nil && !*it.Applied {
+			marked[it.Name+" "+it.Source] = it.DeclareHint
+		}
+	}
+	want := map[string]string{
+		"IN_SHELL global":    "astro local env variable declare IN_SHELL",
+		"token global vault": "astro local env airflow-variable declare token --sensitive",
+		"AIRFLOW__SECRETS__BACKEND_KWARGS global vault": "astro local env variable declare AIRFLOW__SECRETS__BACKEND_KWARGS --sensitive",
+	}
+	if len(marked) != len(want) {
+		t.Fatalf("marked rows = %v, want %v", marked, want)
+	}
+	for k, v := range want {
+		if marked[k] != v {
+			t.Errorf("%s declare hint = %q, want %q", k, marked[k], v)
+		}
+	}
+}
+
+// Outside a project there is nothing a global value could fail to reach, so an
+// undeclared one carries no applied mark.
+func TestListOutsideAProjectLeavesGlobalUnmarked(t *testing.T) {
+	t.Setenv("ASTRO_HOME", t.TempDir())
+	writeGlobalEnv(t, "STRAY_GLOBAL=x\n")
+	items, err := List(nil, "", nil, ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Applied != nil || items[0].DeclareHint != "" {
+		t.Errorf("items = %+v, want one global row with no applied mark", items)
 	}
 }
 

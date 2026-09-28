@@ -221,6 +221,84 @@ func TestEnvGlobalScope(t *testing.T) {
 	}
 }
 
+// A global value reaches a project only through a declaration, so a --global
+// set in a project that does not declare the name says so, and one that does
+// stays quiet.
+func TestEnvGlobalSetNotesAnUndeclaredName(t *testing.T) {
+	dir := envProject(t, "[tool.astro.env]\nDECLARED = {}\n")
+
+	d, _, stderr := envDeps(t, dir, "v\n")
+	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global"); err != nil {
+		t.Fatal(err)
+	}
+	want := "this project does not declare STRAY, so it will not see the global value. Declare it with: astro local env variable declare STRAY"
+	if !strings.Contains(stderr.String(), want) {
+		t.Errorf("stderr = %q, want it to contain %q", stderr.String(), want)
+	}
+
+	d, _, stderr = envDeps(t, dir, "v\n")
+	if err := execute(t, d, "local", "env", "variable", "set", "DECLARED", "--global"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stderr.String(), "does not declare") {
+		t.Errorf("a declared name should get no note: %q", stderr.String())
+	}
+}
+
+// An undeclared global value never reaches the project, so list marks it not
+// applied, in the table and in the JSON rows.
+func TestEnvListMarksUndeclaredGlobalNotApplied(t *testing.T) {
+	dir := envProject(t, "[tool.astro.env]\nDECLARED = {}\n")
+	d, _, _ := envDeps(t, dir, "v\n")
+	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global"); err != nil {
+		t.Fatal(err)
+	}
+	d, _, _ = envDeps(t, dir, "v\n")
+	if err := execute(t, d, "local", "env", "variable", "set", "DECLARED", "--global"); err != nil {
+		t.Fatal(err)
+	}
+
+	d, out, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list"); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(out.String(), "\n") {
+		switch {
+		case strings.Contains(line, "STRAY"):
+			if !strings.Contains(line, "not applied: declare it to use it here (astro local env variable declare STRAY)") {
+				t.Errorf("STRAY row = %q, want the not-applied note", line)
+			}
+		case strings.Contains(line, "DECLARED"):
+			if strings.Contains(line, "not applied") {
+				t.Errorf("DECLARED row = %q, want no not-applied note", line)
+			}
+		}
+	}
+
+	d, out, _ = envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	dec := json.NewDecoder(out)
+	rows := map[string]localenv.ListItem{}
+	for dec.More() {
+		var it localenv.ListItem
+		if err := dec.Decode(&it); err != nil {
+			t.Fatal(err)
+		}
+		rows[it.Name] = it
+	}
+	if a := rows["STRAY"].Applied; a == nil || *a {
+		t.Errorf("STRAY applied = %v, want false", a)
+	}
+	if rows["STRAY"].DeclareHint != "astro local env variable declare STRAY" {
+		t.Errorf("STRAY declare hint = %q", rows["STRAY"].DeclareHint)
+	}
+	if rows["DECLARED"].Applied != nil {
+		t.Errorf("DECLARED applied = %v, want it omitted", *rows["DECLARED"].Applied)
+	}
+}
+
 func TestEnvSetWarnsWhenNotGitignored(t *testing.T) {
 	dir := envProject(t, "")
 	// Remove the .gitignore so .env is not covered.

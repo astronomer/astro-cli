@@ -38,8 +38,14 @@ type ListItem struct {
 	Project string `json:"project,omitempty"`
 	// RemoveHint is the exact command to remove an orphan.
 	RemoveHint string `json:"remove_hint,omitempty"`
-	// DeclareHint is the exact command to declare an orphan in the current
-	// project, so the value it names is one the project expects. Empty
+	// Applied is false for a global value the current project does not
+	// declare: a start passes the global tiers through for declared names
+	// only, so that value never reaches this project. Omitted on every other
+	// row, and outside a project, where there is nothing to apply it to.
+	Applied *bool `json:"applied,omitempty"`
+	// DeclareHint is the exact command to declare the name in the current
+	// project: for an orphan, so the value it names is one the project expects,
+	// and for a row Applied marks false, so the global value reaches it. Empty
 	// outside a project and for an --all orphan from another project.
 	DeclareHint string `json:"declare_hint,omitempty"`
 }
@@ -211,17 +217,19 @@ func KindForSection(s envschema.Section) Kind {
 // the current project ("" outside one), so --all can skip re-listing it.
 func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir string) []ListItem {
 	declared := declaredKeySet(schema)
+	inProject := projectCopies(src, opts.VaultTiers)
 	var out []ListItem
 	add := func(files map[string]string, scope Scope) {
 		for key := range files {
 			if declared[key] {
 				continue
 			}
+			item := orphanItem(key, scope, "", src.hasProject)
 			if isAirflowSetting(key) {
-				out = append(out, ListItem{Kind: KindEnv, Name: key, Source: string(scope)})
-				continue
+				item = ListItem{Kind: KindEnv, Name: key, Source: string(scope)}
 			}
-			out = append(out, orphanItem(key, scope, "", src.hasProject))
+			markIfNotApplied(&item, scope, key, inProject, DeclareHint(item.Kind, item.Name))
+			out = append(out, item)
 		}
 	}
 	switch {
@@ -239,11 +247,12 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 				if declared[e.EnvKey] {
 					continue
 				}
+				item := vaultOrphanItem(e.Kind, e.Name, tier, src.hasProject)
 				if isAirflowSetting(e.EnvKey) {
-					out = append(out, ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label})
-					continue
+					item = ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label}
 				}
-				out = append(out, vaultOrphanItem(e.Kind, e.Name, tier, src.hasProject))
+				markIfNotApplied(&item, tier.Scope, e.EnvKey, inProject, vaultDeclareHint(e.Kind, e.Name))
+				out = append(out, item)
 			}
 		}
 	}
@@ -292,26 +301,31 @@ func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem
 // isAirflowSetting reports a key Airflow reads as a configuration option,
 // AIRFLOW__{SECTION}__{KEY}. Such a key sets how Airflow runs rather than a
 // value the project's code expects, so an undeclared one is listed with its
-// source but never as an orphan: declaring it in [tool.astro.env] would be odd.
+// source but never as an orphan. A global one still needs a declaration to reach
+// a project, so it can carry the not-applied mark.
 func isAirflowSetting(key string) bool {
 	return strings.HasPrefix(key, "AIRFLOW__")
 }
 
-// vaultOrphanItem is an undeclared value held only in the vault tier. Its
-// declare hint keeps a variable sensitive, so a later set leaves it in the vault;
-// a connection is always sensitive.
+// vaultOrphanItem is an undeclared value held only in the vault tier.
 func vaultOrphanItem(kind Kind, name string, tier VaultTier, inProject bool) ListItem {
 	item := ListItem{
 		Kind: kind, Name: name, Source: tier.Label, Orphan: true,
 		RemoveHint: removeHint(kind, name, tier.Scope) + " --secret",
 	}
 	if inProject {
-		item.DeclareHint = declareHint(kind, name)
-		if kind != KindConn {
-			item.DeclareHint += " --sensitive"
-		}
+		item.DeclareHint = vaultDeclareHint(kind, name)
 	}
 	return item
+}
+
+// vaultDeclareHint declares a vault-held variable sensitive, so a later set
+// leaves it in the vault; a connection is always sensitive.
+func vaultDeclareHint(kind Kind, name string) string {
+	if kind == KindConn {
+		return DeclareHint(kind, name)
+	}
+	return DeclareHint(kind, name) + " --sensitive"
 }
 
 func orphanItem(key string, scope Scope, project string, inProject bool) ListItem {
@@ -323,10 +337,45 @@ func orphanItem(key string, scope Scope, project string, inProject bool) ListIte
 	if project == "" {
 		item.RemoveHint = removeHint(kind, name, scope)
 		if inProject {
-			item.DeclareHint = declareHint(kind, name)
+			item.DeclareHint = DeclareHint(kind, name)
 		}
 	}
 	return item
+}
+
+// markIfNotApplied marks an undeclared global row that a start leaves out of
+// the current project. Outside a project nothing is left out. A copy in the
+// project .env or the project vault reaches Airflow undeclared, so declaring
+// the name would not bring the global value in; inProject holds those keys.
+// hint is the command that declares the name.
+func markIfNotApplied(item *ListItem, scope Scope, key string, inProject map[string]bool, hint string) {
+	if scope != ScopeGlobal || inProject == nil || inProject[key] {
+		return
+	}
+	applied := false
+	item.Applied = &applied
+	item.DeclareHint = hint
+}
+
+// projectCopies is the set of keys the current project holds itself, in its
+// .env or its vault tier. It is nil outside a project.
+func projectCopies(src Sources, tiers []VaultTier) map[string]bool {
+	if !src.hasProject {
+		return nil
+	}
+	keys := make(map[string]bool, len(src.project))
+	for key := range src.project {
+		keys[key] = true
+	}
+	for _, tier := range tiers {
+		if tier.Scope != ScopeProject {
+			continue
+		}
+		for _, e := range tier.Entries {
+			keys[e.EnvKey] = true
+		}
+	}
+	return keys
 }
 
 // kindFromKey infers what an undeclared file entry is from its env-var name.
@@ -361,9 +410,9 @@ func removeHint(kind Kind, name string, scope Scope) string {
 	return "astro local env " + Noun(kind) + " delete " + name + " --" + string(scope)
 }
 
-// declareHint is the exact `astro local env <noun> declare` command for an
-// orphan. A declaration lives in the project's pyproject.toml whichever file
+// DeclareHint is the exact `astro local env <noun> declare` command for a
+// name. A declaration lives in the project's pyproject.toml whichever file
 // holds the value, so it takes no scope flag.
-func declareHint(kind Kind, name string) string {
+func DeclareHint(kind Kind, name string) string {
 	return "astro local env " + Noun(kind) + " declare " + name
 }

@@ -648,7 +648,9 @@ func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string) 
 		return err
 	}
 	if route.scope.global {
-		c.warnProjectShadows(route.scope, kind, name)
+		if !c.warnProjectShadows(route.scope, kind, name) {
+			c.noteUndeclaredGlobal(kind, name)
+		}
 	}
 	// Warn (on stderr, so json stdout stays clean) when a project .env would
 	// be tracked by git — the failure mode that actually leaks secrets.
@@ -697,11 +699,12 @@ func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string
 // outrank every global tier, so start keeps using that copy and the value just
 // set does not reach this project. It names the command that removes each copy
 // rather than removing it: a --global command does not delete project values.
-// Best effort, like the gitignore advisory.
-func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name string) {
+// Best effort, like the gitignore advisory. It reports whether it warned.
+func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name string) bool {
 	if _, err := c.discoverProject(); err != nil {
-		return
+		return false
 	}
+	warned := false
 	for _, secret := range []bool{false, true} {
 		projScope := *scope
 		projScope.global, projScope.project, projScope.secret = false, true, secret
@@ -720,7 +723,31 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 			"warning: %s is also set in %s (%s), which outranks the global value for this project, so start uses that copy. "+
 				"Remove it with: astro local env %s delete %s --project %s\n",
 			name, st.ScopeName(), st.Location(), localenv.Noun(kind), name, flag)
+		warned = true
 	}
+	return warned
+}
+
+// noteUndeclaredGlobal tells a --global set inside a project that the project
+// does not declare the name: a start passes global values through for declared
+// names only, so this project will not see the value. Silent outside a project
+// and when the manifest does not read, where there is nothing to check, and
+// after warnProjectShadows, whose project copy wins whether or not it is
+// declared.
+func (c *cli) noteUndeclaredGlobal(kind localenv.Kind, name string) {
+	projectDir, err := c.discoverProject()
+	if err != nil {
+		return
+	}
+	_, schema, err := c.loadManifestSchema(projectDir)
+	if err != nil {
+		return
+	}
+	if _, ok := declaredSpec(schema, kind, name); ok {
+		return
+	}
+	fmt.Fprintf(c.d.Stderr, "note: this project does not declare %s, so it will not see the global value. Declare it with: %s\n",
+		name, localenv.DeclareHint(kind, name))
 }
 
 func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) error {
@@ -1063,7 +1090,10 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 	for i := range items {
 		it := &items[i]
 		note := ""
-		if it.Orphan {
+		switch {
+		case it.Applied != nil && !*it.Applied:
+			note = "not applied: declare it to use it here (" + it.DeclareHint + ")"
+		case it.Orphan:
 			note = "undeclared"
 			// An orphan found under --all lives in another project's file, and
 			// says which. There is no command to offer for one: delete acts on

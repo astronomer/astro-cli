@@ -8,5 +8,6 @@
   "orphan": true,
   "project": "x",
   "remove_hint": "x",
+  "applied": true,
   "declare_hint": "x"
 }
