@@ -88,8 +88,21 @@ func TestDeployDagsV2_Success(t *testing.T) {
 	assert.Equal(t, "test-ws-id", res.WorkspaceID)
 	assert.Equal(t, "7.0.0", res.RuntimeVersion)
 	assert.Equal(t, "tarball-v1", res.DagTarballVersion)
-	assert.NotEmpty(t, res.URL)
+	assert.Equal(t, "http://localhost:5000/test-ws-id/deployments/test-deployment-id", res.URL)
 	client.AssertExpectations(t)
+}
+
+func TestDashboardURLHasAScheme(t *testing.T) {
+	for platform, want := range map[string]string{
+		testUtil.CloudPlatform:    "https://cloud.astronomer.io/ws/deployments/dep",
+		testUtil.CloudDevPlatform: "https://cloud.astronomer-dev.io/ws/deployments/dep",
+		testUtil.LocalPlatform:    "http://localhost:5000/ws/deployments/dep",
+	} {
+		testUtil.InitTestConfig(platform)
+		got, err := dashboardURL("dep", "ws")
+		require.NoError(t, err)
+		assert.Equal(t, want, got, platform)
+	}
 }
 
 func TestDeployDagsV2_DagDeployDisabled(t *testing.T) {

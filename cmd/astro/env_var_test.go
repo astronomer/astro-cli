@@ -310,3 +310,50 @@ func TestEnvVarSetFromFileUpserts(t *testing.T) {
 	assert.Contains(t, out, "Created MISSING")
 	mc.AssertExpectations(t)
 }
+
+func TestEnvVarSetSaysWhenDeploymentsSeeTheChange(t *testing.T) {
+	autoLink := true
+	links := &[]astrov1.EnvironmentObjectLink{{ScopeEntityId: cuid.New()}}
+	for name, tc := range map[string]struct {
+		scopeFlag string
+		updated   astrov1.EnvironmentObject
+		wantNote  bool
+	}{
+		"unlinked workspace variable": {"--workspace-id", astrov1.EnvironmentObject{ObjectKey: "FOO"}, false},
+		"linked workspace variable":   {"--workspace-id", astrov1.EnvironmentObject{ObjectKey: "FOO", Links: links}, true},
+		"auto-linked":                 {"--workspace-id", astrov1.EnvironmentObject{ObjectKey: "FOO", AutoLinkDeployments: &autoLink}, true},
+		"deployment variable":         {"--deployment-id", astrov1.EnvironmentObject{ObjectKey: "FOO"}, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			defer resetEnvFlags()
+
+			id := cuid.New()
+			tc.updated.Id = &id
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
+				Return(&astrov1.ListEnvironmentObjectsResponse{
+					HTTPResponse: &http.Response{StatusCode: 200},
+					JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+						{Id: &id, ObjectKey: "FOO"},
+					}, TotalCount: 1},
+				}, nil).Once()
+			mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, id, mock.Anything).
+				Return(&astrov1.UpdateEnvironmentObjectResponse{
+					HTTPResponse: &http.Response{StatusCode: 200},
+					JSON200:      &tc.updated,
+				}, nil).Once()
+			astroV1Client = mc
+
+			out, err := execEnvCmd("var", "set", "FOO", tc.scopeFlag, cuid.New(), "--value", "bar")
+			assert.NoError(t, err)
+			assert.Contains(t, out, "Updated FOO")
+			if tc.wantNote {
+				assert.Contains(t, out, deploymentPickupNote)
+			} else {
+				assert.NotContains(t, out, deploymentPickupNote)
+			}
+			mc.AssertExpectations(t)
+		})
+	}
+}

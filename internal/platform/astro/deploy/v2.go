@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
@@ -116,7 +117,7 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		}
 	}
 
-	url, err := deployment.GetDeploymentURL(dep.Id, dep.WorkspaceId)
+	url, err := dashboardURL(dep.Id, dep.WorkspaceId)
 	if err != nil {
 		return DagDeployV2Result{}, err
 	}
@@ -128,4 +129,19 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		URL:               url,
 		Git:               gitInfo,
 	}, nil
+}
+
+func dashboardURL(deploymentID, workspaceID string) (string, error) {
+	url, err := deployment.GetDeploymentURL(deploymentID, workspaceID)
+	if err != nil {
+		return "", err
+	}
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+	if c.Domain == domainutil.LocalDomain {
+		return "http://" + url, nil
+	}
+	return "https://" + url, nil
 }

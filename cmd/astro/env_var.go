@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
@@ -227,6 +228,7 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 				return err
 			}
 			printCreated(out, obj)
+			printPickupNoteIfItReachesDeployments(cmd.ErrOrStderr(), scope, obj)
 			return nil
 		}
 		if errors.Is(err, env.ErrNotFound) && envVarNoCreate {
@@ -235,7 +237,18 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
+	printPickupNoteIfItReachesDeployments(cmd.ErrOrStderr(), scope, obj)
 	return nil
+}
+
+const deploymentPickupNote = "Deployments pick up the change within a few minutes. Tasks already running keep the old value."
+
+func printPickupNoteIfItReachesDeployments(w io.Writer, scope env.Scope, obj *astrov1.EnvironmentObject) {
+	autoLinked := obj.AutoLinkDeployments != nil && *obj.AutoLinkDeployments
+	linked := obj.Links != nil && len(*obj.Links) > 0
+	if scope.DeploymentID != "" || autoLinked || linked {
+		fmt.Fprintln(w, deploymentPickupNote)
+	}
 }
 
 func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {

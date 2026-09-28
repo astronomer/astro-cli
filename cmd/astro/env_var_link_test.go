@@ -53,6 +53,33 @@ func TestEnvVarLinkCreate(t *testing.T) {
 	out, err := execEnvCmd("var", "link", "set", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", depID)
 	assert.NoError(t, err)
 	assert.Contains(t, out, "Linked FOO to deployment "+depID)
+	assert.Contains(t, out, deploymentPickupNote)
+	mc.AssertExpectations(t)
+}
+
+func TestEnvVarLinkDeleteSaysWhenDeploymentsSeeIt(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+
+	id := cuid.New()
+	depID := cuid.New()
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
+			linkedEnvVarObj(id, "FOO", "ws-default", &[]astrov1.EnvironmentObjectLink{{ScopeEntityId: depID}}),
+		}},
+	}, nil).Once()
+	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, id, mock.Anything).Return(&astrov1.UpdateEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
+	}, nil).Once()
+	astroV1Client = mc
+
+	out, err := execEnvCmd("var", "link", "delete", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", depID)
+	assert.NoError(t, err)
+	assert.Contains(t, out, "Unlinked FOO from deployment "+depID)
+	assert.Contains(t, out, deploymentPickupNote)
 	mc.AssertExpectations(t)
 }
 

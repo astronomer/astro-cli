@@ -71,6 +71,7 @@ func CreateVar(scope Scope, key, value string, isSecret bool, autoLink *bool, as
 			Value:    value,
 			IsSecret: isSecret,
 		},
+		AutoLinkDeployments: autoLink,
 	}, nil
 }
 

@@ -164,6 +164,7 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(out, "Excluded %s from deployment %s\n", idOrKey, envLinkDeploymentID)
+		fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
 		return nil
 	}
 	var override *string
@@ -178,6 +179,7 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	} else {
 		fmt.Fprintf(out, "Linked %s to deployment %s (no override)\n", idOrKey, envLinkDeploymentID)
 	}
+	fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
 	return nil
 }
 
@@ -197,12 +199,14 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(out, "Removed exclude on %s for deployment %s\n", idOrKey, envLinkDeploymentID)
+		fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
 		return nil
 	}
 	if err := env.UnlinkVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Unlinked %s from deployment %s\n", idOrKey, envLinkDeploymentID)
+	fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
 	return nil
 }
 

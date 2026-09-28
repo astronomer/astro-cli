@@ -191,7 +191,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		}
 	}
 
-	url, err := deployment.GetDeploymentURL(dep.Id, dep.WorkspaceId)
+	url, err := dashboardURL(dep.Id, dep.WorkspaceId)
 	if err != nil {
 		return ImageDeployV2Result{}, err
 	}

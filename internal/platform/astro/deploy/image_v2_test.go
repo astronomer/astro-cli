@@ -115,7 +115,7 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 	assert.Equal(t, "3.1-2", res.RuntimeVersion)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 	assert.Equal(t, "tarball-v1", res.DagTarballVersion)
-	assert.NotEmpty(t, res.URL)
+	assert.Equal(t, "http://localhost:5000/test-ws-id/deployments/test-deployment-id", res.URL)
 
 	// Docker was probed, then a linux/amd64 build ran.
 	assert.True(t, hasImageCall(cmd.calls, "docker info"), "expected a docker info probe, got %v", cmd.calls)
