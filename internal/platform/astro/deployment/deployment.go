@@ -1,10 +1,10 @@
 package deployment
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"sort"
 	"strconv"
@@ -35,6 +35,8 @@ var (
 	ErrInvalidClusterKey         = errors.New("invalid Cluster selected")
 	ErrInvalidRegionKey          = errors.New("invalid Region selected")
 	ErrTimedOut                  = errors.New("timed out waiting for the Deployment to enter a Healthy state")
+	ErrTimedOutHibernating       = errors.New("timed out waiting for the Deployment to hibernate")
+	ErrAirflowNotAnswering       = errors.New("timed out waiting for the Deployment's Airflow API to answer, though Astro reports the Deployment healthy")
 	ErrWrongEnforceInput         = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
 	ErrInvalidResourceRequest    = errors.New("invalid resource request")
 	ErrNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
@@ -341,7 +343,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		return nil
 	}
 	for i := range allResults {
-		fmt.Printf("%f %s %s\n", allResults[i].Timestamp, allResults[i].Raw, allResults[i].Source)
+		fmt.Printf("%s %s\n", allResults[i].Raw, allResults[i].Source)
 	}
 	return nil
 }
@@ -831,33 +833,87 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 
 func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
 	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+	// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
+	// This covers for the case when the deployment is created and straight away goes into hibernation.
+	d, err := pollStatus(deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
+		astrov1.DeploymentStatusHEALTHY, astrov1.DeploymentStatusHIBERNATING)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Deployment %s is now healthy\n", d.Name)
+	return nil
+}
+
+// pollStatus waits sleepTime seconds, then checks the Deployment every
+// tickNum seconds until it reports one of statuses, and returns timedOut when
+// timeoutNum seconds pass first. A Deployment reporting HEALTHY also has to
+// have an Airflow that answers, and ErrAirflowNotAnswering is the timeout when
+// that was all that was missing.
+func pollStatus(deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
 	time.Sleep(time.Duration(sleepTime) * time.Second)
-	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
+	defer ticker.Stop()
+	missing := timedOut
 	for {
 		select {
-		// Got a timeout! fail with a timeout error
 		case <-timeout:
-			return ErrTimedOut
-		// Got a tick, we should check if deployment is healthy
+			return astrov1.Deployment{}, missing
 		case <-ticker.C:
-			buf.Reset()
-			// get core deployment
 			currentDeployment, err := GetDeploymentByID("", deploymentID, astroV1Client)
 			if err != nil {
-				return err
+				return astrov1.Deployment{}, err
 			}
-
-			// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
-			// This covers for the case when the deployment is cretated and straight away goes into hibernation.
-			if currentDeployment.Status == astrov1.DeploymentStatusHEALTHY || currentDeployment.Status == astrov1.DeploymentStatusHIBERNATING {
-				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Name)
-				return nil
+			missing = timedOut
+			if !slices.Contains(statuses, currentDeployment.Status) {
+				continue
 			}
-			continue
+			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(currentDeployment) {
+				return currentDeployment, nil
+			}
+			missing = ErrAirflowNotAnswering
 		}
 	}
+}
+
+// airflowProbeTimeout bounds one airflowAnswering request. A request that
+// times out counts as answering, like any other connection error.
+const airflowProbeTimeout = 10 * time.Second
+
+// airflowAnswering reports whether the Deployment's Airflow API answers with
+// anything but the 502, 503 or 504 its ingress gives while no Airflow is
+// behind it. Astro reports a Deployment HEALTHY some seconds before that
+// after a wake-up. A Deployment with no Airflow API URL has nothing to probe.
+var airflowAnswering = func(d astrov1.Deployment) bool {
+	apiURL := d.WebServerAirflowApiUrl
+	if apiURL == "" {
+		return true
+	}
+	if !strings.HasPrefix(apiURL, "http://") && !strings.HasPrefix(apiURL, "https://") {
+		apiURL = "https://" + apiURL
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), airflowProbeTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(apiURL, "/")+"/version", http.NoBody)
+	if err != nil {
+		return true
+	}
+	if c, err := config.GetCurrentContext(); err == nil && c.Token != "" {
+		req.Header.Set("Authorization", c.Token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		// A machine that cannot reach the Airflow host at all, such as a CI
+		// runner allowed only the Astro API, would otherwise wait out the whole
+		// --wait-time. Only the ingress's own answers mean "not up yet".
+		return true
+	}
+	resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return false
+	}
+	return true
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
@@ -1522,7 +1578,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	return nil
 }
 
-func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string, isHibernating bool, overrideUntil *time.Time, force bool, astroV1Client astrov1.APIClient) error {
+func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string, isHibernating bool, overrideUntil *time.Time, force, waitForStatus bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
 	// Set wording based on the hibernation action
 	var action string
 	if isHibernating {
@@ -1574,6 +1630,26 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		fmt.Println("Any configured hibernation schedules will not resume until override is removed.")
 	}
 
+	if waitForStatus {
+		return waitForHibernationOverride(currentDeployment.Id, isHibernating, waitTime, astroV1Client)
+	}
+	return nil
+}
+
+// waitForHibernationOverride waits until the Deployment reports the state an
+// override asked for: hibernating, or healthy again. Unlike HealthPoll it
+// has no initial sleep, which would be longer than a whole wake-up.
+func waitForHibernationOverride(deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+	status, timedOut, waiting, done := astrov1.DeploymentStatusHEALTHY, ErrTimedOut, "wake up", "awake"
+	if isHibernating {
+		status, timedOut, waiting, done = astrov1.DeploymentStatusHIBERNATING, ErrTimedOutHibernating, "hibernate", "hibernating"
+	}
+	fmt.Printf("\nWaiting for the Deployment to %s…\n", waiting)
+	d, err := pollStatus(deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Deployment %s is now %s\n", d.Name, done)
 	return nil
 }
 

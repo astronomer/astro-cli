@@ -655,6 +655,7 @@ func newDeploymentHibernateCmd() *cobra.Command {
   $ astro deployment hibernate <deployment-id> --for 2h30m
   $ astro deployment hibernate <deployment-id> --until 2024-06-01T12:00:00Z
   $ astro deployment hibernate <deployment-id> --remove-override
+  $ astro deployment hibernate <deployment-id> --wait
 `,
 		RunE: func(cmd *cobra.Command, args []string) error { return deploymentOverrideHibernation(cmd, args, true) },
 	}
@@ -663,7 +664,10 @@ func newDeploymentHibernateCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the hibernation period using a duration. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume regular hibernation schedule.")
 	cmd.Flags().BoolVarP(&forceOverride, "force", "f", false, "Force hibernate. The CLI will not prompt to confirm before hibernating the Deployment.")
+	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to hibernate before ending the command")
+	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to hibernate before ending the command. Can only be used with --wait=true")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
+	cmd.MarkFlagsMutuallyExclusive("wait", "remove-override")
 	return cmd
 }
 
@@ -679,6 +683,7 @@ func newDeploymentWakeUpCmd() *cobra.Command {
   $ astro deployment wake-up <deployment-id> --for 4h
   $ astro deployment wake-up <deployment-id> --until 2024-06-01T18:00:00Z
   $ astro deployment wake-up <deployment-id> --remove-override
+  $ astro deployment wake-up <deployment-id> --wait
 `,
 		RunE: func(cmd *cobra.Command, args []string) error { return deploymentOverrideHibernation(cmd, args, false) },
 	}
@@ -687,7 +692,10 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the awake period using a duration. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule.")
 	cmd.Flags().BoolVarP(&forceOverride, "force", "f", false, "Force wake up. The CLI will not prompt to confirm before waking up the Deployment.")
+	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
+	cmd.MarkFlagsMutuallyExclusive("wait", "remove-override")
 	return cmd
 }
 
@@ -1007,6 +1015,10 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 		deploymentID = args[0]
 	}
 
+	if cmd.Flags().Changed("wait-time") && !waitForStatus {
+		return errors.New("cannot use --wait-time with --wait=false")
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -1019,7 +1031,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 		return err
 	}
 
-	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
+	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, waitForStatus, waitTimeForDeployment, astroV1Client)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.

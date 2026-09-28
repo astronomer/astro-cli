@@ -762,7 +762,11 @@ deployment:
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
 		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(4)
+		unprobedDeployment := *deploymentResponse.JSON200
+		unprobedDeployment.WebServerAirflowApiUrl = ""
+		unprobedResponse := deploymentResponse
+		unprobedResponse.JSON200 = &unprobedDeployment
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&unprobedResponse, nil).Times(4)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
 		origSleep := deployment.SleepTime
@@ -1533,6 +1537,16 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--force"}
 			_, err := execDeploymentCmd(cmdArgs...)
 			assert.Error(t, err)
+		})
+
+		t.Run(fmt.Sprintf("%s refuses --wait-time without --wait", tt.command), func(t *testing.T) {
+			_, err := execDeploymentCmd(tt.command, "test-id-1", "--wait-time", "1m", "--force")
+			assert.ErrorContains(t, err, "cannot use --wait-time with --wait=false")
+		})
+
+		t.Run(fmt.Sprintf("%s refuses --wait with --remove-override", tt.command), func(t *testing.T) {
+			_, err := execDeploymentCmd(tt.command, "test-id-1", "--wait", "--remove-override", "--force")
+			assert.ErrorContains(t, err, "none of the others can be")
 		})
 
 		t.Run(fmt.Sprintf("%s with remove override", tt.command), func(t *testing.T) {

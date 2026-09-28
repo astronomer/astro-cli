@@ -939,8 +939,17 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
 
-		err := Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockV1Client)
+		r, w, err := os.Pipe()
+		s.Require().NoError(err)
+		stdout := os.Stdout
+		os.Stdout = w
+		err = Logs(deploymentID, ws, "", "", true, true, true, true, false, nil, true, false, false, logCount, mockV1Client)
+		os.Stdout = stdout
+		w.Close()
 		s.NoError(err)
+		printed, err := io.ReadAll(r)
+		s.Require().NoError(err)
+		s.Equal("test log line scheduler\ntest log line 2 scheduler\n", string(printed))
 
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2519,7 +2528,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 
 			defer testUtil.MockUserInput(s.T(), "y")()
 
-			err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", tt.IsHibernating, nil, false, mockV1Client)
+			err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", tt.IsHibernating, nil, false, false, 0, mockV1Client)
 			s.NoError(err)
 			mockV1Client.AssertExpectations(s.T())
 		})
@@ -2545,7 +2554,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 
 			defer testUtil.MockUserInput(s.T(), "y")()
 
-			err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", tt.IsHibernating, &overrideUntil, false, mockV1Client)
+			err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", tt.IsHibernating, &overrideUntil, false, false, 0, mockV1Client)
 			s.NoError(err)
 			mockV1Client.AssertExpectations(s.T())
 		})
@@ -2556,7 +2565,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse2, nil).Once()
 
-		err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", true, nil, false, mockV1Client)
+		err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", true, nil, false, false, 0, mockV1Client)
 		s.Error(err)
 		s.Equal(err, ErrNotADevelopmentDeployment)
 		mockV1Client.AssertExpectations(s.T())
@@ -2584,7 +2593,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeploymentListResponse, nil).Once()
 
-		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockV1Client)
+		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, false, 0, mockV1Client)
 		s.Error(err)
 		s.Equal(err.Error(), fmt.Sprintf("%s %s", NoDeploymentInWSMsg, ws))
 		mockV1Client.AssertExpectations(s.T())
@@ -2597,7 +2606,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 
 		defer testUtil.MockUserInput(s.T(), "n")()
 
-		err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", true, nil, false, mockV1Client)
+		err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", true, nil, false, false, 0, mockV1Client)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2606,10 +2615,110 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 		mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
-		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockV1Client)
+		err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, false, 0, mockV1Client)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 	})
+}
+
+func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	origTick, origGet := TickNum, GetDeploymentByID
+	TickNum = 1
+	s.T().Cleanup(func() { TickNum, GetDeploymentByID = origTick, origGet })
+
+	// The first status answers the lookup that picks the Deployment; the rest
+	// answer the wait, one per tick.
+	reports := func(statuses ...astrov1.DeploymentStatus) *int {
+		polls := 0
+		GetDeploymentByID = func(_, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+			status := statuses[min(polls, len(statuses)-1)]
+			polls++
+			isDevelopmentMode := true
+			return astrov1.Deployment{Id: "test-id-1", Name: "test", Status: status, IsDevelopmentMode: &isDevelopmentMode}, nil
+		}
+		return &polls
+	}
+	override := func(isHibernating bool, waitTime time.Duration) error {
+		isActive := true
+		mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateDeploymentHibernationOverrideResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1.DeploymentHibernationOverride{IsHibernating: &isHibernating, IsActive: &isActive},
+		}, nil).Once()
+		return UpdateDeploymentHibernationOverride("test-id-1", ws, "", isHibernating, nil, true, true, waitTime, mockV1Client)
+	}
+
+	s.Run("wake-up waits past HIBERNATING until HEALTHY", func() {
+		polls := reports(astrov1.DeploymentStatusHIBERNATING, astrov1.DeploymentStatusHIBERNATING, astrov1.DeploymentStatusDEPLOYING, astrov1.DeploymentStatusHEALTHY)
+		s.NoError(override(false, time.Minute))
+		s.Equal(4, *polls)
+	})
+
+	s.Run("hibernate waits until HIBERNATING", func() {
+		polls := reports(astrov1.DeploymentStatusHEALTHY, astrov1.DeploymentStatusHEALTHY, astrov1.DeploymentStatusHIBERNATING)
+		s.NoError(override(true, time.Minute))
+		s.Equal(3, *polls)
+	})
+
+	s.Run("hibernate times out", func() {
+		reports(astrov1.DeploymentStatusHEALTHY)
+		s.ErrorIs(override(true, time.Second), ErrTimedOutHibernating)
+	})
+
+	s.Run("wake-up names the Airflow when only it is missing at the timeout", func() {
+		origAnswering := airflowAnswering
+		s.T().Cleanup(func() { airflowAnswering = origAnswering })
+		airflowAnswering = func(astrov1.Deployment) bool { return false }
+		reports(astrov1.DeploymentStatusHIBERNATING, astrov1.DeploymentStatusHEALTHY)
+		s.ErrorIs(override(false, 2*time.Second), ErrAirflowNotAnswering)
+	})
+
+	s.Run("wake-up waits past HEALTHY until the Airflow answers", func() {
+		origAnswering := airflowAnswering
+		s.T().Cleanup(func() { airflowAnswering = origAnswering })
+		probes := 0
+		airflowAnswering = func(astrov1.Deployment) bool {
+			probes++
+			return probes == 2
+		}
+		polls := reports(astrov1.DeploymentStatusHIBERNATING, astrov1.DeploymentStatusHEALTHY)
+		s.NoError(override(false, time.Minute))
+		s.Equal(3, *polls)
+		s.Equal(2, probes)
+	})
+}
+
+func (s *Suite) TestAirflowAnswering() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	login, err := context.GetCurrentContext()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(login.Token)
+	for status, want := range map[int]bool{
+		http.StatusOK:                 true,
+		http.StatusUnauthorized:       true,
+		http.StatusNotFound:           true,
+		http.StatusBadGateway:         false,
+		http.StatusServiceUnavailable: false,
+		http.StatusGatewayTimeout:     false,
+	} {
+		var path, auth string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path, auth = r.URL.Path, r.Header.Get("Authorization")
+			w.WriteHeader(status)
+		}))
+		got := airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: server.URL + "/abc123/api/v2"})
+		server.Close()
+		s.Equal(want, got, "status %d", status)
+		s.Equal("/abc123/api/v2/version", path, "status %d", status)
+		s.Equal(login.Token, auth, "status %d", status)
+	}
+	s.True(airflowAnswering(astrov1.Deployment{}), "a Deployment with no Airflow API URL should not hold up the wait")
+
+	unreachable := httptest.NewServer(http.NotFoundHandler())
+	unreachable.Close()
+	s.True(airflowAnswering(astrov1.Deployment{WebServerAirflowApiUrl: unreachable.URL}), "an Airflow host this machine cannot reach should not hold up the wait")
 }
 
 func (s *Suite) TestDeleteDeploymentHibernationOverride() {
