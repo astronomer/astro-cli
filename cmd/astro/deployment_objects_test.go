@@ -147,7 +147,7 @@ func TestConnectionUpdate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
-		cmdArgs := []string{"connection", "update", "-d", "test-id-1", "--conn-id", "conn-id"}
+		cmdArgs := []string{"connection", "update", "-d", "test-id-1", "--conn-id", "conn-id", "--conn-type", "postgres"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.EqualError(t, err, "error")
 		mockV1Client.AssertExpectations(t)
@@ -162,13 +162,19 @@ func TestConnectionUpdate(t *testing.T) {
 		mockV1Client.AssertExpectations(t)
 	})
 
+	t.Run("a missing connection type is refused before any api call", func(t *testing.T) {
+		cmdArgs := []string{"connection", "update", "-d", "test-id-1", "--conn-id", "conn-id"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "--conn-type")
+	})
+
 	t.Run("successful connection update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Once()
-		cmdArgs := []string{"connection", "update", "-d", "test-id-1", "--conn-id", "conn-id"}
+		cmdArgs := []string{"connection", "update", "-d", "test-id-1", "--conn-id", "conn-id", "--conn-type", "postgres"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -255,7 +261,7 @@ func TestVariableUpdate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
-		cmdArgs := []string{"airflow-variable", "update", "-d", "test-id-1", "--key", "KEY"}
+		cmdArgs := []string{"airflow-variable", "update", "-d", "test-id-1", "--key", "KEY", "--value", "VALUE"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.EqualError(t, err, "error")
 		mockV1Client.AssertExpectations(t)
@@ -275,7 +281,7 @@ func TestVariableUpdate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
-		cmdArgs := []string{"airflow-variable", "update", "-d", "test-id-1", "--key", "KEY"}
+		cmdArgs := []string{"airflow-variable", "update", "-d", "test-id-1", "--key", "KEY", "--value", "VALUE"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -453,7 +459,7 @@ func TestPoolCreate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
-		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name"}
+		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name", "--slots", "5"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.EqualError(t, err, "error")
 		mockV1Client.AssertExpectations(t)
@@ -473,7 +479,7 @@ func TestPoolCreate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
-		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name"}
+		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name", "--slots", "5"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -485,7 +491,7 @@ func TestPoolCreate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&airflow3DeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
-		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name", "--include-deferred", "enable"}
+		cmdArgs := []string{"pool", "create", "-d", "test-id-1", "--name", "name", "--slots", "5", "--include-deferred", "enable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -529,5 +535,75 @@ func TestPoolCopy(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
+	})
+}
+
+func TestPoolCreateRequiresSlots(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mockClient := new(airflowclient_mocks.Client)
+	airflowAPIClient = mockClient
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mockV1Client
+
+	_, err := execDeploymentCmd("pool", "create", "-d", "test-id-1", "--name", "name")
+	assert.ErrorContains(t, err, "--slots")
+	mockV1Client.AssertNotCalled(t, "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
+	mockClient.AssertNotCalled(t, "CreatePool", mock.Anything, mock.Anything)
+}
+
+func TestAirflowObjectDelete(t *testing.T) {
+	cases := []struct {
+		group  string
+		method string
+		idFlag string
+		id     string
+	}{
+		{"connection", "DeleteConnection", "--conn-id", "my-conn"},
+		{"airflow-variable", "DeleteVariable", "--key", "my_var"},
+		{"pool", "DeletePool", "--name", "my-pool"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.group+" requires "+tc.idFlag, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			mockClient := new(airflowclient_mocks.Client)
+			airflowAPIClient = mockClient
+			mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+			astroV1Client = mockV1Client
+
+			_, err := execDeploymentCmd(tc.group, "delete", "-d", "test-id-1", "--force")
+			assert.ErrorContains(t, err, tc.idFlag)
+			mockV1Client.AssertNotCalled(t, "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
+			mockClient.AssertNotCalled(t, tc.method, mock.Anything, mock.Anything)
+		})
+
+		t.Run(tc.group+" delete with --force calls the Airflow API", func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			mockClient := new(airflowclient_mocks.Client)
+			airflowAPIClient = mockClient
+			mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+			astroV1Client = mockV1Client
+
+			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+			mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
+			mockClient.On(tc.method, mock.AnythingOfType("string"), tc.id).Return(nil).Once()
+			_, err := execDeploymentCmd(tc.group, "rm", "-d", "test-id-1", tc.idFlag, tc.id, "-f")
+			assert.NoError(t, err)
+			mockClient.AssertExpectations(t)
+			mockV1Client.AssertExpectations(t)
+		})
+	}
+
+	t.Run("pool delete refuses default_pool before calling any API", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(airflowclient_mocks.Client)
+		airflowAPIClient = mockClient
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		astroV1Client = mockV1Client
+
+		_, err := execDeploymentCmd("pool", "delete", "-d", "test-id-1", "--name", "default_pool", "--force")
+		assert.ErrorContains(t, err, "default_pool cannot be deleted")
+		mockV1Client.AssertNotCalled(t, "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
+		mockClient.AssertNotCalled(t, "DeletePool", mock.Anything, mock.Anything)
 	})
 }

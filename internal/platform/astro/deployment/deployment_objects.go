@@ -5,6 +5,8 @@ import (
 	"io"
 
 	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
+	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -83,6 +85,12 @@ func ConnectionUpdate(airflowURL, connID, connType, description, host, login, pa
 		return err
 	}
 	return nil
+}
+
+func ConnectionDelete(airflowURL, deploymentName, connID string, force bool, airflowAPIClient airflowclient.Client, out io.Writer) error {
+	return deleteAirflowObject("connection", connID, deploymentName, force, out, func() error {
+		return airflowAPIClient.DeleteConnection(airflowURL, connID)
+	})
 }
 
 func CopyConnection(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
@@ -173,6 +181,12 @@ func VariableUpdate(airflowURL, value, key, description string, airflowAPIClient
 	return nil
 }
 
+func VariableDelete(airflowURL, deploymentName, key string, force bool, airflowAPIClient airflowclient.Client, out io.Writer) error {
+	return deleteAirflowObject("Airflow variable", key, deploymentName, force, out, func() error {
+		return airflowAPIClient.DeleteVariable(airflowURL, key)
+	})
+}
+
 //nolint:dupl // the duplication is acceptable here
 func CopyVariable(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
 	// get variables from original Deployment
@@ -259,6 +273,32 @@ func PoolUpdate(airflowURL, name, description string, slots int, includeDeferred
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func PoolDelete(airflowURL, deploymentName, name string, force bool, airflowAPIClient airflowclient.Client, out io.Writer) error {
+	return deleteAirflowObject("pool", name, deploymentName, force, out, func() error {
+		return airflowAPIClient.DeletePool(airflowURL, name)
+	})
+}
+
+func deleteAirflowObject(kind, id, deploymentName string, force bool, out io.Writer, del func() error) error {
+	if !force {
+		confirmed, _ := input.Confirm( //nolint:errcheck // input.Confirm never returns an error
+			fmt.Sprintf("\nAre you sure you want to delete the %s %s from the %s Deployment?", kind, ansi.Bold(id), ansi.Bold(deploymentName)))
+		if !confirmed {
+			fmt.Fprintf(out, "Canceling %s deletion\n", kind)
+			return nil
+		}
+	}
+
+	if err := del(); err != nil {
+		if airflowclient.IsNotFound(err) {
+			return fmt.Errorf("no %s %q found in the %s Deployment", kind, id, deploymentName)
+		}
+		return err
+	}
+	fmt.Fprintf(out, "Deleted %s %s\n", kind, ansi.Bold(id))
 	return nil
 }
 

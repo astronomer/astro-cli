@@ -66,6 +66,60 @@ func (_m *Client) CreateVariable(airflowURL string, variable airflowclient.Varia
 	return r0
 }
 
+// DeleteConnection provides a mock function with given fields: airflowURL, connID
+func (_m *Client) DeleteConnection(airflowURL string, connID string) error {
+	ret := _m.Called(airflowURL, connID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteConnection")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(airflowURL, connID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeletePool provides a mock function with given fields: airflowURL, name
+func (_m *Client) DeletePool(airflowURL string, name string) error {
+	ret := _m.Called(airflowURL, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePool")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(airflowURL, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteVariable provides a mock function with given fields: airflowURL, key
+func (_m *Client) DeleteVariable(airflowURL string, key string) error {
+	ret := _m.Called(airflowURL, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteVariable")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(airflowURL, key)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetConnections provides a mock function with given fields: airflowURL
 func (_m *Client) GetConnections(airflowURL string) (airflowclient.Response, error) {
 	ret := _m.Called(airflowURL)

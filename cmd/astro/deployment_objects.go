@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
@@ -43,14 +44,15 @@ func newDeploymentConnectionRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "connection",
 		Aliases: []string{"con", "connections"},
-		Short:   "Manage deployment connections",
-		Long:    "Manage connections in the running Airflow's metadata database for an Astro Deployment.",
+		Short:   "Manage Airflow connections in an Astro Deployment",
+		Long:    "Manage Airflow connections stored in an Astro Deployment's metadata database.",
 	}
 	cmd.AddCommand(
 		newDeploymentConnectionListCmd(out),
 		newDeploymentConnectionCreateCmd(out),
 		newDeploymentConnectionUpdateCmd(out),
 		newDeploymentConnectionCopyCmd(out),
+		newDeploymentConnectionDeleteCmd(out),
 	)
 	return cmd
 }
@@ -59,7 +61,7 @@ func newDeploymentConnectionListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"li"},
-		Short:   "list a Deployment's connections",
+		Short:   "List a Deployment's connections",
 		Long:    "List Airflow connections in a Deployment's metadata database. Passwords and sensitive extras are not included in the output.",
 		Example: `
   $ astro deployment connection list --deployment-id <deployment-id>
@@ -80,8 +82,8 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create connections for a Deployment",
-		Long:    "Create Airflow connections in a Deployment's metadata database. Provide connection details as JSON. Multiple connections can be created in a single call.",
+		Short:   "Create a connection in a Deployment",
+		Long:    "Create an Airflow connection in a Deployment's metadata database. If a connection with the same ID already exists, it is updated.",
 		Example: `
   $ astro deployment connection create --deployment-id <deployment-id> --conn-id my-conn --conn-type postgres --host localhost --port 5432
   $ astro deployment connection create --deployment-id <deployment-id> --conn-id my-conn --conn-type http --host https://api.example.com
@@ -100,7 +102,7 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&password, "password", "p", "", "The connection password.")
 	cmd.Flags().StringVarP(&schema, "schema", "s", "", "The connection schema.")
 	cmd.Flags().IntVarP(&port, "port", "o", 0, "The connection port.")
-	cmd.Flags().StringVarP(&extra, "extra", "e", "", "The extra field configuration, defined as a stringified JSON object.")
+	cmd.Flags().StringVarP(&extra, "extra", "e", "", "Extra connection fields, as a JSON string.")
 
 	return cmd
 }
@@ -110,8 +112,8 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update connections for a Deployment",
-		Long:    "Update existing Airflow connections in a Deployment's metadata database. Provide updated connection details as JSON.",
+		Short:   "Update a connection in a Deployment",
+		Long:    "Update an existing Airflow connection in a Deployment's metadata database.",
 		Example: `
   $ astro deployment connection update --deployment-id <deployment-id> --conn-id my-conn --conn-type postgres --host new-host
 `,
@@ -129,7 +131,7 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&password, "password", "p", "", "The connection password.")
 	cmd.Flags().StringVarP(&schema, "schema", "s", "", "The connection schema.")
 	cmd.Flags().IntVarP(&port, "port", "o", 0, "The connection port.")
-	cmd.Flags().StringVarP(&extra, "extra", "e", "", "The extra field configuration, defined as a stringified JSON object.")
+	cmd.Flags().StringVarP(&extra, "extra", "e", "", "Extra connection fields, as a JSON string.")
 
 	return cmd
 }
@@ -140,7 +142,7 @@ func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 		Use:     "copy",
 		Aliases: []string{"cp"},
 		Short:   "Copy connections from one Deployment to another",
-		Long:    "Copy Airflow connections from one Astro Deployment to another. Passwords and extra configurations will not copy over. If a connection already exits with same connection ID in the target Deployment, that connection will be updated",
+		Long:    "Copy Airflow connections from one Astro Deployment to another. Passwords and extra configurations will not copy over. If a connection with the same ID already exists in the target Deployment, that connection is updated.",
 		Example: `
   $ astro deployment connection copy --source-id <source-deployment-id> --target-id <target-deployment-id>
   $ astro deployment connection copy --source-name my-source-deployment --target-name my-target-deployment
@@ -150,9 +152,31 @@ func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The ID of the Deployment to copy connections from.")
-	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy connections from")
-	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied connections")
-	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied connections")
+	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy connections from.")
+	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied connections.")
+	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied connections.")
+
+	return cmd
+}
+
+func newDeploymentConnectionDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete",
+		Aliases: []string{"rm"},
+		Short:   "Delete a connection from a Deployment",
+		Long:    "Delete an Airflow connection from a Deployment's metadata database.",
+		Example: `
+  $ astro deployment connection delete --deployment-id <deployment-id> --conn-id my-conn
+  $ astro deployment connection delete --deployment-name my-deployment --conn-id my-conn --force
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentConnectionDelete(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&connID, "conn-id", "i", "", "The connection ID. Required.")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete the connection without asking for confirmation.")
 
 	return cmd
 }
@@ -172,6 +196,7 @@ func newDeploymentAirflowVariableRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentAirflowVariableCreateCmd(out),
 		newDeploymentAirflowVariableUpdateCmd(out),
 		newDeploymentAirflowVariableCopyCmd(out),
+		newDeploymentAirflowVariableDeleteCmd(out),
 	)
 	return cmd
 }
@@ -180,7 +205,7 @@ func newDeploymentAirflowVariableListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"li"},
-		Short:   "list a Deployment's Airflow variables",
+		Short:   "List a Deployment's Airflow variables",
 		Long:    "List Airflow variables stored in a Deployment's metadata database.",
 		Example: `
   $ astro deployment airflow-variable list --deployment-id <deployment-id>
@@ -201,8 +226,8 @@ func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create Airflow variables for a Deployment",
-		Long:    "Create Airflow variables in a Deployment's metadata database. Provide variable key-value pairs as JSON. Multiple variables can be created in a single call.",
+		Short:   "Create an Airflow variable in a Deployment",
+		Long:    "Create an Airflow variable in a Deployment's metadata database. If a variable with the same key already exists, it is updated.",
 		Example: `
   $ astro deployment airflow-variable create --deployment-id <deployment-id> --key my_var --value my_value
   $ astro deployment airflow-variable create --deployment-id <deployment-id> --key my_var --value my_value --description "A useful variable"
@@ -225,8 +250,8 @@ func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update Airflow variables for a Deployment",
-		Long:    "Update existing Airflow variables in a Deployment's metadata database. Provide updated key-value pairs as JSON.",
+		Short:   "Update an Airflow variable in a Deployment",
+		Long:    "Update an existing Airflow variable in a Deployment's metadata database.",
 		Example: `
   $ astro deployment airflow-variable update --deployment-id <deployment-id> --key my_var --value new_value
 `,
@@ -248,8 +273,8 @@ func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
 		Aliases: []string{"cp"},
-		Short:   "Copy the Airflow variables from one Deployment to another",
-		Long:    "Copy Airflow variables from one Astro Deployment to another Astro Deployment. If a variable already exits with same Key it will be updated",
+		Short:   "Copy Airflow variables from one Deployment to another",
+		Long:    "Copy Airflow variables from one Astro Deployment to another. If a variable with the same key already exists in the target Deployment, that variable is updated.",
 		Example: `
   $ astro deployment airflow-variable copy --source-id <source-deployment-id> --target-id <target-deployment-id>
   $ astro deployment airflow-variable copy --source-name my-source-deployment --target-name my-target-deployment
@@ -259,9 +284,31 @@ func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The ID of the Deployment to copy Airflow variables from.")
-	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy Airflow variables from")
-	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied Airflow variables")
-	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied Airflow variables")
+	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy Airflow variables from.")
+	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied Airflow variables.")
+	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied Airflow variables.")
+
+	return cmd
+}
+
+func newDeploymentAirflowVariableDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete",
+		Aliases: []string{"rm"},
+		Short:   "Delete an Airflow variable from a Deployment",
+		Long:    "Delete an Airflow variable from a Deployment's metadata database.",
+		Example: `
+  $ astro deployment airflow-variable delete --deployment-id <deployment-id> --key my_var
+  $ astro deployment airflow-variable delete --deployment-name my-deployment --key my_var --force
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentAirflowVariableDelete(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&key, "key", "k", "", "The Airflow variable key. Required.")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete the Airflow variable without asking for confirmation.")
 
 	return cmd
 }
@@ -270,14 +317,15 @@ func newDeploymentPoolRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pool",
 		Aliases: []string{"pl", "pools"},
-		Short:   "Manage Deployment's Airflow pools",
-		Long:    "Manage Airflow pools stored for an Astro Deployment",
+		Short:   "Manage Airflow pools in an Astro Deployment",
+		Long:    "Manage Airflow pools stored in an Astro Deployment's metadata database.",
 	}
 	cmd.AddCommand(
 		newDeploymentPoolListCmd(out),
 		newDeploymentPoolCreateCmd(out),
 		newDeploymentPoolUpdateCmd(out),
 		newDeploymentPoolCopyCmd(out),
+		newDeploymentPoolDeleteCmd(out),
 	)
 	return cmd
 }
@@ -286,7 +334,7 @@ func newDeploymentPoolListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"li"},
-		Short:   "list a Deployment's Airflow pools",
+		Short:   "List a Deployment's Airflow pools",
 		Long:    "List Airflow pools in a Deployment. Pools limit how many task instances can run concurrently for tasks assigned to the pool.",
 		Example: `
   $ astro deployment pool list --deployment-id <deployment-id>
@@ -307,8 +355,8 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create Airflow pools for an Astro Deployment",
-		Long:    "Create Airflow pools in a Deployment. Each pool defines a slot count that limits concurrent task execution for tasks assigned to it.",
+		Short:   "Create an Airflow pool in an Astro Deployment",
+		Long:    "Create an Airflow pool in a Deployment. A pool's slot count limits how many tasks assigned to it can run at once. If a pool with the same name already exists, it is updated.",
 		Example: `
   $ astro deployment pool create --deployment-id <deployment-id> --name my-pool --slots 5
   $ astro deployment pool create --deployment-id <deployment-id> --name my-pool --slots 10 --description "Pool for ML tasks"
@@ -319,9 +367,9 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
-	cmd.Flags().StringVarP(&name, "name", "", "", "The Airflow pool value. Required")
-	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The Airflow pool key. Required")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The Airflow pool description")
+	cmd.Flags().StringVarP(&name, "name", "", "", "Name of the pool. Required.")
+	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "Number of slots in the pool. Required.")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The pool description.")
 	cmd.Flags().StringVarP(&includeDeferred, "include-deferred", "", "", "If set to 'enable', deferred tasks are considered when calculating open pool slots. Default is 'disable'. Possible values are disable/enable.")
 
 	return cmd
@@ -332,8 +380,8 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update Airflow pools for an Astro Deployment",
-		Long:    "Update an Airflow pool's slot count or description in a Deployment.",
+		Short:   "Update an Airflow pool in an Astro Deployment",
+		Long:    "Update an Airflow pool's slot count, description or deferred-task setting in a Deployment.",
 		Example: `
   $ astro deployment pool update --deployment-id <deployment-id> --name my-pool --slots 10
   $ astro deployment pool update --deployment-id <deployment-id> --name my-pool --slots 10 --description "Updated pool"
@@ -344,10 +392,10 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
-	cmd.Flags().StringVarP(&name, "name", "", "", "The pool value.  Required.")
-	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The pool slots.")
+	cmd.Flags().StringVarP(&name, "name", "", "", "Name of the pool. Required.")
+	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "Number of slots in the pool.")
 	cmd.Flags().StringVarP(&description, "description", "", "", "The pool description.")
-	cmd.Flags().StringVarP(&includeDeferred, "include-deferred", "", "", "If set to 'enable', deferred tasks are considered when calculating open pool slots. Required for Airflow 3+ deployments. Possible values disable/enable.")
+	cmd.Flags().StringVarP(&includeDeferred, "include-deferred", "", "", "If set to 'enable', deferred tasks are considered when calculating open pool slots. Required for Airflow 3+ Deployments. Possible values are disable/enable.")
 
 	return cmd
 }
@@ -358,7 +406,7 @@ func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 		Use:     "copy",
 		Aliases: []string{"cp"},
 		Short:   "Copy Airflow pools from one Astro Deployment to another",
-		Long:    "Copy Airflow pools from one Astro Deployment to another Astro Deployment. If a pool already exits with same name it will be updated",
+		Long:    "Copy Airflow pools from one Astro Deployment to another. If a pool with the same name already exists in the target Deployment, that pool is updated.",
 		Example: `
   $ astro deployment pool copy --source-id <source-deployment-id> --target-id <target-deployment-id>
   $ astro deployment pool copy --source-name my-source-deployment --target-name my-target-deployment
@@ -368,29 +416,37 @@ func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The ID of the Deployment to copy Airflow pools from.")
-	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy Airflow pools from")
-	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied Airflow pools")
-	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied Airflow pools")
+	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy Airflow pools from.")
+	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied Airflow pools.")
+	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied Airflow pools.")
+
+	return cmd
+}
+
+func newDeploymentPoolDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete",
+		Aliases: []string{"rm"},
+		Short:   "Delete an Airflow pool from an Astro Deployment",
+		Long:    "Delete an Airflow pool from a Deployment. Airflow's default_pool cannot be deleted.",
+		Example: `
+  $ astro deployment pool delete --deployment-id <deployment-id> --name my-pool
+  $ astro deployment pool delete --deployment-name my-deployment --name my-pool --force
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentPoolDelete(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&name, "name", "", "", "Name of the pool. Required.")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete the pool without asking for confirmation.")
 
 	return cmd
 }
 
 func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
 	if err != nil {
 		return err
 	}
@@ -399,60 +455,32 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid Workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
-	if err != nil {
-		return err
-	}
-
-	// check connID and connType
 	if connID == "" {
 		return errors.New("a connection ID is needed to create a connection. Please use the '--conn-id' flag to specify a connection ID")
 	}
-
 	if connType == "" {
 		return errors.New("a connection type is needed to create a connection. Please use the '--conn-type' flag to specify a connection type")
+	}
+
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
 	}
 
 	return deployment.ConnectionCreate(airflowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
 }
 
 func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
-	if err != nil {
-		return err
-	}
-
-	// check connID and connType
 	if connID == "" {
-		return errors.New("a connection ID is needed to create a connection. Please use the '--conn-id' flag to specify a connection ID")
+		return errors.New("a connection ID is needed to update a connection. Please use the '--conn-id' flag to specify a connection ID")
+	}
+	if connType == "" {
+		return errors.New("a connection type is needed to update a connection. Please use the '--conn-type' flag to specify a connection type")
+	}
+
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
 	}
 
 	return deployment.ConnectionUpdate(airflowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
@@ -500,22 +528,21 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	return deployment.CopyConnection(fromAirflowURL, toAirflowURL, airflowAPIClient, out)
 }
 
-func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid Workspace")
+func deploymentConnectionDelete(cmd *cobra.Command, out io.Writer) error {
+	if connID == "" {
+		return errors.New("a connection ID is needed to delete a connection. Please use the '--conn-id' flag to specify a connection ID")
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	requestedDeployment, airflowURL, err := resolveDeploymentAirflowURL(cmd)
 	if err != nil {
 		return err
 	}
 
-	airflowURL, err := getAirflowURL(&requestedDeployment)
+	return deployment.ConnectionDelete(airflowURL, requestedDeployment.Name, connID, forceDelete, airflowAPIClient, out)
+}
+
+func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
 	if err != nil {
 		return err
 	}
@@ -524,60 +551,32 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
-	if err != nil {
-		return err
-	}
-
-	// check key and varValue
 	if key == "" {
 		return errors.New("a variable key is needed to create an airflow variable. Please use the '--key' flag to specify a key")
 	}
-
 	if varValue == "" {
 		return errors.New("a variable value is needed to create an airflow variable. Please use the '--value' flag to specify a value")
+	}
+
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
 	}
 
 	return deployment.VariableCreate(airflowURL, varValue, key, description, airflowAPIClient, out)
 }
 
 func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
-	if err != nil {
-		return err
-	}
-
-	// check key
 	if key == "" {
-		return errors.New("a variable key is needed to create an airflow variable. Please use the '--key' flag to specify a key")
+		return errors.New("a variable key is needed to update an airflow variable. Please use the '--key' flag to specify a key")
+	}
+	if varValue == "" {
+		return errors.New("a variable value is needed to update an airflow variable. Please use the '--value' flag to specify a value")
+	}
+
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
 	}
 
 	return deployment.VariableUpdate(airflowURL, varValue, key, description, airflowAPIClient, out)
@@ -625,22 +624,21 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	return deployment.CopyVariable(fromAirflowURL, toAirflowURL, airflowAPIClient, out)
 }
 
-func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+func deploymentAirflowVariableDelete(cmd *cobra.Command, out io.Writer) error {
+	if key == "" {
+		return errors.New("a variable key is needed to delete an airflow variable. Please use the '--key' flag to specify a key")
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	requestedDeployment, airflowURL, err := resolveDeploymentAirflowURL(cmd)
 	if err != nil {
 		return err
 	}
 
-	airflowURL, err := getAirflowURL(&requestedDeployment)
+	return deployment.VariableDelete(airflowURL, requestedDeployment.Name, key, forceDelete, airflowAPIClient, out)
+}
+
+func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
 	if err != nil {
 		return err
 	}
@@ -649,31 +647,13 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
-	if err != nil {
-		return err
-	}
-
-	// check name
 	if name == "" {
 		return errors.New("a pool name is needed to create a pool. Please use the '--name' flag to specify a name")
 	}
+	if !cmd.Flags().Changed("slots") {
+		return errors.New("a slot count is needed to create a pool. Please use the '--slots' flag to specify a slot count")
+	}
 
-	// check includeDeferred
 	var includeDeferredValue bool
 	switch includeDeferred {
 	case enable:
@@ -682,40 +662,21 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
 		includeDeferredValue = false
 	default:
 		return errors.New("Invalid --include-deferred value")
+	}
+
+	_, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
 	}
 
 	return deployment.PoolCreate(airflowURL, name, description, slots, includeDeferredValue, airflowAPIClient, out)
 }
 
 func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
-	if err != nil {
-		return err
-	}
-
-	airflowURL, err := getAirflowURL(&requestedDeployment)
-	if err != nil {
-		return err
-	}
-
-	// check name
 	if name == "" {
 		return errors.New("a pool name is needed to update a pool. Please use the '--name' flag to specify a name")
 	}
 
-	// check includeDeferred
-	if airflowversions.AirflowMajorVersionForRuntimeVersion(requestedDeployment.RuntimeVersion) >= "3" && includeDeferred == "" {
-		return errors.New("an include deferred value is needed to update a pool. Please use the '--include-deferred' flag to specify a value")
-	}
 	var includeDeferredValue bool
 	switch includeDeferred {
 	case enable:
@@ -724,6 +685,15 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
 		includeDeferredValue = false
 	default:
 		return errors.New("Invalid --include-deferred value")
+	}
+
+	requestedDeployment, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
+	}
+
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(requestedDeployment.RuntimeVersion) >= "3" && includeDeferred == "" {
+		return errors.New("an include deferred value is needed to update a pool. Please use the '--include-deferred' flag to specify a value")
 	}
 
 	return deployment.PoolUpdate(airflowURL, name, description, slots, includeDeferredValue, airflowAPIClient, out)
@@ -767,6 +737,42 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	return deployment.CopyPool(fromAirflowURL, toAirflowURL, airflowAPIClient, out)
+}
+
+func deploymentPoolDelete(cmd *cobra.Command, out io.Writer) error {
+	if name == "" {
+		return errors.New("a pool name is needed to delete a pool. Please use the '--name' flag to specify a name")
+	}
+	if name == airflowclient.DefaultPoolName {
+		return errors.New("the default_pool cannot be deleted. Use 'astro deployment pool update' to change its slots instead")
+	}
+
+	requestedDeployment, airflowURL, err := resolveDeploymentAirflowURL(cmd)
+	if err != nil {
+		return err
+	}
+
+	return deployment.PoolDelete(airflowURL, requestedDeployment.Name, name, forceDelete, airflowAPIClient, out)
+}
+
+func resolveDeploymentAirflowURL(cmd *cobra.Command) (astrov1.Deployment, string, error) {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return astrov1.Deployment{}, "", errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	cmd.SilenceUsage = true
+
+	requestedDeployment, err := deployment.GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	if err != nil {
+		return astrov1.Deployment{}, "", err
+	}
+
+	airflowURL, err := getAirflowURL(&requestedDeployment)
+	if err != nil {
+		return astrov1.Deployment{}, "", err
+	}
+	return requestedDeployment, airflowURL, nil
 }
 
 func getAirflowURL(depl *astrov1.Deployment) (string, error) {

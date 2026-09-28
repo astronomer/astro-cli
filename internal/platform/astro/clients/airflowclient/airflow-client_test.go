@@ -1132,3 +1132,43 @@ func (s *Suite) TestGetPoolsPagination() {
 		s.Equal(2, callCount)
 	})
 }
+
+func (s *Suite) TestDeleteObjects() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	cases := []struct {
+		name    string
+		wantURL string
+		del     func(*HTTPClient) error
+	}{
+		{"connection", "https://test-airflow-url/connections/my-conn", func(c *HTTPClient) error { return c.DeleteConnection("test-airflow-url", "my-conn") }},
+		{"variable", "https://test-airflow-url/variables/my%2Fvar", func(c *HTTPClient) error { return c.DeleteVariable("test-airflow-url", "my/var") }},
+		{"pool", "https://test-airflow-url/pools/my%20pool", func(c *HTTPClient) error { return c.DeletePool("test-airflow-url", "my pool") }},
+	}
+	for _, tc := range cases {
+		s.Run(tc.name+" sends DELETE and accepts an empty 204", func() {
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				s.Equal(http.MethodDelete, req.Method)
+				s.Equal(tc.wantURL, req.URL.String())
+				return &http.Response{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(bytes.NewReader(nil)),
+					Header:     make(http.Header),
+				}
+			})
+			s.NoError(tc.del(NewAirflowClient(client)))
+		})
+
+		s.Run(tc.name+" reports a 404 as not found", func() {
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"detail":"not found"}`)),
+					Header:     make(http.Header),
+				}
+			})
+			err := tc.del(NewAirflowClient(client))
+			s.True(IsNotFound(err))
+		})
+	}
+}

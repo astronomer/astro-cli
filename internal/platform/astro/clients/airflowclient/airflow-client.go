@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
@@ -17,13 +18,17 @@ import (
 
 var errDecode = errors.New("failed to decode response from API")
 
-// isConflict reports whether err is an HTTP 409 Conflict.
-func isConflict(err error) bool {
+func hasStatus(err error, status int) bool {
 	var httpErr *httputil.Error
-	if errors.As(err, &httpErr) {
-		return httpErr.Status == http.StatusConflict
-	}
-	return false
+	return errors.As(err, &httpErr) && httpErr.Status == status
+}
+
+func isConflict(err error) bool {
+	return hasStatus(err, http.StatusConflict)
+}
+
+func IsNotFound(err error) bool {
+	return hasStatus(err, http.StatusNotFound)
 }
 
 // isReadMethod reports whether method is a safe, read-only HTTP method.
@@ -44,19 +49,25 @@ const (
 	writeRetryBackoff = 5 * time.Second
 )
 
+// DefaultPoolName is the pool Airflow creates itself and refuses to delete.
+const DefaultPoolName = "default_pool"
+
 type Client interface {
 	// connections
 	GetConnections(airflowURL string) (Response, error)
 	CreateConnection(airflowURL string, conn *Connection) error
 	UpdateConnection(airflowURL string, conn *Connection) error
+	DeleteConnection(airflowURL, connID string) error
 	// variables
 	GetVariables(airflowURL string) (Response, error)
 	CreateVariable(airflowURL string, variable Variable) error
 	UpdateVariable(airflowURL string, variable Variable) error
+	DeleteVariable(airflowURL, key string) error
 	// pools
 	GetPools(airflowURL string) (Response, error)
 	CreatePool(airflowURL string, pool Pool) error
 	UpdatePool(airflowURL string, pool Pool) error
+	DeletePool(airflowURL, name string) error
 }
 
 // Client containers the logger and HTTPClient used to communicate with the Astronomer API
@@ -132,7 +143,7 @@ func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error
 	}
 
 	doOpts := &httputil.DoOptions{
-		Path:   fmt.Sprintf("https://%s/connections/%s", airflowURL, conn.ConnID),
+		Path:   fmt.Sprintf("https://%s/connections/%s", airflowURL, url.PathEscape(conn.ConnID)),
 		Method: http.MethodPatch,
 		Data:   connJSON,
 	}
@@ -143,6 +154,10 @@ func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error
 	}
 
 	return nil
+}
+
+func (c *HTTPClient) DeleteConnection(airflowURL, connID string) error {
+	return c.deleteResource(airflowURL, "connections", connID)
 }
 
 func (c *HTTPClient) GetVariables(airflowURL string) (Response, error) {
@@ -181,7 +196,7 @@ func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error 
 	}
 
 	doOpts := &httputil.DoOptions{
-		Path:   fmt.Sprintf("https://%s/variables/%s", airflowURL, variable.Key),
+		Path:   fmt.Sprintf("https://%s/variables/%s", airflowURL, url.PathEscape(variable.Key)),
 		Method: http.MethodPatch,
 		Data:   varJSON,
 	}
@@ -192,6 +207,10 @@ func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error 
 	}
 
 	return nil
+}
+
+func (c *HTTPClient) DeleteVariable(airflowURL, key string) error {
+	return c.deleteResource(airflowURL, "variables", key)
 }
 
 func (c *HTTPClient) GetPools(airflowURL string) (Response, error) {
@@ -223,10 +242,10 @@ func (c *HTTPClient) CreatePool(airflowURL string, pool Pool) error {
 }
 
 func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
-	path := fmt.Sprintf("https://%s/pools/%s", airflowURL, pool.Name)
+	path := fmt.Sprintf("https://%s/pools/%s", airflowURL, url.PathEscape(pool.Name))
 
 	// default pool does not allow updating other fields, such as description
-	if pool.Name == "default_pool" {
+	if pool.Name == DefaultPoolName {
 		path += "?update_mask=slots&update_mask=include_deferred"
 	}
 
@@ -247,6 +266,19 @@ func (c *HTTPClient) UpdatePool(airflowURL string, pool Pool) error {
 	}
 
 	return nil
+}
+
+func (c *HTTPClient) DeletePool(airflowURL, name string) error {
+	return c.deleteResource(airflowURL, "pools", name)
+}
+
+func (c *HTTPClient) deleteResource(airflowURL, resource, id string) error {
+	doOpts := &httputil.DoOptions{
+		Path:   fmt.Sprintf("https://%s/%s/%s", airflowURL, resource, url.PathEscape(id)),
+		Method: http.MethodDelete,
+	}
+	_, err := c.DoAirflowClient(doOpts)
+	return err
 }
 
 // checkRetryPolicy retries read methods with the default policy and writes only on transient statuses.
@@ -328,6 +360,9 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	}
 
 	decode := Response{}
+	if resp.StatusCode == http.StatusNoContent {
+		return &decode, nil
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&decode); err != nil {
 		return nil, errDecode
 	}

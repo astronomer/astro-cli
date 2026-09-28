@@ -3,11 +3,15 @@ package deployment
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"net/http"
 
 	"github.com/stretchr/testify/mock"
 
 	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
 	airflowclient_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient/mocks"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 var (
@@ -472,4 +476,67 @@ func (s *Suite) TestCopyPool() {
 		s.Error(err)
 		s.Equal("error", err.Error())
 	})
+}
+
+func (s *Suite) TestAirflowObjectDelete() {
+	type deleteFunc func(id string, force bool, c airflowclient.Client, out *bytes.Buffer) error
+	cases := []struct {
+		kind   string
+		method string
+		id     string
+		del    deleteFunc
+	}{
+		{"connection", "DeleteConnection", "my-conn", func(id string, force bool, c airflowclient.Client, out *bytes.Buffer) error {
+			return ConnectionDelete(testAirflowURL, "my-deployment", id, force, c, out)
+		}},
+		{"Airflow variable", "DeleteVariable", "my_var", func(id string, force bool, c airflowclient.Client, out *bytes.Buffer) error {
+			return VariableDelete(testAirflowURL, "my-deployment", id, force, c, out)
+		}},
+		{"pool", "DeletePool", "my-pool", func(id string, force bool, c airflowclient.Client, out *bytes.Buffer) error {
+			return PoolDelete(testAirflowURL, "my-deployment", id, force, c, out)
+		}},
+	}
+	for _, tc := range cases {
+		s.Run(tc.kind+" deletes without a prompt when forced", func() {
+			out := new(bytes.Buffer)
+			mockClient := new(airflowclient_mocks.Client)
+			mockClient.On(tc.method, testAirflowURL, tc.id).Return(nil).Once()
+			s.NoError(tc.del(tc.id, true, mockClient, out))
+			s.Contains(out.String(), "Deleted "+tc.kind)
+			mockClient.AssertExpectations(s.T())
+		})
+
+		s.Run(tc.kind+" deletes after the user confirms", func() {
+			defer testUtil.MockUserInput(s.T(), "y\n")()
+			out := new(bytes.Buffer)
+			mockClient := new(airflowclient_mocks.Client)
+			mockClient.On(tc.method, testAirflowURL, tc.id).Return(nil).Once()
+			s.NoError(tc.del(tc.id, false, mockClient, out))
+			mockClient.AssertExpectations(s.T())
+		})
+
+		s.Run(tc.kind+" does nothing when the user declines", func() {
+			defer testUtil.MockUserInput(s.T(), "n\n")()
+			out := new(bytes.Buffer)
+			mockClient := new(airflowclient_mocks.Client)
+			s.NoError(tc.del(tc.id, false, mockClient, out))
+			s.Contains(out.String(), "Canceling "+tc.kind+" deletion")
+			mockClient.AssertNotCalled(s.T(), tc.method, mock.Anything, mock.Anything)
+		})
+
+		s.Run(tc.kind+" names the missing object on a 404", func() {
+			out := new(bytes.Buffer)
+			mockClient := new(airflowclient_mocks.Client)
+			mockClient.On(tc.method, testAirflowURL, tc.id).Return(&httputil.Error{Status: http.StatusNotFound}).Once()
+			err := tc.del(tc.id, true, mockClient, out)
+			s.EqualError(err, fmt.Sprintf("no %s %q found in the my-deployment Deployment", tc.kind, tc.id))
+		})
+
+		s.Run(tc.kind+" passes other errors through", func() {
+			out := new(bytes.Buffer)
+			mockClient := new(airflowclient_mocks.Client)
+			mockClient.On(tc.method, testAirflowURL, tc.id).Return(errTest).Once()
+			s.ErrorIs(tc.del(tc.id, true, mockClient, out), errTest)
+		})
+	}
 }
