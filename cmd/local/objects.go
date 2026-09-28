@@ -83,11 +83,10 @@ func (q *query) runConnectionsList(ctx context.Context, opts airflowapi.ListOpti
 	if err != nil {
 		return err
 	}
-	list, err := client.ListConnections(ctx, opts)
-	if err != nil {
-		return err
-	}
-	return emitRows(r, mapRows(list.Connections, newConnectionListRow), renderConnectionTable)
+	return emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Connection, int, error) {
+		list, err := client.ListConnections(ctx, page)
+		return list.Connections, list.TotalEntries, err
+	}, newConnectionListRow, renderConnectionTable)
 }
 
 func renderConnectionTable(w io.Writer, rows []connectionListRow) error {
@@ -183,14 +182,12 @@ func (q *query) runVariablesList(ctx context.Context, opts airflowapi.ListOption
 	if err != nil {
 		return err
 	}
-	list, err := client.ListVariables(ctx, opts)
-	if err != nil {
-		return err
-	}
-	rows := mapRows(list.Variables, func(v airflowapi.Variable) variableListRow {
+	return emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Variable, int, error) {
+		list, err := client.ListVariables(ctx, page)
+		return list.Variables, list.TotalEntries, err
+	}, func(v airflowapi.Variable) variableListRow {
 		return variableListRow{Key: v.Key, Description: v.Description, IsEncrypted: v.IsEncrypted}
-	})
-	return emitRows(r, rows, renderVariableTable)
+	}, renderVariableTable)
 }
 
 func renderVariableTable(w io.Writer, rows []variableListRow) error {
@@ -299,11 +296,10 @@ func (q *query) runPoolsList(ctx context.Context, opts airflowapi.ListOptions) e
 	if err != nil {
 		return err
 	}
-	list, err := client.ListPools(ctx, opts)
-	if err != nil {
-		return err
-	}
-	return emitRows(r, mapRows(list.Pools, newPoolRow), renderPoolTable)
+	return emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Pool, int, error) {
+		list, err := client.ListPools(ctx, page)
+		return list.Pools, list.TotalEntries, err
+	}, newPoolRow, renderPoolTable)
 }
 
 func renderPoolTable(w io.Writer, rows []poolRow) error {

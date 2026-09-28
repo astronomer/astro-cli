@@ -1,7 +1,10 @@
 package local
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -180,5 +183,91 @@ func TestDagsPauseAndUnpause(t *testing.T) {
 	}
 	if !strings.Contains(out, "unpaused orders_etl") {
 		t.Errorf("stdout = %q", out)
+	}
+}
+
+// cappedDAGs answers /dags the way Airflow does at its default
+// maximum_page_limit: never more than 100 rows, whatever the limit asked for.
+func cappedDAGs(total int) func(url.Values) string {
+	return func(query url.Values) string {
+		offset, _ := strconv.Atoi(query.Get("offset"))
+		limit, _ := strconv.Atoi(query.Get("limit"))
+		var dags []string
+		for i := offset; i < min(offset+min(limit, 100), total); i++ {
+			dags = append(dags, fmt.Sprintf(`{"dag_id":"dag_%03d"}`, i))
+		}
+		return fmt.Sprintf(`{"dags":[%s],"total_entries":%d}`, strings.Join(dags, ","), total)
+	}
+}
+
+func TestDagsListPagesPastTheServerCap(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.routeFunc(http.MethodGet, "/api/v2/dags", cappedDAGs(179))
+
+	out, errOut, err := runQuery(t, stub, "dags", "list", "--limit", "500", "-o", "json")
+	if err != nil {
+		t.Fatalf("dags list --limit 500: %v", err)
+	}
+	if rows := decodeNDJSON(t, out); len(rows) != 179 {
+		t.Fatalf("got %d rows, want all 179", len(rows))
+	}
+	var pages []string
+	for _, req := range stub.requests() {
+		if req.Path == "/api/v2/dags" {
+			pages = append(pages, req.Query)
+		}
+	}
+	if len(pages) != 2 || !strings.Contains(pages[1], "offset=100") || !strings.Contains(pages[1], "limit=400") {
+		t.Errorf("want two pages, the second at offset 100 asking for the other 400; got %q", pages)
+	}
+	if strings.Contains(errOut, "showing") {
+		t.Errorf("nothing was left out, yet stderr says so: %q", errOut)
+	}
+}
+
+func TestDagsListNamesTheRowsItLeftOut(t *testing.T) {
+	for _, tc := range []struct {
+		args     []string
+		rows     int
+		footer   string
+		lastSeen string
+	}{
+		{nil, 100, "showing 100 of 179; use --offset 100 or --limit 179", "dag_099"},
+		{[]string{"--limit", "150"}, 150, "showing 150 of 179; use --offset 150 or --limit 179", "dag_149"},
+		{[]string{"--offset", "100", "--limit", "50"}, 50, "showing 50 of 179; use --offset 150 or --limit 79", "dag_149"},
+		{[]string{"--offset", "100"}, 79, "", "dag_178"},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			stub := newAirflowStub(t)
+			stub.routeFunc(http.MethodGet, "/api/v2/dags", cappedDAGs(179))
+
+			out, errOut, err := runQuery(t, stub, append([]string{"dags", "list"}, tc.args...)...)
+			if err != nil {
+				t.Fatalf("dags list: %v", err)
+			}
+			if !strings.Contains(out, tc.lastSeen) || strings.Count(out, "dag_") != tc.rows {
+				t.Errorf("want %d rows ending at %s:\n%s", tc.rows, tc.lastSeen, out)
+			}
+			if tc.footer == "" && strings.Contains(errOut, "showing") {
+				t.Errorf("nothing was left out, yet stderr says so: %q", errOut)
+			}
+			if !strings.Contains(errOut, tc.footer) {
+				t.Errorf("stderr = %q, want %q", errOut, tc.footer)
+			}
+			if strings.Contains(out, "showing") {
+				t.Errorf("the footer reached stdout:\n%s", out)
+			}
+
+			out, errOut, err = runQuery(t, stub, append([]string{"dags", "list", "-o", "json"}, tc.args...)...)
+			if err != nil {
+				t.Fatalf("dags list -o json: %v", err)
+			}
+			if rows := decodeNDJSON(t, out); len(rows) != tc.rows {
+				t.Errorf("json has %d rows, want %d", len(rows), tc.rows)
+			}
+			if strings.Contains(errOut, "showing") {
+				t.Errorf("json mode wrote the text footer: %q", errOut)
+			}
+		})
 	}
 }

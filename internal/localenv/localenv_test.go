@@ -256,6 +256,55 @@ func TestListSourceAndOrphans(t *testing.T) {
 	}
 }
 
+// An Airflow setting in .env is listed with its source but is no orphan: it
+// configures Airflow, so declaring it for the project's code would be odd. A
+// connection or Variable key still reads as its own kind, once.
+func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("ASTRO_HOME", t.TempDir())
+	writeGlobalEnv(t, "AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT=False\n")
+	projDir := t.TempDir()
+	other := t.TempDir()
+	body := "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False\nAIRFLOW_CONN_WAREHOUSE=postgres://h\nAIRFLOW_VAR_REGION=us\n"
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ProjectEnvPath(other), []byte("AIRFLOW__CORE__LOAD_EXAMPLES=False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := localrttest.Seed(localrttest.Record{ProjectPath: other, Mode: localrt.ModeStandalone, Port: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := List(nil, projDir, nil, ListOptions{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]int{}
+	for _, it := range items {
+		seen[it.Name]++
+		switch it.Name {
+		case "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION", "AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT":
+			if it.Orphan || it.RemoveHint != "" || it.Kind != KindEnv {
+				t.Errorf("%s = %+v, want a plain env row with no orphan note", it.Name, it)
+			}
+		case "warehouse", "region":
+			if !it.Orphan {
+				t.Errorf("%s = %+v, want the undeclared connection or Variable still an orphan", it.Name, it)
+			}
+		}
+	}
+	if seen["AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION"] != 1 || seen["AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT"] != 1 {
+		t.Errorf("want each setting listed once, got %v", seen)
+	}
+	if seen["warehouse"] != 1 || seen["region"] != 1 || seen["AIRFLOW_CONN_WAREHOUSE"] != 0 || seen["AIRFLOW_VAR_REGION"] != 0 {
+		t.Errorf("want the connection and Variable listed once, under their own names, got %v", seen)
+	}
+	if seen["AIRFLOW__CORE__LOAD_EXAMPLES"] != 0 {
+		t.Errorf("another project's Airflow setting is no orphan of this one, got %v", seen)
+	}
+}
+
 // Each declared row carries its declaration's required, sensitive and
 // description, per section, so `list --output json` answers what the manifest
 // asks for without a second read of it. An orphan has no declaration and

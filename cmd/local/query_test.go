@@ -35,8 +35,9 @@ type airflowStub struct {
 }
 
 type stubRoute struct {
-	status int
-	body   string
+	status  int
+	body    string
+	respond func(url.Values) string
 }
 
 type stubRequest struct {
@@ -77,6 +78,14 @@ func (s *airflowStub) routeStatus(method, path string, status int, body string) 
 	s.routes[method+" "+path] = stubRoute{status: status, body: body}
 }
 
+// routeFunc answers a path with a body built from the request's query, for a
+// case whose answer depends on it, such as the page an offset names.
+func (s *airflowStub) routeFunc(method, path string, respond func(url.Values) string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.routes[method+" "+path] = stubRoute{status: http.StatusOK, respond: respond}
+}
+
 func (s *airflowStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -99,6 +108,10 @@ func (s *airflowStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(route.status)
+	if route.respond != nil {
+		_, _ = io.WriteString(w, route.respond(r.URL.Query()))
+		return
+	}
 	_, _ = io.WriteString(w, route.body)
 }
 

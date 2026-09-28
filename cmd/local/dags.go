@@ -123,11 +123,12 @@ func (q *query) runDagsList(ctx context.Context, opts airflowapi.ListDAGsOptions
 	if err != nil {
 		return err
 	}
-	list, err := client.ListDAGs(ctx, opts)
-	if err != nil {
-		return err
-	}
-	return emitRows(r, mapRows(list.DAGs, newDAGRow), renderDAGTable)
+	return emitList(q, r, opts.ListOptions, func(page airflowapi.ListOptions) ([]airflowapi.DAG, int, error) {
+		filtered := opts
+		filtered.ListOptions = page
+		list, err := client.ListDAGs(ctx, filtered)
+		return list.DAGs, list.TotalEntries, err
+	}, newDAGRow, renderDAGTable)
 }
 
 func renderDAGTable(w io.Writer, rows []dagRow) error {

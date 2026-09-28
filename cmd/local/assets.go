@@ -75,11 +75,10 @@ func (q *query) runAssetsList(ctx context.Context, opts airflowapi.ListOptions) 
 	if err != nil {
 		return err
 	}
-	list, err := client.ListAssets(ctx, opts)
-	if err != nil {
-		return notServed("assets", err)
-	}
-	return emitRows(r, mapRows(list.Assets, newAssetRow), renderAssetTable)
+	return notServed("assets", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Asset, int, error) {
+		list, err := client.ListAssets(ctx, page)
+		return list.Assets, list.TotalEntries, err
+	}, newAssetRow, renderAssetTable))
 }
 
 func renderAssetTable(w io.Writer, rows []assetRow) error {
@@ -161,11 +160,12 @@ func (q *query) runAssetsEvents(ctx context.Context, opts airflowapi.ListAssetEv
 	if err != nil {
 		return err
 	}
-	list, err := client.ListAssetEvents(ctx, opts)
-	if err != nil {
-		return notServed("asset events", err)
-	}
-	return emitRows(r, mapRows(list.AssetEvents, newAssetEventRow), renderAssetEventTable)
+	return notServed("asset events", emitList(q, r, opts.ListOptions, func(page airflowapi.ListOptions) ([]airflowapi.AssetEvent, int, error) {
+		filtered := opts
+		filtered.ListOptions = page
+		list, err := client.ListAssetEvents(ctx, filtered)
+		return list.AssetEvents, list.TotalEntries, err
+	}, newAssetEventRow, renderAssetEventTable))
 }
 
 func renderAssetEventTable(w io.Writer, rows []assetEventRow) error {

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/secrets"
@@ -74,8 +75,19 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		return err
 	}
 	return r.Emit(res, func(w io.Writer) error {
-		return renderInit(w, res)
+		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// nextStart is the start command to suggest once init is done. Standalone
+// mode builds no image, so a project whose manifest declares a Dockerfile or
+// OS packages starts as it will run only in Docker mode.
+func nextStart(dir string) string {
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	if err != nil || (m.Astro.Dockerfile == "" && len(m.Astro.Packages) == 0) {
+		return replaceStart
+	}
+	return replaceStart + " --docker"
 }
 
 // defaultSourceNote says where a defaulted Airflow came from, for the line that
@@ -113,7 +125,7 @@ func (c *cli) resolveDir(dir string) (string, error) {
 	return filepath.Join(wd, dir), nil
 }
 
-func renderInit(w io.Writer, res *scaffold.Result) error {
+func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	// "Adopted" and "Created" are the two shapes Run has: a manifest that was
 	// already there and gained a section, or one this run wrote. Other files
 	// can be updated on either path, so the manifest's own fate decides.
@@ -153,7 +165,7 @@ func renderInit(w io.Writer, res *scaffold.Result) error {
 	if err := renderLeftToDo(w, res.Notes); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(w, "\nNext: %s\n", replaceStart)
+	_, err := fmt.Fprintf(w, "\nNext: %s\n", next)
 	return err
 }
 

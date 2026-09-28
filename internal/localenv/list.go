@@ -2,6 +2,7 @@ package localenv
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
@@ -10,10 +11,10 @@ import (
 )
 
 // ListItem is one row of `astro local env list`: a declared name with the
-// source it resolves from, or an undeclared entry found in a file (an
-// orphan). It never carries a value — the row is built from names and
-// sources only, so `list` is structurally value-free and safe for agent
-// surfaces.
+// source it resolves from, an undeclared entry found in a file (an orphan), or
+// an undeclared Airflow setting, which is no orphan (see isAirflowSetting). It
+// never carries a value — the row is built from names and sources only, so
+// `list` is structurally value-free and safe for agent surfaces.
 type ListItem struct {
 	Kind Kind   `json:"kind"`
 	Name string `json:"name"`
@@ -212,6 +213,10 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 			if declared[key] {
 				continue
 			}
+			if isAirflowSetting(key) {
+				out = append(out, ListItem{Kind: KindEnv, Name: key, Source: string(scope)})
+				continue
+			}
 			out = append(out, orphanItem(key, scope, ""))
 		}
 	}
@@ -228,6 +233,10 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 		for _, tier := range opts.VaultTiers {
 			for _, e := range tier.Entries {
 				if declared[e.EnvKey] {
+					continue
+				}
+				if isAirflowSetting(e.EnvKey) {
+					out = append(out, ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label})
 					continue
 				}
 				out = append(out, ListItem{
@@ -270,13 +279,21 @@ func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem
 		}
 		for key := range m {
 			// Skip keys the current project declares — those are already rows.
-			if declared[key] {
+			if declared[key] || isAirflowSetting(key) {
 				continue
 			}
 			out = append(out, orphanItem(key, ScopeProject, rec.ProjectPath))
 		}
 	}
 	return out
+}
+
+// isAirflowSetting reports a key Airflow reads as a configuration option,
+// AIRFLOW__{SECTION}__{KEY}. Such a key sets how Airflow runs rather than a
+// value the project's code expects, so an undeclared one is listed with its
+// source but never as an orphan: declaring it in [tool.astro.env] would be odd.
+func isAirflowSetting(key string) bool {
+	return strings.HasPrefix(key, "AIRFLOW__")
 }
 
 func orphanItem(key string, scope Scope, project string) ListItem {

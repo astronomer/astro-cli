@@ -128,11 +128,12 @@ func (q *query) runRunsList(ctx context.Context, dagID string, opts airflowapi.L
 	if err != nil {
 		return err
 	}
-	list, err := client.ListDAGRuns(ctx, dagID, opts)
-	if err != nil {
-		return err
-	}
-	return emitRows(r, mapRows(list.DAGRuns, newRunRow), renderRunTable)
+	return emitList(q, r, opts.ListOptions, func(page airflowapi.ListOptions) ([]airflowapi.DAGRun, int, error) {
+		filtered := opts
+		filtered.ListOptions = page
+		list, err := client.ListDAGRuns(ctx, dagID, filtered)
+		return list.DAGRuns, list.TotalEntries, err
+	}, newRunRow, renderRunTable)
 }
 
 func renderRunTable(w io.Writer, rows []runRow) error {
@@ -179,11 +180,10 @@ func (q *query) runRunsTasks(ctx context.Context, dagID, runID string, f listFla
 	if err != nil {
 		return err
 	}
-	list, err := client.ListTaskInstances(ctx, dagID, runID, f.options())
-	if err != nil {
-		return err
-	}
-	return emitRows(r, mapRows(list.TaskInstances, newTaskInstanceRow), renderRunTaskTable)
+	return emitList(q, r, f.options(), func(page airflowapi.ListOptions) ([]airflowapi.TaskInstance, int, error) {
+		list, err := client.ListTaskInstances(ctx, dagID, runID, page)
+		return list.TaskInstances, list.TotalEntries, err
+	}, newTaskInstanceRow, renderRunTaskTable)
 }
 
 // renderRunTaskTable drops the dag and run columns renderTaskInstanceTable

@@ -206,6 +206,49 @@ func (f listFlags) options() airflowapi.ListOptions {
 	return airflowapi.ListOptions{Limit: f.limit, Offset: f.offset, OrderBy: f.orderBy}
 }
 
+// listPages asks for pages until it holds the rows opts.Limit names or the
+// collection runs out, and returns them with the collection's total. Airflow
+// caps a page at its maximum_page_limit, 100 unless configured, so one request
+// for --limit 500 answers with 100 rows.
+func listPages[T any](opts airflowapi.ListOptions, page func(airflowapi.ListOptions) ([]T, int, error)) (rows []T, total int, err error) {
+	want := opts.Limit
+	if want <= 0 {
+		want = airflowapi.DefaultLimit
+	}
+	for {
+		opts.Limit = want - len(rows)
+		got, n, err := page(opts)
+		if err != nil {
+			return nil, 0, err
+		}
+		rows, total = append(rows, got...), n
+		opts.Offset += len(got)
+		if len(got) == 0 || len(rows) >= want || opts.Offset >= total {
+			return rows, total, nil
+		}
+	}
+}
+
+// emitList pages through a list endpoint and renders what it got. A table
+// carries no count, so in text mode the rows left past the listing are named
+// on stderr; json rows stay one object per line with nothing added.
+func emitList[Wire, Row any](q *query, r Renderer, opts airflowapi.ListOptions,
+	page func(airflowapi.ListOptions) ([]Wire, int, error), row func(Wire) Row, text func(io.Writer, []Row) error,
+) error {
+	wire, total, err := listPages(opts, page)
+	if err != nil {
+		return err
+	}
+	if err := emitRows(r, mapRows(wire, row), text); err != nil {
+		return err
+	}
+	next := opts.Offset + len(wire)
+	if r.Format == FormatText && next < total {
+		fmt.Fprintf(q.d.Stderr, "showing %d of %d; use --offset %d or --limit %d\n", len(wire), total, next, total-opts.Offset)
+	}
+	return nil
+}
+
 // notServedMessage is what an Airflow without an endpoint is reported as. What
 // an instance serves is discovered by asking, so this is a normal answer on an
 // older or trimmed-down Airflow rather than a fault to dump a status for.

@@ -31,8 +31,45 @@ func TestInitScaffoldsTheWorkingDir(t *testing.T) {
 		}
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Created Astro project") || !strings.Contains(out, replaceStart) {
+	if !strings.Contains(out, "Created Astro project") || !strings.HasSuffix(out, "Next: "+replaceStart+"\n") {
 		t.Errorf("text output incomplete:\n%s", out)
+	}
+}
+
+// A kept Dockerfile is built only in Docker mode, so that is the start to
+// suggest: a plain start runs standalone and leaves the file out.
+func TestInitSuggestsDockerForAKeptDockerfile(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	dockerfile := "FROM astrocrpublic.azurecr.io/runtime:3.1-1\nRUN apt-get update && apt-get install -y libpq-dev\n"
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(manifest), "dockerfile") {
+		t.Fatalf("the case needs init to keep and declare the Dockerfile:\n%s", manifest)
+	}
+	if out := stdout.String(); !strings.HasSuffix(out, "Next: "+replaceStart+" --docker\n") {
+		t.Errorf("want the Docker-mode start suggested:\n%s", out)
+	}
+}
+
+// OS packages are the other thing only Docker mode applies.
+func TestInitSuggestsDockerForOSPackages(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	if err := os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	if out := stdout.String(); !strings.HasSuffix(out, "Next: "+replaceStart+" --docker\n") {
+		t.Errorf("want the Docker-mode start suggested:\n%s", out)
 	}
 }
 
