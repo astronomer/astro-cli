@@ -474,6 +474,25 @@ func (s *Suite) TestDockerImagePush() {
 		})
 	}
 
+	s.Run("the Docker API gets the token without its Bearer prefix", func() {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(mocks.DockerCLIClient)
+		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
+		mockClient.On("ImagePush", context.Background(), "images.astronomer.io/foo/bar:123", mock.MatchedBy(func(opts image.PushOptions) bool {
+			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
+			if err != nil {
+				return false
+			}
+			var authConfig types.AuthConfig
+			return json.Unmarshal(decodedAuth, &authConfig) == nil && authConfig.Password == "test-token"
+		})).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
+		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
+
+		_, err := handler.Push("images.astronomer.io/foo/bar:123", "cli", "Bearer test-token", false)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
+	})
+
 	s.Run("docker library failure", func() {
 		// This path is used to support running Colima whichn is "docker-cli compatible" but wasn't 100% library compatible in the past.
 		// That was 3 years ago though, so we should re-test and work out if this CLI fallback is still needed or not
@@ -854,6 +873,63 @@ func (s *Suite) TestDockerImagePush403Error() {
 		imageName: "testing",
 	}
 
+	s.Run("an auth error from the Docker API with a username set skips the CLI retry", func() {
+		const fakeToken = "fake-secret-token-2b8e41"
+		mockClient := new(mocks.DockerCLIClient)
+		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
+		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
+		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+			return fmt.Errorf("unauthorized: authentication required for %s", fakeToken)
+		}
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.NotEqual("push", args[0], "the CLI must not upload again with a credential the registry refused")
+			return nil
+		}
+		registryLogin = func(_, _, _, _ string, _, _ io.Writer) error {
+			s.Fail("the CLI must not log in again with a credential the registry refused")
+			return nil
+		}
+
+		prevLevel := logger.GetLevel()
+		var out bytes.Buffer
+		logger.SetLevel(logrus.DebugLevel)
+		logger.SetOutput(&out)
+		defer func() {
+			logger.SetLevel(prevLevel)
+			logger.SetOutput(os.Stderr)
+			getDockerClient = s.origGetDockerClient
+			registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return nil }
+		}()
+
+		_, err := handler.Push("test", "test-username", "Bearer "+fakeToken, false)
+		s.ErrorIs(err, ErrImagePush403)
+		s.Contains(out.String(), "unauthorized: authentication required for [redacted]")
+		s.NotContains(out.String(), fakeToken)
+	})
+
+	s.Run("an auth error from the Docker API without a username still tries the CLI", func() {
+		mockClient := new(mocks.DockerCLIClient)
+		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
+		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
+		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
+		defer func() { getDockerClient = s.origGetDockerClient }()
+		pushed := false
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "push" {
+				pushed = true
+			}
+			return nil
+		}
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+			return fmt.Errorf("unauthorized: authentication required")
+		}
+
+		_, err := handler.Push("test", "", "houston-token", false)
+		s.NoError(err)
+		s.True(pushed)
+	})
+
 	s.Run("403 error with helpful message after both methods fail", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			if args[0] == "tag" {
@@ -869,11 +945,12 @@ func (s *Suite) TestDockerImagePush403Error() {
 			return fmt.Errorf("Error response from daemon: authentication required")
 		}
 
-		_, err := handler.Push("test", "test-username", "test", false)
+		_, err := handler.Push("test", "", "test", false)
 		s.Error(err)
 		s.Contains(err.Error(), "This commonly occurs due to:")
 		s.Contains(err.Error(), "docker logout")
 		s.Contains(err.Error(), "containerd snapshotter")
+		s.Contains(err.Error(), "the push credential can expire before a large layer finishes")
 		s.Contains(err.Error(), "https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push")
 	})
 
@@ -935,6 +1012,7 @@ func (s *Suite) TestIs403Error() {
 		{"nil error", nil, false},
 		{"empty error", fmt.Errorf(""), false},
 		{"404 error should not match", fmt.Errorf("HTTP 404 Not Found"), false},
+		{"403 inside a digest should not match", fmt.Errorf("blob sha256:ab403cd unknown"), false},
 	}
 
 	for _, tc := range testCases {

@@ -158,7 +158,7 @@ func (s *Suite) TestTar() {
 	testDirPath, _ := os.MkdirTemp("", "")
 	testSourceDirName := "source"
 	testSourceDirPath := filepath.Join(testDirPath, testSourceDirName)
-	defer afero.NewOsFs().Remove(testSourceDirPath)
+	defer os.RemoveAll(testDirPath)
 
 	// create a test file, and a symlink to it
 	testFileName := "test.txt"
@@ -175,6 +175,13 @@ func (s *Suite) TestTar() {
 	testSubDirFilePath := filepath.Join(testSubDirPath, testSubDirFileName)
 	_ = os.Mkdir(testSubDirPath, os.ModePerm)
 	WriteStringToFile(testSubDirFilePath, "testing")
+
+	WriteStringToFile(filepath.Join(testSourceDirPath, "__pycache__", "dag.cpython-313.pyc"), "bytecode")
+	WriteStringToFile(filepath.Join(testSubDirPath, "__pycache__", "helper.cpython-313.pyc"), "bytecode")
+	airflowIgnoreName := ".airflowignore"
+	WriteStringToFile(filepath.Join(testSourceDirPath, airflowIgnoreName), "scratch/")
+	sourcelessPycName := "vendored.pyc"
+	WriteStringToFile(filepath.Join(testSourceDirPath, sourcelessPycName), "bytecode")
 
 	type args struct {
 		source         string
@@ -199,6 +206,8 @@ func (s *Suite) TestTar() {
 			expectPaths: []string{
 				testFileName,
 				symlinkFileName,
+				airflowIgnoreName,
+				sourcelessPycName,
 				filepath.Join(testSubDirName, testSubDirFileName),
 			},
 		},
@@ -213,6 +222,8 @@ func (s *Suite) TestTar() {
 			expectPaths: []string{
 				filepath.Join(testSourceDirName, testFileName),
 				filepath.Join(testSourceDirName, symlinkFileName),
+				filepath.Join(testSourceDirName, airflowIgnoreName),
+				filepath.Join(testSourceDirName, sourcelessPycName),
 				filepath.Join(testSourceDirName, testSubDirName, testSubDirFileName),
 			},
 		},
@@ -228,6 +239,8 @@ func (s *Suite) TestTar() {
 			expectPaths: []string{
 				testFileName,
 				symlinkFileName,
+				airflowIgnoreName,
+				sourcelessPycName,
 				// testSubDirFileName excluded
 			},
 		},

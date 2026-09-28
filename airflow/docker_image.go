@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	cliConfig "github.com/docker/cli/cli/config"
@@ -42,10 +43,12 @@ var (
 This commonly occurs due to:
 1. Invalid cached Docker credentials
 2. Incompatible containerd snapshotter configuration
+3. A very long upload: the push credential can expire before a large layer finishes
 
 To resolve:
 • Run 'docker logout' for each Astro registry to clear cached credentials
 • Ensure containerd snapshotter is disabled (Docker Desktop users)
+• If the push ran for many minutes, retry, or make the image smaller
 • Try running 'astro deploy' again
 
 For detailed troubleshooting steps, visit:
@@ -319,21 +322,29 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		creds := configFile.GetCredentialsStore(registryDomain)
 		authConfig, err = creds.Get(registryDomain)
 		if err != nil {
-			logger.Debugf("Error reading credentials for domain: %s from %s credentials store: %v", containerRuntime, registryDomain, err)
+			logger.Debugf("Error reading credentials for domain: %s from %s credentials store: %v", registryDomain, containerRuntime, err)
 		}
 	} else {
 		if username != "" {
 			authConfig.Username = username
 		}
-		authConfig.Password = token
+		authConfig.Password = strings.TrimPrefix(token, prefix)
 		authConfig.ServerAddress = registry
+		authConfig.IdentityToken = ""
+		authConfig.RegistryToken = ""
 	}
 
 	logger.Debugf("Exec Push %s creds %s", containerRuntime, describeAuth(&authConfig))
 
 	err = d.pushWithClient(&authConfig, remoteImage)
 	if err != nil {
+		logger.Debugf("Push through the Docker API failed: %s", redactSecret(err.Error(), authConfig.Password))
+		// The CLI fallback would log in with this same credential and upload again only to be refused.
+		if username != "" && is403Error(err) {
+			return "", ErrImagePush403
+		}
 		// if it does not work with the go library use the container runtime's CLI. Support for (old?) versions of Colima
+		logger.Debugf("Retrying the push with the %s CLI", containerRuntime)
 		err = pushWithCLI(&authConfig, remoteImage)
 		if err != nil {
 			// Check for 403 errors only after both methods fail
@@ -407,7 +418,6 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 	encodedAuth := base64.URLEncoding.EncodeToString(buf)
 	responseBody, err := cli.ImagePush(ctx, remoteImage, image.PushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
-		logger.Debugf("Error pushing image to docker: %v", err)
 		return err
 	}
 	defer responseBody.Close()
@@ -697,6 +707,13 @@ func registryLoginCmd(containerRuntime, server, username, password string) *exec
 	return loginCmd
 }
 
+func redactSecret(s, secret string) string {
+	if secret == "" {
+		return s
+	}
+	return strings.ReplaceAll(s, secret, "[redacted]")
+}
+
 func describeAuth(authConfig *cliTypes.AuthConfig) string {
 	hasSecret := authConfig.Password != "" || authConfig.Auth != "" || authConfig.IdentityToken != "" || authConfig.RegistryToken != ""
 	return fmt.Sprintf("{server: %q, username: %q, secret set: %t}", authConfig.ServerAddress, authConfig.Username, hasSecret)
@@ -754,6 +771,8 @@ func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
 	return nil
 }
 
+var http403Pattern = regexp.MustCompile(`\b403\b`)
+
 // is403Error checks if the error is a 403 authentication error
 func is403Error(err error) bool {
 	if err == nil {
@@ -764,7 +783,7 @@ func is403Error(err error) bool {
 	for currentErr := err; currentErr != nil; currentErr = errors.Unwrap(currentErr) {
 		errStr := strings.ToLower(currentErr.Error())
 
-		if strings.Contains(errStr, "403") ||
+		if http403Pattern.MatchString(errStr) ||
 			strings.Contains(errStr, "forbidden") ||
 			strings.Contains(errStr, "authentication required") {
 			return true

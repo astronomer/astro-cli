@@ -124,7 +124,7 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			}
 
 			if info.IsDir() {
-				return nil
+				return skipPycache(info, path, source)
 			}
 
 			if path == target {
@@ -181,6 +181,16 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			_, err = io.Copy(tarball, file)
 			return err
 		})
+}
+
+// skipPycache keeps bytecode caches out of a tarball. Only the directory is
+// skipped: a sourceless .pyc outside __pycache__ is importable, so it ships.
+func skipPycache(info os.FileInfo, dirPath, source string) error {
+	if info.Name() == "__pycache__" && dirPath != source {
+		logger.Debugf("Excluding tarball path: %s", dirPath)
+		return filepath.SkipDir
+	}
+	return nil
 }
 
 func ReadFileToString(filename string) (string, error) {
