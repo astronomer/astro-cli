@@ -137,10 +137,12 @@ func TestPreflightMWAAConstraints(t *testing.T) {
 		wantOK     bool
 		wantSkip   bool
 		wantConf   bool
+		wantExit   int
 	}{
-		{"clean", nil, true, false, false},
-		{"conflict", &ConstraintConflict{Summary: "pandas>=2 and pandas<1 cannot both hold"}, false, false, true},
-		{"offline", ErrConstraintsUnavailable, false, true, false},
+		{"clean", nil, true, false, false, ExitOK},
+		{"conflict", &ConstraintConflict{Summary: "pandas>=2 and pandas<1 cannot both hold"}, false, false, true, ExitChecksFailed},
+		{"offline", ErrConstraintsUnavailable, false, true, false, ExitOK},
+		{"resolver did not run", errors.New("uv not found"), false, true, false, ExitOK},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -163,10 +165,11 @@ func TestPreflightMWAAConstraints(t *testing.T) {
 			if (c.Conflict != "") != tc.wantConf {
 				t.Errorf("Conflict = %q, want conflict=%v", c.Conflict, tc.wantConf)
 			}
-			// A constraints outcome, whatever it is, never fails the check on its
-			// own; a conflict is reported but the DAG parse was clean here.
-			if tc.wantConf && rep.ExitCode(false) != ExitOK {
-				t.Error("a constraints conflict is a note on a clean parse, not a DAG failure")
+			if c.Conflicted() != tc.wantConf {
+				t.Errorf("Conflicted() = %v, want %v", c.Conflicted(), tc.wantConf)
+			}
+			if got := rep.ExitCode(false); got != tc.wantExit {
+				t.Errorf("ExitCode = %d, want %d", got, tc.wantExit)
 			}
 			// The resolver sees the deps with apache-airflow dropped.
 			if got := strings.Join(prov.gotReqs, " "); strings.Contains(got, "apache-airflow==") {

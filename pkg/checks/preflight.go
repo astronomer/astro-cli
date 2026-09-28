@@ -40,13 +40,13 @@ func KnownTarget(name string) bool {
 
 // ErrConstraintsUnavailable reports that the platform's constraints file could
 // not be fetched — offline, or the URL did not answer. It is a skip, not a
-// failure: the pre-flight notes it and the check still passes on its DAG
-// findings alone.
+// failure: the pre-flight notes it and the check stands on its DAG findings
+// alone.
 var ErrConstraintsUnavailable = errors.New("could not fetch the platform constraints file")
 
 // ConstraintConflict reports that the project's dependencies do not resolve
-// under the platform's constraints file. It is a real finding: the same
-// conflict would fail a slow MWAA environment update. Summary is the resolver's
+// under the platform's constraints file. It fails the check: the same conflict
+// would fail a slow MWAA environment update. Summary is the resolver's
 // one-line explanation; Detail carries its full output.
 type ConstraintConflict struct {
 	Summary string
@@ -129,6 +129,12 @@ type ConstraintOutcome struct {
 	Skipped  string `json:"skipped,omitempty"`
 }
 
+// Conflicted reports whether the dependencies were resolved against the
+// constraints file and failed to solve. A skip is not a conflict.
+func (c *ConstraintOutcome) Conflicted() bool {
+	return c != nil && c.Checked && !c.OK
+}
+
 // TargetReport is one target's pre-flight outcome, rendered by the cmd layer.
 // It carries the DAG findings plus the version mapping and any constraints
 // result, so the reader sees what was checked and against which version.
@@ -157,13 +163,13 @@ type TargetReport struct {
 }
 
 // ExitCode maps a report to a process exit code, strict included: an
-// operational failure is ExitEnvNotReady, findings are ExitChecksFailed, clean
-// is ExitOK.
+// operational failure is ExitEnvNotReady, findings or a constraints conflict
+// are ExitChecksFailed, clean is ExitOK.
 func (r *TargetReport) ExitCode(strict bool) int {
 	if r.OpError != "" {
 		return ExitEnvNotReady
 	}
-	if r.Errors > 0 || (strict && r.Warnings > 0) {
+	if r.Errors > 0 || (strict && r.Warnings > 0) || r.Constraints.Conflicted() {
 		return ExitChecksFailed
 	}
 	return ExitOK

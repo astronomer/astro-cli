@@ -58,7 +58,7 @@ func newCheckCmd(c *cli) *cobra.Command {
 		Use:   nameCheck,
 		Short: "Validate this project's DAGs without starting Airflow",
 		Long: "Parse the project's DAGs in its own environment and report import errors, duplicate DAG ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
-			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the DAGs inside it; mwaa also resolves the dependencies against MWAA's published constraints file (this step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
+			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the DAGs inside it; mwaa also resolves the dependencies against MWAA's published constraints file (a conflict fails the check; the step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if len(targets) == 0 {
@@ -912,7 +912,7 @@ func renderConstraintOutcome(w io.Writer, c *checks.ConstraintOutcome) error {
 	case c.OK:
 		_, err := fmt.Fprintln(w, "constraints: dependencies resolve against MWAA's constraints file")
 		return err
-	case c.Conflict != "":
+	case c.Conflicted():
 		_, err := fmt.Fprintf(w, "constraints: conflict — %s\n", c.Conflict)
 		return err
 	default:
@@ -930,5 +930,9 @@ func targetVerdictLine(rep *checks.TargetReport, strict bool) string {
 	if strict {
 		tail = " (strict)"
 	}
-	return fmt.Sprintf("check %s%s for %s: %d DAGs, %d errors, %d warnings", verdict, tail, rep.Target, rep.DagCount, rep.Errors, rep.Warnings)
+	why := ""
+	if rep.Constraints.Conflicted() {
+		why = "dependencies conflict with MWAA's constraints; "
+	}
+	return fmt.Sprintf("check %s%s for %s: %s%d DAGs, %d errors, %d warnings", verdict, tail, rep.Target, why, rep.DagCount, rep.Errors, rep.Warnings)
 }

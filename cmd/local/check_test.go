@@ -131,6 +131,34 @@ func TestTargetMWAAShowsClosestLowerNote(t *testing.T) {
 	}
 }
 
+func TestTargetMWAAConstraintsConflictFails(t *testing.T) {
+	d, out := targetDeps(t)
+	prov := &fakeProvisioner{python: "/p", resolveErr: &checks.ConstraintConflict{Summary: "scikit-learn==1.5.2 and scikit-learn==1.8.0 cannot both hold"}}
+	d.Provisioner = func(context.Context) (checks.Provisioner, error) { return prov, nil }
+
+	err := execute(t, d, "local", "check", "--target", "mwaa")
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
+		t.Fatalf("a constraints conflict should exit 1, got %v", err)
+	}
+	if want := "check failed for mwaa: dependencies conflict with MWAA's constraints; 1 DAGs, 0 errors, 0 warnings"; !strings.Contains(out.String(), want) {
+		t.Errorf("verdict should say the check failed and why, want %q in:\n%s", want, out.String())
+	}
+}
+
+func TestTargetMWAAConstraintsSkipStillPasses(t *testing.T) {
+	d, out := targetDeps(t)
+	prov := &fakeProvisioner{python: "/p", resolveErr: checks.ErrConstraintsUnavailable}
+	d.Provisioner = func(context.Context) (checks.Provisioner, error) { return prov, nil }
+
+	if err := execute(t, d, "local", "check", "--target", "mwaa"); err != nil {
+		t.Fatalf("an offline constraints step is a skip, not a failure: %v", err)
+	}
+	if !strings.Contains(out.String(), "check passed for mwaa: 1 DAGs") {
+		t.Errorf("verdict should pass with no reason attached:\n%s", out.String())
+	}
+}
+
 func TestTargetCheckJSONEmitsPerTargetNDJSON(t *testing.T) {
 	d, out := targetDeps(t)
 	if err := execute(t, d, "local", "check", "--target", "composer,mwaa", "--output", "json"); err != nil {
