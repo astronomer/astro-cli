@@ -10,6 +10,8 @@ release:
   # "auto" marks prerelease tags (e.g. v1.43.0-rc.1, v1.43.0-nightly.20260522) as prerelease,
   # and clean semver tags (e.g. v1.43.0) as full releases.
   prerelease: auto
+  # Only the stable major (STABLE_MAJOR in the release workflows) becomes GitHub's "latest" release.
+  make_latest: '{{ eq (print .Major) .Env.STABLE_MAJOR }}'
   # install.sh is godownloader.sh with LATEST_VERSION set to this release, so
   # the asset installs the release it ships with and nothing else.
   extra_files:
@@ -61,6 +63,28 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
       branch: "bump-astro-{{ .Version }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: astronomer
+          name: homebrew-tap
+          branch: main
+    directory: Formula
+    skip_upload: '{{ if eq (print .Major) .Env.STABLE_MAJOR }}auto{{ else }}true{{ end }}'
+    homepage: https://astronomer.io
+    description: To build and run Airflow Dags locally via docker-compose and deploy Dags to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    dependencies:
+      - name: podman
+        type: recommended
+        os: mac
+    test: |
+      system "#{bin}/astro version"
+  - name: "astro@{{ .Major }}"
+    repository:
+      owner: astronomer
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      branch: "bump-astro-major-{{ .Version }}"
       pull_request:
         enabled: true
         base:
