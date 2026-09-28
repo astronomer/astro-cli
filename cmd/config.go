@@ -3,16 +3,30 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"maps"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const (
 	configSetSuccessMsg           = "Setting %s to %s successfully\n"
 	configUseOutsideProjectDirMsg = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s\n"
+	configUseInV2ProjectMsg       = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
 )
+
+// unlistedConfigs are settings `astro config list` leaves out: contexts is a
+// map that `astro context` manages, and the other two are credentials.
+var unlistedConfigs = map[string]bool{
+	config.CFG.Contexts.Path:         true,
+	config.CFG.CloudAPIToken.Path:    true,
+	config.CFG.PostgresPassword.Path: true,
+}
 
 var (
 	globalFlag       bool
@@ -30,13 +44,14 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
 		Short:             "Manage CLI settings for this machine",
-		Long:              "Manage CLI settings, stored globally with -g or in a v1 project's .astro/config.yaml. Please see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for list of available cli configurations",
+		Long:              "Manage CLI settings, stored globally with -g or in a v1 project's .astro/config.yaml. Run `astro config list` to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 	cmd.AddCommand(
 		newConfigGetCmd(out),
 		newConfigSetCmd(out),
+		newConfigListCmd(out),
 	)
 	return cmd
 }
@@ -44,7 +59,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 func newConfigGetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get [setting-name]",
-		Short:   "Get project's configurations",
+		Short:   "Get a CLI setting",
 		Long:    "List the value for a particular setting in your config.yaml file",
 		Args:    cobra.ExactArgs(1),
 		Example: configGetExample,
@@ -56,12 +71,24 @@ func newConfigGetCmd(_ io.Writer) *cobra.Command {
 func newConfigSetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "set [setting-name]",
-		Short:   "Set project's configurations",
+		Short:   "Set a CLI setting",
 		Long:    "Update or override a particular setting in your config.yaml file",
 		Example: configSetExample,
 		RunE:    configSet,
 	}
 	return cmd
+}
+
+func newConfigListCmd(out io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List CLI settings",
+		Long:  "List every CLI setting with its value and where the value comes from: project (a v1 project's .astro/config.yaml), global, or default. With -g, list the global values only",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return configList(out)
+		},
+	}
 }
 
 func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
@@ -71,16 +98,36 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	isProjectDir, _ := config.IsProjectDir(config.WorkingPath) //nolint:errcheck // treated as absent on error
-
-	if !isProjectDir && !globalFlag {
-		// cmd.Name(), not cmd.Use: Use carries the argument placeholder, so
-		// the suggested command read "astro config set [setting-name]
-		// project.name -g", which nobody can run.
-		c := "astro config " + cmd.Name() + " " + args[0] + " -g"
-		return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
+	if globalFlag {
+		return nil
 	}
-	return nil
+	if isProjectDir, _ := config.IsProjectDir(config.WorkingPath); isProjectDir { //nolint:errcheck // treated as absent on error
+		return nil
+	}
+	// cmd.Name(), not cmd.Use: Use carries the argument placeholder, so the
+	// suggested command read "astro config set [setting-name] project.name
+	// -g", which nobody can run.
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		quoted[i] = shellQuoteIfNeeded(a)
+	}
+	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
+	cmd.SilenceUsage = true
+	if project.IsV2(config.WorkingPath) {
+		return fmt.Errorf(configUseInV2ProjectMsg, args[0], cmd.Name(), c)
+	}
+	return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
+}
+
+func shellQuoteIfNeeded(s string) string {
+	if s != "" && !strings.ContainsFunc(s, func(r rune) bool { return !isShellSafe(r) }) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func isShellSafe(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("-_.,:/=@+%", r)
 }
 
 func configGet(cmd *cobra.Command, args []string) error {
@@ -134,4 +181,23 @@ func configSet(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf(configSetSuccessMsg+"\n", cfg.Path, args[1])
 	return nil
+}
+
+func configList(out io.Writer) error {
+	tab := printutil.Table{
+		DynamicPadding: true,
+		Header:         []string{"KEY", "VALUE", "SCOPE"},
+	}
+	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
+		if unlistedConfigs[key] {
+			continue
+		}
+		cfg := config.CFGStrMap[key]
+		if globalFlag {
+			tab.AddRow([]string{key, cfg.GetHomeString(), cfg.HomeScope()}, false)
+		} else {
+			tab.AddRow([]string{key, cfg.GetString(), cfg.Scope()}, false)
+		}
+	}
+	return tab.Print(out)
 }

@@ -136,6 +136,24 @@ func (c cfg) GetHomeString() string {
 	return viperHome.GetString(c.Path)
 }
 
+// Scope names where GetString finds this setting: "project", "global", or
+// "default" when no config file sets it.
+func (c cfg) Scope() string {
+	if configExists(viperProject) && viperProject.IsSet(c.Path) {
+		return "project"
+	}
+	return c.HomeScope()
+}
+
+// HomeScope names where GetHomeString finds this setting: "global", or
+// "default" when the home config does not set it.
+func (c cfg) HomeScope() string {
+	if viperHome.InConfig(c.Path) {
+		return "global"
+	}
+	return "default"
+}
+
 // RegisterValidator registers a validation function for this config
 func (c *cfg) RegisterValidator(fn ValidatorFunc) {
 	c.validator = fn
