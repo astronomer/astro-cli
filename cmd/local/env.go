@@ -1009,16 +1009,16 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	}
 	if only != "" {
 		kept := make([]localenv.ListItem, 0, len(items))
-		for _, it := range items {
-			if it.Kind == only {
-				kept = append(kept, it)
+		for i := range items {
+			if items[i].Kind == only {
+				kept = append(kept, items[i])
 			}
 		}
 		items = kept
 	}
 	if r.Format == FormatJSON {
-		for _, it := range items {
-			if err := r.Emit(it, nil); err != nil {
+		for i := range items {
+			if err := r.Emit(items[i], nil); err != nil {
 				return err
 			}
 		}
@@ -1043,8 +1043,8 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 	// DESCRIPTION is a column only when some row has one, so a project that
 	// writes no descriptions keeps the four-column table.
 	described := false
-	for _, it := range items {
-		if it.Description != "" {
+	for i := range items {
+		if items[i].Description != "" {
 			described = true
 			break
 		}
@@ -1060,10 +1060,11 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		header += "\tDESCRIPTION"
 	}
 	fmt.Fprintln(tw, header)
-	for _, it := range items {
+	for i := range items {
+		it := &items[i]
 		note := ""
 		if it.Orphan {
-			note = "orphan"
+			note = "undeclared"
 			// An orphan found under --all lives in another project's file, and
 			// says which. There is no command to offer for one: delete acts on
 			// the working directory's project, so a hint would name a command
@@ -1074,7 +1075,10 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 			if it.Project != "" {
 				note += " in " + it.Project
 			}
-			if it.RemoveHint != "" {
+			switch {
+			case it.DeclareHint != "" && it.RemoveHint != "":
+				note += "; declare: " + it.DeclareHint + " (or remove: " + it.RemoveHint + ")"
+			case it.RemoveHint != "":
 				note += "; remove: " + it.RemoveHint
 			}
 		}

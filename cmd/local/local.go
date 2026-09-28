@@ -36,9 +36,11 @@ const (
 	nameDev     = "dev"
 	nameEnv     = "env"
 
-	replaceStart = "astro local start"
-	replaceLogs  = "astro local logs"
-	replaceInit  = "astro init"
+	replaceStart   = "astro local start"
+	replaceRestart = "astro local restart"
+	replacePackage = "astro package"
+	replaceLogs    = "astro local logs"
+	replaceInit    = "astro init"
 )
 
 // cli carries one command family's invocation state: the deps and the value
@@ -452,7 +454,7 @@ func newStopCmd(c *cli) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.force, "force", false, "Skip the graceful shutdown window")
-	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Also remove derived runtime state (replaces the old astro dev kill)")
+	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Also remove derived runtime state")
 	return cmd
 }
 

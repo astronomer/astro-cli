@@ -21,6 +21,11 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 		}
 	}
 
+	d, _, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "variable", "set", "api_token", "--value", "s3cret", "--secret"); err != nil {
+		t.Fatal(err)
+	}
+
 	d, out, _ := envDeps(t, dir, "")
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)
@@ -43,6 +48,12 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 	}
 	if got[0].RemoveHint != "astro local env connection delete db_main --project --secret" {
 		t.Errorf("remove hint = %q", got[0].RemoveHint)
+	}
+	if got[0].DeclareHint != "astro local env connection declare db_main" {
+		t.Errorf("declare hint = %q", got[0].DeclareHint)
+	}
+	if v := rows["api_token"]; len(v) != 1 || v[0].DeclareHint != "astro local env variable declare api_token --sensitive" {
+		t.Errorf("api_token rows = %+v, want one with a --sensitive declare hint", v)
 	}
 	if d := rows["declared"]; len(d) != 1 || d[0].Orphan {
 		t.Errorf("declared rows = %+v, want one declared row", d)

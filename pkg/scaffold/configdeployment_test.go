@@ -144,3 +144,22 @@ func TestTheDeployTargetNoteDescribesAManifestThatParses(t *testing.T) {
 		"the note has to name the table, not just the section it sits in")
 	assert.Contains(t, note, "deployment = 'cm1orders'")
 }
+
+// The instances list an early v2 build kept in .astro/config.yaml is named,
+// with the command that links each entry, and not converted.
+func TestConfigInstancesAreReported(t *testing.T) {
+	res, about := convertWithConfig(t, "project:\n  name: orders\n"+
+		"instances:\n"+
+		"  - name: prod\n    source: astro\n    deployment_id: cm1prod\n    url: https://x.astronomer.run/abc\n"+
+		"    auth:\n      context: astronomer.io\n      kind: astro\n"+
+		"  - name: dev\n    source: astro\n    deployment_id: cm1dev\n"+
+		"  - name: not a plain name\n    source: astro\n    deployment_id: cm1odd\n"+
+		"  - name: orders\n    source: mwaa\n")
+	require.Len(t, about, 1, "notes: %v", res.Notes)
+	assert.Equal(t, ".astro/config.yaml: its `instances` list names deployment links this run did not carry into pyproject.toml. "+
+		"Link each one with `astro link add prod --deployment cm1prod`, `astro link add dev --deployment cm1dev`, "+
+		"`astro link add <name> --deployment cm1odd`, `astro link add orders --target mwaa`", about[0])
+	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Empty(t, m.Astro.Deployments, "the links are reported, not converted")
+}

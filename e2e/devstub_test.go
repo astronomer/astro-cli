@@ -28,7 +28,8 @@ var devMapping = []struct {
 	{"run", "astro local run"},
 	{"bash", "astro local shell"},
 	{"parse", "astro local check"},
-	{"kill", "astro local stop --clean"},
+	{"build", "astro package"},
+	{"kill", "astro local reset --yes"},
 	{"pytest", "uv run pytest"},
 	{"init", "astro init"},
 	// v1 bulk-loaded connections and variables into a running Airflow. v2

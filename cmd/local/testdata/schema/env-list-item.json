@@ -7,5 +7,6 @@
   "source": "x",
   "orphan": true,
   "project": "x",
-  "remove_hint": "x"
+  "remove_hint": "x",
+  "declare_hint": "x"
 }

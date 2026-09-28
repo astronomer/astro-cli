@@ -109,6 +109,16 @@ type v1Project struct {
 	// only by `astro config set`, so it is usually absent even when deployment
 	// is not — but when it is there it is the other half of a manifest link.
 	workspace string
+	// instances are the entries of the same file's top-level `instances:`
+	// list, the deployment links an early v2 build kept there. Reported, not
+	// converted.
+	instances []v1Instance
+}
+
+// v1Instance is one entry of .astro/config.yaml's `instances:` list. source is
+// empty or "astro" for an Astro Deployment.
+type v1Instance struct {
+	name, source, deploymentID string
 }
 
 // v1Config is the three fields of .astro/config.yaml this reads. The rest of
@@ -132,6 +142,13 @@ type v1Config struct {
 		Deployment any    `yaml:"deployment"`
 		Workspace  any    `yaml:"workspace"`
 	} `yaml:"project"`
+	Instances any `yaml:"instances"`
+}
+
+// v1ConfigFacts is what readV1Config takes from the file.
+type v1ConfigFacts struct {
+	name, deployment, workspace string
+	instances                   []v1Instance
 }
 
 // yamlString is the value of a loosely-decoded scalar string, and "" for every
@@ -181,11 +198,11 @@ func readV1Project(dir string) (*v1Project, error) {
 	// configuration this conversion neither reads nor replaces, so it is not a
 	// candidate for retirement, and recording it there would offer it for
 	// deletion.
-	name, deployment, workspace, note, err := readV1Config(dir)
+	cfg, note, err := readV1Config(dir)
 	if err != nil {
 		return nil, err
 	}
-	v1.projectName, v1.deployment, v1.workspace = name, deployment, workspace
+	v1.projectName, v1.deployment, v1.workspace, v1.instances = cfg.name, cfg.deployment, cfg.workspace, cfg.instances
 	if note != "" {
 		v1.notes = append(v1.notes, note)
 	}
@@ -215,6 +232,7 @@ func readV1Project(dir string) (*v1Project, error) {
 		build := buildStepsNote(data)
 		v1.notes = append(v1.notes, notes...)
 		v1.notes = append(v1.notes, build...)
+		v1.notes = append(v1.notes, pipInstallNote(data)...)
 		if stated {
 			v1.statedVersion = true
 		}
@@ -315,18 +333,45 @@ func dockerfileIsPinOnly(data []byte) bool {
 // The PROJECT's config only, never the home one, though v1 resolved this key
 // with a fallback to it. A global project.name would otherwise rename every
 // project converted on that machine to the same thing.
-func readV1Config(dir string) (name, deployment, workspace, note string, err error) {
+func readV1Config(dir string) (facts v1ConfigFacts, note string, err error) {
 	data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
 	if err != nil || data == nil {
-		return "", "", "", "", err
+		return v1ConfigFacts{}, "", err
 	}
 	var cfg v1Config
 	if uerr := yaml.Unmarshal(data, &cfg); uerr != nil {
-		return "", "", "", v1ConfigRelPath +
+		return v1ConfigFacts{}, v1ConfigRelPath +
 			": could not be read, so the project is named after its directory. " + uerr.Error(), nil
 	}
-	return strings.TrimSpace(cfg.Project.Name),
-		yamlString(cfg.Project.Deployment), yamlString(cfg.Project.Workspace), "", nil
+	return v1ConfigFacts{
+		name:       strings.TrimSpace(cfg.Project.Name),
+		deployment: yamlString(cfg.Project.Deployment),
+		workspace:  yamlString(cfg.Project.Workspace),
+		instances:  yamlInstances(cfg.Instances),
+	}, "", nil
+}
+
+// yamlInstances reads the `instances:` list loosely, for the reason v1Config
+// decodes its ids as any: a shape this does not expect costs the entry, not
+// the file. An entry whose source is not astro keeps its name only.
+func yamlInstances(v any) []v1Instance {
+	entries, _ := v.([]any)
+	var out []v1Instance
+	for _, e := range entries {
+		fields, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		inst := v1Instance{
+			name:         yamlString(fields["name"]),
+			source:       yamlString(fields["source"]),
+			deploymentID: yamlString(fields["deployment_id"]),
+		}
+		if inst.name != "" {
+			out = append(out, inst)
+		}
+	}
+	return out
 }
 
 // readIfPresent returns nil bytes and no error when the file is not there.
@@ -657,6 +702,194 @@ func buildStepsNote(data []byte) []string {
 	// giving v2 users the opposite of the right advice.
 	return []string{"Dockerfile: its " + strings.Join(kinds, ", ") +
 		" instructions were not read here, so the manifest does not describe them. The Dockerfile stays your build and they still run"}
+}
+
+// pipInstallNote names the packages a RUN step installs with pip or uv pip.
+// The Dockerfile still installs them in Docker mode, but standalone mode and
+// `astro local check` install only [project] dependencies, so a DAG importing
+// one of these fails there with nothing pointing at why.
+//
+// Report only. Moving them into the manifest is the user's call: a package
+// installed from a private index behind a build secret does not resolve the
+// same way outside the build.
+func pipInstallNote(data []byte) []string {
+	specs := runPipSpecs(data)
+	if len(specs) == 0 {
+		return nil
+	}
+	quoted := make([]string, len(specs))
+	for i, s := range specs {
+		quoted[i] = `"` + s + `"`
+	}
+	return []string{"Dockerfile: its RUN steps install " + strings.Join(quoted, ", ") +
+		". Standalone mode and `astro local check` do not have " + pronoun(len(specs)) +
+		" unless you add " + pronoun(len(specs)) + " to [project] dependencies"}
+}
+
+// pipCommandRe is the word that runs pip: pip, pip3, pip3.12, or a path to one.
+// pythonCommandRe is the same for python, which runs it as `python -m pip`.
+var (
+	pipCommandRe    = regexp.MustCompile(`^(.*/)?pip[0-9.]*$`)
+	pythonCommandRe = regexp.MustCompile(`^(.*/)?python[0-9.]*$`)
+)
+
+// userinfoRe finds the credentials part of a URL, which a note must not print.
+var userinfoRe = regexp.MustCompile(`://[^/@]+@`)
+
+// runPipSpecs lists the requirement specs `pip install` and `uv pip install`
+// name in the Dockerfile's shell-form RUN steps, in order and without repeats.
+//
+// Conservative by design, since a spec it gets wrong is advice to add the wrong
+// thing: a command it cannot tokenize, an option it does not know, and a spec
+// that is a variable, a local path or a requirements file are all skipped.
+func runPipSpecs(data []byte) []string {
+	var specs []string
+	for _, line := range logicalLines(data) {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.EqualFold(fields[0], "RUN") {
+			continue
+		}
+		words, ok := shellWords(line[len(fields[0]):])
+		if !ok {
+			continue
+		}
+		for _, cmd := range words {
+			for _, spec := range pipSpecs(cmd) {
+				spec = userinfoRe.ReplaceAllString(spec, "://***@")
+				if !slices.Contains(specs, spec) {
+					specs = append(specs, spec)
+				}
+			}
+		}
+	}
+	return specs
+}
+
+// shellWords splits a shell command line into its simple commands, each a list
+// of words with quotes removed. It reports false for anything it would have to
+// guess at: an unclosed quote, an escape, a heredoc or a subshell.
+func shellWords(s string) ([][]string, bool) {
+	var cmds [][]string
+	var words []string
+	var cur strings.Builder
+	inWord := false
+	endWord := func() {
+		if inWord {
+			words = append(words, cur.String())
+			cur.Reset()
+			inWord = false
+		}
+	}
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; c {
+		case '\\', '<', '>', '(', ')', '`':
+			return nil, false
+		case '\'', '"':
+			end := strings.IndexByte(s[i+1:], c)
+			if end < 0 {
+				return nil, false
+			}
+			cur.WriteString(s[i+1 : i+1+end])
+			inWord = true
+			i += end + 1
+		case ' ', '\t':
+			endWord()
+		case ';', '&', '|':
+			endWord()
+			if len(words) > 0 {
+				cmds = append(cmds, words)
+				words = nil
+			}
+		default:
+			cur.WriteByte(c)
+			inWord = true
+		}
+	}
+	endWord()
+	if len(words) > 0 {
+		cmds = append(cmds, words)
+	}
+	return cmds, true
+}
+
+// pipFlagsWithValue are the install options that take a value, which is not a
+// spec. -r, -c and -e name files and paths, so what they name is not listed.
+var pipFlagsWithValue = []string{
+	"-r", "--requirement", "-c", "--constraint", "-e", "--editable",
+	"-i", "--index-url", "--extra-index-url", "-f", "--find-links",
+	"-t", "--target", "--prefix", "--root", "--python", "-p",
+	"--trusted-host", "--cache-dir", "--no-binary", "--only-binary",
+	"--platform", "--python-version", "--index-strategy", "--keyring-provider",
+	"--resolution", "--prerelease", "--exclude-newer", "--upgrade-package", "-P",
+	"--progress-bar",
+}
+
+// pipBoolFlags are the install options that take no value.
+var pipBoolFlags = []string{
+	"-U", "--upgrade", "--user", "--system", "-q", "--quiet", "-v", "--verbose",
+	"--pre", "--no-deps", "--force-reinstall", "--no-cache-dir", "--no-cache",
+	"--break-system-packages", "--compile", "--no-compile", "--no-build-isolation",
+	"--ignore-installed", "-I", "--require-hashes", "--no-input", "--disable-pip-version-check",
+	"--no-warn-script-location", "--strict", "--reinstall",
+}
+
+// pipSpecs returns the specs one simple command installs, or nothing when the
+// command is not a pip install or holds an option pipBoolFlags and
+// pipFlagsWithValue do not name.
+func pipSpecs(cmd []string) []string {
+	// RUN's own flags (--mount, --network) lead the first command.
+	for len(cmd) > 0 && strings.HasPrefix(cmd[0], "--") {
+		cmd = cmd[1:]
+	}
+	switch {
+	case len(cmd) > 0 && cmd[0] == "uv":
+		cmd = cmd[1:]
+	case len(cmd) > 1 && pythonCommandRe.MatchString(cmd[0]) && cmd[1] == "-m":
+		cmd = cmd[2:]
+	}
+	if len(cmd) < 2 || !pipCommandRe.MatchString(cmd[0]) || cmd[1] != "install" {
+		return nil
+	}
+	cmd = cmd[2:]
+	var specs []string
+	for i := 0; i < len(cmd); i++ {
+		arg := cmd[i]
+		if !strings.HasPrefix(arg, "-") {
+			if isPackageSpec(arg) {
+				specs = append(specs, arg)
+			}
+			continue
+		}
+		name, _, hasValue := strings.Cut(arg, "=")
+		switch {
+		case slices.Contains(pipBoolFlags, arg):
+		case slices.Contains(pipFlagsWithValue, name):
+			if !hasValue {
+				i++
+			}
+		default:
+			return nil
+		}
+	}
+	return specs
+}
+
+// isPackageSpec reports an argument that names a package rather than a file,
+// a directory, something the shell expands at build time, or a bare URL, which
+// [project] dependencies cannot take without a `name @` in front.
+func isPackageSpec(arg string) bool {
+	if strings.ContainsAny(arg, "$*?`\\") || strings.HasPrefix(arg, ".") || strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, "~") {
+		return false
+	}
+	parts := strings.FieldsFunc(arg, func(r rune) bool { return strings.ContainsRune("<>=!~;[ @", r) })
+	if len(parts) == 0 {
+		return false
+	}
+	name := strings.ToLower(parts[0])
+	if name == "pip" || name == "uv" || strings.Contains(name, ":") {
+		return false
+	}
+	return !strings.HasSuffix(name, ".whl") && !strings.HasSuffix(name, ".tar.gz") && !strings.HasSuffix(name, ".zip")
 }
 
 // splitImageRef turns the text after FROM into an image reference and its tag,

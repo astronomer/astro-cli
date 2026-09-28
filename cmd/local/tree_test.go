@@ -358,7 +358,7 @@ func TestEveryReplacementNamesARealCommand(t *testing.T) {
 		var path []string
 		for _, word := range strings.Fields(strings.TrimPrefix(m.Replacement, "astro ")) {
 			if strings.HasPrefix(word, "-") {
-				break // astro local stop --clean
+				break // astro local reset --yes
 			}
 			path = append(path, word)
 		}

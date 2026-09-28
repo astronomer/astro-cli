@@ -4,12 +4,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -121,7 +125,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		return err
 	}
 	return r.Emit(res, func(w io.Writer) error {
-		return renderPackage(w, res)
+		return renderPackage(w, res, m.Astro.Deployments)
 	})
 }
 
@@ -135,14 +139,15 @@ func (c *cli) packageRegistry() *pack.Registry {
 
 // renderPackage renders a finished build as text. json mode serializes the
 // Result directly, so this runs only for text. Each artifact shape has its own
-// renderer.
-func renderPackage(w io.Writer, res pack.Result) error {
+// renderer. links are the project's deployment links, for the deploy command
+// an image hands off to.
+func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link) error {
 	if _, err := fmt.Fprintf(w, "target: %s\n", res.Target); err != nil {
 		return err
 	}
 	switch res.Kind {
 	case pack.KindImage:
-		return renderImageResult(w, res)
+		return renderImageResult(w, res, links)
 	case pack.KindTree:
 		return renderTreeResult(w, res)
 	case pack.KindBundle:
@@ -154,7 +159,7 @@ func renderPackage(w io.Writer, res pack.Result) error {
 
 // renderImageResult renders an image target's tag, version, and the deploy
 // command that consumes it, so the CI story is one copy-paste.
-func renderImageResult(w io.Writer, res pack.Result) error {
+func renderImageResult(w io.Writer, res pack.Result, links map[string]manifest.Link) error {
 	if _, err := fmt.Fprintf(w, "image:  %s\n", res.Image); err != nil {
 		return err
 	}
@@ -168,8 +173,30 @@ func renderImageResult(w io.Writer, res pack.Result) error {
 			return err
 		}
 	}
-	_, err := fmt.Fprintf(w, "\nDeploy it with:\n  astro deploy --image-name %s\n", res.Image)
+	_, err := fmt.Fprintf(w, "\nDeploy it with:\n%s\n", deployImageHint(res.Image, links))
 	return err
+}
+
+// deployImageHint is the deploy command for an image. Deploy refuses to pick a
+// target when it cannot prompt, so the command names one: the default link, or
+// the only deployable one. With several and no default, it names a placeholder
+// and lists them the way deploy's own refusal does.
+func deployImageHint(image string, links map[string]manifest.Link) string {
+	deployable := deploy.DeployableLinks(links)
+	target := ""
+	if name, _, ok := manifest.DefaultLink(links); ok && slices.Contains(deployable, name) {
+		target = name
+	} else if len(deployable) == 1 {
+		target = deployable[0]
+	}
+	switch {
+	case target != "":
+		return fmt.Sprintf("  astro deploy %s --image-name %s", target, image)
+	case len(deployable) > 1:
+		return fmt.Sprintf("  astro deploy <link> --image-name %s\nDeployable links: %s", image, strings.Join(deployable, ", "))
+	default:
+		return fmt.Sprintf("  astro deploy --image-name %s", image)
+	}
 }
 
 // renderTreeResult renders a bucket target's paths, any warnings, and the exact

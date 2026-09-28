@@ -420,7 +420,7 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		return namedTarget(req, name, links)
 	}
 
-	deployable := linkNames(links, isAstroLink)
+	deployable := DeployableLinks(links)
 	switch {
 	case len(links) == 0:
 		// A project that links nothing at all: the workspace-level flow, which
@@ -558,6 +558,11 @@ func astroTarget(req Request, name string, link manifest.Link, links map[string]
 		WorkspaceID:  firstNonEmpty(req.WorkspaceID, link.Workspace, req.ContextWorkspace),
 		LinkName:     name,
 	}, nil
+}
+
+// DeployableLinks names the links astro deploy can ship to, sorted.
+func DeployableLinks(links map[string]manifest.Link) []string {
+	return linkNames(links, isAstroLink)
 }
 
 func isAstroLink(l manifest.Link) bool { return l.Kind() == manifest.KindAstro }

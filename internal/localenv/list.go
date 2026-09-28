@@ -38,6 +38,10 @@ type ListItem struct {
 	Project string `json:"project,omitempty"`
 	// RemoveHint is the exact command to remove an orphan.
 	RemoveHint string `json:"remove_hint,omitempty"`
+	// DeclareHint is the exact command to declare an orphan in the current
+	// project, so the value it names is one the project expects. Empty
+	// outside a project and for an --all orphan from another project.
+	DeclareHint string `json:"declare_hint,omitempty"`
 }
 
 // ListOptions selects which files list reports over.
@@ -217,7 +221,7 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 				out = append(out, ListItem{Kind: KindEnv, Name: key, Source: string(scope)})
 				continue
 			}
-			out = append(out, orphanItem(key, scope, ""))
+			out = append(out, orphanItem(key, scope, "", src.hasProject))
 		}
 	}
 	switch {
@@ -239,10 +243,7 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 					out = append(out, ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label})
 					continue
 				}
-				out = append(out, ListItem{
-					Kind: e.Kind, Name: e.Name, Source: tier.Label, Orphan: true,
-					RemoveHint: removeHint(e.Kind, e.Name, tier.Scope) + " --secret",
-				})
+				out = append(out, vaultOrphanItem(e.Kind, e.Name, tier, src.hasProject))
 			}
 		}
 	}
@@ -282,7 +283,7 @@ func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem
 			if declared[key] || isAirflowSetting(key) {
 				continue
 			}
-			out = append(out, orphanItem(key, ScopeProject, rec.ProjectPath))
+			out = append(out, orphanItem(key, ScopeProject, rec.ProjectPath, false))
 		}
 	}
 	return out
@@ -296,7 +297,24 @@ func isAirflowSetting(key string) bool {
 	return strings.HasPrefix(key, "AIRFLOW__")
 }
 
-func orphanItem(key string, scope Scope, project string) ListItem {
+// vaultOrphanItem is an undeclared value held only in the vault tier. Its
+// declare hint keeps a variable sensitive, so a later set leaves it in the vault;
+// a connection is always sensitive.
+func vaultOrphanItem(kind Kind, name string, tier VaultTier, inProject bool) ListItem {
+	item := ListItem{
+		Kind: kind, Name: name, Source: tier.Label, Orphan: true,
+		RemoveHint: removeHint(kind, name, tier.Scope) + " --secret",
+	}
+	if inProject {
+		item.DeclareHint = declareHint(kind, name)
+		if kind != KindConn {
+			item.DeclareHint += " --sensitive"
+		}
+	}
+	return item
+}
+
+func orphanItem(key string, scope Scope, project string, inProject bool) ListItem {
 	kind, name := kindFromKey(key)
 	item := ListItem{Kind: kind, Name: name, Source: string(scope), Orphan: true, Project: project}
 	// A cross-project orphan (project set) lives in another project's file; the
@@ -304,6 +322,9 @@ func orphanItem(key string, scope Scope, project string) ListItem {
 	// the wrong file. Only offer it for the current project and the global file.
 	if project == "" {
 		item.RemoveHint = removeHint(kind, name, scope)
+		if inProject {
+			item.DeclareHint = declareHint(kind, name)
+		}
 	}
 	return item
 }
@@ -338,4 +359,11 @@ func declaredKeySet(schema *envschema.Schema) map[string]bool {
 // orphan, with the scope flag that names the file it lives in.
 func removeHint(kind Kind, name string, scope Scope) string {
 	return "astro local env " + Noun(kind) + " delete " + name + " --" + string(scope)
+}
+
+// declareHint is the exact `astro local env <noun> declare` command for an
+// orphan. A declaration lives in the project's pyproject.toml whichever file
+// holds the value, so it takes no scope flag.
+func declareHint(kind Kind, name string) string {
+	return "astro local env " + Noun(kind) + " declare " + name
 }

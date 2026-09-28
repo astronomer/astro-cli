@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -143,6 +144,128 @@ func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {
 	}
 }
 
+func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
+	const waitNote = "--wait is now the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable, a Go duration: ASTRO_LOCAL_HEALTH_TIMEOUT="
+	const restartNote = "With nothing running, restart starts in standalone mode, which does not build the Dockerfile; use `astro local start --docker` then"
+	withDockerfile := devContext{dockerfile: true, buildSecret: true, packageBuildSecret: true}
+	cases := []struct {
+		name  string
+		args  []string
+		dc    devContext
+		want  string
+		notes []string
+	}{
+		{name: "start", args: []string{"start"}, dc: withDockerfile, want: "astro local start --docker"},
+		{
+			name:  "start with a build secret and a wait",
+			args:  []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT", "--wait", "5m"},
+			dc:    withDockerfile,
+			want:  "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
+			notes: []string{waitNote + "5m astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT"},
+		},
+		{
+			name:  "restart keeps its mode and takes the old plural flag",
+			args:  []string{"restart", "--build-secrets=id=netrc,src=/home/me/.netrc"},
+			dc:    withDockerfile,
+			want:  "astro local restart --build-secret id=netrc,src=/home/me/.netrc",
+			notes: []string{restartNote},
+		},
+		{
+			name: "build carries the build secret to astro package",
+			args: []string{"build", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:   withDockerfile,
+			want: "astro package --build-secret id=netrc,env=NETRC_CONTENT",
+		},
+		{
+			name: "a package that takes no --build-secret is not given one",
+			args: []string{"build", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:   devContext{dockerfile: true, buildSecret: true},
+			want: "astro package",
+		},
+		{
+			name: "a spec with a space is not repeated",
+			args: []string{"start", "--build-secret", "id=x,src=a b"},
+			dc:   withDockerfile,
+			want: "astro local start --docker --build-secret <spec>",
+		},
+		{
+			name:  "a bare wait does not take the next flag as its value",
+			args:  []string{"start", "--wait", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:    withDockerfile,
+			want:  "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
+			notes: []string{waitNote + "10m astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT"},
+		},
+		{
+			name:  "a wait that is not a duration is not repeated",
+			args:  []string{"start", "--wait=soon"},
+			dc:    withDockerfile,
+			want:  "astro local start --docker",
+			notes: []string{waitNote + "10m astro local start --docker"},
+		},
+		{
+			name:  "no Dockerfile, so no Docker mode and no build secret",
+			args:  []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:    devContext{buildSecret: true},
+			want:  "astro local start",
+			notes: []string{"--build-secret applies only to a project that declares [tool.astro] dockerfile"},
+		},
+		{
+			name: "a start that takes no --build-secret is not given one",
+			args: []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:   devContext{dockerfile: true},
+			want: "astro local start --docker",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := buildDevRemoved(devTypedSubcommand(tc.args), tc.args, tc.dc)
+			if p.Replacement != tc.want {
+				t.Errorf("replacement = %q, want %q", p.Replacement, tc.want)
+			}
+			if !slices.Equal(p.Notes, tc.notes) {
+				t.Errorf("notes = %q, want %q", p.Notes, tc.notes)
+			}
+		})
+	}
+}
+
+// The stub reads the project's manifest and the real command tree: a declared
+// Dockerfile gives --docker, and a build secret is carried exactly when
+// `astro local start` takes the flag.
+func TestDevStartReadsTheProjectAndTheTree(t *testing.T) {
+	dir := t.TempDir()
+	pyproject := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*']\n\n" +
+		"[tool.astro]\ndockerfile = 'Dockerfile'\n"
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(pyproject), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, out := testDeps(t)
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	if err := execute(t, d, "dev", "start", "--build-secret", "id=netrc,env=NETRC_CONTENT", "--output", "json"); err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	var payload devRemoved
+	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
+		t.Fatalf("stdout is not one JSON object: %v\n%s", err, out.String())
+	}
+	want := "astro local start --docker"
+	if takesFlag(newRootCmd(d), []string{"local", nameStart}, "build-secret") {
+		want += " --build-secret id=netrc,env=NETRC_CONTENT"
+	}
+	if payload.Replacement != want {
+		t.Errorf("replacement = %q, want %q", payload.Replacement, want)
+	}
+}
+
+func TestDevStubRendersNotesOnTheirOwnLine(t *testing.T) {
+	p := buildDevRemoved("start", []string{"start", "--wait", "5m"}, devContext{})
+	text := renderDevRemoved(p)
+	if !strings.Contains(text, "instead.\n--wait is now the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable, a Go duration: "+
+		"ASTRO_LOCAL_HEALTH_TIMEOUT=5m astro local start\n") {
+		t.Errorf("text does not carry the --wait note:\n%s", text)
+	}
+}
+
 func TestDevStubJSONOutput(t *testing.T) {
 	d, out := testDeps(t)
 	err := execute(t, d, "dev", "ps", "--output", "json")
@@ -173,7 +296,7 @@ func TestDevStubJSONOutput(t *testing.T) {
 }
 
 func TestDevStubTextMatchesJSONData(t *testing.T) {
-	p := buildDevRemoved("ps", false)
+	p := buildDevRemoved("ps", nil, devContext{})
 	text := renderDevRemoved(p)
 	if !strings.Contains(text, p.Error) || !strings.Contains(text, p.Replacement) {
 		t.Errorf("text rendering dropped payload data:\n%s", text)

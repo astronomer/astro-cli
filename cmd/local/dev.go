@@ -4,11 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
@@ -28,6 +33,23 @@ type devRemoved struct {
 	// V1Project is set when the current directory looks like an astro v1
 	// project, which v2 cannot run yet.
 	V1Project bool `json:"v1_project,omitempty"`
+	// Notes say what became of a flag the typed command carried that has no
+	// flag in the replacement.
+	Notes []string `json:"notes,omitempty"`
+}
+
+// devContext is what the stub reads about the directory it runs in and the
+// command tree it points into.
+type devContext struct {
+	v1 bool
+	// dockerfile is set when the current project declares [tool.astro]
+	// dockerfile, which only Docker mode builds.
+	dockerfile bool
+	// buildSecret and packageBuildSecret are set when `astro local start` and
+	// `astro package` take --build-secret, so a replacement never names a flag
+	// the command would refuse.
+	buildSecret        bool
+	packageBuildSecret bool
 }
 
 // NewDevCmd builds the `astro dev` removal stub. The whole v1 dev tree is
@@ -50,16 +72,21 @@ func NewDevCmd(d Deps) *cobra.Command {
 		// Usage is silenced (the guidance is the whole point); the error is
 		// not, so the runner prints the tombstone message.
 		SilenceUsage: true,
-		RunE: func(_ *cobra.Command, args []string) error {
-			return c.runDevRemoved(args)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return c.runDevRemoved(cmd.Root(), args)
 		},
 	}
 	markSkipPreRun(cmd)
 	return cmd
 }
 
-func (c *cli) runDevRemoved(args []string) error {
-	payload := buildDevRemoved(devTypedSubcommand(args), c.isV1Project())
+func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
+	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
+		v1:                 c.isV1Project(),
+		dockerfile:         c.declaresDockerfile(),
+		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
+		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
+	})
 	if devWantsJSON(args) {
 		r := Renderer{Format: FormatJSON, Out: c.d.Stdout}
 		if err := r.Emit(payload, func(w io.Writer) error {
@@ -119,12 +146,12 @@ func devReplacementFor(typed string) (string, bool) {
 	return "", false
 }
 
-func buildDevRemoved(typed string, v1Project bool) devRemoved {
+func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	mapping := devReplacements()
 	p := devRemoved{
 		Typed:     strings.TrimSpace("astro dev " + typed),
 		Mapping:   mapping,
-		V1Project: v1Project,
+		V1Project: dc.v1,
 	}
 	if typed == "" {
 		p.Error = "astro dev was removed in Astro CLI v2"
@@ -132,9 +159,117 @@ func buildDevRemoved(typed string, v1Project bool) devRemoved {
 	}
 	if replacement, ok := devReplacementFor(typed); ok {
 		p.Replacement = replacement
+		switch replacement {
+		case replaceStart, replaceRestart:
+			p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
+		case replacePackage:
+			p.Replacement, p.Notes = devBuildReplacement(args, dc)
+		}
 	}
 	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
 	return p
+}
+
+// buildSecretSpecRe is the shape of a --build-secret spec safe to repeat in a
+// command line: id=, src= and env= pairs naming where a secret comes from.
+var buildSecretSpecRe = regexp.MustCompile(`^[A-Za-z0-9_.,=/~:@+-]+$`)
+
+// devStartReplacement fits the start or restart replacement to the project and
+// to the flags typed. A project that declares a Dockerfile starts in Docker
+// mode, since standalone mode does not build it, and keeps the --build-secret
+// specs its build reads; restart has no --docker flag because it keeps the
+// running mode, but a restart with nothing running starts in standalone mode,
+// so it gets a note. --wait has no flag in v2 and becomes a note. Other flag values
+// may be secrets, so only a build secret spec, which names a source and not a
+// value, and a --wait value that parses as a duration are repeated.
+func devStartReplacement(replacement string, args []string, dc devContext) (command string, notes []string) {
+	cmd := []string{replacement}
+	if dc.dockerfile && replacement == replaceStart {
+		cmd = append(cmd, "--docker")
+	}
+	cmd, notes = withBuildSecrets(cmd, args, dc.buildSecret, dc)
+	if dc.dockerfile && replacement == replaceRestart {
+		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which does not build the Dockerfile; use `%s --docker` then", replaceStart))
+	}
+	if slices.ContainsFunc(args, isWaitFlag) {
+		example := "10m"
+		if waits := devFlagValues(args, "--wait"); len(waits) > 0 {
+			if _, err := time.ParseDuration(waits[len(waits)-1]); err == nil {
+				example = waits[len(waits)-1]
+			}
+		}
+		notes = append(notes, fmt.Sprintf("--wait is now the %s environment variable, a Go duration: %s=%s %s",
+			healthTimeoutEnv, healthTimeoutEnv, example, strings.Join(cmd, " ")))
+	}
+	return strings.Join(cmd, " "), notes
+}
+
+// devBuildReplacement carries the --build-secret specs typed to `astro package`
+// in a project that declares a Dockerfile, as devStartReplacement does for start.
+func devBuildReplacement(args []string, dc devContext) (command string, notes []string) {
+	cmd, notes := withBuildSecrets([]string{replacePackage}, args, dc.packageBuildSecret, dc)
+	command = strings.Join(cmd, " ")
+	return command, notes
+}
+
+// withBuildSecrets appends the --build-secret specs in args to cmd when the
+// replacement takes the flag, or returns a note when the project declares no
+// Dockerfile for them to reach.
+func withBuildSecrets(cmd, args []string, takes bool, dc devContext) (withSecrets, notes []string) {
+	secrets := devFlagValues(args, "--build-secret", "--build-secrets")
+	switch {
+	case len(secrets) == 0 || !takes:
+		return cmd, nil
+	case !dc.dockerfile:
+		return cmd, []string{"--build-secret applies only to a project that declares [tool.astro] dockerfile"}
+	}
+	for _, spec := range secrets {
+		if !buildSecretSpecRe.MatchString(spec) {
+			spec = "<spec>"
+		}
+		cmd = append(cmd, "--build-secret", spec)
+	}
+	return cmd, nil
+}
+
+func isWaitFlag(arg string) bool { return arg == "--wait" || strings.HasPrefix(arg, "--wait=") }
+
+// devFlagValues collects the values given to any of names, in both the
+// `--flag value` and `--flag=value` spellings.
+func devFlagValues(args []string, names ...string) []string {
+	var values []string
+	for i := 0; i < len(args); i++ {
+		name, value, hasValue := strings.Cut(args[i], "=")
+		if !slices.Contains(names, name) {
+			continue
+		}
+		if !hasValue {
+			if i+1 == len(args) || strings.HasPrefix(args[i+1], "-") {
+				continue
+			}
+			i++
+			value = args[i]
+		}
+		values = append(values, value)
+	}
+	return values
+}
+
+// takesFlag reports whether the command at path under root defines flag.
+func takesFlag(root *cobra.Command, path []string, flag string) bool {
+	cmd, _, err := root.Find(path)
+	return err == nil && cmd.Flags().Lookup(flag) != nil
+}
+
+// declaresDockerfile reports whether the current project declares its own
+// Dockerfile. Any failure to read the manifest reads as no.
+func (c *cli) declaresDockerfile() bool {
+	dir, err := c.projectPath()
+	if err != nil {
+		return false
+	}
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	return err == nil && m.Astro.Dockerfile != ""
 }
 
 // renderDevRemoved is the human rendering of the same payload json mode
@@ -147,7 +282,11 @@ func renderDevRemoved(p devRemoved) string {
 	} else if p.Typed != "astro dev" {
 		b.WriteString(" and has no direct replacement")
 	}
-	b.WriteString(".\nLocal Airflow now lives under `astro local`:\n\n")
+	b.WriteString(".")
+	for _, n := range p.Notes {
+		b.WriteString("\n" + n)
+	}
+	b.WriteString("\nLocal Airflow now lives under `astro local`:\n\n")
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},

@@ -1129,6 +1129,13 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 		deployNote = v1ConfigRelPath + ": " + deployTargetNote(v1.deployment, v1.workspace)
 		out = append(out, deployNote)
 	}
+	// Kept out of forRetirement for the reason deployNote is: planRetirements
+	// matches file names as substrings of notes, and link names are the user's.
+	var linksNote string
+	if len(v1.instances) > 0 {
+		linksNote = v1ConfigRelPath + ": " + instancesNote(v1.instances)
+		out = append(out, linksNote)
+	}
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — `astro local start` replaces it"},
 		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
@@ -1161,10 +1168,39 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
-	if deployNote == "" {
+	if deployNote == "" && linksNote == "" {
 		return out, out
 	}
-	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote })
+	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || n == linksNote })
+}
+
+// instancesNote names the deployment links .astro/config.yaml's `instances:`
+// list holds and the command that links each one. A name or id that is not
+// plain is not printed, for the reason deployTargetNote gives.
+func instancesNote(instances []v1Instance) string {
+	cmds := make([]string, 0, len(instances))
+	for _, inst := range instances {
+		name, id := "<name>", "<id>"
+		if plainDeployID(inst.name) {
+			name = inst.name
+		}
+		if plainDeployID(inst.deploymentID) {
+			id = inst.deploymentID
+		}
+		cmd := "astro link add " + name + " --deployment " + id
+		switch {
+		case inst.source == "" || inst.source == "astro":
+		case plainDeployID(inst.source):
+			cmd = "astro link add " + name + " --target " + inst.source
+		default:
+			cmd = "astro link add " + name + " --target <platform>"
+		}
+		if !slices.Contains(cmds, "`"+cmd+"`") {
+			cmds = append(cmds, "`"+cmd+"`")
+		}
+	}
+	return "its `instances` list names deployment links this run did not carry into " + manifest.Marker +
+		". Link each one with " + strings.Join(cmds, ", ")
 }
 
 // deployTargetNote says what .astro/config.yaml saved and what a manifest entry

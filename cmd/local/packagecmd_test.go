@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/pack"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // writeManifest drops a minimal valid v2 manifest in dir and points the deps'
@@ -109,7 +110,7 @@ func TestRenderPackageImageText(t *testing.T) {
 		RuntimeVersion: "3.1-2",
 		SavedPath:      "image.tar",
 	}
-	if err := renderPackage(&buf, res); err != nil {
+	if err := renderPackage(&buf, res, nil); err != nil {
 		t.Fatal(err)
 	}
 	text := buf.String()
@@ -123,5 +124,38 @@ func TestRenderPackageImageText(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("text output missing %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestDeployImageHintNamesATarget(t *testing.T) {
+	const image = "astro-package/demo:3.1-2-abc1234"
+	astro := func(isDefault bool) manifest.Link {
+		return manifest.Link{Deployment: "clx123", Default: isDefault}
+	}
+	cases := []struct {
+		name  string
+		links map[string]manifest.Link
+		want  string
+	}{
+		{name: "no links", want: "  astro deploy --image-name " + image},
+		{name: "the default", links: map[string]manifest.Link{"dev": astro(false), "prod": astro(true)}, want: "  astro deploy prod --image-name " + image},
+		{name: "the only one", links: map[string]manifest.Link{"prod": astro(false)}, want: "  astro deploy prod --image-name " + image},
+		{
+			name:  "several and no default",
+			links: map[string]manifest.Link{"prod": astro(false), "dev": astro(false)},
+			want:  "  astro deploy <link> --image-name " + image + "\nDeployable links: dev, prod",
+		},
+		{
+			name:  "a default that deploy cannot ship to",
+			links: map[string]manifest.Link{"prod": astro(false), "dev": astro(false), "mwaa": {Target: "mwaa", Environment: "e", Default: true}},
+			want:  "  astro deploy <link> --image-name " + image + "\nDeployable links: dev, prod",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := deployImageHint(image, tc.links); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

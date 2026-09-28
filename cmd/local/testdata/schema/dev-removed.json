@@ -8,5 +8,8 @@
       "replacement": "x"
     }
   ],
-  "v1_project": true
+  "v1_project": true,
+  "notes": [
+    "x"
+  ]
 }

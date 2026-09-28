@@ -21,11 +21,10 @@ func DevReplacements() []DevReplacement {
 		{"run", "astro local run"},
 		{"bash", "astro local shell"},
 		{"parse", "astro local check"},
-		{"kill", "astro local stop --clean"},
+		{"build", "astro package"},
+		{"kill", "astro local reset --yes"},
 		{"pytest", "uv run pytest"},
 		{"init", "astro init"},
-		// v1 bulk-loaded connections and variables into a running Airflow and
-		// dumped them back out. v2 declares them per name instead, so there is
 		// There is no "object import" row: v1's import covered connections and
 		// variables together, no single v2 command does, and the honest answer
 		// — the tree — is what the "object" row below already gives. A second

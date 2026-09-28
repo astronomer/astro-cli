@@ -50,9 +50,9 @@ Astro CLI v2 removed the whole `astro dev` tree. Never suggest an
 | `astro dev run` | `astro local run` |
 | `astro dev bash` | `astro local shell` |
 | `astro dev parse` | `astro local check` |
-| `astro dev kill` | `astro local stop --clean` |
+| `astro dev build` | `astro package` |
+| `astro dev kill` | `astro local reset --yes` |
 | `astro dev pytest` | `uv run pytest` |
 | `astro dev init` | `astro init` |
-| `astro dev object import` | `the env schema in pyproject.toml` |
-| `astro dev object export` | `the env schema in pyproject.toml` |
-| `astro dev object` | `the env schema in pyproject.toml` |
+| `astro dev object export` | `astro local env list` |
+| `astro dev object` | `astro local env` |

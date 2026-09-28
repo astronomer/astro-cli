@@ -262,6 +262,11 @@ func TestEnvListOrphanNote(t *testing.T) {
 		{
 			Kind: localenv.KindEnv, Name: "LEFTOVER", Source: "project",
 			Orphan: true, RemoveHint: "astro local env variable delete LEFTOVER --project",
+			DeclareHint: "astro local env variable declare LEFTOVER",
+		},
+		{
+			Kind: localenv.KindEnv, Name: "GLOBALONLY", Source: "global",
+			Orphan: true, RemoveHint: "astro local env variable delete GLOBALONLY --global",
 		},
 		{
 			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
@@ -274,18 +279,22 @@ func TestEnvListOrphanNote(t *testing.T) {
 	}
 	lines := map[string]string{}
 	for _, line := range strings.Split(out.String(), "\n") {
-		for _, name := range []string{"LEFTOVER", "ELSEWHERE", "DECLARED"} {
+		for _, name := range []string{"LEFTOVER", "GLOBALONLY", "ELSEWHERE", "DECLARED"} {
 			if strings.Contains(line, name) {
 				lines[name] = line
 			}
 		}
 	}
 
-	if !strings.Contains(lines["LEFTOVER"], "orphan; remove: astro local env variable delete LEFTOVER --project") {
-		t.Errorf("an orphan in this project should offer the command: %q", lines["LEFTOVER"])
+	if !strings.Contains(lines["LEFTOVER"], "undeclared; declare: astro local env variable declare LEFTOVER "+
+		"(or remove: astro local env variable delete LEFTOVER --project)") {
+		t.Errorf("an orphan in this project should offer declaring it first: %q", lines["LEFTOVER"])
+	}
+	if !strings.Contains(lines["GLOBALONLY"], "undeclared; remove: astro local env variable delete GLOBALONLY --global") {
+		t.Errorf("an orphan with no declare command should offer removal: %q", lines["GLOBALONLY"])
 	}
 
-	if !strings.Contains(lines["ELSEWHERE"], "orphan in /projects/other") {
+	if !strings.Contains(lines["ELSEWHERE"], "undeclared in /projects/other") {
 		t.Errorf("an orphan elsewhere should name the project: %q", lines["ELSEWHERE"])
 	}
 	if strings.Contains(lines["ELSEWHERE"], "remove:") {

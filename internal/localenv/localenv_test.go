@@ -244,8 +244,8 @@ func TestListSourceAndOrphans(t *testing.T) {
 	if it := byName["MISSING"]; it.Source != SourceAbsent {
 		t.Errorf("MISSING = %+v, want absent source", it)
 	}
-	if it := byName["STRAY_PROJECT"]; !it.Orphan || it.RemoveHint == "" {
-		t.Errorf("STRAY_PROJECT = %+v, want orphan with a remove hint", it)
+	if it := byName["STRAY_PROJECT"]; !it.Orphan || it.RemoveHint == "" || it.DeclareHint != "astro local env variable declare STRAY_PROJECT" {
+		t.Errorf("STRAY_PROJECT = %+v, want orphan with a remove and a declare hint", it)
 	}
 	if it := byName["STRAY_GLOBAL"]; !it.Orphan {
 		t.Errorf("STRAY_GLOBAL = %+v, want orphan", it)
@@ -399,8 +399,8 @@ func TestListAllDedupesCurrentProject(t *testing.T) {
 	}
 	// A cross-project orphan names its project and carries no (wrong-target)
 	// remove hint.
-	if bItem.Project == "" || bItem.RemoveHint != "" {
-		t.Fatalf("cross-project orphan = %+v, want a Project and no RemoveHint", *bItem)
+	if bItem.Project == "" || bItem.RemoveHint != "" || bItem.DeclareHint != "" {
+		t.Fatalf("cross-project orphan = %+v, want a Project and no hints", *bItem)
 	}
 }
 

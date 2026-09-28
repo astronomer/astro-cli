@@ -1,8 +1,8 @@
 """Parse test: load every DAG in dags/ and fail if any of them has an import error.
 
 This is the Airflow 3 form of the classic dagbag integrity test. `astro local check` runs
-the same idea from the CLI; this keeps it in the test suite so `uv run pytest` (or
-`astro local run pytest`) catches a broken DAG too.
+the same idea from the CLI; this keeps it in the test suite so `uv run pytest` catches a
+broken DAG too.
 """
 
 from __future__ import annotations

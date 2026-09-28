@@ -951,3 +951,72 @@ func TestConversionStillRetiresThemWithNoDeclaration(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(dir, "requirements.txt"))
 	assert.NoFileExists(t, filepath.Join(dir, "packages.txt"))
 }
+
+// A package a RUN step installs with pip is named, because standalone mode and
+// `astro local check` install only [project] dependencies and would not have
+// it. Anything the reader cannot parse with confidence is left out.
+func TestRunPipSpecs(t *testing.T) {
+	cases := []struct {
+		name, dockerfile string
+		want             []string
+	}{
+		{
+			name: "a quoted git spec behind a build secret",
+			dockerfile: "RUN --mount=type=secret,id=netrc,target=/home/astro/.netrc \\\n" +
+				"    pip install --no-cache-dir \"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\"\n",
+			want: []string{"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3"},
+		},
+		{
+			name:       "uv pip, python -m pip, and a chain",
+			dockerfile: "RUN uv pip install --system pandas==2.1.0 && python3 -m pip install -U 'boto3>=1.34'; pip3 install pandas==2.1.0\n",
+			want:       []string{"pandas==2.1.0", "boto3>=1.34"},
+		},
+		{
+			name:       "an option value is not a spec",
+			dockerfile: "RUN pip install --index-url https://pypi.example.com/simple orders-sdk\n",
+			want:       []string{"orders-sdk"},
+		},
+		{
+			name:       "credentials in a URL are not printed",
+			dockerfile: "RUN pip install 'lib @ git+https://user:tok3n@github.com/acme/lib.git'\n",
+			want:       []string{"lib @ git+https://***@github.com/acme/lib.git"},
+		},
+		{
+			name:       "a python named by path",
+			dockerfile: "RUN /usr/bin/python3 -m pip install orders-sdk\n",
+			want:       []string{"orders-sdk"},
+		},
+		{name: "a bare URL", dockerfile: "RUN pip install git+https://github.com/acme/lib.git\n"},
+		{name: "a command substitution", dockerfile: "RUN pip install \"`cat pkgs`\"\n"},
+		{name: "a requirements file", dockerfile: "RUN pip install -r requirements.txt\n"},
+		{name: "a variable", dockerfile: "RUN pip install $EXTRA_PACKAGES\n"},
+		{name: "a local path", dockerfile: "RUN pip install ./plugins/mylib\n"},
+		{name: "pip itself", dockerfile: "RUN pip install --upgrade pip\n"},
+		{name: "an option it does not know", dockerfile: "RUN pip install --weird value pandas\n"},
+		{name: "an unclosed quote", dockerfile: "RUN pip install \"pandas\n"},
+		{name: "not pip", dockerfile: "RUN apt-get install -y unixodbc-dev\n"},
+		{name: "a comment", dockerfile: "# RUN pip install pandas\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, runPipSpecs([]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"+tc.dockerfile)))
+		})
+	}
+}
+
+func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(
+		"FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"+
+			"RUN --mount=type=secret,id=netrc,target=/home/astro/.netrc "+
+			"pip install \"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\"\n"), 0o600))
+
+	res, err := Run(dir, Options{})
+	require.NoError(t, err)
+	assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install "+
+		"\"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\". "+
+		"Standalone mode and `astro local check` do not have it unless you add it to [project] dependencies")
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")
+}
