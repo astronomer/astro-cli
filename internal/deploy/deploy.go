@@ -51,7 +51,8 @@ type Request struct {
 	// Manifest is the loaded pyproject.toml: deployment links, the Airflow pin,
 	// the project's dependencies and OS packages.
 	Manifest *manifest.Manifest
-	// LinkName is the positional argument naming a deployment link, "" if none.
+	// LinkName is the positional argument, "" if none. It resolves exactly as
+	// Deployment does.
 	LinkName string
 	// Deployment is --deployment. It names a manifest link, or — when the
 	// project links nothing by that name — an Astro Deployment id, which is
@@ -462,22 +463,19 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 	return astroTarget(req, name, link, links)
 }
 
-// namedTarget resolves a target named on the command line: a manifest link, or
-// — for --deployment only — an Astro Deployment id. The id fall-through is what
-// the flag meant before it learned link names, so a CI job that passes one keeps
-// working. The positional argument stays a link name, so a typo there is caught
-// rather than shipped at some id the control plane has never heard of.
+// namedTarget resolves a target named on the command line, by the positional
+// argument or --deployment alike: a manifest link, else an Astro Deployment id.
+// The id fall-through is what both meant before they learned link names — the
+// usage line is `astro deploy DEPLOYMENT-ID`, and astronomer/deploy-action runs
+// exactly that — so a CI job that passes an id keeps working.
 func namedTarget(req Request, name string, links map[string]manifest.Link) (Target, error) {
 	if link, ok := links[name]; ok {
 		return astroTarget(req, name, link, links)
 	}
-	if req.Deployment == name {
-		return Target{
-			DeploymentID: name,
-			WorkspaceID:  firstNonEmpty(req.WorkspaceID, req.ContextWorkspace),
-		}, nil
-	}
-	return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+	return Target{
+		DeploymentID: name,
+		WorkspaceID:  firstNonEmpty(req.WorkspaceID, req.ContextWorkspace),
+	}, nil
 }
 
 // unlinkedTarget runs the workspace-level pick/create flow, for a project whose

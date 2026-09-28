@@ -169,13 +169,26 @@ func TestResolveTarget(t *testing.T) {
 		assert.Equal(t, "ws-flag", target.WorkspaceID)
 	})
 
-	// The positional stays a link name, so a typo is caught rather than shipped
-	// at an id the control plane has never heard of.
-	t.Run("a positional name no link declares", func(t *testing.T) {
-		_, err := resolveTarget(Request{Manifest: manifestWith(twoLinks), LinkName: "staging"}, &stubDeployer{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "staging")
-		assert.Contains(t, err.Error(), "dev, prod")
+	// astronomer/deploy-action runs `astro deploy <id>`, so the positional
+	// falls through to an id exactly as --deployment does.
+	t.Run("the positional falls through to a deployment id", func(t *testing.T) {
+		d := &stubDeployer{}
+		target, err := resolveTarget(Request{
+			Manifest:         manifestWith(twoLinks),
+			LinkName:         "clx-not-a-link",
+			ContextWorkspace: "ws-ctx",
+		}, d)
+		require.NoError(t, err)
+		assert.Equal(t, "clx-not-a-link", target.DeploymentID)
+		assert.Equal(t, "ws-ctx", target.WorkspaceID)
+		assert.Empty(t, target.LinkName)
+		assert.Zero(t, d.asked)
+	})
+
+	t.Run("the positional and --deployment may name the same id", func(t *testing.T) {
+		target, err := resolveTarget(Request{LinkName: "clx-id", Deployment: "clx-id"}, &stubDeployer{})
+		require.NoError(t, err)
+		assert.Equal(t, "clx-id", target.DeploymentID)
 	})
 
 	t.Run("two targets named at once", func(t *testing.T) {

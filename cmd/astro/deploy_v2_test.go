@@ -30,6 +30,10 @@ dependencies = ["apache-airflow==3.1.*"]
 [tool.astro]
 `
 
+// actionDeploymentID is a Deployment id as astronomer/deploy-action passes it:
+// the positional argument, naming no manifest link.
+const actionDeploymentID = "cexampledeployment0000002"
+
 // resetDeployFlagVars zeroes the package-level deploy flag vars so a routing
 // test does not inherit flag state a prior test left behind (cobra binds these
 // vars once and never clears them between runs).
@@ -263,9 +267,8 @@ func TestDeployV2JSONManifestErrorNoUsage(t *testing.T) {
 	resetDeployFlagVars()
 
 	// [tool.astro] with no airflow version fails manifest validation. It still
-	// routes to the v2 path, which fails at manifest.Load — before deployV2 sets
-	// SilenceUsage — so this locks in that json mode still keeps stdout/stderr to
-	// the one error object.
+	// routes to the v2 path, which fails at manifest.Load, so this locks in that
+	// json mode still keeps stdout/stderr to the one error object.
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
 		[]byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
@@ -621,10 +624,11 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 			config.WorkingPath = dir
 			t.Cleanup(func() { config.WorkingPath = orig })
 
-			err := execDeployCmd(tc.args...)
+			out, err := execDeployCapture(append([]string{actionDeploymentID}, tc.args...)...)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "has no effect when deploying a v2 project")
 			assert.Contains(t, err.Error(), tc.want)
+			assert.NotContains(t, out, "Usage:", "a refusal prints the error, not the help")
 		})
 	}
 }
@@ -749,6 +753,95 @@ func TestDeployV2BuildSecretRefusals(t *testing.T) {
 			}
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErr)
+		})
+	}
+}
+
+// astronomer/deploy-action runs `astro deploy $DEPLOYMENT_ID ...`, so the
+// positional takes a Deployment id the way --deployment does, whatever links the
+// project declares.
+func TestDeployV2PositionalDeploymentID(t *testing.T) {
+	linkTo := func(dep string) string {
+		return v2ManifestForRouting + "workspace = \"clw-ws\"\n\n[tool.astro.deployments.test]\ndeployment = \"" + dep + "\"\n"
+	}
+	for _, tc := range []struct {
+		name     string
+		manifest string
+	}{
+		{"no links", v2ManifestForRouting},
+		{"a link to another deployment", linkTo("clx-other")},
+		{"a link to the same deployment", linkTo(actionDeploymentID)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeCmdDeployer{}
+			setupV2DeployWith(t, fake, tc.manifest)
+
+			_, err := execDeployCapture(actionDeploymentID, "--dags")
+			require.NoError(t, err)
+			require.NotNil(t, fake.dagInput)
+			assert.Equal(t, actionDeploymentID, fake.dagInput.DeploymentID)
+		})
+	}
+}
+
+func TestDeployV2PositionalAndFlagMustAgree(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{})
+
+	_, err := execDeployCapture("clx-a", "--deployment", "clx-b", "--dags")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "name one")
+}
+
+// Each shape astronomer/deploy-action v0.16.0 runs, against a v2 project.
+func TestDeployV2DeployActionInvocations(t *testing.T) {
+	withDockerfile := strings.Replace(v2ManifestWithDefaultLink, "[tool.astro]\n", "[tool.astro]\ndockerfile = \"Dockerfile\"\n", 1)
+	for _, tc := range []struct {
+		name        string
+		manifest    string
+		args        []string
+		wantDags    bool
+		wantImage   bool
+		includeDags bool
+	}{
+		{name: "dags", manifest: v2ManifestWithDefaultLink, args: []string{actionDeploymentID, "--wait", "--dags", "--force"}, wantDags: true},
+		{name: "image", manifest: v2ManifestWithDefaultLink, args: []string{actionDeploymentID, "--wait", "--image", "--force"}, wantImage: true},
+		{
+			name:        "image and dags",
+			manifest:    withDockerfile,
+			args:        []string{actionDeploymentID, "--wait", "--force", "--build-secret", "id=x,env=Y", "--description", "d"},
+			wantImage:   true,
+			includeDags: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeCmdDeployer{}
+			setupV2DeployWith(t, fake, tc.manifest)
+			t.Setenv("Y", "secret")
+			require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600))
+
+			_, err := execDeployCapture(tc.args...)
+			require.NoError(t, err)
+
+			if tc.wantDags {
+				require.NotNil(t, fake.dagInput)
+				assert.Equal(t, actionDeploymentID, fake.dagInput.DeploymentID)
+				assert.True(t, fake.dagInput.Wait)
+			} else {
+				assert.Nil(t, fake.dagInput)
+			}
+			if !tc.wantImage {
+				assert.Nil(t, fake.imgInput)
+				return
+			}
+			require.NotNil(t, fake.imgInput)
+			assert.Equal(t, actionDeploymentID, fake.imgInput.DeploymentID)
+			assert.True(t, fake.imgInput.Wait)
+			assert.Equal(t, tc.includeDags, fake.imgInput.IncludeDags)
+			if tc.includeDags {
+				assert.Equal(t, "Dockerfile", fake.imgInput.Dockerfile)
+				assert.Equal(t, []string{"id=x,env=Y"}, fake.imgInput.BuildSecrets)
+				assert.Equal(t, "d", fake.imgInput.Description)
+			}
 		})
 	}
 }

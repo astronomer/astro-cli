@@ -397,6 +397,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	cmd.SilenceUsage = true
 	if rerr := refuseFlagsV2DeployIgnores(cmd); rerr != nil {
 		return deployV2Err(cmd, format, rerr)
 	}
@@ -451,8 +452,6 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	if overrideWorkspace == "" {
 		overrideWorkspace = workspaceID
 	}
-
-	cmd.SilenceUsage = true
 
 	// A prompt has to be answered by someone, and json output has to stay a
 	// stream a program can parse — a question on stderr with the run blocked on
@@ -654,10 +653,10 @@ func deployTargetName(res *v2deploy.Result) string {
 }
 
 // deployV2Err renders a v2 deploy failure. In json mode it writes the
-// {"error","code"} object to stdout and silences cobra's error and usage
-// output so the object is the only thing on the streams; in text mode it
-// returns the error for cobra to print. It returns the error either way, so
-// the process still exits non-zero.
+// {"error","code"} object to stdout and silences cobra's error output so the
+// object is the only thing on the streams; in text mode it returns the error
+// for cobra to print. It returns the error either way, so the process still
+// exits non-zero.
 func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
 	if goerrors.Is(err, v2deploy.ErrAborted) {
 		// The user was asked and said no. Reading their own answer back at them
@@ -665,7 +664,6 @@ func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
 		// the whole message. Only an interactive run can reach here, so this
 		// never eats the object json mode promises.
 		cmd.SilenceErrors = true
-		cmd.SilenceUsage = true
 		return err
 	}
 	if format == formatJSON {
@@ -674,11 +672,7 @@ func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
 			Error string `json:"error"`
 			Code  int    `json:"code"`
 		}{Error: err.Error(), Code: 1})
-		// A manifest or selection failure can return before deployV2 sets
-		// SilenceUsage, so set it here too — json mode must not dump the usage
-		// block onto stderr alongside the object.
 		cmd.SilenceErrors = true
-		cmd.SilenceUsage = true
 	}
 	return err
 }
