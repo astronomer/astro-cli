@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -940,5 +941,84 @@ func TestCheckJSONEmitsNDJSONFindingsAndSummary(t *testing.T) {
 	}
 	if summary.Passed {
 		t.Error("summary should report a failure")
+	}
+}
+
+// envCapturingParser records the environment each parse was handed.
+type envCapturingParser struct {
+	got *[]string
+}
+
+func (p envCapturingParser) Parse(_ context.Context, in checks.ParseInput) (checks.ParseReport, error) {
+	*p.got = in.Env
+	return checks.ParseReport{}, nil
+}
+
+func (p envCapturingParser) ParseWith(_ context.Context, _ string, in checks.ParseInput) (checks.ParseReport, error) {
+	*p.got = in.Env
+	return checks.ParseReport{}, nil
+}
+
+// A check imports the DAGs under the values a start would give them: the
+// project's .env and a declared default, as well as the shell. A DAG that reads
+// its .env at import time otherwise fails here and runs fine under a start.
+func TestCheckParsesUnderTheProjectEnvironment(t *testing.T) {
+	const m = validManifest + "\n[tool.astro.env]\nASTRO_TEST_DEFAULTED = { default = 'from-manifest' }\n"
+	for _, args := range [][]string{
+		{"local", "check"},
+		{"local", "check", "--target", "astro"},
+		{"local", "check", "--target", "composer"},
+	} {
+		t.Run(strings.Join(args[2:], " "), func(t *testing.T) {
+			isolateEnvSources(t, "ASTRO_TEST_DOTENV", "ASTRO_TEST_DEFAULTED")
+			t.Setenv("ASTRO_TEST_SHELL", "from-shell")
+			d, _ := targetDeps(t)
+			dir, err := d.WorkingDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("ASTRO_TEST_DOTENV=sandbox\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			d.Checks = envCapturingParser{got: &got}
+			d.CheckVenv = envCapturingParser{got: &got}
+
+			_ = execute(t, d, args...)
+
+			for _, want := range []string{"ASTRO_TEST_DOTENV=sandbox", "ASTRO_TEST_DEFAULTED=from-manifest", "ASTRO_TEST_SHELL=from-shell"} {
+				if !slices.Contains(got, want) {
+					t.Errorf("the parse env is missing %s", want)
+				}
+			}
+		})
+	}
+}
+
+// A [tool.astro.env] declaration that does not parse stops a check the way it
+// stops a start, because the check can no longer tell what a start would give
+// the DAGs.
+func TestCheckIsBlockedByAnEnvDeclarationThatDoesNotParse(t *testing.T) {
+	isolateEnvSources(t)
+	d, out := checkDeps(t)
+	dir, err := d.WorkingDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := validManifest + "\n[tool.astro.env]\nASTRO_TEST_BAD = 5\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err = execute(t, d, "local", "check")
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != checks.ExitEnvNotReady {
+		t.Fatalf("want exit %d, got %v", checks.ExitEnvNotReady, err)
+	}
+	if !strings.Contains(out.String(), "ASTRO_TEST_BAD") {
+		t.Errorf("stdout should name the declaration, got %q", out.String())
 	}
 }

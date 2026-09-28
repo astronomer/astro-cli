@@ -29,6 +29,7 @@ func envValue(env []string, key string) (string, bool) {
 
 func buildTestEnv(t *testing.T, goos, airflowVersion string, planEnv map[string]string) []string {
 	t.Helper()
+	unsetDevDefaults(t)
 	e, _, _ := testEngine(t)
 	e.goos = goos
 	project := t.TempDir()
@@ -36,7 +37,16 @@ func buildTestEnv(t *testing.T, goos, airflowVersion string, planEnv map[string]
 	return e.buildEnv(p, project, t.TempDir(), filepath.Join(project, ".astro", "standalone"), 8123)
 }
 
-func TestBuildEnvDevOverridesAreAuthoritative(t *testing.T) {
+func unsetDevDefaults(t *testing.T) {
+	t.Helper()
+	for _, kv := range devDefaults {
+		key, _, _ := strings.Cut(kv, "=")
+		t.Setenv(key, "")
+		require.NoError(t, os.Unsetenv(key))
+	}
+}
+
+func TestBuildEnvAppliesTheDevSettings(t *testing.T) {
 	env := buildTestEnv(t, "linux", "3.0.2", map[string]string{
 		// The plan must not be able to unbind the loopback pin.
 		"AIRFLOW__API__HOST": "0.0.0.0",
@@ -72,6 +82,31 @@ func TestBuildEnvDevOverridesAreAuthoritative(t *testing.T) {
 	// The plan's other values layer over the base.
 	foo, _ := envValue(env, "FOO")
 	assert.Equal(t, "bar", foo)
+}
+
+// A project that sets a dev default itself keeps its own value, from its .env
+// or from the plan. The loopback bind is the exception: it guards the
+// instance, so no project setting reaches it.
+func TestBuildEnvLetsTheProjectOverrideDevDefaults(t *testing.T) {
+	unsetDevDefaults(t)
+	e, _, _ := testEngine(t)
+	project := t.TempDir()
+	dotenv := "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
+	require.NoError(t, os.WriteFile(filepath.Join(project, ".env"), []byte(dotenv), 0o600))
+	p := rt.Plan{ProjectPath: project, Mode: rt.ModeStandalone, AirflowVersion: "3.0.2", Env: map[string]string{
+		"AIRFLOW__CORE__DEFAULT_TASK_RETRIES": "2",
+	}}
+	env := e.buildEnv(p, project, t.TempDir(), filepath.Join(project, ".astro"), 8080)
+
+	paused, _ := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
+	assert.Equal(t, "True", paused)
+	retries, _ := envValue(env, "AIRFLOW__CORE__DEFAULT_TASK_RETRIES")
+	assert.Equal(t, "2", retries)
+	rescan, _ := envValue(env, "AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL")
+	assert.Equal(t, "2", rescan, "a default the project does not set still applies")
+
+	web, _ := envValue(env, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST")
+	assert.Equal(t, "127.0.0.1", web)
 }
 
 func TestBuildEnvAF2Block(t *testing.T) {

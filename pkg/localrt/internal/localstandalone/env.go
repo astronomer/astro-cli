@@ -16,17 +16,17 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
-// buildEnv constructs the environment for the standalone Airflow process:
-// pkg/airflowrt's BuildEnv as the base (inherited env, the project's .env,
-// the standalone-critical settings, the macOS proxy workaround), the plan's
-// fully layered Env on top, then the version- and platform-specific blocks,
-// the per-project JWT secret, and finally the dev-mode overrides — which
-// come last so they are authoritative: the loopback bind in particular must
-// win over everything (docs/v2-architecture.md, "Defaults").
 // goosDarwin names the platform whose _scproxy fork-safety workaround the
 // AF2 blocks below depend on.
 const goosDarwin = "darwin"
 
+// buildEnv constructs the environment for the standalone Airflow process:
+// pkg/airflowrt's BuildEnv as the base (inherited env, the project's .env,
+// the standalone-critical settings, the macOS proxy workaround), the plan's
+// fully layered Env on top, then the version- and platform-specific blocks,
+// the per-project JWT secret, and finally the dev-mode settings: defaults
+// wherever the environment so far left a key unset, and the loopback bind
+// over everything (docs/v2-architecture.md, "Defaults").
 func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, port int) []string {
 	env := airflowrt.BuildEnv(projectPath, strconv.Itoa(port), "")
 	// BuildEnv hardcodes AIRFLOW_HOME to the default location; honor the
@@ -54,7 +54,7 @@ func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, 
 			env = append(env, "NO_PROXY=*", "no_proxy=*")
 		}
 	}
-	return append(jwtEnv(env, stateDir), devConfigOverrides...)
+	return devEnv(jwtEnv(env, stateDir))
 }
 
 // jwtEnv gap-fills the JWT signing settings AF3's api-server needs set
@@ -92,9 +92,20 @@ func af2Env(port int) []string {
 	}
 }
 
-// devConfigOverrides are the Airflow settings forced for local dev, per the
-// design's decision 13: fast DAG rescan yes, zero default task retries
-// yes, loopback-only bind always. In Airflow 3 the dag-processor is a separate
+// devEnv gap-fills devDefaults, so a project that sets one of those keys
+// itself keeps its value, and then pins loopbackBind, which nothing overrides.
+func devEnv(env []string) []string {
+	for _, kv := range devDefaults {
+		if key, _, _ := strings.Cut(kv, "="); !hasKey(env, key) {
+			env = append(env, kv)
+		}
+	}
+	return append(env, loopbackBind...)
+}
+
+// devDefaults are the Airflow settings local dev runs with unless the project
+// or the shell sets them, per the design: fast DAG rescan and zero
+// default task retries. In Airflow 3 the dag-processor is a separate
 // component with its own config section, so both the scheduler and
 // dag_processor intervals are set; the key for whichever Airflow major is not
 // running is ignored.
@@ -111,20 +122,13 @@ func af2Env(port int) []string {
 // desktop has forced False for its whole life for that reason, so this is
 // also what local users already have — and matching it is what lets the
 // desktop provision through this engine without changing their experience.
-//
-// The api-server (AF3) and webserver (AF2) are pinned to the IPv4 loopback:
-// Airflow's own default bind is 0.0.0.0, which would expose the instance —
-// effectively unauthenticated under SIMPLE_AUTH_MANAGER_ALL_ADMINS — to
-// every device on the LAN.
-var devConfigOverrides = []string{
+var devDefaults = []string{
 	"AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=2",
 	"AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL=0",
 	"AIRFLOW__DAG_PROCESSOR__DAG_DIR_LIST_INTERVAL=2",
 	"AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL=0",
 	"AIRFLOW__CORE__DEFAULT_TASK_RETRIES=0",
 	"AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
-	"AIRFLOW__API__HOST=127.0.0.1",
-	"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1",
 	// The log file is not a terminal, so nothing in it should be colored.
 	// `airflow standalone` colors the component name it prefixes each line
 	// with and structlog colors the body, which costs about forty wasted bytes
@@ -134,6 +138,16 @@ var devConfigOverrides = []string{
 	// own console handler.
 	"NO_COLOR=1",
 	"AIRFLOW__LOGGING__COLORED_CONSOLE_LOG=False",
+}
+
+// loopbackBind pins the api-server (AF3) and webserver (AF2) to the IPv4
+// loopback whatever the project sets. It is a security guard, not a
+// preference: Airflow's own default bind is 0.0.0.0, which would expose the
+// instance — effectively unauthenticated under SIMPLE_AUTH_MANAGER_ALL_ADMINS
+// — to every device on the LAN.
+var loopbackBind = []string{
+	"AIRFLOW__API__HOST=127.0.0.1",
+	"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1",
 }
 
 const (
@@ -205,7 +219,7 @@ func (e *Engine) shellEnv(rec localstate.Record) ([]string, error) {
 			env = append(env, "NO_PROXY=*", "no_proxy=*")
 		}
 	}
-	env = append(jwtEnv(env, stateDir), devConfigOverrides...)
+	env = devEnv(jwtEnv(env, stateDir))
 	return append(env, "VIRTUAL_ENV="+filepath.Join(rec.ProjectPath, ".venv")), nil
 }
 

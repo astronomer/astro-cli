@@ -25,16 +25,15 @@ type ParseInput struct {
 	ProjectPath string
 	DagsDir     string
 	// Env is the environment the DAGs are imported under, in os.Environ form.
-	// Empty inherits this process's, which is what the CLI wants: it runs from
-	// the project directory and its own environment is the user's shell.
+	// Empty inherits this process's.
 	//
-	// A caller whose environment is NOT the user's shell has to supply it, or
-	// the parse and the real Airflow disagree. A DAG that reads a variable at
-	// module scope — `os.environ["SNOWFLAKE_ACCOUNT"]`, a Variable.get default
-	// — imports fine under an Airflow started with the project's environment
-	// and raises here without it, which reports a working DAG as broken. A GUI
-	// that composes the environment itself (project .env, a vault, declared
-	// defaults) is exactly that caller.
+	// A caller should supply the environment the project's Airflow runs with
+	// (its .env, a vault, declared defaults), or the parse and the real Airflow
+	// disagree. A DAG that reads a variable at module scope —
+	// `os.environ["SNOWFLAKE_ACCOUNT"]`, a Variable.get default — imports fine
+	// under an Airflow started with the project's environment and raises here
+	// without it, which reports a working DAG as broken. The user's shell alone
+	// is not that environment: a start layers the project's .env over it.
 	//
 	// AIRFLOW_HOME, the DAGs folder, the examples switch and the result-file
 	// path are appended after this and win: they are what makes the parse

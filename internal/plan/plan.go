@@ -7,8 +7,10 @@
 package plan
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
@@ -161,6 +163,30 @@ func Build(workingDir string, opts Options) (*Built, error) {
 			RequestedPort:  choosePort(opts.RequestedPort, us.Port),
 		},
 	}, nil
+}
+
+// Environ is the environment a start of the project in dir runs its DAGs
+// under, in os.Environ form: this process's own, then the
+// ASTRONOMER_ENVIRONMENT both engines set, then Plan.Env, then Plan.SecretEnv,
+// the order standalone applies them in. It is for commands that
+// import the project's DAGs without starting Airflow, so a DAG that reads its
+// .env at import time sees what it would under a start.
+//
+// Offline, unlike a start: no Environment Manager lookup. A required value with
+// no source is left out rather than refused, so the DAG that needs it reports
+// the problem itself.
+func Environ(dir string, m *manifest.Manifest) ([]string, error) {
+	resolved, err := resolveEnv(m, &project.Project{Dir: dir}, Options{AllowMissing: true})
+	if err != nil {
+		return nil, err
+	}
+	env := append(os.Environ(), "ASTRONOMER_ENVIRONMENT=local")
+	for _, layer := range []map[string]string{resolved.env, resolved.secretEnv} {
+		for _, k := range slices.Sorted(maps.Keys(layer)) {
+			env = append(env, k+"="+layer[k])
+		}
+	}
+	return env, nil
 }
 
 // choosePort applies the v2 requested-port precedence:

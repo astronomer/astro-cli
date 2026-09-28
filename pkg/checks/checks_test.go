@@ -386,6 +386,18 @@ func TestRunPassesDagsDirToParser(t *testing.T) {
 	assert.Equal(t, filepath.Join("proj", "dags"), got.DagsDir)
 }
 
+func TestRunPassesEnvToParser(t *testing.T) {
+	var got ParseInput
+	capture := parserFunc(func(_ context.Context, in ParseInput) (ParseReport, error) {
+		got = in
+		return ParseReport{}, nil
+	})
+	env := []string{"ENV=sandbox"}
+	_, err := Run(context.Background(), Options{ProjectPath: "proj", Env: env}, capture)
+	require.NoError(t, err)
+	assert.Equal(t, env, got.Env)
+}
+
 type parserFunc func(context.Context, ParseInput) (ParseReport, error)
 
 func (f parserFunc) Parse(ctx context.Context, in ParseInput) (ParseReport, error) { return f(ctx, in) }

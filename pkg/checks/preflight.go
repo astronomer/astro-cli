@@ -115,6 +115,8 @@ type PreflightInput struct {
 	Deps []string
 	// Constraints is the manifest's [tool.uv] constraint-dependencies.
 	Constraints []string
+	// Env is the environment the DAGs are imported under; see ParseInput.Env.
+	Env []string
 }
 
 // ConstraintOutcome is the MWAA constraints pre-flight result. Exactly one of
@@ -229,7 +231,7 @@ func Preflight(ctx context.Context, target string, in PreflightInput, prov Provi
 		return rep
 	}
 
-	report, err := parser.ParseWith(ctx, pythonBin, ParseInput{ProjectPath: in.ProjectPath, DagsDir: in.DagsDir})
+	report, err := parser.ParseWith(ctx, pythonBin, ParseInput{ProjectPath: in.ProjectPath, DagsDir: in.DagsDir, Env: in.Env})
 	if err != nil {
 		rep.OpError = fmt.Sprintf("parsing DAGs for %s: %v", target, err)
 		return rep

@@ -43,11 +43,13 @@ type fakeTargetParser struct {
 	report     ParseReport
 	err        error
 	gotPython  string
+	gotEnv     []string
 	parseCalls int
 }
 
-func (f *fakeTargetParser) ParseWith(_ context.Context, python string, _ ParseInput) (ParseReport, error) {
+func (f *fakeTargetParser) ParseWith(_ context.Context, python string, in ParseInput) (ParseReport, error) {
 	f.gotPython = python
+	f.gotEnv = in.Env
 	f.parseCalls++
 	return f.report, f.err
 }
@@ -89,6 +91,20 @@ func TestPreflightComposerResolvesCleanly(t *testing.T) {
 	}
 	if parser.gotPython != "/scratch/bin/python" {
 		t.Errorf("parser should run against the provisioned interpreter, got %q", parser.gotPython)
+	}
+}
+
+func TestPreflightParsesUnderTheSuppliedEnvironment(t *testing.T) {
+	parser := &fakeTargetParser{report: cleanReport()}
+	in := PreflightInput{Pin: "3.1", Env: []string{"ENV=sandbox"}}
+
+	rep := Preflight(context.Background(), TargetComposer, in, &fakeProvisioner{python: "/scratch/bin/python"}, parser, false, noteProgress)
+
+	if rep.OpError != "" {
+		t.Fatalf("clean composer check should not error: %s", rep.OpError)
+	}
+	if !slices.Equal(parser.gotEnv, in.Env) {
+		t.Errorf("the parse should run under the supplied environment, got %q", parser.gotEnv)
 	}
 }
 

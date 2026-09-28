@@ -187,6 +187,8 @@ type Options struct {
 	ProjectPath string
 	// Strict turns warnings into failures.
 	Strict bool
+	// Env is the environment the DAGs are imported under; see ParseInput.Env.
+	Env []string
 }
 
 // Parser runs the embedded DAG-parse script and returns its structured report.
@@ -222,6 +224,7 @@ func run(ctx context.Context, opts Options, parser Parser, remedy string) (Resul
 	in := ParseInput{
 		ProjectPath: opts.ProjectPath,
 		DagsDir:     DefaultDagsDir(opts.ProjectPath),
+		Env:         opts.Env,
 	}
 	report, err := parser.Parse(ctx, in)
 	if err != nil {

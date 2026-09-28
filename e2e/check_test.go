@@ -137,6 +137,23 @@ func TestCheckNamesTheExceptionNotAUrlInItsMessage(t *testing.T) {
 	}
 }
 
+// A DAG that reads the project's .env at import time passes, because a start
+// gives it those values and a check that did not would report a working DAG
+// as broken.
+func TestCheckImportsUnderTheProjectDotenv(t *testing.T) {
+	tier(t, 1)
+
+	p := airflowProject(t)
+	write(t, filepath.Join(p.Dir, ".env"), "ENV=sandbox\n")
+	writeDag(t, p, "envdag.py", "import os\nfrom airflow.sdk import dag\n"+
+		"assert os.environ['ENV'].lower() == 'sandbox'\n")
+
+	r := p.run("local", "check").requireSuccess()
+	if !strings.Contains(r.Stdout, "checks passed") {
+		t.Errorf("expected a passing summary\n%s", r.output())
+	}
+}
+
 // Two files defining one dag_id is a duplicate, not an import error, and it is
 // reported once however many files are involved.
 func TestCheckReportsADuplicateDagID(t *testing.T) {

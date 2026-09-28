@@ -23,7 +23,7 @@ import (
 // worth making: a terminal whose environment merely resembles the running
 // Airflow's is the failure this exists to prevent. Spot-checking PATH and
 // AIRFLOW_HOME is what the first version did, and it survived replacing the
-// whole body with a bare BuildEnv call — no JWT secret, no dev overrides, no
+// whole body with a bare BuildEnv call — no JWT secret, no dev settings, no
 // VIRTUAL_ENV.
 func TestEnvIsExactlyWhatRunUses(t *testing.T) {
 	e, _, _ := testEngine(t)

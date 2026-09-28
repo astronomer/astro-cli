@@ -68,8 +68,7 @@ func TestTheParseOwnedVariablesWinOverTheCaller(t *testing.T) {
 	assert.Equal(t, "False", lastValue("AIRFLOW__CORE__LOAD_EXAMPLES"))
 }
 
-// An empty Env inherits the process environment, which is what the CLI wants:
-// it runs from the project directory and its environment is the user's shell.
+// An empty Env inherits the process environment.
 func TestAnEmptyEnvInheritsTheProcessEnvironment(t *testing.T) {
 	t.Setenv("ASTRO_PARSE_TEST_MARKER", "inherited")
 

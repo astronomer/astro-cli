@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -92,6 +93,10 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	if err != nil {
 		return blocked(r, err)
 	}
+	env, err := plan.Environ(project, m)
+	if err != nil {
+		return blocked(r, err)
+	}
 
 	// Collect the cached check environments once this run is finished with
 	// them — see sweepCheckVenvs for why not from inside EnsureVenv. Deferred,
@@ -100,7 +105,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	// protects it.
 	defer sweepCheckVenvs(c.sweepProgressFn(r))
 
-	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict}, m)
+	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict, Env: env}, m)
 	if err != nil {
 		if errors.Is(err, checks.ErrEnvNotReady) {
 			return blocked(r, err)
@@ -138,6 +143,10 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	if err != nil {
 		return blocked(r, err)
 	}
+	env, err := plan.Environ(project, m)
+	if err != nil {
+		return blocked(r, err)
+	}
 
 	// Once, after every target — not per target. Each resolves its own
 	// environment, and a sweep between two of them deletes what the next is
@@ -147,7 +156,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	reports := make([]checks.TargetReport, 0, len(targets))
 	worst := checks.ExitOK
 	for _, t := range dedupeTargets(targets) {
-		rep := c.checkTarget(ctx, t, project, m, r, strict)
+		rep := c.checkTarget(ctx, t, project, env, m, r, strict)
 		reports = append(reports, rep)
 		if code := rep.ExitCode(strict); code > worst {
 			worst = code
@@ -167,10 +176,10 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 // as a target report; mwaa and composer run the scratch-venv pre-flight. The
 // progress notes stream in text mode and are dropped in json mode, where the
 // report object carries everything.
-func (c *cli) checkTarget(ctx context.Context, target, project string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
+func (c *cli) checkTarget(ctx context.Context, target, project string, env []string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
 	progress := c.progressFn(r, target)
 	if target == checks.TargetAstro {
-		return c.checkAstroTarget(ctx, project, m, r, strict)
+		return c.checkAstroTarget(ctx, project, env, m, r, strict)
 	}
 
 	prov, err := c.provisioner(ctx)
@@ -183,19 +192,20 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, m *manife
 		Pin:         m.Airflow().Pin,
 		Deps:        m.Project.Dependencies,
 		Constraints: m.UV.ConstraintDependencies,
+		Env:         env,
 	}, prov, c.d.CheckVenv, strict, progress)
 }
 
 // checkAstroTarget runs the plain project-venv check and shapes it as a target
 // report, so --target astro reads uniformly beside the platform targets. Its
 // verdict, findings, and env-not-ready handling are today's check exactly.
-func (c *cli) checkAstroTarget(ctx context.Context, project string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
+func (c *cli) checkAstroTarget(ctx context.Context, project string, env []string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
 	rep := checks.TargetReport{
 		Target:         checks.TargetAstro,
 		AirflowChecked: m.Airflow().Pin,
 		Notes:          []string{"astro runs your project's own Airflow; this is the default `astro local check`"},
 	}
-	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict}, m)
+	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict, Env: env}, m)
 	if err != nil {
 		rep.OpError = err.Error()
 		return rep
