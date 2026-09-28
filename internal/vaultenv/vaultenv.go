@@ -30,19 +30,33 @@
 // token decide and the two tools would disagree for a var and an env var that
 // encode to one env-var name.
 //
+// # Link state
+//
+// A global entry is eligible only for the checkouts its link state includes
+// (secrets.OpenLinks and secrets.Reach.Includes, the predicate Astro Desktop
+// applies too). With no row it reaches every project, which is every entry on
+// a machine that has never written the index. A global that does not reach
+// this checkout is left out of the tier and kept aside, so Diagnose can say
+// where it is linked instead and Tiers can list it as held but not here. An
+// index this build cannot read, or one a newer build wrote, fails the global
+// tier closed: nothing resolves from it, and Diagnose names the file. The
+// project tier and the plain files are unaffected either way.
+//
 // # Cost
 //
 // Building the index touches no keyring: pkg/secrets holds each key in
 // plaintext inside its value file and decrypts only on Get, and constructing
-// the store is lazy. So a run that resolves nothing from the vault never opens
-// the keychain, and one that resolves a name opens it once for the run. Nothing
-// here is written to disk.
+// the store is lazy. The link index is a plain file read. So a run that
+// resolves nothing from the vault never opens the keychain, and one that
+// resolves a name opens it once for the run. Nothing here is written to disk.
 package vaultenv
 
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
@@ -81,12 +95,27 @@ type Source struct {
 	// string outside a project or when the path cannot be canonicalized. It is
 	// the scope half of every project-tier key.
 	scope string
+	// checkout is what a global entry's link state is matched against: the
+	// canonical path and the project home (localrt.ProjectHome), both empty
+	// outside a project.
+	checkout secrets.Checkout
+	// links is the link index as Load read it; nil reads as no rows.
+	links *secrets.Links
+	// linksPath names the index in a diagnosis.
+	linksPath string
 
 	once   sync.Once
 	scoped map[string]string // Airflow env key -> vault key
 	global map[string]string
+	// withheld are the global entries the vault holds that do not resolve for
+	// this checkout, by env key: linked elsewhere, or behind an index this
+	// build cannot read. Kept for Diagnose and Tiers, never for Lookup.
+	withheld map[string]withheldEntry
 	// down is a whole-source failure: the vault cannot be listed at all.
 	down *outage
+	// globalDown fails the global tier alone closed: the link index could not
+	// be read, so which globals reach this checkout is unknown.
+	globalDown *outage
 
 	mu sync.Mutex
 	// values and readErrs cache the outcome of each decrypt, per vault key.
@@ -105,6 +134,15 @@ type Source struct {
 type outage struct {
 	short string
 	cause string
+}
+
+// withheldEntry is a global entry kept out of the tier.
+type withheldEntry struct {
+	vaultKey string
+	kind     secrets.Kind
+	name     string
+	// reach is where it is linked. Unused when the index was unreadable.
+	reach secrets.Reach
 }
 
 // Load opens the shared vault for one invocation. projectDir is the project's
@@ -134,8 +172,30 @@ func Load(projectDir string) *Source {
 		// outage: the global tier is still readable.
 		if p, cerr := localrt.CanonicalPath(projectDir); cerr == nil {
 			s.scope = p
+			s.checkout.Path = p
+			if home, herr := localrt.ProjectHome(projectDir); herr == nil {
+				s.checkout.Home = home
+			}
 		}
 	}
+	// The link index decides which globals reach this checkout. Read here,
+	// once, as a plain file: no keyring. Unreadable or too new fails the
+	// global tier alone closed, so a pinned credential never reaches a
+	// project on a guess.
+	s.linksPath = secrets.LinksPath(dir)
+	links, err := secrets.OpenLinks(dir)
+	if err != nil {
+		short := "link index unreadable"
+		if errors.Is(err, secrets.ErrLinksTooNew) {
+			short = "link index too new"
+		}
+		s.globalDown = &outage{
+			short: short,
+			cause: fmt.Sprintf("the shared vault holds a global of this name, but no global resolves while its link "+
+				"index cannot be used (%v); project secrets and the plain env files are unaffected", err),
+		}
+	}
+	s.links = links
 	return s
 }
 
@@ -157,6 +217,7 @@ func (s *Source) Providers() []envresolve.Provider {
 func (s *Source) load() {
 	s.once.Do(func() {
 		s.scoped, s.global = map[string]string{}, map[string]string{}
+		s.withheld = map[string]withheldEntry{}
 		if s.down != nil {
 			return
 		}
@@ -180,6 +241,11 @@ func (s *Source) load() {
 			envKey   string
 			name     string
 			global   bool
+			kind     secrets.Kind
+			// withheld is a global that does not resolve here; reach says
+			// where it is linked.
+			withheld bool
+			reach    secrets.Reach
 		}
 		entries := make([]entry, 0, len(metas))
 		for _, m := range metas {
@@ -195,9 +261,16 @@ func (s *Source) load() {
 			}
 			switch {
 			case scope == secrets.GlobalScope:
-				entries = append(entries, entry{m.Key, envKey, name, true})
+				e := entry{vaultKey: m.Key, envKey: envKey, name: name, global: true, kind: kind}
+				// Eligibility: an unreadable index withholds every global,
+				// and otherwise the entry's link state has to include this
+				// checkout. Only the project scope is exempt; scoped
+				// entries never consult links.
+				e.reach = s.links.ReachOf(m.Key)
+				e.withheld = s.globalDown != nil || !e.reach.Includes(s.checkout)
+				entries = append(entries, e)
 			case s.scope != "" && scope == s.scope:
-				entries = append(entries, entry{m.Key, envKey, name, false})
+				entries = append(entries, entry{vaultKey: m.Key, envKey: envKey, name: name, kind: kind})
 			}
 		}
 		// Last name wins, so a later assignment overwrites an earlier one. Ties
@@ -210,9 +283,12 @@ func (s *Source) load() {
 			return entries[i].vaultKey < entries[j].vaultKey
 		})
 		for _, e := range entries {
-			if e.global {
+			switch {
+			case e.withheld:
+				s.withheld[e.envKey] = withheldEntry{vaultKey: e.vaultKey, kind: e.kind, name: e.name, reach: e.reach}
+			case e.global:
 				s.global[e.envKey] = e.vaultKey
-			} else {
+			default:
 				s.scoped[e.envKey] = e.vaultKey
 			}
 		}
@@ -245,13 +321,27 @@ func envKeyFor(kind secrets.Kind, name string) (string, bool) {
 // decrypts nothing, so it needs no keyring. The project tier comes first and is
 // omitted outside a project; a vault that cannot be listed yields empty tiers.
 // Where two names share an env key, the one the chain resolves is listed.
+//
+// A global this checkout is not eligible for (linked elsewhere, or behind a
+// link index that cannot be read) is listed in the global tier with Unlinked
+// set rather than dropped: the vault does hold it, and a listing that hid it
+// would send a user to set a value that already exists. An eligible entry of
+// the same env key shadows it, as it does in the chain.
 func (s *Source) Tiers() []localenv.VaultTier {
 	s.load()
 	var out []localenv.VaultTier
 	if s.scope != "" {
 		out = append(out, localenv.VaultTier{Label: SourceProject, Scope: localenv.ScopeProject, Entries: entries(s.scoped)})
 	}
-	return append(out, localenv.VaultTier{Label: SourceGlobal, Scope: localenv.ScopeGlobal, Entries: entries(s.global)})
+	global := entries(s.global)
+	for envKey, w := range s.withheld {
+		if _, shadowed := s.global[envKey]; shadowed {
+			continue
+		}
+		global = append(global, localenv.VaultEntry{Kind: localKind(w.kind), Name: w.name, EnvKey: envKey, Unlinked: true})
+	}
+	sort.Slice(global, func(i, j int) bool { return global[i].EnvKey < global[j].EnvKey })
+	return append(out, localenv.VaultTier{Label: SourceGlobal, Scope: localenv.ScopeGlobal, Entries: global})
 }
 
 // entries turns one tier's index into listing entries, sorted by env key.
@@ -351,12 +441,14 @@ func (s *Source) readErrFor(vaultKey string) error {
 //     ~/.astro/env, so a machine-wide secret never leaks into a project that
 //     did not ask for it.
 //
-// That second rule is a deliberate divergence from Astro Desktop, which reaches
-// every project a global value is auto-linked to. The link state lives in the
-// desktop's own index and not in the vault, so this tool cannot read it and
-// must choose a rule of its own; the conservative one matches the CLI's
-// existing treatment of its global file. A project that wants a global secret
-// declares it, which is portable and visible in review.
+// Which globals are candidates at all is decided earlier, by the link state
+// both tools share (see the package doc): s.global holds only the globals whose
+// reach includes this checkout. The declared-only rule applies on top of that,
+// and it is where the two tools still differ on purpose: Astro Desktop injects
+// every global that reaches a project, while this injects only the reaching
+// globals the schema declares, matching the CLI's treatment of its global
+// file. A project that wants a global secret declares it, which is portable
+// and visible in review.
 //
 // Best effort by design. An unreachable keyring yields an empty map rather than
 // an error, because the resolver has already decided what a run cannot start
@@ -431,6 +523,9 @@ func (p *provider) Diagnose(key string) string {
 		return p.src.down.cause
 	}
 	if !indexed {
+		if p.global {
+			return p.src.withheldCause(key)
+		}
 		return ""
 	}
 	if err := p.src.readErrFor(vaultKey); err != nil {
@@ -450,4 +545,44 @@ func (p *provider) Diagnose(key string) string {
 		return fmt.Sprintf("the encrypted vault holds it but it could not be read: %v", err)
 	}
 	return ""
+}
+
+// withheldCause explains a global the vault holds under key that does not
+// resolve for this checkout, or is empty when there is none. Caller has called
+// load.
+func (s *Source) withheldCause(key string) string {
+	w, ok := s.withheld[key]
+	if !ok {
+		return ""
+	}
+	if s.globalDown != nil {
+		return s.globalDown.cause
+	}
+	// TODO(vault-links): name the link command here once `astro local env
+	// <noun> link` exists.
+	return fmt.Sprintf("the shared vault holds global %s %q, but it is linked to %s; "+
+		"which projects each global reaches is recorded in %s",
+		localenv.Noun(localKind(w.kind)), w.name, describeReach(w.reach), s.linksPath)
+}
+
+// describeReach says where a restricted global is linked, for a message,
+// marking the paths that no longer exist so a moved project reads as the
+// cause it is.
+func describeReach(r secrets.Reach) string {
+	if len(r.Projects) == 0 {
+		return "no project"
+	}
+	return linkedPaths(r) + ", not to this project"
+}
+
+// linkedPaths lists a reach's paths, each marked when it no longer exists.
+func linkedPaths(r secrets.Reach) string {
+	parts := make([]string, 0, len(r.Projects))
+	for _, p := range r.Projects {
+		if _, err := os.Stat(p); err != nil {
+			p += " (missing)"
+		}
+		parts = append(parts, p)
+	}
+	return strings.Join(parts, ", ")
 }

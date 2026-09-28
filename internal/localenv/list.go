@@ -100,6 +100,14 @@ type VaultEntry struct {
 	Kind   Kind
 	Name   string
 	EnvKey string
+	// Unlinked marks a global the vault holds that does not resolve for this
+	// checkout: its link state names other projects, or the link index could
+	// not be read. It is listed so the vault's contents are not hidden, but no
+	// provider returns it here.
+	//
+	// TODO(vault-links): show it as "not linked here" in list output with the
+	// link verbs; until then it lists as an ordinary orphan.
+	Unlinked bool
 }
 
 // List builds the resolver-backed listing: every schema-declared name with

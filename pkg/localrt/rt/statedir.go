@@ -142,7 +142,7 @@ func spellingOnDisk(dir, want string) string {
 // stat'd, or is claimed more than once — because trueCase is best effort and a
 // spelling it cannot verify is left as the caller wrote it.
 func sameEntrySpelling(dir string, entries []os.DirEntry, want string) string {
-	target, err := os.Lstat(filepath.Join(dir, want))
+	target, err := os.Lstat(filepath.Join(dir, want)) //nolint:gosec // G703: an Lstat to learn a spelling; CanonicalPath's callers pass paths to resolve, some read from git's pointer files
 	if err != nil {
 		return want
 	}
@@ -246,4 +246,143 @@ func StateDir(projectPath string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(root, "projects", id), nil
+}
+
+// ProjectHome returns the project a checkout belongs to, as a canonical path:
+// the key a link to "this project" is recorded under, so that the link reaches
+// every worktree of it.
+//
+//   - A linked git worktree resolves to its main worktree's root, plus the
+//     checkout's offset from its own git toplevel, so a monorepo subdirectory
+//     in a worktree maps to the same subdirectory of the main checkout.
+//   - Anything else resolves to its own canonical path: a main worktree, a
+//     subdirectory of one, a directory outside any repository, and a git
+//     submodule, which is a repository in its own right rather than a
+//     checkout of its parent.
+//
+// Worktrees can live anywhere, so this reads git's own pointers rather than
+// matching path prefixes. A linked worktree is a .git FILE whose gitdir holds a
+// commondir file naming the shared repository directory; the main worktree's
+// root is that directory's parent. A submodule also has a .git file, but its
+// gitdir (.git/modules/<name>) has no commondir, which is what tells the two
+// apart. A worktree whose shared directory is not named .git (a bare
+// repository's worktree, or a worktree of a submodule) has no main checkout
+// this can name, and resolves to itself. So does any pointer that does not
+// resolve: reaching fewer projects is the safe failure for a link.
+//
+// Only reads files; it does not run git. The error is CanonicalPath's, for a
+// directory that cannot be resolved at all.
+func ProjectHome(dir string) (string, error) {
+	path, err := CanonicalPath(dir)
+	if err != nil {
+		return "", err
+	}
+	top, ok := gitToplevel(path)
+	if !ok {
+		return path, nil
+	}
+	main, ok := mainWorktreeRoot(top)
+	if !ok {
+		return path, nil
+	}
+	rel, err := filepath.Rel(top, path)
+	if err != nil {
+		return path, nil //nolint:nilerr // top is an ancestor of path by construction; a failure means there is no home to name
+	}
+	return filepath.Join(main, rel), nil
+}
+
+// gitToplevel is the nearest directory at or above path holding a .git entry,
+// the way git itself finds a checkout's toplevel.
+func gitToplevel(path string) (string, bool) {
+	for d := path; ; {
+		if _, err := os.Lstat(filepath.Join(d, ".git")); err == nil {
+			return d, true
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", false
+		}
+		d = parent
+	}
+}
+
+// gitdirPrefix starts the one line of a .git file.
+const gitdirPrefix = "gitdir:"
+
+// backLinked reports whether a worktree's admin directory names this .git file
+// as its own, the back-link `git worktree add` writes to <gitdir>/gitdir. The
+// forward pointer is just a file in the checkout, so without this a hand-made
+// .git could borrow another project's home, and with it that project's linked
+// globals. Both sides are canonicalized before comparing.
+func backLinked(gitdir, dotGit string) bool {
+	raw, err := os.ReadFile(filepath.Join(gitdir, "gitdir")) //nolint:gosec // G703: git's own pointer, only parsed
+	if err != nil {
+		return false
+	}
+	back := strings.TrimSpace(string(raw))
+	if back == "" {
+		return false
+	}
+	if !filepath.IsAbs(back) {
+		back = filepath.Join(gitdir, back)
+	}
+	want, err := CanonicalPath(dotGit)
+	if err != nil {
+		return false
+	}
+	got, err := CanonicalPath(back)
+	return err == nil && got == want
+}
+
+// mainWorktreeRoot is the canonical root of the main worktree when top is a
+// linked worktree, and false for anything else.
+func mainWorktreeRoot(top string) (string, bool) {
+	dotGit := filepath.Join(top, ".git")
+	info, err := os.Stat(dotGit)
+	if err != nil || info.IsDir() {
+		return "", false // a .git directory is a main worktree
+	}
+	raw, err := os.ReadFile(dotGit)
+	if err != nil {
+		return "", false
+	}
+	line := strings.TrimSpace(string(raw))
+	if !strings.HasPrefix(line, gitdirPrefix) {
+		return "", false
+	}
+	gitdir := strings.TrimSpace(strings.TrimPrefix(line, gitdirPrefix))
+	if gitdir == "" {
+		return "", false
+	}
+	if !filepath.IsAbs(gitdir) {
+		gitdir = filepath.Join(top, gitdir)
+	}
+	if !backLinked(gitdir, dotGit) {
+		return "", false
+	}
+	// commondir is what a linked worktree's gitdir has and a submodule's does not.
+	common, err := os.ReadFile(filepath.Join(gitdir, "commondir")) //nolint:gosec // G703: a pointer file in the checkout's own repository, only parsed
+	if err != nil {
+		return "", false
+	}
+	commonDir := strings.TrimSpace(string(common))
+	if commonDir == "" {
+		return "", false
+	}
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(gitdir, commonDir)
+	}
+	commonDir = filepath.Clean(commonDir)
+	if filepath.Base(commonDir) != ".git" {
+		return "", false // a bare repository, or a submodule's worktree: no main checkout to name
+	}
+	if info, err := os.Stat(commonDir); err != nil || !info.IsDir() {
+		return "", false
+	}
+	main, err := CanonicalPath(filepath.Dir(commonDir))
+	if err != nil {
+		return "", false
+	}
+	return main, true
 }

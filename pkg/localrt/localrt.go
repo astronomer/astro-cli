@@ -86,6 +86,11 @@ var ErrImageNotBuilt = rt.ErrImageNotBuilt
 // CanonicalPath resolves a project path to the spelling every tool agrees on.
 func CanonicalPath(path string) (string, error) { return rt.CanonicalPath(path) }
 
+// ProjectHome is the canonical path of the project a checkout belongs to: a
+// linked git worktree's main worktree (plus the checkout's offset within it),
+// otherwise the checkout's own canonical path. See rt.ProjectHome.
+func ProjectHome(dir string) (string, error) { return rt.ProjectHome(dir) }
+
 // ProjectID is the stable per-project identifier derived from its path.
 func ProjectID(projectPath string) (string, error) { return rt.ProjectID(projectPath) }
 
