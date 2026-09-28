@@ -164,6 +164,7 @@ func attachTarget(q *query, cmd *cobra.Command) {
 	q.t.register(cmd)
 	addOutputFlag(cmd, &q.cli.output)
 	cmd.Long += "\n\n" + q.t.note()
+	explainOutages(q.cli, cmd)
 	markSkipPreRun(cmd)
 }
 

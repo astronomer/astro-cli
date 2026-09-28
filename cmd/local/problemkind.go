@@ -3,6 +3,7 @@ package local
 import (
 	"errors"
 
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
@@ -61,6 +62,18 @@ const (
 	KindDatabaseNewerThanAirflow ProblemKind = "database_newer_than_airflow"
 	// KindNotRunning: no local Airflow is running for this project.
 	KindNotRunning ProblemKind = "not_running"
+	// KindDeploymentHibernating: the Astro Deployment is hibernating, so its
+	// Airflow cannot answer until something wakes it.
+	KindDeploymentHibernating ProblemKind = "deployment_hibernating"
+	// KindDeploymentDeploying: the Astro Deployment is being created or
+	// updated, and its Airflow has not come up yet. Transient.
+	KindDeploymentDeploying ProblemKind = "deployment_deploying"
+	// KindDeploymentUnhealthy: Astro reports the Deployment unhealthy, and its
+	// Airflow is not answering.
+	KindDeploymentUnhealthy ProblemKind = "deployment_unhealthy"
+	// KindAirflowUnavailable: Astro reports the Deployment healthy, but its
+	// Airflow is not answering yet, as after a wake-up or deploy. Transient.
+	KindAirflowUnavailable ProblemKind = "airflow_unavailable"
 )
 
 // problemKinds maps a failure to the name it publishes under.
@@ -110,6 +123,10 @@ var problemKinds = []struct {
 	// its own go.mod would mean one failure with two contracts.
 	{KindLocked, sentinel(localrt.ErrStartInProgress)},
 	{KindNotRunning, sentinel(localrt.ErrNotRunning)},
+	{KindDeploymentHibernating, sentinel(instancelocate.ErrDeploymentHibernating)},
+	{KindDeploymentDeploying, sentinel(instancelocate.ErrDeploymentDeploying)},
+	{KindDeploymentUnhealthy, sentinel(instancelocate.ErrDeploymentUnhealthy)},
+	{KindAirflowUnavailable, sentinel(instancelocate.ErrAirflowUnavailable)},
 }
 
 // sentinel matches an error that wraps target.

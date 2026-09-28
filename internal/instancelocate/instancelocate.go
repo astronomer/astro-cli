@@ -106,7 +106,7 @@ func New(domain string) instances.Locator {
 }
 
 // deploymentsOn is the v1 client for domain's control plane. Its token is left
-// empty because astroBaseURL puts the session's bearer on every request.
+// empty because astroDeployment puts the session's bearer on every request.
 func deploymentsOn(domain string) Deployments {
 	if domain == "" {
 		return astrov1.NewV1Client(httputil.NewHTTPClient())
@@ -130,6 +130,14 @@ type GoogleChain interface {
 
 func (l *locator) Google() (token func(ctx context.Context) (string, error), account func(ctx context.Context) string) {
 	return l.googleToken, l.googleAccount
+}
+
+// Diagnoser is implemented by a locator that can ask a control plane why a
+// link's Airflow is not answering. The composition root asks for it only after
+// a command has failed on such an answer, so a working command never pays for
+// the extra lookup. It is optional for the reason GoogleChain is.
+type Diagnoser interface {
+	WhyUnavailable(ctx context.Context, i instances.Instance) error
 }
 
 // BaseURL resolves an instance's Airflow base URL. It is the instances.Locator

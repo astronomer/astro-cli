@@ -259,3 +259,46 @@ func TestKindsWithNothingToLookUp(t *testing.T) {
 		}
 	}
 }
+
+func deploymentIn(status astrov1.DeploymentStatus) deploymentsFunc {
+	return func(context.Context, string, string) (*astrov1.GetDeploymentResponse, error) {
+		resp := deploymentResponse(http.StatusOK, "https://orders.astronomer.run/abc123")
+		resp.JSON200.Status = status
+		return resp, nil
+	}
+}
+
+func TestWhyUnavailableNamesTheStateAstroReports(t *testing.T) {
+	cases := []struct {
+		status astrov1.DeploymentStatus
+		is     error
+		want   string
+	}{
+		{astrov1.DeploymentStatusHIBERNATING, ErrDeploymentHibernating, "astro deployment wake-up clm2xk9dq000108l7a2b3c4d5"},
+		{astrov1.DeploymentStatusDEPLOYING, ErrDeploymentDeploying, "still deploying"},
+		{astrov1.DeploymentStatusCREATING, ErrDeploymentDeploying, "still deploying"},
+		{astrov1.DeploymentStatusUNHEALTHY, ErrDeploymentUnhealthy, "astro deployment inspect clm2xk9dq000108l7a2b3c4d5"},
+		{astrov1.DeploymentStatusHEALTHY, ErrAirflowUnavailable, "reports healthy, but its Airflow is not answering yet"},
+	}
+	for _, tc := range cases {
+		err := astroLocator(deploymentIn(tc.status)).WhyUnavailable(context.Background(), astroInstance())
+		if !errors.Is(err, tc.is) {
+			t.Errorf("%s: err = %v, want %v", tc.status, err, tc.is)
+		}
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: err = %v, want it to name %q", tc.status, err, tc.want)
+		}
+	}
+}
+
+func TestWhyUnavailableHasNothingToAddForAnUnknownStatusOrAFailedLookup(t *testing.T) {
+	if err := astroLocator(deploymentIn(astrov1.DeploymentStatusUNKNOWN)).WhyUnavailable(context.Background(), astroInstance()); err != nil {
+		t.Errorf("unknown: err = %v, want nil", err)
+	}
+	offline := astroLocator(func(context.Context, string, string) (*astrov1.GetDeploymentResponse, error) {
+		return nil, errors.New("dial tcp: no such host")
+	})
+	if err := offline.WhyUnavailable(context.Background(), astroInstance()); err != nil {
+		t.Errorf("offline: err = %v, want nil", err)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
@@ -32,6 +33,10 @@ func sampleFor(kind ProblemKind) (error, bool) {
 		KindDatabaseNewerThanAirflow: localrt.ErrDatabaseNewerThanAirflow,
 		KindLocked:                   localrt.ErrStartInProgress,
 		KindNotRunning:               localrt.ErrNotRunning,
+		KindDeploymentHibernating:    &instancelocate.UnavailableError{State: instancelocate.ErrDeploymentHibernating},
+		KindDeploymentDeploying:      &instancelocate.UnavailableError{State: instancelocate.ErrDeploymentDeploying},
+		KindDeploymentUnhealthy:      &instancelocate.UnavailableError{State: instancelocate.ErrDeploymentUnhealthy},
+		KindAirflowUnavailable:       &instancelocate.UnavailableError{State: instancelocate.ErrAirflowUnavailable},
 	}
 	s, ok := samples[kind]
 	return s, ok
@@ -76,6 +81,10 @@ func TestProblemKindOrderIsPinned(t *testing.T) {
 		KindDatabaseNewerThanAirflow,
 		KindLocked,
 		KindNotRunning,
+		KindDeploymentHibernating,
+		KindDeploymentDeploying,
+		KindDeploymentUnhealthy,
+		KindAirflowUnavailable,
 	}
 	if len(problemKinds) != len(want) {
 		t.Fatalf("%d kinds in the table, %d pinned here", len(problemKinds), len(want))

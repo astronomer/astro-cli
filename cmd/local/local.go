@@ -44,6 +44,8 @@ const (
 type cli struct {
 	d      Deps
 	output string
+	// outage watches the astro link this run opened, if it opened one.
+	outage *outageWatch
 }
 
 func (c *cli) renderer() (Renderer, error) {

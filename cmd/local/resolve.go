@@ -188,6 +188,10 @@ func (c *cli) clientFor(ctx context.Context, i instances.Instance, domain string
 	if err != nil {
 		return nil, err
 	}
+	if i.Kind == instances.KindAstro {
+		c.outage = &outageWatch{next: transport, instance: i, domain: domain}
+		transport = c.outage
+	}
 	return airflowapi.New(transport), nil
 }
 
