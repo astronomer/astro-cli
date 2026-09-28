@@ -357,6 +357,7 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 		ImageTag:          "deploy-2026",
 		DagTarballVersion: "3-169",
 		URL:               "https://cloud/deployments/dep-prod",
+		Git:               Git{Commit: &Commit{SHA: "abc123", Branch: "main"}},
 	}}
 	res, err := Run(Request{
 		ProjectDir: "/proj",
@@ -385,6 +386,7 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 	assert.Equal(t, "deploy-2026", res.ImageTag)
 	assert.Equal(t, "3-169", res.DagTarballVersion)
 	assert.Equal(t, "prod", res.LinkName)
+	assert.Equal(t, &Commit{SHA: "abc123", Branch: "main"}, res.Git.Commit)
 }
 
 func TestRun_ImageOnlyDropsDags(t *testing.T) {
@@ -442,6 +444,7 @@ func TestRun_DefaultLinkDeploysDags(t *testing.T) {
 		RuntimeVersion:    "3.1-2",
 		DagTarballVersion: "3-169",
 		URL:               "https://cloud/deployments/dep-prod",
+		Git:               Git{Uncommitted: true},
 	}}
 	res, err := Run(Request{
 		ProjectDir: "/proj",
@@ -462,6 +465,7 @@ func TestRun_DefaultLinkDeploysDags(t *testing.T) {
 	assert.Equal(t, "3.1-2", res.RuntimeVersion)
 	assert.Equal(t, "3-169", res.DagTarballVersion)
 	assert.Equal(t, "prod", res.LinkName)
+	assert.True(t, res.Git.Uncommitted)
 }
 
 func TestRun_UnlinkedInteractiveSelects(t *testing.T) {

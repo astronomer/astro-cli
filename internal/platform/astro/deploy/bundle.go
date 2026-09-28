@@ -297,7 +297,13 @@ func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeplo
 		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
 		return nil, ""
 	}
+	return readHeadGitMetadata(bundlePath)
+}
 
+// readHeadGitMetadata describes the HEAD commit of the repository holding
+// bundlePath, without checking for uncommitted changes. Returns nil and empty
+// string if git metadata cannot be retrieved.
+func readHeadGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeployGitRequest, commitMessage string) {
 	// get the raw remote URL (needed for the GENERIC provider), assume the remote is named "origin"
 	remoteURL, err := git.GetRemoteURL(bundlePath, "origin")
 	if err != nil {

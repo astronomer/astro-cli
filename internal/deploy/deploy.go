@@ -110,6 +110,24 @@ type Result struct {
 	URL               string
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
+	Git      Git
+}
+
+// Git is what a deploy recorded about the commit it shipped.
+type Git struct {
+	// Commit is nil when the deploy recorded none.
+	Commit *Commit
+	// Uncommitted reports that no commit was recorded because the project had
+	// uncommitted changes.
+	Uncommitted bool
+}
+
+// Commit is the git commit a deploy recorded as its source.
+type Commit struct {
+	SHA    string
+	Branch string
+	// URL links to the commit on GitHub, "" for other remotes.
+	URL string
 }
 
 // DagDeploy is the request the transport's dags-only deploy takes. The
@@ -131,6 +149,7 @@ type DagResult struct {
 	RuntimeVersion    string
 	DagTarballVersion string
 	URL               string
+	Git               Git
 }
 
 // ImageDeploy is the request the transport's image deploy takes. The deployment
@@ -172,6 +191,7 @@ type ImageResult struct {
 	ImageTag          string
 	DagTarballVersion string
 	URL               string
+	Git               Git
 }
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
@@ -302,6 +322,7 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 		DagTarballVersion: dag.DagTarballVersion,
 		URL:               dag.URL,
 		LinkName:          target.LinkName,
+		Git:               dag.Git,
 	}, nil
 }
 
@@ -368,6 +389,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		DagTarballVersion: img.DagTarballVersion,
 		URL:               img.URL,
 		LinkName:          target.LinkName,
+		Git:               img.Git,
 	}, nil
 }
 

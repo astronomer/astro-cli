@@ -529,6 +529,9 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		return deployV2Err(cmd, format, err)
 	}
 
+	if res.Git.Uncommitted {
+		fmt.Fprintln(errOut, "note: the project has uncommitted changes, so this deploy records no git commit")
+	}
 	return renderV2Deploy(out, format, &res)
 }
 
@@ -605,13 +608,20 @@ type deployJSON struct {
 	// Link is the manifest link the deploy resolved to, omitted when the target
 	// was named by id. It is what the person typed and what their teammates
 	// call it; the id alone makes a consumer look it up again.
-	Link             string `json:"link,omitempty"`
-	Workspace        string `json:"workspace"`
-	Type             string `json:"type"`
-	ImageTag         string `json:"image_tag,omitempty"`
-	DagBundleVersion string `json:"dag_bundle_version,omitempty"`
-	RuntimeVersion   string `json:"runtime_version,omitempty"`
-	URL              string `json:"url,omitempty"`
+	Link             string         `json:"link,omitempty"`
+	Workspace        string         `json:"workspace"`
+	Type             string         `json:"type"`
+	ImageTag         string         `json:"image_tag,omitempty"`
+	DagBundleVersion string         `json:"dag_bundle_version,omitempty"`
+	RuntimeVersion   string         `json:"runtime_version,omitempty"`
+	URL              string         `json:"url,omitempty"`
+	Git              *deployGitJSON `json:"git,omitempty"`
+}
+
+type deployGitJSON struct {
+	CommitSHA string `json:"commit_sha"`
+	Branch    string `json:"branch,omitempty"`
+	CommitURL string `json:"commit_url,omitempty"`
 }
 
 // renderV2Deploy writes a finished v2 deploy: one JSON object in json mode, a
@@ -619,7 +629,7 @@ type deployJSON struct {
 // never drift.
 func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) error {
 	if format == formatJSON {
-		return json.NewEncoder(w).Encode(deployJSON{
+		obj := deployJSON{
 			Deployment:       res.DeploymentID,
 			Link:             res.LinkName,
 			Workspace:        res.WorkspaceID,
@@ -628,7 +638,11 @@ func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) erro
 			DagBundleVersion: res.DagTarballVersion,
 			RuntimeVersion:   res.RuntimeVersion,
 			URL:              res.URL,
-		})
+		}
+		if c := res.Git.Commit; c != nil {
+			obj.Git = &deployGitJSON{CommitSHA: c.SHA, Branch: c.Branch, CommitURL: c.URL}
+		}
+		return json.NewEncoder(w).Encode(obj)
 	}
 	target := deployTargetName(res)
 	switch res.Type {
@@ -796,7 +810,22 @@ func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, erro
 		RuntimeVersion:    res.RuntimeVersion,
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
+		Git:               toV2DeployGit(res.Git),
 	}, nil
+}
+
+func toV2DeployGit(g astrodeploy.DeployGitV2) v2deploy.Git {
+	out := v2deploy.Git{Uncommitted: g.Uncommitted}
+	if c := g.Commit; c != nil {
+		out.Commit = &v2deploy.Commit{SHA: c.CommitSha}
+		if c.Branch != nil {
+			out.Commit.Branch = *c.Branch
+		}
+		if c.CommitUrl != nil {
+			out.Commit.URL = *c.CommitUrl
+		}
+	}
+	return out
 }
 
 // DeployImage builds or adopts the project image and ships it through the
@@ -827,6 +856,7 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		ImageTag:          res.ImageTag,
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
+		Git:               toV2DeployGit(res.Git),
 	}, nil
 }
 

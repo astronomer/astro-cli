@@ -370,6 +370,65 @@ func TestDeployV2JSONOmitsAnAbsentLinkName(t *testing.T) {
 	assert.False(t, has)
 }
 
+func TestDeployV2JSONCarriesTheCommit(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{
+		ImageTag:          "tag",
+		DagTarballVersion: "3-1",
+		Git: v2deploy.Git{Commit: &v2deploy.Commit{
+			SHA:    "0123abcd",
+			Branch: "main",
+			URL:    "https://github.com/account/repo/commit/0123abcd",
+		}},
+	}})
+
+	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, map[string]any{
+		"commit_sha": "0123abcd",
+		"branch":     "main",
+		"commit_url": "https://github.com/account/repo/commit/0123abcd",
+	}, m["git"])
+}
+
+func TestDeployV2JSONOmitsGitWhenNoCommitIsRecorded(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+
+	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	_, has := m["git"]
+	assert.False(t, has)
+}
+
+func TestToV2DeployGit(t *testing.T) {
+	branch, url := "main", "https://github.com/account/repo/commit/0123abcd"
+	got := toV2DeployGit(astrodeploy.DeployGitV2{Commit: &astrov1.CreateDeployGitRequest{
+		CommitSha: "0123abcd",
+		Branch:    &branch,
+		CommitUrl: &url,
+	}})
+	assert.Equal(t, v2deploy.Git{Commit: &v2deploy.Commit{SHA: "0123abcd", Branch: branch, URL: url}}, got)
+
+	assert.Equal(t, v2deploy.Git{Uncommitted: true}, toV2DeployGit(astrodeploy.DeployGitV2{Uncommitted: true}))
+}
+
+func TestDeployV2NotesUncommittedChanges(t *testing.T) {
+	for _, format := range []string{"text", "json"} {
+		t.Run(format, func(t *testing.T) {
+			setupV2Deploy(t, &fakeCmdDeployer{dag: v2deploy.DagResult{
+				DagTarballVersion: "3-1",
+				Git:               v2deploy.Git{Uncommitted: true},
+			}})
+
+			out, errOut, err := execDeployIO("", "prod", "--dags", "--output", format)
+			require.NoError(t, err)
+			assert.Contains(t, errOut, "note: the project has uncommitted changes, so this deploy records no git commit\n")
+			assert.NotContains(t, out, "uncommitted")
+		})
+	}
+}
+
 // The highlight is labeled with what put it there. ASTRO_DEPLOYMENT outranks
 // the manifest's marker for the cursor, and saying "default" over an entry an
 // exported variable chose tells the reader their committed file says something

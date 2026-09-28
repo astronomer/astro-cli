@@ -49,6 +49,7 @@ type ImageDeployV2Result struct {
 	ImageTag          string
 	DagTarballVersion string
 	URL               string
+	Git               DeployGitV2
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -91,6 +92,13 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		return ImageDeployV2Result{}, err
 	}
 
+	// A prebuilt image need not match the working tree, so it records no commit.
+	var gitInfo DeployGitV2
+	var commitMessage string
+	if in.ImageName == "" {
+		gitInfo, commitMessage = readDeployGitV2(in.ProjectDir)
+	}
+
 	// Build or adopt the image and read its runtime-version label.
 	localImage, runtimeVersion, err := prepareDeployImage(ctx, &in, cmd, bin, env)
 	if err != nil {
@@ -108,9 +116,11 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	if in.IncludeDags {
 		deployType = astrov1.CreateDeployRequestTypeIMAGEANDDAG
 	}
+	description := descriptionOrCommitMessage(in.Description, commitMessage)
 	created, err := createDeploy(dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
-		Description: &in.Description,
+		Description: &description,
 		Type:        deployType,
+		Git:         gitInfo.Commit,
 	}, astroV1Client)
 	if err != nil {
 		return ImageDeployV2Result{}, explainHibernating(err, &dep)
@@ -156,6 +166,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		ImageTag:          created.ImageTag,
 		DagTarballVersion: tarballVersion,
 		URL:               url,
+		Git:               gitInfo,
 	}, nil
 }
 
