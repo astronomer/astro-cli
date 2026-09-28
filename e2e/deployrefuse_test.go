@@ -185,7 +185,7 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 }
 
 // v2ProjectForDeploy is a scaffolded project, which is all `astro deploy`
-// needs to take the v2 path: IsV2Project looks for a pyproject.toml carrying
+// needs to take the v2 path: project.IsV2 looks for a pyproject.toml carrying
 // [tool.astro].
 func v2ProjectForDeploy(t *testing.T) *project {
 	t.Helper()

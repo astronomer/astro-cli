@@ -101,22 +101,38 @@ func New(dir string) (*Project, error) {
 	}, nil
 }
 
-// IsV1 reports whether dir holds an astro v1 project: the old Dockerfile
-// layout with a .astro/ directory and no v2 manifest. A Dockerfile on its own
-// marks some container project, not necessarily v1, so it does not qualify —
-// `astro dev` must not claim such a directory is v1. A directory carrying the
-// v2 Marker is a v2 project, so it is never v1 either. `astro init` does not
-// consult this: it makes a v1 directory a v2 project too, and reports the v1
-// files it could not read rather than refusing them.
-func IsV1(dir string) bool {
-	if _, err := os.Stat(filepath.Join(dir, Marker)); err == nil {
+// IsV2 reports whether dir holds a v2 project: a pyproject.toml carrying a
+// [tool.astro] table. A pyproject that fails to parse, or one whose
+// [tool.astro] fails validation, still counts as v2 — it is a v2 project with a
+// manifest to fix, and the v2 path gives the clearer error. A pyproject without
+// [tool.astro] (a plain Python project, or one that only configures tools such
+// as ruff or pytest) and a missing pyproject are not v2.
+func IsV2(dir string) bool {
+	_, err := manifest.Load(filepath.Join(dir, Marker))
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
 		return false
+	default:
+		return true
 	}
+}
+
+// IsV1 reports whether dir holds an astro v1 project: the old Dockerfile
+// layout with a .astro/ directory, and no v2 manifest. A Dockerfile on its own
+// marks some container project, not necessarily v1, so it does not qualify —
+// `astro dev` must not claim such a directory is v1. A pyproject.toml does not
+// rule v1 out: plenty of v1 repositories keep one for ruff or pytest settings,
+// and only one that IsV2 accepts makes the directory a v2 project. `astro init`
+// does not consult this: it makes a v1 directory a v2 project too, and reports
+// the v1 files it could not read rather than refusing them.
+func IsV1(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false
 	}
 	info, err := os.Stat(filepath.Join(dir, ".astro"))
-	return err == nil && info.IsDir()
+	return err == nil && info.IsDir() && !IsV2(dir)
 }
 
 // ID returns the identity key for a project directory: the sha256 hex of

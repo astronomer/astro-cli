@@ -12,64 +12,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-const v2Manifest = `[project]
-name = "demo"
-dependencies = ["apache-airflow==3.1.*"]
-
-[tool.astro]
-`
-
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-}
-
-func TestIsV2Project(t *testing.T) {
-	t.Run("valid manifest", func(t *testing.T) {
-		dir := t.TempDir()
-		writeFile(t, filepath.Join(dir, "pyproject.toml"), v2Manifest)
-		assert.True(t, IsV2Project(dir))
-	})
-
-	t.Run("valid manifest beside a Dockerfile is still v2", func(t *testing.T) {
-		dir := t.TempDir()
-		writeFile(t, filepath.Join(dir, "pyproject.toml"), v2Manifest)
-		writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM x\n")
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-		assert.True(t, IsV2Project(dir))
-	})
-
-	t.Run("missing pyproject", func(t *testing.T) {
-		assert.False(t, IsV2Project(t.TempDir()))
-	})
-
-	t.Run("v1 layout is not v2", func(t *testing.T) {
-		dir := t.TempDir()
-		writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM quay.io/astronomer/astro-runtime:1\n")
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-		assert.False(t, IsV2Project(dir))
-	})
-
-	t.Run("pyproject without tool.astro", func(t *testing.T) {
-		dir := t.TempDir()
-		writeFile(t, filepath.Join(dir, "pyproject.toml"), "[project]\nname = \"demo\"\n")
-		assert.False(t, IsV2Project(dir))
-	})
-
-	t.Run("tool.astro present but invalid still routes to v2", func(t *testing.T) {
-		dir := t.TempDir()
-		// [tool.astro] with no airflow version fails validation, but it is still
-		// a v2 project whose error should surface on the v2 path.
-		writeFile(t, filepath.Join(dir, "pyproject.toml"), "[project]\nname = \"demo\"\n\n[tool.astro]\n")
-		assert.True(t, IsV2Project(dir))
-	})
-
-	t.Run("unparseable pyproject routes to v2", func(t *testing.T) {
-		dir := t.TempDir()
-		writeFile(t, filepath.Join(dir, "pyproject.toml"), "this is not : valid = toml [[[\n")
-		assert.True(t, IsV2Project(dir))
-	})
 }
 
 func manifestWith(links map[string]manifest.Link) *manifest.Manifest {

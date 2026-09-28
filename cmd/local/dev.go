@@ -31,11 +31,14 @@ type devRemoved struct {
 	Replacement string           `json:"replacement,omitempty"`
 	Mapping     []devReplacement `json:"mapping"`
 	// V1Project is set when the current directory looks like an astro v1
-	// project, which v2 cannot run yet.
+	// project, which the replacements only work in once it is converted.
 	V1Project bool `json:"v1_project,omitempty"`
 	// Notes say what became of a flag the typed command carried that has no
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
+	// Convert is the command that converts a v1 project in place, set with
+	// V1Project.
+	Convert string `json:"convert,omitempty"`
 }
 
 // devContext is what the stub reads about the directory it runs in and the
@@ -152,6 +155,15 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		Typed:     strings.TrimSpace("astro dev " + typed),
 		Mapping:   mapping,
 		V1Project: dc.v1,
+	}
+	if dc.v1 {
+		p.Convert = replaceInit
+		// astro init keeps a Dockerfile that does more than pick a base image,
+		// and one that mounts a build secret always does, so the converted
+		// project builds it in Docker mode.
+		if len(devFlagValues(args, "--build-secret", "--build-secrets")) > 0 {
+			dc.dockerfile = true
+		}
 	}
 	if typed == "" {
 		p.Error = "astro dev was removed in Astro CLI v2"
@@ -277,9 +289,12 @@ func (c *cli) declaresDockerfile() bool {
 func renderDevRemoved(p devRemoved) string {
 	var b strings.Builder
 	b.WriteString(p.Error)
-	if p.Replacement != "" {
+	switch {
+	case p.Replacement != "" && p.Convert != "" && p.Replacement != p.Convert:
+		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
+	case p.Replacement != "":
 		fmt.Fprintf(&b, ". Use `%s` instead", p.Replacement)
-	} else if p.Typed != "astro dev" {
+	case p.Typed != "astro dev":
 		b.WriteString(" and has no direct replacement")
 	}
 	b.WriteString(".")
@@ -305,14 +320,15 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
 	if p.V1Project {
-		b.WriteString("\n\nThis directory holds an astro v1 project (Dockerfile and .astro/). Migration ships in a later release; use astro CLI 1.x with this project for now.")
+		fmt.Fprintf(&b, "\n\nThis directory holds an astro v1 project (Dockerfile and .astro/). "+
+			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
 	}
 	return b.String()
 }
 
 // isV1Project reports whether the working directory holds a v1 astro project,
-// using the shared predicate in internal/project so `astro dev` and
-// `astro init` never disagree about what counts as v1.
+// per project.IsV1.
 func (c *cli) isV1Project() bool {
 	wd, err := c.d.WorkingDir()
 	if err != nil {

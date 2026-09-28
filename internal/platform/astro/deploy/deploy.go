@@ -51,7 +51,8 @@ const (
 	parseAndPytest           = "parse-and-all-tests"
 	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
-	invalidWorkspaceID       = "Invalid workspace id %s was provided through the --workspace-id flag\n"
+	workspaceFlagMismatchMsg = "deployment %s is in workspace %s, not workspace %s given by --workspace-id. Pass --workspace-id %s, or leave the flag out"
+	otherWorkspaceMsg        = "Deployment %s is in workspace %s, not the current workspace %s. Deploying to it there.\n"
 	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
 )
 
@@ -102,6 +103,7 @@ type InputDeploy struct {
 	Path           string
 	RuntimeID      string
 	WsID           string
+	WsIDFromFlag   bool
 	Pytest         string
 	EnvFile        string
 	ImageName      string
@@ -244,8 +246,10 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 	}
 
 	if deployInput.WsID != deployInfo.workspaceID {
-		fmt.Printf(invalidWorkspaceID, deployInput.WsID)
-		return nil
+		if deployInput.WsIDFromFlag {
+			return fmt.Errorf(workspaceFlagMismatchMsg, deployInfo.deploymentID, deployInfo.workspaceID, deployInput.WsID, deployInfo.workspaceID)
+		}
+		fmt.Printf(otherWorkspaceMsg, deployInfo.deploymentID, deployInfo.workspaceID, deployInput.WsID)
 	}
 
 	if deployInput.Image && !deployInfo.isRemoteExecutionEnabled {

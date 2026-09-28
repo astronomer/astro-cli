@@ -23,6 +23,7 @@ import (
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/git"
@@ -95,7 +96,7 @@ func NewDeployCmd() *cobra.Command {
 			// A v2 project has no .astro/config.yaml, so the v1 EnsureProjectDir
 			// check would reject it. The v2 path loads and validates the manifest
 			// itself, so skip the v1 check and let deploy() route.
-			if v2deploy.IsV2Project(config.WorkingPath) {
+			if project.IsV2(config.WorkingPath) {
 				return nil
 			}
 			// A DAG-only deploy sourcing its DAGs from --dags-path does not read anything
@@ -233,8 +234,8 @@ func refuseFlagsV2DeployIgnores(cmd *cobra.Command) error {
 func deploy(cmd *cobra.Command, args []string) error {
 	// Route by project type. A v2 project (a pyproject.toml with [tool.astro])
 	// takes the new v2 deploy path; everything else runs the v1 path below,
-	// unchanged. project detection lives in internal/deploy.
-	if v2deploy.IsV2Project(config.WorkingPath) {
+	// unchanged. project detection lives in internal/project.
+	if project.IsV2(config.WorkingPath) {
 		return deployV2(cmd, args)
 	}
 
@@ -304,6 +305,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Path:           config.WorkingPath,
 		RuntimeID:      deploymentID,
 		WsID:           workspaceID,
+		WsIDFromFlag:   cmd.Flags().Changed("workspace-id"),
 		Pytest:         pytestFile,
 		EnvFile:        envFile,
 		ImageName:      imageName,
@@ -843,7 +845,7 @@ func isWithinV2Project(path string) bool {
 		return false
 	}
 	for dir := abs; ; {
-		if v2deploy.IsV2Project(dir) {
+		if project.IsV2(dir) {
 			return true
 		}
 		parent := filepath.Dir(dir)

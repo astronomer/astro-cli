@@ -7,8 +7,8 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
-	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -66,7 +66,7 @@ func newRemoteDeployCmd() *cobra.Command {
 			// reject it. astro deploy grew this bypass and its sibling here
 			// never did, which left remote deploy refusing every v2 project
 			// with advice to run astro dev init, a command v2 removed.
-			if v2deploy.IsV2Project(config.WorkingPath) {
+			if project.IsV2(config.WorkingPath) {
 				return nil
 			}
 			return utils.EnsureProjectDir(cmd, args)

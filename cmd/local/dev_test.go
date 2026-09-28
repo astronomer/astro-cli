@@ -122,6 +122,17 @@ func TestDevStubV1Notice(t *testing.T) {
 			t.Errorf("v1 dir should get the v1 notice: %v", err)
 		}
 	})
+	t.Run("a pyproject that only configures tools keeps the v1 notice", func(t *testing.T) {
+		d, _ := testDeps(t)
+		d.WorkingDir = func() (string, error) { return v1ProjectWithToolsPyproject(t), nil }
+		err := execute(t, d, "dev")
+		if err == nil || !strings.Contains(err.Error(), notice) {
+			t.Errorf("a v1 dir with a tools-only pyproject.toml should get the v1 notice: %v", err)
+		}
+		if err != nil && !strings.Contains(err.Error(), "Run `astro init` here to convert it in place") {
+			t.Errorf("the v1 notice should point at astro init: %v", err)
+		}
+	})
 	t.Run("Dockerfile alone gets no v1 notice", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
@@ -135,6 +146,74 @@ func TestDevStubV1Notice(t *testing.T) {
 			t.Errorf("a Dockerfile-only dir must not be called v1: %v", err)
 		}
 	})
+}
+
+// v1ProjectWithToolsPyproject is a classic v1 project that also keeps a
+// pyproject.toml for tool settings only, which many v1 repositories do.
+func v1ProjectWithToolsPyproject(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, content := range map[string]string{
+		"Dockerfile":       "FROM quay.io/astronomer/astro-runtime:3.1-12\n",
+		"requirements.txt": "requests\n",
+		project.Marker:     "[tool.ruff]\nline-length = 120\n\n[tool.pytest.ini_options]\ntestpaths = ['tests']\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestDevStubLeadsWithTheConversionInAV1Project(t *testing.T) {
+	d, _ := testDeps(t)
+	d.WorkingDir = func() (string, error) { return v1ProjectWithToolsPyproject(t), nil }
+
+	err := execute(t, d, "dev", "pytest")
+	if err == nil || !strings.Contains(err.Error(), "Convert with `astro init`, then use `uv run pytest`") {
+		t.Errorf("a v1 project should be told to convert before using the replacement: %v", err)
+	}
+
+	err = execute(t, d, "dev", "init")
+	if err == nil || !strings.Contains(err.Error(), "Use `astro init` instead") {
+		t.Errorf("astro dev init should name astro init once, as its replacement: %v", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "then use `astro init`") {
+		t.Errorf("astro dev init should not be told to convert and then convert: %v", err)
+	}
+}
+
+func TestDevStubJSONNamesTheConversion(t *testing.T) {
+	convert := func(t *testing.T, dir string) (string, bool) {
+		t.Helper()
+		d, out := testDeps(t)
+		d.WorkingDir = func() (string, error) { return dir, nil }
+		if err := execute(t, d, "dev", "pytest", "--output", "json"); err == nil {
+			t.Fatal("json mode must still fail")
+		}
+		var payload struct {
+			Replacement string `json:"replacement"`
+			Convert     string `json:"convert"`
+			V1Project   bool   `json:"v1_project"`
+		}
+		if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
+			t.Fatalf("stdout is not one JSON object: %v\n%s", err, out.String())
+		}
+		if payload.Replacement != "uv run pytest" {
+			t.Errorf("replacement = %q, want uv run pytest", payload.Replacement)
+		}
+		return payload.Convert, payload.V1Project
+	}
+
+	if got, v1 := convert(t, v1ProjectWithToolsPyproject(t)); got != "astro init" || !v1 {
+		t.Errorf("v1 project: convert = %q, v1_project = %v; want astro init, true", got, v1)
+	}
+	if got, v1 := convert(t, t.TempDir()); got != "" || v1 {
+		t.Errorf("empty dir: convert = %q, v1_project = %v; want neither", got, v1)
+	}
 }
 
 func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {
@@ -212,6 +291,12 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 			dc:    devContext{buildSecret: true},
 			want:  "astro local start",
 			notes: []string{"--build-secret applies only to a project that declares [tool.astro] dockerfile"},
+		},
+		{
+			name: "a v1 project with a build secret converts to a Docker-mode build",
+			args: []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
+			dc:   devContext{v1: true, buildSecret: true},
+			want: "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
 		},
 		{
 			name: "a start that takes no --build-secret is not given one",

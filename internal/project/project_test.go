@@ -237,14 +237,88 @@ func TestIsV1(t *testing.T) {
 		writeMarker(t, dir)
 		assert.False(t, IsV1(dir))
 	})
-	t.Run("v2 marker beside a v1 layout is not v1", func(t *testing.T) {
+	t.Run("empty dir is not v1", func(t *testing.T) {
+		assert.False(t, IsV1(t.TempDir()))
+	})
+	t.Run("a pyproject that only configures tools leaves a v1 layout v1", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
-		writeMarker(t, dir)
+		writeManifest(t, dir, toolsOnlyPyproject)
+		assert.True(t, IsV1(dir))
+	})
+	t.Run("a v2 manifest beside a v1 layout is not v1", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		writeAstroDir(t, dir)
+		writeManifest(t, dir, v2Manifest)
 		assert.False(t, IsV1(dir))
 	})
-	t.Run("empty dir is not v1", func(t *testing.T) {
-		assert.False(t, IsV1(t.TempDir()))
+	t.Run("an unparseable pyproject beside a v1 layout is not v1", func(t *testing.T) {
+		dir := t.TempDir()
+		writeDockerfile(t, dir)
+		writeAstroDir(t, dir)
+		writeManifest(t, dir, "this is not : valid = toml [[[\n")
+		assert.False(t, IsV1(dir))
+	})
+}
+
+const v2Manifest = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+`
+
+const toolsOnlyPyproject = `[tool.ruff]
+line-length = 120
+
+[tool.sqlfluff.core]
+dialect = "snowflake"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+`
+
+func writeManifest(t *testing.T, dir, content string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, Marker), []byte(content), 0o600))
+}
+
+func TestIsV2(t *testing.T) {
+	t.Run("valid manifest", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, v2Manifest)
+		assert.True(t, IsV2(dir))
+	})
+	t.Run("valid manifest beside a Dockerfile is still v2", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, v2Manifest)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
+		assert.True(t, IsV2(dir))
+	})
+	t.Run("missing pyproject", func(t *testing.T) {
+		assert.False(t, IsV2(t.TempDir()))
+	})
+	t.Run("pyproject without tool.astro", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, "[project]\nname = \"demo\"\n")
+		assert.False(t, IsV2(dir))
+	})
+	t.Run("pyproject that only configures tools", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, toolsOnlyPyproject)
+		assert.False(t, IsV2(dir))
+	})
+	t.Run("tool.astro present but invalid still counts as v2", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+		assert.True(t, IsV2(dir))
+	})
+	t.Run("unparseable pyproject counts as v2", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, "this is not : valid = toml [[[\n")
+		assert.True(t, IsV2(dir))
 	})
 }

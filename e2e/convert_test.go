@@ -435,6 +435,26 @@ func v1Cases() []v1Case {
 			// carried. The case below is the one that earns the note.
 		},
 		{
+			// A v1 repository that also keeps a pyproject.toml, holding only
+			// tool settings. Common in real v1 repositories, and not a v2
+			// project: the conversion adopts the file, carries the v1 lists into
+			// it, and leaves the tool tables as they were.
+			name: "a v1 repository whose pyproject.toml only configures tools",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n",
+				"Dockerfile":         runtime3,
+				"requirements.txt":   "pandas==2.1.0\n",
+				"pyproject.toml":     "[tool.ruff]\nline-length = 120\n\n[tool.pytest.ini_options]\ntestpaths = ['tests']\n",
+			},
+			airflow:         "3.1",
+			adopted:         true,
+			projectName:     "orders-pipeline",
+			manifestHas:     []string{"'pandas==2.1.0'", "'apache-airflow==3.1.*'", "[tool.astro]", "[tool.ruff]", "line-length = 120", "[tool.pytest.ini_options]"},
+			retired:         []string{"Dockerfile", "requirements.txt"},
+			kept:            []string{".astro/config.yaml"},
+			reportedUpdated: []string{"pyproject.toml"},
+		},
+		{
 			// The same file after `astro deploy --save`. The saved target is
 			// the one thing here a v2 project wants, so the note states the
 			// whole manifest entry for it, table name included, rather than

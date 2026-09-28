@@ -615,6 +615,35 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
+// A Deployment id names its own workspace. When the workspace in hand came
+// from the current context rather than --workspace-id, the deploy follows the
+// Deployment to its workspace instead of stopping.
+func TestDagsDeployByIDFollowsTheDeploymentsWorkspace(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil)
+	mockV1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil)
+	mockV1Client.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&finalizeDeployResponse, nil)
+	azureUploader = func(string, io.Reader) (string, error) { return "version-id", nil }
+	defer os.RemoveAll("./testfiles/dags/")
+
+	deployInput := InputDeploy{
+		Path:      "./testfiles/",
+		RuntimeID: deploymentID,
+		WsID:      "context-ws-id",
+		Dags:      true,
+		DagsPath:  "./testfiles/dags",
+	}
+	assert.NoError(t, Deploy(deployInput, mockV1Client, nil))
+	mockV1Client.AssertNumberOfCalls(t, "CreateDeployWithResponse", 1)
+
+	deployInput.WsIDFromFlag = true
+	err := Deploy(deployInput, mockV1Client, nil)
+	assert.EqualError(t, err, "deployment test-deployment-id is in workspace test-ws-id, not workspace context-ws-id given by --workspace-id. Pass --workspace-id test-ws-id, or leave the flag out")
+	mockV1Client.AssertNumberOfCalls(t, "CreateDeployWithResponse", 1)
+}
+
 func TestImageOnlyDeploySuccess(t *testing.T) {
 	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
@@ -957,8 +986,10 @@ func TestDeployFailure(t *testing.T) {
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.RuntimeID = deploymentID
 	deployInput.WsID = "invalid-workspace"
+	deployInput.WsIDFromFlag = true
 	err = Deploy(deployInput, mockV1Client, nil)
-	assert.NoError(t, err)
+	assert.EqualError(t, err, "deployment test-deployment-id is in workspace test-ws-id, not workspace invalid-workspace given by --workspace-id. Pass --workspace-id test-ws-id, or leave the flag out")
+	deployInput.WsIDFromFlag = false
 
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.WsID = ws

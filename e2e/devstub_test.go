@@ -3,6 +3,8 @@
 package e2e
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -206,5 +208,35 @@ func TestDevJSONFlagSpellings(t *testing.T) {
 				t.Errorf("replacement = %q, want %q", payload.Replacement, "astro local status")
 			}
 		})
+	}
+}
+
+// A classic v1 project that also keeps a pyproject.toml for tool settings is
+// still v1, so the stub leads with the conversion: `uv run pytest` does not
+// work until `astro init` has made the directory a v2 project.
+func TestDevInAV1ProjectLeadsWithTheConversion(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+	if err := os.Mkdir(filepath.Join(p.Dir, ".astro"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM quay.io/astronomer/astro-runtime:3.1-12\n")
+	write(t, filepath.Join(p.Dir, ".astro", "config.yaml"), "project:\n  name: orders\n")
+	write(t, filepath.Join(p.Dir, "requirements.txt"), "pandas\n")
+	write(t, filepath.Join(p.Dir, "pyproject.toml"), "[tool.ruff]\nline-length = 120\n")
+
+	p.run("dev", "pytest").
+		requireFailure().
+		requireStderr("Convert with `astro init`, then use `uv run pytest`").
+		requireStderr("astro v1 project (Dockerfile and .astro/)")
+
+	var payload struct {
+		Convert   string `json:"convert"`
+		V1Project bool   `json:"v1_project"`
+	}
+	p.run("dev", "pytest", "--output", "json").requireFailure().requireJSON(&payload)
+	if payload.Convert != "astro init" || !payload.V1Project {
+		t.Errorf("convert = %q, v1_project = %v; want astro init, true", payload.Convert, payload.V1Project)
 	}
 }

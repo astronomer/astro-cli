@@ -1,6 +1,6 @@
 // Package deploy holds the v2 deploy logic that `astro deploy` routes into
 // when the working directory is a v2 project (a pyproject.toml with a
-// [tool.astro] table). It classifies the project for routing, settles which
+// [tool.astro] table, which internal/project's IsV2 checks). It settles which
 // deployment to ship to — named on the command line, or asked for and answered
 // — and drives the deploy through an injected transport: a dags-only deploy, an
 // image deploy, or both.
@@ -14,7 +14,6 @@ package deploy
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -25,23 +24,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
-
-// IsV2Project reports whether dir holds a v2 project: a pyproject.toml carrying
-// a [tool.astro] table. A pyproject that fails to parse, or one whose
-// [tool.astro] fails validation, still counts as v2 — it is a v2 project with a
-// manifest to fix, and the v2 path gives the clearer error. A pyproject without
-// [tool.astro] (a plain Python project) and a missing pyproject are not v2.
-func IsV2Project(dir string) bool {
-	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
-	switch {
-	case err == nil:
-		return true
-	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
-		return false
-	default:
-		return true
-	}
-}
 
 // Request is the resolved input for a v2 deploy. cmd fills it from flags, args,
 // the manifest, and the current context, then hands it to Run.
