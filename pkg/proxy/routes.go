@@ -16,10 +16,11 @@ import (
 const (
 	routesFileName = "routes.json"
 	lockFileName   = "routes.lock"
-	// lockTimeout must exceed the CLI's daemon start wait (10s): EnsureRunning
-	// holds this lock while a daemon starts, and concurrent route writes should
-	// outwait that instead of failing.
-	lockTimeout = 15 * time.Second
+	// lockTimeout must exceed the longest the CLI's EnsureRunning holds this
+	// lock: stopping an older v2 proxy and then an astro 1.x proxy (about 6s
+	// each) and then waiting for a daemon to start (10s). Concurrent route
+	// writes should outwait that instead of failing.
+	lockTimeout = 30 * time.Second
 	FilePermRW  = 0o600 // owner read/write
 	DirPermRWX  = 0o755 // owner rwx, group/other rx
 )

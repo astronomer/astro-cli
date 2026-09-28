@@ -96,6 +96,15 @@ type Proxy struct {
 	RenderLanding  func(w io.Writer, routes []LandingRoute)
 	RenderNotFound func(w io.Writer, hostname, port string)
 
+	// FallbackPort is the port Start tries when the configured one is taken,
+	// before it asks the OS for any free port. Empty skips it. Set it before
+	// calling Start.
+	//
+	// A host that remembers the port it fell back to last time and passes it
+	// here keeps its URLs across restarts while something else holds the
+	// configured port.
+	FallbackPort string
+
 	store     *Store
 	mu        sync.RWMutex
 	proxies   map[string]*httputil.ReverseProxy // keyed by backend port
@@ -139,8 +148,8 @@ func (p *Proxy) Running() bool {
 }
 
 // Start binds the listeners and serves in the background. Call Stop to shut
-// down. If the configured port is taken, Start falls back to an OS-assigned
-// ephemeral port; read the bound port back with Port().
+// down. If the configured port is taken, Start falls back to FallbackPort and
+// then to an OS-assigned ephemeral port; read the bound port back with Port().
 //
 // Both loopback families are bound: `localhost` and `*.localhost` resolve to
 // ::1 before 127.0.0.1 on macOS, and clients that don't fall back to IPv4
@@ -157,7 +166,7 @@ func (p *Proxy) Start() error {
 		IdleTimeout:       idleTimeout,
 	}
 
-	v4, boundPort, err := bindLoopbackWithFallback(p.Port())
+	v4, boundPort, err := bindLoopbackWithFallback(p.Port(), p.FallbackPort)
 	if err != nil {
 		return fmt.Errorf("starting proxy: %w", err)
 	}
@@ -191,12 +200,17 @@ func (p *Proxy) Start() error {
 	}
 }
 
-// bindLoopbackWithFallback binds 127.0.0.1:preferredPort, falling back to an
-// OS-assigned ephemeral port if preferredPort is already taken. Returns the
-// listener and the port actually bound.
-func bindLoopbackWithFallback(preferredPort string) (l net.Listener, actualPort string, err error) {
-	if l, err = net.Listen("tcp4", "127.0.0.1:"+preferredPort); err == nil {
-		return l, preferredPort, nil
+// bindLoopbackWithFallback binds 127.0.0.1 on the first of preferredPort and
+// fallbackPort that is free, and on an OS-assigned ephemeral port if neither
+// is. Returns the listener and the port actually bound.
+func bindLoopbackWithFallback(preferredPort, fallbackPort string) (l net.Listener, actualPort string, err error) {
+	for _, port := range []string{preferredPort, fallbackPort} {
+		if port == "" {
+			continue
+		}
+		if l, err = net.Listen("tcp4", "127.0.0.1:"+port); err == nil {
+			return l, port, nil
+		}
 	}
 	l, err = net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {

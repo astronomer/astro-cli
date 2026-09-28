@@ -161,6 +161,43 @@ func TestProxy_StartReportsBoundPort(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
+func TestProxy_StartPrefersTheFallbackPort(t *testing.T) {
+	s := testStore(t)
+
+	taken, err := net.Listen("tcp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer taken.Close()
+	takenPort := fmt.Sprintf("%d", taken.Addr().(*net.TCPAddr).Port)
+
+	free, err := net.Listen("tcp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	freePort := fmt.Sprintf("%d", free.Addr().(*net.TCPAddr).Port)
+	require.NoError(t, free.Close())
+
+	p := NewProxy(takenPort, s)
+	p.FallbackPort = freePort
+	require.NoError(t, p.Start())
+	defer p.Stop()
+
+	assert.Equal(t, freePort, p.Port())
+}
+
+func TestProxy_StartSkipsATakenFallbackPort(t *testing.T) {
+	s := testStore(t)
+
+	taken, err := net.Listen("tcp4", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer taken.Close()
+	takenPort := fmt.Sprintf("%d", taken.Addr().(*net.TCPAddr).Port)
+
+	p := NewProxy(takenPort, s)
+	p.FallbackPort = takenPort
+	require.NoError(t, p.Start())
+	defer p.Stop()
+
+	assert.NotEqual(t, takenPort, p.Port())
+}
+
 // A Host header is whatever the client typed, and it reaches a log line. A
 // newline in it would end that line and start one the reader has no way to tell
 // from something the proxy wrote.

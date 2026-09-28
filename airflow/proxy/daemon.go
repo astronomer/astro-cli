@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	semver "github.com/Masterminds/semver/v3"
+
 	"github.com/astronomer/astro-cli/pkg/logger"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/version"
@@ -24,11 +26,15 @@ const (
 	pidFileName  = "proxy.pid"
 	logFileName  = "proxy.log"
 	portFileName = "proxy.port"
-	stopTimeout  = 5 * time.Second
-	stopPollWait = 500 * time.Millisecond
-	// startTimeout must stay below pkg/proxy's routes lock timeout (15s):
-	// EnsureRunning holds that lock for up to this long, and waiters on it
-	// must outlast a worst-case daemon start.
+	// fallbackFileName holds the port the daemon bound the last time its own
+	// was taken. Unlike proxy.port it outlives the daemon.
+	fallbackFileName = "proxy.fallback-port"
+	stopTimeout      = 5 * time.Second
+	stopPollWait     = 500 * time.Millisecond
+	// startTimeout plus two stops (stopTimeout and a poll each) must stay
+	// below pkg/proxy's routes lock timeout (30s): EnsureRunning holds that
+	// lock while it stops an older v2 daemon, takes the port from astro 1.x
+	// and starts, and waiters on it must outlast a worst-case start.
 	startTimeout  = 10 * time.Second
 	startPollWait = 50 * time.Millisecond
 )
@@ -47,6 +53,11 @@ func logFilePath() string {
 // writes its bound port here once listening; StartDaemon waits for it.
 func portFilePath() string {
 	return filepath.Join(Routes().Dir(), portFileName)
+}
+
+// fallbackFilePath returns the path to ~/.astro/proxy/proxy.fallback-port.
+func fallbackFilePath() string {
+	return filepath.Join(Routes().Dir(), fallbackFileName)
 }
 
 // parsePIDFile reads this daemon's record.
@@ -97,8 +108,11 @@ func BoundPort() string {
 }
 
 // EnsureRunning starts the proxy daemon if it's not already running.
-// If the running daemon was started by a different CLI version, it is
-// restarted to avoid incompatibilities with route file formats.
+// If the running daemon was started by an older or unrelated CLI version, it
+// is restarted to avoid incompatibilities with route file formats; one from a
+// newer release is kept, since it reads every field this CLI writes.
+// Before a start, an astro 1.x proxy holding port is stopped (see
+// takeOverFromV1), so the daemon serves on port rather than a fallback.
 // Returns the port the proxy is actually listening on.
 func EnsureRunning(port string) (string, error) {
 	if port == "" {
@@ -117,7 +131,7 @@ func EnsureRunning(port string) (string, error) {
 	pid, ver, bound := rec.PID, rec.Version, rec.Port
 	if err == nil && pkgproxy.IsPIDAlive(pid) {
 		switch {
-		case ver == version.CurrVersion || version.CurrVersion == "":
+		case ver == version.CurrVersion || version.CurrVersion == "" || isNewerVersion(ver, version.CurrVersion):
 			// kill-0 only proves *some* process owns this PID. A SIGKILL'd
 			// daemon can leave a PID file whose PID an unrelated process later
 			// recycles — most likely on dev builds, where an empty version
@@ -141,7 +155,23 @@ func EnsureRunning(port string) (string, error) {
 	// Clean up stale PID file
 	os.Remove(pidFilePath()) //nolint:errcheck // best-effort cleanup
 
+	takeOverFromV1(port)
 	return StartDaemon(port)
+}
+
+// isNewerVersion reports whether recorded is a later release than current in
+// the same major version.
+// A version that is not semver, such as a SNAPSHOT build's, is never newer.
+func isNewerVersion(recorded, current string) bool {
+	r, err := semver.StrictNewVersion(strings.TrimPrefix(recorded, "v"))
+	if err != nil {
+		return false
+	}
+	c, err := semver.StrictNewVersion(strings.TrimPrefix(current, "v"))
+	if err != nil {
+		return false
+	}
+	return r.Major() == c.Major() && r.GreaterThan(c)
 }
 
 // proxyProbeTimeout bounds the liveness probe so EnsureRunning can't hang on a
@@ -165,20 +195,30 @@ var isProxyDaemon = func(pid int, port string) bool {
 // loopback Host makes the proxy answer with its own landing page (which sets
 // the header) instead of routing to a backend.
 func probeProxySignature(port string) bool {
+	resp, _, ok := probeProxy(port, "localhost")
+	return ok && resp.Header.Get(pkgproxy.SignatureHeader) == pkgproxy.SignatureValue
+}
+
+// probeBodyLimit caps how much of a probe's response body is read.
+const probeBodyLimit = 64 << 10
+
+// probeProxy GETs / on port with the given Host, within proxyProbeTimeout, and
+// returns the response with the start of its body.
+func probeProxy(port, host string) (resp *http.Response, body []byte, ok bool) {
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+port+"/", http.NoBody)
 	if err != nil {
-		return false
+		return nil, nil, false
 	}
-	req.Host = "localhost"
+	req.Host = host
 
 	client := &http.Client{Timeout: proxyProbeTimeout}
-	resp, err := client.Do(req)
+	resp, err = client.Do(req)
 	if err != nil {
-		return false
+		return nil, nil, false
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) //nolint:errcheck // error deliberately ignored in this v1 path
-	return resp.Header.Get(pkgproxy.SignatureHeader) == pkgproxy.SignatureValue
+	body, err = io.ReadAll(io.LimitReader(resp.Body, probeBodyLimit))
+	return resp, body, err == nil
 }
 
 // processLooksLikeProxy reports whether pid's command line looks like this
@@ -272,8 +312,8 @@ func waitForPortFile() (string, error) {
 // Once listening it writes the bound port to the port file, which is what
 // StartDaemon waits for before writing the PID file.
 func Serve(port string) error {
-	p := pkgproxy.NewProxy(port, Routes())
-	if err := p.Start(); err != nil {
+	p, err := startProxy(port)
+	if err != nil {
 		return err
 	}
 
@@ -289,6 +329,26 @@ func Serve(port string) error {
 	logger.Debugf("proxy received shutdown signal")
 	p.Stop()
 	return nil
+}
+
+// startProxy starts a proxy on port. When port is taken, it tries the port it
+// fell back to last time before any other, and remembers a new one, so a
+// project's URL does not change on every restart while something else holds
+// port.
+func startProxy(port string) (*pkgproxy.Proxy, error) {
+	p := pkgproxy.NewProxy(port, Routes())
+	if last, err := os.ReadFile(fallbackFilePath()); err == nil {
+		p.FallbackPort = strings.TrimSpace(string(last))
+	}
+	if err := p.Start(); err != nil {
+		return nil, err
+	}
+	if p.Port() != port && p.Port() != p.FallbackPort {
+		if err := os.WriteFile(fallbackFilePath(), []byte(p.Port()), pkgproxy.FilePermRW); err != nil {
+			logger.Debugf("could not remember fallback port %s: %s", p.Port(), err)
+		}
+	}
+	return p, nil
 }
 
 // StopDaemon stops the proxy daemon by sending SIGTERM, then SIGKILL if needed.
@@ -391,7 +451,7 @@ func claimDaemonForStop() (int, bool) {
 	// ReadRoutes, not ListRoutes: ListRoutes takes this same lock, and the
 	// flock is not reentrant across descriptors — measured. It would not
 	// deadlock, because AcquireLock polls LOCK_NB against a deadline; it would
-	// stall fifteen seconds and then fail, and the daemon would simply never
+	// stall until the lock timeout and then fail, and the daemon would simply never
 	// be stopped, slowly.
 	routes, err := store.ReadRoutes()
 	if err != nil {
