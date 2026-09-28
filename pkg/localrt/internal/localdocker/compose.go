@@ -238,25 +238,33 @@ func airflowEnv(projectName string, webPort int, major string, planEnv, secretEn
 //
 // Both generations build UI links from a base URL, which is why that setting
 // carries the host port; in the container Airflow always listens on 8080.
+//
+// Both also get standalone's DAG rescan intervals, in place of Airflow's
+// 30s re-parse and 300s listing defaults, so an edit to a mounted DAG shows
+// in seconds.
 func generationEnv(projectName string, webPort int, major string) map[string]string {
 	baseURL := fmt.Sprintf("http://localhost:%d", webPort)
 	if major == airflow2 {
 		return map[string]string{
-			"AIRFLOW__API__AUTH_BACKENDS":    "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth",
-			"AIRFLOW__WEBSERVER__BASE_URL":   baseURL,
-			"AIRFLOW__WEBSERVER__RBAC":       "True",
-			"AIRFLOW__WEBSERVER__SECRET_KEY": projectName,
+			"AIRFLOW__API__AUTH_BACKENDS":                   "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth",
+			"AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL":     "2",
+			"AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL": "3",
+			"AIRFLOW__WEBSERVER__BASE_URL":                  baseURL,
+			"AIRFLOW__WEBSERVER__RBAC":                      "True",
+			"AIRFLOW__WEBSERVER__SECRET_KEY":                projectName,
 		}
 	}
 	return map[string]string{
-		"AIRFLOW__API__BASE_URL":                        baseURL,
-		"AIRFLOW__API__PORT":                            "8080",
-		"AIRFLOW__API__SECRET_KEY":                      projectName,
-		"AIRFLOW__API_AUTH__JWT_SECRET":                 projectName,
-		"AIRFLOW__CORE__AUTH_MANAGER":                   "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager",
-		"AIRFLOW__CORE__EXECUTION_API_SERVER_URL":       "http://api-server:8080/execution/",
-		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS": "True",
-		"AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR":  "True",
+		"AIRFLOW__API__BASE_URL":                            baseURL,
+		"AIRFLOW__API__PORT":                                "8080",
+		"AIRFLOW__API__SECRET_KEY":                          projectName,
+		"AIRFLOW__API_AUTH__JWT_SECRET":                     projectName,
+		"AIRFLOW__CORE__AUTH_MANAGER":                       "airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager",
+		"AIRFLOW__CORE__EXECUTION_API_SERVER_URL":           "http://api-server:8080/execution/",
+		"AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS":     "True",
+		"AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL": "3",
+		"AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL":          "2",
+		"AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR":      "True",
 	}
 }
 

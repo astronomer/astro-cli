@@ -106,9 +106,12 @@ func devEnv(env []string) []string {
 // devDefaults are the Airflow settings local dev runs with unless the project
 // or the shell sets them, per the design: fast DAG rescan and zero
 // default task retries. In Airflow 3 the dag-processor is a separate
-// component with its own config section, so both the scheduler and
-// dag_processor intervals are set; the key for whichever Airflow major is not
-// running is ignored.
+// component with its own config section, where dag_dir_list_interval is named
+// refresh_interval, so both the scheduler and dag_processor intervals are set.
+//
+// The per-file interval is 3s rather than 0: at 0 the dag-processor re-parses
+// every file in a tight loop and holds about 45% of a core on an idle
+// one-DAG project; at 3 it idles at 1-2% and a saved change shows within ~5s.
 //
 // DAGs are created UNPAUSED, which reverses what decision 13 originally said;
 // docs/v2-architecture.md carries the amended wording.
@@ -124,9 +127,9 @@ func devEnv(env []string) []string {
 // desktop provision through this engine without changing their experience.
 var devDefaults = []string{
 	"AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=2",
-	"AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL=0",
-	"AIRFLOW__DAG_PROCESSOR__DAG_DIR_LIST_INTERVAL=2",
-	"AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL=0",
+	"AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL=3",
+	"AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL=2",
+	"AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL=3",
 	"AIRFLOW__CORE__DEFAULT_TASK_RETRIES=0",
 	"AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
 	// The log file is not a terminal, so nothing in it should be colored.

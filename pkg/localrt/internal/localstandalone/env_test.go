@@ -64,6 +64,12 @@ func TestBuildEnvAppliesTheDevSettings(t *testing.T) {
 	// it paused means it sits still while its next run time slides past.
 	rescan, _ := envValue(env, "AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL")
 	assert.Equal(t, "2", rescan)
+	refresh, _ := envValue(env, "AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL")
+	assert.Equal(t, "2", refresh)
+	perFile, _ := envValue(env, "AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL")
+	assert.Equal(t, "3", perFile)
+	af2PerFile, _ := envValue(env, "AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL")
+	assert.Equal(t, "3", af2PerFile)
 	retries, _ := envValue(env, "AIRFLOW__CORE__DEFAULT_TASK_RETRIES")
 	assert.Equal(t, "0", retries)
 	paused, found := envValue(env, "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION")
