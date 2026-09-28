@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
@@ -205,7 +206,7 @@ func runCloud(opts *CloudOptions) error {
 	}
 
 	// Parse fields into request body
-	params, err := parseFields(opts.MagicFields, opts.RawFields)
+	params, err := apirequest.ParseFields(opts.MagicFields, opts.RawFields)
 	if err != nil {
 		return fmt.Errorf("parsing fields: %w", err)
 	}

@@ -160,6 +160,81 @@ func TestURLTargetTakesItsCredentialFromTheEnvironment(t *testing.T) {
 	}
 }
 
+// urlPair is the environment a --url target with a username and password sees.
+var urlPair = instancestest.Env(map[string]string{EnvUsername: "ada", EnvPassword: "hunter2"})
+
+// An Airflow 3 takes no username and password on an API call, so a --url
+// target exchanges them at the instance's own /auth/token, the way `astro api
+// airflow --url` does, and sends the JWT that comes back.
+func TestURLTargetMintsWithAUsernameAndPasswordOnAirflow3(t *testing.T) {
+	var got struct {
+		method             string
+		username, password string
+	}
+	server := mintServer(t, &got)
+	defer server.Close()
+
+	i := URLInstance(server.URL)
+	src, refresh, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: urlPair, HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	if got := instancestest.Header(t, src); got != "Bearer minted" {
+		t.Fatalf("header = %q, want the minted token", got)
+	}
+	if got.method != http.MethodPost || got.username != "ada" || got.password != "hunter2" {
+		t.Fatalf("minted with %s %s/%s, want a POST as ada", got.method, got.username, got.password)
+	}
+	if refresh == nil {
+		t.Fatal("no refresh hook: an Airflow 3 token is short-lived and has to be re-mintable")
+	}
+}
+
+// An Airflow 2 serves no /auth/token, and there the same pair goes on the
+// request as basic auth, as it always did.
+func TestURLTargetSendsBasicAuthOnAirflow2(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	i := URLInstance(server.URL)
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: urlPair, HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	want := "Basic " + base64.StdEncoding.EncodeToString([]byte("ada:hunter2"))
+	if got := instancestest.Header(t, src); got != want {
+		t.Fatalf("header = %q, want %q", got, want)
+	}
+}
+
+// A mint the instance refuses fails the request and says what was being
+// exchanged, rather than quietly sending the pair a JWT-only Airflow rejects.
+func TestURLTargetMintRefusalNamesTheExchange(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"detail":"Invalid credentials"}`))
+	}))
+	defer server.Close()
+
+	i := URLInstance(server.URL)
+	src, _, err := credentials(context.Background(), i, i.URL, Deps{LookupEnv: urlPair, HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	_, _, err = src(context.Background())
+	if err == nil {
+		t.Fatal("a refused mint produced a credential")
+	}
+	for _, want := range []string{EnvUsername, EnvPassword, "/auth/token", server.URL} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message does not name %s: %s", want, err)
+		}
+	}
+}
+
 // localProject writes a project pinning the given Airflow, which is what tells
 // the resolver which credentials its local engine provisioned.
 func localProject(t *testing.T, airflowVersion string) string {

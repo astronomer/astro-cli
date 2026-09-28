@@ -107,6 +107,10 @@ type Response struct {
 	StatusCode int
 	Header     http.Header
 	Body       []byte
+	// Proto is the protocol the answer came over, "HTTP/1.1" and the like, for
+	// a caller that prints the status line. Empty from a door that is not HTTP
+	// to the Airflow itself.
+	Proto string
 }
 
 // Decode unmarshals the body into v. An empty body leaves v untouched, so a
@@ -384,6 +388,7 @@ func (t *HTTPTransport) send(ctx context.Context, req Request, body []byte) (Res
 		StatusCode: redirectAsRefusal(httpResp),
 		Header:     httpResp.Header,
 		Body:       payload,
+		Proto:      httpResp.Proto,
 	}, nil
 }
 

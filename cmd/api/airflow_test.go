@@ -919,3 +919,80 @@ func TestInitAirflowSpecCache_ConnectionError_SuppressesWarning(t *testing.T) {
 	// The noisy warning should be suppressed for connection errors
 	assert.Empty(t, errOut.String())
 }
+
+// --- ls --filter and spec ----------------------------------------------------
+
+// specOpts is a parent AirflowOptions whose spec is already resolved: a cache
+// over a stub serving doc, so ls, describe and spec read it without reaching
+// GitHub. The target is a --url with a credential supplied, so nothing mints.
+func specOpts(t *testing.T, doc string) *AirflowOptions {
+	t.Helper()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(doc))
+	}))
+	t.Cleanup(ts.Close)
+	opts := &AirflowOptions{
+		URL: ts.URL,
+		RequestOptions: RequestOptions{
+			ErrOut:         new(bytes.Buffer),
+			HTTPClient:     http.DefaultClient,
+			RequestHeaders: []string{"Authorization: Bearer supplied"},
+			specCache:      openapi.NewCacheWithOptions(ts.URL, filepath.Join(t.TempDir(), "cache.json")),
+		},
+	}
+	opts.detectedVersion = "3.0.3"
+	return opts
+}
+
+const twoPathSpec = `{"openapi":"3.0.0","info":{"title":"Airflow","version":"1"},"paths":{` +
+	`"/variables":{"get":{"operationId":"get_variables","tags":["Variable"]}},` +
+	`"/dags":{"get":{"operationId":"get_dags","tags":["DAG"]}}}}`
+
+// af spells the ls filter --filter; the positional argument astro has always
+// taken still works beside it.
+func TestAirflowListFilterFlag(t *testing.T) {
+	for _, args := range [][]string{{"--filter", "variable", "--json"}, {"variable", "--json"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			var out bytes.Buffer
+			cmd := NewAirflowListCmd(&out, specOpts(t, twoPathSpec))
+			cmd.SetArgs(args)
+			require.NoError(t, cmd.Execute())
+
+			var rows []map[string]any
+			require.NoError(t, json.Unmarshal(out.Bytes(), &rows))
+			require.Len(t, rows, 1)
+			assert.Equal(t, "/variables", rows[0]["path"])
+		})
+	}
+}
+
+func TestAirflowListRefusesTwoFilters(t *testing.T) {
+	cmd := NewAirflowListCmd(new(bytes.Buffer), specOpts(t, twoPathSpec))
+	cmd.SetArgs([]string{"dags", "--filter", "variable"})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "disagree")
+}
+
+// spec prints the document ls reads, whole, as JSON.
+func TestAirflowSpecPrintsTheDocumentLsReads(t *testing.T) {
+	var out bytes.Buffer
+	cmd := NewAirflowSpecCmd(&out, specOpts(t, twoPathSpec))
+	cmd.SetArgs(nil)
+	require.NoError(t, cmd.Execute())
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(out.Bytes(), &doc), "spec must print JSON: %s", out.String())
+	assert.Equal(t, "3.0.0", doc["openapi"])
+	assert.Contains(t, doc["paths"], "/variables")
+}
+
+// spec hangs under `astro api airflow` beside ls and describe.
+func TestAirflowCmdHasSpec(t *testing.T) {
+	cmd := NewAirflowCmd(new(bytes.Buffer))
+	found, _, err := cmd.Find([]string{"spec"})
+	require.NoError(t, err)
+	assert.Equal(t, "spec", found.Name())
+}

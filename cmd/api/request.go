@@ -17,6 +17,7 @@ import (
 
 	"github.com/fatih/color"
 
+	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -127,12 +128,12 @@ func (o *RequestOptions) GetHTTPClient() *http.Client {
 // setCustomHeaders parses and applies custom headers to the request.
 // Each header must be in "key:value" format.
 func setCustomHeaders(req *http.Request, headers []string) error {
-	for _, h := range headers {
-		parts := strings.SplitN(h, ":", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid header format %q, expected key:value", h)
-		}
-		req.Header.Set(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+	parsed, err := apirequest.ParseHeaders(headers)
+	if err != nil {
+		return err
+	}
+	for key, values := range parsed {
+		req.Header[key] = values
 	}
 	return nil
 }
@@ -248,9 +249,7 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 
 	// Print response headers if requested (skip if verbose already printed them)
 	if opts.ShowResponseHeaders && !opts.Verbose {
-		fmt.Fprintf(opts.Out, "%s %s\n", result.Proto, result.Status)
-		printHeaders(opts.Out, result.Header, isColorEnabled(opts.Out))
-		fmt.Fprintln(opts.Out)
+		apirequest.WriteHead(opts.Out, result.Proto+" "+result.Status, result.Header, isColorEnabled(opts.Out))
 	}
 
 	// Handle error responses: print the body, then return a SilentError so cobra
@@ -516,35 +515,11 @@ func addQueryParams(requestURL string, params map[string]interface{}) string {
 
 	q := u.Query()
 	for key, value := range params {
-		addQueryParam(q, key, value)
+		apirequest.AddQuery(q, key, value)
 	}
 	u.RawQuery = q.Encode()
 
 	return u.String()
-}
-
-// addQueryParam recursively adds a parameter to the query.
-func addQueryParam(q url.Values, key string, value interface{}) {
-	switch v := value.(type) {
-	case string:
-		q.Add(key, v)
-	case int:
-		q.Add(key, fmt.Sprintf("%d", v))
-	case bool:
-		q.Add(key, fmt.Sprintf("%v", v))
-	case nil:
-		q.Add(key, "")
-	case []interface{}:
-		for _, item := range v {
-			addQueryParam(q, key+"[]", item)
-		}
-	case map[string]interface{}:
-		for subkey, subvalue := range v {
-			addQueryParam(q, key+"["+subkey+"]", subvalue)
-		}
-	default:
-		q.Add(key, fmt.Sprintf("%v", v))
-	}
 }
 
 // shellQuote wraps a string in single quotes for safe shell interpolation,
@@ -714,26 +689,6 @@ func printResponseHeaders(out io.Writer, resp *http.Response) {
 	}
 	fmt.Fprintln(out, color.CyanString("<"))
 	fmt.Fprintln(out)
-}
-
-// printHeaders prints HTTP headers.
-func printHeaders(w io.Writer, headers http.Header, colorize bool) {
-	names := make([]string, 0, len(headers))
-	for name := range headers {
-		if name == "Status" {
-			continue
-		}
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		if colorize {
-			fmt.Fprintf(w, "%s: %s\n", newColor(color.Bold, color.FgBlue).Sprint(name), strings.Join(headers[name], ", "))
-		} else {
-			fmt.Fprintf(w, "%s: %s\n", name, strings.Join(headers[name], ", "))
-		}
-	}
 }
 
 // maskToken masks most of a token for display.

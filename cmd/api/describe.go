@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 
+	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -113,7 +114,7 @@ func runDescribe(opts *DescribeOptions) error {
 // printEndpointDetails prints detailed information about an endpoint.
 func printEndpointDetails(out io.Writer, ep *openapi.Endpoint, resolver *openapi.SchemaResolver) {
 	// Header
-	method := colorizeMethod(ep.Method)
+	method := apirequest.ColorizeMethod(ep.Method)
 	fmt.Fprintf(out, "%s %s\n", method, ep.Path)
 
 	if ep.Deprecated {

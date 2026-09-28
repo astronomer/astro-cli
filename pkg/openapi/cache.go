@@ -252,6 +252,25 @@ func (c *Cache) GetSchemas() map[string]*Schema {
 	}
 }
 
+// RawSpec is the document Load read, byte for byte as it arrived: JSON or
+// YAML, whichever the source served. Nil before a successful Load.
+func (c *Cache) RawSpec() []byte {
+	return c.rawSpec
+}
+
+// ParseEndpoints reads the endpoints out of a spec already in hand, for a
+// caller that fetched the document itself — from the Airflow it describes,
+// rather than from a URL this package caches. stripPrefix is removed from
+// every path, as a Cache's is, so /api/v2/dags reads as /dags.
+func ParseEndpoints(raw []byte, stripPrefix string) ([]Endpoint, error) {
+	v3doc, v2doc, err := parseSpec(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parsing OpenAPI spec: %w", err)
+	}
+	c := Cache{doc: v3doc, v2doc: v2doc, stripPrefix: stripPrefix}
+	return c.GetEndpoints(), nil
+}
+
 // IsLoaded returns true if a spec has been loaded.
 func (c *Cache) IsLoaded() bool {
 	return c.doc != nil || c.v2doc != nil

@@ -798,35 +798,6 @@ func TestCombinePages_NoArrayField(t *testing.T) {
 	assert.Contains(t, string(result), "name")
 }
 
-// --- printHeaders ------------------------------------------------------------
-
-func TestPrintHeaders(t *testing.T) {
-	headers := http.Header{
-		"Content-Type": {"application/json"},
-		"X-Custom":     {"value"},
-		"Status":       {"should-be-skipped"},
-	}
-
-	var buf bytes.Buffer
-	printHeaders(&buf, headers, false)
-	output := buf.String()
-
-	assert.Contains(t, output, "Content-Type: application/json")
-	assert.Contains(t, output, "X-Custom: value")
-	assert.NotContains(t, output, "should-be-skipped", "Status header should be skipped")
-}
-
-func TestPrintHeaders_Colorized(t *testing.T) {
-	headers := http.Header{
-		"X-Test": {"val"},
-	}
-
-	var buf bytes.Buffer
-	printHeaders(&buf, headers, true)
-	assert.Contains(t, buf.String(), "\x1b[") // ANSI escape
-	assert.Contains(t, buf.String(), "X-Test")
-}
-
 // --- printResponseHeaders status colors --------------------------------------
 
 func TestPrintResponseHeaders_StatusColors(t *testing.T) {

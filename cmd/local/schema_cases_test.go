@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/internal/plan"
@@ -87,6 +88,7 @@ var publishedPayloads = []schemaCase{
 	{"event", event{}},
 	{"open-url", urlResult{}},
 	{"check-blocked", checkBlocked{}},
+	{"api-exchange", apiExchange{}},
 
 	// Published from other packages. A guard that reads this directory
 	// cannot see them, and they are contracts all the same: `astro local
@@ -97,6 +99,9 @@ var publishedPayloads = []schemaCase{
 	{"check-target-report", checks.TargetReport{}},
 	{"package-result", pack.Result{}},
 	{"start-missing-env", plan.MissingPayload{}},
+	// `astro local api ls --output json`, one per endpoint. The row is
+	// apirequest's because `astro api airflow ls --json` prints the same one.
+	{"api-endpoint-row", apirequest.EndpointRow{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {

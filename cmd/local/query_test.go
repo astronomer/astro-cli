@@ -50,6 +50,7 @@ type stubRequest struct {
 	Path   string
 	Query  string
 	Body   string
+	Header http.Header
 }
 
 // newAirflowStub is an Airflow 3 stub: version detection answers on /api/v2,
@@ -110,6 +111,7 @@ func (s *airflowStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Path:   r.URL.Path,
 		Query:  r.URL.RawQuery,
 		Body:   string(body),
+		Header: r.Header.Clone(),
 	})
 	key := r.Method + " " + r.URL.Path
 	route, ok := s.routes[key]

@@ -29,7 +29,7 @@ func credentials(ctx context.Context, i Instance, baseURL string, d Deps) (airfl
 		return localCredentials(i, baseURL, d)
 	}
 	if i.Source == SourceURL {
-		return urlCredentials(d)
+		return urlCredentials(baseURL, d)
 	}
 	switch i.Link.Auth.Method {
 	case manifest.AuthNone:
@@ -102,7 +102,14 @@ func astroCredentials(d Deps) airflowapi.CredentialSource {
 // urlCredentials reads the credential for a --url target from the environment.
 // Nothing set means nothing sent: an open dev server is a real case, and
 // guessing a credential would only turn a clear 401 into a confusing one.
-func urlCredentials(d Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
+//
+// A username and password are exchanged rather than sent. An Airflow 3 takes
+// neither on an API call — it wants the JWT its own /auth/token mints for them
+// — while an Airflow 2 takes them as basic auth, and which one is behind a URL
+// is discovered by asking: TokenMinter posts to /auth/token and falls back to
+// basic auth on the 404 or 405 an Airflow with nothing to mint at answers. That
+// is the exchange `astro api airflow --url` and a local Airflow already make.
+func urlCredentials(baseURL string, d Deps) (airflowapi.CredentialSource, func(context.Context) error, error) {
 	if token, ok := d.credentialEnv(EnvToken); ok {
 		return airflowapi.BearerToken(token), nil, nil
 	}
@@ -110,7 +117,19 @@ func urlCredentials(d Deps) (airflowapi.CredentialSource, func(context.Context) 
 	password, hasPassword := d.credentialEnv(EnvPassword)
 	switch {
 	case hasUser && hasPassword:
-		return airflowapi.BasicAuth(username, password), nil, nil
+		minter, err := airflowapi.NewTokenMinter(baseURL, username, password, d.httpOptions()...)
+		if err != nil {
+			return nil, nil, err
+		}
+		source := func(ctx context.Context) (string, string, error) {
+			scheme, value, err := minter.Credentials(ctx)
+			if err != nil {
+				return "", "", fmt.Errorf("%s could not exchange %s and %s for a token at its %s: %w",
+					baseURL, EnvUsername, EnvPassword, airflowTokenPath, err)
+			}
+			return scheme, value, nil
+		}
+		return source, minter.Refresh, nil
 	case hasUser != hasPassword:
 		return nil, nil, fmt.Errorf("%s and %s go together: set both, or neither and use %s instead", EnvUsername, EnvPassword, EnvToken)
 	}

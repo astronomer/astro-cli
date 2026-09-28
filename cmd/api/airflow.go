@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -98,6 +98,10 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax.
 To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 		Example: `  # List Airflow API endpoints
   astro api airflow ls
+  astro api airflow ls --filter variable
+
+  # The OpenAPI specification those come from, as JSON
+  astro api airflow spec
 
   # Get all DAGs from a deployment this project links in pyproject.toml
   astro api airflow -d prod /dags
@@ -184,6 +188,7 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	// Note: These need to create their own spec cache since version is determined at runtime
 	cmd.AddCommand(NewAirflowListCmd(out, opts))
 	cmd.AddCommand(NewAirflowDescribeCmd(out, opts))
+	cmd.AddCommand(NewAirflowSpecCmd(out, opts))
 
 	return cmd
 }
@@ -246,7 +251,7 @@ func runAirflow(opts *AirflowOptions) error {
 	}
 
 	// Parse fields into request body
-	params, err := parseFields(opts.MagicFields, opts.RawFields)
+	params, err := apirequest.ParseFields(opts.MagicFields, opts.RawFields)
 	if err != nil {
 		return fmt.Errorf("parsing fields: %w", err)
 	}
@@ -313,7 +318,7 @@ func runAirflowThroughTransport(ctx stdctx.Context, opts *AirflowOptions, target
 	req := airflowapi.Request{Method: strings.ToUpper(method), Path: requestPath}
 	if len(params) > 0 {
 		if strings.EqualFold(method, http.MethodGet) {
-			req.Query = queryFromParams(params)
+			req.Query = apirequest.Query(params)
 		} else {
 			req.Body = params
 		}
@@ -329,16 +334,6 @@ func runAirflowThroughTransport(ctx stdctx.Context, opts *AirflowOptions, target
 		return &SilentError{StatusCode: resp.StatusCode}
 	}
 	return outputResponseBody(&opts.RequestOptions, resp.Body)
-}
-
-// queryFromParams turns the -f/-F fields into a query string, the same encoding
-// addQueryParams applies to a URL.
-func queryFromParams(params map[string]interface{}) url.Values {
-	query := url.Values{}
-	for key, value := range params {
-		addQueryParam(query, key, value)
-	}
-	return query
 }
 
 // airflowHostRoot strips any /api/v1 or /api/v2 suffix to get the bare host URL.
@@ -477,7 +472,7 @@ func loadAirflowSpec(ctx stdctx.Context, opts *AirflowOptions) error {
 
 // NewAirflowListCmd creates the 'astro api airflow ls' command.
 func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command {
-	var filter string
+	var filterFlag string
 	var verbose bool
 	var refresh bool
 	var jsonOut bool
@@ -488,13 +483,15 @@ func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 		Short:   "List available Airflow API endpoints",
 		Long: `List all available endpoints from the Airflow API.
 
-You can optionally provide a filter to search for specific endpoints.
-The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
+You can optionally provide a filter to search for specific endpoints, as an
+argument or with --filter. The filter matches against endpoint paths, methods,
+operation IDs, summaries, and tags.`,
 		Example: `  # List all endpoints
   astro api airflow ls
 
   # Filter endpoints
   astro api airflow ls dags
+  astro api airflow ls --filter dags
 
   # List POST endpoints
   astro api airflow ls POST
@@ -503,8 +500,9 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
   astro api airflow ls --verbose`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				filter = args[0]
+			filter, err := apirequest.ListFilter(args, filterFlag)
+			if err != nil {
+				return err
 			}
 
 			if err := loadAirflowSpec(cmd.Context(), parentOpts); err != nil {
@@ -529,10 +527,54 @@ The filter matches against endpoint paths, methods, operation IDs, summaries, an
 		},
 	}
 
+	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint list as JSON")
 
+	return cmd
+}
+
+// NewAirflowSpecCmd creates the 'astro api airflow spec' command: the OpenAPI
+// document ls and describe read, printed whole as JSON.
+func NewAirflowSpecCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command {
+	var refresh bool
+	cmd := &cobra.Command{
+		Use:   "spec",
+		Short: "Print the Airflow API's OpenAPI specification",
+		Long: `Print the OpenAPI specification this command reads, as JSON.
+
+It is the document ls and describe work from: the published specification for
+the Airflow version the target reports, or the one --airflow-version names. An
+Airflow 2 specification is YAML at its source and is printed as JSON all the
+same, so a script piping it into jq does not have to know which it reached.`,
+		Example: `  # The whole document
+  astro api airflow spec
+
+  # Every path it declares
+  astro api airflow spec | jq '.paths | keys'`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			target, err := resolveAirflowTarget(ctx, parentOpts)
+			if err != nil {
+				return err
+			}
+			if _, err := initAirflowSpecCache(ctx, parentOpts, target); err != nil {
+				return err
+			}
+			if err := parentOpts.specCache.Load(refresh); err != nil {
+				return fmt.Errorf("loading OpenAPI spec: %w", err)
+			}
+			doc, err := apirequest.SpecJSON(parentOpts.specCache.RawSpec())
+			if err != nil {
+				return err
+			}
+			_, err = out.Write(doc)
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	return cmd
 }
 

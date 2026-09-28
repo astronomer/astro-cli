@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -158,7 +159,7 @@ func runRegistry(opts *RegistryOptions) error {
 	}
 
 	// Parse fields into request body
-	params, err := parseFields(opts.MagicFields, opts.RawFields)
+	params, err := apirequest.ParseFields(opts.MagicFields, opts.RawFields)
 	if err != nil {
 		return fmt.Errorf("parsing fields: %w", err)
 	}

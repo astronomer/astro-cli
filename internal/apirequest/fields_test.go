@@ -1,8 +1,9 @@
-package api
+package apirequest
 
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -154,7 +155,7 @@ func TestParseFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseFields(tt.magicFields, tt.rawFields)
+			result, err := ParseFields(tt.magicFields, tt.rawFields)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -183,7 +184,7 @@ func TestMagicFieldValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result, err := magicFieldValue(tt.input)
+			result, err := Fields{}.magicValue(tt.input)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -197,13 +198,13 @@ func TestMagicFieldValueFileReading(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmpFile, []byte("file content"), 0o600))
 
 	t.Run("reads file with @ prefix", func(t *testing.T) {
-		result, err := magicFieldValue("@" + tmpFile)
+		result, err := Fields{}.magicValue("@" + tmpFile)
 		require.NoError(t, err)
 		assert.Equal(t, "file content", result)
 	})
 
 	t.Run("file not found error", func(t *testing.T) {
-		_, err := magicFieldValue("@/nonexistent/path/file.txt")
+		_, err := Fields{}.magicValue("@/nonexistent/path/file.txt")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "opening file")
 	})
@@ -211,7 +212,56 @@ func TestMagicFieldValueFileReading(t *testing.T) {
 
 func TestParseFieldsMagicFileError(t *testing.T) {
 	// Exercises the "error parsing %q value" wrapping in parseField
-	_, err := parseFields([]string{"data=@/nonexistent/file"}, nil)
+	_, err := ParseFields([]string{"data=@/nonexistent/file"}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error parsing")
+}
+
+// af's -F rule, which `astro local api` follows: anything Python's float()
+// reads is a number, not only integers. The cases that rule would get wrong
+// (nan and inf become JSON nothing parses, a hex literal float() refuses) stay
+// strings.
+func TestAnyNumberReadsFloatsTheWayAfDoes(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected any
+	}{
+		{"42", 42},
+		{"-10", -10},
+		{"1.5", 1.5},
+		{"-0.25", -0.25},
+		{"1e3", 1000.0},
+		{"true", true},
+		{"false", false},
+		{"null", nil},
+		{"nan", "nan"},
+		{"inf", "inf"},
+		{"-Infinity", "-Infinity"},
+		{"0x1p-2", "0x1p-2"},
+		{"3.0.1", "3.0.1"},
+		{"hello", "hello"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := Fields{Numbers: AnyNumber}.magicValue(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+// The rule is per command, and the one `astro api` has always had is still
+// the default: a float stays the string it was typed as.
+func TestIntegersIsTheDefaultRule(t *testing.T) {
+	params, err := Fields{Magic: []string{"ratio=1.5", "count=3"}}.Parse()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"ratio": "1.5", "count": 3}, params)
+}
+
+// @- reads the reader the command hands in, so the caller decides what stdin
+// is.
+func TestMagicFileReadsTheGivenStdin(t *testing.T) {
+	params, err := Fields{Magic: []string{"doc=@-"}, Stdin: strings.NewReader("from stdin")}.Parse()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"doc": "from stdin"}, params)
 }
