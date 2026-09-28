@@ -65,7 +65,8 @@ type v1Project struct {
 	// defaulted pin.
 	statedVersion bool
 	// settings is what airflow_settings.yaml yielded: declarations that join
-	// envSchema's, and the connection and variable values that go to the vault.
+	// envSchema's, the connection and variable values that go to the vault, and
+	// the pools that go to [tool.astro.pools].
 	settings carriedSettings
 	// envSchema is what .astro/env.schema.yaml declared, split into what the
 	// manifest grammar accepts and what it does not.
@@ -202,7 +203,7 @@ func readV1Project(dir string) (*v1Project, error) {
 	} else if data != nil {
 		v1.settings = readAirflowSettings(data)
 		v1.notes = append(v1.notes, v1.settings.blockers...)
-		v1.notes = append(v1.notes, v1.settings.notes()...)
+		v1.notes = append(v1.notes, v1.settings.pools.notes...)
 		v1.present = append(v1.present, SettingsRelPath)
 	}
 
@@ -731,7 +732,7 @@ func (v1 *v1Project) mergeDeclarationSources() {
 		// none of them: the inverse of what applySecrets exists to guarantee,
 		// and silent.
 		if len(v1.envSchema.blockers) > 0 {
-			v1.dropSettingsCarry(SettingsRelPath + " was not carried either, and is kept as it is: " +
+			v1.dropSettingsCarry(SettingsRelPath + "'s connections and variables were not carried either, and the file is kept as it is: " +
 				envschema.LegacyRelPath + " has to be fixed first, because the two share [tool.astro.env]")
 			return
 		}
@@ -765,7 +766,7 @@ func (v1 *v1Project) mergeDeclarationSources() {
 	if len(clashes) > 0 {
 		v1.envSchema = carriedEnvSchema{blockers: []string{
 			SettingsRelPath + " and " + envschema.LegacyRelPath + " both declare " +
-				strings.Join(clashes, ", ") + ". Neither file was carried, and both are kept as they are. " +
+				strings.Join(clashes, ", ") + ". Neither file's declarations were carried, and both files are kept as they are. " +
 				"Remove the duplicate from one of them and convert again",
 		}}
 		v1.dropSettingsCarry(v1.envSchema.blockers[0])
@@ -774,14 +775,15 @@ func (v1 *v1Project) mergeDeclarationSources() {
 	v1.envSchema.advisories = append(v1.envSchema.advisories, v1.settings.advisories...)
 }
 
-// dropSettingsCarry abandons airflow_settings.yaml entirely: no declarations,
-// and no values.
+// dropSettingsCarry abandons airflow_settings.yaml's connections and variables:
+// no declarations, and no values.
 //
 // Both halves together, always. A path that clears one and not the other either
 // writes credentials to the vault that nothing declares, or declares required
 // connections whose values were never stored — and each leaves a project that
-// cannot start for a reason nothing on screen explains. The pools survive
-// because the note about them is about the file, which is being kept.
+// cannot start for a reason nothing on screen explains. The pools survive:
+// they go to [tool.astro.pools], which the reason for dropping the rest does
+// not touch.
 func (v1 *v1Project) dropSettingsCarry(reason string) {
 	v1.settings = carriedSettings{blockers: []string{reason}, pools: v1.settings.pools}
 	v1.notes = append(v1.notes, reason)

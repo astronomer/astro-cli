@@ -158,10 +158,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// it is load-bearing there for the same reason it is in the greenfield arm.
 	// Both arms declare it or the field would only be true of projects that
 	// arrived one particular way.
-	if err := setDockerfileDeclaration(ed, v1); err != nil {
-		return nil, nil, pin, err
-	}
-	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
+	if err := setV1Declarations(ed, v1); err != nil {
 		return nil, nil, pin, err
 	}
 
@@ -205,6 +202,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if v1.envSchema.declares() {
 		labels = append(labels, manifest.Marker+" (migrated "+migratedFrom(v1)+" into [tool.astro.env])")
 	}
+	labels = appendLabel(labels, poolsLabel(v1.settings.pools.byName))
 	return out, labels, pin, nil
 }
 

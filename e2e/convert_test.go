@@ -353,8 +353,8 @@ func v1Cases() []v1Case {
 			noNotes:       true,
 		},
 		{
-			// A settings file with no pools and nothing left in it is retired
-			// like any other carried v1 file. The variable is empty so the
+			// A settings file with nothing left in it is retired like any
+			// other carried v1 file. The variable is empty so the
 			// case stores nothing and stays off the keyring. An empty variable
 			// is declared optional, since v1 skipped it rather than create it,
 			// and the manifest carries no value for it.
@@ -389,11 +389,9 @@ func v1Cases() []v1Case {
 			noNotes:       true,
 		},
 		{
-			// Pools have nowhere to go: neither `astro local start` nor the app
-			// creates or stores them, so the file is the only record of them
-			// that survives. It is kept and the run says why — and the pool
-			// must NOT appear in the manifest, because a key nothing downstream
-			// reads would swallow it silently.
+			// Pools move into [tool.astro.pools], which `astro local start`
+			// creates in Airflow, so a file holding only pools has nothing
+			// left in it and goes.
 			name: "a settings file with pools",
 			files: map[string]string{
 				"Dockerfile": runtime2,
@@ -402,14 +400,9 @@ func v1Cases() []v1Case {
 					"    - pool_name: heavy\n" +
 					"      pool_slot: 5\n",
 			},
-			airflow:       "2",
-			manifestLacks: []string{"heavy", "pool"},
-			kept:          []string{"airflow_settings.yaml"},
-			keptHas:       map[string]string{"airflow_settings.yaml": "pool_name: heavy"},
-			notes: []string{
-				"kept for its pool `heavy`",
-				"`astro local start` does not create pools",
-			},
+			airflow:     "2",
+			manifestHas: []string{"[tool.astro.pools]", "heavy = {slots = 5}"},
+			retired:     []string{"airflow_settings.yaml"},
 		},
 		{
 			// What `astro dev init` actually left behind: a project config, a

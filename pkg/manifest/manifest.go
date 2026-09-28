@@ -133,6 +133,9 @@ type Astro struct {
 	// Env is the decoded [tool.astro.env] section, untyped: its schema
 	// belongs to pkg/envschema, which this package must not import.
 	Env map[string]any
+	// Pools is [tool.astro.pools], the Airflow pools a local start creates or
+	// updates, by name. See pools.go.
+	Pools map[string]Pool
 	// Dockerfile is [tool.astro] dockerfile, a slash-separated project-relative
 	// path (shape-validated only — see validate) to the
 	// project's own Dockerfile — "tier 3" in the project design, the escape
@@ -317,6 +320,7 @@ const (
 	CodeRequired            ProblemCode = "required"
 	CodeExpectedString      ProblemCode = "expected_string"
 	CodeExpectedBool        ProblemCode = "expected_bool"
+	CodeExpectedInteger     ProblemCode = "expected_integer"
 	CodeExpectedTable       ProblemCode = "expected_table"
 	CodeExpectedStringArray ProblemCode = "expected_string_array"
 	CodeEmptyString         ProblemCode = "empty_string"
@@ -414,6 +418,13 @@ const (
 	//nolint:gosec // G101: as above, a rule identifier
 	CodeAuthNeedsCredentials ProblemCode = "auth_needs_credentials"
 	CodeAuthTooManyPairs     ProblemCode = "auth_too_many_pairs"
+
+	// [tool.astro.pools].
+	CodePoolNameInvalid  ProblemCode = "pool_name_invalid"
+	CodePoolSlotsInvalid ProblemCode = "pool_slots_invalid"
+	// CodeDefaultPoolDescription is a description on default_pool, which
+	// Airflow 3 refuses to change.
+	CodeDefaultPoolDescription ProblemCode = "default_pool_description"
 )
 
 // problemCodes is every code above, in declaration order — the closed set, in
@@ -421,7 +432,7 @@ const (
 // values, identifier spelling, each one reachable from some manifest) read it
 // instead of keeping a second copy that a new code could be left out of.
 var problemCodes = []ProblemCode{
-	CodeRequired, CodeExpectedString, CodeExpectedBool, CodeExpectedTable,
+	CodeRequired, CodeExpectedString, CodeExpectedBool, CodeExpectedInteger, CodeExpectedTable,
 	CodeExpectedStringArray, CodeEmptyString, CodeUnknownKey,
 
 	CodeProjectNameInvalid,
@@ -447,6 +458,8 @@ var problemCodes = []ProblemCode{
 	CodeAuthFieldNotForMethod, CodeAuthFieldRequired, CodeAuthEnvNameInvalid,
 	CodeAuthCommandEmpty, CodeAuthPairIncomplete, CodeAuthNeedsCredentials,
 	CodeAuthTooManyPairs,
+
+	CodePoolNameInvalid, CodePoolSlotsInvalid, CodeDefaultPoolDescription,
 }
 
 // Problem is one validation finding, addressed by the dotted TOML key it
@@ -625,7 +638,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "deployments", "dockerfile", "domain", "env", "packages", "runtime", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "deployments", "dockerfile", "domain", "env", "packages", "pools", "runtime", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
@@ -700,6 +713,7 @@ func (p *parser) astro(raw map[string]any) Astro {
 		Target:    p.defaultTarget(raw["target"]),
 		Targets:   p.targets(raw["targets"]),
 		Env:       p.table(astroRoot+".env", raw["env"]),
+		Pools:     p.pools(raw["pools"]),
 		// Trimmed at DECODE, not just in validate, because the stored value is
 		// what consumers branch on. `dockerfile = " "` is non-empty to a
 		// `declared != ""` test and names no file, so leaving it untrimmed here

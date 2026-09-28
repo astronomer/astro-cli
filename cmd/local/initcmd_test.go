@@ -155,9 +155,8 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	// rather than the files themselves — listing a carried file would be
 	// telling the user to redo work init just did.
 	//
-	// airflow_settings.yaml is here for its POOLS, the one thing in it that
-	// cannot move: neither tool stores them, so they stay in the file and the
-	// file stays. Its connections and Variables no longer appear.
+	// airflow_settings.yaml is here for its pools, which move into
+	// [tool.astro.pools], so the file goes and nothing about it is left to do.
 	for name, body := range map[string]string{
 		"requirements.txt":      "flask==2.0\n",
 		"airflow_settings.yaml": "airflow:\n  pools:\n    - pool_name: heavy\n      pool_slot: 4\n",
@@ -175,8 +174,11 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	if !found {
 		t.Fatalf("no hand-off list:\n%s", out)
 	}
-	if !strings.Contains(handoff, "heavy") {
-		t.Errorf("the pool that stays behind was not named:\n%s", out)
+	if strings.Contains(handoff, "heavy") || strings.Contains(handoff, "airflow_settings.yaml") {
+		t.Errorf("the carried pool is still left to do:\n%s", out)
+	}
+	if !strings.Contains(out, "migrated 1 pool from airflow_settings.yaml into [tool.astro.pools]") {
+		t.Errorf("the run did not say the pool moved:\n%s", out)
 	}
 	// And not the old instruction to move the whole file by hand, which now
 	// contradicts the same run's report of what it carried.

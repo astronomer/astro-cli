@@ -13,8 +13,8 @@ import (
 // Delete is produced by planRetirements, for the v1 files whose entire contents
 // reached the manifest, or for airflow_settings.yaml the manifest and the
 // vault. That file is kept by an explicit rule, not by whether some note
-// happens to mention it, whenever it names pools, which neither tool stores,
-// or holds a value the vault did not take: see carriedSettings.retirable.
+// happens to mention it, whenever it holds a value the vault did not take or a
+// pool the manifest could not carry: see carriedSettings.retirable.
 type Kind string
 
 const (

@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -13,6 +14,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -47,12 +50,12 @@ const SettingsRelPath = "airflow_settings.yaml"
 // guessed at from its name, so the declaration says where the value lives and
 // a later `set --secret=false` cannot move it into a plain file.
 //
-// # Pools do not move
+// # Pools go to [tool.astro.pools]
 //
-// Neither tool persists pools — v2 has nowhere to put them, v1 only replayed
-// them into a running Airflow, and `astro local start` does not read this file
-// — so they are reported and the file is kept for them. A file with no pools
-// is retired once everything else in it is carried.
+// A pool holds no secret, so it goes into the manifest as written: its name,
+// its slots and its description. `astro local start` creates or updates each
+// one, which is what v1 did with this file on every start. A file whose pools
+// and values are all carried is retired.
 
 // carriedSettings is what airflow_settings.yaml yielded.
 //
@@ -67,8 +70,11 @@ type carriedSettings struct {
 	// in a Change, so nothing that previews or serializes a changeset can carry
 	// a credential.
 	secrets []SecretWrite
-	// pools names the pools found, so the note can say which ones stay behind.
-	pools []string
+	// pools is what goes to [tool.astro.pools]. It is read apart from the rest
+	// of the file, both ways: a pool declares nothing in [tool.astro.env], so
+	// the all-or-nothing reason above does not reach it, and a pool that
+	// cannot be carried does not stop the connections and variables.
+	pools carriedPools
 	// held names the carried values the vault already holds. Apply does not
 	// write over them, so the file stays as the only copy of its own values.
 	held []string
@@ -77,6 +83,15 @@ type carriedSettings struct {
 	unstored bool
 
 	blockers   []string
+	advisories []string
+}
+
+// carriedPools is what the file's pools yielded.
+type carriedPools struct {
+	byName map[string]manifest.Pool
+	// notes name each entry that was not carried. They keep the file, as the
+	// only record of that entry.
+	notes      []string
 	advisories []string
 }
 
@@ -147,21 +162,80 @@ func readAirflowSettings(data []byte) carriedSettings {
 	}}
 	out.readConnections(doc.Airflow.Connections)
 	out.readVariables(doc.Airflow.Variables)
-	for i := range doc.Airflow.Pools {
-		p := &doc.Airflow.Pools[i]
-		switch {
-		case strings.TrimSpace(p.Name) != "":
-			out.pools = append(out.pools, p.Name)
-		case !blankPool(p):
-			out.blockers = append(out.blockers, SettingsRelPath+": pool "+strconv.Itoa(i+1)+
-				" has no pool_name. Add one, or delete the entry")
-		}
-	}
+	out.pools = readPools(doc.Airflow.Pools)
 
 	if len(out.blockers) > 0 {
 		return carriedSettings{blockers: out.blockers, pools: out.pools}
 	}
 	return out
+}
+
+// readPools carries each pool Airflow can take. v1 skipped a pool it could not
+// create, with a line saying so; here the entry is named in a note instead,
+// and the file stays.
+func readPools(pools []settingsPool) carriedPools {
+	var c carriedPools
+	for i := range pools {
+		p := &pools[i]
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			if !blankPool(p) {
+				c.notes = append(c.notes, SettingsRelPath+": pool "+strconv.Itoa(i+1)+
+					" has no pool_name. Add one, or delete the entry")
+			}
+			continue
+		}
+		if _, dup := c.byName[name]; dup {
+			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" is listed twice, and only the first was carried. Delete one entry")
+			continue
+		}
+		if reason := manifest.PoolNameProblem(name); reason != "" {
+			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" cannot be carried: "+reason)
+			continue
+		}
+		slots, err := poolSlot(p.Slot)
+		if err != nil {
+			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" cannot be carried. "+err.Error())
+			continue
+		}
+		pool := manifest.Pool{Slots: slots, Description: strings.TrimSpace(p.Description)}
+		if name == manifest.DefaultPoolName && pool.Description != "" {
+			// Airflow 3 refuses to change default_pool's description, so the
+			// manifest refuses to state one. Its slots are what matter.
+			pool.Description = ""
+			c.advisories = append(c.advisories, SettingsRelPath+": carried default_pool's slots and not its description, "+
+				"which Airflow does not let a caller change")
+		}
+		if c.byName == nil {
+			c.byName = map[string]manifest.Pool{}
+		}
+		c.byName[name] = pool
+	}
+	return c
+}
+
+// poolSlot accepts what v1 accepted, an integer or a string holding one, and
+// what Airflow accepts: a number above zero, or -1 for no limit.
+func poolSlot(v any) (int, error) {
+	var n int
+	switch s := v.(type) {
+	case nil:
+		return 0, errors.New("pool_slot is missing")
+	case int:
+		n = s
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(s))
+		if err != nil {
+			return 0, fmt.Errorf("pool_slot %q is not a number", s)
+		}
+		n = parsed
+	default:
+		return 0, fmt.Errorf("pool_slot must be a whole number, not %v", v)
+	}
+	if !manifest.ValidPoolSlots(n) {
+		return 0, fmt.Errorf("pool_slot %d is not a slot count: use a number above zero, or -1 for no limit", n)
+	}
+	return n, nil
 }
 
 func (c *carriedSettings) readConnections(conns []settingsConn) {
@@ -476,32 +550,34 @@ func (c *carriedSettings) declares() bool {
 	return len(c.schema.AirflowVariables)+len(c.schema.Connections) > 0
 }
 
-// notes is what stays behind: the pools, which have nowhere to go, and so the
-// reason the file is kept rather than retired.
-func (c *carriedSettings) notes() []string {
-	if len(c.pools) == 0 {
-		return nil
-	}
-	return []string{SettingsRelPath + ": kept for its " + c.poolList() +
-		". `astro local start` does not create pools, and neither pyproject.toml nor the vault stores them, so create them in Airflow"}
-}
-
-// poolList names the pools as prose: "pool `heavy`", "pools `default` and `heavy`".
-func (c *carriedSettings) poolList() string {
-	quoted := make([]string, len(c.pools))
-	for i, p := range c.pools {
-		quoted[i] = "`" + p + "`"
-	}
-	if len(quoted) == 1 {
-		return "pool " + quoted[0]
-	}
-	return "pools " + joinNames(quoted)
-}
-
 // retirable reports that the conversion leaves nothing behind in the file: it
-// was carried, it names no pools, and every value in it reaches the vault.
+// was carried, every value in it reaches the vault, and every pool reaches the
+// manifest.
 func (c *carriedSettings) retirable() bool {
-	return c.schema != nil && len(c.pools) == 0 && len(c.held) == 0 && !c.unstored
+	return c.schema != nil && len(c.pools.notes) == 0 && len(c.held) == 0 && !c.unstored
+}
+
+// setPools writes the carried pools into [tool.astro.pools].
+func setPools(ed tomledit.Editor, pools map[string]manifest.Pool) error {
+	for _, name := range slices.Sorted(maps.Keys(pools)) {
+		table := map[string]any{"slots": pools[name].Slots}
+		if d := pools[name].Description; d != "" {
+			table["description"] = d
+		}
+		if err := ed.Set([]string{"tool", "astro", "pools", name}, table); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// poolsLabel is the manifest line saying the pools moved, or "" when there
+// were none.
+func poolsLabel(pools map[string]manifest.Pool) string {
+	if len(pools) == 0 {
+		return ""
+	}
+	return manifest.Marker + " (migrated " + plural(len(pools), "pool", "pools") + " from " + SettingsRelPath + " into [tool.astro.pools])"
 }
 
 // keptFor says why a carried file stays, for the advisory that says its
@@ -510,8 +586,8 @@ func (c *carriedSettings) keptFor() string {
 	switch {
 	case c.retirable():
 		return ""
-	case len(c.pools) > 0:
-		return "for its " + c.poolList() + ", which neither pyproject.toml nor the vault stores"
+	case len(c.pools.notes) > 0:
+		return "for a pool entry that could not be carried"
 	case len(c.held) > 0:
 		return "because the vault already held " + joinNames(c.held) + ", so the file's value was not carried over it"
 	}

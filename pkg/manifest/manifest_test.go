@@ -982,6 +982,66 @@ deployment = "dep-xyz"
 		wantKeys:  []string{"tool.astro.deployments.prod.url"},
 		wantCodes: []ProblemCode{CodeURLNoHost},
 	},
+	{
+		name:      "a pool with no slots",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { description = 'ETL loads' }\n",
+		wantKeys:  []string{"tool.astro.pools.etl.slots"},
+		wantCodes: []ProblemCode{CodeRequired},
+	},
+	{
+		name:      "a pool whose slots are not a whole number",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = '4' }\n",
+		wantKeys:  []string{"tool.astro.pools.etl.slots"},
+		wantCodes: []ProblemCode{CodeExpectedInteger},
+	},
+	{
+		name:      "a pool with zero slots",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = 0 }\n",
+		wantKeys:  []string{"tool.astro.pools.etl.slots"},
+		wantCodes: []ProblemCode{CodePoolSlotsInvalid},
+	},
+	{
+		name:      "a pool with slots below -1",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = -2 }\n",
+		wantKeys:  []string{"tool.astro.pools.etl.slots"},
+		wantCodes: []ProblemCode{CodePoolSlotsInvalid},
+	},
+	{
+		name:      "a pool with a key Airflow has no field for",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = 4, open_slots = 2 }\n",
+		wantKeys:  []string{"tool.astro.pools.etl.open_slots"},
+		wantCodes: []ProblemCode{CodeUnknownKey},
+	},
+	{
+		name:      "a pool include_deferred that is not a boolean",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = 4, include_deferred = 'yes' }\n",
+		wantKeys:  []string{"tool.astro.pools.etl.include_deferred"},
+		wantCodes: []ProblemCode{CodeExpectedBool},
+	},
+	{
+		name:      "a pool that is not a table",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = 4\n",
+		wantKeys:  []string{"tool.astro.pools.etl"},
+		wantCodes: []ProblemCode{CodeExpectedTable},
+	},
+	{
+		name:      "a pool name with a slash",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\n'etl/eu' = { slots = 4 }\n",
+		wantKeys:  []string{"tool.astro.pools.etl/eu"},
+		wantCodes: []ProblemCode{CodePoolNameInvalid},
+	},
+	{
+		name:      "a blank pool name",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\n' ' = { slots = 4 }\n",
+		wantKeys:  []string{"tool.astro.pools. "},
+		wantCodes: []ProblemCode{CodePoolNameInvalid},
+	},
+	{
+		name:      "a description on default_pool",
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\ndefault_pool = { slots = 64, description = 'mine' }\n",
+		wantKeys:  []string{"tool.astro.pools.default_pool.description"},
+		wantCodes: []ProblemCode{CodeDefaultPoolDescription},
+	},
 }
 
 func TestValidation(t *testing.T) {

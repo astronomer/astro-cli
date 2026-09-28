@@ -74,7 +74,7 @@ const settingsWithEverything = `airflow:
 `
 
 // The whole of it: a connection and a Variable go to the vault, the manifest
-// declares both without their values, and the pool keeps the file alive.
+// declares both without their values and holds the pool, and the file goes.
 func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 	dir := v1WithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
@@ -108,9 +108,8 @@ func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 	require.Contains(t, string(manifest), "batch_size = {sensitive = true}")
 	require.NotContains(t, string(manifest), "'50'")
 
-	// The file is kept, and the note says why.
-	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.True(t, anyContains(cs.Notes, "heavy"), "no note named the pool that stays behind: %v", cs.Notes)
+	require.Contains(t, string(manifest), "[tool.astro.pools]\nheavy = {slots = 4}")
+	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
 }
 
 // A conn_uri is stored as the JSON the codec produces, not as written. The
@@ -207,9 +206,9 @@ func TestNoWriterLeavesTheValuesInTheFileAndSaysSo(t *testing.T) {
 		"nothing said the credentials were not moved: %v", res.Notes)
 }
 
-// With no writer, a file with no pools still stays: the values in it went
-// nowhere else, so it is their only copy. The note names both commands.
-func TestNoWriterKeepsAFileWithNoPools(t *testing.T) {
+// With no writer the file stays: the values in it went nowhere else, so it is
+// their only copy. The note names both commands.
+func TestNoWriterKeepsTheFile(t *testing.T) {
 	dir := v1WithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
@@ -371,9 +370,9 @@ func TestAValueAlreadyInTheVaultIsNotOverwritten(t *testing.T) {
 }
 
 // The file's value for a name the vault already held was not carried, so the
-// file is its only copy and stays, even with no pools to keep it.
+// file is its only copy and stays.
 func TestAFileWhoseValueTheVaultHeldIsKept(t *testing.T) {
-	dir := v1WithSettings(t, settingsNoPools)
+	dir := v1WithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	writer.held["API_TOKEN"] = "the-one-the-user-set"
 
@@ -396,7 +395,7 @@ func TestAFileWhoseValueTheVaultHeldIsKept(t *testing.T) {
 // arrives before Apply, the file would be the only copy of its value, so Apply
 // refuses before it stores or deletes anything.
 func TestAValueThatReachesTheVaultAfterPlanStopsTheRetirement(t *testing.T) {
-	dir := v1WithSettings(t, settingsNoPools)
+	dir := v1WithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -412,7 +411,7 @@ func TestAValueThatReachesTheVaultAfterPlanStopsTheRetirement(t *testing.T) {
 // A vault that cannot be asked keeps the file. Plan does not fail over it:
 // Apply asks the same question and fails there.
 func TestAVaultThatCannotBeAskedKeepsTheFile(t *testing.T) {
-	dir := v1WithSettings(t, settingsNoPools)
+	dir := v1WithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	writer.hasErr = errors.New("keyring locked")
 
@@ -502,9 +501,9 @@ func TestTwoConnectionsThatDifferOnlyInCaseAreRefused(t *testing.T) {
 		"the collision was not named: %v", res.Notes)
 }
 
-// settingsNoPools is the shape a real project has: connections and Variables
-// holding tokens, and no pools.
-const settingsNoPools = `airflow:
+// settingsValuesOnly is the shape a real project has: connections and Variables
+// holding tokens.
+const settingsValuesOnly = `airflow:
   connections:
     - conn_id: warehouse
       conn_type: snowflake
@@ -514,11 +513,11 @@ const settingsNoPools = `airflow:
       variable_value: tok-123
 `
 
-// With no pools and every value in the vault, nothing in the file stays
-// behind, so it is retired like any other carried v1 file. No note keeps it
-// and no advisory says it still holds plaintext.
-func TestASettingsFileWithNoPoolsIsRetired(t *testing.T) {
-	dir := v1WithSettings(t, settingsNoPools)
+// With every value in the vault, nothing in the file stays behind, so it is
+// retired like any other carried v1 file. No note keeps it and no advisory
+// says it still holds plaintext.
+func TestASettingsFileWhoseValuesReachTheVaultIsRetired(t *testing.T) {
+	dir := v1WithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -698,7 +697,9 @@ func findAdvisory(t *testing.T, advisories []string, substr string) string {
 
 func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
 	dir := v1WithSettings(t, settingsWithEverything)
-	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	writer := newRecordingWriter()
+	writer.held["batch_size"] = "set-by-hand"
+	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
 
 	// One advisory, compared whole: it names the file, names the connection left
@@ -706,7 +707,7 @@ func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
 	got := findAdvisory(t, cs.Advisories, "plaintext")
 	require.Equal(t,
 		SettingsRelPath+" still contains batch_size and warehouse in plaintext, and is kept "+
-			"for its pool `heavy`, which neither pyproject.toml nor the vault stores",
+			"because the vault already held batch_size, so the file's value was not carried over it",
 		got)
 
 	// It does NOT instruct a deletion. Apply may decline to overwrite a name
@@ -722,7 +723,7 @@ func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
 		"the advisory must survive Apply unchanged")
 
 	// The claim has to stay true: the file must actually still be there, since
-	// it is the only surviving record of any pools it carried. Deleted holds
+	// it is the only surviving record of the value the vault kept. Deleted holds
 	// decorated labels, not bare paths, so an equality check against the path
 	// would pass whatever happened — use the substring helper.
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
@@ -741,20 +742,14 @@ func TestThePlaintextAdvisoryNamesEveryConnection(t *testing.T) {
     - conn_id: billing
       conn_type: mysql
       conn_host: billing.example.com
-  pools:
-    - pool_name: heavy
-      pool_slot: 4
-    - pool_name: default_pool
-      pool_slot: 128
 `)
-	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
+	writer := newRecordingWriter()
+	writer.held["warehouse"] = "set-by-hand"
+	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
 
 	got := findAdvisory(t, cs.Advisories, "plaintext")
 	require.Contains(t, got, "billing and warehouse")
-	require.Contains(t, got, "for its pools `default_pool` and `heavy`")
-	require.Contains(t, cs.Notes, SettingsRelPath+": kept for its pools `default_pool` and `heavy`. "+
-		"`astro local start` does not create pools, and neither pyproject.toml nor the vault stores them, so create them in Airflow")
 }
 
 // A settings file with no connections has no carried value to describe, so the

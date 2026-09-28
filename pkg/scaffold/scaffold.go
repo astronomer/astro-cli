@@ -433,7 +433,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 			switch {
 			case len(cs.Secrets) > 0:
 				label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
-			case !v1.settings.declares():
+			case !v1.settings.declares() && len(v1.settings.pools.byName) == 0:
 				label = name + " (nothing to carry, removed)"
 			}
 		}
@@ -450,6 +450,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// the opposite KIND of statement: Notes is work outstanding, an advisory is
 	// a change already made.
 	cs.Advisories = append(cs.Advisories, v1.envSchema.advisories...)
+	cs.Advisories = append(cs.Advisories, v1.settings.pools.advisories...)
 
 	// The project said what it was called and this run did not use that. An
 	// advisory rather than a note for the usual reason: nothing is left to do,
@@ -531,12 +532,12 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 			continue
 		}
 		// airflow_settings.yaml is retired only when nothing in it stays
-		// behind: no pools, which neither tool stores, and no value the vault
-		// did not take.
+		// behind: no value the vault did not take and no pool the manifest
+		// could not carry.
 		//
 		// Explicit, and not left to the notes that mention those cases: this
 		// deletes files, a note is prose, and "is that string still in the
-		// list" is not what should stand between a project's pools and rm.
+		// list" is not what should stand between a project's values and rm.
 		if name == SettingsRelPath && !v1.settings.retirable() {
 			continue
 		}
@@ -610,6 +611,16 @@ func (v1 *v1Project) buildPython() string {
 		return ""
 	}
 	return v1.basePython
+}
+
+func setV1Declarations(ed tomledit.Editor, v1 *v1Project) error {
+	if err := setDockerfileDeclaration(ed, v1); err != nil {
+		return err
+	}
+	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
+		return err
+	}
+	return setPools(ed, v1.settings.pools.byName)
 }
 
 // setDockerfileDeclaration records the project's own Dockerfile in the manifest,
@@ -701,6 +712,7 @@ func migratedLabels(v1 *v1Project) []string {
 	if v1.envSchema.declares() {
 		out = append(out, manifest.Marker+" (migrated "+migratedFrom(v1)+" into [tool.astro.env])")
 	}
+	out = appendLabel(out, poolsLabel(v1.settings.pools.byName))
 
 	if v1.airflow != "" {
 		out = append(out, manifest.Marker+" (read Airflow "+v1.airflow+" from the Dockerfile)")
@@ -888,10 +900,7 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 			return nil, nil, err
 		}
 	}
-	if err := setDockerfileDeclaration(ed, v1); err != nil {
-		return nil, nil, err
-	}
-	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
+	if err := setV1Declarations(ed, v1); err != nil {
 		return nil, nil, err
 	}
 	data, err := ed.Bytes()

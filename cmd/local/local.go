@@ -239,6 +239,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
 		return err
 	}
+	c.applyPools(ctx, r, st, built.Pools)
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
@@ -556,6 +557,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
 		return err
 	}
+	c.applyPools(ctx, r, st, built.Pools)
 	return r.Emit(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})

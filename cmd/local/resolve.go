@@ -214,12 +214,17 @@ func (c *cli) machineInstance() (instances.Instance, error) {
 	if status.State != localrt.StateRunning {
 		return instances.Instance{}, errNoLocalAirflow
 	}
+	return localInstance(status), nil
+}
+
+// localInstance is the running Airflow a status describes.
+func localInstance(status localrt.Status) instances.Instance {
 	return instances.LocalInstance(instances.Local{
 		ProjectPath:  status.ProjectPath,
 		Port:         status.Port,
 		AirflowMajor: status.AirflowMajor,
 		Mode:         string(status.Mode),
-	}, instances.LocalName), nil
+	}, instances.LocalName)
 }
 
 // instanceDeps hands resolution what it needs from the process: the login and

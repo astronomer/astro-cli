@@ -77,6 +77,10 @@ type Built struct {
 	// load (manifest.Manifest.Warnings), carried out for the same reason as
 	// EnvWarnings.
 	ManifestWarnings []manifest.Problem
+	// Pools are the manifest's [tool.astro.pools], which a start creates or
+	// updates once Airflow answers. They are not part of the Plan: the
+	// runtime starts Airflow, and the pools go in over its API afterwards.
+	Pools map[string]manifest.Pool
 }
 
 // Build discovers the project containing workingDir, loads and validates its
@@ -119,6 +123,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		EnvWarnings:      resolved.warnings,
 		StartedWithout:   resolved.startedWithout,
 		ManifestWarnings: m.Warnings,
+		Pools:            m.Astro.Pools,
 		Plan: localrt.Plan{
 			ProjectPath:    proj.Dir,
 			Mode:           opts.Mode,
