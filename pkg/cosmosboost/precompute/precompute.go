@@ -45,6 +45,11 @@ type Options struct {
 	// SlimManifest also writes a slim, field-filtered copy of each discovered
 	// manifest.json (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
+
+	// ManifestName, when set, replaces manifest.json as the filename
+	// findManifests matches - for a manifest under a different name, or to
+	// pick one out of several valid manifests in the same directory.
+	ManifestName string
 }
 
 // Run finds every dbt project (a directory with dbt_project.yml) and standalone
@@ -79,7 +84,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 
 	manifests := map[string]bool{}
 	for _, root := range roots {
-		found, err := findManifests(root, projectDirs)
+		found, err := findManifests(root, projectDirs, opts.ManifestName)
 		if err != nil {
 			return Summary{}, fmt.Errorf("scanning %q for manifests: %w", root, err)
 		}
@@ -140,13 +145,16 @@ func processProject(dir, version string, opts Options) Result {
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
 
-	// A manifest.json in the project root is not a unit of its own - its .astro/
-	// is this project's, so it would collide with the sidecar written below - and
-	// findManifests skips it for that reason. Slim it here instead, leaving the
-	// project's own hash as the anchor the pointer hangs off.
+	// A manifest.json (or opts.ManifestName) in the project root is not a unit
+	// of its own - its .astro/ is this project's - so findManifests skips it.
+	// Slim it here instead, leaving the project's own hash as the anchor.
 	var filtered *FilteredManifest
 	if opts.SlimManifest {
-		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, manifestFile)); readErr == nil && isDbt {
+		name := manifestFile
+		if opts.ManifestName != "" {
+			name = opts.ManifestName
+		}
+		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, name)); readErr == nil && isDbt {
 			// Nothing mutates doc afterward here, unlike processManifest.
 			data, _ := json.Marshal(buildSlimManifest(doc, version))
 			if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {

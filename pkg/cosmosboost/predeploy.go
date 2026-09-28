@@ -28,6 +28,16 @@ func slimManifestEnabled() bool {
 	return value == "" || util.CheckEnvBool(value)
 }
 
+// manifestNameEnvVar names the filename discovery matches in place of
+// manifest.json (see precompute.Options.ManifestName).
+const manifestNameEnvVar = "ASTRO_COSMOS_BOOST_MANIFEST_NAME"
+
+// manifestNameOverride returns "" when unset, leaving manifest.json as the
+// only name discovery matches.
+func manifestNameOverride() string {
+	return strings.TrimSpace(os.Getenv(manifestNameEnvVar))
+}
+
 // PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
 // (dbt_project.yml) gets a .astro/dbt_metadata.json sidecar carrying its
 // content hash, which the Cosmos Boost plugin uses as a cache version key at
@@ -35,7 +45,10 @@ func slimManifestEnabled() bool {
 // manifest.json gets a hash sidecar too, plus a slim, field-filtered copy for
 // the plugin to load in place of the full manifest at DAG-parse time.
 func PreDeploy(path string) error {
-	opts := precompute.Options{SlimManifest: slimManifestEnabled()}
+	opts := precompute.Options{
+		SlimManifest: slimManifestEnabled(),
+		ManifestName: manifestNameOverride(),
+	}
 	summary, err := precompute.Run([]string{path}, version.CurrVersion, opts)
 	if err != nil {
 		return fmt.Errorf("running the Cosmos Boost pre-deploy step: %w", err)

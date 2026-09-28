@@ -126,6 +126,68 @@ func TestRunSkipsNonDBTManifest(t *testing.T) {
 	}
 }
 
+// TestRunHonorsManifestNameOverride: two valid dbt manifests share a
+// directory, neither named manifest.json. ManifestName picks up exactly the
+// one it names, leaving the other alone.
+func TestRunHonorsManifestNameOverride(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"manifests_per_schedule/manifest_global_daily_schedule.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.daily":{"name":"daily"}}}`,
+		"manifests_per_schedule/manifest_full.json":                  `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.full":{"name":"full"}}}`,
+	})
+	want := filepath.Join(root, "manifests_per_schedule", "manifest_full.json")
+
+	summary, err := Run([]string{root}, "test", Options{ManifestName: "manifest_full.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Path != want || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 result for manifest_full.json only, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "manifests_per_schedule", sidecarDir, sidecarName))
+}
+
+// TestRunManifestNameOverrideExcludesDefaultName: ManifestName replaces
+// manifest.json rather than adding to it - a manifest.json sitting alongside
+// the named file is left untouched.
+func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"shipped/manifest.json":      `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"shipped/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	want := filepath.Join(root, "shipped", "manifest_full.json")
+
+	summary, err := Run([]string{root}, "test", Options{ManifestName: "manifest_full.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Path != want {
+		t.Fatalf("want 1 result for manifest_full.json only, manifest.json must be ignored: %+v", summary.Results)
+	}
+}
+
+// TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered: a
+// ManifestName file in a project root is slimmed by processProject, not
+// discovered as its own unit (same as manifest.json there).
+func TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":    "name: shop\n",
+		"proj/models/a.sql":       "select 1",
+		"proj/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"]}}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestName: "manifest_full.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 project-only result, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, slimManifestName))
+}
+
 // TestRunWarnsOnTemplatedPackagesPath verifies a project whose packages-install-path
 // is a Jinja template still gets stamped, but the Result carries a non-fatal warning.
 func TestRunWarnsOnTemplatedPackagesPath(t *testing.T) {
