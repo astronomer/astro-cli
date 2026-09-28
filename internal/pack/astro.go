@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -90,13 +91,18 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 // checkSecrets runs before a build of the declared Dockerfile. It refuses a
 // build secret whose variable is unset, and warns about each secret the
 // Dockerfile mounts that no build secret supplies, returning those for a
-// failed build to name again. A generated build has nothing to check.
+// failed build to name again. It also warns about the per-machine files the
+// build context would carry into the image. A generated build has nothing to
+// check.
 func checkSecrets(req Request, cb localrt.Callbacks) (util.MissingSecrets, error) {
 	if req.Manifest.Astro.Dockerfile == "" {
 		return util.MissingSecrets{}, nil
 	}
 	missing, err := util.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
 	for _, w := range missing.Warnings() {
+		emit(cb, "warning: "+w)
+	}
+	if w := scaffold.LocalFilesWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" && err == nil {
 		emit(cb, "warning: "+w)
 	}
 	return missing, err
@@ -375,8 +381,8 @@ func (t *AstroTarget) save(ctx context.Context, image, path string, cb localrt.C
 //
 // NOT the build CONTEXT, which the Dockerfile can also COPY from, so this
 // address is incomplete and knowingly so. A first attempt hashed the whole
-// project directory and had to be withdrawn: `astro init` writes no
-// .dockerignore, standalone provisions <project>/.venv, and AIRFLOW_HOME is
+// project directory and had to be withdrawn: `astro init` wrote no
+// .dockerignore then, standalone provisions <project>/.venv, and AIRFLOW_HOME is
 // <project>/.astro/standalone — so the walk read a virtualenv full of
 // host-absolute symlinks, a .git directory full of timestamps, and a live SQLite
 // database. The tag then differed between a laptop and CI for a byte-identical

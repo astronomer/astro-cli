@@ -3,6 +3,7 @@ package deploy
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -164,4 +165,24 @@ func TestRunRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 	req.DagsOnly = true
 	_, err = Run(req, &fakeDeployer{})
 	require.NoError(t, err, "a dags-only deploy builds nothing")
+}
+
+// An image deploy from a declared Dockerfile warns about the per-machine files
+// its build context would carry into the pushed image, and still deploys.
+func TestRunWarnsAboutLocalFilesInTheContext(t *testing.T) {
+	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".venv"), 0o750))
+	var warnings []string
+	warn := func(s string) { warnings = append(warnings, s) }
+	d := &fakeDeployer{}
+	_, err := Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod", Warn: warn}, d)
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], ".venv. To keep them out, add it to .dockerignore")
+	assert.Equal(t, 1, d.imgDeploys)
+
+	warnings = nil
+	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod", DagsOnly: true, Warn: warn}, &fakeDeployer{})
+	require.NoError(t, err)
+	assert.Empty(t, warnings, "a dags-only deploy builds no image")
 }

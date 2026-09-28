@@ -241,3 +241,41 @@ func TestPackageChecksTheRuntimeBuild(t *testing.T) {
 		t.Errorf("calls = %v", rec.calls)
 	}
 }
+
+// A Docker-mode start and restart of a project with its own Dockerfile warn
+// about the per-machine files that build would copy into the image, and go on.
+// Standalone builds no image, so it says nothing.
+func TestStartWarnsAboutLocalFilesInTheImageInDockerModeOnly(t *testing.T) {
+	const warning = "warning: the image built from Dockerfile would copy in these per-machine files: " +
+		".astro/standalone. To keep them out, add it to .dockerignore"
+	for _, tc := range []struct {
+		name string
+		args []string
+		mode localrt.Mode
+		warn bool
+	}{
+		{name: "start", args: []string{"local", "start"}},
+		{name: "start --docker", args: []string{"local", "start", "--docker"}, warn: true},
+		{name: "restart standalone", args: []string{"local", "restart"}, mode: localrt.ModeStandalone},
+		{name: "restart docker", args: []string{"local", "restart"}, mode: localrt.ModeDocker, warn: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, stdout := testDeps(t)
+			started := false
+			d.Runtime = startRecorder{started: &started, mode: tc.mode}
+			wiringProject(t, &d, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
+			dir, _ := d.WorkingDir()
+			if err := os.MkdirAll(filepath.Join(dir, ".astro", "standalone"), 0o750); err != nil {
+				t.Fatal(err)
+			}
+
+			_ = execute(t, d, tc.args...)
+			if got := strings.Contains(stdout.String(), warning); got != tc.warn {
+				t.Errorf("warned = %v, want %v: %q", got, tc.warn, stdout.String())
+			}
+			if !started {
+				t.Error("the start did not reach the runtime")
+			}
+		})
+	}
+}

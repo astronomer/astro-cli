@@ -239,7 +239,9 @@ func Run(req Request, d Deployer) (Result, error) {
 // checkImageSource holds what an image deploy would build from to the Airflow
 // requirement, for a deploy that builds one from the manifest: a declared
 // Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
-// [tool.astro] runtime build (Request.CheckRuntime). A dags-only deploy and one
+// [tool.astro] runtime build (Request.CheckRuntime). It also warns about the
+// per-machine files a declared Dockerfile's build would copy into the image
+// (scaffold.LocalFilesWarning). A dags-only deploy and one
 // adopting a prebuilt --image-name build nothing from the manifest, and are not
 // held to it. It returns the build secrets the declared Dockerfile mounts and
 // nobody gave, for a failed build to name again.
@@ -263,6 +265,9 @@ func checkImageSource(req Request) (util.MissingSecrets, error) {
 		for _, w := range missing.Warnings() {
 			warn(w)
 		}
+	}
+	if w := scaffold.LocalFilesWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
+		warn(w)
 	}
 	airflow := req.Manifest.Airflow()
 	if airflow.Runtime == "" || req.CheckRuntime == nil {

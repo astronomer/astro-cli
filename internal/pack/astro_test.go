@@ -551,3 +551,25 @@ func TestAstroBuildRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 	require.ErrorContains(t, err, "reads the environment variable NETRC_CONTENT")
 	assert.Empty(t, builder.gotReq.Tag, "the build ran")
 }
+
+// A declared Dockerfile builds with the project as its context, so the
+// per-machine files a standalone run leaves there reach the artifact unless
+// .dockerignore leaves them out. The package says so, and still builds.
+func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nCOPY . .\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, ".astro", "standalone"), 0o750))
+	var lines []string
+	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
+	require.NoError(t, err)
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "warning: ")
+	assert.Contains(t, lines[0], ".astro/standalone")
+
+	lines = nil
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte(".astro/standalone/\n"), 0o600))
+	_, err = newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
+	require.NoError(t, err)
+	assert.Empty(t, lines)
+}

@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // Command-name and replacement strings that appear in more than one place
@@ -233,6 +234,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWithout(r, "started", built.StartedWithout)
+	warnLocalFilesInImage(r, built.Plan)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err
 	}
@@ -317,6 +319,18 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r Renderer, p localrt.Plan)
 		})
 	}
 	return err
+}
+
+// warnLocalFilesInImage warns, before a Docker-mode start builds the project's
+// own Dockerfile, about the per-machine files that build would copy into the
+// image (scaffold.LocalFilesWarning). Standalone builds no image.
+func warnLocalFilesInImage(r Renderer, p localrt.Plan) {
+	if p.Mode != localrt.ModeDocker {
+		return
+	}
+	if w := scaffold.LocalFilesWarning(p.ProjectPath, p.Dockerfile); w != "" {
+		emitWarning(r, event{Event: "warning", Text: w})
+	}
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a
@@ -573,6 +587,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWithout(r, "started", built.StartedWithout)
+	warnLocalFilesInImage(r, built.Plan)
 	// Before the stop, like the build: a refusal leaves Airflow running.
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err

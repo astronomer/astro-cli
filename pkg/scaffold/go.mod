@@ -10,6 +10,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/runtimeversions v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
+	github.com/moby/patternmatcher v0.6.1
 	github.com/stretchr/testify v1.11.1
 )
 

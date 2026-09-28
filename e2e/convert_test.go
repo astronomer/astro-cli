@@ -223,6 +223,24 @@ func v1Cases() []v1Case {
 			notes:       []string{"its RUN instructions were not read here"},
 		},
 		{
+			// A kept Dockerfile builds with the project as its context, so the
+			// .dockerignore v1 wrote keeps its lines and gains the per-machine
+			// paths it lacks.
+			name: "a kept Dockerfile beside a v1 .dockerignore",
+			files: map[string]string{
+				"Dockerfile":    runtime3 + "RUN echo hi\n",
+				".dockerignore": "astro\n.git\n.env\n.venv\n",
+			},
+			airflow:     "3.1",
+			manifestHas: []string{"dockerfile = 'Dockerfile'"},
+			kept:        []string{"Dockerfile", ".dockerignore"},
+			keptHas: map[string]string{
+				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Per-machine files Astro tools write into the project. Keep them out of the image.\n.astro/standalone/\n",
+			},
+			reportedUpdated: []string{".dockerignore (added the per-machine rules)"},
+			notes:           []string{"its RUN instructions were not read here"},
+		},
+		{
 			// Four kinds of line [project.dependencies] cannot express. Each
 			// gets a note naming the line and where it belongs, none is guessed
 			// at, and the file stays with those lines still in it.

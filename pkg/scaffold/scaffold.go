@@ -225,9 +225,10 @@ const fileExampleDag = dagsDir + "/exampledag.py"
 // never drift. gitignore.go uses these too — it arrived with its own
 // .gitignore and 0o644 constants, which is the drift this comment forbids.
 const (
-	fileGitignore = ".gitignore"
-	fileAgents    = "AGENTS.md"
-	fileClaude    = "CLAUDE.md"
+	fileGitignore    = ".gitignore"
+	fileDockerignore = ".dockerignore"
+	fileAgents       = "AGENTS.md"
+	fileClaude       = "CLAUDE.md"
 	// fileDockerfile is the one place a v1 layout can put a Dockerfile, so it
 	// is both the file the retirement decision is about and the value the
 	// manifest declaration carries. The literals in v1files.go are left alone
@@ -355,6 +356,9 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	}
 
 	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
+		return nil, err
+	}
+	if err := planKeptDockerfileIgnore(abs, v1, cs); err != nil {
 		return nil, err
 	}
 
