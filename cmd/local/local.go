@@ -215,6 +215,9 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
 	opts.BuildSecretFlags = buildSecretFlag
+	if opts.Mode != localrt.ModeDocker {
+		c.refreshAstroBuild(ctx, r, wd)
+	}
 	built, err := plan.Build(wd, opts)
 	if err != nil {
 		return c.reportBuildError(r, err)
@@ -540,6 +543,9 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	// Rebuild the plan from the manifest and env as they are now, so a
 	// restart picks up edits — but keep the running mode, port, and session
 	// tie. Build before stopping: a build failure leaves Airflow untouched.
+	if st.Mode != localrt.ModeDocker {
+		c.refreshAstroBuild(ctx, r, wd)
+	}
 	built, err := plan.Build(wd, plan.Options{
 		Mode:             st.Mode,
 		RequestedPort:    st.Port,

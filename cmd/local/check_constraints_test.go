@@ -52,6 +52,56 @@ func TestCheckVenvsCarryTheManifestsConstraints(t *testing.T) {
 	}
 }
 
+// A project held to Astronomer's build checks against it: the plain check gets
+// the index pages its sources name, since the scratch venv cannot read them. A
+// platform target runs Apache's Airflow, so the pins to the build are left out.
+func TestCheckVenvsFollowTheAstroBuild(t *testing.T) {
+	const pinned = "[project]\nname = 'demo'\nrequires-python = '>=3.12'\n" +
+		"dependencies = [\"apache-airflow==3.3.*\", \"apache-airflow-core\", \"apache-airflow-task-sdk\"]\n[tool.astro]\n\n" +
+		"[tool.uv]\nconstraint-dependencies = ['pandas<3', 'apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']\n\n" +
+		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n\n" +
+		"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\napache-airflow-task-sdk = { index = 'astronomer' }\n"
+	for _, tc := range []struct {
+		args        []string
+		constraints []string
+		findLinks   []string
+	}{
+		{
+			[]string{"local", "check"},
+			[]string{"apache-airflow-task-sdk==1.3.2+astro.1", "apache-airflow==3.3.2+astro.1", "pandas<3"},
+			[]string{
+				"https://pip.astronomer.io/v2/apache-airflow-core/",
+				"https://pip.astronomer.io/v2/apache-airflow-task-sdk/",
+				"https://pip.astronomer.io/v2/apache-airflow/",
+			},
+		},
+		{[]string{"local", "check", "--target", "composer"}, []string{"pandas<3"}, nil},
+	} {
+		t.Run(strings.Join(tc.args[1:], " "), func(t *testing.T) {
+			d, _ := targetDeps(t)
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(pinned), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			d.WorkingDir = func() (string, error) { return dir, nil }
+			d.Checks = stubParser{err: checks.ErrNoInterpreter}
+			var got checks.VenvSpec
+			d.Provisioner = func(context.Context) (checks.Provisioner, error) {
+				return &fakeProvisioner{python: "/tmp/venv/bin/python", got: &got}, nil
+			}
+			if err := execute(t, d, tc.args...); err != nil {
+				t.Fatalf("check: %v", err)
+			}
+			if got := slices.Sorted(slices.Values(got.Constraints)); !reflect.DeepEqual(got, tc.constraints) {
+				t.Errorf("constraints = %q, want %q", got, tc.constraints)
+			}
+			if got := slices.Sorted(slices.Values(got.FindLinks)); !reflect.DeepEqual(got, slices.Sorted(slices.Values(tc.findLinks))) {
+				t.Errorf("find-links = %q, want %q", got, tc.findLinks)
+			}
+		})
+	}
+}
+
 // And the provisioner hands them to uv as a constraints file, rather than
 // installing without them.
 func TestProvisionerInstallsUnderTheSpecsConstraints(t *testing.T) {

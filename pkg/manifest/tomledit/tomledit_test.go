@@ -357,6 +357,56 @@ func TestArrayAppendAndOutOfRange(t *testing.T) {
 	})
 }
 
+// An array of tables is started from nothing and extended, and Set fills
+// each new element by its index.
+func TestAppendArrayTable(t *testing.T) {
+	src := []byte("[tool.uv]\n# keep\nexclude-newer = \"1 week\"\n")
+	both(t, src, func(t *testing.T, e Editor) {
+		key := []string{"tool", "uv", "index"}
+		for i, name := range []string{"corp", "astronomer"} {
+			n, err := e.AppendArrayTable(key)
+			if err != nil || n != i {
+				t.Fatalf("AppendArrayTable() = %d, %v; want %d", n, err, i)
+			}
+			if err := e.Set(append(append([]string{}, key...), strconv.Itoa(n), "name"), name); err != nil {
+				t.Fatal(err)
+			}
+		}
+		out, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Tool struct {
+				UV struct {
+					ExcludeNewer string           `toml:"exclude-newer"`
+					Index        []map[string]any `toml:"index"`
+				} `toml:"uv"`
+			} `toml:"tool"`
+		}
+		if err := toml.Unmarshal(out, &doc); err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if len(doc.Tool.UV.Index) != 2 || doc.Tool.UV.Index[1]["name"] != "astronomer" || doc.Tool.UV.ExcludeNewer != "1 week" {
+			t.Errorf("document = %+v\n%s", doc, out)
+		}
+		if _, err := e.AppendArrayTable([]string{"tool", "uv", "exclude-newer"}); err == nil {
+			t.Error("AppendArrayTable over a string should fail")
+		}
+	})
+	e, err := NewSurgical(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.AppendArrayTable([]string{"tool", "uv", "index"}); err != nil {
+		t.Fatal(err)
+	}
+	out, _ := e.Bytes()
+	if want := string(src) + "\n[[tool.uv.index]]\n"; string(out) != want {
+		t.Errorf("surgical output = %q, want the source untouched and one header appended: %q", out, want)
+	}
+}
+
 func TestParseErrors(t *testing.T) {
 	bad := []byte("not = valid = toml\n")
 	for name, ctor := range map[string]func([]byte) (Editor, error){

@@ -7,6 +7,7 @@ package runtimecatalog
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -32,6 +33,20 @@ func Options(timeout time.Duration) runtimeversions.Options {
 		Timeout:   timeout,
 		UserAgent: "astro-cli/" + version.Current(),
 	}
+}
+
+// astroBuildTimeout bounds each request of an AstroBuild lookup. It runs
+// before every standalone start and after init, up to three requests in a
+// row, and a network that drops packets should cost seconds, not a minute:
+// offline, the start goes on with the manifest as it stands.
+const astroBuildTimeout = 4 * time.Second
+
+// AstroBuild looks up the Astronomer build of Airflow a deployment of this pin
+// and [tool.astro] runtime build runs, as of the UV_EXCLUDE_NEWER cutoff when
+// one is set, so the build agrees with everything else uv resolves then.
+func AstroBuild(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error) {
+	return runtimeversions.LookupAstroBuild(ctx, Options(astroBuildTimeout), airflowPin, runtime,
+		runtimeversions.ParseExcludeNewer(os.Getenv("UV_EXCLUDE_NEWER")))
 }
 
 // CheckRuntime checks a manifest's [tool.astro] runtime against its Airflow

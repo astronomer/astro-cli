@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -234,7 +235,33 @@ func tier(t *testing.T, n int) {
 	if got := maxTier(t); n > got {
 		t.Skipf("tier %d: this run stops at %d (raise it with ASTRO_E2E_MAX_TIER)", n, got)
 	}
+	declaredTiers.Store(t.Name(), n)
 }
+
+// declaredTiers is the tier each top-level test declared, for env to keep a
+// tier 0 case off the network: see astroIndex.
+var declaredTiers sync.Map
+
+// declaredTier is the tier t declared, or the nearest test above it did.
+func declaredTier(t *testing.T) int {
+	for name := t.Name(); ; {
+		if n, ok := declaredTiers.Load(name); ok {
+			return n.(int)
+		}
+		i := strings.LastIndex(name, "/")
+		if i < 0 {
+			return 0
+		}
+		name = name[:i]
+	}
+}
+
+// unreachableIndex stands in for Astronomer's package index in a tier 0 case.
+// `astro init` looks the Airflow build up there, and the hermetic tier must
+// neither reach the network nor write a manifest that depends on what it
+// found. Offline, init writes no build and says nothing: the start makes the
+// same lookup, and reports it.
+const unreachableIndex = "http://127.0.0.1:1/v2/"
 
 // project is one isolated place to run the CLI: a working directory, plus the
 // three levers that keep the run out of the developer's real state.
@@ -280,6 +307,15 @@ func (p *project) catalog() string {
 		return p.catalogURL
 	}
 	return unreachableCatalog
+}
+
+// astroIndex is the package index this project's commands read: the real one
+// from tier 1 up, where uv installs Airflow anyway, and none below.
+func (p *project) astroIndex() string {
+	if declaredTier(p.t) >= 1 {
+		return "https://pip.astronomer.io/v2/"
+	}
+	return unreachableIndex
 }
 
 // newProject returns an isolated project directory. Everything it creates is
@@ -451,6 +487,7 @@ func (p *project) env(extra map[string]string) []string {
 		// ASTRO_ is stripped above, so the catalog a command reads is set
 		// here, deliberately: see catalogURL.
 		"ASTRO_RUNTIME_VERSIONS_URL="+p.catalog(),
+		"ASTRO_AIRFLOW_INDEX_URL="+p.astroIndex(),
 	)
 	// See uvCache: shared on purpose. Only when there is a directory to name —
 	// an explicitly empty UV_CACHE_DIR is not the same as an unset one, and uv

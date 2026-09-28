@@ -91,14 +91,14 @@ func Load(ctx context.Context, o Options) (*Catalog, Source, error) {
 	url := URL()
 	path := cachePath(o.CacheDir, url)
 	if path != "" {
-		if data, err := readFresh(path); err == nil {
+		if data, err := readFresh(path, CacheTTL); err == nil {
 			if c, err := Parse(data); err == nil {
 				return c, SourceCache, nil
 			}
 		}
 	}
 
-	data, fetchErr := fetch(ctx, o, url)
+	data, fetchErr := fetch(ctx, o, url, "application/json")
 	if fetchErr == nil {
 		c, err := Parse(data)
 		if err == nil {
@@ -129,7 +129,7 @@ func URL() string {
 	return DefaultURL
 }
 
-func fetch(ctx context.Context, o Options, url string) ([]byte, error) {
+func fetch(ctx context.Context, o Options, url, accept string) ([]byte, error) {
 	timeout := o.Timeout
 	if timeout <= 0 {
 		timeout = DefaultTimeout
@@ -140,7 +140,7 @@ func fetch(ctx context.Context, o Options, url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", accept)
 	if o.UserAgent != "" {
 		req.Header.Set("User-Agent", o.UserAgent)
 	}
@@ -150,7 +150,7 @@ func fetch(ctx context.Context, o Options, url string) ([]byte, error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP %d", url, res.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTP %d", withoutUser(url), res.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(res.Body, maxBytes))
 }
@@ -180,14 +180,14 @@ func cachePath(cacheDir, url string) string {
 	return filepath.Join(cacheDir, "runtime-versions-"+hex.EncodeToString(sum[:])[:12]+".json")
 }
 
-// readFresh returns the cached bytes when they are younger than CacheTTL.
-func readFresh(path string) ([]byte, error) {
+// readFresh returns the cached bytes when they are younger than ttl.
+func readFresh(path string, ttl time.Duration) ([]byte, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
-	if time.Since(info.ModTime()) > CacheTTL {
-		return nil, errors.New("cached runtime versions are stale")
+	if time.Since(info.ModTime()) > ttl {
+		return nil, errors.New("the cached copy is stale")
 	}
 	return os.ReadFile(path)
 }

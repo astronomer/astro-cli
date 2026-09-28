@@ -20,6 +20,8 @@ import (
 const (
 	airflowDist     = "apache-airflow"
 	airflowCoreDist = "apache-airflow-core"
+	// taskSDKDist is not one of the two: it states no Airflow version.
+	taskSDKDist = "apache-airflow-task-sdk"
 )
 
 // Airflow is the Airflow a project runs, as its manifest states it.
@@ -90,12 +92,15 @@ func requirementFor(dist, version string) string {
 // WithoutAirflow returns deps without the requirements that state the Airflow
 // version (apache-airflow and apache-airflow-core), for a caller whose Airflow
 // comes from somewhere else: a runtime image, a managed platform, or a check
-// environment that installs the Airflow it is checking against. Every other
-// entry, the providers and the task SDK included, is kept in order.
+// environment that installs the Airflow it is checking against. A bare
+// apache-airflow-task-sdk goes too: it states no version, and is listed only
+// so [tool.uv.sources] can reach it, while the Airflow that comes from
+// elsewhere brings its own. Every other entry, the providers and a Task SDK
+// with a version included, is kept in order.
 func WithoutAirflow(deps []string) []string {
 	out := make([]string, 0, len(deps))
 	for _, d := range deps {
-		if !NamesAirflow(d) {
+		if !NamesAirflow(d) && (DistName(d) != taskSDKDist || statesVersion(d)) {
 			out = append(out, d)
 		}
 	}
@@ -121,6 +126,52 @@ func NamesAirflow(spec string) bool {
 		return true
 	}
 	return false
+}
+
+// AstroPin reports whether spec is a constraint holding apache-airflow,
+// apache-airflow-core or apache-airflow-task-sdk to one of Astronomer's builds,
+// a +astro.N local version: the pins `astro init` writes into [tool.uv]
+// constraint-dependencies so uv installs what a deployment runs.
+func AstroPin(spec string) bool {
+	switch DistName(spec) {
+	case airflowDist, airflowCoreDist, taskSDKDist:
+		return strings.Contains(spec, "+astro.")
+	}
+	return false
+}
+
+// WithoutAstroPins returns constraints without the AstroPin entries, for an
+// environment that runs Apache's own Airflow: MWAA's, or Composer's.
+func WithoutAstroPins(constraints []string) []string {
+	out := make([]string, 0, len(constraints))
+	for _, c := range constraints {
+		if !AstroPin(c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// CoreBesideAirflow reports whether spec is a bare apache-airflow-core, with no
+// version, in dependencies that also name apache-airflow. That entry states
+// no Airflow version: it lists the distribution so [tool.uv.sources] can point
+// it at Astronomer's index, which uv applies to direct dependencies only, and
+// the apache-airflow requirement beside it still states the version.
+func CoreBesideAirflow(spec string, deps []string) bool {
+	if DistName(spec) != airflowCoreDist || statesVersion(spec) {
+		return false
+	}
+	return slices.ContainsFunc(deps, func(d string) bool { return DistName(d) == airflowDist })
+}
+
+// statesVersion reports whether a requirement carries a version specifier or
+// a URL ahead of any environment marker.
+func statesVersion(spec string) bool {
+	head, _, _ := strings.Cut(spec, ";")
+	if i := strings.Index(head, "]"); i >= 0 {
+		head = head[i+1:]
+	}
+	return strings.ContainsAny(head, "<>=!~@")
 }
 
 // AirflowPin returns the version an Airflow requirement pins, when it carries a
@@ -222,7 +273,7 @@ func (p *parser) airflow(m *Manifest) {
 		unpinned bool
 	)
 	for i, spec := range m.Project.Dependencies {
-		if !NamesAirflow(spec) {
+		if !NamesAirflow(spec) || CoreBesideAirflow(spec, m.Project.Dependencies) {
 			continue
 		}
 		named++

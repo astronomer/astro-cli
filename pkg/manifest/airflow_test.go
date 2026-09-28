@@ -176,6 +176,7 @@ func TestWithoutAirflow(t *testing.T) {
 		"Apache_Airflow_Core[otel]==3.3.2 ; sys_platform == 'linux'",
 		"apache-airflow-providers-standard",
 		"apache-airflow-task-sdk>=1.1",
+		"apache-airflow-task-sdk",
 	})
 	want := []string{"pandas", "apache-airflow-providers-standard", "apache-airflow-task-sdk>=1.1"}
 	if !reflect.DeepEqual(got, want) {

@@ -88,6 +88,30 @@ type UV struct {
 	// ConstraintDependencies is [tool.uv] constraint-dependencies: version
 	// limits on packages the project may pull in, without requiring them.
 	ConstraintDependencies []string
+	// Environments is [tool.uv] environments: the platform markers uv
+	// resolves the lockfile for. Empty means every platform.
+	Environments []string
+	// Sources maps a package to the [[tool.uv.index]] URL its
+	// [tool.uv.sources] entry names, for the entries that name an index.
+	Sources map[string]string
+}
+
+// IndexPages are the per-package pages of the indexes Sources names, the
+// PEP 503 layout <index>/<package>/, for an install that happens outside the
+// project, where uv cannot read [tool.uv.sources]: a page lists one package's
+// files, so passing it as find-links scopes the index to that package the way
+// the source does.
+func (u UV) IndexPages() []string {
+	pkgs := make([]string, 0, len(u.Sources))
+	for pkg := range u.Sources {
+		pkgs = append(pkgs, pkg)
+	}
+	sort.Strings(pkgs)
+	pages := make([]string, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		pages = append(pages, strings.TrimSuffix(u.Sources[pkg], "/")+"/"+pkg+"/")
+	}
+	return pages
 }
 
 // Project is the standard [project] table, the fields astro cares about.
@@ -631,11 +655,40 @@ func onlyAirflowVersion(problems []Problem) bool {
 // uvTable reads the [tool.uv] fields astro uses, skipping any value that is not
 // the shape uv documents rather than reporting it: the table is uv's.
 func uvTable(t map[string]any) UV {
-	var out UV
-	list, _ := t["constraint-dependencies"].([]any)
+	out := UV{
+		ConstraintDependencies: stringList(t["constraint-dependencies"]),
+		Environments:           stringList(t["environments"]),
+	}
+	urls := map[string]string{}
+	indexes, _ := t["index"].([]any)
+	for _, raw := range indexes {
+		index, _ := raw.(map[string]any)
+		name, _ := index["name"].(string)
+		address, _ := index["url"].(string)
+		if name != "" && address != "" {
+			urls[name] = address
+		}
+	}
+	sources, _ := t["sources"].(map[string]any)
+	for pkg, raw := range sources {
+		source, _ := raw.(map[string]any)
+		name, _ := source["index"].(string)
+		if address, ok := urls[name]; ok {
+			if out.Sources == nil {
+				out.Sources = map[string]string{}
+			}
+			out.Sources[pkg] = address
+		}
+	}
+	return out
+}
+
+func stringList(v any) []string {
+	list, _ := v.([]any)
+	var out []string
 	for _, v := range list {
 		if s, ok := v.(string); ok {
-			out.ConstraintDependencies = append(out.ConstraintDependencies, s)
+			out = append(out, s)
 		}
 	}
 	return out

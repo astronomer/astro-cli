@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -1361,6 +1362,43 @@ func TestLoadReadsUVConstraintDependencies(t *testing.T) {
 	}
 	if want := []string{"sqlalchemy<2.1", "pandas<3"}; !reflect.DeepEqual(m.UV.ConstraintDependencies, want) {
 		t.Errorf("constraint-dependencies = %#v, want %#v", m.UV.ConstraintDependencies, want)
+	}
+}
+
+// A bare apache-airflow-core beside the apache-airflow requirement lists the
+// distribution for [tool.uv.sources]; it states no second version.
+func TestABareCoreBesideAirflowStatesNoVersion(t *testing.T) {
+	const head = "[project]\nname = \"etl\"\ndependencies = [%s]\n\n[tool.astro]\n"
+	for deps, wantErr := range map[string]bool{
+		`"apache-airflow==3.3.*", "apache-airflow-core", "apache-airflow-task-sdk"`: false,
+		`"apache-airflow==3.3.*", "apache-airflow-core==3.3.*"`:                     true,
+		`"apache-airflow-core"`: true,
+	} {
+		m, err := Load(write(t, fmt.Sprintf(head, deps)))
+		if (err != nil) != wantErr {
+			t.Errorf("dependencies [%s]: err = %v, want an error: %v", deps, err, wantErr)
+			continue
+		}
+		if err == nil && m.Airflow().Pin != "3.3" {
+			t.Errorf("dependencies [%s]: pin = %q, want 3.3", deps, m.Airflow().Pin)
+		}
+	}
+}
+
+func TestLoadReadsTheUVTablesAnAstroBuildWrites(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\n\n"+
+		"[tool.uv]\nexclude-newer = \"1 week\"\nenvironments = [\"sys_platform == 'linux'\"]\n\n"+
+		"[[tool.uv.index]]\nname = \"astronomer\"\nurl = \"https://pip.astronomer.io/v2/\"\nexplicit = true\n\n"+
+		"[[tool.uv.index]]\nname = \"nameless\"\n\n"+
+		"[tool.uv.sources]\napache-airflow = { index = \"astronomer\" }\nmylib = { path = \"../mylib\" }\nother = { index = \"unknown\" }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"sys_platform == 'linux'"}; !reflect.DeepEqual(m.UV.Environments, want) {
+		t.Errorf("Environments = %#v, want %#v", m.UV.Environments, want)
+	}
+	if want := []string{"https://pip.astronomer.io/v2/apache-airflow/"}; !reflect.DeepEqual(m.UV.IndexPages(), want) {
+		t.Errorf("IndexPages() = %#v, want only the source that names a known index: %#v", m.UV.IndexPages(), want)
 	}
 }
 

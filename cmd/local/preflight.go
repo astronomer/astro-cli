@@ -126,10 +126,11 @@ func (p *uvProvisioner) EnsureVenv(ctx context.Context, spec checks.VenvSpec, pr
 	if err := p.client.VenvAt(ctx, dir, spec.Python, uv.Stdio{}); err != nil {
 		return "", err
 	}
-	// No project directory, deliberately: this is a scratch environment in the
-	// cache, not a project, so uv should not pick up whatever [tool.uv] the
-	// caller happens to be sitting in. The project's own constraints arrive in
-	// the spec instead, written beside the venv for uv to read.
+	// Run from the scratch environment, not from the caller's directory: this
+	// is not a project, and uv run from inside one applies that project's
+	// [tool.uv], whose pins to Astronomer's build of Airflow would fight a
+	// platform target's own Airflow. The project's constraints arrive in the
+	// spec instead, written beside the venv for uv to read.
 	constraints := ""
 	if len(spec.Constraints) > 0 {
 		constraints = filepath.Join(dir, venvConstraints)
@@ -137,7 +138,7 @@ func (p *uvProvisioner) EnsureVenv(ctx context.Context, spec checks.VenvSpec, pr
 			return "", fmt.Errorf("writing the check environment's constraints: %w", err)
 		}
 	}
-	if err := p.client.PipInstall(ctx, "", python, spec.Reqs, constraints, uv.Stdio{}); err != nil {
+	if err := p.client.PipInstallFrom(ctx, dir, python, spec.Reqs, constraints, spec.FindLinks, uv.Stdio{}); err != nil {
 		return "", err
 	}
 	if err := os.WriteFile(marker, nil, markerPerms); err != nil {
@@ -370,7 +371,11 @@ func (p *uvProvisioner) ResolveConstraints(ctx context.Context, reqs []string, u
 	}
 
 	stdin := strings.NewReader(strings.Join(reqs, "\n") + "\n")
-	err = p.client.PipCompile(ctx, file.Name(), pythonVersion, uv.Stdio{In: stdin})
+	// From the cache, not the project, for the reason EnsureVenv gives.
+	if err := os.MkdirAll(p.cacheDir, cacheDirPerms); err != nil {
+		return fmt.Errorf("preparing the check-environment cache: %w", err)
+	}
+	err = p.client.PipCompileIn(ctx, p.cacheDir, file.Name(), pythonVersion, uv.Stdio{In: stdin})
 	if err == nil {
 		return nil
 	}

@@ -38,6 +38,11 @@ type Editor interface {
 	// table already there keeps its place, and so does a leading comment
 	// block. Later Sets fill the tables where they now are.
 	EnsureTablesAtTop(keys [][]string) error
+	// AppendArrayTable adds an empty element to the array of tables at key,
+	// creating the array when the document has none, and returns the new
+	// element's index for Set to fill: Set can extend an array of tables but
+	// cannot start one.
+	AppendArrayTable(key []string) (int, error)
 	// Delete removes the value at key — a scalar, a whole table, or an
 	// array element — and reports whether it was present.
 	Delete(key []string) bool

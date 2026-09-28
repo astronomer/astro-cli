@@ -222,6 +222,25 @@ func TestNewestRuntimeFor(t *testing.T) {
 	}
 }
 
+func TestAirflowFor(t *testing.T) {
+	c := loadFixture(t)
+	for _, tc := range []struct{ pin, runtime, want string }{
+		{"3.3", "", "3.3.2"},
+		{"3.2.0", "", "3.2.0"},
+		{"2.11", "", "2.11.2"},
+		{"3.3", "3.2-1", "3.2.0"},
+	} {
+		if got, ok := c.AirflowFor(tc.pin, tc.runtime); !ok || got != tc.want {
+			t.Errorf("AirflowFor(%q, %q) = %q, %v; want %q", tc.pin, tc.runtime, got, ok, tc.want)
+		}
+	}
+	for _, tc := range []struct{ pin, runtime string }{{"2.8", ""}, {"3.3", "3.9-1"}} {
+		if got, ok := c.AirflowFor(tc.pin, tc.runtime); ok {
+			t.Errorf("AirflowFor(%q, %q) = %q; want none", tc.pin, tc.runtime, got)
+		}
+	}
+}
+
 func TestRuntimeTagOrderIsNumeric(t *testing.T) {
 	c := parse(t, `{"runtimeVersionsV3": {
 		"3.3-8":  {"metadata": {"airflowVersion": "3.3.2", "channel": "stable"}},

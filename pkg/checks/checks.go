@@ -259,6 +259,9 @@ type ProvisionInput struct {
 	RequiresPython string
 	// Constraints is the manifest's [tool.uv] constraint-dependencies.
 	Constraints []string
+	// FindLinks is manifest.UV.IndexPages: where the constraints' Astronomer
+	// build of Airflow is found.
+	FindLinks []string
 }
 
 // RunProvisioned inspects a project's DAGs with an interpreter it builds, for
@@ -286,6 +289,7 @@ func RunProvisioned(ctx context.Context, opts Options, in ProvisionInput, prov P
 		Python:      in.RequiresPython,
 		Reqs:        projectRequirements(in.Pin, in.Deps),
 		Constraints: sortedCopy(in.Constraints),
+		FindLinks:   in.FindLinks,
 	}, progress)
 	if err != nil {
 		return Result{}, err

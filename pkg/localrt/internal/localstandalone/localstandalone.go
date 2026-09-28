@@ -92,6 +92,7 @@ type Engine struct {
 	kill      func(pid int, sig syscall.Signal) error
 	selfExe   func() (string, error)
 	goos      string
+	goarch    string
 	now       func() time.Time
 
 	healthTimeout time.Duration
@@ -132,6 +133,7 @@ func New(routesDir string, daemon rt.ProxyDaemon, uvOpts UVOptions) *Engine {
 		kill:          syscall.Kill,
 		selfExe:       os.Executable,
 		goos:          goruntime.GOOS,
+		goarch:        goruntime.GOARCH,
 		now:           time.Now,
 		healthTimeout: defaultHealthTimeout,
 		stopTimeout:   airflowrt.StopTimeout,
@@ -465,6 +467,9 @@ func (e *Engine) syncVenv(ctx context.Context, projectPath, python string, cb rt
 		if cb.OnLine != nil {
 			cb.OnLine(l)
 		}
+	}
+	if err := checkPlatform(projectPath, e.goos, e.goarch); err != nil {
+		return err
 	}
 	client, err := e.uv(ctx, emit)
 	if err != nil {

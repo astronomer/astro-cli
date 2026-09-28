@@ -91,6 +91,26 @@ func (r *rewrite) EnsureTablesAtTop(keys [][]string) error {
 	return nil
 }
 
+func (r *rewrite) AppendArrayTable(key []string) (int, error) {
+	if len(key) == 0 {
+		return 0, &KeyError{Key: key, Reason: "empty key"}
+	}
+	var elems []any
+	if v, ok := r.Get(key); ok {
+		existing, isArray := v.([]any)
+		if !isArray {
+			return 0, &KeyError{Key: key, Reason: "not an array of tables"}
+		}
+		elems = existing
+	}
+	elems = append(elems, map[string]any{})
+	deleteIn(r.root, key)
+	if _, err := setIn(r.root, key, key, elems); err != nil {
+		return 0, err
+	}
+	return len(elems) - 1, nil
+}
+
 func (r *rewrite) Delete(key []string) bool {
 	if len(key) == 0 {
 		return false

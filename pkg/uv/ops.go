@@ -78,6 +78,14 @@ var ErrRequirementLooksLikeFlag = errors.New("this requirement would be read as 
 // Unlike sync, this does not read the manifest's dependency list; reqs is
 // explicit, which is what makes it usable on an environment that already exists.
 func (c *Client) PipInstall(ctx context.Context, project, pythonBin string, reqs []string, constraint string, stdio Stdio) error {
+	return c.PipInstallFrom(ctx, project, pythonBin, reqs, constraint, nil, stdio)
+}
+
+// PipInstallFrom is PipInstall that also searches findLinks, pages of links
+// to distributions, beside the indexes. An environment built outside a
+// project cannot read the project's [tool.uv.sources], and a page per package
+// (manifest.UV.IndexPages) serves the same packages from the same index.
+func (c *Client) PipInstallFrom(ctx context.Context, project, pythonBin string, reqs []string, constraint string, findLinks []string, stdio Stdio) error {
 	for _, r := range reqs {
 		if strings.HasPrefix(r, "-") {
 			return fmt.Errorf("%w: %q", ErrRequirementLooksLikeFlag, r)
@@ -86,6 +94,9 @@ func (c *Client) PipInstall(ctx context.Context, project, pythonBin string, reqs
 	args := []string{"pip", "install", "--python", pythonBin}
 	if constraint != "" {
 		args = append(args, "--constraint", constraint)
+	}
+	for _, l := range findLinks {
+		args = append(args, "--find-links="+l)
 	}
 	args = append(args, reqs...)
 	return asResolution("pip install", c.fetch(ctx, project, stdio, args...))
@@ -99,6 +110,13 @@ func (c *Client) PipInstall(ctx context.Context, project, pythonBin string, reqs
 // faithfully. A conflict surfaces as *ResolutionError. It is how a caller asks
 // "does this dependency set solve under these constraints?" without an install.
 func (c *Client) PipCompile(ctx context.Context, constraint, pythonVersion string, stdio Stdio) error {
+	return c.PipCompileIn(ctx, "", constraint, pythonVersion, stdio)
+}
+
+// PipCompileIn is PipCompile run from dir. uv reads [tool.uv] from the
+// directory it runs in and those above it, so a resolve that is not the
+// project's own runs from somewhere else than the project.
+func (c *Client) PipCompileIn(ctx context.Context, dir, constraint, pythonVersion string, stdio Stdio) error {
 	args := []string{"pip", "compile", "-", "--no-header", "--no-annotate"}
 	if constraint != "" {
 		args = append(args, "--constraint", constraint)
@@ -106,7 +124,7 @@ func (c *Client) PipCompile(ctx context.Context, constraint, pythonVersion strin
 	if pythonVersion != "" {
 		args = append(args, "--python-version", pythonVersion)
 	}
-	return asResolution("pip compile", c.fetch(ctx, "", stdio, args...))
+	return asResolution("pip compile", c.fetch(ctx, dir, stdio, args...))
 }
 
 // Sync makes <project>/.venv match the project's lockfile, locking first

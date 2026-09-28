@@ -70,6 +70,10 @@ Layout:
 - ` + "`tests/`" + ` — tests; run them with ` + "`uv run pytest`" + `
 - ` + "`.venv/`" + ` — derived environment; never commit or edit it by hand
 
+Add a Python dependency with ` + "`uv add <package>`" + `: it writes the requirement,
+keeps the ` + "`[tool.uv]`" + ` pins that hold Airflow to the build a deployment runs,
+and installs the package, so a running standalone Airflow picks it up.
+
 ## Local Airflow
 
 Local Airflow lives under ` + "`astro local`" + `. It works offline, needs no

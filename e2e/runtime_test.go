@@ -507,6 +507,17 @@ func TestQueriesAgainstARunningAirflow(t *testing.T) {
 		}
 	})
 
+	// The Airflow a deployment runs is Astronomer's build, not PyPI's, and the
+	// two differ; standalone installs the same one.
+	t.Run("run imports Astronomer's build of Airflow", func(t *testing.T) {
+		p := parent.forT(t)
+		out := strings.TrimSpace(p.runSlow("local", "run", "python", "-c",
+			"import airflow; print(airflow.__version__)").requireSuccess().Stdout)
+		if !strings.Contains(out, "+astro.") {
+			t.Errorf("the project environment runs Airflow %q, want an Astronomer build", out)
+		}
+	})
+
 	// And reaches the Airflow that is running, which `airflow version` does
 	// not: that prints the installed package's version and talks to nothing.
 	// `dags list` reads the metadata database this start migrated.

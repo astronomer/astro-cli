@@ -80,6 +80,11 @@ type VenvSpec struct {
 	// applies to the project's own environment but cannot see from a scratch
 	// one.
 	Constraints []string
+	// FindLinks are the per-package index pages the project's
+	// [tool.uv.sources] name (manifest.UV.IndexPages), which the scratch
+	// environment cannot read from the project: the pages Astronomer's build
+	// of Airflow is found on.
+	FindLinks []string
 }
 
 // Provisioner builds and caches a scratch venv for a target, and resolves a

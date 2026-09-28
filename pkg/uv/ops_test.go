@@ -548,6 +548,22 @@ func TestPipInstallPassesInterpreterConstraintAndReqs(t *testing.T) {
 	}
 }
 
+func TestPipInstallFromSearchesTheFindLinks(t *testing.T) {
+	argsFile := filepath.Join(t.TempDir(), "args")
+	c := newTestClient(t, Options{}, "echo \"$@\" > \""+argsFile+"\"\nexit 0")
+
+	err := c.PipInstallFrom(t.Context(), "", "/p/bin/python", []string{"apache-airflow==3.3.*"}, "",
+		[]string{"https://pip.example/v2/apache-airflow/", "https://pip.example/v2/apache-airflow-core/"}, Stdio{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "--color never pip install --python /p/bin/python --find-links=https://pip.example/v2/apache-airflow/ " +
+		"--find-links=https://pip.example/v2/apache-airflow-core/ apache-airflow==3.3.*"
+	if got := readCount(t, argsFile); got != want {
+		t.Errorf("uv args = %q, want %q", got, want)
+	}
+}
+
 func TestPipInstallResolutionError(t *testing.T) {
 	c := newTestClient(t, Options{}, "cat \""+fixturePath(t)+"\" >&2\nexit 1")
 	err := c.PipInstall(t.Context(), "", "/p", []string{"pandas"}, "", Stdio{})

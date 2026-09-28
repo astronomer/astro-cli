@@ -124,6 +124,13 @@ type Deps struct {
 	// catalog through runtimecatalog.CheckRuntime, which never fails for want
 	// of it. A seam so a test never reaches the network; nil checks nothing.
 	RuntimeCheck func(ctx context.Context, runtime, airflowPin string) ([]runtimeversions.Finding, error)
+
+	// AstroBuild looks up the Astronomer build of Airflow a deployment of a
+	// pin and runtime build runs, which init writes into [tool.uv] and a
+	// start keeps current. Production reads the catalog and Astronomer's
+	// index through runtimecatalog.AstroBuild. A seam so a test never reaches
+	// the network; nil writes nothing.
+	AstroBuild func(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error)
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -172,6 +179,7 @@ func NewDeps() Deps {
 		Interactive:      stdinIsTerminal,
 		AirflowDefault:   catalogDefault,
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
+		AstroBuild:       runtimecatalog.AstroBuild,
 	}
 }
 

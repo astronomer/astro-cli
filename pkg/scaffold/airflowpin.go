@@ -334,9 +334,10 @@ func repinAirflowRequirements(ed tomledit.Editor, version string) (rewritten []s
 	if !ok {
 		return nil, false, nil
 	}
+	specs := asStrings(raw)
 	for i, d := range deps {
 		spec, ok := d.(string)
-		if !ok || !manifest.NamesAirflow(spec) {
+		if !ok || !manifest.NamesAirflow(spec) || manifest.CoreBesideAirflow(spec, specs) {
 			continue
 		}
 		// An entry that already says version is left as written, so a repeated

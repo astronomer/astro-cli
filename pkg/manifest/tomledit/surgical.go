@@ -102,6 +102,44 @@ func (s *surgical) EnsureTablesAtTop(keys [][]string) error {
 	return s.reparse(buf.Bytes())
 }
 
+func (s *surgical) AppendArrayTable(key []string) (int, error) {
+	if len(key) == 0 {
+		return 0, &KeyError{Key: key, Reason: "empty key"}
+	}
+	n := 0
+	if v, ok := s.doc.Get(key); ok {
+		elems, isArray := v.([]any)
+		if !isArray {
+			return 0, &KeyError{Key: key, Reason: "not an array of tables"}
+		}
+		n = len(elems)
+	}
+	header, err := headerKey(key)
+	if err != nil {
+		return 0, &KeyError{Key: key, Err: err}
+	}
+	// Appended at the end of the document, where an element of an array of
+	// tables may always go: its header names the array, wherever it stands.
+	data := s.doc.Bytes()
+	newline := eol(data)
+	var buf bytes.Buffer
+	buf.Write(data)
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		buf.Write(newline)
+	}
+	if len(data) > 0 && !blankLineBefore(buf.Bytes(), buf.Len()) {
+		buf.Write(newline)
+	}
+	buf.WriteString("[[" + header + "]]")
+	buf.Write(newline)
+	doc, err := edit.Parse(buf.Bytes())
+	if err != nil {
+		return 0, &KeyError{Key: key, Err: err}
+	}
+	s.doc = doc
+	return n, nil
+}
+
 func (s *surgical) Delete(key []string) bool {
 	return s.doc.Delete(key)
 }

@@ -456,8 +456,8 @@ const (
 //     uv "No solution found" that names neither the base image nor the
 //     manifest.
 //
-// Every other dependency — providers, the task SDK, pandas, and the rest —
-// installs normally.
+// A bare apache-airflow-task-sdk goes with them; one with a version, and every
+// other dependency — providers, pandas, and the rest — installs normally.
 func runtimeDeps(deps []string) []string {
 	return manifest.WithoutAirflow(deps)
 }

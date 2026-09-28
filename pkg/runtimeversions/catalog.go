@@ -5,7 +5,9 @@
 //
 // It owns fetching, caching and decoding, and the few questions its consumers
 // ask of it: which Airflow series a new project should start on, which Python
-// that series runs, and which runtime carries a given Airflow. astro init, the
+// that series runs, which runtime carries a given Airflow, and, from
+// Astronomer's package index beside the catalog, which build of that Airflow
+// the runtime installs (LookupAstroBuild). astro init, the
 // Airflow 2 image lookup in pkg/imagebuild and Astro Desktop's runtime poller
 // all read it through here, so there is one answer to each.
 //
@@ -212,6 +214,25 @@ func (c *Catalog) NewestRuntimeFor(airflowPin string) (string, bool) {
 		}
 	}
 	return best, best != ""
+}
+
+// AirflowFor is the exact Airflow a deployment of this project runs: the one
+// the runtime build carries when the manifest names one, and otherwise the one
+// the newest build of the pin carries, which is what the series image tag
+// resolves to.
+func (c *Catalog) AirflowFor(airflowPin, runtime string) (string, bool) {
+	tag := runtime
+	if tag == "" {
+		var ok bool
+		if tag, ok = c.NewestRuntimeFor(airflowPin); !ok {
+			return "", false
+		}
+	}
+	r, ok := c.runtimes[tag]
+	if !ok || r.AirflowVersion == "" {
+		return "", false
+	}
+	return r.AirflowVersion, true
 }
 
 // qualifies is the test of one build: stable, not yanked, released.

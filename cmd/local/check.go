@@ -191,7 +191,9 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 		DagsDir:     checks.DefaultDagsDir(project),
 		Pin:         m.Airflow().Pin,
 		Deps:        m.Project.Dependencies,
-		Constraints: m.UV.ConstraintDependencies,
+		// Without the pins to Astronomer's build of Airflow: a platform runs
+		// Apache's own, at its own version.
+		Constraints: manifest.WithoutAstroPins(m.UV.ConstraintDependencies),
 		Env:         env,
 	}, prov, c.d.CheckVenv, strict, progress)
 }
@@ -266,6 +268,7 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 		RequiresPython: cmp.Or(m.Project.RequiresPython,
 			airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin)),
 		Constraints: m.UV.ConstraintDependencies,
+		FindLinks:   m.UV.IndexPages(),
 	}, prov, c.d.CheckVenv, c.progressFn(r, nameCheck))
 	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {
 		// An operational failure of the parse itself is not an environment
