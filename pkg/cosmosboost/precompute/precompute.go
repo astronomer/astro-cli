@@ -156,27 +156,29 @@ func processProject(dir, root, version string, opts Options) Result {
 	if opts.SlimManifest {
 		name := effectiveManifestName(opts.ManifestNames, root, dir)
 		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, name)); readErr == nil && isDbt {
-			// Skip slimming (not the whole project) when another valid dbt
-			// manifest shares this directory: see hasSiblingDbtManifest.
-			ambiguous, sibErr := hasSiblingDbtManifest(dir, name)
-			if sibErr != nil {
-				r.Err = sibErr
-				r.Duration = time.Since(start)
-				return r
-			}
-			if ambiguous {
-				note := name + " not slimmed: another valid dbt manifest shares this directory"
-				if r.Warning != "" {
-					note = r.Warning + "; " + note
-				}
-				r.Warning = note
-			} else {
+			// A failed ambiguity check only skips slimming, not the whole
+			// project: unlike a writeSlimManifest failure below, it leaves no
+			// partial artifact, and the project's tree hash below doesn't
+			// depend on it either way.
+			note := ""
+			switch ambiguous, sibErr := hasSiblingDbtManifest(dir, name); {
+			case sibErr != nil:
+				note = name + " not slimmed: could not check for another manifest in this directory (" + sibErr.Error() + ")"
+			case ambiguous:
+				note = name + " not slimmed: another valid dbt manifest shares this directory"
+			default:
 				// Nothing mutates doc afterward here, unlike processManifest.
 				data, _ := json.Marshal(buildSlimManifest(doc, version))
 				if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
 					r.Duration = time.Since(start)
 					return r
 				}
+			}
+			if note != "" {
+				if r.Warning != "" {
+					note = r.Warning + "; " + note
+				}
+				r.Warning = note
 			}
 		}
 	}
@@ -196,9 +198,14 @@ func processManifest(path, version string, opts Options) Result {
 	doc, bytes, isDbt, err := readManifestDoc(path)
 	var hash string
 	var slimData []byte
-	var ambiguous bool
+	var skipNote string
 	if err == nil && isDbt {
-		if ambiguous, err = hasSiblingDbtManifest(filepath.Dir(path), filepath.Base(path)); err == nil && !ambiguous {
+		switch ambiguous, sibErr := hasSiblingDbtManifest(filepath.Dir(path), filepath.Base(path)); {
+		case sibErr != nil:
+			skipNote = "could not check for another manifest in this directory (" + sibErr.Error() + ")"
+		case ambiguous:
+			skipNote = "another valid dbt manifest shares this directory; skipped to avoid stamping the wrong one's cache"
+		default:
 			if opts.SlimManifest {
 				// Marshal before hashDocument mutates doc: the slim manifest shares
 				// doc's nested values, so only turning it into bytes here decouples
@@ -214,9 +221,9 @@ func processManifest(path, version string, opts Options) Result {
 		r.Err = err
 	case !isDbt:
 		r.Skipped = true
-	case ambiguous:
+	case skipNote != "":
 		r.Skipped = true
-		r.Warning = "another valid dbt manifest shares this directory; skipped to avoid stamping the wrong one's cache"
+		r.Warning = skipNote
 	default:
 		dir := filepath.Dir(path)
 		// The sidecar goes last: it carries the filtered_manifest pointer, so it

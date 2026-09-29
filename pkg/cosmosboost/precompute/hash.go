@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // excludedDirs are directory names skipped during *project* discovery
@@ -177,16 +178,17 @@ func stripEntityCreatedAt(doc map[string]any) {
 	}
 }
 
-// isDbtManifest reports whether doc looks like a dbt manifest. dbt always writes
-// metadata.dbt_schema_version, which unrelated manifest.json files (web app/PWA,
-// tooling, etc.) do not have — so we only stamp files that carry it.
+// isDbtManifest reports whether doc is a dbt manifest specifically - every
+// dbt artifact (run_results.json, catalog.json, ...) carries the same
+// metadata.dbt_schema_version, just under its own schema URL, so presence
+// alone would also match run_results.json, which target/ always has too.
 func isDbtManifest(doc map[string]any) bool {
 	meta, ok := doc["metadata"].(map[string]any)
 	if !ok {
 		return false
 	}
 	v, ok := meta["dbt_schema_version"].(string)
-	return ok && v != ""
+	return ok && strings.Contains(v, "/manifest/")
 }
 
 // readManifestDoc reads path and parses it as JSON. isDbt reports whether the
