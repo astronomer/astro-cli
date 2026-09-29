@@ -55,10 +55,7 @@ var manifestSkipDirs = map[string]bool{
 // effectiveManifestName resolves dir's override in overrides (keyed by its
 // path relative to root, "." for root itself), or manifestFile if none.
 func effectiveManifestName(overrides map[string]string, root, dir string) string {
-	rel, err := filepath.Rel(root, dir)
-	if err != nil {
-		return manifestFile
-	}
+	rel, _ := filepath.Rel(root, dir) // dir always descends from root; an error here can't match a real override key
 	if name, ok := overrides[filepath.ToSlash(rel)]; ok && name != "" {
 		return name
 	}
