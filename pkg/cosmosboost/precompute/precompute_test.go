@@ -149,6 +149,38 @@ func TestRunSkipsAmbiguousDirectoryEvenWithOverride(t *testing.T) {
 	}
 }
 
+// TestRunDoesNotFlagOtherDbtArtifactsAsAmbiguous: the ordinary case of a
+// compiled project - target/manifest.json sitting beside target/run_results.json
+// and target/catalog.json, which "dbt build" and "dbt docs generate" always
+// produce - must not trip hasSiblingDbtManifest. Regression test for a false
+// positive that would have silently disabled stamping for most real projects.
+func TestRunDoesNotFlagOtherDbtArtifactsAsAmbiguous(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":         "name: shop\n",
+		"proj/models/a.sql":            "select 1",
+		"proj/target/manifest.json":    `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/target/run_results.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/run-results/v6.json"}}`,
+		"proj/target/catalog.json":     `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/catalog/v1.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]int{}
+	for _, r := range summary.Results {
+		if r.Err != nil || r.Skipped {
+			t.Fatalf("unexpected non-success result: %+v", r)
+		}
+		kinds[r.Kind]++
+	}
+	if kinds["project"] != 1 || kinds["manifest"] != 1 {
+		t.Fatalf("want 1 project + 1 manifest, got %+v (%+v)", kinds, summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "proj", "target", sidecarDir, slimManifestName))
+}
+
 // TestRunManifestNameOverrideExcludesDefaultName: an override replaces
 // manifest.json rather than adding to it.
 func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {

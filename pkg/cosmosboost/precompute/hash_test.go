@@ -220,15 +220,19 @@ func TestHashManifestIgnoresVolatileMetadata(t *testing.T) {
 	}
 }
 
-// TestHashManifestSkipsNonDBT verifies that a manifest.json lacking the dbt shape
-// (e.g. a web-app/PWA manifest) or invalid JSON is not treated as a dbt manifest,
-// so it won't be stamped.
+// TestHashManifestSkipsNonDBT verifies that a manifest.json lacking the dbt
+// shape (e.g. a web-app/PWA manifest), invalid JSON, or another dbt artifact
+// entirely (run_results.json, catalog.json - both carry the same
+// metadata.dbt_schema_version field dbt manifests do) is not treated as a dbt
+// manifest, so it won't be stamped.
 func TestHashManifestSkipsNonDBT(t *testing.T) {
 	dir := t.TempDir()
 	cases := map[string]string{
-		"webapp.json":  `{"name":"My App","short_name":"App","icons":[]}`, // no metadata.dbt_schema_version
-		"nometa.json":  `{"nodes":{"model.x":{}}}`,                        // nodes but no metadata
-		"invalid.json": `{not json`,                                       // not JSON at all
+		"webapp.json":      `{"name":"My App","short_name":"App","icons":[]}`,                                                 // no metadata.dbt_schema_version
+		"nometa.json":      `{"nodes":{"model.x":{}}}`,                                                                        // nodes but no metadata
+		"invalid.json":     `{not json`,                                                                                       // not JSON at all
+		"run_results.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/run-results/v6.json"}}`,        // a dbt artifact, but not the manifest
+		"catalog.json":     `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/catalog/v1.json"},"nodes":{}}`, // ditto, and it even has "nodes"
 	}
 	for name, content := range cases {
 		p := filepath.Join(dir, name)
@@ -484,7 +488,7 @@ func TestHashManifestStableAcrossFullParses(t *testing.T) {
 func TestHashManifestKeepsUserMetaCreatedAt(t *testing.T) {
 	// The scalar top-level key pins that the created_at stripper tolerates
 	// non-collection values in the document root.
-	base := `{"metadata": {"dbt_schema_version": "v12"}, "unrelated_scalar": 7,
+	base := `{"metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json"}, "unrelated_scalar": 7,
   "nodes": {"model.shop.a": {"name": "a", "created_at": 1.0, "meta": {"created_at": "%s"}}}}`
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
