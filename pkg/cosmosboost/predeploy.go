@@ -2,9 +2,11 @@ package cosmosboost
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
@@ -28,14 +30,31 @@ func slimManifestEnabled() bool {
 	return value == "" || util.CheckEnvBool(value)
 }
 
-// manifestNameEnvVar names the filename discovery matches in place of
-// manifest.json (see precompute.Options.ManifestName).
+// manifestNameEnvVar holds a JSON object mapping a directory (relative to the
+// deployed path, "." for its root) to the filename discovery should match
+// there instead of manifest.json (see precompute.Options.ManifestNames). A
+// directory with no entry keeps matching manifest.json.
 const manifestNameEnvVar = "ASTRO_COSMOS_BOOST_MANIFEST_NAME"
 
-// manifestNameOverride returns "" when unset, leaving manifest.json as the
-// only name discovery matches.
-func manifestNameOverride() string {
-	return strings.TrimSpace(os.Getenv(manifestNameEnvVar))
+// manifestNameOverrides parses manifestNameEnvVar, or returns nil when unset
+// (every directory keeps matching manifest.json). Every value must be a bare
+// filename (no path separators): findManifests matches on a file's basename
+// alone, so a path there would silently match nothing.
+func manifestNameOverrides() (map[string]string, error) {
+	value := strings.TrimSpace(os.Getenv(manifestNameEnvVar))
+	if value == "" {
+		return nil, nil
+	}
+	var overrides map[string]string
+	if err := json.Unmarshal([]byte(value), &overrides); err != nil {
+		return nil, fmt.Errorf("%s must be a JSON object of directory to manifest filename: %w", manifestNameEnvVar, err)
+	}
+	for dir, name := range overrides {
+		if name == "" || filepath.Base(name) != name {
+			return nil, fmt.Errorf("%s: %q for directory %q must be a bare filename, not a path", manifestNameEnvVar, name, dir)
+		}
+	}
+	return overrides, nil
 }
 
 // PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
@@ -45,9 +64,13 @@ func manifestNameOverride() string {
 // manifest.json gets a hash sidecar too, plus a slim, field-filtered copy for
 // the plugin to load in place of the full manifest at DAG-parse time.
 func PreDeploy(path string) error {
+	manifestNames, err := manifestNameOverrides()
+	if err != nil {
+		return err
+	}
 	opts := precompute.Options{
-		SlimManifest: slimManifestEnabled(),
-		ManifestName: manifestNameOverride(),
+		SlimManifest:  slimManifestEnabled(),
+		ManifestNames: manifestNames,
 	}
 	summary, err := precompute.Run([]string{path}, version.CurrVersion, opts)
 	if err != nil {

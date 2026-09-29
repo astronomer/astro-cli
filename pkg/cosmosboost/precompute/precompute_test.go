@@ -127,8 +127,8 @@ func TestRunSkipsNonDBTManifest(t *testing.T) {
 }
 
 // TestRunHonorsManifestNameOverride: two valid dbt manifests share a
-// directory, neither named manifest.json. ManifestName picks up exactly the
-// one it names, leaving the other alone.
+// directory, neither named manifest.json. A ManifestNames entry for that
+// directory picks up exactly the one it names, leaving the other alone.
 func TestRunHonorsManifestNameOverride(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -137,7 +137,7 @@ func TestRunHonorsManifestNameOverride(t *testing.T) {
 	})
 	want := filepath.Join(root, "manifests_per_schedule", "manifest_full.json")
 
-	summary, err := Run([]string{root}, "test", Options{ManifestName: "manifest_full.json"})
+	summary, err := Run([]string{root}, "test", Options{ManifestNames: map[string]string{"manifests_per_schedule": "manifest_full.json"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,9 +147,9 @@ func TestRunHonorsManifestNameOverride(t *testing.T) {
 	mustExist(t, filepath.Join(root, "manifests_per_schedule", sidecarDir, sidecarName))
 }
 
-// TestRunManifestNameOverrideExcludesDefaultName: ManifestName replaces
-// manifest.json rather than adding to it - a manifest.json sitting alongside
-// the named file is left untouched.
+// TestRunManifestNameOverrideExcludesDefaultName: a directory's override
+// replaces manifest.json rather than adding to it - a manifest.json sitting
+// alongside the named file is left untouched.
 func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -158,7 +158,7 @@ func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	})
 	want := filepath.Join(root, "shipped", "manifest_full.json")
 
-	summary, err := Run([]string{root}, "test", Options{ManifestName: "manifest_full.json"})
+	summary, err := Run([]string{root}, "test", Options{ManifestNames: map[string]string{"shipped": "manifest_full.json"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,8 +168,9 @@ func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 }
 
 // TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered: a
-// ManifestName file in a project root is slimmed by processProject, not
-// discovered as its own unit (same as manifest.json there).
+// ManifestNames file in a project root ("." - the project dir itself) is
+// slimmed by processProject, not discovered as its own unit (same as
+// manifest.json there).
 func TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -178,7 +179,7 @@ func TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered(t *testing.T
 		"proj/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"]}}}`,
 	})
 
-	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestName: "manifest_full.json"})
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestNames: map[string]string{"proj": "manifest_full.json"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,6 +187,31 @@ func TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered(t *testing.T
 		t.Fatalf("want 1 project-only result, got %+v", summary.Results)
 	}
 	mustExist(t, filepath.Join(root, "proj", sidecarDir, slimManifestName))
+}
+
+// TestRunManifestNameOverridePerDirectory: two dbt projects with different
+// manifest-root conventions in one Run - ManifestNames applies each
+// directory's own override independently.
+func TestRunManifestNameOverridePerDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"dbt1/dbt_project.yml":      "name: one\n",
+		"dbt1/models/a.sql":         "select 1",
+		"dbt1/manifest_custom.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"one"},"nodes":{"model.one.a":{"original_file_path":"models/a.sql","package_name":"one","resource_type":"model","fqn":["one","a"]}}}`,
+		"dbt2/dbt_project.yml":      "name: two\n",
+		"dbt2/models/b.sql":         "select 2",
+		"dbt2/manifest.json":        `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"two"},"nodes":{"model.two.b":{"original_file_path":"models/b.sql","package_name":"two","resource_type":"model","fqn":["two","b"]}}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestNames: map[string]string{"dbt1": "manifest_custom.json"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 2 {
+		t.Fatalf("want 2 project results, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "dbt1", sidecarDir, slimManifestName)) // found via the override
+	mustExist(t, filepath.Join(root, "dbt2", sidecarDir, slimManifestName)) // found via the manifest.json default
 }
 
 // TestRunWarnsOnTemplatedPackagesPath verifies a project whose packages-install-path

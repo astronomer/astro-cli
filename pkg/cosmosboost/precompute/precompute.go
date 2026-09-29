@@ -46,10 +46,13 @@ type Options struct {
 	// manifest.json (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
 
-	// ManifestName, when set, replaces manifest.json as the filename
-	// findManifests matches - for a manifest under a different name, or to
-	// pick one out of several valid manifests in the same directory.
-	ManifestName string
+	// ManifestNames overrides, per directory, the filename findManifests and
+	// processProject match instead of manifest.json - for a manifest under a
+	// different name, or to pick one out of several valid manifests in the
+	// same directory. Keyed by a directory's slash-separated path relative to
+	// its root ("." for the root itself); a directory with no entry still
+	// uses manifest.json.
+	ManifestNames map[string]string
 }
 
 // Run finds every dbt project (a directory with dbt_project.yml) and standalone
@@ -72,6 +75,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 	start := time.Now()
 
 	projectDirs := map[string]bool{}
+	projectRoots := map[string]string{} // project dir -> root it was found under
 	for _, root := range roots {
 		found, err := findProjects(root)
 		if err != nil {
@@ -79,12 +83,13 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 		}
 		for _, d := range found {
 			projectDirs[d] = true
+			projectRoots[d] = root
 		}
 	}
 
 	manifests := map[string]bool{}
 	for _, root := range roots {
-		found, err := findManifests(root, projectDirs, opts.ManifestName)
+		found, err := findManifests(root, projectDirs, opts.ManifestNames)
 		if err != nil {
 			return Summary{}, fmt.Errorf("scanning %q for manifests: %w", root, err)
 		}
@@ -93,13 +98,13 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 		}
 	}
 
-	type unit struct{ kind, path string }
+	type unit struct{ kind, path, root string }
 	var units []unit
 	for d := range projectDirs {
-		units = append(units, unit{kindProject, d})
+		units = append(units, unit{kindProject, d, projectRoots[d]})
 	}
 	for m := range manifests {
-		units = append(units, unit{kindManifest, m})
+		units = append(units, unit{kindManifest, m, ""})
 	}
 	// Composite sort key: path first, kind as the tiebreaker. NUL sorts below
 	// every other byte, so prefix relationships between paths are preserved.
@@ -117,7 +122,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 			defer wg.Done()
 			defer func() { <-sem }() // release the slot
 			if u.kind == kindProject {
-				results[i] = processProject(u.path, version, opts)
+				results[i] = processProject(u.path, u.root, version, opts)
 			} else {
 				results[i] = processManifest(u.path, version, opts)
 			}
@@ -131,7 +136,8 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 // processProject hashes one dbt project directory and writes its sidecar. It reads
 // dbt_project.yml once (readDbtConfig) and threads the result through hashing and the
 // templated-packages warning, so the file isn't parsed more than once per project.
-func processProject(dir, version string, opts Options) Result {
+// root is the discovery root dir was found under, used to resolve opts.ManifestNames.
+func processProject(dir, root, version string, opts Options) Result {
 	start := time.Now()
 	cfg := readDbtConfig(dir)
 	hash, files, totalBytes, err := hashProject(dir, cfg)
@@ -145,15 +151,13 @@ func processProject(dir, version string, opts Options) Result {
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
 
-	// A manifest.json (or opts.ManifestName) in the project root is not a unit
-	// of its own - its .astro/ is this project's - so findManifests skips it.
-	// Slim it here instead, leaving the project's own hash as the anchor.
+	// A manifest.json (or an opts.ManifestNames override) in the project root
+	// is not a unit of its own - its .astro/ is this project's - so
+	// findManifests skips it. Slim it here instead, leaving the project's own
+	// hash as the anchor.
 	var filtered *FilteredManifest
 	if opts.SlimManifest {
-		name := manifestFile
-		if opts.ManifestName != "" {
-			name = opts.ManifestName
-		}
+		name := effectiveManifestName(opts.ManifestNames, root, dir)
 		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, name)); readErr == nil && isDbt {
 			// Nothing mutates doc afterward here, unlike processManifest.
 			data, _ := json.Marshal(buildSlimManifest(doc, version))

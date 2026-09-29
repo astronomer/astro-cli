@@ -102,7 +102,8 @@ func TestSlimManifestEnabled(t *testing.T) {
 }
 
 // TestPreDeployRespectsManifestNameEnvVar: a manifest.json-only discovery
-// misses a differently-named file, but stamps it once the env var names it.
+// misses a differently-named file, but stamps it once the env var names it
+// for the deploy root (".").
 func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
@@ -112,9 +113,26 @@ func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
 	_, err := os.Stat(filepath.Join(dir, ".astro"))
 	require.True(t, os.IsNotExist(err), "a non-manifest.json name is invisible to discovery without the override")
 
-	t.Setenv(manifestNameEnvVar, "manifest_full.json")
+	t.Setenv(manifestNameEnvVar, `{".": "manifest_full.json"}`)
 	require.NoError(t, PreDeploy(dir))
 	require.FileExists(t, filepath.Join(dir, artifactRelPath))
+}
+
+// TestPreDeployRejectsInvalidManifestNameJSON: malformed JSON in the env var
+// fails the deploy step rather than silently matching nothing.
+func TestPreDeployRejectsInvalidManifestNameJSON(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(manifestNameEnvVar, "not-json")
+	require.ErrorContains(t, PreDeploy(dir), manifestNameEnvVar)
+}
+
+// TestPreDeployRejectsPathValuedManifestName: a value containing a path
+// separator would never match findManifests' basename comparison, so it's
+// rejected up front instead of silently stamping nothing.
+func TestPreDeployRejectsPathValuedManifestName(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(manifestNameEnvVar, `{".": "target/manifest_full.json"}`)
+	require.ErrorContains(t, PreDeploy(dir), manifestNameEnvVar)
 }
 
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {

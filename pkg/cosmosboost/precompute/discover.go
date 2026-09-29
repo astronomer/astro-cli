@@ -52,18 +52,33 @@ var manifestSkipDirs = map[string]bool{
 	gitDir:         true, // VCS internals can't hold a project's manifest
 }
 
-// findManifests walks root and returns file paths named manifestFile, or
-// name (when set) instead - for a manifest written under a different name.
+// effectiveManifestName is the filename expected in dir: overrides[rel],
+// where rel is dir's slash-separated path relative to root ("." for root
+// itself), or manifestFile when overrides is empty or has no entry for rel.
+func effectiveManifestName(overrides map[string]string, root, dir string) string {
+	if len(overrides) == 0 {
+		return manifestFile
+	}
+	rel, err := filepath.Rel(root, dir)
+	if err != nil {
+		return manifestFile
+	}
+	if name, ok := overrides[filepath.ToSlash(rel)]; ok && name != "" {
+		return name
+	}
+	return manifestFile
+}
+
+// findManifests walks root and returns file paths matching, in each
+// directory, the name effectiveManifestName resolves for it - manifestFile
+// by default, or a per-directory override.
 //
 // A manifest whose parent directory is itself a discovered project root is
 // omitted: that project's folder hash already covers a manifest sitting in its
 // root. Manifests elsewhere — most importantly a standalone one shipped for a
 // manifest-only (DBT_MANIFEST) deployment, or a project's target/manifest.json —
 // each get their own sidecar.
-func findManifests(root string, projectDirs map[string]bool, name string) ([]string, error) {
-	if name == "" {
-		name = manifestFile
-	}
+func findManifests(root string, projectDirs map[string]bool, overrides map[string]string) ([]string, error) {
 	var manifests []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -76,7 +91,7 @@ func findManifests(root string, projectDirs map[string]bool, name string) ([]str
 			}
 			return nil
 		}
-		if d.Name() != name {
+		if d.Name() != effectiveManifestName(overrides, root, filepath.Dir(path)) {
 			return nil
 		}
 		if projectDirs[filepath.Dir(path)] {
