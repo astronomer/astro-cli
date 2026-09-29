@@ -46,12 +46,9 @@ type Options struct {
 	// manifest.json (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
 
-	// ManifestNames overrides, per directory, the filename findManifests and
-	// processProject match instead of manifest.json - for a manifest under a
-	// different name, or to pick one out of several valid manifests in the
-	// same directory. Keyed by a directory's slash-separated path relative to
-	// its root ("." for the root itself); a directory with no entry still
-	// uses manifest.json.
+	// ManifestNames overrides the filename matched in a directory (keyed by
+	// its path relative to its root, "." for the root itself) instead of
+	// manifest.json.
 	ManifestNames map[string]string
 }
 

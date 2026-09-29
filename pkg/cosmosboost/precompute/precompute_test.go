@@ -126,13 +126,9 @@ func TestRunSkipsNonDBTManifest(t *testing.T) {
 	}
 }
 
-// TestRunSkipsAmbiguousDirectoryEvenWithOverride: the real hazard this PR's
-// override could otherwise hit head-on - two valid dbt manifests share a
-// directory (e.g. per-schedule manifests, each read by a different DAG). The
-// plugin resolves both the hash sidecar and the slim manifest by directory
-// alone, with no check of which manifest produced them, so naming one via
-// ManifestNames must NOT cause it to be stamped: the other DAG would then load
-// this manifest's slim copy and hash. Nothing gets written for either file.
+// TestRunSkipsAmbiguousDirectoryEvenWithOverride: naming one of two valid dbt
+// manifests via ManifestNames must not stamp it - the plugin resolves both
+// artifacts by directory alone, so the other manifest's DAG would load them.
 func TestRunSkipsAmbiguousDirectoryEvenWithOverride(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -153,10 +149,8 @@ func TestRunSkipsAmbiguousDirectoryEvenWithOverride(t *testing.T) {
 	}
 }
 
-// TestRunManifestNameOverrideExcludesDefaultName: a directory's override
-// replaces manifest.json rather than adding to it - a manifest.json sitting
-// alongside the named file (here, not itself a dbt manifest, so it can't also
-// trigger the ambiguity guard) is left untouched.
+// TestRunManifestNameOverrideExcludesDefaultName: an override replaces
+// manifest.json rather than adding to it.
 func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -175,11 +169,8 @@ func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
 }
 
-// TestRunSkipsSlimInProjectRootWhenAmbiguous: the processProject side of the
-// same guard - a project root holding two valid dbt manifests still gets its
-// own tree-hash sidecar (unaffected, since it isn't manifest-specific), but
-// is not slimmed, since either manifest's DAG could be the wrong one to load
-// the other's slim copy.
+// TestRunSkipsSlimInProjectRootWhenAmbiguous: a project root with two valid
+// dbt manifests still gets its tree-hash sidecar, but isn't slimmed.
 func TestRunSkipsSlimInProjectRootWhenAmbiguous(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -202,12 +193,8 @@ func TestRunSkipsSlimInProjectRootWhenAmbiguous(t *testing.T) {
 	}
 }
 
-// TestRunManifestNameOverridePerDirectory: two dbt projects with different
-// manifest-root conventions in one Run - ManifestNames applies each
-// directory's own override independently. dbt1 also pins that a
-// ManifestNames file in a project root is slimmed by processProject, not
-// discovered as its own unit (same as manifest.json there): a stray third
-// unit would make the result count 3, not 2.
+// TestRunManifestNameOverridePerDirectory: two projects with different
+// manifest-root conventions in one Run each apply their own override.
 func TestRunManifestNameOverridePerDirectory(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
