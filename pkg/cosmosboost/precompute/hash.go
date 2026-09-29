@@ -211,6 +211,34 @@ func readManifestDoc(path string) (doc map[string]any, bytes int64, isDbt bool, 
 	return doc, bytes, true, nil
 }
 
+// hasSiblingDbtManifest reports whether dir holds a *.json file, other than
+// exclude, that also parses as a valid dbt manifest. The Cosmos Boost plugin
+// resolves both the hash sidecar and the slim manifest by directory alone,
+// with no check of which manifest produced them - so stamping dir while it
+// holds more than one valid dbt manifest risks serving one manifest's
+// artifacts to a DAG that points at the other. Checking .json files only
+// keeps the cost bounded to plausible candidates in that single directory,
+// not a tree-wide scan.
+func hasSiblingDbtManifest(dir, exclude string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == exclude || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		_, _, isDbt, err := readManifestDoc(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return false, err
+		}
+		if isDbt {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // hashDocument computes the "sha256-manifest-v2" hash of an already-parsed
 // dbt manifest document, after removing the volatile fields dbt regenerates on
 // every full parse, so the value is stable across recompiles of unchanged
