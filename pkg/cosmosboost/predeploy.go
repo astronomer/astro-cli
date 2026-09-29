@@ -50,7 +50,7 @@ func manifestNameOverrides() (map[string]string, error) {
 		return nil, fmt.Errorf("%s must be a JSON object of directory to manifest filename: %w", manifestNameEnvVar, err)
 	}
 	for dir, name := range overrides {
-		if name == "" || filepath.Base(name) != name {
+		if filepath.Base(name) != name {
 			return nil, fmt.Errorf("%s: %q for directory %q must be a bare filename, not a path", manifestNameEnvVar, name, dir)
 		}
 	}
