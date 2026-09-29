@@ -168,7 +168,11 @@ func processProject(dir, root, version string, opts Options) Result {
 				return r
 			}
 			if ambiguous {
-				r.Warning = joinWarnings(r.Warning, name+" not slimmed: another valid dbt manifest shares this directory")
+				note := name + " not slimmed: another valid dbt manifest shares this directory"
+				if r.Warning != "" {
+					note = r.Warning + "; " + note
+				}
+				r.Warning = note
 			} else {
 				// Nothing mutates doc afterward here, unlike processManifest.
 				data, _ := json.Marshal(buildSlimManifest(doc, version))
@@ -188,13 +192,8 @@ func processProject(dir, root, version string, opts Options) Result {
 // processManifest hashes one manifest.json and writes a sidecar next to it,
 // plus a slim, field-filtered copy of the manifest when opts asks for one (see
 // buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
-// written) so unrelated manifest.json files in the project aren't stamped.
-//
-// It is also skipped when another valid dbt manifest shares its directory
-// (see hasSiblingDbtManifest): both artifacts would land in the same .astro/,
-// and the plugin has no way to tell which manifest they belong to, so writing
-// them risks serving this manifest's slim copy and hash to a DAG that
-// actually points at the sibling.
+// written) so unrelated manifest.json files in the project aren't stamped -
+// same as one with a sibling dbt manifest (see hasSiblingDbtManifest).
 func processManifest(path, version string, opts Options) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
@@ -236,15 +235,6 @@ func processManifest(path, version string, opts Options) Result {
 		}
 	}
 	return r
-}
-
-// joinWarnings appends add to existing, semicolon-separated, so a later
-// warning doesn't overwrite an earlier one on the same Result.
-func joinWarnings(existing, add string) string {
-	if existing == "" {
-		return add
-	}
-	return existing + "; " + add
 }
 
 // writeSlimManifest writes data as dir's slim manifest and returns the sidecar

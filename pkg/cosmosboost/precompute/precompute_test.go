@@ -202,31 +202,12 @@ func TestRunSkipsSlimInProjectRootWhenAmbiguous(t *testing.T) {
 	}
 }
 
-// TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered: a
-// ManifestNames file in a project root ("." - the project dir itself) is
-// slimmed by processProject, not discovered as its own unit (same as
-// manifest.json there).
-func TestRunManifestNameOverrideInProjectRootIsSlimmedNotDiscovered(t *testing.T) {
-	root := t.TempDir()
-	writeFiles(t, root, map[string]string{
-		"proj/dbt_project.yml":    "name: shop\n",
-		"proj/models/a.sql":       "select 1",
-		"proj/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.orders":{"original_file_path":"models/orders.sql","package_name":"shop","resource_type":"model","fqn":["shop","orders"]}}}`,
-	})
-
-	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestNames: map[string]string{"proj": "manifest_full.json"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil {
-		t.Fatalf("want 1 project-only result, got %+v", summary.Results)
-	}
-	mustExist(t, filepath.Join(root, "proj", sidecarDir, slimManifestName))
-}
-
 // TestRunManifestNameOverridePerDirectory: two dbt projects with different
 // manifest-root conventions in one Run - ManifestNames applies each
-// directory's own override independently.
+// directory's own override independently. dbt1 also pins that a
+// ManifestNames file in a project root is slimmed by processProject, not
+// discovered as its own unit (same as manifest.json there): a stray third
+// unit would make the result count 3, not 2.
 func TestRunManifestNameOverridePerDirectory(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{

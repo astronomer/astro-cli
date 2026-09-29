@@ -118,21 +118,28 @@ func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, artifactRelPath))
 }
 
-// TestPreDeployRejectsInvalidManifestNameJSON: malformed JSON in the env var
-// fails the deploy step rather than silently matching nothing.
-func TestPreDeployRejectsInvalidManifestNameJSON(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv(manifestNameEnvVar, "not-json")
-	require.ErrorContains(t, PreDeploy(dir), manifestNameEnvVar)
-}
+// TestManifestNameOverrides: unset leaves every directory matching
+// manifest.json; malformed JSON or a value containing a path separator
+// (which would never match findManifests' basename comparison) is rejected
+// instead of silently matching nothing.
+func TestManifestNameOverrides(t *testing.T) {
+	t.Setenv(manifestNameEnvVar, "")
+	got, err := manifestNameOverrides()
+	require.NoError(t, err)
+	require.Nil(t, got)
 
-// TestPreDeployRejectsPathValuedManifestName: a value containing a path
-// separator would never match findManifests' basename comparison, so it's
-// rejected up front instead of silently stamping nothing.
-func TestPreDeployRejectsPathValuedManifestName(t *testing.T) {
-	dir := t.TempDir()
+	t.Setenv(manifestNameEnvVar, `{".": "manifest_full.json"}`)
+	got, err = manifestNameOverrides()
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{".": "manifest_full.json"}, got)
+
+	t.Setenv(manifestNameEnvVar, "not-json")
+	_, err = manifestNameOverrides()
+	require.ErrorContains(t, err, manifestNameEnvVar)
+
 	t.Setenv(manifestNameEnvVar, `{".": "target/manifest_full.json"}`)
-	require.ErrorContains(t, PreDeploy(dir), manifestNameEnvVar)
+	_, err = manifestNameOverrides()
+	require.ErrorContains(t, err, manifestNameEnvVar)
 }
 
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
