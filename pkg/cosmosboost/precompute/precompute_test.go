@@ -201,6 +201,27 @@ func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
 }
 
+// TestRunManifestNameOverrideForNestedProject: a dbt project living under
+// dags/ (a common Astro layout) is keyed by its full path relative to the
+// deploy root, not by its own name alone.
+func TestRunManifestNameOverrideForNestedProject(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"dags/dbt/shop/dbt_project.yml":      "name: shop\n",
+		"dags/dbt/shop/models/a.sql":         "select 1",
+		"dags/dbt/shop/manifest_custom.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json","project_name":"shop"},"nodes":{"model.shop.a":{"original_file_path":"models/a.sql","package_name":"shop","resource_type":"model","fqn":["shop","a"]}}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestNames: map[string]string{"dags/dbt/shop": "manifest_custom.json"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 project-only result, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "dags", "dbt", "shop", sidecarDir, slimManifestName))
+}
+
 // TestRunSkipsSlimInProjectRootWhenAmbiguous: a project root with two valid
 // dbt manifests still gets its tree-hash sidecar, but isn't slimmed.
 func TestRunSkipsSlimInProjectRootWhenAmbiguous(t *testing.T) {
