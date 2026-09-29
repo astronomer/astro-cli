@@ -27,8 +27,8 @@ type Result struct {
 	Files    int           // files hashed (1 for a manifest)
 	Bytes    int64         // total bytes hashed
 	Duration time.Duration // time spent on this unit
-	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar written)
-	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
+	Skipped  bool          // no sidecar written: not a dbt manifest, or (see Warning) an ambiguous directory
+	Warning  string        // non-fatal note, e.g. an unresolved template, or why a Skipped unit was skipped
 	Err      error         // non-nil if hashing, writing the sidecar, or writing the slim manifest failed
 }
 
@@ -159,11 +159,23 @@ func processProject(dir, root, version string, opts Options) Result {
 	if opts.SlimManifest {
 		name := effectiveManifestName(opts.ManifestNames, root, dir)
 		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, name)); readErr == nil && isDbt {
-			// Nothing mutates doc afterward here, unlike processManifest.
-			data, _ := json.Marshal(buildSlimManifest(doc, version))
-			if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
+			// Skip slimming (not the whole project) when another valid dbt
+			// manifest shares this directory: see hasSiblingDbtManifest.
+			ambiguous, sibErr := hasSiblingDbtManifest(dir, name)
+			if sibErr != nil {
+				r.Err = sibErr
 				r.Duration = time.Since(start)
 				return r
+			}
+			if ambiguous {
+				r.Warning = joinWarnings(r.Warning, name+" not slimmed: another valid dbt manifest shares this directory")
+			} else {
+				// Nothing mutates doc afterward here, unlike processManifest.
+				data, _ := json.Marshal(buildSlimManifest(doc, version))
+				if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
+					r.Duration = time.Since(start)
+					return r
+				}
 			}
 		}
 	}
@@ -177,19 +189,28 @@ func processProject(dir, root, version string, opts Options) Result {
 // plus a slim, field-filtered copy of the manifest when opts asks for one (see
 // buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
 // written) so unrelated manifest.json files in the project aren't stamped.
+//
+// It is also skipped when another valid dbt manifest shares its directory
+// (see hasSiblingDbtManifest): both artifacts would land in the same .astro/,
+// and the plugin has no way to tell which manifest they belong to, so writing
+// them risks serving this manifest's slim copy and hash to a DAG that
+// actually points at the sibling.
 func processManifest(path, version string, opts Options) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
 	var hash string
 	var slimData []byte
+	var ambiguous bool
 	if err == nil && isDbt {
-		if opts.SlimManifest {
-			// Marshal before hashDocument mutates doc: the slim manifest shares
-			// doc's nested values, so only turning it into bytes here decouples
-			// the two. It holds JSON-native types only, so this cannot fail.
-			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+		if ambiguous, err = hasSiblingDbtManifest(filepath.Dir(path), filepath.Base(path)); err == nil && !ambiguous {
+			if opts.SlimManifest {
+				// Marshal before hashDocument mutates doc: the slim manifest shares
+				// doc's nested values, so only turning it into bytes here decouples
+				// the two. It holds JSON-native types only, so this cannot fail.
+				slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+			}
+			hash = hashDocument(doc)
 		}
-		hash = hashDocument(doc)
 	}
 	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
 	switch {
@@ -197,6 +218,9 @@ func processManifest(path, version string, opts Options) Result {
 		r.Err = err
 	case !isDbt:
 		r.Skipped = true
+	case ambiguous:
+		r.Skipped = true
+		r.Warning = "another valid dbt manifest shares this directory; skipped to avoid stamping the wrong one's cache"
 	default:
 		dir := filepath.Dir(path)
 		// The sidecar goes last: it carries the filtered_manifest pointer, so it
@@ -212,6 +236,15 @@ func processManifest(path, version string, opts Options) Result {
 		}
 	}
 	return r
+}
+
+// joinWarnings appends add to existing, semicolon-separated, so a later
+// warning doesn't overwrite an earlier one on the same Result.
+func joinWarnings(existing, add string) string {
+	if existing == "" {
+		return add
+	}
+	return existing + "; " + add
 }
 
 // writeSlimManifest writes data as dir's slim manifest and returns the sidecar
@@ -239,8 +272,8 @@ func (s Summary) CountFailed() int {
 	return n
 }
 
-// CountSkipped returns the number of units skipped (manifest.json files that aren't
-// dbt manifests).
+// CountSkipped returns the number of units skipped: not a dbt manifest, or an
+// ambiguous directory (see hasSiblingDbtManifest).
 func (s Summary) CountSkipped() int {
 	n := 0
 	for _, r := range s.Results {
@@ -271,6 +304,8 @@ func (s Summary) WriteReport(w io.Writer) {
 		switch {
 		case r.Err != nil:
 			fmt.Fprintf(w, "  %s %-8s %s  (%v)\n", glyphFail, r.Kind, r.Path, r.Err)
+		case r.Skipped && r.Warning != "":
+			fmt.Fprintf(w, "  %s %-8s %s  (%s)\n", glyphLeft, r.Kind, r.Path, r.Warning)
 		case r.Skipped:
 			fmt.Fprintf(w, "  %s %-8s %s  (not a dbt manifest)\n", glyphLeft, r.Kind, r.Path)
 		default:

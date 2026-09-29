@@ -126,10 +126,14 @@ func TestRunSkipsNonDBTManifest(t *testing.T) {
 	}
 }
 
-// TestRunHonorsManifestNameOverride: two valid dbt manifests share a
-// directory, neither named manifest.json. A ManifestNames entry for that
-// directory picks up exactly the one it names, leaving the other alone.
-func TestRunHonorsManifestNameOverride(t *testing.T) {
+// TestRunSkipsAmbiguousDirectoryEvenWithOverride: the real hazard this PR's
+// override could otherwise hit head-on - two valid dbt manifests share a
+// directory (e.g. per-schedule manifests, each read by a different DAG). The
+// plugin resolves both the hash sidecar and the slim manifest by directory
+// alone, with no check of which manifest produced them, so naming one via
+// ManifestNames must NOT cause it to be stamped: the other DAG would then load
+// this manifest's slim copy and hash. Nothing gets written for either file.
+func TestRunSkipsAmbiguousDirectoryEvenWithOverride(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
 		"manifests_per_schedule/manifest_global_daily_schedule.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.daily":{"name":"daily"}}}`,
@@ -137,23 +141,26 @@ func TestRunHonorsManifestNameOverride(t *testing.T) {
 	})
 	want := filepath.Join(root, "manifests_per_schedule", "manifest_full.json")
 
-	summary, err := Run([]string{root}, "test", Options{ManifestNames: map[string]string{"manifests_per_schedule": "manifest_full.json"}})
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true, ManifestNames: map[string]string{"manifests_per_schedule": "manifest_full.json"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(summary.Results) != 1 || summary.Results[0].Path != want || summary.Results[0].Err != nil {
-		t.Fatalf("want 1 result for manifest_full.json only, got %+v", summary.Results)
+	if len(summary.Results) != 1 || summary.Results[0].Path != want || !summary.Results[0].Skipped || summary.Results[0].Warning == "" {
+		t.Fatalf("want 1 skipped result with a reason, got %+v", summary.Results)
 	}
-	mustExist(t, filepath.Join(root, "manifests_per_schedule", sidecarDir, sidecarName))
+	if _, err := os.Stat(filepath.Join(root, "manifests_per_schedule", sidecarDir)); !os.IsNotExist(err) {
+		t.Fatalf("an ambiguous directory must get no .astro/ at all: %v", err)
+	}
 }
 
 // TestRunManifestNameOverrideExcludesDefaultName: a directory's override
 // replaces manifest.json rather than adding to it - a manifest.json sitting
-// alongside the named file is left untouched.
+// alongside the named file (here, not itself a dbt manifest, so it can't also
+// trigger the ambiguity guard) is left untouched.
 func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
-		"shipped/manifest.json":      `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"shipped/manifest.json":      `{"name":"My App","icons":[]}`,
 		"shipped/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
 	})
 	want := filepath.Join(root, "shipped", "manifest_full.json")
@@ -162,8 +169,36 @@ func TestRunManifestNameOverrideExcludesDefaultName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(summary.Results) != 1 || summary.Results[0].Path != want {
-		t.Fatalf("want 1 result for manifest_full.json only, manifest.json must be ignored: %+v", summary.Results)
+	if len(summary.Results) != 1 || summary.Results[0].Path != want || summary.Results[0].Err != nil || summary.Results[0].Skipped {
+		t.Fatalf("want 1 stamped result for manifest_full.json only, manifest.json must be ignored: %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "shipped", sidecarDir, sidecarName))
+}
+
+// TestRunSkipsSlimInProjectRootWhenAmbiguous: the processProject side of the
+// same guard - a project root holding two valid dbt manifests still gets its
+// own tree-hash sidecar (unaffected, since it isn't manifest-specific), but
+// is not slimmed, since either manifest's DAG could be the wrong one to load
+// the other's slim copy.
+func TestRunSkipsSlimInProjectRootWhenAmbiguous(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":    "name: shop\n",
+		"proj/models/a.sql":       "select 1",
+		"proj/manifest.json":      `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil || summary.Results[0].Warning == "" {
+		t.Fatalf("want 1 project result with a warning, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, sidecarName))
+	if _, err := os.Stat(filepath.Join(root, "proj", sidecarDir, slimManifestName)); !os.IsNotExist(err) {
+		t.Fatalf("an ambiguous project root must not be slimmed: %v", err)
 	}
 }
 
