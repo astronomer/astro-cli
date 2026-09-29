@@ -25,24 +25,6 @@ const (
 	LayerDefault Layer = "default"
 )
 
-// layerLabel is how each layer names itself to a user: the thing they would
-// type or change.
-var layerLabel = map[Layer]string{
-	LayerFlag:    "--deployment",
-	LayerURL:     "--url",
-	LayerEnv:     EnvVar,
-	LayerPin:     "astro use",
-	LayerDefault: "manifest default link",
-}
-
-// Label is the user-facing name of a layer, for the resolution table.
-func (l Layer) Label() string {
-	if s, ok := layerLabel[l]; ok {
-		return s
-	}
-	return string(l)
-}
-
 // Request is what the command layer knows about this invocation: the flags it
 // parsed, the env var it read, and the pin it loaded.
 type Request struct {
@@ -84,7 +66,7 @@ var ErrNone = errors.New("no deployment to act on: this project links none ([too
 // listing deployments it is not one of.
 var ErrLocalNotADeployment = errors.New("`" + LocalName + "` is not a deployment: it is this machine, and it has its own commands — " +
 	"`astro local start` runs it, `astro local af dags list` and `astro local af health` read it. " +
-	"`astro use` pins deployments only")
+	"`astro use` selects among deployments only")
 
 // UnknownError reports a name no link declares.
 type UnknownError struct {
@@ -102,7 +84,7 @@ func (e *UnknownError) Error() string {
 	case LayerEnv:
 		fmt.Fprintf(&b, " (from %s)", EnvVar)
 	case LayerPin:
-		b.WriteString(" (pinned for this project; clear it with `astro use --unset`)")
+		b.WriteString(" (selected with `astro use`; clear it with `astro use --unset`)")
 	case LayerFlag, LayerURL, LayerDefault:
 	}
 	if len(e.Known) == 0 {
@@ -122,7 +104,7 @@ type AmbiguousError struct {
 }
 
 func (e *AmbiguousError) Error() string {
-	return fmt.Sprintf("several deployments are linked and none is the default (%s): pick one with -d <name>, export %s=<name>, or pin one with `astro use <name>`",
+	return fmt.Sprintf("several deployments are linked and none is the default (%s): pick one with -d <name>, export %s=<name>, or select one with `astro use <name>`",
 		strings.Join(e.Choices, ", "), EnvVar)
 }
 
@@ -137,7 +119,7 @@ func (s Set) Unknown(layer Layer, name string) error {
 	if layer == LayerPin {
 		// A pin an older release wrote fails every command until it is cleared,
 		// so the way out has to travel with the refusal.
-		return fmt.Errorf("%w (clear the pin with `astro use --unset`)", ErrLocalNotADeployment)
+		return fmt.Errorf("%w (clear it with `astro use --unset`)", ErrLocalNotADeployment)
 	}
 	return ErrLocalNotADeployment
 }
@@ -220,62 +202,4 @@ func (s Set) DeploymentByID(id string) Instance {
 	}
 	link := manifest.Link{Deployment: id, Auth: manifest.Auth{Method: manifest.AuthAstro}}
 	return Instance{Name: id, Kind: KindAstro, Source: SourceDeploymentID, Where: linkWhere(link), Link: link}
-}
-
-// Row is one layer of the resolution rule and what it currently holds — the
-// backing for a bare `astro use`, which shows the whole rule rather than only
-// its answer.
-type Row struct {
-	Layer Layer  `json:"layer"`
-	Value string `json:"value,omitempty"`
-	// Where is the coordinate the layer's deployment points at — detail about
-	// something that works.
-	Where string `json:"where,omitempty"`
-	// Problem is why the layer's value cannot be used, such as a pin naming a
-	// link the manifest no longer declares. It is kept apart from Where because
-	// one is reassurance and the other is a fault, and a reader scanning a
-	// column should not have to tell them apart by wording.
-	Problem string `json:"problem,omitempty"`
-	// Wins marks the layer that decides the deployment right now.
-	Wins bool `json:"wins"`
-}
-
-// Explain lays out the whole rule: every sticky layer with what it holds, and
-// the selection those layers currently produce (or the error saying why they
-// produce none). The flag and --url layers are left out — they exist only for
-// the command being typed, and this describes the standing state — so the
-// caller gets one answer rather than running Select itself and risking a
-// second, drifting version of the rule.
-func (s Set) Explain(req Request) (rows []Row, sel Selection, err error) {
-	sel, err = s.Select(Request{Env: req.Env, Pin: req.Pin})
-	winner := Layer("")
-	if err == nil {
-		winner = sel.From
-	}
-	rows = []Row{
-		{Layer: LayerEnv, Value: req.Env},
-		{Layer: LayerPin, Value: req.Pin},
-	}
-	if it, ok := s.defaultInstance(); ok {
-		rows = append(rows, Row{Layer: LayerDefault, Value: it.Name, Where: it.Where})
-	} else {
-		rows = append(rows, Row{Layer: LayerDefault})
-	}
-	// The two layers a user types into are the two that can name something that
-	// is not there; the default row below them is read from the set.
-	for i := range rows {
-		rows[i].Wins = rows[i].Layer == winner
-		if rows[i].Value == "" || (rows[i].Layer != LayerEnv && rows[i].Layer != LayerPin) {
-			continue
-		}
-		switch it, known := s.Lookup(rows[i].Value); {
-		case known:
-			rows[i].Where = it.Where
-		case rows[i].Value == LocalName:
-			rows[i].Problem = "the machine is not a deployment; spell the command `astro local …`"
-		default:
-			rows[i].Problem = "names no deployment this project links"
-		}
-	}
-	return rows, sel, err
 }

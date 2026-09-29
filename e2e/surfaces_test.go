@@ -63,103 +63,103 @@ func TestUseRefusesLocalAsADeploymentName(t *testing.T) {
 	}
 }
 
-// The resolution ladder: every layer that could name a deployment, which one
-// won, and where it came from.
-//
-// It is the answer to "why is it deploying to that": a single resolved name
-// would leave somebody to guess which of the environment, the pin, and the
-// manifest default had supplied it.
+// Bare `astro use` off a terminal: the linked Deployments, which one is
+// current, and what made it current.
 //
 // The two states are separate cases because they publish different fields and
 // each hides the other's. A project resolving to nothing fills `reason` and
-// leaves `winner` empty; one that resolves fills `winner` and leaves `reason`
-// empty — they are the two arms of one branch in runUse, so a fixture that
-// only reaches one silently pins the test to it.
+// leaves `current` empty; one that resolves fills `current` and `from` and
+// leaves `reason` empty — they are the two arms of one branch in runUseShow,
+// so a fixture that only reaches one silently pins the test to it.
 
-// ladderLayers are the three Explain always publishes, in precedence order.
-// That order IS the contract: asserting merely that rows exist cannot fail,
-// because Explain builds all three before it looks anything up.
-var ladderLayers = []string{"env", "pin", "default"}
+// useListingPayload is the report, written out rather than imported: asking
+// the implementation what it promises cannot catch a promise being broken.
+type useListingPayload struct {
+	Current     string `json:"current"`
+	From        string `json:"from"`
+	Reason      string `json:"reason"`
+	Deployments []struct {
+		Name    string `json:"name"`
+		Kind    string `json:"kind"`
+		Where   string `json:"where"`
+		Current bool   `json:"current"`
+	} `json:"deployments"`
+}
 
-func TestUseLadderSaysWhyWhenNothingResolves(t *testing.T) {
+func useListing(t *testing.T, p *project) useListingPayload {
+	t.Helper()
+	var res useListingPayload
+	p.run("use", "--output", "json").requireSuccess().requireJSON(&res)
+	return res
+}
+
+func TestUseSaysWhyWhenNothingIsCurrent(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
 	p.run("init", "--name", "unlinked").requireSuccess()
 
-	res := ladder(t, p)
-	assertLadderLayers(t, res.Layers)
-
-	if res.Winner != "" {
-		t.Errorf("nothing is linked, so nothing should win; got %q", res.Winner)
+	res := useListing(t, p)
+	if res.Current != "" {
+		t.Errorf("nothing is linked, so nothing should be current; got %q", res.Current)
 	}
 	if res.Reason == "" {
-		t.Error("with no winner the ladder owes a reason, and published none")
+		t.Error("with nothing current the report owes a reason, and published none")
 	}
-	for _, row := range res.Layers {
-		if row.Wins {
-			t.Errorf("layer %q claims to win while the winner is empty", row.Layer)
-		}
+	if len(res.Deployments) != 0 {
+		t.Errorf("an unlinked project listed deployments: %+v", res.Deployments)
 	}
 }
 
-func TestUseLadderNamesTheWinnerAndWhereItCameFrom(t *testing.T) {
+func TestUseNamesTheCurrentDeploymentAndWhy(t *testing.T) {
 	tier(t, 0)
 
 	p := linkedProject(t, "prod")
-	res := ladder(t, p)
-	assertLadderLayers(t, res.Layers)
+	res := useListing(t, p)
 
-	if res.Winner == "" {
-		t.Fatalf("a linked project should resolve; reason=%q", res.Reason)
+	if res.Current != "prod" || res.Reason != "" {
+		t.Fatalf("a linked project should resolve to its default; current=%q reason=%q", res.Current, res.Reason)
 	}
-	won := false
-	for _, row := range res.Layers {
-		if !row.Wins {
-			continue
-		}
-		won = true
-		if row.Value == "" {
-			t.Errorf("the winning layer publishes no value: %+v", row)
-		}
-		// WHERE is the half that says which file or variable supplied it,
-		// and it is exactly what a bare resolved name leaves out.
-		if row.Where == "" {
-			t.Errorf("the winning layer does not say where it came from: %+v", row)
-		}
+	// `from` is the half a bare name leaves out: which of the environment,
+	// your selection and the manifest default supplied it.
+	if res.From != "default" {
+		t.Errorf("from = %q, want default", res.From)
 	}
-	if !won {
-		t.Errorf("a winner was named (%q) but no layer is marked as winning", res.Winner)
+	if len(res.Deployments) != 1 || !res.Deployments[0].Current || res.Deployments[0].Where == "" {
+		t.Errorf("deployments = %+v, want prod, current, with its coordinate", res.Deployments)
 	}
 }
 
-func TestUseLadderTextCarriesTheSameAnswer(t *testing.T) {
+func TestUseTextMarksTheCurrentDeployment(t *testing.T) {
 	tier(t, 0)
 
 	p := linkedProject(t, "prod")
 	out := p.run("use").requireSuccess().Stdout
 
-	for _, col := range []string{"LAYER", "VALUE", "WHERE"} {
-		if !strings.Contains(out, col) {
-			t.Errorf("the ladder should have a %s column\n%s", col, out)
+	// The header prints before any row, so a header-only assertion passes on
+	// an empty listing. The marked row is what proves rows reached the writer.
+	marked := false
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "*") && strings.Contains(line, "prod") && strings.Contains(line, "← default = true") {
+			marked = true
 		}
 	}
-	// The headers print before any row is rendered, so a header-only
-	// assertion passes on an empty ladder. The resolved name is what proves
-	// rows reached the writer.
-	if !strings.Contains(out, "prod") {
-		t.Errorf("the rendered ladder should carry the resolved deployment\n%s", out)
+	if !marked {
+		t.Errorf("the listing should mark prod as current by the manifest default\n%s", out)
+	}
+	if strings.Contains(out, "LAYER") {
+		t.Errorf("the listing still prints the resolution rule\n%s", out)
 	}
 }
 
-// The payload is pinned in cmd/local/testdata/schema/use-resolution.json.
-// Holding real output against it catches a key this file does not decode —
-// problem, and the whole instances array — being renamed or dropped.
-func TestUseLadderPublishesNoUnpinnedKeys(t *testing.T) {
+// The payload is pinned in cmd/local/testdata/schema/use-listing.json.
+// Holding real output against it catches a key this file does not decode
+// being renamed or dropped.
+func TestUseListingPublishesNoUnpinnedKeys(t *testing.T) {
 	tier(t, 0)
 
 	p := linkedProject(t, "prod")
-	pinned := pinnedKeys(t, "use-resolution")
+	pinned := pinnedKeys(t, "use-listing")
 
 	var emitted map[string]any
 	p.run("use", "--output", "json").requireSuccess().requireJSON(&emitted)
@@ -173,44 +173,8 @@ func TestUseLadderPublishesNoUnpinnedKeys(t *testing.T) {
 	}
 }
 
-// ladderRow is one line of the ladder, written out rather than imported:
-// asking the implementation what it promises cannot catch a promise being
-// broken.
-type ladderRow struct {
-	Layer   string `json:"layer"`
-	Value   string `json:"value"`
-	Where   string `json:"where"`
-	Problem string `json:"problem"`
-	Wins    bool   `json:"wins"`
-}
-
-type resolutionPayload struct {
-	Layers []ladderRow `json:"layers"`
-	Winner string      `json:"winner"`
-	Reason string      `json:"reason"`
-}
-
-func ladder(t *testing.T, p *project) resolutionPayload {
-	t.Helper()
-	var res resolutionPayload
-	p.run("use", "--output", "json").requireSuccess().requireJSON(&res)
-	return res
-}
-
-func assertLadderLayers(t *testing.T, got []ladderRow) {
-	t.Helper()
-	if len(got) != len(ladderLayers) {
-		t.Fatalf("the ladder should publish %d layers (%v), got %d", len(ladderLayers), ladderLayers, len(got))
-	}
-	for i, name := range ladderLayers {
-		if got[i].Layer != name {
-			t.Errorf("layer %d is %q, want %q — the order is the precedence", i, got[i].Layer, name)
-		}
-	}
-}
-
-// linkedProject scaffolds a project with one default deployment link, so the
-// ladder has something to resolve.
+// linkedProject scaffolds a project with one default deployment link, so
+// there is something to resolve.
 func linkedProject(t *testing.T, name string) *project {
 	t.Helper()
 	p := newProject(t)

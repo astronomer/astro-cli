@@ -6,8 +6,7 @@
 // The machine's own Airflow is not in that set. It is not a deployment and it
 // never competes for a name: `astro local af dags list` acts on it, spelled that
 // way so a top-level command can never silently hit localhost. LocalInstance
-// builds it for the commands that do act on it, and for the inventory bare
-// `astro use` prints.
+// builds it for the commands that do act on it.
 //
 // The two halves are deliberately separate. Building the set and picking a
 // winner touch nothing but the inputs handed in, so `astro use` renders with
@@ -27,7 +26,7 @@ import (
 )
 
 // LocalName is the reserved word for the Airflow running on this machine: the
-// name the inventory shows it under, the name resolution refuses at every
+// `astro local` answers to, the name resolution refuses at every
 // layer, and the link name the manifest rejects (manifest.ReservedLinkName).
 // It is that same constant, so the three cannot drift apart.
 const LocalName = manifest.ReservedLinkName
@@ -127,10 +126,9 @@ type Local struct {
 }
 
 // LocalInstance is a running local Airflow as an instance: what every
-// `astro local` query command acts on, and how the inventory lists it. The
-// project in front of the user passes LocalName; another project's Airflow is
-// listed under a name of the caller's choosing, since only the caller knows
-// which project it is looking at.
+// `astro local` query command acts on. The project in front of the user passes
+// LocalName; another project's Airflow takes a name of the caller's choosing,
+// since only the caller knows which project it is looking at.
 //
 // It is built rather than resolved. The machine is reached by spelling the
 // command `astro local …`, never by winning a precedence rule, so nothing here

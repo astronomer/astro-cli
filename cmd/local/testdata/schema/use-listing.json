@@ -1,0 +1,15 @@
+{
+  "current": "x",
+  "from": "x",
+  "reason": "x",
+  "deployments": [
+    {
+      "name": "x",
+      "kind": "x",
+      "where": "x",
+      "url": "x",
+      "auth_method": "x",
+      "current": true
+    }
+  ]
+}

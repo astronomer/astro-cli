@@ -456,7 +456,7 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		return Target{}, fmt.Errorf("astro deploy ships to Astro Deployments, and this project links none%s", nonAstroLinks(links))
 	case !req.Interactive:
 		return Target{}, fmt.Errorf("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>. "+
-			"Deploy never picks for you — a pin, %s, or `default = true` only preselect the prompt. Deployable links: %s",
+			"Deploy never picks for you — `astro use`, %s, or `default = true` only preselect the prompt. Deployable links: %s",
 			deploymentEnvVar, strings.Join(deployable, ", "))
 	}
 
@@ -532,7 +532,7 @@ type Preselect struct {
 // The three things that can move the prompt's cursor. DefaultMarker is spelled
 // as the manifest spells it, so the label and the file agree.
 const (
-	PinnedBy      = "pinned"
+	PinnedBy      = "astro use"
 	DefaultMarker = "default = true"
 	// deploymentEnvVar is the ephemeral layer of the query commands' rule,
 	// named here so the non-interactive refusal tells the reader what deploy is

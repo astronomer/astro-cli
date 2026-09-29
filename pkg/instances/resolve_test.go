@@ -97,7 +97,7 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 		want string
 	}{
 		{Request{Env: "nope"}, `no deployment named "nope" (from ASTRO_DEPLOYMENT); known deployments: dev, prod`},
-		{Request{Pin: "nope"}, `no deployment named "nope" (pinned for this project; clear it with ` + "`astro use --unset`" + `); known deployments: dev, prod`},
+		{Request{Pin: "nope"}, `no deployment named "nope" (selected with ` + "`astro use`" + `; clear it with ` + "`astro use --unset`" + `); known deployments: dev, prod`},
 	}
 	for _, tc := range cases {
 		_, err := set.Select(tc.req)
@@ -176,67 +176,6 @@ func TestNothingToActOnNamesBothSpellings(t *testing.T) {
 	for _, want := range []string{"astro local", "--url", "[tool.astro.deployments]"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("message does not name %s: %s", want, err)
-		}
-	}
-}
-
-func TestExplainShowsEveryLayerAndTheWinner(t *testing.T) {
-	set := fullSet(t)
-	rows, sel, err := set.Explain(Request{Pin: "prod"})
-	if err != nil {
-		t.Fatalf("explain: %v", err)
-	}
-	if sel.Instance.Name != "prod" {
-		t.Fatalf("selection = %s, want prod", sel.Instance.Name)
-	}
-	want := []struct {
-		layer Layer
-		value string
-		wins  bool
-	}{
-		{LayerEnv, "", false},
-		{LayerPin, "prod", true},
-		{LayerDefault, "dev", false},
-	}
-	if len(rows) != len(want) {
-		t.Fatalf("explained %d layers, want %d", len(rows), len(want))
-	}
-	for i, exp := range want {
-		if rows[i].Layer != exp.layer || rows[i].Value != exp.value || rows[i].Wins != exp.wins {
-			t.Errorf("row %d = %+v, want {%s %q wins=%v}", i, rows[i], exp.layer, exp.value, exp.wins)
-		}
-	}
-}
-
-// TestExplainSeparatesDetailFromFault: a layer naming something gone is a
-// problem; a layer naming something real carries its coordinate. They are
-// different columns because they mean opposite things.
-func TestExplainSeparatesDetailFromFault(t *testing.T) {
-	set := fullSet(t)
-	rows, _, err := set.Explain(Request{Pin: "gone"})
-	if err == nil {
-		t.Fatal("a pin naming nothing resolved")
-	}
-	for _, row := range rows {
-		switch row.Layer {
-		case LayerPin:
-			if row.Problem == "" || row.Where != "" || row.Wins {
-				t.Errorf("a pin naming nothing = %+v, want a problem, no coordinate, and no win", row)
-			}
-		case LayerDefault:
-			if row.Where == "" || row.Problem != "" {
-				t.Errorf("the default link = %+v, want its coordinate and no problem", row)
-			}
-		case LayerEnv, LayerFlag, LayerURL:
-		}
-	}
-
-	// A pin naming the reserved word is its own problem, with its own fix — not
-	// "names no deployment".
-	rows, _, _ = set.Explain(Request{Pin: LocalName})
-	for _, row := range rows {
-		if row.Layer == LayerPin && !strings.Contains(row.Problem, "astro local") {
-			t.Errorf("a pin naming the machine = %+v", row)
 		}
 	}
 }

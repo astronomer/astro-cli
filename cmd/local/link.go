@@ -183,7 +183,7 @@ func newLinkRemoveCmd(c *cli) *cobra.Command {
 			if len(args) == 1 {
 				return c.runLinkRemove(args[0])
 			}
-			name, err := c.pickLink("Select a link to remove", false, "name the link to remove: astro link remove NAME")
+			name, err := c.pickLink("Select a link to remove", "", "", "", "name the link to remove: astro link remove NAME")
 			if err != nil {
 				return err
 			}
@@ -211,7 +211,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 			case len(args) == 1:
 				return c.runLinkDefault(args[0])
 			}
-			name, err := c.pickLink("Select the default link", true, "name the link to make the default, or pass --unset to clear it")
+			name, err := c.pickLink("Select the default link", "clear the default", "", "", "name the link to make the default, or pass --unset to clear it")
 			if err != nil {
 				return err
 			}
@@ -279,10 +279,14 @@ func newLinkWorkspaceCmd(c *cli) *cobra.Command {
 
 // pickLink asks which of the project's links a command acts on, with the table
 // picker the Deployment picker uses, or fails with missing when this run cannot
-// be asked. withNone adds a last row that clears, the way --unset does, and
-// picking it returns "". An answer that is not a row number is refused, as the
-// Deployment picker refuses one.
-func (c *cli) pickLink(title string, withNone bool, missing string) (string, error) {
+// be asked. A non-empty none adds a last row, described by it, that clears the
+// way --unset does, and picking it returns "". current, when it names a link,
+// is drawn bold green, as the workspace and organization pickers draw theirs,
+// so the reader sees what they are choosing away from. A non-empty mark goes
+// in a last column on that row, for when the reader also needs telling why it
+// is current. An answer that is not a row number is refused, as the Deployment
+// picker refuses one.
+func (c *cli) pickLink(title, none, current, mark, missing string) (string, error) {
 	if !c.mayPrompt() {
 		return "", errors.New(missing)
 	}
@@ -302,13 +306,30 @@ func (c *cli) pickLink(title string, withNone bool, missing string) (string, err
 		Padding:        []int{5, 30, 10, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "NAME", "KIND", "DEPLOYMENT, ENVIRONMENT OR URL"},
+		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	}
+	// The mark column exists only when some row carries one; otherwise every
+	// row would end in blank padding.
+	marked := mark != "" && slices.Contains(names, current)
+	if marked {
+		tab.Header = append(tab.Header, "")
+	}
+	row := func(cells ...string) []string {
+		if marked {
+			cells = append(cells, "")
+		}
+		return cells
 	}
 	for i, name := range names {
 		l := m.Astro.Deployments[name]
-		tab.AddRow([]string{strconv.Itoa(i + 1), name, string(l.Kind()), linkWhere(&l)}, false)
+		cells := row(strconv.Itoa(i+1), name, string(l.Kind()), linkWhere(&l))
+		if marked && name == current {
+			cells[len(cells)-1] = mark
+		}
+		tab.AddRow(cells, name == current)
 	}
-	if withNone {
-		tab.AddRow([]string{strconv.Itoa(len(names) + 1), "none", "", "clear the default"}, false)
+	if none != "" {
+		tab.AddRow(row(strconv.Itoa(len(names)+1), "none", "", none), false)
 	}
 	i, ok := tab.Pick(c.d.Stdout, c.d.Stdin, title)
 	switch {
@@ -646,7 +667,7 @@ func (c *cli) runLinkRemove(name string) error {
 	// Left pointing at a link that is gone, it fails every command until
 	// cleared, which is better said now than at the next one.
 	if state, serr := userstate.Load(dir); serr == nil && state.Instance == name {
-		fmt.Fprintf(c.d.Stderr, "note: your pin for this project still names %s. Clear it with `astro use --unset`\n", name)
+		fmt.Fprintf(c.d.Stderr, "note: `astro use` still names %s for this project. Clear it with `astro use --unset`\n", name)
 	}
 	res := linkResult{Name: name, Kind: kind, Status: linkStatusRemoved, Manifest: path}
 	return r.Emit(res, func(w io.Writer) error {

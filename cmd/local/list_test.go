@@ -39,6 +39,16 @@ func (s stubRuntime) ReadStatus(projectPath string) (localrt.Status, error) {
 	return localrt.Status{ProjectPath: projectPath, State: localrt.StateStopped}, nil
 }
 
+// canonical resolves symlinks in a path so two spellings of one directory
+// compare equal. A path that cannot be resolved keeps its original spelling.
+func canonical(path string) string {
+	resolved, err := localrt.CanonicalPath(path)
+	if err != nil {
+		return path
+	}
+	return resolved
+}
+
 func TestBuildListRows(t *testing.T) {
 	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
 	statuses := []localrt.Status{

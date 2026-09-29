@@ -3,6 +3,7 @@ package local
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +72,7 @@ func TestUsePinsAndUnsets(t *testing.T) {
 	if state.Instance != "prod" {
 		t.Fatalf("pin = %q, want prod", state.Instance)
 	}
-	if !strings.Contains(out.String(), "pinned prod") {
+	if !strings.Contains(out.String(), "now uses prod") {
 		t.Fatalf("stdout = %q", out)
 	}
 	// The one deliberate stderr line: what the pin now resolves to.
@@ -123,7 +124,20 @@ func TestUseRefusesTheReservedName(t *testing.T) {
 	}
 }
 
-func TestBareUseShowsTheWholeRule(t *testing.T) {
+// lineOf returns the line of out whose NAME column is name, "" when none is.
+func lineOf(out, name string) string {
+	for _, line := range strings.Split(out, "\n") {
+		if f := strings.Fields(strings.TrimPrefix(line, "*")); len(f) > 0 && f[0] == name {
+			return line
+		}
+	}
+	return ""
+}
+
+// Bare `astro use` off a terminal lists the links and marks the current one —
+// nothing else. The resolution rule is in the help, and a running local
+// Airflow is not something `astro use` can select, so neither is printed.
+func TestBareUseListsTheLinksAndMarksTheCurrentOne(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
 	if err := savePin(dir, "prod"); err != nil {
 		t.Fatal(err)
@@ -133,183 +147,101 @@ func TestBareUseShowsTheWholeRule(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := out.String()
-	for _, want := range []string{"ASTRO_DEPLOYMENT", "astro use", "manifest default link", "resolves to prod"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("table does not show %q:\n%s", want, text)
-		}
+	if prod := lineOf(text, "prod"); !strings.HasPrefix(prod, "*") || strings.Contains(prod, "←") {
+		t.Errorf("prod, your own selection, should carry the * and no label: %q\n%s", prod, text)
 	}
-	// The running local Airflow is no longer a layer of the rule — it is not on
-	// the ladder at all, only in the inventory below it.
-	if strings.Contains(text, "running local Airflow") {
-		t.Errorf("the machine is still a resolution layer:\n%s", text)
+	if dev := lineOf(text, "dev"); dev == "" || strings.HasPrefix(dev, "*") {
+		t.Errorf("dev is listed and not current: %q\n%s", dev, text)
+	}
+	for _, gone := range []string{"LAYER", "resolves to", "ASTRO_DEPLOYMENT", "localhost:8080", "local "} {
+		if strings.Contains(text, gone) {
+			t.Errorf("the listing still prints %q:\n%s", gone, text)
+		}
 	}
 }
 
-// Bare `astro use` answers both halves of one question: what this project is
-// pointed at, and what else it could be pointed at — its links, and every local
-// Airflow on the machine, told apart by the source column.
-func TestBareUseListsDeploymentsAndTheMachine(t *testing.T) {
+// A row something other than your selection made current says what did, in
+// the picker's words.
+func TestBareUseLabelsARowItDidNotSelect(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
-	other := filepath.Join(t.TempDir(), "billing")
-	d, out, _ := instanceDeps(t, dir,
-		localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080},
-		localrt.Status{ProjectPath: other, State: localrt.StateRunning, Port: 8081},
-		// A record whose runtime is gone is not a running Airflow.
-		localrt.Status{ProjectPath: filepath.Join(t.TempDir(), "stale"), State: localrt.StateStopped, Port: 8082},
-	)
+	d, out, _ := instanceDeps(t, dir)
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	text := out.String()
-	for _, want := range []string{"dev", "prod", "local", "billing", "manifest", "running", "http://localhost:8080"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("listing does not show %q:\n%s", want, text)
-		}
+	if dev := lineOf(out.String(), "dev"); !strings.HasPrefix(dev, "*") || !strings.Contains(dev, "← default = true") {
+		t.Errorf("dev, current by the manifest default, should say so: %q\n%s", dev, out)
 	}
-	if strings.Contains(text, "stale") {
-		t.Errorf("a stopped record is listed as running:\n%s", text)
-	}
-}
 
-// Two names can want the same word: a neighboring checkout called `local`,
-// and one called `billing` when the manifest already links a `billing`. Before
-// the split, instances.Build arbitrated this; the inventory re-derives names
-// and has to carry the rule. Every row keeps a distinct name, the reserved word
-// stays this machine's, and nothing shown is a name `astro use` would refuse
-// without saying so.
-func TestInventoryNamesNeverCollide(t *testing.T) {
-	dir := instanceProject(t, twoLinkManifest+"\n[tool.astro.deployments.billing]\ndeployment = 'clm2xk9dq000108l7a2b3c4d7'\n")
-	elsewhere := t.TempDir()
-	foreignLocal := filepath.Join(elsewhere, "local")
-	foreignBilling := filepath.Join(elsewhere, "billing")
-
-	d, out, _ := instanceDeps(t, dir,
-		localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080},
-		localrt.Status{ProjectPath: foreignLocal, State: localrt.StateRunning, Port: 8081},
-		localrt.Status{ProjectPath: foreignBilling, State: localrt.StateRunning, Port: 8082},
-	)
-	if err := execute(t, d, "use", "--output", "json"); err != nil {
+	t.Setenv(instances.EnvVar, "prod")
+	d, out, _ = instanceDeps(t, dir)
+	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	var report struct {
-		Instances []struct {
-			Name, Kind, URL, Source, Note string
-		} `json:"instances"`
-	}
-	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
-		t.Fatalf("decode %q: %v", out, err)
-	}
-
-	seen := map[string]int{}
-	for _, row := range report.Instances {
-		seen[row.Name]++
-	}
-	for name, n := range seen {
-		if n > 1 {
-			t.Errorf("%d rows are named %q — a consumer keying on name cannot tell them apart:\n%s", n, name, out)
-		}
-	}
-	for _, row := range report.Instances {
-		switch {
-		case row.Name == instances.LocalName && row.URL != "http://localhost:8080":
-			t.Errorf("a neighbor answers to %q: %+v", instances.LocalName, row)
-		case row.Source == "running" && row.Note == "":
-			// `astro use <name>` pins deployments only, so a running row that
-			// said nothing would be a name the next command refuses.
-			t.Errorf("running row %q carries no note saying how to reach it: %+v", row.Name, row)
-		case row.Source == "manifest" && row.Note != "":
-			t.Errorf("deployment %q carries a note it does not need: %q", row.Name, row.Note)
-		}
-	}
-	// The two neighbors are reachable only as bare URLs, and the listing says so.
-	for _, want := range []string{"--url http://localhost:8081", "--url http://localhost:8082"} {
-		if !strings.Contains(out.String(), want) {
-			t.Errorf("listing does not say %q:\n%s", want, out)
-		}
+	if prod := lineOf(out.String(), "prod"); !strings.HasPrefix(prod, "*") || !strings.Contains(prod, "← "+instances.EnvVar) {
+		t.Errorf("prod, current by the env var, should say so: %q\n%s", prod, out)
 	}
 }
 
-// Every name the listing prints is either pinnable or carries the note that
-// says what to do instead — checked by feeding each one straight back to
-// `astro use`, which is what a reader would do.
-func TestEveryListedNameIsPinnableOrExplained(t *testing.T) {
-	dir := instanceProject(t, twoLinkManifest)
-	other := filepath.Join(t.TempDir(), "billing")
-	d, out, _ := instanceDeps(t, dir,
-		localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080},
-		localrt.Status{ProjectPath: other, State: localrt.StateRunning, Port: 8081},
-	)
-	if err := execute(t, d, "use", "--output", "json"); err != nil {
+// Several links and no default: nothing is current, and the listing says why
+// rather than leaving the reader to wonder where the * went.
+func TestBareUseSaysWhyNothingIsCurrent(t *testing.T) {
+	dir := instanceProject(t, "\n[tool.astro.deployments.dev]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d6'\n")
+	d, out, _ := instanceDeps(t, dir)
+	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	var report struct {
-		Instances []struct {
-			Name, Source, Note string
-		} `json:"instances"`
+	if !strings.Contains(out.String(), "No Deployment is current: several deployments are linked and none is the default") {
+		t.Errorf("no reason given:\n%s", out)
 	}
-	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	for _, row := range report.Instances {
-		pin, _, _ := instanceDeps(t, dir)
-		err := execute(t, pin, "use", row.Name)
-		if row.Source == "manifest" {
-			if err != nil {
-				t.Errorf("`astro use %s` refused a deployment the listing printed: %v", row.Name, err)
-			}
-			continue
-		}
-		if err == nil {
-			t.Errorf("`astro use %s` pinned a running Airflow; only deployments are pinnable", row.Name)
-		}
-		if row.Note == "" {
-			t.Errorf("row %q is not pinnable and does not say what to do instead", row.Name)
-		}
+	if strings.Contains(out.String(), "*") {
+		t.Errorf("a row is marked current with nothing resolving:\n%s", out)
 	}
 }
 
-func TestBareUseJSONCarriesEveryLayerTheWinnerAndTheInventory(t *testing.T) {
+func TestBareUseJSONCarriesTheCurrentLinkAndWhy(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
 	t.Setenv(instances.EnvVar, "dev")
 	d, out, _ := instanceDeps(t, dir, localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080})
 	if err := execute(t, d, "use", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	var got struct {
-		Layers []struct {
-			Layer, Value string
-			Wins         bool
-		}
-		Winner    string
-		Instances []struct {
-			Name, Kind, Where, URL, Source string
-			AuthMethod                     string `json:"auth_method"`
-			Current                        bool
-		}
-	}
+	var got map[string]json.RawMessage
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
-	if got.Winner != "dev" || len(got.Layers) != 3 {
-		t.Fatalf("json = %+v", got)
+	for _, gone := range []string{"layers", "winner", "instances"} {
+		if _, ok := got[gone]; ok {
+			t.Errorf("the report still publishes %q:\n%s", gone, out)
+		}
 	}
-	if got.Layers[0].Layer != "env" || got.Layers[0].Value != "dev" || !got.Layers[0].Wins {
-		t.Fatalf("env layer = %+v, want it winning with dev", got.Layers[0])
+	var res useListing
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatal(err)
 	}
-	if len(got.Instances) != 3 {
-		t.Fatalf("instances = %+v, want the two links and the machine", got.Instances)
+	if res.Current != "dev" || res.From != "env" || res.Reason != "" {
+		t.Fatalf("report = %+v", res)
 	}
-	if got.Instances[0].Name != "dev" || got.Instances[0].Source != "manifest" || !got.Instances[0].Current {
-		t.Errorf("first row = %+v, want the winning link marked current", got.Instances[0])
+	if len(res.Deployments) != 2 || res.Deployments[0].Name != "dev" || !res.Deployments[0].Current || res.Deployments[1].Current {
+		t.Fatalf("deployments = %+v, want the two links with dev current", res.Deployments)
 	}
-	// The machine is listed, and never current: it is not something resolution
-	// can pick.
-	machine := got.Instances[2]
-	if machine.Name != instances.LocalName || machine.Kind != "local" || machine.Source != "running" || machine.Current {
-		t.Errorf("machine row = %+v", machine)
+	if res.Deployments[0].Kind != "astro" || res.Deployments[0].Where != "clm2xk9dq000108l7a2b3c4d5" {
+		t.Errorf("dev row = %+v", res.Deployments[0])
 	}
-	if machine.URL != "http://localhost:8080" {
-		t.Errorf("the machine row has no address: %+v", machine)
+
+	// Your own selection reads as one, never as the internal word for it.
+	t.Setenv(instances.EnvVar, "")
+	if err := savePin(dir, "prod"); err != nil {
+		t.Fatal(err)
+	}
+	d, out, _ = instanceDeps(t, dir)
+	if err := execute(t, d, "use", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Current != "prod" || res.From != "selection" {
+		t.Errorf("report = %+v, want prod from selection", res)
 	}
 }
 
@@ -322,32 +254,57 @@ func TestBareUseJSONCarriesURLAndAuthMethod(t *testing.T) {
 	if err := execute(t, d, "use", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	var got struct {
-		Instances []struct {
-			URL        string
-			AuthMethod string `json:"auth_method"`
-		}
-	}
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+	var res useListing
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
-	if len(got.Instances) != 1 {
-		t.Fatalf("instances = %+v", got.Instances)
+	if len(res.Deployments) != 1 {
+		t.Fatalf("deployments = %+v", res.Deployments)
 	}
-	if got.Instances[0].URL != "https://airflow.staging.corp.dev" || got.Instances[0].AuthMethod != "token" {
-		t.Fatalf("row = %+v", got.Instances[0])
+	if row := res.Deployments[0]; row.URL != "https://airflow.staging.corp.dev" || row.AuthMethod != "token" || !row.Current {
+		t.Fatalf("row = %+v", row)
 	}
 }
 
-// A project with nothing to act on says so rather than printing an empty table.
-func TestBareUseSaysWhenThereIsNothingToActOn(t *testing.T) {
+// Every name the listing prints is one `astro use` takes — checked by feeding
+// each straight back, which is what a reader would do.
+func TestEveryListedNameIsSelectable(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	d, out, _ := instanceDeps(t, dir, localrt.Status{ProjectPath: dir, State: localrt.StateRunning, Port: 8080})
+	if err := execute(t, d, "use", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	var res useListing
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, row := range res.Deployments {
+		sel, _, _ := instanceDeps(t, dir)
+		if err := execute(t, sel, "use", row.Name); err != nil {
+			t.Errorf("`astro use %s` refused a name the listing printed: %v", row.Name, err)
+		}
+	}
+}
+
+// A project with nothing linked says so rather than printing an empty table,
+// in text and in json.
+func TestBareUseSaysWhenNothingIsLinked(t *testing.T) {
 	dir := instanceProject(t, "")
 	d, out, _ := instanceDeps(t, dir)
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), emptyInventory) {
+	if !strings.Contains(out.String(), noLinks) {
 		t.Errorf("output does not explain the empty listing:\n%s", out)
+	}
+
+	d, out, _ = instanceDeps(t, dir)
+	if err := execute(t, d, "use", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	var res useListing
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Deployments == nil || len(res.Deployments) != 0 {
+		t.Errorf("json = %s, %v; want an empty deployments array", out, err)
 	}
 }
 
@@ -364,5 +321,156 @@ func TestPromptTakesANameAndRejectsAStranger(t *testing.T) {
 	c = &cli{d: d}
 	if _, err := c.promptForDeployment([]string{"dev", "prod"}); err == nil {
 		t.Fatal("a name outside the choices was accepted")
+	}
+}
+
+// Bare `astro use` at a terminal asks which link to use and pins the answer.
+// The none row that clears the pin is offered only once there is a pin to
+// clear, so on a fresh project the row past the links is not a choice.
+func TestBareUseAtATerminalPicksAndPins(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	pick := func(answer string) (string, error) {
+		t.Helper()
+		d, out, _ := instanceDeps(t, dir)
+		d.Interactive = func() bool { return true }
+		d.OutputTerminal = func() bool { return true }
+		d.Stdin = strings.NewReader(answer)
+		err := execute(t, d, "use")
+		return out.String(), err
+	}
+	pin := func() string {
+		t.Helper()
+		state, err := userstate.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return state.Instance
+	}
+
+	if _, err := pick("3\n"); !errors.Is(err, errInvalidLinkSelection) {
+		t.Fatalf("a none row was offered with no pin to clear: %v", err)
+	}
+	out, err := pick("2\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Select the Deployment this project uses") || !strings.Contains(out, "now uses prod") {
+		t.Errorf("output:\n%s", out)
+	}
+	// Before any selection, the manifest's default is current, and says so.
+	if !lineWith(out, "dev", "← default = true") || !lineWith(out, "dev", "\033[1;32m") {
+		t.Errorf("dev not marked as the default-chosen current row:\n%s", out)
+	}
+	if got := pin(); got != "prod" {
+		t.Fatalf("pin = %q, want prod", got)
+	}
+	if out, err = pick("3\n"); err != nil {
+		t.Fatal(err)
+	}
+	// Now the user's own selection is current: highlighted, once, with no label.
+	if !lineWith(out, "prod", "\033[1;32m") || !lineWith(out, "prod", "clm2xk9dq000108l7a2b3c4d6") ||
+		strings.Contains(out, "←") || strings.Count(out, "\033[1;32m") != 1 {
+		t.Errorf("prod not marked as the selected current row:\n%s", out)
+	}
+	if !strings.Contains(out, "clear your selection") || pin() != "" {
+		t.Errorf("none did not clear the pin (pin %q):\n%s", pin(), out)
+	}
+}
+
+// Bare `astro use` reports rather than prompts when the picker could not be
+// seen or would have nothing to offer: stdout piped away from a terminal
+// stdin, or a project that links nothing.
+func TestBareUseReportsWhenThePickerCannotHelp(t *testing.T) {
+	for name, tc := range map[string]struct {
+		links, want string
+		stdoutTTY   bool
+	}{
+		"stdout piped": {twoLinkManifest, "← default = true", false},
+		"no links":     {"", noLinks, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := instanceProject(t, tc.links)
+			d, out, _ := instanceDeps(t, dir)
+			d.Interactive = func() bool { return true }
+			d.OutputTerminal = func() bool { return tc.stdoutTTY }
+			d.Stdin = strings.NewReader("2\n")
+			if err := execute(t, d, "use"); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), tc.want) || strings.Contains(out.String(), "Select the Deployment") {
+				t.Errorf("want the report:\n%s", out)
+			}
+		})
+	}
+}
+
+// A pin that ASTRO_DEPLOYMENT outranks says so, rather than announcing a target
+// the next command will not act on.
+func TestUseWarnsWhenTheEnvOutranksThePin(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	t.Setenv(instances.EnvVar, "dev")
+	d, _, errOut := instanceDeps(t, dir)
+	if err := execute(t, d, "use", "prod"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(errOut.String(), instances.EnvVar+"=dev still takes precedence") {
+		t.Errorf("no warning:\n%s", errOut)
+	}
+
+	d, _, errOut = instanceDeps(t, dir)
+	if err := execute(t, d, "use", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(errOut.String(), "precedence") {
+		t.Errorf("warned about an env var that agrees with the pin:\n%s", errOut)
+	}
+}
+
+// lineWith reports whether one line of out holds both the name and the mark.
+func lineWith(out, name, mark string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, " "+name+" ") && strings.Contains(line, mark) {
+			return true
+		}
+	}
+	return false
+}
+
+// A row ASTRO_DEPLOYMENT made current is marked with the variable, since
+// selecting another row here will not move it.
+func TestBareUseMarksAnEnvChosenRow(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	t.Setenv(instances.EnvVar, "prod")
+	d, out, _ := instanceDeps(t, dir)
+	d.Interactive = func() bool { return true }
+	d.OutputTerminal = func() bool { return true }
+	d.Stdin = strings.NewReader("2\n")
+	if err := execute(t, d, "use"); err != nil {
+		t.Fatal(err)
+	}
+	if !lineWith(out.String(), "prod", "← "+instances.EnvVar) {
+		t.Errorf("prod not marked as env-chosen:\n%s", out)
+	}
+}
+
+// --output json never prompts, terminal or not: it is the report, as before.
+func TestBareUseWithJSONAtATerminalReports(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest)
+	d, out, _ := instanceDeps(t, dir)
+	d.Interactive = func() bool { return true }
+	d.OutputTerminal = func() bool { return true }
+	d.Stdin = strings.NewReader("2\n")
+	if err := execute(t, d, "use", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	var got useListing
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
+	if got.Current != "dev" {
+		t.Errorf("current = %q, want dev", got.Current)
+	}
+	if state, _ := userstate.Load(dir); state.Instance != "" {
+		t.Errorf("json run pinned %q", state.Instance)
 	}
 }

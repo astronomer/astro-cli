@@ -109,6 +109,12 @@ type Deps struct {
 	// a run that cannot be asked is never blocked waiting for an answer.
 	Interactive func() bool
 
+	// OutputTerminal reports whether stdout is a terminal, for a command whose
+	// question and whose report both go to stdout: `astro use | grep prod` has a
+	// terminal on stdin and still wants the report, not a picker it cannot see.
+	// nil means not a terminal.
+	OutputTerminal func() bool
+
 	// AirflowDefault is the Airflow `astro init` gives a project that states
 	// none: the series, the requires-python its runtime ships with (empty for
 	// the built-in rule), and where the answer came from. Production reads the
@@ -177,6 +183,7 @@ func NewDeps() Deps {
 		Locator:          instancelocate.New,
 		LoginDomain:      astrosession.Domain,
 		Interactive:      stdinIsTerminal,
+		OutputTerminal:   stdoutIsTerminal,
 		AirflowDefault:   catalogDefault,
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
@@ -186,6 +193,12 @@ func NewDeps() Deps {
 // stdinIsTerminal is the production answer to "can this run ask a question".
 func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
+}
+
+// stdoutIsTerminal is the production answer to "will the user see what this
+// run prints".
+func stdoutIsTerminal() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
 // skipPreRunAnnotation mirrors internal/telemetry.SkipPreRunAnnotation. It

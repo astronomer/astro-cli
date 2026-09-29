@@ -53,13 +53,13 @@ func TestUseListsEveryCloudLink(t *testing.T) {
 	}
 
 	var report struct {
-		Instances []map[string]any `json:"instances"`
+		Deployments []map[string]any `json:"deployments"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &report); err != nil {
 		t.Fatalf("decode %q: %v", out, err)
 	}
 	byName := map[string]map[string]any{}
-	for _, row := range report.Instances {
+	for _, row := range report.Deployments {
 		byName[row["name"].(string)] = row
 	}
 	want := map[string][2]string{
@@ -79,7 +79,7 @@ func TestUseListsEveryCloudLink(t *testing.T) {
 	}
 	// A coordinate link shows as the manifest writes it, with no url filled
 	// in: nothing was looked up to render this.
-	if byName["prod-composer"]["where"] != "environment orders-composer" {
+	if byName["prod-composer"]["where"] != "orders-composer" {
 		t.Errorf("where = %v, want the coordinate as written", byName["prod-composer"]["where"])
 	}
 	if _, resolved := byName["prod-mwaa"]["url"]; resolved {

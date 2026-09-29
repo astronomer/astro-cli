@@ -284,7 +284,7 @@ func TestPromptPinsAndIsNeverAskedTwice(t *testing.T) {
 	if sel.Instance.Name != "prod" {
 		t.Fatalf("resolved to %s, want the answer", sel.Instance.Name)
 	}
-	if !strings.Contains(errOut.String(), "picked prod — pinned for this project") {
+	if !strings.Contains(errOut.String(), "picked prod — this project uses it from now on") {
 		t.Errorf("the pick was not announced: %q", errOut)
 	}
 	state, err := userstate.Load(dir)

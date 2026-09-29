@@ -46,47 +46,6 @@ func (c *cli) deploymentSet() (projectDir string, set instances.Set, err error) 
 	return dir, instances.Build(m), nil
 }
 
-// runningLocals is every local Airflow alive on this machine, for the inventory
-// that promises to list them all. Liveness is why the runtime does the listing
-// rather than the record store directly — a leftover record is not a running
-// Airflow.
-//
-// Every path is canonicalized here, at the boundary, because identity is a
-// filesystem question: a record written from /private/tmp/x and a command run
-// from /tmp/x are the same project, and pkg/instances compares the strings
-// it is given rather than touching the disk itself.
-func (c *cli) runningLocals() ([]instances.Local, error) {
-	statuses, err := c.d.Runtime.List()
-	if err != nil {
-		return nil, err
-	}
-	running := make([]instances.Local, 0, len(statuses))
-	for i := range statuses {
-		if statuses[i].State != localrt.StateRunning {
-			continue
-		}
-		running = append(running, instances.Local{
-			ProjectPath:  canonical(statuses[i].ProjectPath),
-			Port:         statuses[i].Port,
-			AirflowMajor: statuses[i].AirflowMajor,
-			Mode:         string(statuses[i].Mode),
-		})
-	}
-	return running, nil
-}
-
-// canonical resolves symlinks in a path so two spellings of one directory
-// compare equal. A path that cannot be resolved — a project deleted while its
-// Airflow runs — keeps its original spelling, which is still the best name for
-// it.
-func canonical(path string) string {
-	resolved, err := localrt.CanonicalPath(path)
-	if err != nil {
-		return path
-	}
-	return resolved
-}
-
 // deploymentRequest fills the two layers a command reads rather than parses:
 // the env var and the project's pin. A command that also has flags to add sets
 // them on the result.
@@ -103,19 +62,19 @@ func deploymentRequest(projectDir string) (instances.Request, error) {
 	return req, nil
 }
 
-// standing is the front half bare `astro use` needs: the project, its
+// standing is the front half bare `astro use` needs: the project's
 // deployments, and the layers that stand between runs. It parses no flag into
 // the rule — it reports what is true right now.
-func (c *cli) standing() (projectDir string, set instances.Set, req instances.Request, err error) {
+func (c *cli) standing() (set instances.Set, req instances.Request, err error) {
 	dir, set, err := c.deploymentSet()
 	if err != nil {
-		return "", instances.Set{}, instances.Request{}, err
+		return instances.Set{}, instances.Request{}, err
 	}
 	req, err = deploymentRequest(dir)
 	if err != nil {
-		return "", instances.Set{}, instances.Request{}, err
+		return instances.Set{}, instances.Request{}, err
 	}
-	return dir, set, req, nil
+	return set, req, nil
 }
 
 // deploymentFlags carries the two flags every top-level Airflow-facing command
@@ -323,7 +282,7 @@ func (c *cli) pickAndPin(projectDir string, set instances.Set, choices []string)
 	if err := savePin(projectDir, name); err != nil {
 		return instances.Selection{}, err
 	}
-	fmt.Fprintf(c.d.Stderr, "picked %s — pinned for this project (astro use --unset to clear)\n", name)
+	fmt.Fprintf(c.d.Stderr, "picked %s — this project uses it from now on, for you only (astro use --unset to clear)\n", name)
 	return set.Select(instances.Request{Pin: name})
 }
 
