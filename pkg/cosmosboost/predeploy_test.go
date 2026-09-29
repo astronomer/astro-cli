@@ -101,9 +101,8 @@ func TestSlimManifestEnabled(t *testing.T) {
 	}
 }
 
-// TestPreDeployRespectsManifestNameEnvVar: a manifest.json-only discovery
-// misses a differently-named file, but stamps it once the env var names it
-// for the deploy root (".").
+// TestPreDeployRespectsManifestNameEnvVar: a differently-named manifest is
+// stamped once the env var names it for the deploy root (".").
 func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
@@ -118,10 +117,8 @@ func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, artifactRelPath))
 }
 
-// TestManifestNameOverrides: unset leaves every directory matching
-// manifest.json; malformed JSON or a value containing a path separator
-// (which would never match findManifests' basename comparison) is rejected
-// instead of silently matching nothing.
+// TestManifestNameOverrides: unset is nil; malformed JSON or a non-bare
+// filename value is rejected instead of silently matching nothing.
 func TestManifestNameOverrides(t *testing.T) {
 	t.Setenv(manifestNameEnvVar, "")
 	got, err := manifestNameOverrides()

@@ -52,9 +52,8 @@ var manifestSkipDirs = map[string]bool{
 	gitDir:         true, // VCS internals can't hold a project's manifest
 }
 
-// effectiveManifestName is the filename expected in dir: overrides[rel],
-// where rel is dir's slash-separated path relative to root ("." for root
-// itself), or manifestFile when overrides is empty or has no entry for rel.
+// effectiveManifestName resolves dir's override in overrides (keyed by its
+// path relative to root, "." for root itself), or manifestFile if none.
 func effectiveManifestName(overrides map[string]string, root, dir string) string {
 	rel, err := filepath.Rel(root, dir)
 	if err != nil {
@@ -66,9 +65,8 @@ func effectiveManifestName(overrides map[string]string, root, dir string) string
 	return manifestFile
 }
 
-// findManifests walks root and returns file paths matching, in each
-// directory, the name effectiveManifestName resolves for it - manifestFile
-// by default, or a per-directory override.
+// findManifests walks root and returns file paths matching each directory's
+// effectiveManifestName.
 //
 // A manifest whose parent directory is itself a discovered project root is
 // omitted: that project's folder hash already covers a manifest sitting in its

@@ -30,16 +30,13 @@ func slimManifestEnabled() bool {
 	return value == "" || util.CheckEnvBool(value)
 }
 
-// manifestNameEnvVar holds a JSON object mapping a directory (relative to the
-// deployed path, "." for its root) to the filename discovery should match
-// there instead of manifest.json (see precompute.Options.ManifestNames). A
-// directory with no entry keeps matching manifest.json.
+// manifestNameEnvVar holds a JSON directory->filename map (see
+// precompute.Options.ManifestNames).
 const manifestNameEnvVar = "ASTRO_COSMOS_BOOST_MANIFEST_NAME"
 
-// manifestNameOverrides parses manifestNameEnvVar, or returns nil when unset
-// (every directory keeps matching manifest.json). Every value must be a bare
-// filename (no path separators): findManifests matches on a file's basename
-// alone, so a path there would silently match nothing.
+// manifestNameOverrides parses manifestNameEnvVar ("" when unset). Every
+// value must be a bare filename: findManifests matches by basename, so a
+// path there would silently match nothing.
 func manifestNameOverrides() (map[string]string, error) {
 	value := strings.TrimSpace(os.Getenv(manifestNameEnvVar))
 	if value == "" {
