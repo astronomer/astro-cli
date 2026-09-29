@@ -74,7 +74,7 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 func TestListMarksUndeclaredGlobalVaultEntryNotApplied(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "shared_db", "--value", "postgres://u:p@h/db", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "shared_db", "--value", "postgres://u:p@h/db", "--global", "--everywhere"); err != nil {
 		t.Fatal(err)
 	}
 

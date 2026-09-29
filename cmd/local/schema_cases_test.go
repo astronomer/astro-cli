@@ -39,6 +39,7 @@ var publishedPayloads = []schemaCase{
 	{"dev-removed", devRemoved{}},
 	{"env-result", envResult{}},
 	{"env-value", envValue{}},
+	{"env-link-result", envLinkResult{}},
 	{"env-declaration", envDeclarationResult{}},
 	// `astro local env list --output json` streams one of these per value,
 	// then the whole slice in text mode. Found by recording what Emit
@@ -130,6 +131,8 @@ func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
 var notPublished = map[string]string{
 	"fileStore": "an adapter around localenv.Store; embeds it for the methods, never marshaled",
 	"query":     "a command receiver carrying *cli and its target; never marshaled",
+	"reachJSON": "never emitted alone; nested in env-value and env-link-result, whose goldens pin it",
+	"reachPath": "never emitted alone; nested in reachJSON, pinned by the same goldens",
 }
 
 func TestEveryJSONPayloadTypeIsPinned(t *testing.T) {

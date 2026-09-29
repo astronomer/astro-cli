@@ -9,5 +9,8 @@
   "project": "x",
   "remove_hint": "x",
   "applied": true,
+  "not_linked_here": true,
+  "links_down": "x",
+  "link_hint": "x",
   "declare_hint": "x"
 }

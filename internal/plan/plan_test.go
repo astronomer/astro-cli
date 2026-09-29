@@ -264,6 +264,9 @@ func seedVault(t *testing.T, projectDir, name string) {
 	if err != nil {
 		t.Fatalf("open vault writer: %v", err)
 	}
+	// A seeded global reaches every project, as one created before link
+	// state existed does; the link tests write the rows they are about.
+	w.NewEverywhere = true
 	if _, err := w.Set(localenv.KindEnv, name, "from-vault"); err != nil {
 		t.Fatalf("seed vault: %v", err)
 	}

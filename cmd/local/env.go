@@ -95,6 +95,9 @@ func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
 type setInput struct {
 	stdin bool
 	value string
+	// everywhere creates a new global vault entry reaching every project
+	// instead of none.
+	everywhere bool
 }
 
 // newEnvCmd builds the `astro local env` tree. The three kinds — environment
@@ -303,7 +306,8 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	// Reads, then the write, then the destructive one — the same order
 	// `astro env` uses for the same four verbs, so help reads the same
 	// whichever tree you are in. The two declaration verbs, which the cloud
-	// tree has no counterpart for, follow them. TestEnvVerbOrderMatchesTheCloudTree
+	// tree has no counterpart for, follow them, and then the two that decide
+	// which projects a global vault entry reaches. TestEnvVerbOrderMatchesTheCloudTree
 	// pins it.
 	cmd.AddCommand(
 		newEnvListCmd(c, scope, k.kind, "List "+k.label+"s and where each resolves from"),
@@ -312,6 +316,8 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		newEnvDeleteCmd(c, scope, k),
 		newEnvDeclareCmd(c, scope, k),
 		newEnvUndeclareCmd(c, scope, k),
+		newEnvLinkCmd(c, scope, k),
+		newEnvUnlinkCmd(c, scope, k),
 	)
 	return cmd
 }
@@ -326,7 +332,10 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		"Connections and Airflow variables go to the vault by default; --secret=false\n" +
 		"keeps one in a plain file. An environment variable goes to the vault when\n" +
 		"the project's pyproject.toml declares it sensitive. --secret=false is refused\n" +
-		"for a declared-sensitive name."
+		"for a declared-sensitive name.\n\n" +
+		"A new global in the vault reaches no project until you link it with\n" +
+		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --everywhere creates it\n" +
+		"reaching every project instead. Updating an existing global keeps its links."
 	if k.kind == localenv.KindConn {
 		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type,\n" +
 			"--host and the rest."
@@ -348,11 +357,12 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return c.runEnvSet(route, k.kind, args[0], value)
+			return c.runEnvSet(route, k.kind, args[0], value, in.everywhere)
 		},
 	}
 	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
 	cmd.Flags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
+	cmd.Flags().BoolVar(&in.everywhere, "everywhere", false, "With --global, create a new vault entry reaching every project instead of none")
 	valueHelp := "The value; omit it to be prompted with echo off, or use --stdin"
 	if k.kind == localenv.KindConn {
 		valueHelp = "The whole connection as a URI or JSON; omit it to be prompted, or use --stdin"
@@ -502,7 +512,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "Also include the global file and every known project's .env")
+	cmd.Flags().BoolVar(&all, "all", false, "Also include the global file, every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
 
@@ -521,6 +531,9 @@ type envValue struct {
 	Name   string        `json:"name"`
 	Source string        `json:"source"`
 	Value  string        `json:"value"`
+	// Reach is where a global vault entry is linked; absent for every other
+	// source, since only those have link state.
+	Reach *reachJSON `json:"reach,omitempty"`
 }
 
 // envRoute is the store choice a set acts on once the defaults and the manifest
@@ -622,7 +635,7 @@ func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
 		localenv.Noun(kind), name, manifestPath)
 }
 
-func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string) error {
+func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string, everywhere bool) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
@@ -630,6 +643,31 @@ func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string) 
 	store, projectDir, err := c.envStore(route.scope)
 	if err != nil {
 		return err
+	}
+	if err := refusePinnedToPlain(store, kind, name); err != nil {
+		return err
+	}
+	globalVault, isGlobalVault := store.(*vaultenv.Writer)
+	isGlobalVault = isGlobalVault && store.ScopeName() == vaultenv.SourceGlobal
+	if everywhere && !isGlobalVault {
+		return errors.New("--everywhere applies to a global in the vault: pass --global, and drop --secret=false")
+	}
+	created := false
+	if isGlobalVault {
+		had, herr := store.Has(kind, name)
+		if herr != nil {
+			return herr
+		}
+		created = !had
+		globalVault.NewEverywhere = everywhere
+		// A value moving in from ~/.astro/env is not new: it already reached
+		// every project that declares it, and the plain copy is about to be
+		// removed, so seeding an empty row would take it away from all of
+		// them. It moves in with no row.
+		if created && plainGlobalHas(kind, name) {
+			created = false
+			globalVault.NewEverywhere = true
+		}
 	}
 	if _, err := store.Set(kind, name, value); err != nil {
 		switch {
@@ -659,6 +697,14 @@ func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string) 
 	if path := store.DotenvPath(); path != "" {
 		c.warnUnignoredEnv(path, store.ScopeName(), projectDir)
 	}
+	switch {
+	case created && !everywhere:
+		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with `%s`, or re-run with --everywhere.\n",
+			name, localenv.LinkHint(kind, name))
+	case !created && everywhere:
+		fmt.Fprintf(c.d.Stderr, "note: %s already existed, so its links were kept; to reach every project run: %s --everywhere\n",
+			name, localenv.LinkHint(kind, name))
+	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
 		_, werr := fmt.Fprintf(w, "set %s %s in %s (%s)\n", localenv.Noun(kind), name, store.ScopeName(), store.Location())
@@ -683,7 +729,7 @@ func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string
 	if err != nil {
 		return nil //nolint:nilerr // a store that cannot be opened holds no copy to remove
 	}
-	removed, err := other.Delete(kind, name)
+	removed, err := c.deleteKeepingRow(other, kind, name)
 	if err != nil {
 		return fmt.Errorf("%s %s was set, but its other copy in %s could not be removed: %w",
 			localenv.Noun(kind), name, other.Location(), err)
@@ -819,7 +865,11 @@ func (c *cli) getScoped(r Renderer, scope *scopeFlags, kind localenv.Kind, name 
 	if !ok {
 		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, winner.ScopeName())
 	}
-	return emitValue(r, envValue{Kind: kind, Name: name, Source: string(winner.ScopeName()), Value: value})
+	v := envValue{Kind: kind, Name: name, Source: string(winner.ScopeName()), Value: value}
+	if w, isVault := winner.(*vaultenv.Writer); isVault {
+		v.Reach = globalReach(w, kind, name)
+	}
+	return c.emitValue(r, v)
 }
 
 // getResolved reads a value through the full chain and reports the winning
@@ -836,7 +886,13 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	}
 	for _, p := range src.Providers(vaultenv.Load(projectDir).Providers()) {
 		if v, has := p.Lookup(key); has {
-			return emitValue(r, envValue{Kind: kind, Name: name, Source: p.Label(), Value: v})
+			ev := envValue{Kind: kind, Name: name, Source: p.Label(), Value: v}
+			if p.Label() == vaultenv.SourceGlobal {
+				if w, err := vaultenv.NewWriter(""); err == nil {
+					ev.Reach = globalReach(w, kind, name)
+				}
+			}
+			return c.emitValue(r, ev)
 		}
 	}
 	// No local source held it. A name declared source = "workspace" resolves
@@ -847,9 +903,20 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 		return err
 	}
 	if ok {
-		return emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
+		return c.emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
 	}
-	return fmt.Errorf("%s %q is not set anywhere (shell env, project .env, the encrypted vault, or global ~/.astro/env)", localenv.Noun(kind), name)
+	msg := fmt.Sprintf("%s %q is not set anywhere (shell env, project .env, the encrypted vault, or global ~/.astro/env)", localenv.Noun(kind), name)
+	// A global the vault holds that does not reach this checkout is the one
+	// absence worth explaining: the value exists, and the fix is a link.
+	for _, p := range vaultenv.Load(projectDir).Providers() {
+		if d, ok := p.(envresolve.Diagnoser); ok {
+			if why := d.Diagnose(key); why != "" {
+				msg += ": " + why
+				break
+			}
+		}
+	}
+	return errors.New(msg)
 }
 
 // getFromWorkspace resolves a workspace-source name from Environment Manager
@@ -917,8 +984,14 @@ func declaredSpec(schema *envschema.Schema, kind localenv.Kind, name string) (en
 	return spec, ok
 }
 
-func emitValue(r Renderer, v envValue) error {
+// emitValue prints a get. The text form's stdout is the value alone, so
+// `$(astro local env ... get NAME)` keeps working; a global's reach goes to
+// stderr beside it.
+func (c *cli) emitValue(r Renderer, v envValue) error {
 	return r.Emit(v, func(w io.Writer) error {
+		if v.Reach != nil {
+			fmt.Fprintf(c.d.Stderr, "Reach: %s\n", v.Reach.text())
+		}
 		_, werr := fmt.Fprintln(w, v.Value)
 		return werr
 	})
@@ -944,7 +1017,7 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 		return err
 	}
 	if scope.secretGiven {
-		ok, err := store.Delete(kind, name)
+		ok, err := c.deleteKeepingRow(store, kind, name)
 		if err != nil {
 			return err
 		}
@@ -961,7 +1034,7 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 	var vaulted valueStore
 	removedVault := false
 	if vault, _, verr := c.envStore(&vaultScope); verr == nil {
-		removedVault, err = vault.Delete(kind, name)
+		removedVault, err = c.deleteKeepingRow(vault, kind, name)
 		if err != nil {
 			return fmt.Errorf("could not remove %s %s from the vault, so nothing was deleted: %w", localenv.Noun(kind), name, err)
 		}
@@ -985,6 +1058,20 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 		return fmt.Errorf("%s %q is not set in %s or the vault", localenv.Noun(kind), name, store.ScopeName())
 	}
 	return emitDeleted(r, kind, name, store)
+}
+
+// deleteKeepingRow is store.Delete, with a global's link row that could not be
+// removed after its value was reported as a warning rather than a failure: the
+// value is gone, and the row left behind only narrows what a re-created entry
+// of the same name reaches, which get shows.
+func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string) (bool, error) {
+	ok, err := store.Delete(kind, name)
+	if errors.Is(err, vaultenv.ErrLinkRowKept) {
+		fmt.Fprintf(c.d.Stderr, "warning: deleted %s %s, but %v. A new global of this name would reach only the projects that row names; once the index is usable, clear it with: %s --everywhere\n",
+			localenv.Noun(kind), name, err, localenv.LinkHint(kind, name))
+		return ok, nil
+	}
+	return ok, err
 }
 
 func emitDeleted(r Renderer, kind localenv.Kind, name string, store valueStore) error {
@@ -1091,6 +1178,10 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		it := &items[i]
 		note := ""
 		switch {
+		case it.NotLinkedHere && it.LinksDown != "":
+			note = "not linked here: " + it.LinksDown
+		case it.NotLinkedHere:
+			note = "not linked here (link: " + it.LinkHint + ")"
 		case it.Applied != nil && !*it.Applied:
 			note = "not applied: declare it to use it here (" + it.DeclareHint + ")"
 		case it.Orphan:

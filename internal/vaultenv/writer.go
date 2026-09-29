@@ -26,6 +26,11 @@ type Writer struct {
 	// label names this scope the way localenv.Store.Scope does, for the message
 	// a set or delete prints.
 	label string
+	// dir is the vault directory, where the link index lives beside the values.
+	dir string
+	// NewEverywhere makes a global this writer creates reach every project
+	// (no link row) instead of none. See seedLinks.
+	NewEverywhere bool
 }
 
 // NewWriter opens the shared vault for writing. An empty projectDir writes the
@@ -44,7 +49,7 @@ func NewWriter(projectDir string) (*Writer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open the encrypted vault: %w", err)
 	}
-	w := &Writer{store: store, scope: secrets.GlobalScope, label: SourceGlobal}
+	w := &Writer{store: store, scope: secrets.GlobalScope, label: SourceGlobal, dir: dir}
 	if projectDir != "" {
 		canonical, cerr := localrt.CanonicalPath(projectDir)
 		if cerr != nil {
@@ -95,21 +100,43 @@ func (w *Writer) Set(kind localenv.Kind, name, value string) (envKey string, err
 			return "", err
 		}
 	}
-	if err := w.store.Set(vaultKey, value); err != nil {
-		return "", refusal(err)
-	}
-	others, err := w.sameEnvKey(kind, key)
+	existing, err := w.sameEnvKey(kind, key)
 	if err != nil {
 		return "", err
 	}
-	for _, other := range others {
-		if other == vaultKey {
-			continue
+	var others []string
+	for _, k := range existing {
+		if k != vaultKey {
+			others = append(others, k)
 		}
+	}
+	// A global that replaces another spelling takes its link row first, so
+	// the value is never, at any point, reachable from more projects than
+	// the one it replaces.
+	if err := w.carryLinks(vaultKey, others); err != nil {
+		return "", fmt.Errorf("set %s: %w", name, err)
+	}
+	// A global that is new, under any spelling, gets its link row first too:
+	// it starts out reaching no project, as a new global does in Astro
+	// Desktop, unless NewEverywhere is set.
+	if len(existing) == 0 {
+		if err := w.seedLinks(vaultKey); err != nil {
+			return "", fmt.Errorf("set %s: %w", name, err)
+		}
+	}
+	if err := w.store.Set(vaultKey, value); err != nil {
+		return "", refusal(err)
+	}
+	var removed []string
+	for _, other := range others {
 		if err := w.store.Delete(other); err != nil && !errors.Is(err, secrets.ErrNotFound) {
 			return "", fmt.Errorf("set %s, but could not remove another entry for %s: %w", name, key, refusal(err))
 		}
+		removed = append(removed, other)
 	}
+	// The replaced spellings' rows go once their values have. Best effort: a
+	// row left behind only narrows a later entry of that spelling.
+	_ = w.dropLinkRows(removed) //nolint:errcheck // see above
 	return key, nil
 }
 
@@ -152,6 +179,12 @@ func (w *Writer) Has(kind localenv.Kind, name string) (bool, error) {
 // name)'s env-var key, for the reason Set removes the other spellings. ok is
 // false when it held none, which is not an error: the same contract
 // localenv.Store.Delete has.
+//
+// In the global scope a removed entry's link row goes too, after the value, so
+// a later entry of the same name starts out reaching every project rather than
+// inheriting a pin nobody can see. When the row cannot be removed the value is
+// still gone and the error wraps ErrLinkRowKept: the row left behind can only
+// narrow what a re-created entry reaches, which is the safe direction.
 func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
 	key, _, err := w.keys(kind, name)
 	if err != nil {
@@ -161,16 +194,21 @@ func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
 	if err != nil {
 		return false, err
 	}
+	var removed []string
 	for _, vaultKey := range matches {
 		switch err := w.store.Delete(vaultKey); {
 		case err == nil:
 			ok = true
+			removed = append(removed, vaultKey)
 		case errors.Is(err, secrets.ErrNotFound):
 		default:
+			// The rows of what did go still go. Best effort: the refusal is
+			// the story, and a row kept only narrows.
+			_ = w.dropLinkRows(removed) //nolint:errcheck // see above
 			return ok, refusal(err)
 		}
 	}
-	return ok, nil
+	return ok, w.dropLinkRows(removed)
 }
 
 // sameEnvKey returns this scope's vault keys of kind whose names resolve to

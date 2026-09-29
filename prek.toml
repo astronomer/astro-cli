@@ -50,7 +50,8 @@ hooks = [
   { id = "file-contents-sorter", args = ["--ignore-case"], files = "^\\.gitignore$" },
   { id = "mixed-line-ending", args = ["--fix=lf"] },
   { id = "no-commit-to-branch", args = ["-b", "main"] },
-  { id = "pretty-format-json", args = ["--autofix", "--no-ensure-ascii"] },
+  # The --output json goldens pin field order (TestPublishedJSONPayloadsKeepTheirShape), which key sorting would break.
+  { id = "pretty-format-json", args = ["--autofix", "--no-ensure-ascii"], exclude = "^cmd/local/testdata/schema/" },
   { id = "sort-simple-yaml" },
   { id = "trailing-whitespace", exclude = ".*_test\\.go$" },
 ]

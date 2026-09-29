@@ -43,6 +43,13 @@ type ListItem struct {
 	// only, so that value never reaches this project. Omitted on every other
 	// row, and outside a project, where there is nothing to apply it to.
 	Applied *bool `json:"applied,omitempty"`
+	// NotLinkedHere marks a global the vault holds that does not reach this
+	// checkout: its link state names other projects, or the link index cannot
+	// be used (LinksDown then says why). LinkHint is the command that links it
+	// here, empty when the index is the cause.
+	NotLinkedHere bool   `json:"not_linked_here,omitempty"`
+	LinksDown     string `json:"links_down,omitempty"`
+	LinkHint      string `json:"link_hint,omitempty"`
 	// DeclareHint is the exact command to declare the name in the current
 	// project: for an orphan, so the value it names is one the project expects,
 	// and for a row Applied marks false, so the global value reaches it. Empty
@@ -57,7 +64,9 @@ type ListOptions struct {
 	// whole chain.
 	Scope Scope
 	// All widens the view to the global file plus every project's .env the
-	// CLI knows about, beyond the current project.
+	// CLI knows about, beyond the current project, and to the undeclared
+	// globals in the vault that do not reach this project, marked
+	// NotLinkedHere. Without it those are left out.
 	All bool
 	// WorkspaceProvider resolves names declared source = "workspace" against
 	// the workspace's Environment Manager objects, so `list` can label their
@@ -90,6 +99,10 @@ type VaultTier struct {
 	Label   string
 	Scope   Scope
 	Entries []VaultEntry
+	// LinksDown is set when the link index cannot be used, so every entry of
+	// this tier is Unlinked for that reason rather than for where it is
+	// linked: a short reason such as "link index unreadable".
+	LinksDown string
 }
 
 // VaultEntry is one name a vault tier holds. The name is the one stored, not
@@ -103,10 +116,7 @@ type VaultEntry struct {
 	// Unlinked marks a global the vault holds that does not resolve for this
 	// checkout: its link state names other projects, or the link index could
 	// not be read. It is listed so the vault's contents are not hidden, but no
-	// provider returns it here.
-	//
-	// TODO(vault-links): show it as "not linked here" in list output with the
-	// link verbs; until then it lists as an ordinary orphan.
+	// provider returns it here. The listing marks it NotLinkedHere.
 	Unlinked bool
 }
 
@@ -129,8 +139,17 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 	}
 
 	var items []ListItem
+	unlinked := unlinkedGlobals(opts)
 	for _, rn := range res.Resolved {
-		items = append(items, declaredItem(rn, schema))
+		item := declaredItem(rn, schema)
+		// Without --all a global that does not reach this project is as good
+		// as absent, so the declared row reads exactly as if none existed.
+		if item.Source == SourceAbsent && opts.All {
+			if e, ok := unlinked[envKeyOfItem(item)]; ok {
+				markNotLinked(&item, e.entry, e.tier)
+			}
+		}
+		items = append(items, item)
 	}
 	items = append(items, orphans(src, schema, opts, projectDir)...)
 	sort.SliceStable(items, func(i, j int) bool {
@@ -143,6 +162,35 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 		return items[i].Project < items[j].Project
 	})
 	return items, nil
+}
+
+type unlinkedGlobal struct {
+	entry VaultEntry
+	tier  VaultTier
+}
+
+// unlinkedGlobals is the vault's globals that do not reach this checkout, by
+// env key, so under --all a declared name that resolves nowhere can say it is
+// held but not linked here. Only the unnarrowed view reads the vault.
+func unlinkedGlobals(opts ListOptions) map[string]unlinkedGlobal {
+	if opts.Scope != "" {
+		return nil
+	}
+	out := map[string]unlinkedGlobal{}
+	for _, tier := range opts.VaultTiers {
+		for _, e := range tier.Entries {
+			if e.Unlinked {
+				out[e.EnvKey] = unlinkedGlobal{entry: e, tier: tier}
+			}
+		}
+	}
+	return out
+}
+
+// envKeyOfItem is the env key a declared row resolves under.
+func envKeyOfItem(item ListItem) string {
+	key, _ := EnvKeyFor(item.Kind, item.Name)
+	return key
 }
 
 // listProviders picks the chain a list reads over. A scope flag narrows it to
@@ -250,22 +298,41 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 			add(src.project, ScopeProject)
 		}
 		add(src.global, ScopeGlobal)
-		for _, tier := range opts.VaultTiers {
-			for _, e := range tier.Entries {
-				if declared[e.EnvKey] {
-					continue
-				}
-				item := vaultOrphanItem(e.Kind, e.Name, tier, src.hasProject)
-				if isAirflowSetting(e.EnvKey) {
-					item = ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label}
-				}
-				markIfNotApplied(&item, tier.Scope, e.EnvKey, inProject, vaultDeclareHint(e.Kind, e.Name))
-				out = append(out, item)
-			}
-		}
+		out = append(out, vaultOrphans(src, opts, declared, inProject)...)
 	}
 	if opts.All {
 		out = append(out, crossProjectOrphans(declared, projectDir)...)
+	}
+	return out
+}
+
+// vaultOrphans lists the undeclared names the vault tiers hold.
+func vaultOrphans(src Sources, opts ListOptions, declared, inProject map[string]bool) []ListItem {
+	var out []ListItem
+	for _, tier := range opts.VaultTiers {
+		for _, e := range tier.Entries {
+			if declared[e.EnvKey] {
+				continue
+			}
+			// A global that does not reach this project is not part of it,
+			// so only --all lists it. Outside a project nothing is reached
+			// through links, and hiding would empty the view.
+			if e.Unlinked && !opts.All && src.hasProject {
+				continue
+			}
+			item := vaultOrphanItem(e.Kind, e.Name, tier, src.hasProject)
+			if isAirflowSetting(e.EnvKey) {
+				item = ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label}
+			}
+			if e.Unlinked {
+				// Declaring it would not bring it in: it does not reach this
+				// checkout at all, which is the reason worth giving.
+				markNotLinked(&item, e, tier)
+			} else {
+				markIfNotApplied(&item, tier.Scope, e.EnvKey, inProject, vaultDeclareHint(e.Kind, e.Name))
+			}
+			out = append(out, item)
+		}
 	}
 	return out
 }
@@ -351,6 +418,16 @@ func orphanItem(key string, scope Scope, project string, inProject bool) ListIte
 	return item
 }
 
+// markNotLinked marks a row for a global the vault holds that does not reach
+// this checkout.
+func markNotLinked(item *ListItem, e VaultEntry, tier VaultTier) {
+	item.NotLinkedHere = true
+	item.LinksDown = tier.LinksDown
+	if tier.LinksDown == "" {
+		item.LinkHint = LinkHint(e.Kind, e.Name)
+	}
+}
+
 // markIfNotApplied marks an undeclared global row that a start leaves out of
 // the current project. Outside a project nothing is left out. A copy in the
 // project .env or the project vault reaches Airflow undeclared, so declaring
@@ -423,4 +500,10 @@ func removeHint(kind Kind, name string, scope Scope) string {
 // holds the value, so it takes no scope flag.
 func DeclareHint(kind Kind, name string) string {
 	return "astro local env " + Noun(kind) + " declare " + name
+}
+
+// LinkHint is the command that links a global vault entry to the project it
+// is run in.
+func LinkHint(kind Kind, name string) string {
+	return "astro local env " + Noun(kind) + " link " + name
 }

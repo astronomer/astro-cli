@@ -41,7 +41,7 @@ func TestGlobalSetWarnsAboutAProjectVaultCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, _, stderr := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global", "--everywhere"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stderr.String(), "astro local env connection delete db --project --secret\n") {
@@ -56,7 +56,7 @@ func TestGlobalSetWarnsAboutAProjectVaultCopy(t *testing.T) {
 func TestGlobalSetWithNoProjectCopyDoesNotWarn(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, stderr := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global", "--everywhere"); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(stderr.String(), "warning:") {

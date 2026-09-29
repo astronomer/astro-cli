@@ -1,8 +1,7 @@
 {
   "kind": "x",
   "name": "x",
-  "source": "x",
-  "value": "x",
+  "status": "x",
   "reach": {
     "everywhere": true,
     "projects": [

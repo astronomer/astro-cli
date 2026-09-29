@@ -131,7 +131,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 	// A value with no tier name in it, so only the source field can satisfy the
 	// assertion below.
 	d, _, _ := envDeps(t, dir, "shared-secret\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--secret", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--secret", "--global", "--everywhere"); err != nil {
 		t.Fatal(err)
 	}
 	got := getJSON(t, dir, "SHARED")

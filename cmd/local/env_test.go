@@ -939,7 +939,7 @@ func TestEnvVerbOrderMatchesTheCloudTree(t *testing.T) {
 
 	for _, noun := range []string{"variable", "connection", "airflow-variable"} {
 		t.Run(noun, func(t *testing.T) {
-			assert.Equal(t, []string{"list", "get", "set", "delete", "declare", "undeclare"}, names("local", "env", noun))
+			assert.Equal(t, []string{"list", "get", "set", "delete", "declare", "undeclare", "link", "unlink"}, names("local", "env", noun))
 		})
 	}
 

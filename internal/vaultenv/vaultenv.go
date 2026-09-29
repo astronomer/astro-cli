@@ -341,7 +341,11 @@ func (s *Source) Tiers() []localenv.VaultTier {
 		global = append(global, localenv.VaultEntry{Kind: localKind(w.kind), Name: w.name, EnvKey: envKey, Unlinked: true})
 	}
 	sort.Slice(global, func(i, j int) bool { return global[i].EnvKey < global[j].EnvKey })
-	return append(out, localenv.VaultTier{Label: SourceGlobal, Scope: localenv.ScopeGlobal, Entries: global})
+	tier := localenv.VaultTier{Label: SourceGlobal, Scope: localenv.ScopeGlobal, Entries: global}
+	if s.globalDown != nil {
+		tier.LinksDown = s.globalDown.short
+	}
+	return append(out, tier)
 }
 
 // entries turns one tier's index into listing entries, sorted by env key.
@@ -558,11 +562,9 @@ func (s *Source) withheldCause(key string) string {
 	if s.globalDown != nil {
 		return s.globalDown.cause
 	}
-	// TODO(vault-links): name the link command here once `astro local env
-	// <noun> link` exists.
-	return fmt.Sprintf("the shared vault holds global %s %q, but it is linked to %s; "+
-		"which projects each global reaches is recorded in %s",
-		localenv.Noun(localKind(w.kind)), w.name, describeReach(w.reach), s.linksPath)
+	return fmt.Sprintf("the shared vault holds global %s %q, but it is linked to %s. "+
+		"To use it here, run in this project: %s (which projects each global reaches is recorded in %s)",
+		localenv.Noun(localKind(w.kind)), w.name, describeReach(w.reach), localenv.LinkHint(localKind(w.kind), w.name), s.linksPath)
 }
 
 // describeReach says where a restricted global is linked, for a message,
