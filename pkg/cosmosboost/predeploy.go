@@ -2,11 +2,9 @@ package cosmosboost
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
@@ -30,45 +28,14 @@ func slimManifestEnabled() bool {
 	return value == "" || util.CheckEnvBool(value)
 }
 
-// manifestNameEnvVar holds a JSON directory->filename map (see
-// precompute.Options.ManifestNames).
-const manifestNameEnvVar = "ASTRO_COSMOS_BOOST_MANIFEST_NAME"
-
-// manifestNameOverrides parses manifestNameEnvVar ("" when unset). Every
-// value must be a bare filename: findManifests matches by basename, so a
-// path there would silently match nothing.
-func manifestNameOverrides() (map[string]string, error) {
-	value := strings.TrimSpace(os.Getenv(manifestNameEnvVar))
-	if value == "" {
-		return nil, nil
-	}
-	var overrides map[string]string
-	if err := json.Unmarshal([]byte(value), &overrides); err != nil {
-		return nil, fmt.Errorf("%s must be a JSON object of directory to manifest filename: %w", manifestNameEnvVar, err)
-	}
-	for dir, name := range overrides {
-		if filepath.Base(name) != name {
-			return nil, fmt.Errorf("%s: %q for directory %q must be a bare filename, not a path", manifestNameEnvVar, name, dir)
-		}
-	}
-	return overrides, nil
-}
-
 // PreDeploy runs the Cosmos Boost pre-deploy step over path: every dbt project
 // (dbt_project.yml) gets a .astro/dbt_metadata.json sidecar carrying its
 // content hash, which the Cosmos Boost plugin uses as a cache version key at
 // parse time instead of hashing the project tree itself. Every standalone dbt
-// manifest.json gets a hash sidecar too, plus a slim, field-filtered copy for
+// manifest gets a hash sidecar too, plus a slim, field-filtered copy for
 // the plugin to load in place of the full manifest at DAG-parse time.
 func PreDeploy(path string) error {
-	manifestNames, err := manifestNameOverrides()
-	if err != nil {
-		return err
-	}
-	opts := precompute.Options{
-		SlimManifest:  slimManifestEnabled(),
-		ManifestNames: manifestNames,
-	}
+	opts := precompute.Options{SlimManifest: slimManifestEnabled()}
 	summary, err := precompute.Run([]string{path}, version.CurrVersion, opts)
 	if err != nil {
 		return fmt.Errorf("running the Cosmos Boost pre-deploy step: %w", err)

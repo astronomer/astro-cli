@@ -101,42 +101,17 @@ func TestSlimManifestEnabled(t *testing.T) {
 	}
 }
 
-// TestPreDeployRespectsManifestNameEnvVar: a differently-named manifest is
-// stamped once the env var names it for the deploy root (".").
-func TestPreDeployRespectsManifestNameEnvVar(t *testing.T) {
+// TestPreDeployDiscoversCustomNamedManifest: a manifest not literally named
+// manifest.json is found and stamped automatically - by name and content,
+// with nothing to configure.
+func TestPreDeployDiscoversCustomNamedManifest(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest_full.json"), []byte(manifest), 0o644))
 
 	require.NoError(t, PreDeploy(dir))
-	_, err := os.Stat(filepath.Join(dir, ".astro"))
-	require.True(t, os.IsNotExist(err), "a non-manifest.json name is invisible to discovery without the override")
-
-	t.Setenv(manifestNameEnvVar, `{".": "manifest_full.json"}`)
-	require.NoError(t, PreDeploy(dir))
 	require.FileExists(t, filepath.Join(dir, artifactRelPath))
-}
-
-// TestManifestNameOverrides: unset is nil; malformed JSON or a non-bare
-// filename value is rejected instead of silently matching nothing.
-func TestManifestNameOverrides(t *testing.T) {
-	t.Setenv(manifestNameEnvVar, "")
-	got, err := manifestNameOverrides()
-	require.NoError(t, err)
-	require.Nil(t, got)
-
-	t.Setenv(manifestNameEnvVar, `{".": "manifest_full.json"}`)
-	got, err = manifestNameOverrides()
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{".": "manifest_full.json"}, got)
-
-	t.Setenv(manifestNameEnvVar, "not-json")
-	_, err = manifestNameOverrides()
-	require.ErrorContains(t, err, manifestNameEnvVar)
-
-	t.Setenv(manifestNameEnvVar, `{".": "target/manifest_full.json"}`)
-	_, err = manifestNameOverrides()
-	require.ErrorContains(t, err, manifestNameEnvVar)
+	require.FileExists(t, filepath.Join(dir, ".astro", "manifest_full.slim.json"))
 }
 
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
