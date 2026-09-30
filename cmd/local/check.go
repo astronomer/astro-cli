@@ -115,7 +115,10 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	}
 	res = withEnvFindings(res, envFindings(envRep))
 
-	if err := renderCheck(r, res, strict, provisioned); err != nil {
+	// Best effort: the check is about the DAGs, and a listing that cannot be
+	// read only costs the note.
+	undeclared, _ := plan.UndeclaredLocal(project, m) //nolint:errcheck // informational, see above
+	if err := renderCheck(r, res, strict, provisioned, undeclared); err != nil {
 		return err
 	}
 	if code := res.ExitCode(strict); code != checks.ExitOK {
@@ -372,20 +375,26 @@ type checkSummary struct {
 	// docker project, whose image is the real environment. Omitted when false
 	// so the ordinary payload is unchanged.
 	Provisioned bool `json:"provisioned,omitempty"`
+	// UndeclaredEnv is the env-var names the project gets from this machine
+	// without declaring them (plan.UndeclaredLocal). Informational: they work
+	// here and will not follow the project to a Deployment or a teammate, so
+	// they never fail the check, --strict or not. Names only.
+	UndeclaredEnv []string `json:"undeclared_env,omitempty"`
 }
 
 // renderCheck writes findings then a summary. In json mode each finding is one
 // NDJSON line and the summary is the last; in text mode findings form a table
 // and the summary is one sentence. Both render the same data.
-func renderCheck(r Renderer, res checks.Result, strict, provisioned bool) error {
+func renderCheck(r Renderer, res checks.Result, strict, provisioned bool, undeclared []string) error {
 	summary := checkSummary{
-		Event:       "summary",
-		Provisioned: provisioned,
-		Dags:        res.DagCount,
-		Errors:      res.Errors,
-		Warnings:    res.Warnings,
-		Strict:      strict,
-		Passed:      res.Passed(strict),
+		Event:         "summary",
+		Provisioned:   provisioned,
+		UndeclaredEnv: undeclared,
+		Dags:          res.DagCount,
+		Errors:        res.Errors,
+		Warnings:      res.Warnings,
+		Strict:        strict,
+		Passed:        res.Passed(strict),
 	}
 	if r.Format == FormatJSON {
 		for i := range res.Findings {
@@ -405,6 +414,11 @@ func renderCheck(r Renderer, res checks.Result, strict, provisioned bool) error 
 	// gap, a duplicate dag id butted straight up against the verdict.
 	if len(res.Findings) > 0 {
 		if _, err := fmt.Fprintln(r.Out); err != nil {
+			return err
+		}
+	}
+	if note := plan.UndeclaredNote(undeclared); note != "" {
+		if _, err := fmt.Fprintf(r.Out, "info: %s\n\n", note); err != nil {
 			return err
 		}
 	}

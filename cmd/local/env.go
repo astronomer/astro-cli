@@ -335,7 +335,9 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		"for a declared-sensitive name.\n\n" +
 		"A new global in the vault reaches no project until you link it with\n" +
 		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --everywhere creates it\n" +
-		"reaching every project instead. Updating an existing global keeps its links."
+		"reaching every project instead. Updating an existing global keeps its links.\n" +
+		"A global goes to the Airflow of every project it reaches, whether or not the\n" +
+		"project declares it."
 	if k.kind == localenv.KindConn {
 		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type,\n" +
 			"--host and the rest."
@@ -499,8 +501,11 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 	// noun's own list says all it needs in its Short.
 	long := ""
 	if only == "" {
-		long = "List every declared value and where it resolves from. Values are not shown;\n" +
-			"use get to see one."
+		long = "List every declared value and where it resolves from, and every undeclared\n" +
+			"value a start passes to this project anyway. Whatever reaches a project goes\n" +
+			"to its Airflow, declared or not: declaring a name makes it a requirement, and\n" +
+			"`link` narrows which projects a global reaches. Values are not shown; use get\n" +
+			"to see one."
 	}
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -661,7 +666,7 @@ func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string, 
 		created = !had
 		globalVault.NewEverywhere = everywhere
 		// A value moving in from ~/.astro/env is not new: it already reached
-		// every project that declares it, and the plain copy is about to be
+		// every project, and the plain copy is about to be
 		// removed, so seeding an empty row would take it away from all of
 		// them. It moves in with no row.
 		if created && plainGlobalHas(kind, name) {
@@ -775,8 +780,10 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 }
 
 // noteUndeclaredGlobal tells a --global set inside a project that the project
-// does not declare the name: a start passes global values through for declared
-// names only, so this project will not see the value. Silent outside a project
+// does not declare the name. A start passes every global that reaches the
+// project, declared or not, so the note is not that the value is missing: it
+// is that nothing makes the project require it, and a Deployment or a
+// teammate's clone will not know to supply it. Silent outside a project
 // and when the manifest does not read, where there is nothing to check, and
 // after warnProjectShadows, whose project copy wins whether or not it is
 // declared.
@@ -792,7 +799,8 @@ func (c *cli) noteUndeclaredGlobal(kind localenv.Kind, name string) {
 	if _, ok := declaredSpec(schema, kind, name); ok {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "note: this project does not declare %s, so it will not see the global value. Declare it with: %s\n",
+	fmt.Fprintf(c.d.Stderr, "note: this project does not declare %s. It gets the global value wherever the value reaches, "+
+		"but declare it to make it a requirement: %s\n",
 		name, localenv.DeclareHint(kind, name))
 }
 
@@ -1189,8 +1197,13 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 			note = "not linked here: " + it.LinksDown
 		case it.NotLinkedHere:
 			note = "not linked here (link: " + it.LinkHint + ")"
-		case it.Applied != nil && !*it.Applied:
-			note = "not applied: declare it to use it here (" + it.DeclareHint + ")"
+		case it.Orphan && it.Applied != nil && *it.Applied && it.DeclareHint != "":
+			// The value reaches Airflow already, so declaring it only makes it
+			// a requirement the project states.
+			note = "not declared (declare it to make it a requirement: " + it.DeclareHint + ")"
+			if it.RemoveHint != "" {
+				note += "; remove: " + it.RemoveHint
+			}
 		case it.Orphan:
 			note = "undeclared"
 			// An orphan found under --all lives in another project's file, and

@@ -101,6 +101,29 @@ func TestPackageMWAABuildsTree(t *testing.T) {
 	}
 }
 
+// A value the project gets from this machine without declaring it is carried by
+// no artifact, so package warns about it beside the target's own warnings.
+func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("ASTRO_HOME", "")
+	d, out := testDeps(t)
+	dir := t.TempDir()
+	writeManifest(t, &d, dir)
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("AIRFLOW_VAR_REGION=us\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outDir := filepath.Join(t.TempDir(), "mwaa-artifact")
+	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
+		t.Fatalf("package mwaa: %v", err)
+	}
+	line, ok := lineContaining(out.String(), "AIRFLOW_VAR_REGION")
+	if !ok || !strings.Contains(line, "will not follow it to a Deployment") {
+		t.Errorf("want a warning naming AIRFLOW_VAR_REGION:\n%s", out.String())
+	}
+}
+
 // `astro package astro` refuses a [tool.astro.env] declaration the parser
 // refuses, as `astro local start` does, before it needs Docker.
 func TestPackageAstroRefusesAnEnvDeclarationThatDoesNotParse(t *testing.T) {

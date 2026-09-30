@@ -63,7 +63,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
-	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -125,7 +124,7 @@ type Source struct {
 	mu sync.Mutex
 	// values and readErrs cache the outcome of each decrypt, per vault key.
 	//
-	// A cache rather than a convenience: a declared value was being decrypted
+	// A cache rather than a convenience: a value was being decrypted
 	// twice per start, once by the resolver's Lookup and again by
 	// SecretInjection, so every file read and AEAD open happened twice. And the
 	// error has to be per key — a source-wide latch mislabeled a value that read
@@ -483,28 +482,21 @@ func (s *Source) readErrFor(vaultKey string) error {
 // a value and handed to the compose process instead (pkg/localrt), and
 // standalone treats it as ordinary environment.
 //
-// The two tiers inject by different rules, mirroring the files they sit beside:
-//
-//   - The project tier goes in wholesale. These are this project's own secrets,
-//     like its .env.
-//   - The global tier contributes only what the schema declares, like
-//     ~/.astro/env, so a machine-wide secret never leaks into a project that
-//     did not ask for it.
-//
-// Which globals are candidates at all is decided earlier, by the link state
-// both tools share (see the package doc): s.global holds only the globals whose
-// reach includes this checkout. The declared-only rule applies on top of that,
-// and it is where the two tools still differ on purpose: Astro Desktop injects
-// every global that reaches a project, while this injects only the reaching
-// globals the schema declares, matching the CLI's treatment of its global
-// file. A project that wants a global secret declares it, which is portable
-// and visible in review.
+// Both tiers inject everything they hold for this checkout, declared or not.
+// The project tier is this project's own secrets, like its .env. The global
+// tier is every global whose link state reaches this checkout: s.global holds
+// only those (see the package doc), so the link state is the one filter, and
+// `astro local env <noun> link` is how a user narrows it. A declaration is a
+// requirement on top of that rather than a gate: it makes a start refuse when
+// no source supplies the name, and it types and validates the value. Astro
+// Desktop applies the same rule to the same vault, so a value reaches a project
+// the same way from either tool.
 //
 // Best effort by design. An unreachable keyring yields an empty map rather than
 // an error, because the resolver has already decided what a run cannot start
 // without: a declared name with no source blocks it through Missing, and an
-// undeclared one was never load-bearing.
-func (s *Source) SecretInjection(schema *envschema.Schema) map[string]string {
+// undeclared one is not a requirement.
+func (s *Source) SecretInjection() map[string]string {
 	s.load()
 	out := map[string]string{}
 	if s.down != nil {
@@ -518,14 +510,12 @@ func (s *Source) SecretInjection(schema *envschema.Schema) map[string]string {
 	// Global second so a project secret of the same name is not overwritten by
 	// it. Both maps are keyed by the same env-var name, so this ordering IS the
 	// precedence.
-	for _, envKey := range envschema.DeclaredEnvKeys(schema) {
+	for envKey, vk := range s.global {
 		if _, taken := out[envKey]; taken {
 			continue
 		}
-		if vk, ok := s.global[envKey]; ok {
-			if v, ok := s.read(vk); ok {
-				out[envKey] = v
-			}
+		if v, ok := s.read(vk); ok {
+			out[envKey] = v
 		}
 	}
 	return out
@@ -651,9 +641,9 @@ func linkedPaths(r secrets.Reach) string {
 // It exists for pkg/connwarehouse, which writes what it gets to a plaintext
 // file for Otto's analyzing-data skill, so a global withheld from this
 // checkout, or every global while the link index is unusable, must not reach
-// it. Unlike SecretInjection there is no declared-only filter: the desktop
-// feeds every connection that reaches a project, and the two launch paths give
-// Otto the same warehouses.
+// it. It reads the same two indexes SecretInjection does, so the warehouses
+// Otto gets are exactly the connections a start injects, and the desktop feeds
+// the same set.
 //
 // Best effort: a vault that cannot be read yields nothing, and an entry that
 // cannot be decrypted or decoded is left out.

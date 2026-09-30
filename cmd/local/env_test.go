@@ -221,9 +221,9 @@ func TestEnvGlobalScope(t *testing.T) {
 	}
 }
 
-// A global value reaches a project only through a declaration, so a --global
-// set in a project that does not declare the name says so, and one that does
-// stays quiet.
+// A global value reaches a project declared or not, so a --global set in a
+// project that does not declare the name says a declaration would make it a
+// requirement, and one that does stays quiet.
 func TestEnvGlobalSetNotesAnUndeclaredName(t *testing.T) {
 	dir := envProject(t, "[tool.astro.env]\nDECLARED = {}\n")
 
@@ -231,7 +231,8 @@ func TestEnvGlobalSetNotesAnUndeclaredName(t *testing.T) {
 	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global"); err != nil {
 		t.Fatal(err)
 	}
-	want := "this project does not declare STRAY, so it will not see the global value. Declare it with: astro local env variable declare STRAY"
+	want := "this project does not declare STRAY. It gets the global value wherever the value reaches, " +
+		"but declare it to make it a requirement: astro local env variable declare STRAY"
 	if !strings.Contains(stderr.String(), want) {
 		t.Errorf("stderr = %q, want it to contain %q", stderr.String(), want)
 	}
@@ -245,9 +246,9 @@ func TestEnvGlobalSetNotesAnUndeclaredName(t *testing.T) {
 	}
 }
 
-// An undeclared global value never reaches the project, so list marks it not
-// applied, in the table and in the JSON rows.
-func TestEnvListMarksUndeclaredGlobalNotApplied(t *testing.T) {
+// An undeclared global value reaches the project, so list marks it applied and
+// notes it is not declared, in the table and in the JSON rows.
+func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	dir := envProject(t, "[tool.astro.env]\nDECLARED = {}\n")
 	d, _, _ := envDeps(t, dir, "v\n")
 	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global"); err != nil {
@@ -265,12 +266,12 @@ func TestEnvListMarksUndeclaredGlobalNotApplied(t *testing.T) {
 	for _, line := range strings.Split(out.String(), "\n") {
 		switch {
 		case strings.Contains(line, "STRAY"):
-			if !strings.Contains(line, "not applied: declare it to use it here (astro local env variable declare STRAY)") {
-				t.Errorf("STRAY row = %q, want the not-applied note", line)
+			if !strings.Contains(line, "not declared (declare it to make it a requirement: astro local env variable declare STRAY)") {
+				t.Errorf("STRAY row = %q, want the not-declared note", line)
 			}
 		case strings.Contains(line, "DECLARED"):
-			if strings.Contains(line, "not applied") {
-				t.Errorf("DECLARED row = %q, want no not-applied note", line)
+			if strings.Contains(line, "not declared") {
+				t.Errorf("DECLARED row = %q, want no not-declared note", line)
 			}
 		}
 	}
@@ -288,8 +289,8 @@ func TestEnvListMarksUndeclaredGlobalNotApplied(t *testing.T) {
 		}
 		rows[it.Name] = it
 	}
-	if a := rows["STRAY"].Applied; a == nil || *a {
-		t.Errorf("STRAY applied = %v, want false", a)
+	if a := rows["STRAY"].Applied; a == nil || !*a {
+		t.Errorf("STRAY applied = %v, want true", a)
 	}
 	if rows["STRAY"].DeclareHint != "astro local env variable declare STRAY" {
 		t.Errorf("STRAY declare hint = %q", rows["STRAY"].DeclareHint)

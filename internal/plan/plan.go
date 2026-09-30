@@ -7,10 +7,12 @@
 package plan
 
 import (
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
@@ -216,6 +218,41 @@ func EnvironReport(dir string, m *manifest.Manifest) ([]string, EnvReport, error
 	return env, rep, nil
 }
 
+// UndeclaredLocal is the env-var names a start of the project in dir passes to
+// Airflow from this machine without the manifest declaring them
+// (localenv.Sources.Undeclared). It reads the files and the vault's listing and
+// decrypts nothing, so it opens no keyring.
+func UndeclaredLocal(dir string, m *manifest.Manifest) ([]string, error) {
+	schema, err := envschema.ParseSchema(m.Astro.Env)
+	if err != nil {
+		return nil, err
+	}
+	src, err := localenv.LoadSources(os.Environ(), dir)
+	if err != nil {
+		return nil, err
+	}
+	return src.Undeclared(schema, vaultenv.Load(dir).Tiers()), nil
+}
+
+// UndeclaredNote is the sentence check and package print for UndeclaredLocal's
+// names, or empty when there are none.
+func UndeclaredNote(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("this project gets %s locally without declaring %s, so %s will not follow it to a Deployment "+
+		"or a teammate's clone. Declare what it needs to make it a requirement: astro local env <kind> declare NAME "+
+		"(run astro local env list to see where each comes from)",
+		strings.Join(names, ", "), pronoun(len(names), "it", "them"), pronoun(len(names), "it", "they"))
+}
+
+func pronoun(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
 // choosePort applies the v2 requested-port precedence:
 //
 //	--port flag > user state > manifest default > runtime allocator.
@@ -258,15 +295,16 @@ func PersistPort(projectPath string, chosen int) error {
 // declared names only the shell satisfies (Plan.PassthroughEnv). A required
 // value with no source surfaces as *MissingEnvError — the clone-and-run gate.
 //
-// Injection is not the resolved map: the project .env goes in wholesale
-// (every entry, docker-compose semantics) and the global file contributes
-// only its schema-declared entries (localenv.Sources.Injection). Both engines
-// apply the result identically through Plan.Env.
+// Injection is not the resolved map: everything that reaches the project goes
+// in, declared or not. The project .env and the global file go in wholesale
+// (localenv.Sources.Injection), and the vault's project secrets and every
+// global linked to this checkout come back separately, for Plan.SecretEnv
+// (vaultenv.SecretInjection). A declaration is a requirement, not a gate: it
+// refuses a start when nothing supplies the name, and types the value.
 //
-// The vault's values come back separately, for Plan.SecretEnv, and follow the
-// same shape one tier down: the project's own secrets wholesale, the
-// machine-wide ones only where the schema declares them
-// (vaultenv.SecretInjection).
+// A name more than one source holds goes to the highest in the chain above,
+// with one exception kept from before: the project .env, applied wholesale,
+// also beats the shell for a name the schema does not declare.
 // resolvedEnv is what resolveEnv hands Build: the environment in its two
 // halves, the names docker passes through from the shell, the value-level
 // warnings, and any required value the start was allowed past.
@@ -334,7 +372,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 			winner[r.EnvKey] = r.Source
 		}
 	}
-	inj := src.Injection(schema)
+	inj := src.Injection()
 	wsInj := map[string]string{}
 	for k, v := range res.Injected {
 		if winner[k] == string(envschema.SourceWorkspace) {
@@ -349,18 +387,23 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	// rather than by the chain — which means everything the chain already decided
 	// has to be applied here by hand.
 	//
-	// Membership in `inj` was the wrong test, in both directions. `inj` carries
-	// the global file's schema-declared entries, and those sit BELOW both vault
-	// tiers, so keying on it let ~/.astro/env delete a secret that had won. And a
-	// name the shell environment satisfied is not in `inj` at all, so keying on it
-	// left the secret in place and let it override an explicit
-	// `FOO=bar astro local start`. Both inverted the documented order.
+	// Membership in `inj` is the wrong test, in both directions. `inj` carries
+	// the global file's entries, and those sit BELOW both vault tiers, so keying
+	// on it would let ~/.astro/env delete a secret that had won. And a name the
+	// shell environment satisfied is not in `inj` at all, so keying on it would
+	// leave the secret in place and let it override an explicit
+	// `FOO=bar astro local start`. Both invert the documented order.
 	//
 	// The resolver already made this decision for every DECLARED name, so ask it
 	// rather than re-deriving. A name the schema does not declare was never
-	// resolved — the project tier injects wholesale — so those are checked
-	// against the sources that outrank the vault.
-	secretInj := vault.SecretInjection(schema)
+	// resolved — both vault tiers inject everything that reaches the checkout —
+	// so those are checked against the sources that outrank the vault, and
+	// otherwise beat the global file.
+	secretInj := vault.SecretInjection()
+	// shellWon is the undeclared names a lower source held that the shell beat.
+	// Standalone inherits the shell, but a docker container does not, so these
+	// have to join the passthrough list or docker gets no value at all.
+	shellWon := src.ShellOverGlobalFile()
 	for k := range secretInj {
 		if source, declared := winner[k]; declared {
 			if vaultenv.IsVaultSource(source) {
@@ -376,6 +419,9 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		}
 		if src.AboveVault(k) {
 			delete(secretInj, k)
+			if src.InShell(k) {
+				shellWon = append(shellWon, k)
+			}
 			continue
 		}
 		delete(inj, k)
@@ -391,7 +437,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	return resolvedEnv{
 		env:            inj,
 		secretEnv:      secretInj,
-		passthrough:    passthroughKeys(res.Resolved, inj),
+		passthrough:    withShellWon(passthroughKeys(res.Resolved, inj), shellWon, inj, secretInj),
 		warnings:       valueWarnings(res.Violations),
 		startedWithout: startedWithout,
 	}, nil
@@ -415,6 +461,29 @@ func valueWarnings(all []envschema.Violation) []envschema.Violation {
 		}
 	}
 	return out
+}
+
+// withShellWon adds the undeclared names the shell beat a lower source for to
+// the passthrough list, once each and sorted after the declared ones. A name
+// something else still carries (Env or SecretEnv) is left out: that value is
+// what both engines apply.
+func withShellWon(keys, shellWon []string, env, secretEnv map[string]string) []string {
+	seen := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		seen[k] = true
+	}
+	extra := make([]string, 0, len(shellWon))
+	for _, k := range shellWon {
+		_, inEnv := env[k]
+		_, inSecret := secretEnv[k]
+		if seen[k] || inEnv || inSecret {
+			continue
+		}
+		seen[k] = true
+		extra = append(extra, k)
+	}
+	slices.Sort(extra)
+	return append(keys, extra...)
 }
 
 // passthroughKeys is the Airflow env-var names for declared values the shell

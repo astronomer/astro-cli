@@ -116,8 +116,10 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"does not. --everywhere removes the links, and the value reaches every project\n" +
 			"again.\n\n" +
 			"Only global vault entries have links: a project secret already reaches only\n" +
-			"its own project, and ~/.astro/env reaches only projects that declare a name.\n" +
-			"Astro Desktop reads the same links.",
+			"its own project, and ~/.astro/env reaches every project.\n\n" +
+			"Whatever reaches a project is passed to its Airflow at start, declared or not,\n" +
+			"so linking is how to keep a global out of the projects that should not get\n" +
+			"it. Astro Desktop reads the same links.",
 		Example: `
   # limit it to the current project (and its worktrees)
   astro local env ` + noun + ` link ` + exampleName(k.kind) + `
@@ -283,7 +285,7 @@ func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, d
 // refusePinnedToPlain refuses a plain ~/.astro/env set of a name the global
 // vault holds with link state. The set would remove the vault copy, row and
 // all (removeOtherCopy), and a plain global has no links: it reaches every
-// project that declares it, so a pinned value would silently widen. Nothing
+// project, so a pinned value would silently widen. Nothing
 // is refused for a project store, or for a vault entry that reaches every
 // project already.
 func refusePinnedToPlain(store valueStore, kind localenv.Kind, name string) error {
@@ -305,8 +307,8 @@ func refusePinnedToPlain(store valueStore, kind localenv.Kind, name string) erro
 	case r.Everywhere:
 		return nil
 	}
-	return fmt.Errorf("%s %s is held in the vault linked to %s. %s has no links, so the value would reach every project "+
-		"that declares it. Keep it in the vault (drop --secret=false), or first run: %s --everywhere",
+	return fmt.Errorf("%s %s is held in the vault linked to %s. %s has no links, so the value would reach every project. "+
+		"Keep it in the vault (drop --secret=false), or first run: %s --everywhere",
 		localenv.Noun(kind), name, newReachJSON(r).text(), store.Location(), localenv.LinkHint(kind, name))
 }
 
@@ -373,7 +375,7 @@ func (c *cli) linkWriter(scope *scopeFlags, kind localenv.Kind, name string) (*v
 	}
 	if gs, err := localenv.GlobalStore(); err == nil {
 		if _, ok, _ := gs.Get(kind, name); ok { //nolint:errcheck // an unreadable file just skips this reason
-			return nil, fmt.Errorf("%s %s is in %s, a plain file outside the vault, which has no links: a start passes it only to projects that declare it. "+
+			return nil, fmt.Errorf("%s %s is in %s, a plain file outside the vault, which has no links: a start passes it to every project. "+
 				"To limit it to specific projects, move it into the vault with: astro local env %s set %s --global --secret",
 				noun, name, gs.Path, noun, name)
 		}

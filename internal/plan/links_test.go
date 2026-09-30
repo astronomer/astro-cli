@@ -55,14 +55,14 @@ func TestNoLinkIndexLeavesTheStartGateUnchanged(t *testing.T) {
 		t.Errorf("gate payload changed:\n got: %s\nwant: %s", got, want)
 	}
 
-	// Resolution: the declared global and the project secret inject; the
-	// undeclared global does not.
+	// Resolution: everything that reaches the project injects, the undeclared
+	// global included.
 	write("GLOBAL_TOKEN = {}\n")
 	built, err := Build(dir, Options{Mode: localrt.ModeDocker})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantSecret := map[string]string{"GLOBAL_TOKEN": "from-vault", "PROJECT_ONLY": "from-vault"}
+	wantSecret := map[string]string{"GLOBAL_TOKEN": "from-vault", "PROJECT_ONLY": "from-vault", "UNDECLARED_GLOBAL": "from-vault"}
 	if !maps.Equal(built.Plan.SecretEnv, wantSecret) {
 		t.Errorf("SecretEnv = %v, want %v", built.Plan.SecretEnv, wantSecret)
 	}

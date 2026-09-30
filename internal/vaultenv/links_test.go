@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 	"github.com/astronomer/astro-cli/pkg/secrets/secretstest"
 )
@@ -87,6 +88,7 @@ func TestReachCasesThroughLoad(t *testing.T) {
 			}
 
 			assertLookups(t, s, c.Want)
+			assertInjection(t, s, c.Want)
 		})
 	}
 }
@@ -111,6 +113,67 @@ func globalTierKeys(t *testing.T, s *Source) (eligible, unlinked []string) {
 		}
 	}
 	return eligible, unlinked
+}
+
+// assertInjection checks a start injects exactly the globals that reach the
+// checkout, with no schema declaring any of them: the link state is the one
+// filter.
+func assertInjection(t *testing.T, s *Source, want []string) {
+	t.Helper()
+	inj := s.SecretInjection()
+	for _, key := range secretstest.ReachVault {
+		v, ok := inj[envKeyOf(t, key)]
+		reaches := slices.Contains(want, key)
+		switch {
+		case reaches && (!ok || v != "value of "+key):
+			t.Errorf("%s reaches this checkout undeclared but was not injected (%q, %v)", key, v, ok)
+		case !reaches && ok:
+			t.Errorf("%s was injected into a checkout it does not reach", key)
+		}
+	}
+}
+
+// The warehouse feed and a start agree on what reaches a checkout: for every
+// reach case, the connections ReachingConnections decodes are exactly the
+// AIRFLOW_CONN_* names SecretInjection carries. Values are valid connection
+// JSON here so both sides can decode every one.
+func TestWarehouseFeedMatchesInjection(t *testing.T) {
+	for _, c := range secretstest.ReachCases() {
+		t.Run(c.Name, func(t *testing.T) {
+			vaultDir := isolatedHome(t)
+			l := secretstest.NewLayout(t)
+			if why := c.Skip(l); why != "" {
+				t.Skip(why)
+			}
+			store, err := secrets.NewKeyringStore(secrets.Config{Service: secrets.DefaultService, Dir: vaultDir})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, k := range secretstest.ReachVault {
+				if err := store.Set(k, `{"conn_type":"postgres","host":"h"}`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			c.WriteIndex(t, vaultDir, l)
+
+			s := Load(l.Dir(c.Place))
+			var fed []string
+			for _, conn := range s.ReachingConnections() {
+				fed = append(fed, airflowenv.EnvKeyForConnID(conn.ConnID))
+			}
+			var injected []string
+			for k := range s.SecretInjection() {
+				if airflowenv.IsConnEnvKey(k) {
+					injected = append(injected, k)
+				}
+			}
+			slices.Sort(fed)
+			slices.Sort(injected)
+			if !slices.Equal(fed, injected) {
+				t.Errorf("warehouse feed = %v, injected connections = %v; they must agree", fed, injected)
+			}
+		})
+	}
 }
 
 // assertLookups checks every listed key resolves from the global tier exactly
@@ -215,7 +278,7 @@ func assertGlobalTierClosed(t *testing.T, s *Source) {
 	if v, source, ok := lookup(s, "PROJECT_TOKEN"); !ok || v != "project" || source != SourceProject {
 		t.Errorf("project secret = %q from %q (%v); the project tier must keep working", v, source, ok)
 	}
-	if inj := s.SecretInjection(nil); inj["PROJECT_TOKEN"] != "project" || len(inj) != 1 {
+	if inj := s.SecretInjection(); inj["PROJECT_TOKEN"] != "project" || len(inj) != 1 {
 		t.Errorf("injection = %v, want only the project secret", inj)
 	}
 	d := globalDiagnoser(t, s)

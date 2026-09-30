@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	pkgmanifest "github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/secrets"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -68,8 +69,8 @@ func TestChoosePortPrecedence(t *testing.T) {
 
 func TestBuildFillsPlanFromManifest(t *testing.T) {
 	dir := newProject(t)
-	secrets := []string{"id=netrc,env=NETRC_CONTENT"}
-	built, err := Build(dir, Options{Mode: localrt.ModeDocker, RequestedPort: 8080, StopWithSession: true, BuildSecretFlags: secrets})
+	flagSecrets := []string{"id=netrc,env=NETRC_CONTENT"}
+	built, err := Build(dir, Options{Mode: localrt.ModeDocker, RequestedPort: 8080, StopWithSession: true, BuildSecretFlags: flagSecrets})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,8 +87,8 @@ func TestBuildFillsPlanFromManifest(t *testing.T) {
 	if p.Mode != localrt.ModeDocker || !p.StopWithSession || p.RequestedPort != 8080 {
 		t.Errorf("flags not carried: mode=%q stopWithSession=%v port=%d", p.Mode, p.StopWithSession, p.RequestedPort)
 	}
-	if !slices.Equal(p.BuildSecrets, secrets) {
-		t.Errorf("BuildSecrets = %q, want %q", p.BuildSecrets, secrets)
+	if !slices.Equal(p.BuildSecrets, flagSecrets) {
+		t.Errorf("BuildSecrets = %q, want %q", p.BuildSecrets, flagSecrets)
 	}
 	if !strings.HasSuffix(p.Hostname, ".localhost") {
 		t.Errorf("Hostname = %q, want a .localhost label", p.Hostname)
@@ -370,6 +371,192 @@ func TestProjectDotEnvBeatsAnUndeclaredVaultSecret(t *testing.T) {
 	}
 	if got := built.Plan.SecretEnv["ONLY_VAULT"]; got != "from-vault" {
 		t.Errorf("SecretEnv[ONLY_VAULT] = %q, want the undeclared project secret injected wholesale", got)
+	}
+}
+
+// seedValue stores one value in the vault: global when projectDir is empty,
+// reaching every project.
+func seedValue(t *testing.T, projectDir string, kind localenv.Kind, name, value string) {
+	t.Helper()
+	w, err := vaultenv.NewWriter(projectDir)
+	if err != nil {
+		t.Fatalf("open vault writer: %v", err)
+	}
+	w.NewEverywhere = true
+	if _, err := w.Set(kind, name, value); err != nil {
+		t.Fatalf("seed vault: %v", err)
+	}
+}
+
+// Nothing here is declared, and all of it reaches the project, so every name
+// injects and the chain alone picks each winner: shell > project .env >
+// project vault > global vault > ~/.astro/env. A declaration is not what gets
+// a value in.
+func TestUndeclaredValuesInjectInChainOrder(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("DOTENV_OVER_VAULT=from-dotenv\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	globalFile := "FILE_ONLY=from-file\nVAULT_OVER_FILE=from-file\nSHELL_OVER_FILE=from-file\n"
+	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte(globalFile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	seedValue(t, "", localenv.KindConn, "shared_db", "postgres://global")
+	seedValue(t, "", localenv.KindEnv, "VAULT_OVER_FILE", "from-global-vault")
+	seedValue(t, "", localenv.KindEnv, "PROJECT_OVER_GLOBAL", "from-global-vault")
+	seedValue(t, dir, localenv.KindEnv, "PROJECT_OVER_GLOBAL", "from-project-vault")
+	seedValue(t, "", localenv.KindEnv, "DOTENV_OVER_VAULT", "from-global-vault")
+	seedValue(t, "", localenv.KindEnv, "SHELL_OVER_VAULT", "from-global-vault")
+	t.Setenv("SHELL_OVER_VAULT", "from-shell")
+	t.Setenv("SHELL_OVER_FILE", "from-shell")
+
+	built, err := Build(dir, Options{Mode: localrt.ModeStandalone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, secret := built.Plan.Env, built.Plan.SecretEnv
+	checks := []struct {
+		name      string
+		m         map[string]string
+		key, want string
+	}{
+		{"an undeclared linked global connection injects", secret, "AIRFLOW_CONN_SHARED_DB", `{"conn_type":"postgres","host":"global"}`},
+		{"an ~/.astro/env entry injects undeclared", env, "FILE_ONLY", "from-file"},
+		{"the global vault beats ~/.astro/env", secret, "VAULT_OVER_FILE", "from-global-vault"},
+		{"project scope beats global", secret, "PROJECT_OVER_GLOBAL", "from-project-vault"},
+		{"the project .env beats the vault", env, "DOTENV_OVER_VAULT", "from-dotenv"},
+	}
+	for _, c := range checks {
+		if got := c.m[c.key]; got != c.want {
+			t.Errorf("%s: %s = %q, want %q", c.name, c.key, got, c.want)
+		}
+	}
+	for _, k := range []string{"VAULT_OVER_FILE", "PROJECT_OVER_GLOBAL"} {
+		if v, ok := env[k]; ok {
+			t.Errorf("Env[%s] = %q: the loser must not travel beside the winner", k, v)
+		}
+	}
+	if v, ok := secret["DOTENV_OVER_VAULT"]; ok {
+		t.Errorf("SecretEnv[DOTENV_OVER_VAULT] = %q, want the .env value alone", v)
+	}
+	for _, k := range []string{"SHELL_OVER_VAULT", "SHELL_OVER_FILE"} {
+		if v, ok := secret[k]; ok {
+			t.Errorf("SecretEnv[%s] = %q would override the shell", k, v)
+		}
+		if v, ok := env[k]; ok {
+			t.Errorf("Env[%s] = %q would override the shell", k, v)
+		}
+	}
+}
+
+// An undeclared name the vault, ~/.astro/env and the shell all hold resolves to
+// the shell in both engines. Standalone inherits the shell, so nothing may
+// carry the lower values; docker inherits nothing, so the name has to ride the
+// passthrough list or the container gets no value at all.
+func TestShellBeatsUndeclaredLowerSourcesInBothEngines(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte("SHELL_WINS=from-file\nFILE_ONLY_SHELL=from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	seedValue(t, "", localenv.KindEnv, "SHELL_WINS", "from-global-vault")
+	seedValue(t, "", localenv.KindEnv, "VAULT_ONLY_SHELL", "from-global-vault")
+	t.Setenv("SHELL_WINS", "from-shell")
+	t.Setenv("FILE_ONLY_SHELL", "from-shell")
+	t.Setenv("VAULT_ONLY_SHELL", "from-shell")
+
+	for _, mode := range []localrt.Mode{localrt.ModeStandalone, localrt.ModeDocker} {
+		built, err := Build(dir, Options{Mode: mode})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range []string{"SHELL_WINS", "FILE_ONLY_SHELL", "VAULT_ONLY_SHELL"} {
+			if v, ok := built.Plan.Env[k]; ok {
+				t.Errorf("%s: Env[%s] = %q would override the shell", mode, k, v)
+			}
+			if v, ok := built.Plan.SecretEnv[k]; ok {
+				t.Errorf("%s: SecretEnv[%s] = %q would override the shell", mode, k, v)
+			}
+			if !slices.Contains(built.Plan.PassthroughEnv, k) {
+				t.Errorf("%s: PassthroughEnv = %v, want %s so docker gets the shell value", mode, built.Plan.PassthroughEnv, k)
+			}
+		}
+	}
+}
+
+// UndeclaredLocal names what a project gets from this machine undeclared, for
+// check and package, and leaves the declared names out.
+func TestUndeclaredLocal(t *testing.T) {
+	dir := t.TempDir()
+	manifest := manifestTOML + "\n[tool.astro.env]\nDECLARED = {}\n"
+	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("DECLARED=x\nFROM_DOTENV=y\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	seedValue(t, "", localenv.KindVar, "region", "us")
+	// A stored key the Variable rule now rejects: listed as invalid, never
+	// injected, so not something the project gets. Written to the store
+	// directly, since the writer refuses the name.
+	dirV, err := secrets.DefaultDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := secrets.NewKeyringStore(secrets.Config{Service: secrets.DefaultService, Dir: dirV})
+	if err != nil {
+		t.Fatal(err)
+	}
+	badKey, err := secrets.Key(secrets.KindVar, secrets.GlobalScope, "1bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Set(badKey, "x"); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := pkgmanifest.Load(filepath.Join(dir, project.Marker))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := UndeclaredLocal(dir, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"AIRFLOW_VAR_REGION", "FROM_DOTENV"}; !slices.Equal(got, want) {
+		t.Errorf("UndeclaredLocal = %v, want %v", got, want)
+	}
+	note := UndeclaredNote(got)
+	for _, want := range []string{"AIRFLOW_VAR_REGION, FROM_DOTENV", "will not follow it to a Deployment", "astro local env <kind> declare NAME"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("note = %q, want it to contain %q", note, want)
+		}
+	}
+	if UndeclaredNote(nil) != "" {
+		t.Error("no names must give no note")
 	}
 }
 

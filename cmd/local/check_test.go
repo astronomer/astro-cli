@@ -239,6 +239,42 @@ func TestCheckCleanExitsZeroAndPrintsSummary(t *testing.T) {
 	}
 }
 
+// What the project gets locally without declaring it is reported, as info that
+// fails nothing: not a plain check, and not --strict either.
+func TestCheckNotesUndeclaredLocalValues(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("ASTRO_HOME", "")
+	d, out := checkDeps(t)
+	dir, err := d.WorkingDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("AIRFLOW_CONN_LOCAL_DB=postgres://h\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute(t, d, "local", "check", "--strict"); err != nil {
+		t.Fatalf("an undeclared local value must not fail the check: %v", err)
+	}
+	line, ok := lineContaining(out.String(), "info: ")
+	if !ok || !strings.Contains(line, "AIRFLOW_CONN_LOCAL_DB") || !strings.Contains(line, "will not follow it to a Deployment") {
+		t.Errorf("want an info line naming AIRFLOW_CONN_LOCAL_DB, got:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "checks passed") {
+		t.Errorf("summary missing: %q", out.String())
+	}
+
+	d, out = checkDeps(t)
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	if err := execute(t, d, "local", "check", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"undeclared_env":["AIRFLOW_CONN_LOCAL_DB"]`) {
+		t.Errorf("json summary missing undeclared_env: %s", out.String())
+	}
+}
+
 func TestCheckImportErrorFailsWithCode1(t *testing.T) {
 	d, out := checkDeps(t)
 	d.Checks = stubParser{report: checks.ParseReport{

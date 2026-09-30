@@ -42,10 +42,11 @@ type ListItem struct {
 	Invalid string `json:"invalid,omitempty"`
 	// RemoveHint is the exact command to remove an orphan.
 	RemoveHint string `json:"remove_hint,omitempty"`
-	// Applied is false for a global value the current project does not
-	// declare: a start passes the global tiers through for declared names
-	// only, so that value never reaches this project. Omitted on every other
-	// row, and outside a project, where there is nothing to apply it to.
+	// Applied is true for an undeclared value a start passes to the current
+	// project: everything that reaches a project is applied, declared or not.
+	// Omitted on declared rows, on a global row the project's own copy
+	// shadows, on one not linked here, and outside a project, where there is
+	// nothing to apply it to.
 	Applied *bool `json:"applied,omitempty"`
 	// NotLinkedHere marks a global the vault holds that does not reach this
 	// checkout: its link state names other projects, or the link index cannot
@@ -55,9 +56,9 @@ type ListItem struct {
 	LinksDown     string `json:"links_down,omitempty"`
 	LinkHint      string `json:"link_hint,omitempty"`
 	// DeclareHint is the exact command to declare the name in the current
-	// project: for an orphan, so the value it names is one the project expects,
-	// and for a row Applied marks false, so the global value reaches it. Empty
-	// outside a project and for an --all orphan from another project.
+	// project: for an orphan, so the value it names becomes a requirement the
+	// project states. Empty outside a project and for an --all orphan from
+	// another project.
 	DeclareHint string `json:"declare_hint,omitempty"`
 }
 
@@ -282,6 +283,17 @@ func KindForSection(s envschema.Section) Kind {
 func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir string) []ListItem {
 	declared := declaredKeySet(schema)
 	inProject := projectCopies(src, opts.VaultTiers)
+	globalVault := map[string]bool{}
+	for _, tier := range opts.VaultTiers {
+		if tier.Scope != ScopeGlobal {
+			continue
+		}
+		for _, e := range tier.Entries {
+			if !e.Unlinked {
+				globalVault[e.EnvKey] = true
+			}
+		}
+	}
 	var out []ListItem
 	add := func(files map[string]string, scope Scope) {
 		for key := range files {
@@ -292,7 +304,11 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 			if isAirflowSetting(key) {
 				item = ListItem{Kind: KindEnv, Name: key, Source: string(scope)}
 			}
-			markIfNotApplied(&item, scope, key, inProject, DeclareHint(item.Kind, item.Name))
+			// The global vault outranks ~/.astro/env, so a name both hold is
+			// applied from the vault, and that row carries the mark.
+			if scope != ScopeGlobal || !globalVault[key] {
+				markApplied(&item, scope, key, inProject)
+			}
 			out = append(out, item)
 		}
 	}
@@ -338,11 +354,11 @@ func vaultOrphans(src Sources, opts ListOptions, declared, inProject map[string]
 				item = ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label}
 			}
 			if e.Unlinked {
-				// Declaring it would not bring it in: it does not reach this
-				// checkout at all, which is the reason worth giving.
+				// It does not reach this checkout at all, so a start leaves it
+				// out whether or not it is declared, and linking is the fix.
 				markNotLinked(&item, e, tier)
 			} else {
-				markIfNotApplied(&item, tier.Scope, e.EnvKey, inProject, vaultDeclareHint(e.Kind, e.Name))
+				markApplied(&item, tier.Scope, e.EnvKey, inProject)
 			}
 			out = append(out, item)
 		}
@@ -389,8 +405,7 @@ func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem
 // isAirflowSetting reports a key Airflow reads as a configuration option,
 // AIRFLOW__{SECTION}__{KEY}. Such a key sets how Airflow runs rather than a
 // value the project's code expects, so an undeclared one is listed with its
-// source but never as an orphan. A global one still needs a declaration to reach
-// a project, so it can carry the not-applied mark.
+// source but never as an orphan.
 func isAirflowSetting(key string) bool {
 	return strings.HasPrefix(key, "AIRFLOW__")
 }
@@ -442,18 +457,17 @@ func markNotLinked(item *ListItem, e VaultEntry, tier VaultTier) {
 	}
 }
 
-// markIfNotApplied marks an undeclared global row that a start leaves out of
-// the current project. Outside a project nothing is left out. A copy in the
-// project .env or the project vault reaches Airflow undeclared, so declaring
-// the name would not bring the global value in; inProject holds those keys.
-// hint is the command that declares the name.
-func markIfNotApplied(item *ListItem, scope Scope, key string, inProject map[string]bool, hint string) {
-	if scope != ScopeGlobal || inProject == nil || inProject[key] {
+// markApplied marks an undeclared row that a start passes to the current
+// project: everything that reaches a project is applied, declared or not.
+// Outside a project there is nothing to apply it to. A global row whose name
+// the project's own .env or vault also holds is shadowed by that copy rather
+// than applied; inProject holds those keys.
+func markApplied(item *ListItem, scope Scope, key string, inProject map[string]bool) {
+	if inProject == nil || (scope == ScopeGlobal && inProject[key]) {
 		return
 	}
-	applied := false
+	applied := true
 	item.Applied = &applied
-	item.DeclareHint = hint
 }
 
 // projectCopies is the set of keys the current project holds itself, in its

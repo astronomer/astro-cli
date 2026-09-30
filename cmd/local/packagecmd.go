@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
+	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -126,8 +127,26 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	if err != nil {
 		return err
 	}
+	// What the project gets from this machine without declaring it runs locally
+	// and is carried by no artifact, so every target says so beside its own
+	// warnings. Best effort: a listing that cannot be read costs only the note.
+	note := ""
+	if undeclared, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
+		note = plan.UndeclaredNote(undeclared)
+	}
+	if note != "" {
+		res.Warnings = append(res.Warnings, note)
+	}
 	return r.Emit(res, func(w io.Writer) error {
-		return renderPackage(w, res, m.Astro.Deployments)
+		if err := renderPackage(w, res, m.Astro.Deployments); err != nil {
+			return err
+		}
+		// A tree result prints its Warnings itself. An image target's own
+		// warnings were streamed as the build ran, so only the note is left.
+		if res.Kind == pack.KindImage && note != "" {
+			return renderWarnings(w, []string{note})
+		}
+		return nil
 	})
 }
 

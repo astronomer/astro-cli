@@ -1,6 +1,7 @@
 package localenv
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
@@ -107,25 +108,91 @@ func (s Sources) AboveVault(key string) bool {
 	return false
 }
 
+// InShell reports whether the shell environment sets key.
+func (s Sources) InShell(key string) bool {
+	_, ok := s.shell[key]
+	return ok
+}
+
+// ShellOverGlobalFile is the ~/.astro/env keys Injection leaves out because the
+// shell sets them too, sorted. The caller passes them through to docker, which
+// inherits no host shell.
+func (s Sources) ShellOverGlobalFile() []string {
+	var out []string
+	for key := range s.global {
+		if s.InShell(key) {
+			out = append(out, key)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Injection is the map layered into the Airflow environment at start: the
 // project .env WHOLESALE (every entry, docker-compose semantics) over the
-// global file's schema-declared entries only. The shell environment is not
-// here — the process already carries it. Both engines apply this identically
+// global file's entries, also wholesale. ~/.astro/env reaches every project,
+// so all of it reaches this one, declared or not: a declaration makes a name a
+// requirement, it does not decide whether a value is passed. The shell
+// environment is not here, since the process already carries it, and a global
+// entry the shell also sets is left out: the shell outranks the global file,
+// and a Plan.Env entry would override it. Both engines apply this identically
 // through Plan.Env.
-func (s Sources) Injection(schema *envschema.Schema) map[string]string {
+func (s Sources) Injection() map[string]string {
 	inj := map[string]string{}
-	// Global: only the keys the schema declares. A stray global entry never
-	// leaks into a project that did not ask for it.
-	for _, key := range envschema.DeclaredEnvKeys(schema) {
-		if v, ok := s.global[key]; ok {
-			inj[key] = v
+	for key, v := range s.global {
+		if s.InShell(key) {
+			continue
 		}
+		inj[key] = v
 	}
 	// Project: every entry, declared or not.
 	for k, v := range s.project {
 		inj[k] = v
 	}
 	return inj
+}
+
+// Undeclared is the env-var names a start of this project passes to Airflow
+// from local sources the schema does not declare: the project .env, the
+// global file, and the vault tiers' entries that reach this checkout. They
+// work locally and nowhere else, since a Deployment and a teammate's clone get
+// only what the project declares, so check and package name them. Airflow
+// settings (AIRFLOW__*) are left out: they configure Airflow rather than name a
+// value the project's code expects, the same reason list does not call them
+// orphans. Names only, sorted; nothing here is a value.
+func (s Sources) Undeclared(schema *envschema.Schema, tiers []VaultTier) []string {
+	declared := map[string]bool{}
+	for _, k := range envschema.DeclaredEnvKeys(schema) {
+		declared[k] = true
+	}
+	seen := map[string]bool{}
+	add := func(key string) {
+		if !declared[key] && !isAirflowSetting(key) {
+			seen[key] = true
+		}
+	}
+	for key := range s.project {
+		add(key)
+	}
+	for key := range s.global {
+		add(key)
+	}
+	for _, tier := range tiers {
+		for _, e := range tier.Entries {
+			// An unlinked global does not reach this checkout, and an invalid
+			// entry never reaches Airflow at all; neither is injected, so
+			// neither is something the project gets.
+			if !e.Unlinked && e.Invalid == "" {
+				add(e.EnvKey)
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for key := range seen {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // environMap converts os.Environ() form ("KEY=value") to a map.

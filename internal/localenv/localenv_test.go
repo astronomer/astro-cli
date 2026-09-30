@@ -153,36 +153,67 @@ func TestMultilineValueRejected(t *testing.T) {
 	}
 }
 
-// TestInjectionWholesaleVsDeclared checks the two files inject differently:
-// the project .env goes in wholesale, the global file only where the schema
-// declares a value.
-func TestInjectionWholesaleVsDeclared(t *testing.T) {
+// TestInjectionWholesale checks both files inject everything they hold,
+// declared or not: ~/.astro/env reaches every project. The project .env wins a
+// name both hold, and a global entry the shell also sets is left out, since the
+// shell outranks the global file.
+func TestInjectionWholesale(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	writeGlobalEnv(t, "DECLARED_GLOBAL=g\nUNDECLARED_GLOBAL=stray\n")
+	writeGlobalEnv(t, "GLOBAL_A=g\nUNDECLARED_GLOBAL=everywhere\nBOTH=global\nSHELL_SET=global\n")
 	projDir := t.TempDir()
-	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("DECLARED_PROJECT=p\nUNDECLARED_PROJECT=alsohere\n"), 0o600); err != nil {
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("PROJECT_A=p\nUNDECLARED_PROJECT=alsohere\nBOTH=project\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{
-		"DECLARED_GLOBAL":  {},
-		"DECLARED_PROJECT": {},
-	}}
 
+	src, err := LoadSources([]string{"SHELL_SET=shell"}, projDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inj := src.Injection()
+
+	if inj["GLOBAL_A"] != "g" || inj["UNDECLARED_GLOBAL"] != "everywhere" {
+		t.Errorf("~/.astro/env not injected wholesale: %v", inj)
+	}
+	if inj["PROJECT_A"] != "p" || inj["UNDECLARED_PROJECT"] != "alsohere" {
+		t.Errorf("project .env not injected wholesale: %v", inj)
+	}
+	if inj["BOTH"] != "project" {
+		t.Errorf("BOTH = %q, want the project .env to beat ~/.astro/env", inj["BOTH"])
+	}
+	if _, ok := inj["SHELL_SET"]; ok {
+		t.Errorf("SHELL_SET is injected, so ~/.astro/env would override the shell: %v", inj)
+	}
+}
+
+// TestUndeclared names what a project gets locally without declaring it: from
+// both files and the vault entries that reach it, never a declared name, an
+// Airflow setting, or a global linked elsewhere.
+func TestUndeclared(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("ASTRO_HOME", home)
+	writeGlobalEnv(t, "FROM_GLOBAL=g\nDECLARED=g\nAIRFLOW__CORE__LOAD_EXAMPLES=False\n")
+	projDir := t.TempDir()
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("FROM_PROJECT=p\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	src, err := LoadSources(nil, projDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	inj := src.Injection(schema)
-
-	if inj["DECLARED_GLOBAL"] != "g" {
-		t.Errorf("declared global not injected: %v", inj)
+	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{"DECLARED": {}}}
+	tiers := []VaultTier{
+		{Scope: ScopeProject, Entries: []VaultEntry{{Kind: KindEnv, Name: "PROJECT_SECRET", EnvKey: "PROJECT_SECRET"}}},
+		{Scope: ScopeGlobal, Entries: []VaultEntry{
+			{Kind: KindConn, Name: "shared_db", EnvKey: "AIRFLOW_CONN_SHARED_DB"},
+			{Kind: KindConn, Name: "elsewhere", EnvKey: "AIRFLOW_CONN_ELSEWHERE", Unlinked: true},
+			{Kind: KindVar, Name: "1bad", EnvKey: "AIRFLOW_VAR_1BAD", Invalid: "starts with a digit"},
+		}},
 	}
-	if _, ok := inj["UNDECLARED_GLOBAL"]; ok {
-		t.Errorf("undeclared global leaked into injection: %v", inj)
-	}
-	if inj["DECLARED_PROJECT"] != "p" || inj["UNDECLARED_PROJECT"] != "alsohere" {
-		t.Errorf("project .env not injected wholesale: %v", inj)
+	got := strings.Join(src.Undeclared(schema, tiers), ",")
+	want := "AIRFLOW_CONN_SHARED_DB,FROM_GLOBAL,FROM_PROJECT,PROJECT_SECRET"
+	if got != want {
+		t.Errorf("Undeclared = %s, want %s", got, want)
 	}
 }
 
@@ -247,12 +278,12 @@ func TestListSourceAndOrphans(t *testing.T) {
 	if it := byName["STRAY_PROJECT"]; !it.Orphan || it.RemoveHint == "" || it.DeclareHint != "astro local env variable declare STRAY_PROJECT" {
 		t.Errorf("STRAY_PROJECT = %+v, want orphan with a remove and a declare hint", it)
 	}
-	if it := byName["STRAY_GLOBAL"]; !it.Orphan || it.Applied == nil || *it.Applied ||
+	if it := byName["STRAY_GLOBAL"]; !it.Orphan || it.Applied == nil || !*it.Applied ||
 		it.DeclareHint != "astro local env variable declare STRAY_GLOBAL" {
-		t.Errorf("STRAY_GLOBAL = %+v, want an orphan marked not applied, with a declare hint", it)
+		t.Errorf("STRAY_GLOBAL = %+v, want an orphan marked applied, with a declare hint", it)
 	}
-	if it := byName["STRAY_PROJECT"]; it.Applied != nil {
-		t.Errorf("STRAY_PROJECT = %+v, want no applied mark: the project .env passes through", it)
+	if it := byName["STRAY_PROJECT"]; it.Applied == nil || !*it.Applied {
+		t.Errorf("STRAY_PROJECT = %+v, want it marked applied: the project .env passes through", it)
 	}
 	// list never carries a value.
 	for _, it := range items {
@@ -292,9 +323,8 @@ func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
 			if it.Orphan || it.RemoveHint != "" || it.Kind != KindEnv {
 				t.Errorf("%s = %+v, want a plain env row with no orphan note", it.Name, it)
 			}
-			global := it.Name == "AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT"
-			if marked := it.Applied != nil && !*it.Applied; marked != global {
-				t.Errorf("%s = %+v, want the not-applied mark only on the global setting", it.Name, it)
+			if it.Applied == nil || !*it.Applied || it.DeclareHint != "" {
+				t.Errorf("%s = %+v, want the setting marked applied, with no declare hint", it.Name, it)
 			}
 		case "warehouse", "region":
 			if !it.Orphan {
@@ -313,9 +343,8 @@ func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
 	}
 }
 
-// A global value the project .env also holds is shadowed rather than left out:
-// the project copy reaches Airflow undeclared, so declaring the name would not
-// bring the global value in, and the row carries no not-applied mark.
+// A global value the project .env also holds is shadowed: the project copy is
+// the one applied, so only its row carries the mark.
 func TestListLeavesAShadowedGlobalUnmarked(t *testing.T) {
 	t.Setenv("ASTRO_HOME", t.TempDir())
 	writeGlobalEnv(t, "BOTH=g\n")
@@ -328,8 +357,9 @@ func TestListLeavesAShadowedGlobalUnmarked(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, it := range items {
-		if it.Applied != nil {
-			t.Errorf("%+v carries an applied mark, want none", it)
+		applied := it.Applied != nil && *it.Applied
+		if applied != (it.Source == SourceProject) {
+			t.Errorf("%+v: applied = %v, want the mark on the project row only", it, applied)
 		}
 	}
 }
@@ -355,14 +385,17 @@ func TestListMarksAGlobalByProjectCopiesOnly(t *testing.T) {
 	}
 	marked := map[string]string{}
 	for _, it := range items {
-		if it.Applied != nil && !*it.Applied {
+		if it.Applied != nil && *it.Applied {
 			marked[it.Name+" "+it.Source] = it.DeclareHint
 		}
 	}
+	// IN_VAULT's global row is the one left out: the project vault's copy is
+	// applied instead. An Airflow setting is no orphan, so it gets no hint.
 	want := map[string]string{
-		"IN_SHELL global":    "astro local env variable declare IN_SHELL",
-		"token global vault": "astro local env airflow-variable declare token --sensitive",
-		"AIRFLOW__SECRETS__BACKEND_KWARGS global vault": "astro local env variable declare AIRFLOW__SECRETS__BACKEND_KWARGS --sensitive",
+		"IN_SHELL global":                               "astro local env variable declare IN_SHELL",
+		"IN_VAULT project vault":                        "astro local env variable declare IN_VAULT --sensitive",
+		"token global vault":                            "astro local env airflow-variable declare token --sensitive",
+		"AIRFLOW__SECRETS__BACKEND_KWARGS global vault": "",
 	}
 	if len(marked) != len(want) {
 		t.Fatalf("marked rows = %v, want %v", marked, want)

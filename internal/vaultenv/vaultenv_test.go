@@ -8,7 +8,6 @@ import (
 
 	"github.com/zalando/go-keyring"
 
-	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -158,9 +157,7 @@ func TestMalformedEnvNameIsSkipped(t *testing.T) {
 	if v, _, ok := lookup(s, "GOOD"); !ok || v != "yes" {
 		t.Errorf("the valid entry beside it must still resolve: %q %v", v, ok)
 	}
-	// Declared, so the global tier is eligible to inject at all.
-	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{"GOOD": {}, "A=B": {}}}
-	if inj := s.SecretInjection(schema); len(inj) != 1 || inj["GOOD"] != "yes" {
+	if inj := s.SecretInjection(); len(inj) != 1 || inj["GOOD"] != "yes" {
 		t.Errorf("injection = %v, want only the valid entry", inj)
 	}
 }
@@ -288,33 +285,31 @@ func TestUnlistableVaultIsASilentMiss(t *testing.T) {
 	if _, _, ok := lookup(s, "TOKEN"); ok {
 		t.Fatal("want a miss")
 	}
-	if inj := s.SecretInjection(nil); len(inj) != 0 {
+	if inj := s.SecretInjection(); len(inj) != 0 {
 		t.Errorf("injection = %v, want empty", inj)
 	}
 }
 
-// Injection mirrors the files it sits beside: the project's own secrets go in
-// wholesale, and a machine-wide secret only where the schema asked for it. A
-// global value reaching a project that never declared it is the leak the rule
-// exists to prevent.
-func TestInjectionTakesProjectWholesaleAndGlobalOnlyWhenDeclared(t *testing.T) {
+// Everything that reaches a project injects, declared or not: the project's own
+// secrets, and every global whose link state includes this checkout. There is
+// no schema to consult; a declaration is a requirement, checked elsewhere.
+func TestInjectionTakesEverythingThatReaches(t *testing.T) {
 	store := testVault(t)
 	dir := t.TempDir()
 	put(t, store, secrets.KindEnv, dir, "PROJECT_ONLY", "p")
-	put(t, store, secrets.KindEnv, secrets.GlobalScope, "DECLARED", "d")
 	put(t, store, secrets.KindEnv, secrets.GlobalScope, "UNDECLARED", "u")
+	put(t, store, secrets.KindConn, secrets.GlobalScope, "shared_db", "postgres://h/d")
 
-	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{"DECLARED": {}}}
-	inj := newSource(store, dir).SecretInjection(schema)
+	inj := newSource(store, dir).SecretInjection()
 
 	if inj["PROJECT_ONLY"] != "p" {
 		t.Errorf("a project secret must inject without being declared: %v", inj)
 	}
-	if inj["DECLARED"] != "d" {
-		t.Errorf("a declared global secret must inject: %v", inj)
+	if inj["UNDECLARED"] != "u" {
+		t.Errorf("an undeclared global that reaches the project must inject: %v", inj)
 	}
-	if v, ok := inj["UNDECLARED"]; ok {
-		t.Errorf("an undeclared global secret leaked into the project: %q", v)
+	if inj["AIRFLOW_CONN_SHARED_DB"] != "postgres://h/d" {
+		t.Errorf("an undeclared global connection must inject as AIRFLOW_CONN_*: %v", inj)
 	}
 }
 
@@ -326,8 +321,7 @@ func TestInjectionPrefersTheProjectTier(t *testing.T) {
 	put(t, store, secrets.KindEnv, dir, "TOKEN", "project")
 	put(t, store, secrets.KindEnv, secrets.GlobalScope, "TOKEN", "global")
 
-	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{"TOKEN": {}}}
-	if got := newSource(store, dir).SecretInjection(schema)["TOKEN"]; got != "project" {
+	if got := newSource(store, dir).SecretInjection()["TOKEN"]; got != "project" {
 		t.Errorf("TOKEN = %q, want the project tier to win", got)
 	}
 }

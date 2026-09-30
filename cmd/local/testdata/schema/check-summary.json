@@ -5,5 +5,8 @@
   "warnings": -1,
   "strict": true,
   "passed": true,
-  "provisioned": true
+  "provisioned": true,
+  "undeclared_env": [
+    "x"
+  ]
 }
