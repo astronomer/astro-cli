@@ -1,10 +1,25 @@
 package precompute
 
-const slimManifestName = "manifest.slim.json"
+import "strings"
+
+// slimManifestSuffix marks a slim companion file, and lets Cleanup recognize
+// one regardless of which manifest it came from.
+const slimManifestSuffix = ".slim.json"
+
+// slimManifestName is the slim companion for the default "manifest.json".
+const slimManifestName = "manifest" + slimManifestSuffix
 
 // slimSchemaVersion identifies the allowlist that produced a slim manifest, so
 // a reader that doesn't recognize it can fall back to the full manifest.
 const slimSchemaVersion = 1
+
+// slimNameFor returns manifestFilename's slim companion name, e.g.
+// "manifest_full.json" -> "manifest_full.slim.json" - so multiple manifests
+// in one directory each get their own, discoverable by the same convention
+// a consumer already knows its own manifest_path by.
+func slimNameFor(manifestFilename string) string {
+	return strings.TrimSuffix(manifestFilename, ".json") + slimManifestSuffix
+}
 
 // slimSections are the only top-level collections Cosmos loads nodes from
 // (cosmos/dbt/graph.py::_load_nodes_from_manifest_data).

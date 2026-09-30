@@ -126,6 +126,143 @@ func TestRunSkipsNonDBTManifest(t *testing.T) {
 	}
 }
 
+// TestIsManifestCandidateName pins the name-matching rule discovery is built
+// on: case-insensitive, "manifest" anywhere in a *.json filename.
+func TestIsManifestCandidateName(t *testing.T) {
+	cases := map[string]bool{
+		"manifest.json":        true,
+		"manifest_full.json":   true,
+		"MANIFEST.JSON":        true,
+		"dbt_manifest_v2.json": true,
+		"run_results.json":     false,
+		"catalog.json":         false,
+		"manifest.txt":         false,
+		"manifest":             false,
+	}
+	for name, want := range cases {
+		if got := isManifestCandidateName(name); got != want {
+			t.Errorf("isManifestCandidateName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// TestRunSlimsEveryManifestInADirectory: two custom-named manifests sharing a
+// directory each get their own slim file, named after themselves - no
+// collision, no picking a winner.
+func TestRunSlimsEveryManifestInADirectory(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"manifests_per_schedule/manifest_global_daily_schedule.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.daily":{"name":"daily"}}}`,
+		"manifests_per_schedule/manifest_full.json":                  `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.full":{"name":"full"}}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 2 {
+		t.Fatalf("want 2 manifest results, got %+v", summary.Results)
+	}
+	for _, r := range summary.Results {
+		if r.Err != nil || r.Skipped {
+			t.Fatalf("unexpected non-success result: %+v", r)
+		}
+	}
+	mustExist(t, filepath.Join(root, "manifests_per_schedule", sidecarDir, "manifest_global_daily_schedule.slim.json"))
+	mustExist(t, filepath.Join(root, "manifests_per_schedule", sidecarDir, "manifest_full.slim.json"))
+}
+
+// TestRunDoesNotFlagOtherDbtArtifactsAsManifests: run_results.json and
+// catalog.json (which "dbt build"/"dbt docs generate" always produce beside
+// manifest.json) don't contain "manifest" in their name; semantic_manifest.json
+// does, but its schema URL isn't a manifest one, so content rejects it too.
+func TestRunDoesNotFlagOtherDbtArtifactsAsManifests(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":               "name: shop\n",
+		"proj/models/a.sql":                  "select 1",
+		"proj/target/manifest.json":          `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/target/run_results.json":       `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/run-results/v6.json"}}`,
+		"proj/target/catalog.json":           `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/catalog/v1.json"},"nodes":{}}`,
+		"proj/target/semantic_manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/semantic-manifest/v1.json"}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var succeeded, skipped int
+	for _, r := range summary.Results {
+		if r.Err != nil {
+			t.Fatalf("unexpected error: %+v", r)
+		}
+		if r.Skipped {
+			if filepath.Base(r.Path) != "semantic_manifest.json" {
+				t.Fatalf("unexpected skip: %+v", r)
+			}
+			skipped++
+			continue
+		}
+		succeeded++
+	}
+	if succeeded != 2 || skipped != 1 { // 1 project + 1 manifest succeed, semantic_manifest.json is skipped
+		t.Fatalf("want 2 successes + 1 skip, got %d successes, %d skipped: %+v", succeeded, skipped, summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "proj", "target", sidecarDir, slimManifestName))
+	if _, err := os.Stat(filepath.Join(root, "proj", "target", sidecarDir, "semantic_manifest.slim.json")); !os.IsNotExist(err) {
+		t.Fatalf("semantic_manifest.json must not be treated as a manifest: %v", err)
+	}
+}
+
+// TestRunSlimsEveryManifestInProjectRoot: a project root with two manifests
+// gets both slimmed, plus its own unaffected tree-hash sidecar.
+func TestRunSlimsEveryManifestInProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":    "name: shop\n",
+		"proj/models/a.sql":       "select 1",
+		"proj/manifest.json":      `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 project-only result, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, sidecarName))
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, slimManifestName))
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, "manifest_full.slim.json"))
+}
+
+// TestRunHandlesMultipleProjectsWithDifferentManifestNames: three dbt
+// projects, each naming its manifest differently, all get discovered and
+// slimmed with no configuration.
+func TestRunHandlesMultipleProjectsWithDifferentManifestNames(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"dbt1/dbt_project.yml":      "name: one\n",
+		"dbt1/manifest_custom.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"dbt2/dbt_project.yml":      "name: two\n",
+		"dbt2/manifest.json":        `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"dbt3/dbt_project.yml":      "name: three\n",
+		"dbt3/manifest_by_run.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 3 {
+		t.Fatalf("want 3 project results, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "dbt1", sidecarDir, "manifest_custom.slim.json"))
+	mustExist(t, filepath.Join(root, "dbt2", sidecarDir, slimManifestName))
+	mustExist(t, filepath.Join(root, "dbt3", sidecarDir, "manifest_by_run.slim.json"))
+}
+
 // TestRunWarnsOnTemplatedPackagesPath verifies a project whose packages-install-path
 // is a Jinja template still gets stamped, but the Result carries a non-fatal warning.
 func TestRunWarnsOnTemplatedPackagesPath(t *testing.T) {

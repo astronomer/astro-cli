@@ -101,6 +101,19 @@ func TestSlimManifestEnabled(t *testing.T) {
 	}
 }
 
+// TestPreDeployDiscoversCustomNamedManifest: a manifest not literally named
+// manifest.json is found and stamped automatically - by name and content,
+// with nothing to configure.
+func TestPreDeployDiscoversCustomNamedManifest(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest_full.json"), []byte(manifest), 0o644))
+
+	require.NoError(t, PreDeploy(dir))
+	require.FileExists(t, filepath.Join(dir, artifactRelPath))
+	require.FileExists(t, filepath.Join(dir, ".astro", "manifest_full.slim.json"))
+}
+
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('hi')"), 0o644))
