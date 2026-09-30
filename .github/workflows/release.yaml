@@ -87,7 +87,7 @@ jobs:
           echo "Previous GA tag for changelog: $PREV_GA"
 
       - name: Get Homebrew token via Octo STS
-        if: needs.detect.outputs.type == 'ga'
+        if: needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true'
         uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
         id: homebrew-token
         with:
