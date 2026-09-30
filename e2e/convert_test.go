@@ -492,6 +492,24 @@ func v1Cases() []v1Case {
 			},
 		},
 		{
+			// Both ids in their Astro shape: the saved target is carried as a
+			// link, the way `astro link add` writes one, so it is an advisory
+			// and not a note.
+			name: "a v1 project whose saved deploy target can be linked",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
+					"  deployment: cm1ordersdeployment000001\n  workspace: cm1ordersworkspace0000001\n",
+				"Dockerfile": runtime2,
+			},
+			airflow:     "2",
+			projectName: "orders-pipeline",
+			kept:        []string{"Dockerfile", ".astro/config.yaml"},
+			manifestHas: []string{
+				"[tool.astro.deployments]\ndefault = {deployment = 'cm1ordersdeployment000001', workspace = 'cm1ordersworkspace0000001', default = true}",
+			},
+			advisories: []string{"its saved deploy target is now the default link"},
+		},
+		{
 			// The `instances:` list an early v2 build wrote, which keeps each
 			// deployment id under `auth:`. The link command names that id.
 			name: "a config with instances",

@@ -455,6 +455,9 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// a change already made.
 	cs.Advisories = append(cs.Advisories, v1.envSchema.advisories...)
 	cs.Advisories = append(cs.Advisories, v1.settings.pools.advisories...)
+	if a := v1.deployLinkAdvisory(); a != "" {
+		cs.Advisories = append(cs.Advisories, a)
+	}
 
 	// The project said what it was called and this run did not use that. An
 	// advisory rather than a note for the usual reason: nothing is left to do,
@@ -622,6 +625,9 @@ func setV1Declarations(ed tomledit.Editor, v1 *v1Project) error {
 		return err
 	}
 	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
+		return err
+	}
+	if err := setDeployLink(ed, v1); err != nil {
 		return err
 	}
 	return setPools(ed, v1.settings.pools.byName)
@@ -1129,7 +1135,9 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// tells them apart, so the note says what to do with it if it is the first
 	// rather than asserting that it is.
 	var deployNote string
-	if v1.deployment != "" {
+	// A target the conversion linked (setDeployLink) is carried, so it is an
+	// advisory rather than a note; only one it could not link is left to do.
+	if _, linked := v1.deployLink(); v1.deployment != "" && !linked {
 		deployNote = v1ConfigRelPath + ": " + deployTargetNote(v1.deployment, v1.workspace)
 		out = append(out, deployNote)
 	}

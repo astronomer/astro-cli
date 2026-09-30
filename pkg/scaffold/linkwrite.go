@@ -183,7 +183,16 @@ func SaveLink(dir string, wrap func(run func() error) error, l Link) error {
 	if err := l.validate(); err != nil {
 		return err
 	}
-	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+	return EditManifest(dir, wrap, l.edit())
+}
+
+// edit is SaveLink's change to the manifest, for a link already trimmed and
+// validated. The v1 conversion applies it to the manifest it is building, so
+// a converted project's link is written exactly as `astro link add` writes one.
+//
+//nolint:gocritic // hugeParam: by value, as SaveLink holds it
+func (l Link) edit() ManifestEdit {
+	return func(before *manifest.Manifest, ed tomledit.Editor) error {
 		key := linkKey(l.Name)
 		// Read from the raw TOML, before the entry is replaced: the parsed
 		// link has the defaults folded in, so it cannot say which keys the link
@@ -226,7 +235,7 @@ func SaveLink(dir string, wrap func(run func() error) error, l Link) error {
 			return err
 		}
 		return ReplaceTable(ed, key, table)
-	})
+	}
 }
 
 // RemoveLink removes the link called name from the pyproject.toml in dir,
