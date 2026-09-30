@@ -21,6 +21,8 @@
       "files": [
         "x"
       ],
+      "section": "x",
+      "key": "x",
       "message": "x",
       "parse_time_seconds": 1.5,
       "threshold_seconds": 1.5

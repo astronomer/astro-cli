@@ -136,6 +136,12 @@ const (
 	// running and finding nothing. Without it a checker that stopped checking
 	// is indistinguishable from a clean project.
 	KindChecksIncomplete Kind = "checks_incomplete"
+	// KindEnvMissing is a required [tool.astro.env] value with no source on
+	// this machine, the one `astro local start` refuses over. An error.
+	KindEnvMissing Kind = "env_missing"
+	// KindEnvInvalid is a declared value that is present but is not what its
+	// declaration says, which a start warns about and runs past. A warning.
+	KindEnvInvalid Kind = "env_invalid"
 )
 
 // Finding is one thing the check noticed about one DAG or file. It is the unit
@@ -150,6 +156,11 @@ type Finding struct {
 	DagID string `json:"dag_id,omitempty"`
 	// Files lists every file defining a duplicated dag_id.
 	Files []string `json:"files,omitempty"`
+	// Section and Key name the declaration an env finding is about: the
+	// [tool.astro.env] section (env_var, airflow_variable, connection) and the
+	// name under it.
+	Section string `json:"section,omitempty"`
+	Key     string `json:"key,omitempty"`
 	// Message carries an import error's text.
 	Message string `json:"message,omitempty"`
 	// ParseSeconds and ThresholdSeconds describe a slow-parse finding.

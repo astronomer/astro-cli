@@ -177,7 +177,20 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	}, nil
 }
 
-// Environ is the environment a start of the project in dir runs its DAGs
+// EnvReport is what a start's gate would have said about the declared
+// environment, for a command that resolves it without starting: the required
+// values with no source, and the value-level warnings a start prints.
+type EnvReport struct {
+	// Missing is every required value with no source, as *MissingEnvError
+	// would list it. A name declared source = "workspace" is among them when
+	// nothing local holds it, marked Missing.Workspace: resolution here is
+	// offline, so the caller decides what an unasked Environment Manager
+	// means.
+	Missing  []envresolve.Missing
+	Warnings []envschema.Violation
+}
+
+// EnvironReport returns the environment a start of the project in dir runs its DAGs
 // under, in os.Environ form: this process's own, then the
 // ASTRONOMER_ENVIRONMENT both engines set, then Plan.Env, then Plan.SecretEnv,
 // the order standalone applies them in. It is for commands that
@@ -185,20 +198,22 @@ func Build(workingDir string, opts Options) (*Built, error) {
 // .env at import time sees what it would under a start.
 //
 // Offline, unlike a start: no Environment Manager lookup. A required value with
-// no source is left out rather than refused, so the DAG that needs it reports
-// the problem itself.
-func Environ(dir string, m *manifest.Manifest) ([]string, error) {
+// no source is left out of the environment rather than refused, and comes back
+// in the report instead, beside the warnings a start prints: what the start
+// gate would have said, from the same one resolution.
+func EnvironReport(dir string, m *manifest.Manifest) ([]string, EnvReport, error) {
 	resolved, err := resolveEnv(m, &project.Project{Dir: dir}, Options{AllowMissing: true})
 	if err != nil {
-		return nil, err
+		return nil, EnvReport{}, err
 	}
+	rep := EnvReport{Missing: resolved.startedWithout, Warnings: resolved.warnings}
 	env := append(os.Environ(), "ASTRONOMER_ENVIRONMENT=local")
 	for _, layer := range []map[string]string{resolved.env, resolved.secretEnv} {
 		for _, k := range slices.Sorted(maps.Keys(layer)) {
 			env = append(env, k+"="+layer[k])
 		}
 	}
-	return env, nil
+	return env, rep, nil
 }
 
 // choosePort applies the v2 requested-port precedence:
@@ -297,9 +312,8 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	// and a project that cannot start over its own annotation is a tool arguing
 	// with its user.
 	//
-	// They are reported instead, as Built.EnvWarnings. `astro local check`
-	// does not validate the environment yet, so this is the only
-	// thing that surfaces them.
+	// They are reported instead, as Built.EnvWarnings, and `astro local check`
+	// reports the same ones through EnvironReport.
 	if len(res.Missing) > 0 {
 		if !opts.AllowMissing {
 			return resolvedEnv{}, &MissingEnvError{

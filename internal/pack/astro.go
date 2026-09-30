@@ -69,6 +69,24 @@ func NewAstroTarget(builder ImageBuilder, docker imagebuild.Commander, bin strin
 
 func (t *AstroTarget) Name() string { return TargetAstro }
 
+// checkManifest runs the checks on the manifest that come before any build:
+// the runtime build against its pin, then the declared environment, which
+// must parse and which the image does not carry.
+func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) ([]string, error) {
+	warnings, err := checkRuntimeBuild(ctx, req, airflow)
+	if err != nil {
+		return nil, err
+	}
+	envWarning, err := imageEnvWarning(req.Manifest.Astro.Env)
+	if err != nil {
+		return nil, err
+	}
+	if envWarning != "" {
+		warnings = append(warnings, envWarning)
+	}
+	return warnings, nil
+}
+
 // checkRuntimeBuild holds the manifest's runtime build to its pin before
 // anything is built (Request.CheckRuntime): a build of another series refuses
 // the package, and what the catalog warns about comes back to ride on the
@@ -124,7 +142,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, errors.New("the project has no name; set [project] name in pyproject.toml")
 	}
 	airflow := req.Manifest.Airflow()
-	warnings, err := checkRuntimeBuild(ctx, req, airflow)
+	warnings, err := checkManifest(ctx, req, airflow)
 	if err != nil {
 		return Result{}, err
 	}

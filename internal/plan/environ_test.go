@@ -33,7 +33,7 @@ ASTRO_TEST_DEFAULTED = { default = 'from-manifest' }
 		t.Fatal(err)
 	}
 
-	env, err := Environ(dir, man)
+	env, _, err := EnvironReport(dir, man)
 	if err != nil {
 		t.Fatalf("a missing required value should not stop Environ: %v", err)
 	}

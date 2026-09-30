@@ -319,6 +319,41 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 	return b.String(), nil
 }
 
+// imageEnvWarning says what the astro image does not carry: none of the values
+// [tool.astro.env] declares, defaults included, since the image is built from
+// the dependencies and OS packages alone. The Deployment supplies them, as its
+// own environment variables or the Environment Manager objects linked to it.
+// "" when the manifest declares none. A declaration the parser refuses is an
+// error, as it is for `astro local start`.
+func imageEnvWarning(env map[string]any) (string, error) {
+	if len(env) == 0 {
+		return "", nil
+	}
+	schema, err := envschema.ParseSchema(env)
+	if err != nil {
+		return "", err
+	}
+	var names []string
+	for _, s := range []struct {
+		label string
+		specs map[string]envschema.ValueSpec
+	}{
+		{"env var", schema.EnvVars},
+		{"airflow variable", schema.AirflowVariables},
+		{"connection", schema.Connections},
+	} {
+		for _, name := range sortedKeys(s.specs) {
+			names = append(names, s.label+" "+name+valueMeta(s.specs[name]))
+		}
+	}
+	if len(names) == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("the image carries none of the %d value(s) [tool.astro.env] declares, defaults included: "+
+		"set them on the Deployment, as its environment variables or linked Environment Manager objects: %s",
+		len(names), strings.Join(names, ", ")), nil
+}
+
 // valueMeta annotates a checklist entry with where its value comes from: a
 // committed default, the workspace's Environment Manager, or neither. A value
 // with neither is one the platform operator must supply, unless it is

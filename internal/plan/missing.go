@@ -87,6 +87,12 @@ func setHint(m *envresolve.Missing) string {
 	return "astro local env " + noun + " set " + m.Name + " --project"
 }
 
+// SetCommand is the exact command that provides m, the one the start gate's
+// message and payload name.
+func SetCommand(m *envresolve.Missing) string {
+	return setHint(m)
+}
+
 // sectionLabel is the human word for a schema section.
 func sectionLabel(s envschema.Section) string {
 	switch s {

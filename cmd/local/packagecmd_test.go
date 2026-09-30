@@ -101,6 +101,22 @@ func TestPackageMWAABuildsTree(t *testing.T) {
 	}
 }
 
+// `astro package astro` refuses a [tool.astro.env] declaration the parser
+// refuses, as `astro local start` does, before it needs Docker.
+func TestPackageAstroRefusesAnEnvDeclarationThatDoesNotParse(t *testing.T) {
+	d, _ := testDeps(t)
+	dir := t.TempDir()
+	writeManifest(t, &d, dir)
+	m := "[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n[tool.astro.env]\nASTRO_TEST_BAD = 5\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := execute(t, d, "package", "astro")
+	if err == nil || !strings.Contains(err.Error(), "ASTRO_TEST_BAD") {
+		t.Fatalf("want the declaration named in an error, got %v", err)
+	}
+}
+
 func TestRenderPackageImageText(t *testing.T) {
 	var buf bytes.Buffer
 	res := pack.Result{

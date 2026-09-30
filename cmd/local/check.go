@@ -58,6 +58,7 @@ func newCheckCmd(c *cli) *cobra.Command {
 		Use:   nameCheck,
 		Short: "Validate this project's DAGs without starting Airflow",
 		Long: "Parse the project's DAGs in its own environment and report import errors, duplicate DAG ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
+			"It also checks [tool.astro.env] the way astro local start does: a required value with no source on this machine is an error, and a value that is not what its declaration says is a warning. A source = 'workspace' value nothing local holds is not checked, since the Environment Manager is not asked.\n\n" +
 			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the DAGs inside it; mwaa also resolves the dependencies against MWAA's published constraints file (a conflict fails the check; the step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -93,7 +94,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	if err != nil {
 		return blocked(r, err)
 	}
-	env, err := plan.Environ(project, m)
+	env, envRep, err := plan.EnvironReport(project, m)
 	if err != nil {
 		return blocked(r, err)
 	}
@@ -112,6 +113,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		}
 		return err
 	}
+	res = withEnvFindings(res, envFindings(envRep))
 
 	if err := renderCheck(r, res, strict, provisioned); err != nil {
 		return err
@@ -143,7 +145,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	if err != nil {
 		return blocked(r, err)
 	}
-	env, err := plan.Environ(project, m)
+	env, envRep, err := plan.EnvironReport(project, m)
 	if err != nil {
 		return blocked(r, err)
 	}
@@ -157,6 +159,13 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	worst := checks.ExitOK
 	for _, t := range dedupeTargets(targets) {
 		rep := c.checkTarget(ctx, t, project, env, m, r, strict)
+		// The declared environment is this machine's, which only the astro
+		// target runs under; mwaa and composer set theirs on the platform,
+		// from the ENV_SETUP.md checklist `astro package` writes.
+		if t == checks.TargetAstro && rep.OpError == "" {
+			res := withEnvFindings(checks.Result{Findings: rep.Findings, DagCount: rep.DagCount, Errors: rep.Errors, Warnings: rep.Warnings}, envFindings(envRep))
+			rep.Findings, rep.Errors, rep.Warnings = res.Findings, res.Errors, res.Warnings
+		}
 		reports = append(reports, rep)
 		if code := rep.ExitCode(strict); code > worst {
 			worst = code
@@ -379,8 +388,8 @@ func renderCheck(r Renderer, res checks.Result, strict, provisioned bool) error 
 		Passed:      res.Passed(strict),
 	}
 	if r.Format == FormatJSON {
-		for _, f := range res.Findings {
-			if err := r.Emit(f, nil); err != nil {
+		for i := range res.Findings {
+			if err := r.Emit(res.Findings[i], nil); err != nil {
 				return err
 			}
 		}
@@ -409,11 +418,12 @@ func renderFindingsTable(w io.Writer, findings []checks.Finding, budget *int) er
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "SEVERITY\tCHECK\tLOCATION\tDETAIL")
-	for _, f := range findings {
+	for i := range findings {
+		f := &findings[i]
 		// Both text columns are sanitized, not just DETAIL: a dag_id comes from
 		// somebody's Python and a filename may legally contain a tab, and either
 		// one opens a phantom column that shifts every row below it.
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", f.Severity, f.Kind, cell(findingLocation(f)), cell(findingDetail(f)))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", f.Severity, f.Kind, cell(findingLocation(*f)), cell(findingDetail(*f)))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -457,7 +467,8 @@ const maxTracebacks = 5
 // caller owns for the whole run.
 func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error {
 	suppressed := 0
-	for _, f := range findings {
+	for i := range findings {
+		f := &findings[i]
 		// Trimmed before the test, not just inside the loop below: a message
 		// with one trailing newline has nothing to show under the table, and
 		// printing it anyway produced a "traceback" block that was a verbatim
@@ -470,7 +481,7 @@ func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error
 			suppressed++
 			continue
 		}
-		if _, err := fmt.Fprintf(w, "\n%s:\n", cell(findingLocation(f))); err != nil {
+		if _, err := fmt.Fprintf(w, "\n%s:\n", cell(findingLocation(*f))); err != nil {
 			return err
 		}
 		for _, line := range strings.Split(body, "\n") {
@@ -492,6 +503,9 @@ func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error
 }
 
 func findingLocation(f checks.Finding) string {
+	if f.Key != "" {
+		return envFindingLocation(f)
+	}
 	if f.DagID != "" {
 		return f.DagID
 	}
@@ -517,6 +531,10 @@ func findingDetail(f checks.Finding) string {
 		// The whole finding is its message: it names checks that did not run,
 		// so there is no file or dag_id to point at and the LOCATION column
 		// stays empty.
+		return f.Message
+	case checks.KindEnvMissing, checks.KindEnvInvalid:
+		// The declaration is the LOCATION; the message is what is wrong with
+		// its value.
 		return f.Message
 	default:
 		return f.Message
