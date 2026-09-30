@@ -62,6 +62,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
+	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/secrets"
@@ -639,4 +640,59 @@ func linkedPaths(r secrets.Reach) string {
 		parts = append(parts, p)
 	}
 	return strings.Join(parts, ", ")
+}
+
+// ReachingConnections is every connection the vault holds that reaches this
+// checkout, decrypted, project tier first: the project's own connections, then
+// the globals whose link state includes the checkout (Reach.Includes, the rule
+// Astro Desktop applies to the same vault). A connection both tiers hold
+// appears once, from the project tier.
+//
+// It exists for pkg/connwarehouse, which writes what it gets to a plaintext
+// file for Otto's analyzing-data skill, so a global withheld from this
+// checkout, or every global while the link index is unusable, must not reach
+// it. Unlike SecretInjection there is no declared-only filter: the desktop
+// feeds every connection that reaches a project, and the two launch paths give
+// Otto the same warehouses.
+//
+// Best effort: a vault that cannot be read yields nothing, and an entry that
+// cannot be decrypted or decoded is left out.
+func (s *Source) ReachingConnections() []connmodel.Connection {
+	s.load()
+	if s.down != nil {
+		return nil
+	}
+	var out []connmodel.Connection
+	seen := map[string]bool{}
+	for _, index := range []map[string]string{s.scoped, s.global} {
+		envKeys := make([]string, 0, len(index))
+		for k := range index {
+			envKeys = append(envKeys, k)
+		}
+		sort.Strings(envKeys)
+		for _, envKey := range envKeys {
+			if seen[envKey] {
+				continue
+			}
+			vaultKey := index[envKey]
+			kind, _, name, err := secrets.ParseKey(vaultKey)
+			if err != nil || kind != secrets.KindConn {
+				continue
+			}
+			// Claimed before the read: a project connection that cannot be
+			// read still shadows the global of its name, as it does in the
+			// resolver, rather than letting the global stand in for it.
+			seen[envKey] = true
+			v, ok := s.read(vaultKey)
+			if !ok {
+				continue
+			}
+			c, err := airflowenv.DecodeConnValue(name, v)
+			if err != nil {
+				continue
+			}
+			out = append(out, c)
+		}
+	}
+	return out
 }

@@ -3,8 +3,11 @@ package otto
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -23,6 +26,9 @@ type Config struct {
 	Domain       string
 	Organization string
 	AirflowURL   string
+	// AirflowV2 is true when AirflowURL is a v2 project's Airflow, which Otto
+	// authenticates to itself: no username and password are injected for it.
+	AirflowV2 bool
 }
 
 // NewConfigFromContext builds a Config from the current astro login context.
@@ -43,18 +49,18 @@ func NewConfigFromContext() *Config {
 }
 
 // DetectAirflow returns a URL to the Airflow belonging to the current project
-// directory, or "" if there is none. The nearest enclosing v2 project's
+// directory, or "" if there is none, and whether it is a v2 project's. The nearest enclosing v2 project's
 // running Airflow wins — even over a v1 route registered on cwd itself;
 // otherwise the v1 proxy routes decide.
-func DetectAirflow() string {
+func DetectAirflow() (url string, v2 bool) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return ""
+		return "", false
 	}
 	if url := detectV2Airflow(cwd); url != "" {
-		return url
+		return url, true
 	}
-	return detectV1Airflow(cwd)
+	return detectV1Airflow(cwd), false
 }
 
 // detectV2Airflow reports the running local Airflow of the v2 project cwd
@@ -80,9 +86,8 @@ func detectV2Airflow(cwd string) string {
 		return ""
 	}
 	// Airflow 2's standalone generates its own admin password, which otto
-	// doesn't read — BuildEnv would pair the URL with admin/admin and the
-	// token exchange would fail. Better no URL than a half-wired one. Docker
-	// mode creates admin/admin itself, so that pairing is the right one.
+	// doesn't read, so its token exchange would fail. Better no URL than a
+	// half-wired one. Docker mode creates admin/admin itself.
 	if (rec.AirflowMajor == "2" && rec.Mode != localrt.ModeDocker) || rec.Port == 0 {
 		return ""
 	}
@@ -152,21 +157,18 @@ func (c *Config) BuildEnv() []string {
 		env = append(env, prefix+value)
 	}
 
-	// Prepend ~/.astro/bin to PATH so Otto's bash tool can resolve the `af`
-	// wrapper we install in EnsureAfWrapper. Without this we'd be at the mercy
-	// of the user having added ~/.astro/bin to their shell PATH manually.
-	prependPath := func(dir string) {
-		prefix := "PATH="
-		for i, e := range env {
-			if strings.HasPrefix(e, prefix) {
-				existing := strings.TrimPrefix(e, prefix)
-				env[i] = prefix + dir + string(os.PathListSeparator) + existing
-				return
-			}
-		}
-		env = append(env, prefix+dir)
+	// PATH gets two directories in front of it. The launcher directory comes
+	// first, so the `astro` Otto's bash tool runs is the CLI that launched it
+	// rather than whichever one the shell PATH finds first (a v1 install
+	// beside a v2 build, say). It holds that one `astro` and nothing else: the
+	// CLI's own directory may be ~/.local/bin or ~/go/bin, and putting that
+	// first would shadow python, uv and airflow for Otto. Then ~/.astro/bin,
+	// where Otto itself is installed.
+	foldCase := runtime.GOOS == windowsGOOS
+	env = prependPath(env, BinDir(), foldCase)
+	if dir := ensureLauncherBin(); dir != "" {
+		env = prependPath(env, dir, foldCase)
 	}
-	prependPath(BinDir())
 
 	// Auth context — Otto reads these instead of parsing config.yaml
 	set("ASTRO_TOKEN", c.Token)
@@ -183,19 +185,21 @@ func (c *Config) BuildEnv() []string {
 	// Airflow connection
 	set("AIRFLOW_API_URL", c.AirflowURL)
 
-	if c.AirflowURL != "" {
-		// The account the engines provision, from pkg/airflowrt rather than
-		// spelled again here.
+	if c.AirflowURL != "" && !c.AirflowV2 {
+		// A v1 route: the account the engines provision, from pkg/airflowrt
+		// rather than spelled again here. Right for docker mode either
+		// version, and for macOS standalone. NOT right for a non-macOS
+		// standalone Airflow 2, whose password `airflow standalone` generates:
+		// detectV1Airflow has no Airflow-major or mode information to refuse
+		// it with, so such a route still gets a pair that will 401. See the
+		// gap noted in pkg/airflowrt/account.go.
 		//
-		// Right for docker mode either version, and for macOS standalone. NOT
-		// right for a non-macOS standalone Airflow 2, whose password `airflow
-		// standalone` generates: detectV2Airflow refuses that case explicitly,
-		// detectV1Airflow has no Airflow-major or mode information to refuse it
-		// with, so a v1 standalone AF2 route still gets a pair that will 401.
-		// See the gap noted in pkg/airflowrt/account.go.
+		// A v2 project's Airflow gets no pair: Otto reads that project's
+		// credentials itself, and a default pair here would override them.
 		set("AIRFLOW_USERNAME", airflowrt.Airflow2AdminUser)
 		set("AIRFLOW_PASSWORD", airflowrt.Airflow2AdminPassword)
-	} else {
+	}
+	if c.AirflowURL == "" {
 		// We couldn't match the current project to a running Airflow.
 		// Point the af CLI at an empty config so it doesn't silently fall
 		// back to ~/.af/config.yaml's `current-instance`, which is a
@@ -205,4 +209,87 @@ func (c *Config) BuildEnv() []string {
 	}
 
 	return env
+}
+
+// prependPath puts dir in front of env's PATH, adding one if there is none.
+// foldCase matches the key case-insensitively, as Windows does: its
+// environment usually spells it "Path", and a second, upper-case entry would
+// leave the child with two variables and no telling which one it reads.
+func prependPath(env []string, dir string, foldCase bool) []string {
+	for i, e := range env {
+		eq := strings.IndexByte(e, '=')
+		if eq < 0 {
+			continue
+		}
+		key := e[:eq]
+		if key == "PATH" || (foldCase && strings.EqualFold(key, "PATH")) {
+			env[i] = key + "=" + dir + string(os.PathListSeparator) + e[eq+1:]
+			return env
+		}
+	}
+	return append(env, "PATH="+dir)
+}
+
+// executable is os.Executable, a var so a test can stand in a launcher.
+var executable = os.Executable
+
+// LauncherBinDir holds the one `astro` Otto should run: the CLI that
+// launched it. Nothing else is ever put there.
+func LauncherBinDir() string {
+	return filepath.Join(config.HomeConfigPath, "otto", "launcher-bin")
+}
+
+// ensureLauncherBin refreshes LauncherBinDir so it holds only an `astro`
+// pointing at the running CLI, resolved through symlinks: a symlink, or a copy
+// on Windows, where creating one needs a privilege most users lack. Refreshed
+// every launch, so it follows whichever CLI ran last. Returns the directory, or
+// "" when it could not be prepared, and then Otto gets no launcher entry
+// rather than a stale one.
+func ensureLauncherBin() string {
+	exe, err := executable()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	dir := LauncherBinDir()
+	if err := os.RemoveAll(dir); err != nil {
+		logger.Debugf("otto: clearing %s: %v", dir, err)
+		return ""
+	}
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		logger.Debugf("otto: creating %s: %v", dir, err)
+		return ""
+	}
+	name := "astro"
+	if runtime.GOOS == windowsGOOS {
+		name += ".exe"
+		err = copyExecutable(exe, filepath.Join(dir, name))
+	} else {
+		err = os.Symlink(exe, filepath.Join(dir, name))
+	}
+	if err != nil {
+		logger.Debugf("otto: linking the launcher into %s: %v", dir, err)
+		return ""
+	}
+	return dir
+}
+
+// copyExecutable copies src to dst with the binary's mode.
+func copyExecutable(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, binPerm)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }

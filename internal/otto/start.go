@@ -71,20 +71,25 @@ func Start(args []string) error {
 		defer closer.Close()
 	}
 
-	// Install the `af` wrapper alongside Otto. Best-effort: if this fails
-	// (disk full, permissions, etc.), Otto falls back to the full
-	// `uvx --from ...` prefix at runtime.
-	if err := EnsureAfWrapper(); err != nil {
-		logger.Warnf("otto: failed to install af wrapper: %v (will fall back to uvx)", err)
-	}
-
 	// Deferred from NewConfigFromContext: detection health-probes local
 	// ports, so it runs only once the launch is definitely spawning Otto.
-	cfg.AirflowURL = DetectAirflow()
+	cfg.AirflowURL, cfg.AirflowV2 = DetectAirflow()
 
-	env := cfg.BuildEnv()
+	// Help and version exit before Otto reads anything, so they neither need
+	// the warehouses nor should open the keychain for them.
+	if !isHelpOrVersion(args) {
+		if cwd, err := os.Getwd(); err == nil {
+			writeWarehouses(cwd)
+		}
+	}
 
-	cmd := exec.Command(BinaryPath(), args...) //nolint:gosec // forwarding user args to the Otto binary is the whole point of this command
+	return spawnOtto(BinaryPath(), args, cfg.BuildEnv())
+}
+
+// spawnOtto runs the Otto binary in the foreground and waits for it. A var so
+// a test can take the launch's arguments and environment without running Otto.
+var spawnOtto = func(bin string, args, env []string) error {
+	cmd := exec.Command(bin, args...)
 	cmd.Env = env
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

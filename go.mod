@@ -40,6 +40,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/astroauth v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/checks v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/connwarehouse v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/container v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/envschema v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/fsatomic v0.0.0-00010101000000-000000000000
@@ -349,6 +350,8 @@ replace github.com/astronomer/astro-cli/pkg/secrets => ./pkg/secrets
 replace github.com/astronomer/astro-cli/pkg/checks => ./pkg/checks
 
 replace github.com/astronomer/astro-cli/pkg/connmodel => ./pkg/connmodel
+
+replace github.com/astronomer/astro-cli/pkg/connwarehouse => ./pkg/connwarehouse
 
 replace github.com/astronomer/astro-cli/pkg/platformversions => ./pkg/platformversions
 

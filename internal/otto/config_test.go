@@ -157,7 +157,7 @@ func (s *ConfigSuite) TestDetectAirflow_V2ProjectHealthy() {
 	cwd := s.chdirV2Project("v2-healthy")
 	s.writeV2Record(cwd, serverPort(srv))
 
-	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), DetectAirflow())
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_V2StaleRecord() {
@@ -166,7 +166,7 @@ func (s *ConfigSuite) TestDetectAirflow_V2StaleRecord() {
 	cwd := s.chdirV2Project("v2-stale")
 	s.writeV2Record(cwd, unusedPort(s.T()))
 
-	s.Empty(DetectAirflow())
+	s.Empty(detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_V2Airflow2StandaloneRefused() {
@@ -184,7 +184,7 @@ func (s *ConfigSuite) TestDetectAirflow_V2Airflow2StandaloneRefused() {
 		AirflowMajor: "2",
 	}))
 
-	s.Empty(DetectAirflow())
+	s.Empty(detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_V2Airflow2DockerDetected() {
@@ -201,13 +201,13 @@ func (s *ConfigSuite) TestDetectAirflow_V2Airflow2DockerDetected() {
 		AirflowMajor: "2",
 	}))
 
-	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), DetectAirflow())
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_V2ProjectNoRecord() {
 	s.chdirV2Project("v2-not-started")
 
-	s.Empty(DetectAirflow())
+	s.Empty(detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_V2WinsOverV1Route() {
@@ -227,7 +227,7 @@ func (s *ConfigSuite) TestDetectAirflow_V2WinsOverV1Route() {
 		PID:        os.Getpid(),
 	})
 
-	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(v2srv)), DetectAirflow())
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(v2srv)), detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_NoRouteForProject() {
@@ -237,7 +237,7 @@ func (s *ConfigSuite) TestDetectAirflow_NoRouteForProject() {
 	// Airflow. It must now return empty instead.
 	s.chdirTempProject("no-route-project")
 
-	s.Empty(DetectAirflow())
+	s.Empty(detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_RouteExistsAndHealthy() {
@@ -255,7 +255,7 @@ func (s *ConfigSuite) TestDetectAirflow_RouteExistsAndHealthy() {
 		PID:        os.Getpid(),
 	})
 
-	s.Equal(fmt.Sprintf("http://localhost:%s", port), DetectAirflow())
+	s.Equal(fmt.Sprintf("http://localhost:%s", port), detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_RouteExistsButUnhealthy() {
@@ -270,7 +270,7 @@ func (s *ConfigSuite) TestDetectAirflow_RouteExistsButUnhealthy() {
 		PID:        os.Getpid(),
 	})
 
-	s.Empty(DetectAirflow())
+	s.Empty(detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_IgnoresOtherProjectsRoutes() {
@@ -291,7 +291,7 @@ func (s *ConfigSuite) TestDetectAirflow_IgnoresOtherProjectsRoutes() {
 	})
 
 	s.chdirTempProject("current-project")
-	s.Empty(DetectAirflow())
+	s.Empty(detectedURL())
 }
 
 // --- helpers ---
