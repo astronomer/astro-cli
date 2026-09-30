@@ -4,13 +4,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // dbt requires the project file to be named exactly dbt_project.yml (the .yaml
 // extension is not accepted), so we match only this name.
 const dbtProjectFile = "dbt_project.yml"
-
-const manifestFile = "manifest.json"
 
 // findProjects walks root and returns every directory that contains a
 // dbt_project.yml.
@@ -52,25 +51,27 @@ var manifestSkipDirs = map[string]bool{
 	gitDir:         true, // VCS internals can't hold a project's manifest
 }
 
-// effectiveManifestName resolves dir's override in overrides (keyed by its
-// path relative to root, "." for root itself), or manifestFile if none.
-func effectiveManifestName(overrides map[string]string, root, dir string) string {
-	rel, _ := filepath.Rel(root, dir) // dir always descends from root; an error here can't match a real override key
-	if name, ok := overrides[filepath.ToSlash(rel)]; ok && name != "" {
-		return name
-	}
-	return manifestFile
+// isManifestCandidateName reports whether name could be a dbt manifest, by
+// name alone: a *.json file whose name contains "manifest" (case-insensitive)
+// - covers manifest.json, manifest_full.json, manifest_by_schedule.json, etc.
+// without needing a customer to configure anything. Content is validated
+// separately (isDbtManifest) before anything gets stamped, which is what
+// keeps this from also matching e.g. semantic_manifest.json.
+func isManifestCandidateName(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".json") && strings.Contains(lower, "manifest")
 }
 
-// findManifests walks root and returns file paths matching each directory's
-// effectiveManifestName.
+// findManifests walks root and returns every file matching
+// isManifestCandidateName.
 //
 // A manifest whose parent directory is itself a discovered project root is
 // omitted: that project's folder hash already covers a manifest sitting in its
-// root. Manifests elsewhere — most importantly a standalone one shipped for a
-// manifest-only (DBT_MANIFEST) deployment, or a project's target/manifest.json —
-// each get their own sidecar.
-func findManifests(root string, projectDirs map[string]bool, overrides map[string]string) ([]string, error) {
+// root, and processProject slims it there instead. Manifests elsewhere —
+// most importantly a standalone one shipped for a manifest-only
+// (DBT_MANIFEST) deployment, or a project's target/manifest.json — each get
+// their own sidecar.
+func findManifests(root string, projectDirs map[string]bool) ([]string, error) {
 	var manifests []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -83,7 +84,7 @@ func findManifests(root string, projectDirs map[string]bool, overrides map[strin
 			}
 			return nil
 		}
-		if d.Name() != effectiveManifestName(overrides, root, filepath.Dir(path)) {
+		if !isManifestCandidateName(d.Name()) {
 			return nil
 		}
 		if projectDirs[filepath.Dir(path)] {

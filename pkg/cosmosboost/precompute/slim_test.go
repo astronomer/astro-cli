@@ -17,6 +17,25 @@ func parseDoc(t *testing.T, raw string) map[string]any {
 	return doc
 }
 
+// TestSlimNameFor pins the naming convention a consumer needs to compute a
+// manifest's slim companion from its own filename alone, with no sidecar
+// lookup required.
+func TestSlimNameFor(t *testing.T) {
+	cases := map[string]string{
+		"manifest.json":             "manifest.slim.json",
+		"manifest_full.json":        "manifest_full.slim.json",
+		"manifest_by_schedule.json": "manifest_by_schedule.slim.json",
+	}
+	for in, want := range cases {
+		if got := slimNameFor(in); got != want {
+			t.Errorf("slimNameFor(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if slimNameFor("manifest.json") != slimManifestName {
+		t.Errorf("slimNameFor(%q) must equal slimManifestName, the default case's constant", "manifest.json")
+	}
+}
+
 // TestBuildSlimManifestKeepsOnlyAllowedResourceFields pins the field allowlist
 // Cosmos actually reads from a manifest node - both the DbtNode build
 // (cosmos/dbt/graph.py::_build_dbt_node_from_manifest_resource) and the outlet

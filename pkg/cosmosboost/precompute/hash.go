@@ -179,9 +179,11 @@ func stripEntityCreatedAt(doc map[string]any) {
 }
 
 // isDbtManifest reports whether doc is a dbt manifest specifically - every
-// dbt artifact (run_results.json, catalog.json, ...) carries the same
-// metadata.dbt_schema_version, just under its own schema URL, so presence
-// alone would also match run_results.json, which target/ always has too.
+// dbt artifact (run_results.json, catalog.json, semantic_manifest.json, ...)
+// carries the same metadata.dbt_schema_version, just under its own schema
+// URL, so presence alone would also match those - most importantly
+// semantic_manifest.json, whose name (like discovery's) also contains
+// "manifest".
 func isDbtManifest(doc map[string]any) bool {
 	meta, ok := doc["metadata"].(map[string]any)
 	if !ok {
@@ -211,30 +213,6 @@ func readManifestDoc(path string) (doc map[string]any, bytes int64, isDbt bool, 
 		return nil, bytes, false, nil
 	}
 	return doc, bytes, true, nil
-}
-
-// hasSiblingDbtManifest reports whether dir holds another *.json file that
-// also parses as a valid dbt manifest. The plugin resolves both artifacts by
-// directory alone, not by manifest identity, so stamping an ambiguous
-// directory risks serving one manifest's cache to a DAG pointed at the other.
-func hasSiblingDbtManifest(dir, exclude string) (bool, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false, err
-	}
-	for _, e := range entries {
-		if e.IsDir() || e.Name() == exclude || filepath.Ext(e.Name()) != ".json" {
-			continue
-		}
-		_, _, isDbt, err := readManifestDoc(filepath.Join(dir, e.Name()))
-		if err != nil {
-			return false, err
-		}
-		if isDbt {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // hashDocument computes the "sha256-manifest-v2" hash of an already-parsed

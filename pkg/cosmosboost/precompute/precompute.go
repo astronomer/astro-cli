@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -19,17 +20,17 @@ const (
 )
 
 // Result records what happened for one unit of work: either a dbt project
-// directory or a standalone manifest.json.
+// directory or a standalone manifest.
 type Result struct {
 	Kind     string        // "project" or "manifest"
-	Path     string        // project directory, or manifest.json path
+	Path     string        // project directory, or manifest path
 	Hash     string        // version hash (empty if Err != nil or Skipped)
 	Files    int           // files hashed (1 for a manifest)
 	Bytes    int64         // total bytes hashed
 	Duration time.Duration // time spent on this unit
-	Skipped  bool          // no sidecar written: not a dbt manifest, or (see Warning) an ambiguous directory
-	Warning  string        // non-fatal note, e.g. an unresolved template, or why a Skipped unit was skipped
-	Err      error         // non-nil if hashing, writing the sidecar, or writing the slim manifest failed
+	Skipped  bool          // a manifest-like file that isn't a dbt manifest (no sidecar written)
+	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
+	Err      error         // non-nil if hashing, writing the sidecar, or writing a slim manifest failed
 }
 
 // Summary is the structured outcome of a precompute run. It backs both the
@@ -43,36 +44,31 @@ type Summary struct {
 // hash sidecars.
 type Options struct {
 	// SlimManifest also writes a slim, field-filtered copy of each discovered
-	// manifest.json (see buildSlimManifest) next to its sidecar.
+	// manifest (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
-
-	// ManifestNames overrides the filename matched in a directory (keyed by
-	// its path relative to its root, "." for the root itself) instead of
-	// manifest.json.
-	ManifestNames map[string]string
 }
 
-// Run finds every dbt project (a directory with dbt_project.yml) and standalone
-// dbt manifest.json under the given roots, and writes a .astro/dbt_metadata.json
-// hash sidecar next to each. Units are processed concurrently — one worker each,
-// bounded by GOMAXPROCS — and each is hashed over sorted input, so results are
-// deterministic with no cross-worker coordination.
+// Run finds every dbt project (a directory with dbt_project.yml) and every
+// standalone dbt manifest under the given roots, and writes a
+// .astro/dbt_metadata.json hash sidecar next to each. Units are processed
+// concurrently — one worker each, bounded by GOMAXPROCS — and each is hashed
+// over sorted input, so results are deterministic with no cross-worker
+// coordination.
 //
 // Per-unit failures are best-effort: a unit that fails is recorded in its Result
 // and does not stop the others. Run only returns a non-nil error for a top-level
 // problem, such as a root that cannot be walked. version is recorded in each
 // sidecar's generated_by.
 //
-// With opts.SlimManifest set, every dbt manifest.json also gets a slim,
-// field-filtered copy (see buildSlimManifest) written into the .astro/ beside
-// it, for the Cosmos Boost plugin to load in place of the full manifest at
-// DAG-parse time. That includes one in a project's own root, which is not a
-// discovery unit of its own and is handled by processProject.
+// With opts.SlimManifest set, every dbt manifest also gets a slim,
+// field-filtered copy (see buildSlimManifest, slimNameFor) written into the
+// .astro/ beside it, for the Cosmos Boost plugin to load in place of the full
+// manifest at DAG-parse time. That includes any in a project's own root,
+// which aren't discovery units of their own and are handled by processProject.
 func Run(roots []string, version string, opts Options) (Summary, error) {
 	start := time.Now()
 
 	projectDirs := map[string]bool{}
-	projectRoots := map[string]string{} // project dir -> root it was found under
 	for _, root := range roots {
 		found, err := findProjects(root)
 		if err != nil {
@@ -80,13 +76,12 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 		}
 		for _, d := range found {
 			projectDirs[d] = true
-			projectRoots[d] = root
 		}
 	}
 
 	manifests := map[string]bool{}
 	for _, root := range roots {
-		found, err := findManifests(root, projectDirs, opts.ManifestNames)
+		found, err := findManifests(root, projectDirs)
 		if err != nil {
 			return Summary{}, fmt.Errorf("scanning %q for manifests: %w", root, err)
 		}
@@ -95,13 +90,13 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 		}
 	}
 
-	type unit struct{ kind, path, root string }
+	type unit struct{ kind, path string }
 	var units []unit
 	for d := range projectDirs {
-		units = append(units, unit{kindProject, d, projectRoots[d]})
+		units = append(units, unit{kindProject, d})
 	}
 	for m := range manifests {
-		units = append(units, unit{kindManifest, m, ""})
+		units = append(units, unit{kindManifest, m})
 	}
 	// Composite sort key: path first, kind as the tiebreaker. NUL sorts below
 	// every other byte, so prefix relationships between paths are preserved.
@@ -119,7 +114,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 			defer wg.Done()
 			defer func() { <-sem }() // release the slot
 			if u.kind == kindProject {
-				results[i] = processProject(u.path, u.root, version, opts)
+				results[i] = processProject(u.path, version, opts)
 			} else {
 				results[i] = processManifest(u.path, version, opts)
 			}
@@ -133,8 +128,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 // processProject hashes one dbt project directory and writes its sidecar. It reads
 // dbt_project.yml once (readDbtConfig) and threads the result through hashing and the
 // templated-packages warning, so the file isn't parsed more than once per project.
-// root is the discovery root dir was found under, used to resolve opts.ManifestNames.
-func processProject(dir, root, version string, opts Options) Result {
+func processProject(dir, version string, opts Options) Result {
 	start := time.Now()
 	cfg := readDbtConfig(dir)
 	hash, files, totalBytes, err := hashProject(dir, cfg)
@@ -148,37 +142,38 @@ func processProject(dir, root, version string, opts Options) Result {
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
 
-	// A manifest.json (or an opts.ManifestNames override) in the project root
-	// is not a unit of its own - its .astro/ is this project's - so
-	// findManifests skips it. Slim it here instead, leaving the project's own
-	// hash as the anchor.
+	// A manifest-like file in the project root is not a unit of its own -
+	// its .astro/ is this project's - so findManifests skips it. Slim every
+	// one found directly here instead, leaving the project's own hash as the
+	// anchor; the sidecar's filtered_manifest points at the last one
+	// processed when more than one exists.
 	var filtered *FilteredManifest
 	if opts.SlimManifest {
-		name := effectiveManifestName(opts.ManifestNames, root, dir)
-		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, name)); readErr == nil && isDbt {
-			// A failed ambiguity check only skips slimming, not the whole
-			// project: unlike a writeSlimManifest failure below, it leaves no
-			// partial artifact, and the project's tree hash below doesn't
-			// depend on it either way.
-			note := ""
-			switch ambiguous, sibErr := hasSiblingDbtManifest(dir, name); {
-			case sibErr != nil:
-				note = name + " not slimmed: could not check for another manifest in this directory (" + sibErr.Error() + ")"
-			case ambiguous:
-				note = name + " not slimmed: another valid dbt manifest shares this directory"
-			default:
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			note := "could not scan for manifests to slim: " + readErr.Error()
+			if r.Warning != "" {
+				note = r.Warning + "; " + note
+			}
+			r.Warning = note
+		} else {
+			for _, e := range entries {
+				if e.IsDir() || !isManifestCandidateName(e.Name()) {
+					continue
+				}
+				doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, e.Name()))
+				if readErr != nil || !isDbt {
+					continue
+				}
 				// Nothing mutates doc afterward here, unlike processManifest.
 				data, _ := json.Marshal(buildSlimManifest(doc, version))
-				if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
+				f, writeErr := writeSlimManifest(dir, e.Name(), data)
+				if writeErr != nil {
+					r.Err = writeErr
 					r.Duration = time.Since(start)
 					return r
 				}
-			}
-			if note != "" {
-				if r.Warning != "" {
-					note = r.Warning + "; " + note
-				}
-				r.Warning = note
+				filtered = f
 			}
 		}
 	}
@@ -188,32 +183,24 @@ func processProject(dir, root, version string, opts Options) Result {
 	return r
 }
 
-// processManifest hashes one manifest.json and writes a sidecar next to it,
-// plus a slim, field-filtered copy of the manifest when opts asks for one (see
-// buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
-// written) so unrelated manifest.json files in the project aren't stamped -
-// same as one with a sibling dbt manifest (see hasSiblingDbtManifest).
+// processManifest hashes one manifest-like file and writes a sidecar next to
+// it, plus a slim, field-filtered copy named after it (see slimNameFor) when
+// opts asks for one (see buildSlimManifest). A file that isn't actually a dbt
+// manifest is skipped (nothing is written), so an unrelated *.json file whose
+// name happens to contain "manifest" isn't stamped.
 func processManifest(path, version string, opts Options) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
 	var hash string
 	var slimData []byte
-	var skipNote string
 	if err == nil && isDbt {
-		switch ambiguous, sibErr := hasSiblingDbtManifest(filepath.Dir(path), filepath.Base(path)); {
-		case sibErr != nil:
-			skipNote = "could not check for another manifest in this directory (" + sibErr.Error() + ")"
-		case ambiguous:
-			skipNote = "another valid dbt manifest shares this directory; skipped to avoid stamping the wrong one's cache"
-		default:
-			if opts.SlimManifest {
-				// Marshal before hashDocument mutates doc: the slim manifest shares
-				// doc's nested values, so only turning it into bytes here decouples
-				// the two. It holds JSON-native types only, so this cannot fail.
-				slimData, _ = json.Marshal(buildSlimManifest(doc, version))
-			}
-			hash = hashDocument(doc)
+		if opts.SlimManifest {
+			// Marshal before hashDocument mutates doc: the slim manifest shares
+			// doc's nested values, so only turning it into bytes here decouples
+			// the two. It holds JSON-native types only, so this cannot fail.
+			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
 		}
+		hash = hashDocument(doc)
 	}
 	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
 	switch {
@@ -221,9 +208,6 @@ func processManifest(path, version string, opts Options) Result {
 		r.Err = err
 	case !isDbt:
 		r.Skipped = true
-	case skipNote != "":
-		r.Skipped = true
-		r.Warning = skipNote
 	default:
 		dir := filepath.Dir(path)
 		// The sidecar goes last: it carries the filtered_manifest pointer, so it
@@ -232,7 +216,7 @@ func processManifest(path, version string, opts Options) Result {
 		// safe.
 		var filtered *FilteredManifest
 		if slimData != nil {
-			filtered, r.Err = writeSlimManifest(dir, slimData)
+			filtered, r.Err = writeSlimManifest(dir, filepath.Base(path), slimData)
 		}
 		if r.Err == nil {
 			r.Err = writeSidecar(dir, algoManifestJSON, hash, version, filtered)
@@ -241,16 +225,18 @@ func processManifest(path, version string, opts Options) Result {
 	return r
 }
 
-// writeSlimManifest writes data as dir's slim manifest and returns the sidecar
-// pointer describing it. data must already be marshaled, so a caller that later
-// mutates the source doc cannot leak into it (see processManifest).
-func writeSlimManifest(dir string, data []byte) (*FilteredManifest, error) {
-	if err := writeArtifact(dir, slimManifestName, data); err != nil {
+// writeSlimManifest writes data as the slim companion of manifestFilename
+// (see slimNameFor) inside dir, and returns the sidecar pointer describing
+// it. data must already be marshaled, so a caller that later mutates the
+// source doc cannot leak into it (see processManifest).
+func writeSlimManifest(dir, manifestFilename string, data []byte) (*FilteredManifest, error) {
+	name := slimNameFor(manifestFilename)
+	if err := writeArtifact(dir, name, data); err != nil {
 		return nil, err
 	}
 	return &FilteredManifest{
 		Schema:  slimSchemaVersion,
-		Path:    slimManifestName,
+		Path:    name,
 		Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(data)},
 	}, nil
 }
@@ -266,8 +252,8 @@ func (s Summary) CountFailed() int {
 	return n
 }
 
-// CountSkipped returns the number of units skipped: not a dbt manifest, or an
-// ambiguous directory (see hasSiblingDbtManifest).
+// CountSkipped returns the number of units skipped (manifest-like files that
+// aren't dbt manifests).
 func (s Summary) CountSkipped() int {
 	n := 0
 	for _, r := range s.Results {
@@ -298,8 +284,6 @@ func (s Summary) WriteReport(w io.Writer) {
 		switch {
 		case r.Err != nil:
 			fmt.Fprintf(w, "  %s %-8s %s  (%v)\n", glyphFail, r.Kind, r.Path, r.Err)
-		case r.Skipped && r.Warning != "":
-			fmt.Fprintf(w, "  %s %-8s %s  (%s)\n", glyphLeft, r.Kind, r.Path, r.Warning)
 		case r.Skipped:
 			fmt.Fprintf(w, "  %s %-8s %s  (not a dbt manifest)\n", glyphLeft, r.Kind, r.Path)
 		default:
