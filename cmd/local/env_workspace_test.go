@@ -86,7 +86,7 @@ func TestEnvListShowsWorkspaceSource(t *testing.T) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out.String())), &item); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	if item.Name != "DATA_WAREHOUSE_URI" || item.Source != "workspace" {
+	if item.Name != "DATA_WAREHOUSE_URI" || item.Source != "workspace (cmws)" {
 		t.Fatalf("list item = %+v, want workspace source", item)
 	}
 	if strings.Contains(out.String(), "postgres://cloud") {
@@ -110,7 +110,7 @@ func TestEnvGetFromWorkspace(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	if got.Source != "workspace" || got.Value != "postgres://cloud" {
+	if got.Source != "workspace (cmws)" || got.Value != "postgres://cloud" {
 		t.Fatalf("get json = %+v, want workspace/postgres://cloud", got)
 	}
 }

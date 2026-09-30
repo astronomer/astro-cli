@@ -1,8 +1,12 @@
 package emenv
 
 import (
+	"errors"
+	"time"
+
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -58,3 +62,26 @@ type unavailable struct{ reason string }
 func (u *unavailable) Lookup(string) (string, bool) { return "", false }
 func (u *unavailable) Label() string                { return sourceLabel + " (unavailable: " + u.reason + ")" }
 func (u *unavailable) Diagnose(string) string       { return u.reason }
+func (u *unavailable) Keys() []string               { return nil }
+func (u *unavailable) SkippedKeys() []string        { return nil }
+func (u *unavailable) Outage() (short, cause string) {
+	return u.reason, u.reason
+}
+
+// WorkspaceConnections is the native connections workspaceID holds on domain,
+// read with secret values, for the warehouse file Otto's analyzing-data skill
+// queries through: a connection without its credentials cannot be queried.
+// A connection the org's secrets policy withheld is left out. The error is
+// the read's outage cause when the workspace could not be read; an empty
+// workspaceID reads nothing and returns neither. timeout bounds the read.
+func WorkspaceConnections(workspaceID, domain string, clientFor ClientFactory, timeout time.Duration) ([]connmodel.Connection, error) {
+	if workspaceID == "" {
+		return nil, nil
+	}
+	p := &provider{workspaceID: workspaceID, domain: domain, clientFor: clientFor, reveal: true, timeout: timeout}
+	conns := p.Connections()
+	if _, cause := p.Outage(); cause != "" {
+		return nil, errors.New(cause)
+	}
+	return conns, nil
+}

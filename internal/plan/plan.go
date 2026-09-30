@@ -37,10 +37,12 @@ type Options struct {
 	RequestedPort int
 	// StopWithSession ties Airflow's lifetime to the calling process.
 	StopWithSession bool
-	// WorkspaceProvider, when set, turns on Environment Manager resolution for
-	// names declared `source = "workspace"`. nil leaves a workspace source
-	// unresolved (a required one gates as missing) — the offline default, no
-	// network.
+	// WorkspaceProvider, when set, turns on the linked workspace's tier: the
+	// manifest's workspace's Environment Manager objects reach Airflow below
+	// ~/.astro/env and above declaration defaults, declared or not, and a name
+	// declared `source = "workspace"` resolves from them. nil leaves the tier
+	// out and a workspace source unresolved (a required one gates as missing)
+	// — the offline default, no network.
 	//
 	// It is a constructor rather than a client because the workspace comes from
 	// the manifest, which this package is what reads. Taking the Astro client
@@ -81,6 +83,11 @@ type Built struct {
 	// load (manifest.Manifest.Warnings), carried out for the same reason as
 	// EnvWarnings.
 	ManifestWarnings []manifest.Problem
+	// WorkspaceNote is one line saying the linked workspace could not be read
+	// and the start went on without its values, or empty when it was read, the
+	// manifest links none, or the tier was not asked for. Carried out for the
+	// same reason as EnvWarnings.
+	WorkspaceNote string
 	// Pools are the manifest's [tool.astro.pools], which a start creates or
 	// updates once Airflow answers. They are not part of the Plan: the
 	// runtime starts Airflow, and the pools go in over its API afterwards.
@@ -126,6 +133,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		Project:          proj,
 		EnvWarnings:      resolved.warnings,
 		StartedWithout:   resolved.startedWithout,
+		WorkspaceNote:    resolved.workspaceNote,
 		ManifestWarnings: m.Warnings,
 		Pools:            m.Astro.Pools,
 		Plan: localrt.Plan{
@@ -235,15 +243,25 @@ func UndeclaredLocal(dir string, m *manifest.Manifest) ([]string, error) {
 }
 
 // UndeclaredNote is the sentence check and package print for UndeclaredLocal's
-// names, or empty when there are none.
-func UndeclaredNote(names []string) string {
-	if len(names) == 0 {
-		return ""
+// names and the manifest's linked workspace, or empty when there are neither.
+//
+// The workspace's objects reach a start declared or not too, but check and
+// package stay offline and never read them, so the note names the workspace
+// rather than its objects, and says they were not checked.
+func UndeclaredNote(names []string, workspace string) string {
+	var parts []string
+	if len(names) > 0 {
+		parts = append(parts, fmt.Sprintf("this project gets %s locally without declaring %s, so %s will not follow it to a Deployment "+
+			"or a teammate's clone. Declare what it needs to make it a requirement: astro local env <kind> declare NAME "+
+			"(run astro local env list to see where each comes from).",
+			strings.Join(names, ", "), pronoun(len(names), "it", "them"), pronoun(len(names), "it", "they")))
 	}
-	return fmt.Sprintf("this project gets %s locally without declaring %s, so %s will not follow it to a Deployment "+
-		"or a teammate's clone. Declare what it needs to make it a requirement: astro local env <kind> declare NAME "+
-		"(run astro local env list to see where each comes from)",
-		strings.Join(names, ", "), pronoun(len(names), "it", "them"), pronoun(len(names), "it", "they"))
+	if workspace != "" {
+		parts = append(parts, fmt.Sprintf("a start also passes Airflow what workspace %s holds, declared or not, "+
+			"below every local source. Those values are not checked here, since this runs offline: run astro local env list "+
+			"to see them, and declare what the project needs to make it a requirement.", workspace))
+	}
+	return strings.Join(parts, " ")
 }
 
 func pronoun(n int, one, many string) string {
@@ -313,6 +331,7 @@ type resolvedEnv struct {
 	passthrough    []string
 	warnings       []envschema.Violation
 	startedWithout []envresolve.Missing
+	workspaceNote  string
 }
 
 func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (resolvedEnv, error) {
@@ -428,11 +447,16 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	}
 	// After the vault reconciliation, which would otherwise delete these: a
 	// workspace value won its name, so nothing else may carry that name, and
-	// no file held it — resolveWorkspace only answers when the local chain
-	// did not.
+	// no file held it — the resolver asks the workspace only when the local
+	// chain did not answer.
 	for k, v := range wsInj {
 		secretInj[k] = v
 		delete(inj, k)
+	}
+	var wsNote string
+	if in.WorkspaceProvider != nil && m.Astro.Workspace != "" {
+		shellWon = append(shellWon, workspaceUndeclared(in.WorkspaceProvider, schema, src, inj, secretInj)...)
+		wsNote = workspaceNote(in.WorkspaceProvider, m.Astro.Workspace)
 	}
 	return resolvedEnv{
 		env:            inj,
@@ -440,7 +464,57 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		passthrough:    withShellWon(passthroughKeys(res.Resolved, inj), shellWon, inj, secretInj),
 		warnings:       valueWarnings(res.Violations),
 		startedWithout: startedWithout,
+		workspaceNote:  wsNote,
 	}, nil
+}
+
+// workspaceUndeclared adds to secretInj the linked workspace's values for the
+// names the schema does not declare and nothing local supplies: the workspace
+// tier reaches a project whole, as every local tier does, below all of them.
+// inj and secretInj are what the local tiers inject, already reconciled; a
+// name either carries is theirs. It returns the names the shell beat the
+// workspace for, which docker has to pass through. An empty value is skipped
+// rather than injected as a blank, and a secret the org withheld never
+// resolves, the rules Astro Desktop injects by.
+//
+// Travels as SecretEnv, like a declared workspace value, so docker hands it to
+// the compose process rather than writing it into the compose file.
+func workspaceUndeclared(wp envresolve.Provider, schema *envschema.Schema, src localenv.Sources, inj, secretInj map[string]string) []string {
+	declared := map[string]bool{}
+	for _, k := range envschema.DeclaredEnvKeys(schema) {
+		declared[k] = true
+	}
+	var shellWon []string
+	for _, k := range envresolve.Keys(wp) {
+		if declared[k] {
+			continue // the resolver already placed it in the chain
+		}
+		if _, ok := inj[k]; ok {
+			continue
+		}
+		if _, ok := secretInj[k]; ok {
+			continue
+		}
+		if src.InShell(k) {
+			shellWon = append(shellWon, k)
+			continue
+		}
+		if v, ok := wp.Lookup(k); ok && v != "" {
+			secretInj[k] = v
+		}
+	}
+	return shellWon
+}
+
+// workspaceNote is the line a start prints when the linked workspace could not
+// be read, or, when it was, the line naming any keys it holds that cannot be
+// env-var names; empty otherwise.
+func workspaceNote(wp envresolve.Provider, workspace string) string {
+	short, cause := envresolve.Outage(wp)
+	if short == "" {
+		return envresolve.SkippedNote(wp, workspace)
+	}
+	return fmt.Sprintf("workspace %s not read (%s): starting without its values. %s", workspace, short, cause)
 }
 
 // valueWarnings is the violations a start reports without refusing: everything

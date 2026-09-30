@@ -233,6 +233,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 		return err
 	}
 	warnEnvValues(r, built.EnvWarnings)
+	warnWorkspaceUnread(r, built.WorkspaceNote)
 	warnWithout(r, "started", built.StartedWithout)
 	warnLocalFilesInImage(r, built.Plan)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
@@ -429,6 +430,18 @@ func warnWithout(r Renderer, doing string, missing []envresolve.Missing) {
 	}
 }
 
+// warnWorkspaceUnread reports, in one line, that the linked workspace could
+// not be read (offline, logged out, access lost) and the command went on
+// without its values. A value only the workspace could supply that is
+// required still refuses the start, through *plan.MissingEnvError; this is for
+// the rest, which Airflow simply does not get this time.
+func warnWorkspaceUnread(r Renderer, note string) {
+	if note == "" {
+		return
+	}
+	emitWarning(r, event{Event: "warning", Text: note, Reason: note})
+}
+
 // sectionLabel names a section the way a person would, since the wire values
 // are snake_case and these strings are read by one. The machine-readable form
 // travels in the event's own Section field, so rewording these is safe.
@@ -586,6 +599,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 		return err
 	}
 	warnEnvValues(r, built.EnvWarnings)
+	warnWorkspaceUnread(r, built.WorkspaceNote)
 	warnWithout(r, "started", built.StartedWithout)
 	warnLocalFilesInImage(r, built.Plan)
 	// Before the stop, like the build: a refusal leaves Airflow running.
@@ -986,6 +1000,7 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 	}
 	// On stderr: stdout belongs to the command being run.
 	stderr := Renderer{Format: FormatText, Out: c.d.Stderr}
+	warnWorkspaceUnread(stderr, built.WorkspaceNote)
 	warnWithout(stderr, "running", local)
 	warnWorkspaceSkipped(stderr, workspace)
 	return c.d.Runtime.Stopped(built.Plan)

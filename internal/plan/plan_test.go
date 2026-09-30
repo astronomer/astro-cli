@@ -549,14 +549,31 @@ func TestUndeclaredLocal(t *testing.T) {
 	if want := []string{"AIRFLOW_VAR_REGION", "FROM_DOTENV"}; !slices.Equal(got, want) {
 		t.Errorf("UndeclaredLocal = %v, want %v", got, want)
 	}
-	note := UndeclaredNote(got)
+	note := UndeclaredNote(got, "")
+	if !strings.HasSuffix(note, ").") {
+		t.Errorf("note = %q, want it to end in a period", note)
+	}
 	for _, want := range []string{"AIRFLOW_VAR_REGION, FROM_DOTENV", "will not follow it to a Deployment", "astro local env <kind> declare NAME"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("note = %q, want it to contain %q", note, want)
 		}
 	}
-	if UndeclaredNote(nil) != "" {
+	if UndeclaredNote(nil, "") != "" {
 		t.Error("no names must give no note")
+	}
+	if strings.Contains(note, "workspace") {
+		t.Errorf("note = %q names a workspace the manifest does not link", note)
+	}
+	for _, names := range [][]string{nil, got} {
+		ws := UndeclaredNote(names, "cmws")
+		if !strings.HasSuffix(ws, ".") || strings.Contains(ws, "..") || strings.Contains(ws, ". .") {
+			t.Errorf("note = %q, want sentences that each end in one period", ws)
+		}
+		for _, want := range []string{"workspace cmws holds, declared or not", "not checked here", "astro local env list"} {
+			if !strings.Contains(ws, want) {
+				t.Errorf("note = %q, want it to contain %q", ws, want)
+			}
+		}
 	}
 }
 

@@ -24,7 +24,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -40,6 +42,16 @@ const sourceLabel = "workspace"
 // a test can stand in for the refresh.
 var login = astrosession.Login
 
+// ReadTimeout bounds one whole read of a workspace (every object type, every
+// page) for a start or a listing. A start reads the workspace whenever the
+// manifest names one, so a slow or unreachable API must cost a bounded wait,
+// after which the read counts as offline.
+const ReadTimeout = 15 * time.Second
+
+// fetchTimeout is the bound a provider built without its own uses. A var so a
+// test can shorten it.
+var fetchTimeout = ReadTimeout
+
 // provider resolves declared env values for one workspace from Environment
 // Manager. It fetches lazily on the first Lookup and caches the result for the
 // run.
@@ -52,6 +64,8 @@ type provider struct {
 	clientFor ClientFactory
 	client    astrov1.APIClient // built in load, from the domain's login
 	reveal    bool              // ask for secret values (start/get); false is presence-only (list)
+	// timeout bounds the read; zero means fetchTimeout.
+	timeout time.Duration
 
 	once    sync.Once
 	objects map[string]objectValue
@@ -70,6 +84,10 @@ type provider struct {
 type objectValue struct {
 	value    string
 	isSecret bool
+	// native marks a CONNECTION object, as opposed to an AIRFLOW_CONN_* env
+	// var: the warehouse feed takes native connections only, as Astro Desktop's
+	// does.
+	native bool
 }
 
 // outage is a whole-provider failure.
@@ -107,6 +125,79 @@ func (p *provider) Label() string {
 		return sourceLabel + " (unavailable: " + p.down.short + ")"
 	}
 	return sourceLabel
+}
+
+// Keys is every Airflow env-var key the workspace holds that Lookup resolves,
+// sorted: the names the workspace tier supplies to a project whether or not
+// the manifest declares them. A key that cannot be an env var is left out. Nil
+// when the workspace could not be read.
+func (p *provider) Keys() []string {
+	p.load()
+	if p.down != nil {
+		return nil
+	}
+	out := make([]string, 0, len(p.objects))
+	for key := range p.objects {
+		if !airflowenv.ValidEnvKey(key) {
+			continue
+		}
+		if _, ok := p.Lookup(key); ok {
+			out = append(out, key)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// SkippedKeys is the keys the workspace holds that cannot be env-var names, so
+// no start passes them to Airflow, sorted. Keys only, never values. Nil when
+// the workspace could not be read.
+func (p *provider) SkippedKeys() []string {
+	p.load()
+	if p.down != nil {
+		return nil
+	}
+	var out []string
+	for key := range p.objects {
+		if !airflowenv.ValidEnvKey(key) {
+			out = append(out, key)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Outage reports why the workspace could not be read: a short reason for a
+// one-line note and the longer cause with its fix. Both are empty when the
+// read succeeded.
+func (p *provider) Outage() (short, cause string) {
+	p.load()
+	if p.down == nil {
+		return "", ""
+	}
+	return p.down.short, p.down.cause
+}
+
+// Connections is every native connection the workspace holds with a value in
+// hand, decoded, sorted by connection id. A connection the org's secrets
+// policy withheld is left out, since what is left of it cannot authenticate.
+// Nil when the workspace could not be read.
+func (p *provider) Connections() []connmodel.Connection {
+	p.load()
+	if p.down != nil {
+		return nil
+	}
+	var out []connmodel.Connection
+	for key, obj := range p.objects {
+		if !obj.native || obj.value == "" {
+			continue
+		}
+		if c, ok := airflowenv.DecodeConnEnv(key, obj.value); ok {
+			out = append(out, c)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ConnID < out[j].ConnID })
+	return out
 }
 
 // Diagnose explains why key did not resolve, for the missing-value message.
@@ -156,7 +247,13 @@ func (p *provider) load() {
 		// workspace secret then reads as a miss whose cause names the org
 		// toggle. secretsIncluded is what Diagnose uses to tell that apart from
 		// a secret the platform simply holds no value for.
-		objs, secretsIncluded, err := emfetch.WithSecretsFallback(httpcontext.Background(), p.reveal,
+		timeout := p.timeout
+		if timeout == 0 {
+			timeout = fetchTimeout
+		}
+		reqCtx, cancel := httpcontext.WithTimeout(httpcontext.Background(), timeout)
+		defer cancel()
+		objs, secretsIncluded, err := emfetch.WithSecretsFallback(reqCtx, p.reveal,
 			func(reqCtx httpcontext.Context, showSecrets bool) (map[string]objectValue, error) {
 				return p.fetch(reqCtx, ctx.Organization, showSecrets)
 			})
@@ -263,10 +360,10 @@ func indexObject(out map[string]objectValue, obj *astrov1.EnvironmentObject, sho
 			// withheld secret — a hard miss in reveal mode whose cause names the
 			// org toggle, and still present for list, which never needs the value.
 			// Astro Desktop skips these connections the same way.
-			out[key] = objectValue{isSecret: true}
+			out[key] = objectValue{isSecret: true, native: true}
 			return
 		}
-		out[key] = objectValue{value: value}
+		out[key] = objectValue{value: value, native: true}
 	case astrov1.EnvironmentObjectObjectTypeMETRICSEXPORT:
 		// A deployment telemetry concern, out of scope. fetch does not ask for
 		// the type, so this is a defensive guard.
@@ -350,6 +447,9 @@ func (p *provider) classify(err error) *outage {
 			short = shortLabels[c]
 		}
 		return &outage{short: short, cause: emfetch.StatusText(he.code, p.domain, p.workspaceID, he.err)}
+	}
+	if errors.Is(err, httpcontext.DeadlineExceeded) {
+		return &outage{short: "timed out", cause: p.cause(emfetch.CauseOffline)}
 	}
 	return &outage{short: "offline", cause: p.cause(emfetch.CauseOffline)}
 }

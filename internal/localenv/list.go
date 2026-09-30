@@ -73,11 +73,16 @@ type ListOptions struct {
 	// globals in the vault that do not reach this project, marked
 	// NotLinkedHere. Without it those are left out.
 	All bool
-	// WorkspaceProvider resolves names declared source = "workspace" against
-	// the workspace's Environment Manager objects, so `list` can label their
-	// source "workspace" (or its unavailable variant). nil leaves such a name
-	// unresolved. Built presence-only (no secret values pulled).
+	// WorkspaceProvider is the linked workspace's Environment Manager objects,
+	// the tier below ~/.astro/env and above declaration defaults: a declared
+	// name nothing local holds resolves from it, and what it holds undeclared
+	// is listed the way an undeclared file entry is. nil leaves the tier out.
+	// Built presence-only (no secret values pulled).
 	WorkspaceProvider envresolve.Provider
+	// Workspace is the manifest's workspace id, which a row the workspace
+	// supplies names as its source: "workspace (<id>)". Empty when the
+	// manifest links none, which also leaves out the undeclared rows.
+	Workspace string
 	// VaultProviders are the encrypted tier's providers, in order
 	// (internal/vaultenv). Passed in for the same reason WorkspaceProvider is:
 	// this package touches no keyring, and the caller is the composition root.
@@ -151,6 +156,9 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 	unlinked := unlinkedGlobals(opts)
 	for _, rn := range res.Resolved {
 		item := declaredItem(rn, schema)
+		if item.Source == string(envschema.SourceWorkspace) && opts.Workspace != "" {
+			item.Source = WorkspaceSource(opts.Workspace)
+		}
 		// Without --all a global that does not reach this project is as good
 		// as absent, so the declared row reads exactly as if none existed.
 		if item.Source == SourceAbsent && opts.All {
@@ -161,6 +169,7 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 		items = append(items, item)
 	}
 	items = append(items, orphans(src, schema, opts, projectDir)...)
+	items = append(items, workspaceOrphans(src, schema, opts)...)
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].Kind != items[j].Kind {
 			return items[i].Kind < items[j].Kind
@@ -171,6 +180,61 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 		return items[i].Project < items[j].Project
 	})
 	return items, nil
+}
+
+// WorkspaceSource is the source a row the linked workspace supplies carries.
+func WorkspaceSource(workspace string) string {
+	return string(envschema.SourceWorkspace) + " (" + workspace + ")"
+}
+
+// workspaceOrphans lists what the linked workspace holds that the schema does
+// not declare. A start passes each to Airflow unless a local source holds the
+// same name, so the row is marked applied only then; a row a local source
+// shadows reads as undeclared, the way a global the project's own copy
+// shadows does. There is nothing to remove locally, so no row carries a
+// remove hint. A narrowed listing names one file, which the workspace is not,
+// so --project and --global leave these out. A workspace that could not be
+// read lists nothing; the caller prints why (envresolve.Outage).
+func workspaceOrphans(src Sources, schema *envschema.Schema, opts ListOptions) []ListItem {
+	if opts.WorkspaceProvider == nil || opts.Workspace == "" || opts.Scope != "" {
+		return nil
+	}
+	declared := declaredKeySet(schema)
+	local := map[string]bool{}
+	for _, files := range []map[string]string{src.shell, src.project, src.global} {
+		for key := range files {
+			local[key] = true
+		}
+	}
+	for _, tier := range opts.VaultTiers {
+		for _, e := range tier.Entries {
+			if !e.Unlinked && e.Invalid == "" {
+				local[e.EnvKey] = true
+			}
+		}
+	}
+	var out []ListItem
+	for _, key := range envresolve.Keys(opts.WorkspaceProvider) {
+		if declared[key] {
+			continue
+		}
+		kind, name := kindFromKey(key)
+		item := ListItem{Kind: kind, Name: name, Source: WorkspaceSource(opts.Workspace), Orphan: true}
+		if isAirflowSetting(key) {
+			item.Orphan = false
+			out = append(out, item)
+			continue
+		}
+		if src.hasProject {
+			item.DeclareHint = DeclareHint(kind, name)
+			if !local[key] {
+				applied := true
+				item.Applied = &applied
+			}
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 type unlinkedGlobal struct {

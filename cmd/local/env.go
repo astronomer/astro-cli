@@ -121,7 +121,9 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"Values live in the project's .env, or ~/.astro/env with --global. Pass --secret\n" +
 			"to use the encrypted vault instead.\n\n" +
 			"At start, each value comes from the first of: shell env, project .env, project\n" +
-			"vault, global vault, ~/.astro/env, the workspace's Environment Manager.",
+			"vault, global vault, ~/.astro/env, the linked workspace's Environment Manager,\n" +
+			"a declaration's default. Every source reaches Airflow whole, declared or not.\n" +
+			"A workspace that cannot be read is skipped with a note.",
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
 		SuggestionsMinimumDistance: 2,
@@ -903,9 +905,9 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 			return c.emitValue(r, ev)
 		}
 	}
-	// No local source held it. A name declared source = "workspace" resolves
-	// from Environment Manager — the one place `get` reveals a cloud value, and
-	// only for the single name asked.
+	// No local source held it. The linked workspace resolves it from
+	// Environment Manager — the one place `get` reveals a cloud value, and only
+	// for the single name asked.
 	v, source, ok, err := c.getFromWorkspace(projectDir, kind, name, key)
 	if err != nil {
 		return err
@@ -944,9 +946,11 @@ func (c *cli) workspaceProvider() func(workspace, domain string, reveal bool) en
 	}
 }
 
-// for `get`. It returns ok=false (no error) when the name has no workspace
-// source, so the caller reports the plain "not set anywhere". A workspace-source
-// name that cannot be fetched is an error naming the cause.
+// for `get`: a workspace-source name, or any name when the manifest links a
+// workspace, since that tier reaches every name. It returns ok=false (no
+// error) when the workspace does not supply it and the name has no workspace
+// source, so the caller reports the plain "not set anywhere". A
+// workspace-source name that cannot be fetched is an error naming the cause.
 func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key string) (value, source string, ok bool, err error) {
 	if projectDir == "" || c.d.WorkspaceClients == nil {
 		return "", "", false, nil
@@ -955,13 +959,20 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 	if err != nil || schema == nil {
 		return "", "", false, err
 	}
-	if declaredSource(schema, kind, name) != envschema.SourceWorkspace {
+	workspaceSource := declaredSource(schema, kind, name) == envschema.SourceWorkspace
+	if !workspaceSource && m.Astro.Workspace == "" {
 		return "", "", false, nil
 	}
 	// reveal = true: get is the one deliberate reveal of a value.
 	wp := emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, true)
 	if v, has := wp.Lookup(key); has {
-		return v, wp.Label(), true, nil
+		return v, localenv.WorkspaceSource(m.Astro.Workspace), true, nil
+	}
+	if !workspaceSource {
+		// The linked workspace reaches every name, declared or not, but only a
+		// workspace source is expected to be there: any other miss is the
+		// plain "not set anywhere".
+		return "", "", false, nil
 	}
 	return "", "", false, fmt.Errorf("%s %q resolves from the workspace but has no value: %s", localenv.Noun(kind), name, envresolve.Diagnose(wp, key))
 }
@@ -1116,6 +1127,7 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	// it reads Environment Manager for presence only and pulls no secret.
 	if m != nil && c.d.WorkspaceClients != nil {
 		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, false)
+		opts.Workspace = m.Astro.Workspace
 	}
 	switch {
 	case scope.project && scope.global:
@@ -1128,6 +1140,16 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	items, err := localenv.List(os.Environ(), projectDir, schema, opts)
 	if err != nil {
 		return err
+	}
+	// A workspace that could not be read lists no rows, so say so in one line,
+	// on stderr so stdout stays the listing. The fetch is cached, so this
+	// reads nothing more.
+	if opts.Workspace != "" && opts.Scope == "" {
+		if short, _ := envresolve.Outage(opts.WorkspaceProvider); short != "" {
+			fmt.Fprintf(c.d.Stderr, "workspace %s not read (%s): its values are not listed\n", opts.Workspace, short)
+		} else if note := envresolve.SkippedNote(opts.WorkspaceProvider, opts.Workspace); note != "" {
+			fmt.Fprintln(c.d.Stderr, note)
+		}
 	}
 	if only != "" {
 		kept := make([]localenv.ListItem, 0, len(items))

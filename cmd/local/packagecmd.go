@@ -130,10 +130,11 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// What the project gets from this machine without declaring it runs locally
 	// and is carried by no artifact, so every target says so beside its own
 	// warnings. Best effort: a listing that cannot be read costs only the note.
-	note := ""
-	if undeclared, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
-		note = plan.UndeclaredNote(undeclared)
+	var undeclared []string
+	if names, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
+		undeclared = names
 	}
+	note := plan.UndeclaredNote(undeclared, m.Astro.Workspace)
 	if note != "" {
 		res.Warnings = append(res.Warnings, note)
 	}

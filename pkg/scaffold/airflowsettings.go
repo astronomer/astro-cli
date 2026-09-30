@@ -517,7 +517,9 @@ func connExtra(v any) (map[string]any, error) {
 		}
 		var out map[string]any
 		if err := json.Unmarshal([]byte(e), &out); err != nil {
-			return nil, fmt.Errorf("conn_extra is neither a mapping nor JSON: %w", err)
+			// The decoder's error is left out: a json.SyntaxError quotes the
+			// byte it stopped on, which in an extra can be part of a secret.
+			return nil, errors.New("conn_extra is neither a mapping nor JSON")
 		}
 		return out, nil
 	case map[any]any:

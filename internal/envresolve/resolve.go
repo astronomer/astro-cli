@@ -18,11 +18,13 @@ type Inputs struct {
 	// vault > global vault > global ~/.astro/env (internal/localenv assembles
 	// it).
 	Providers []Provider
-	// WorkspaceProvider resolves a name declared `source = "workspace"`
-	// against the workspace's Environment Manager objects. The local files
-	// still win — source is a default, not a lock — so it answers only when no
-	// file did. nil leaves a workspace source unresolved (a required one gates
-	// as missing): a source is never silently resolved from another place.
+	// WorkspaceProvider is the linked workspace's Environment Manager objects,
+	// the tier below every local source and above a declaration's default. It
+	// answers for every declared name nothing local holds: a name declared
+	// `source = "workspace"` resolves only from here or a local source, and a
+	// plain declaration falls to it before its default. nil leaves a
+	// workspace source unresolved (a required one gates as missing): a source
+	// is never silently resolved from another place.
 	WorkspaceProvider Provider
 }
 
@@ -86,11 +88,11 @@ type Result struct {
 }
 
 // Resolve assembles values for every declared name from the provider chain
-// (shell env > project .env > the two vault tiers > global ~/.astro/env, then the workspace source
-// for names that declare it), validates them, and reports what is missing and
+// (shell env > project .env > the two vault tiers > global ~/.astro/env > the
+// linked workspace > the declaration's default), validates them, and reports what is missing and
 // where each present value came from. It never writes and resolves only
-// declared names — undeclared entries in any source pass through untouched,
-// unjudged.
+// declared names — undeclared entries in any source, the workspace included,
+// are the caller's to pass through, unjudged.
 func Resolve(in Inputs) (*Result, error) {
 	res := &Result{}
 	if in.Schema == nil {
@@ -202,8 +204,9 @@ func (r *resolver) connTypes(specs map[string]envschema.ValueSpec) map[string]st
 }
 
 // resolveOne resolves one declared name. The default (empty) source walks the
-// local provider chain and falls back to the manifest default when set; the
-// default sits at the very bottom, below every file. A workspace source checks
+// local provider chain, then the linked workspace, and falls back to the
+// manifest default when set; the default sits at the very bottom, below every
+// file and the workspace. A workspace source checks
 // the local chain first (local always wins) and falls to the workspace's
 // Environment Manager scope.
 func (r *resolver) resolveOne(spec envschema.ValueSpec, section envschema.Section, name, key string) (value, srcLabel string, found bool) {
@@ -211,6 +214,15 @@ func (r *resolver) resolveOne(spec envschema.ValueSpec, section envschema.Sectio
 	case "":
 		if v, src, ok := lookup(r.in.Providers, key); ok {
 			return v, src, true
+		}
+		// The linked workspace sits below every local source and above the
+		// default, for a declared name whatever its source says, as Astro
+		// Desktop layers it.
+		if wp := r.in.WorkspaceProvider; wp != nil {
+			if v, ok := wp.Lookup(key); ok {
+				r.injected[key] = v
+				return v, wp.Label(), true
+			}
 		}
 		if spec.HasDefault {
 			// The default is not on disk; layer it into Airflow the same way a

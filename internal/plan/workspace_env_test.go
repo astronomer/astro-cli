@@ -211,7 +211,15 @@ func TestBuildLocalFileBeatsWorkspaceValue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called: the file answered
+	// The workspace holds the name too. It is read anyway, since the tier
+	// supplies undeclared names, but the file still wins.
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
+		Return(okListResp(astrov1.EnvironmentObject{
+			ObjectKey:           "DATA_WAREHOUSE_URI",
+			ObjectType:          astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
+			EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "postgres://cloud"},
+		}), nil)
 	built, err := Build(dir, Options{Mode: localrt.ModeDocker, WorkspaceProvider: emProvider(mc)})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
@@ -222,5 +230,4 @@ func TestBuildLocalFileBeatsWorkspaceValue(t *testing.T) {
 	if _, ok := built.Plan.SecretEnv["DATA_WAREHOUSE_URI"]; ok {
 		t.Fatal("the losing workspace value traveled beside the file's")
 	}
-	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }

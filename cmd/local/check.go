@@ -118,7 +118,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	// Best effort: the check is about the DAGs, and a listing that cannot be
 	// read only costs the note.
 	undeclared, _ := plan.UndeclaredLocal(project, m) //nolint:errcheck // informational, see above
-	if err := renderCheck(r, res, strict, provisioned, undeclared); err != nil {
+	if err := renderCheck(r, res, strict, provisioned, undeclared, m.Astro.Workspace); err != nil {
 		return err
 	}
 	if code := res.ExitCode(strict); code != checks.ExitOK {
@@ -385,7 +385,7 @@ type checkSummary struct {
 // renderCheck writes findings then a summary. In json mode each finding is one
 // NDJSON line and the summary is the last; in text mode findings form a table
 // and the summary is one sentence. Both render the same data.
-func renderCheck(r Renderer, res checks.Result, strict, provisioned bool, undeclared []string) error {
+func renderCheck(r Renderer, res checks.Result, strict, provisioned bool, undeclared []string, workspace string) error {
 	summary := checkSummary{
 		Event:         "summary",
 		Provisioned:   provisioned,
@@ -417,7 +417,7 @@ func renderCheck(r Renderer, res checks.Result, strict, provisioned bool, undecl
 			return err
 		}
 	}
-	if note := plan.UndeclaredNote(undeclared); note != "" {
+	if note := plan.UndeclaredNote(undeclared, workspace); note != "" {
 		if _, err := fmt.Fprintf(r.Out, "info: %s\n\n", note); err != nil {
 			return err
 		}
