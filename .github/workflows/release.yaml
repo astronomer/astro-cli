@@ -28,7 +28,6 @@ jobs:
       - name: Parse tag
         id: parse
         run: |
-
           TAG="${GITHUB_REF_NAME}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 

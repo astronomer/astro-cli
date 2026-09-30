@@ -79,28 +79,6 @@ brews:
         os: mac
     test: |
       system "#{bin}/astro version"
-  - name: "astro@{{ .Major }}"
-    repository:
-      owner: astronomer
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-      branch: "bump-astro-major-{{ .Version }}"
-      pull_request:
-        enabled: true
-        base:
-          owner: astronomer
-          name: homebrew-tap
-          branch: main
-    directory: Formula
-    skip_upload: auto
-    homepage: https://astronomer.io
-    description: To build and run Airflow Dags locally via docker-compose and deploy Dags to Astronomer-managed Airflow clusters and interact with the Astronomer API.
-    dependencies:
-      - name: podman
-        type: recommended
-        os: mac
-    test: |
-      system "#{bin}/astro version"
   - name: "astro@{{ .Version }}"
     repository:
       owner: astronomer
@@ -114,7 +92,7 @@ brews:
           name: homebrew-tap
           branch: main
     directory: Formula
-    skip_upload: auto
+    skip_upload: '{{ if eq (print .Major) .Env.STABLE_MAJOR }}auto{{ else }}true{{ end }}'
     homepage: https://astronomer.io
     description: To build and run Airflow Dags locally via docker-compose and deploy Dags to Astronomer-managed Airflow clusters and interact with the Astronomer API.
     dependencies:
