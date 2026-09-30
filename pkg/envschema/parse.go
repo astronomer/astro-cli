@@ -88,7 +88,7 @@ func ParseSchema(env map[string]any) (*Schema, error) {
 				"not a valid connection id (letters, digits, _)", SectionConnection)
 		case "airflow_variables":
 			s.AirflowVariables = p.specs(envRoot+".airflow_variables", raw, airflowenv.ValidVarKey,
-				"not a valid variable key (letters, digits, _)", SectionAirflowVariable)
+				"not a valid variable key ("+airflowenv.VarKeyRule+")", SectionAirflowVariable)
 		default:
 			vars[name] = raw
 		}
@@ -113,9 +113,9 @@ func (p *schemaParser) add(code ProblemCode, key, reason string) {
 
 // specs decodes one map of declarations. validName gates each declared name:
 // every name must be expressible as an env var, and the rule differs per
-// section — a plain var must itself be a legal env-var name (ValidEnvKey), an
-// Airflow Variable key may start with a digit (ValidVarKey), a connection id is
-// ValidConnID.
+// section — a plain var and an Airflow Variable key must each be a legal
+// env-var name (ValidEnvKey, ValidVarKey), and a connection id is ValidConnID,
+// which also admits a leading digit.
 func (p *schemaParser) specs(key string, raw any, validName func(string) bool, invalidReason string, section Section) map[string]ValueSpec {
 	table, ok := raw.(map[string]any)
 	if !ok {

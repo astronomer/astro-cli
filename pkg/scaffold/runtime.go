@@ -93,10 +93,11 @@ var errAirflowUnclear = errors.New("the Airflow requirement in [project] depende
 // when not. The requirement itself never changes: moving it to the build's
 // series is SetAirflowVersionWith, the caller's to offer.
 //
-// A manifest with no runtime line is left as it is.
+// A manifest with no runtime line is left as it is. With opts.DryRun the
+// change is reported and nothing is written.
 func AlignRuntime(dir string, wrap func(run func() error) error, opts AirflowPinOptions) (RuntimeChange, error) {
 	var out RuntimeChange
-	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+	err := editManifestFor(opts.DryRun, dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		out = RuntimeChange{Previous: before.Astro.Runtime, Runtime: before.Astro.Runtime}
 		if out.Previous == "" {
 			return nil

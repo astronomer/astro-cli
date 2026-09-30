@@ -1178,6 +1178,13 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		it := &items[i]
 		note := ""
 		switch {
+		case it.Invalid != "":
+			note = it.Invalid
+			if it.Project != "" {
+				note += " (in " + it.Project + ")"
+			} else if it.RemoveHint != "" {
+				note += " (remove: " + it.RemoveHint + ")"
+			}
 		case it.NotLinkedHere && it.LinksDown != "":
 			note = "not linked here: " + it.LinksDown
 		case it.NotLinkedHere:

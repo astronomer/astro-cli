@@ -75,9 +75,12 @@ type carriedSettings struct {
 	// the all-or-nothing reason above does not reach it, and a pool that
 	// cannot be carried does not stop the connections and variables.
 	pools carriedPools
-	// held names the carried values the vault already holds. Apply does not
-	// write over them, so the file stays as the only copy of its own values.
+	// held names the carried values the project already holds a different
+	// value for. Apply does not write over them, so the file stays as the only
+	// copy of its own values.
 	held []string
+	// heldIn is where each held name's copy is, for the advisory.
+	heldIn map[string]SecretHeld
 	// unstored reports that the values stay only in the file: the caller gave
 	// no writer, or the vault could not be asked.
 	unstored bool
@@ -589,7 +592,7 @@ func (c *carriedSettings) keptFor() string {
 	case len(c.pools.notes) > 0:
 		return "for a pool entry that could not be carried"
 	case len(c.held) > 0:
-		return "because the vault already held " + joinNames(c.held) + ", so the file's value was not carried over it"
+		return "because " + c.heldPhrase() + ", so the file's value was not carried over it"
 	}
 	return "because the vault could not be read"
 }
@@ -601,15 +604,35 @@ func (c *carriedSettings) keptFor() string {
 // same question.
 func (c *carriedSettings) checkVault(w SecretWriter) {
 	for i := range c.secrets {
-		held, err := w.HasSecret(c.secrets[i].Kind, c.secrets[i].Name)
+		h, err := checkHeld(w, &c.secrets[i])
 		if err != nil {
 			c.unstored = true
 			return
 		}
-		if held {
+		if h.conflicts() {
 			c.held = append(c.held, c.secrets[i].Name)
+			if c.heldIn == nil {
+				c.heldIn = map[string]SecretHeld{}
+			}
+			c.heldIn[c.secrets[i].Name] = h
 		}
 	}
+}
+
+// heldPhrase says where the held names' other values are: "the vault already
+// held a and b", or one clause per place, "the vault already held a, and .env
+// already held b".
+func (c *carriedSettings) heldPhrase() string {
+	byPlace := map[string][]string{}
+	for _, name := range c.held {
+		p := c.heldIn[name].place()
+		byPlace[p] = append(byPlace[p], name)
+	}
+	var clauses []string
+	for _, p := range slices.Sorted(maps.Keys(byPlace)) {
+		clauses = append(clauses, p+" already held "+joinNames(byPlace[p]))
+	}
+	return strings.Join(clauses, ", and ")
 }
 
 // valueCount counts the values a run stores, by kind, as prose: "1 connection",

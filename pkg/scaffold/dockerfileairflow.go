@@ -123,10 +123,11 @@ var ErrNoDockerfileAirflow = errors.New("the declared Dockerfile names no Astro 
 // ("apache-airflow==2.*"), the most the tag says.
 //
 // A requirement that already agrees with the FROM is left alone and reports
-// Changed false. A FROM this cannot read is ErrNoDockerfileAirflow.
+// Changed false. A FROM this cannot read is ErrNoDockerfileAirflow. With
+// opts.DryRun the change is reported and nothing is written.
 func MatchAirflowToDockerfile(dir string, wrap func(run func() error) error, opts AirflowPinOptions) (AirflowPinChange, error) {
 	var change AirflowPinChange
-	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+	err := editManifestFor(opts.DryRun, dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		path := dockerfilePath(dir, before)
 		if path == "" {
 			return fmt.Errorf("%w: [tool.astro] declares no dockerfile", ErrNoDockerfileAirflow)

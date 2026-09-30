@@ -76,10 +76,37 @@ type ManifestEdit func(before *manifest.Manifest, ed tomledit.Editor) error
 // An edit that changes no bytes writes nothing, so an idempotent caller does
 // not disturb the file's mtime or wake anything watching it.
 func EditManifest(dir string, wrap func(run func() error) error, edit ManifestEdit) error {
-	return editManifestJudged(dir, wrap, edit, func(before *manifest.Manifest, out []byte) error {
-		_, err := loadable(before, out)
-		return err
+	return editManifestJudged(dir, wrap, edit, loadableJudge)
+}
+
+// errDryRun is how a dry run's judge stops editManifest short of the write,
+// after the result has passed the same check a real write needs. It never
+// leaves editManifestFor.
+var errDryRun = errors.New("dry run")
+
+// editManifestFor is EditManifest, or with dryRun the same edit stopped before
+// the write: the edit runs inside wrap and its result is judged as
+// EditManifest judges it, so a refusal is reported the same way, and the file
+// is left untouched.
+func editManifestFor(dryRun bool, dir string, wrap func(run func() error) error, edit ManifestEdit) error {
+	if !dryRun {
+		return EditManifest(dir, wrap, edit)
+	}
+	err := editManifestJudged(dir, wrap, edit, func(before *manifest.Manifest, out []byte) error {
+		if err := loadableJudge(before, out); err != nil {
+			return err
+		}
+		return errDryRun
 	})
+	if errors.Is(err, errDryRun) {
+		return nil
+	}
+	return err
+}
+
+func loadableJudge(before *manifest.Manifest, out []byte) error {
+	_, err := loadable(before, out)
+	return err
 }
 
 // judge decides whether an edit's result may be written: it returns nil, or
@@ -163,6 +190,9 @@ func editManifest(dir string, edit ManifestEdit, ok judge) error {
 		return withPath(err, path)
 	}
 	if err := ok(baseline, out); err != nil {
+		if errors.Is(err, errDryRun) {
+			return err
+		}
 		return fmt.Errorf("%w, because the result would not load: %w", ErrEditRefused, withPath(err, path))
 	}
 	return fsatomic.WriteFile(target, out, mode)

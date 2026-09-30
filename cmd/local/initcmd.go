@@ -244,6 +244,14 @@ func (l *lazyVaultWriter) HasSecret(kind secrets.Kind, name string) (bool, error
 	return w.HasSecret(kind, name)
 }
 
+func (l *lazyVaultWriter) HasSecretValue(kind secrets.Kind, name, value string) (scaffold.SecretHeld, error) {
+	w, err := l.writer()
+	if err != nil {
+		return scaffold.SecretHeld{}, err
+	}
+	return w.HasSecretValue(kind, name, value)
+}
+
 func (l *lazyVaultWriter) writer() (*vaultenv.Writer, error) {
 	if l.w == nil {
 		w, err := vaultenv.NewWriter(l.dir)

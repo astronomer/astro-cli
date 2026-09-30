@@ -111,6 +111,10 @@ type Source struct {
 	// this checkout, by env key: linked elsewhere, or behind an index this
 	// build cannot read. Kept for Diagnose and Tiers, never for Lookup.
 	withheld map[string]withheldEntry
+	// invalid are entries this checkout's tiers hold under a name the key
+	// rule now refuses, by the env key they were stored under, per tier.
+	// Kept for Diagnose and Tiers, never for Lookup.
+	invalidScoped, invalidGlobal map[string]invalidEntry
 	// down is a whole-source failure: the vault cannot be listed at all.
 	down *outage
 	// globalDown fails the global tier alone closed: the link index could not
@@ -143,6 +147,13 @@ type withheldEntry struct {
 	name     string
 	// reach is where it is linked. Unused when the index was unreadable.
 	reach secrets.Reach
+}
+
+// invalidEntry is a vault entry whose name no longer resolves.
+type invalidEntry struct {
+	kind   secrets.Kind
+	name   string
+	reason string
 }
 
 // Load opens the shared vault for one invocation. projectDir is the project's
@@ -257,6 +268,7 @@ func (s *Source) load() {
 			}
 			envKey, ok := envKeyFor(kind, name)
 			if !ok {
+				s.noteInvalid(kind, scope, name)
 				continue
 			}
 			switch {
@@ -295,6 +307,39 @@ func (s *Source) load() {
 	})
 }
 
+// noteInvalid records an entry of this checkout's tiers whose name no longer
+// resolves, so it is listed and diagnosed rather than silently gone. Caller
+// holds load.
+func (s *Source) noteInvalid(kind secrets.Kind, scope, name string) {
+	reason := localenv.InvalidStoredReason(localKind(kind), name)
+	if reason == "" {
+		return
+	}
+	envKey, _ := localenv.StoredVarEnvKey(name)
+	e := invalidEntry{kind: kind, name: name, reason: reason}
+	switch {
+	case scope == secrets.GlobalScope:
+		if s.invalidGlobal == nil {
+			s.invalidGlobal = map[string]invalidEntry{}
+		}
+		s.invalidGlobal[envKey] = e
+	case s.scope != "" && scope == s.scope:
+		if s.invalidScoped == nil {
+			s.invalidScoped = map[string]invalidEntry{}
+		}
+		s.invalidScoped[envKey] = e
+	}
+}
+
+// withInvalid adds a tier's invalid entries to its listing.
+func withInvalid(entries []localenv.VaultEntry, invalid map[string]invalidEntry) []localenv.VaultEntry {
+	for envKey, e := range invalid {
+		entries = append(entries, localenv.VaultEntry{Kind: localKind(e.kind), Name: e.name, EnvKey: envKey, Invalid: e.reason})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].EnvKey < entries[j].EnvKey })
+	return entries
+}
+
 // envKeyFor is the Airflow env-var name a vault entry resolves under: the
 // forward encode, never a reverse derivation. ok is false for a kind this
 // source does not serve, or a name that cannot be an env var at all.
@@ -331,7 +376,7 @@ func (s *Source) Tiers() []localenv.VaultTier {
 	s.load()
 	var out []localenv.VaultTier
 	if s.scope != "" {
-		out = append(out, localenv.VaultTier{Label: SourceProject, Scope: localenv.ScopeProject, Entries: entries(s.scoped)})
+		out = append(out, localenv.VaultTier{Label: SourceProject, Scope: localenv.ScopeProject, Entries: withInvalid(entries(s.scoped), s.invalidScoped)})
 	}
 	global := entries(s.global)
 	for envKey, w := range s.withheld {
@@ -340,7 +385,7 @@ func (s *Source) Tiers() []localenv.VaultTier {
 		}
 		global = append(global, localenv.VaultEntry{Kind: localKind(w.kind), Name: w.name, EnvKey: envKey, Unlinked: true})
 	}
-	sort.Slice(global, func(i, j int) bool { return global[i].EnvKey < global[j].EnvKey })
+	global = withInvalid(global, s.invalidGlobal)
 	tier := localenv.VaultTier{Label: SourceGlobal, Scope: localenv.ScopeGlobal, Entries: global}
 	if s.globalDown != nil {
 		tier.LinksDown = s.globalDown.short
@@ -527,6 +572,13 @@ func (p *provider) Diagnose(key string) string {
 		return p.src.down.cause
 	}
 	if !indexed {
+		invalid := p.src.invalidScoped
+		if p.global {
+			invalid = p.src.invalidGlobal
+		}
+		if e, ok := invalid[key]; ok {
+			return fmt.Sprintf("the encrypted vault holds %s, but %s", e.name, e.reason)
+		}
 		if p.global {
 			return p.src.withheldCause(key)
 		}

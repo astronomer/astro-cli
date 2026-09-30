@@ -53,6 +53,86 @@ type SecretWriter interface {
 	HasSecret(kind secrets.Kind, name string) (bool, error)
 }
 
+// SecretValueChecker is what a SecretWriter may also implement so the
+// conversion can tell a held value equal to the one it carries from a
+// different one. Optional: a writer with only HasSecret has every held value
+// treated as different, which is the safe reading.
+//
+// An equal value is not a conflict. Storing it changes nothing a project
+// resolves, so it is carried like any other, SetSecret included (a writer that
+// holds it somewhere other than its vault, like Astro Desktop's .env, can move
+// it), and airflow_settings.yaml can be retired. A different value is kept
+// and the file stays, as HasSecret alone decides.
+//
+// Plan calls it, not only Apply, so an implementation may decrypt at plan
+// time, and the CLI's does: a preview of a conversion then reads the vault's
+// value of each name the vault holds. A writer that must not touch the
+// keyring during a preview (Astro Desktop's) should compare only what it can
+// read as plaintext, such as a .env, and for a name held in the vault return
+// Held with Compared false. That is the "not compared" answer, and it keeps
+// the conservative behavior a writer with only HasSecret gets: the held value
+// is kept, the file stays, and the advisory does not claim the two differ.
+type SecretValueChecker interface {
+	// HasSecretValue reports whether this scope holds a value for kind and
+	// name, and, when it compared them, whether it equals value.
+	HasSecretValue(kind secrets.Kind, name, value string) (SecretHeld, error)
+}
+
+// SecretHeld is what a SecretValueChecker found under one name.
+type SecretHeld struct {
+	// Held is that the scope holds a value under the name.
+	Held bool
+	// Compared is that the writer read the held value and compared it. False
+	// is "not compared": the held value is treated as different, without
+	// saying it is.
+	Compared bool
+	// Equal is that the held value is the one the conversion carries. Only
+	// meaningful when Held and Compared.
+	Equal bool
+	// Where names the held copy's home for a person, like ".env", when it is
+	// not the vault. Empty means the vault.
+	Where string
+}
+
+// conflicts reports that a held value is one the conversion must not write
+// over: any held value not compared and found equal.
+func (h SecretHeld) conflicts() bool { return h.Held && !(h.Compared && h.Equal) }
+
+// place is Where as a sentence's subject: "the vault" when it is empty.
+func (h SecretHeld) place() string {
+	if h.Where == "" {
+		return "the vault"
+	}
+	return h.Where
+}
+
+// yours is where the held copy is, as the advisory addressing its owner says it.
+func (h SecretHeld) yours() string {
+	if h.Where == "" {
+		return "your vault"
+	}
+	return h.Where
+}
+
+// other names the file's value beside the held one: "a different one" when the
+// writer compared them, and only "one too" when it could not.
+func (h SecretHeld) other() string {
+	if h.Compared {
+		return "a different one"
+	}
+	return "one too"
+}
+
+// checkHeld asks w about one carried value, through HasSecretValue when w
+// implements it and HasSecret otherwise.
+func checkHeld(w SecretWriter, s *SecretWrite) (SecretHeld, error) {
+	if c, ok := w.(SecretValueChecker); ok {
+		return c.HasSecretValue(s.Kind, s.Name, s.value)
+	}
+	has, err := w.HasSecret(s.Kind, s.Name)
+	return SecretHeld{Held: has}, err
+}
+
 // applySecrets stores every carried value.
 //
 // Runs before any file is written. A conversion that stores nothing and writes
@@ -72,7 +152,7 @@ func (cs *Changeset) applySecrets() error {
 	if len(cs.Secrets) == 0 || cs.secrets == nil {
 		return nil
 	}
-	held := make([]bool, len(cs.Secrets))
+	held := make([]SecretHeld, len(cs.Secrets))
 	var heldNames []string
 	for i := range cs.Secrets {
 		w := &cs.Secrets[i]
@@ -89,8 +169,9 @@ func (cs *Changeset) applySecrets() error {
 			return fmt.Errorf("%w: %s carries no value, so this changeset is not the one that was planned",
 				ErrChangedOnDisk, w.Label)
 		}
-		// A value already in the vault is not overwritten, and this is the one
-		// place the two values for one name are ever compared.
+		// A different value already held is not overwritten, and this is the
+		// one place the two values for one name are ever compared. An equal
+		// one is carried as though nothing were held.
 		//
 		// What is carried here is whatever was written into a v1 file, which
 		// may be months stale or a placeholder. What is already in the vault
@@ -99,12 +180,12 @@ func (cs *Changeset) applySecrets() error {
 		// the good credential unrecoverably and leaves the project running
 		// against exactly the value this transform exists to get out of version
 		// control.
-		has, err := cs.secrets.HasSecret(w.Kind, w.Name)
+		h, err := checkHeld(cs.secrets, w)
 		if err != nil {
 			return fmt.Errorf("check %s: %w", w.Label, err)
 		}
-		if has {
-			held[i] = true
+		if h.conflicts() {
+			held[i] = h
 			heldNames = append(heldNames, w.Name)
 		}
 	}
@@ -112,15 +193,15 @@ func (cs *Changeset) applySecrets() error {
 	// arrived since would leave the file as the only copy of its value, and
 	// deleting it anyway is not what the preview described.
 	if len(heldNames) > 0 && cs.retires(SettingsRelPath) {
-		return fmt.Errorf("%w: the vault now holds %s, so %s has to stay; convert again",
+		return fmt.Errorf("%w: this project now holds another value for %s, so %s has to stay; convert again",
 			ErrChangedOnDisk, joinNames(heldNames), SettingsRelPath)
 	}
 	for i := range cs.Secrets {
 		w := &cs.Secrets[i]
-		if held[i] {
+		if held[i].conflicts() {
 			cs.Advisories = append(cs.Advisories, w.Name+
-				": kept the value already in your vault. "+SettingsRelPath+
-				" holds one too, which was not carried over it")
+				": kept the value already in "+held[i].yours()+". "+SettingsRelPath+
+				" holds "+held[i].other()+", which was not carried over it")
 			continue
 		}
 		if err := cs.secrets.SetSecret(w.Kind, w.Name, w.value); err != nil {

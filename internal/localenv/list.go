@@ -36,6 +36,10 @@ type ListItem struct {
 	// Project is the project an --all orphan came from, when it is not the
 	// current one. Empty for the current project and the global file.
 	Project string `json:"project,omitempty"`
+	// Invalid says why a stored entry no longer resolves, a Variable key an
+	// older build accepted, and that it should be renamed or deleted.
+	// RemoveHint still removes it.
+	Invalid string `json:"invalid,omitempty"`
 	// RemoveHint is the exact command to remove an orphan.
 	RemoveHint string `json:"remove_hint,omitempty"`
 	// Applied is false for a global value the current project does not
@@ -118,6 +122,10 @@ type VaultEntry struct {
 	// not be read. It is listed so the vault's contents are not hidden, but no
 	// provider returns it here. The listing marks it NotLinkedHere.
 	Unlinked bool
+	// Invalid says why the entry does not resolve at all: a name the key
+	// rule now refuses (InvalidStoredReason). Its EnvKey is the key it was
+	// stored under.
+	Invalid string
 }
 
 // List builds the resolver-backed listing: every schema-declared name with
@@ -321,6 +329,11 @@ func vaultOrphans(src Sources, opts ListOptions, declared, inProject map[string]
 				continue
 			}
 			item := vaultOrphanItem(e.Kind, e.Name, tier, src.hasProject)
+			if e.Invalid != "" {
+				item.Invalid, item.DeclareHint = e.Invalid, ""
+				out = append(out, item)
+				continue
+			}
 			if isAirflowSetting(e.EnvKey) {
 				item = ListItem{Kind: e.Kind, Name: e.Name, Source: tier.Label}
 			}
@@ -406,12 +419,13 @@ func vaultDeclareHint(kind Kind, name string) string {
 func orphanItem(key string, scope Scope, project string, inProject bool) ListItem {
 	kind, name := kindFromKey(key)
 	item := ListItem{Kind: kind, Name: name, Source: string(scope), Orphan: true, Project: project}
+	item.Invalid = InvalidStoredReason(kind, name)
 	// A cross-project orphan (project set) lives in another project's file; the
 	// delete command runs against the cwd's project, so a hint would point at
 	// the wrong file. Only offer it for the current project and the global file.
 	if project == "" {
 		item.RemoveHint = removeHint(kind, name, scope)
-		if inProject {
+		if inProject && item.Invalid == "" {
 			item.DeclareHint = DeclareHint(kind, name)
 		}
 	}

@@ -230,6 +230,7 @@ func TestCheckNameRefusesWhatTheParserRefuses(t *testing.T) {
 		{SectionEnvVar, "connections"},
 		{SectionEnvVar, "airflow_variables"},
 		{SectionAirflowVariable, "batch.size"},
+		{SectionAirflowVariable, "2nd"},
 		{SectionConnection, "my-warehouse"},
 	}
 	for _, tc := range refused {
@@ -245,7 +246,7 @@ func TestCheckNameRefusesWhatTheParserRefuses(t *testing.T) {
 		{SectionEnvVar, "API_URL"},
 		{SectionEnvVar, "KeepMyCase"},
 		{SectionAirflowVariable, "region"},
-		{SectionAirflowVariable, "2nd"},
+		{SectionAirflowVariable, "_2nd"},
 		{SectionConnection, "warehouse"},
 		// The reserved names only collide for a plain env var: as a section's
 		// own key they are ordinary.

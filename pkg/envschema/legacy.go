@@ -171,7 +171,7 @@ func CheckName(section Section, name string) error {
 		}
 	case SectionAirflowVariable:
 		if !airflowenv.ValidVarKey(name) {
-			return fmt.Errorf("%q is not a valid Airflow Variable key (letters, digits, _)", name)
+			return fmt.Errorf("%q is not a valid Airflow Variable key (%s). Rename the variable, and the Dags reading it", name, airflowenv.VarKeyRule)
 		}
 	case SectionEnvVar:
 		if !airflowenv.ValidEnvKey(name) {

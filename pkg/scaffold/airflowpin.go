@@ -67,6 +67,12 @@ type AirflowPinOptions struct {
 	// It also picks the build a [tool.astro] runtime moves to when the pin
 	// leaves its series. Without it the line is deleted instead.
 	Catalog *runtimeversions.Catalog
+
+	// DryRun makes AlignRuntime and MatchAirflowToDockerfile report the change
+	// they would make, Changed included, without writing the file, so a caller
+	// can preview a fix. A result that would not load is refused exactly as the
+	// real edit refuses it. SetAirflowVersionWith ignores it.
+	DryRun bool
 }
 
 // SetAirflowVersionWith moves the Airflow the manifest in dir pins to version,

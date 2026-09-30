@@ -54,6 +54,24 @@ type Finding struct {
 	// Blocking means the image must not be built: the build and the
 	// requirement disagree on the Airflow series.
 	Blocking bool `json:"blocking"`
+
+	// The structured facts the Message is written from, for a caller that
+	// phrases the finding itself (Astro Desktop translates it) and should not
+	// have to look them up again. Each is empty where the kind has none.
+
+	// Runtime is the build checked, as [tool.astro] runtime names it.
+	Runtime string `json:"runtime,omitempty"`
+	// AirflowPin is the requirement's pin the build was checked against.
+	AirflowPin string `json:"airflowPin,omitempty"`
+	// AirflowVersion is the exact Airflow the catalog says the build carries.
+	// Set for FindingAirflowExcluded, FindingSeriesMismatch and FindingYanked.
+	AirflowVersion string `json:"airflowVersion,omitempty"`
+	// YankedReason is the catalog's reason for withdrawing the build, trimmed,
+	// for FindingYanked. Empty when the catalog gives none.
+	YankedReason string `json:"yankedReason,omitempty"`
+	// Suggested is a build carrying AirflowPin that the Message names instead,
+	// for FindingSeriesMismatch when the catalog has one.
+	Suggested string `json:"suggested,omitempty"`
 }
 
 // RuntimeError is a blocking Finding, as the error CheckRuntime returns.
@@ -79,13 +97,13 @@ func (c *Catalog) CheckRuntime(runtime, airflowPin string) []Finding {
 		if !airflow2 {
 			return nil
 		}
-		return []Finding{{Kind: FindingSkipped, Message: fmt.Sprintf(
+		return []Finding{{Kind: FindingSkipped, Runtime: runtime, AirflowPin: airflowPin, Message: fmt.Sprintf(
 			"the runtime catalog could not be read, so which Airflow 2 series runtime %s carries was not checked against the requirement's %s",
 			runtime, airflowPin)}}
 	}
 	r, ok := c.Runtime(runtime)
 	if !ok || r.AirflowVersion == "" {
-		return []Finding{{Kind: FindingUnknown, Message: fmt.Sprintf(
+		return []Finding{{Kind: FindingUnknown, Runtime: runtime, AirflowPin: airflowPin, Message: fmt.Sprintf(
 			"the runtime catalog lists no build %s, so the Airflow it carries was not checked against the requirement's %s", runtime, airflowPin)}}
 	}
 	var out []Finding
@@ -94,11 +112,15 @@ func (c *Catalog) CheckRuntime(runtime, airflowPin string) []Finding {
 	}
 	if r.Yanked {
 		msg := fmt.Sprintf("runtime %s is yanked", runtime)
-		if r.YankedReason != "" {
-			msg += ": " + strings.TrimSuffix(strings.TrimSpace(r.YankedReason), ".")
+		reason := strings.TrimSuffix(strings.TrimSpace(r.YankedReason), ".")
+		if reason != "" {
+			msg += ": " + reason
 		}
 		msg += ". Pick another build of the series in [tool.astro] runtime, or delete the line to build from the newest one"
-		out = append(out, Finding{Kind: FindingYanked, Message: msg})
+		out = append(out, Finding{
+			Kind: FindingYanked, Message: msg,
+			Runtime: runtime, AirflowPin: airflowPin, AirflowVersion: r.AirflowVersion, YankedReason: reason,
+		})
 	}
 	return out
 }
@@ -116,14 +138,18 @@ func (c *Catalog) disagreement(r *Runtime, pin string) Finding {
 	if !sameSeries {
 		msg := fmt.Sprintf("runtime %s carries Airflow %s, and the requirement pins Airflow %s: the image would run one series and standalone install another",
 			r.Tag, carried, pin)
-		if other, ok := c.NewestRuntimeFor(pin); ok {
+		other, ok := c.NewestRuntimeFor(pin)
+		if ok {
 			msg += fmt.Sprintf(". Name a build carrying Airflow %s, like %s, in [tool.astro] runtime, or change the requirement", pin, other)
 		} else {
 			msg += ". Change [tool.astro] runtime or the requirement so they name the same series"
 		}
-		return Finding{Kind: FindingSeriesMismatch, Message: msg, Blocking: true}
+		return Finding{
+			Kind: FindingSeriesMismatch, Message: msg, Blocking: true,
+			Runtime: r.Tag, AirflowPin: pin, AirflowVersion: carried, Suggested: other,
+		}
 	}
-	return Finding{Kind: FindingAirflowExcluded, Message: fmt.Sprintf(
+	return Finding{Kind: FindingAirflowExcluded, Runtime: r.Tag, AirflowPin: pin, AirflowVersion: carried, Message: fmt.Sprintf(
 		"runtime %s carries Airflow %s, which the requirement's pin %s excludes: Docker mode, deploy and package run %s while standalone installs %s. "+
 			"Pin the requirement to %s or to the series, or pick a build carrying %s",
 		r.Tag, carried, pin, carried, pin, carried, pin)}

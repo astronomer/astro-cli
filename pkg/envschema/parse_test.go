@@ -91,7 +91,7 @@ TYPO = { typo = true }                # unknown table field
 NOTVALUE = 5                          # not a string or table
 
 [tool.astro.env.airflow_variables]
-"1ok" = {}                            # AIRFLOW_VAR_1OK is legal
+"1ok" = {}                            # a key must be an env-var name itself
 
 [tool.astro.env.connections]
 "my.conn" = {}                        # not a conn id
@@ -108,6 +108,7 @@ NOTVALUE = 5                          # not a string or table
 		"tool.astro.env.EMPTYSRC.source",
 		"tool.astro.env.NOTVALUE",
 		"tool.astro.env.TYPO.typo",
+		"tool.astro.env.airflow_variables.1ok",
 		"tool.astro.env.connections.my.conn",
 	}
 	var gotKeys []string
@@ -127,7 +128,7 @@ NOTVALUE = 5                          # not a string or table
 	// version of this passed a mutant that comma-joined all seven onto one
 	// unreadable line — every key was present, nothing pinned the shape. The
 	// readable shape IS the fix, so it is what gets compared.
-	want := "invalid [tool.astro.env]: 7 problems"
+	want := "invalid [tool.astro.env]: 8 problems"
 	for _, p := range se.Problems {
 		want += "\n  " + p.Key + ": " + p.Reason
 	}

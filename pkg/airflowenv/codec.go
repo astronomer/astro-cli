@@ -250,11 +250,20 @@ func EnvKeyForVarKey(varKey string) string {
 	return VarPrefix + strings.ToUpper(varKey)
 }
 
-// ValidVarKey reports whether a variable key can be represented as an
-// AIRFLOW_VAR_* env var.
+// ValidVarKey reports whether a variable key can be stored and resolved as an
+// Airflow Variable: the key must itself be a legal env-var name (ValidEnvKey),
+// leading digit refused, and so AIRFLOW_VAR_<KEY> is one too.
+//
+// The key alone is held to the env-var rule, not only the prefixed form, so
+// that every tool storing a Variable agrees: Astro Desktop keeps a project's
+// values in a .env keyed by the POSIX rule (envfile.ValidKey), and a key only
+// the CLI accepted would be one the desktop cannot hold or show.
 func ValidVarKey(varKey string) bool {
-	return varKey != "" && ValidEnvKey(EnvKeyForVarKey(varKey))
+	return ValidEnvKey(varKey)
 }
+
+// VarKeyRule is ValidVarKey's rule as a person reads it, for a refusal.
+const VarKeyRule = "letters, digits, _; no leading digit"
 
 // EncodeVarEnv renders an Airflow variable as an (AIRFLOW_VAR_<KEY>, value)
 // pair. The value is stored raw — Airflow variable values are opaque

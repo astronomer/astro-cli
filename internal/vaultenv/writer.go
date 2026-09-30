@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -186,6 +187,9 @@ func (w *Writer) Has(kind localenv.Kind, name string) (bool, error) {
 // still gone and the error wraps ErrLinkRowKept: the row left behind can only
 // narrow what a re-created entry reaches, which is the safe direction.
 func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
+	if localenv.InvalidStoredReason(kind, name) != "" {
+		return w.deleteExact(kind, name)
+	}
 	key, _, err := w.keys(kind, name)
 	if err != nil {
 		return false, err
@@ -209,6 +213,23 @@ func (w *Writer) Delete(kind localenv.Kind, name string) (ok bool, err error) {
 		}
 	}
 	return ok, w.dropLinkRows(removed)
+}
+
+// deleteExact removes the entry stored under exactly (kind, name) in this
+// scope: the way to reach one whose name the key rule now refuses, which
+// sameEnvKey cannot see because the name no longer maps to an env key.
+func (w *Writer) deleteExact(kind localenv.Kind, name string) (bool, error) {
+	vaultKey, err := secrets.Key(vaultKind(kind), w.scope, name)
+	if err != nil {
+		return false, err
+	}
+	switch err := w.store.Delete(vaultKey); {
+	case errors.Is(err, secrets.ErrNotFound):
+		return false, nil
+	case err != nil:
+		return false, refusal(err)
+	}
+	return true, w.dropLinkRows([]string{vaultKey})
 }
 
 // sameEnvKey returns this scope's vault keys of kind whose names resolve to
@@ -331,6 +352,17 @@ func (w *Writer) SetSecret(kind secrets.Kind, name, value string) error {
 	if err != nil {
 		return err
 	}
+	// The conversion carries a value HasSecretValue found equal, and for this
+	// vault there is nothing to move: the value is already here, perhaps under
+	// another spelling of the same env key. Writing it anyway would leave two
+	// entries for one AIRFLOW_* key, so the write is skipped.
+	held, err := w.HasSecretValue(kind, name, value)
+	if err != nil {
+		return err
+	}
+	if held.Held && held.Equal {
+		return nil
+	}
 	if err := w.store.Set(key, value); err != nil {
 		return refusal(err)
 	}
@@ -343,4 +375,21 @@ func (w *Writer) SetSecret(kind secrets.Kind, name, value string) error {
 // key, as Has does, so a file's "API_TOKEN" finds a vault's "api_token".
 func (w *Writer) HasSecret(kind secrets.Kind, name string) (bool, error) {
 	return w.Has(localKind(kind), name)
+}
+
+// HasSecretValue is HasSecret that also says whether the held value equals
+// value, which is pkg/scaffold's SecretValueChecker: a conversion carrying the
+// value the vault already holds has nothing to keep apart. It asks the index
+// first, so a name the vault does not hold needs no keyring; a held one is
+// decrypted, at plan time as well as apply.
+func (w *Writer) HasSecretValue(kind secrets.Kind, name, value string) (scaffold.SecretHeld, error) {
+	held, err := w.HasSecret(kind, name)
+	if err != nil || !held {
+		return scaffold.SecretHeld{}, err
+	}
+	got, ok, err := w.Get(localKind(kind), name)
+	if err != nil {
+		return scaffold.SecretHeld{}, err
+	}
+	return scaffold.SecretHeld{Held: ok, Compared: ok, Equal: ok && got == value}, nil
 }

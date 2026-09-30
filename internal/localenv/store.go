@@ -108,8 +108,14 @@ func (s *Store) Get(kind Kind, name string) (value string, ok bool, err error) {
 
 // Delete removes (kind, name) from the file. ok is false when it held no
 // such value.
+//
+// A Variable whose key is no longer valid (InvalidStoredReason) is still
+// removed by the key it was stored under, so the entry list flags can go.
 func (s *Store) Delete(kind Kind, name string) (ok bool, err error) {
 	key, valid := EnvKeyFor(kind, name)
+	if !valid && InvalidStoredReason(kind, name) != "" {
+		key, valid = StoredVarEnvKey(name)
+	}
 	if !valid {
 		return false, InvalidName(kind, name)
 	}
@@ -125,7 +131,7 @@ func InvalidName(kind Kind, name string) error {
 	case KindEnv:
 		return fmt.Errorf("%q is not a valid env var name (letters, digits, _; no leading digit)", name)
 	case KindVar:
-		return fmt.Errorf("%q is not a valid variable key (letters, digits, _)", name)
+		return fmt.Errorf("%q is not a valid variable key (%s)", name, airflowenv.VarKeyRule)
 	case KindConn:
 		return fmt.Errorf("%q is not a valid connection id (letters, digits, _)", name)
 	default:

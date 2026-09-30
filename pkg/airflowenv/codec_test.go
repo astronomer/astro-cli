@@ -131,7 +131,10 @@ func TestVarRoundTrip(t *testing.T) {
 			t.Errorf("DecodeVarEnv = (%q,%q,%v), want (%q,%q,true)", gotKey, gotVal, ok, tc.wantBack, tc.value)
 		}
 	}
-	if ValidVarKey("a.b") || ValidVarKey("") {
+	// A leading digit is refused although AIRFLOW_VAR_1X is a legal name: the
+	// key is held to the env-var rule on its own, which Astro Desktop's .env
+	// store applies too.
+	if ValidVarKey("a.b") || ValidVarKey("") || ValidVarKey("1x") || ValidVarKey("9") {
 		t.Error("invalid var keys accepted")
 	}
 }
