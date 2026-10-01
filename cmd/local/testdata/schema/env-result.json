@@ -2,5 +2,12 @@
   "kind": "x",
   "name": "x",
   "scope": "x",
-  "status": "x"
+  "status": "x",
+  "remainder": "x",
+  "source": "x",
+  "set_hint": "x",
+  "undeclare_hint": "x",
+  "undeclared": true,
+  "workspace": "x",
+  "manifest": "x"
 }

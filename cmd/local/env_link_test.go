@@ -324,6 +324,10 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 		if !it.NotLinkedHere || it.LinkHint != "astro local env connection link "+name {
 			t.Errorf("%s row = %+v, want not linked here with a link hint", name, it)
 		}
+		// Its way out is the link, not a value or an undeclare.
+		if it.SetHint != "" || it.UndeclareHint != "" {
+			t.Errorf("%s row = %+v, want no set or undeclare hint", name, it)
+		}
 	}
 
 	out, _ = mustRun(t, dir, "connection", "list", "--all")

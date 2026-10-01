@@ -478,17 +478,26 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 }
 
 func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
+	var undeclare bool
 	cmd := &cobra.Command{
 		Use:     "delete " + k.arg,
 		Aliases: []string{"rm"},
 		Short:   "Delete " + k.article + " " + k.label,
-		Args:    cobra.ExactArgs(1),
+		Long: "Delete " + k.article + " " + k.label + "'s value.\n\n" +
+			"A declaration in the project's pyproject.toml is not a value, so delete leaves\n" +
+			"it in place and says what the name resolves to now: another source, nothing\n" +
+			"(list shows it as absent), or, for a required name, nothing the next start\n" +
+			"will accept. --undeclare also removes the declaration, as undeclare does.\n" +
+			"With --global it removes it only from the current project's pyproject.toml,\n" +
+			"and refuses outside a project.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			scope.secretGiven = cmd.Flags().Changed("secret")
-			return c.runEnvDelete(scope, k.kind, args[0])
+			return c.runEnvDelete(scope, k.kind, args[0], undeclare)
 		},
 	}
 	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
+	cmd.Flags().BoolVar(&undeclare, "undeclare", false, "Also remove the name's declaration from the current project's pyproject.toml")
 	return cmd
 }
 
@@ -530,6 +539,20 @@ type envResult struct {
 	Name   string         `json:"name"`
 	Scope  localenv.Scope `json:"scope"`
 	Status string         `json:"status"`
+	// The rest is a delete's alone, and only in a project that declares the
+	// name: Remainder is what the declaration leaves (supplied, absent or
+	// required), Source what supplies it when supplied, and the hints the
+	// commands that settle it. Undeclared reports that --undeclare removed the
+	// declaration from Manifest, in which case there is no remainder.
+	Remainder     envschema.Remainder `json:"remainder,omitempty"`
+	Source        string              `json:"source,omitempty"`
+	SetHint       string              `json:"set_hint,omitempty"`
+	UndeclareHint string              `json:"undeclare_hint,omitempty"`
+	Undeclared    bool                `json:"undeclared,omitempty"`
+	// Workspace is the linked workspace's id when nothing local supplies the
+	// name: a delete reads no workspace, so the name may still come from it.
+	Workspace string `json:"workspace,omitempty"`
+	Manifest  string `json:"manifest,omitempty"`
 }
 
 // envValue is the get object: the one deliberate reveal.
@@ -1026,24 +1049,67 @@ func (c *cli) emitValue(r Renderer, v envValue) error {
 //
 // Removing a vault entry deletes its file and needs no keyring, so the no-flag
 // form works where there is none.
-func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) error {
+//
+// The value is all it removes: a declaration of the name stays, and the result
+// says what it leaves (see deleteRemainder). undeclare also removes the
+// declaration, through the path undeclare takes, and only ever from the
+// current project's manifest, so it is refused outside a project before
+// anything is deleted, --global or not.
+func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string, undeclare bool) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
 	}
+	projectDir, perr := c.discoverProject()
+	if undeclare && perr != nil {
+		return fmt.Errorf("--undeclare removes a declaration from the current project's %s, and there is no project here, so nothing was deleted. It never edits another project's", project.Marker)
+	}
+	if undeclare {
+		if err := checkUndeclarable(projectDir, kind, name); err != nil {
+			return err
+		}
+	}
+	store, err := c.deleteValue(scope, kind, name)
+	if err != nil {
+		if undeclare && errors.Is(err, errValueNotSet) {
+			return fmt.Errorf("%w, so nothing was deleted. To remove only its declaration: %s", err, localenv.UndeclareHint(kind, name))
+		}
+		return err
+	}
+	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "deleted"}
+	switch {
+	case undeclare:
+		decl, changed, err := c.undeclareIn(projectDir, kind, name)
+		if err != nil {
+			return fmt.Errorf("deleted %s %s from %s (%s), but its declaration was not removed: %w",
+				localenv.Noun(kind), name, store.ScopeName(), store.Location(), err)
+		}
+		res.Undeclared, res.Manifest = changed, decl.Manifest
+	case perr == nil:
+		c.deleteRemainder(&res, projectDir)
+	}
+	return r.Emit(res, func(w io.Writer) error { return renderDeleted(w, &res, store) })
+}
+
+// errValueNotSet is deleteValue's error for a name no store it looked in holds.
+var errValueNotSet = errors.New("not set")
+
+// deleteValue removes the value of name from the stores the scope names, and
+// returns the one to report: see runEnvDelete.
+func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (valueStore, error) {
 	store, _, err := c.envStore(scope)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if scope.secretGiven {
 		ok, err := c.deleteKeepingRow(store, kind, name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !ok {
-			return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, store.ScopeName())
+			return nil, fmt.Errorf("%s %q is %w in %s", localenv.Noun(kind), name, errValueNotSet, store.ScopeName())
 		}
-		return emitDeleted(r, kind, name, store)
+		return store, nil
 	}
 	// Both stores, the vault first. A vault removal that fails then leaves both
 	// copies as they were, so the error is the whole story; a file removal that
@@ -1055,17 +1121,17 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 	if vault, _, verr := c.envStore(&vaultScope); verr == nil {
 		removedVault, err = c.deleteKeepingRow(vault, kind, name)
 		if err != nil {
-			return fmt.Errorf("could not remove %s %s from the vault, so nothing was deleted: %w", localenv.Noun(kind), name, err)
+			return nil, fmt.Errorf("could not remove %s %s from the vault, so nothing was deleted: %w", localenv.Noun(kind), name, err)
 		}
 		vaulted = vault
 	}
 	removedFile, err := store.Delete(kind, name)
 	if err != nil {
 		if removedVault {
-			return fmt.Errorf("deleted %s %s from %s (%s), but its plaintext copy in %s could not be removed: %w",
+			return nil, fmt.Errorf("deleted %s %s from %s (%s), but its plaintext copy in %s could not be removed: %w",
 				localenv.Noun(kind), name, vaulted.ScopeName(), vaulted.Location(), store.Location(), err)
 		}
-		return err
+		return nil, err
 	}
 	ok := removedFile || removedVault
 	if removedVault {
@@ -1074,9 +1140,9 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string) e
 		store = vaulted
 	}
 	if !ok {
-		return fmt.Errorf("%s %q is not set in %s or the vault", localenv.Noun(kind), name, store.ScopeName())
+		return nil, fmt.Errorf("%s %q is %w in %s or the vault", localenv.Noun(kind), name, errValueNotSet, store.ScopeName())
 	}
-	return emitDeleted(r, kind, name, store)
+	return store, nil
 }
 
 // deleteKeepingRow is store.Delete, with a global's link row that could not be
@@ -1093,12 +1159,32 @@ func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string
 	return ok, err
 }
 
-func emitDeleted(r Renderer, kind localenv.Kind, name string, store valueStore) error {
-	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "deleted"}
-	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", localenv.Noun(kind), name, store.ScopeName(), store.Location())
-		return werr
-	})
+// renderDeleted is a delete's text: what was removed, then what the
+// declaration leaves, or what --undeclare did to it.
+func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
+	noun := localenv.Noun(res.Kind)
+	if _, err := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", noun, res.Name, store.ScopeName(), store.Location()); err != nil {
+		return err
+	}
+	var err error
+	switch {
+	case res.Undeclared:
+		_, err = fmt.Fprintf(w, "undeclared %s %s in %s\n", noun, res.Name, res.Manifest)
+	case res.Remainder == envschema.RemainderAbsent:
+		_, err = fmt.Fprintf(w, "%s is still declared in %s, so `astro local env list` shows it as absent. Remove the declaration with `%s`.\n",
+			res.Name, res.Manifest, res.UndeclareHint)
+	case res.Remainder == envschema.RemainderRequired:
+		_, err = fmt.Fprintf(w, "%s is still declared in %s, and required: the next `astro local start` refuses until a value is set with `%s`. Remove the declaration with `%s`.\n",
+			res.Name, res.Manifest, res.SetHint, res.UndeclareHint)
+	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
+		_, err = fmt.Fprintf(w, "%s is still declared in %s, and its declared default now applies.\n", res.Name, res.Manifest)
+	case res.Remainder == envschema.RemainderSupplied:
+		_, err = fmt.Fprintf(w, "%s is still declared in %s, and now resolves from %s.\n", res.Name, res.Manifest, res.Source)
+	}
+	if err == nil && res.Workspace != "" {
+		_, err = fmt.Fprintf(w, "It may still come from workspace %s, which a delete does not read.\n", res.Workspace)
+	}
+	return err
 }
 
 // runEnvList renders the list. only names a single kind to keep, or is empty
@@ -1115,20 +1201,8 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	if err != nil {
 		return err
 	}
-	opts := localenv.ListOptions{All: all}
-	// The vault tiers, or a name held only there reports as "absent" while start
-	// injects it and get returns it.
-	vault := vaultenv.Load(projectDir)
-	opts.VaultProviders = vault.Providers()
-	// And what the vault holds undeclared, listed as orphans the way an
-	// undeclared file entry is.
-	opts.VaultTiers = vault.Tiers()
-	// reveal = false: list reports where each name resolves, never a value, so
-	// it reads Environment Manager for presence only and pulls no secret.
-	if m != nil && c.d.WorkspaceClients != nil {
-		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, false)
-		opts.Workspace = m.Astro.Workspace
-	}
+	opts := c.listOptions(projectDir, m)
+	opts.All = all
 	switch {
 	case scope.project && scope.global:
 		return errors.New("--project and --global are mutually exclusive")
@@ -1171,6 +1245,27 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	return r.Emit(items, func(w io.Writer) error { return renderEnvList(w, items, only) })
 }
 
+// listOptions is the full resolution chain a listing of projectDir reads: the
+// files, both vault tiers, and the linked workspace. m is the project's
+// manifest, nil outside a project.
+func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.ListOptions {
+	var opts localenv.ListOptions
+	// The vault tiers, or a name held only there reports as "absent" while start
+	// injects it and get returns it.
+	vault := vaultenv.Load(projectDir)
+	opts.VaultProviders = vault.Providers()
+	// And what the vault holds undeclared, listed as orphans the way an
+	// undeclared file entry is.
+	opts.VaultTiers = vault.Tiers()
+	// reveal = false: list reports where each name resolves, never a value, so
+	// it reads Environment Manager for presence only and pulls no secret.
+	if m != nil && c.d.WorkspaceClients != nil {
+		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, false)
+		opts.Workspace = m.Astro.Workspace
+	}
+	return opts
+}
+
 // renderEnvList prints the table. only names the kind the rows were narrowed
 // to, or is empty for the cross-kind view; it exists for the empty case, where
 // the cross-kind wording ("no entries in any .env") is simply false when the
@@ -1206,46 +1301,7 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 	fmt.Fprintln(tw, header)
 	for i := range items {
 		it := &items[i]
-		note := ""
-		switch {
-		case it.Invalid != "":
-			note = it.Invalid
-			if it.Project != "" {
-				note += " (in " + it.Project + ")"
-			} else if it.RemoveHint != "" {
-				note += " (remove: " + it.RemoveHint + ")"
-			}
-		case it.NotLinkedHere && it.LinksDown != "":
-			note = "not linked here: " + it.LinksDown
-		case it.NotLinkedHere:
-			note = "not linked here (link: " + it.LinkHint + ")"
-		case it.Orphan && it.Applied != nil && *it.Applied && it.DeclareHint != "":
-			// The value reaches Airflow already, so declaring it only makes it
-			// a requirement the project states.
-			note = "not declared (declare it to make it a requirement: " + it.DeclareHint + ")"
-			if it.RemoveHint != "" {
-				note += "; remove: " + it.RemoveHint
-			}
-		case it.Orphan:
-			note = "undeclared"
-			// An orphan found under --all lives in another project's file, and
-			// says which. There is no command to offer for one: delete acts on
-			// the working directory's project, so a hint would name a command
-			// that edits the wrong file, which is why ListItem leaves
-			// RemoveHint empty for these. The label follows the hint rather
-			// than being printed regardless, or the row reads "remove: " with
-			// nothing after it.
-			if it.Project != "" {
-				note += " in " + it.Project
-			}
-			switch {
-			case it.DeclareHint != "" && it.RemoveHint != "":
-				note += "; declare: " + it.DeclareHint + " (or remove: " + it.RemoveHint + ")"
-			case it.RemoveHint != "":
-				note += "; remove: " + it.RemoveHint
-			}
-		}
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, note)
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, listNote(it))
 		if described {
 			// Collapsed to one line: a TOML multi-line string would otherwise
 			// break the row out of the table.
@@ -1254,6 +1310,52 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		fmt.Fprintln(tw, row)
 	}
 	return tw.Flush()
+}
+
+// listNote is a list row's NOTE cell.
+func listNote(it *localenv.ListItem) string {
+	note := ""
+	switch {
+	case it.Invalid != "":
+		note = it.Invalid
+		if it.Project != "" {
+			note += " (in " + it.Project + ")"
+		} else if it.RemoveHint != "" {
+			note += " (remove: " + it.RemoveHint + ")"
+		}
+	case it.NotLinkedHere && it.LinksDown != "":
+		note = "not linked here: " + it.LinksDown
+	case it.NotLinkedHere:
+		note = "not linked here (link: " + it.LinkHint + ")"
+	case it.SetHint != "" && it.UndeclareHint != "":
+		note = "declared, no value; set: " + it.SetHint + "; or remove the declaration: " + it.UndeclareHint
+	case it.Orphan && it.Applied != nil && *it.Applied && it.DeclareHint != "":
+		// The value reaches Airflow already, so declaring it only makes it
+		// a requirement the project states.
+		note = "not declared (declare it to make it a requirement: " + it.DeclareHint + ")"
+		if it.RemoveHint != "" {
+			note += "; remove: " + it.RemoveHint
+		}
+	case it.Orphan:
+		note = "undeclared"
+		// An orphan found under --all lives in another project's file, and
+		// says which. There is no command to offer for one: delete acts on
+		// the working directory's project, so a hint would name a command
+		// that edits the wrong file, which is why ListItem leaves
+		// RemoveHint empty for these. The label follows the hint rather
+		// than being printed regardless, or the row reads "remove: " with
+		// nothing after it.
+		if it.Project != "" {
+			note += " in " + it.Project
+		}
+		switch {
+		case it.DeclareHint != "" && it.RemoveHint != "":
+			note += "; declare: " + it.DeclareHint + " (or remove: " + it.RemoveHint + ")"
+		case it.RemoveHint != "":
+			note += "; remove: " + it.RemoveHint
+		}
+	}
+	return note
 }
 
 // envStore resolves the flags to the one store a set/get/delete acts on,

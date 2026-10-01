@@ -224,20 +224,9 @@ func (c *cli) runEnvUndeclare(scope *scopeFlags, kind localenv.Kind, name string
 	if err != nil {
 		return err
 	}
-	// Named before the removal, since afterwards there is nothing to find.
-	res, err := declarationResult(dir, kind, name)
+	res, changed, err := c.undeclareIn(dir, kind, name)
 	if err != nil {
 		return err
-	}
-	changed, err := watchManifest(dir, func(wrap func(run func() error) error) error {
-		return scaffold.RemoveEnvDeclaration(dir, wrap, sectionFor(kind), name)
-	})
-	if err != nil {
-		return err
-	}
-	res.Status = declStatusUnchanged
-	if changed {
-		res.Status = declStatusUndeclared
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		var werr error
@@ -248,6 +237,101 @@ func (c *cli) runEnvUndeclare(scope *scopeFlags, kind localenv.Kind, name string
 		}
 		return werr
 	})
+}
+
+// undeclareIn removes name's declaration from the manifest in dir through
+// scaffold.RemoveEnvDeclaration, the writer Astro Desktop uses, and reports
+// whether the file changed. undeclare and delete --undeclare both come here.
+func (c *cli) undeclareIn(dir string, kind localenv.Kind, name string) (envDeclarationResult, bool, error) {
+	// Named before the removal, since afterwards there is nothing to find.
+	res, err := declarationResult(dir, kind, name)
+	if err != nil {
+		return envDeclarationResult{}, false, err
+	}
+	changed, err := watchManifest(dir, func(wrap func(run func() error) error) error {
+		return scaffold.RemoveEnvDeclaration(dir, wrap, sectionFor(kind), name)
+	})
+	if err != nil {
+		return envDeclarationResult{}, false, err
+	}
+	res.Status = declStatusUnchanged
+	if changed {
+		res.Status = declStatusUndeclared
+	}
+	return res, changed, nil
+}
+
+// deleteRemainder fills in what a delete of res.Name leaves in the project in
+// dir: nothing when the manifest does not declare it, or cannot be read, since
+// a delete that succeeded is not failed by its report. Otherwise the remainder
+// envschema.RemainderAfterDelete gives for the source a listing now resolves
+// it from, and the commands that settle it.
+func (c *cli) deleteRemainder(res *envResult, dir string) {
+	// The key the name is declared under, found the way undeclare finds it. A
+	// name not declared yields a key the schema does not hold either.
+	key, _, err := scaffold.EnvDeclarationKey(dir, sectionFor(res.Kind), res.Name)
+	if err != nil {
+		return
+	}
+	m, schema, err := c.loadManifestSchema(dir)
+	if err != nil {
+		return
+	}
+	spec, ok := declaredSpec(schema, res.Kind, key)
+	if !ok {
+		return
+	}
+	// Local sources only: a delete does not wait on a network read of the
+	// workspace. Whether the workspace holds the name is reported as a
+	// possibility instead (res.Workspace).
+	opts := c.listOptions(dir, nil)
+	items, err := localenv.List(os.Environ(), dir, schema, opts)
+	if err != nil {
+		return
+	}
+	source, supplied := "", false
+	for i := range items {
+		it := &items[i]
+		// Resolved is only ever true on a declared row, so no orphan matches.
+		if it.Kind == res.Kind && it.Name == key && it.Resolved {
+			source, supplied = it.Source, true
+		}
+	}
+	res.Remainder = envschema.RemainderAfterDelete(&spec, supplied)
+	res.Manifest = filepath.Join(dir, project.Marker)
+	switch res.Remainder {
+	case envschema.RemainderSupplied:
+		res.Source = source
+	case envschema.RemainderAbsent, envschema.RemainderRequired:
+		res.SetHint = localenv.SetHint(res.Kind, key)
+		res.UndeclareHint = localenv.UndeclareHint(res.Kind, key)
+		if m != nil {
+			res.Workspace = m.Astro.Workspace
+		}
+	case envschema.RemainderUndeclared:
+	}
+}
+
+// checkUndeclarable refuses a delete --undeclare whose declaration half would
+// fail, before the value half runs: a manifest that does not load, or one that
+// does not declare the name.
+func checkUndeclarable(dir string, kind localenv.Kind, name string) error {
+	m, err := manifest.Load(filepath.Join(dir, project.Marker))
+	if err != nil {
+		return fmt.Errorf("%w, so nothing was deleted", err)
+	}
+	if _, err := envschema.ParseSchema(m.Astro.Env); err != nil {
+		return fmt.Errorf("%w, so nothing was deleted", err)
+	}
+	_, declared, err := scaffold.EnvDeclarationKey(dir, sectionFor(kind), name)
+	if err != nil {
+		return fmt.Errorf("%w, so nothing was deleted", err)
+	}
+	if !declared {
+		return fmt.Errorf("%s %s is not declared in %s, so nothing was deleted. To delete only its value, drop --undeclare",
+			localenv.Noun(kind), name, filepath.Join(dir, project.Marker))
+	}
+	return nil
 }
 
 // edit is the change declare's flags ask for: each annotation whose flag was

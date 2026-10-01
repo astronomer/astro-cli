@@ -60,6 +60,15 @@ type ListItem struct {
 	// project states. Empty outside a project and for an --all orphan from
 	// another project.
 	DeclareHint string `json:"declare_hint,omitempty"`
+	// SetHint and UndeclareHint are the two ways to settle a declared name no
+	// source supplies (not Resolved): the command that sets a value, and the
+	// one that removes the declaration. Empty on every other row.
+	SetHint       string `json:"set_hint,omitempty"`
+	UndeclareHint string `json:"undeclare_hint,omitempty"`
+	// Resolved is true for a declared row something supplies. Source alone
+	// cannot say so: a workspace-sourced name the workspace did not supply
+	// still carries the workspace label.
+	Resolved bool `json:"-"`
 }
 
 // ListOptions selects which files list reports over.
@@ -165,6 +174,15 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 			if e, ok := unlinked[envKeyOfItem(item)]; ok {
 				markNotLinked(&item, e.entry, e.tier)
 			}
+		}
+		// A declared name nothing supplies has two ways out: a value, or no
+		// declaration. A row not linked here has its own way out, the link.
+		// Keyed on Resolved, not the absent label: a workspace-sourced name the
+		// workspace did not supply keeps the workspace label and is no less
+		// unsupplied.
+		if !item.Resolved && !item.NotLinkedHere {
+			item.SetHint = SetHint(item.Kind, item.Name)
+			item.UndeclareHint = UndeclareHint(item.Kind, item.Name)
 		}
 		items = append(items, item)
 	}
@@ -294,6 +312,7 @@ func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem
 		Required:    !spec.Optional,
 		Sensitive:   spec.Sensitive,
 		Description: spec.Description,
+		Resolved:    rn.Found,
 	}
 	// A resolved name carries its winning source; a workspace-source name that
 	// did not resolve still carries the "workspace" label (with any
@@ -592,6 +611,17 @@ func removeHint(kind Kind, name string, scope Scope) string {
 // holds the value, so it takes no scope flag.
 func DeclareHint(kind Kind, name string) string {
 	return "astro local env " + Noun(kind) + " declare " + name
+}
+
+// SetHint is the `astro local env <noun> set` command for a name. It names no
+// value: set prompts for one and refuses it as an argument.
+func SetHint(kind Kind, name string) string {
+	return "astro local env " + Noun(kind) + " set " + name
+}
+
+// UndeclareHint is the `astro local env <noun> undeclare` command for a name.
+func UndeclareHint(kind Kind, name string) string {
+	return "astro local env " + Noun(kind) + " undeclare " + name
 }
 
 // LinkHint is the command that links a global vault entry to the project it
