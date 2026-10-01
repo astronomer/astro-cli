@@ -19,10 +19,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // Request is the resolved input for a v2 deploy. cmd fills it from flags, args,
@@ -272,8 +272,8 @@ func Run(req Request, d Deployer) (Result, error) {
 // adopting a prebuilt --image-name build nothing from the manifest, and are not
 // held to it. It returns the build secrets the declared Dockerfile mounts and
 // nobody gave, for a failed build to name again.
-func checkImageSource(req Request) (util.MissingSecrets, error) {
-	var missing util.MissingSecrets
+func checkImageSource(req Request) (imagebuild.MissingSecrets, error) {
+	var missing imagebuild.MissingSecrets
 	if req.DagsOnly || req.ImageName != "" || req.Manifest == nil {
 		return missing, nil
 	}
@@ -285,7 +285,7 @@ func checkImageSource(req Request) (util.MissingSecrets, error) {
 		warn = func(string) {}
 	}
 	var err error
-	if missing, err = util.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets); err != nil {
+	if missing, err = imagebuild.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets); err != nil {
 		return missing, err
 	}
 	for _, w := range missing.Warnings() {

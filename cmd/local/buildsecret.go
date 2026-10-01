@@ -3,6 +3,7 @@ package local
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -33,11 +34,11 @@ func checkBuildSecrets(r Renderer, flag []string, p localrt.Plan) error {
 // refuses a build secret whose variable is unset, and warns about each secret
 // a project Dockerfile mounts that no build secret supplies, returning those
 // for the start to name again if the build fails.
-func warnMissingBuildSecrets(r Renderer, p localrt.Plan) (util.MissingSecrets, error) {
+func warnMissingBuildSecrets(r Renderer, p localrt.Plan) (imagebuild.MissingSecrets, error) {
 	if p.Mode != localrt.ModeDocker {
-		return util.MissingSecrets{}, nil
+		return imagebuild.MissingSecrets{}, nil
 	}
-	missing, err := util.CheckBuildSecrets(p.ProjectPath, p.Dockerfile, p.BuildSecrets)
+	missing, err := imagebuild.CheckBuildSecrets(p.ProjectPath, p.Dockerfile, p.BuildSecrets)
 	for _, w := range missing.Warnings() {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}

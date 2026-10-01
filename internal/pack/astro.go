@@ -16,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // runtimeVersionLabel is the label the runtime base image carries with its
@@ -120,15 +119,15 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 // that no build secret supplies, returning those for a failed build to name
 // again. It also warns about the per-machine files a declared Dockerfile's
 // build context would carry into the image.
-func checkSecrets(req Request, cb localrt.Callbacks) (util.MissingSecrets, error) {
+func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets, error) {
 	if req.Manifest.Astro.Dockerfile == "" {
-		missing, err := util.CheckBuildSecrets(req.ProjectDir, "", req.BuildSecrets)
+		missing, err := imagebuild.CheckBuildSecrets(req.ProjectDir, "", req.BuildSecrets)
 		for _, w := range missing.Warnings() {
 			emit(cb, "warning: "+w)
 		}
 		return missing, err
 	}
-	missing, err := util.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
+	missing, err := imagebuild.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
 	for _, w := range missing.Warnings() {
 		emit(cb, "warning: "+w)
 	}

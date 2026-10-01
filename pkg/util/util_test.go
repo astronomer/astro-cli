@@ -1,16 +1,10 @@
 package util
 
 import (
-	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
-	"github.com/astronomer/astro-cli/pkg/imagebuild"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 type Suite struct {
@@ -338,25 +332,6 @@ func (s *Suite) TestIsCUID() {
 	}
 }
 
-func (s *Suite) TestMissingSecretsExplain() {
-	buildErr := fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)
-	netrc := airflowrt.SecretMount{ID: "netrc", Line: 5}
-	pip := airflowrt.SecretMount{ID: "pip", Line: 9}
-
-	one := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{netrc}}
-	err := one.Explain(buildErr)
-	s.ErrorIs(err, imagebuild.ErrDockerfileBuild)
-	s.Equal(`building the project's Dockerfile failed; see the build output above: exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`, err.Error())
-
-	two := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{netrc, pip}}
-	s.Equal(`building the project's Dockerfile failed; see the build output above: exit status 1 — Dockerfile mounts build secrets "netrc", "pip", which were not given; pass --build-secret id=netrc,env=<VAR> --build-secret id=pip,env=<VAR> or set BUILD_SECRET_INPUT`, two.Explain(buildErr).Error())
-
-	other := errors.New("docker is not running")
-	s.Equal(other, one.Explain(other), "only a failed Dockerfile build gets the hint")
-	s.Equal(buildErr, MissingSecrets{}.Explain(buildErr), "nothing missing, nothing added")
-	s.NoError(one.Explain(nil))
-}
-
 func (s *Suite) TestResolveProjectBuildSecrets() {
 	a := []string{"id=netrc,env=NETRC_CONTENT"}
 
@@ -368,24 +343,4 @@ func (s *Suite) TestResolveProjectBuildSecrets() {
 	s.Equal([]string{"id=pip,env=PIP_CONF"}, ResolveProjectBuildSecrets(nil, a))
 
 	s.Equal([]string{"id=ca,src=/etc/ca.pem"}, ResolveProjectBuildSecrets([]string{"id=ca,src=/etc/ca.pem"}, a))
-}
-
-func (s *Suite) TestCheckBuildSecretEnv() {
-	s.T().Setenv("NETRC_CONTENT", "machine example.com")
-	s.T().Setenv("PIP_CONF", "")
-	s.NoError(checkBuildSecretEnv([]string{"id=netrc,env=NETRC_CONTENT", "id=ca,src=/etc/ca.pem", "id=netrc"}))
-
-	err := checkBuildSecretEnv([]string{"id=netrc,env=NETRC_CONTENT", "id=pip,type=env,src=PIP_CONF"})
-	s.EqualError(err, `build secret "pip" reads the environment variable PIP_CONF, which is empty or not set. Set it before the build, or give the secret another source`)
-
-	err = checkBuildSecretEnv([]string{"id=netrc,env=machine github.com password hunter2"})
-	s.ErrorIs(err, manifest.ErrBuildSecretEnvNotAName)
-	s.NotContains(err.Error(), "hunter2")
-
-	err = checkBuildSecretEnv([]string{"id=gh,env=ghp_hunter2Token"})
-	s.EqualError(err, `build secret "gh" reads the environment variable its env= names, which is empty or not set. Set it before the build, or give the secret another source`)
-
-	err = checkBuildSecretEnv([]string{"id=pw,env=hunter2,def"})
-	s.ErrorContains(err, "not a key=value pair")
-	s.NotContains(err.Error(), "hunter2")
 }
