@@ -313,25 +313,18 @@ func (c *cli) deleteRemainder(res *envResult, dir string) {
 }
 
 // checkUndeclarable refuses a delete --undeclare whose declaration half would
-// fail, before the value half runs: a manifest that does not load, or one that
-// does not declare the name.
+// fail, before the value half runs. The check is scaffold.CheckUndeclarable,
+// the one Astro Desktop runs; this only words its refusal for the command.
 func checkUndeclarable(dir string, kind localenv.Kind, name string) error {
-	m, err := manifest.Load(filepath.Join(dir, project.Marker))
-	if err != nil {
-		return fmt.Errorf("%w, so nothing was deleted", err)
-	}
-	if _, err := envschema.ParseSchema(m.Astro.Env); err != nil {
-		return fmt.Errorf("%w, so nothing was deleted", err)
-	}
-	_, declared, err := scaffold.EnvDeclarationKey(dir, sectionFor(kind), name)
-	if err != nil {
-		return fmt.Errorf("%w, so nothing was deleted", err)
-	}
-	if !declared {
+	err := scaffold.CheckUndeclarable(dir, sectionFor(kind), name)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, scaffold.ErrNotDeclared):
 		return fmt.Errorf("%s %s is not declared in %s, so nothing was deleted. To delete only its value, drop --undeclare",
 			localenv.Noun(kind), name, filepath.Join(dir, project.Marker))
 	}
-	return nil
+	return fmt.Errorf("%w, so nothing was deleted", err)
 }
 
 // edit is the change declare's flags ask for: each annotation whose flag was
