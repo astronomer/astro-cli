@@ -4,18 +4,11 @@ import "errors"
 
 const containerRuntimeNotFoundErrMsg = notFoundMsg
 
-// ContainerRuntime is the lifecycle a caller drives around a container engine:
-// Initialize brings the engine up (auto-starting Docker on Mac, or ensuring the
-// Podman astro-machine), Configure points the current process at the running
-// engine, ConfigureOrKill does the same but tears the machine down when nothing
-// is running, and Kill stops/removes the astro-machine when appropriate. For
-// Docker/OrbStack all but Initialize are no-ops; the Podman implementation is
-// the *Manager.
+// ContainerRuntime is what a caller drives before using a container engine:
+// Initialize brings the engine up (auto-starting Docker or OrbStack on Mac) or,
+// for Podman, checks that the user's machine is running.
 type ContainerRuntime interface {
 	Initialize() error
-	Configure() error
-	ConfigureOrKill() error
-	Kill() error
 }
 
 // GetContainerRuntime resolves the host engine from cfg and returns the matching

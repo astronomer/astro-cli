@@ -133,6 +133,15 @@ type Config struct {
 	// what a start leaves behind when it does not finish — has no way to ask
 	// for that otherwise.
 	HealthTimeout time.Duration
+	// ContainerBinary returns the container.binary setting for a project —
+	// "docker" or "podman" pins the engine docker mode drives, anything else
+	// (or a nil func) auto-detects from PATH, docker first. A func of the
+	// project path because the setting can be per project (a v1
+	// .astro/config.yaml over the global config), and the consumer owns
+	// reading it: the CLI from its config package, Astro Desktop from its own
+	// mirror of it. Called with "" where no one project is in question, which
+	// asks for the global value.
+	ContainerBinary func(projectPath string) string
 }
 
 // ErrHealthTimeout reports a start whose Airflow did not answer in the time
@@ -169,6 +178,7 @@ func New(cfg Config) *Runtime {
 		docker.SetHealthTimeout(cfg.HealthTimeout)
 		standalone.SetHealthTimeout(cfg.HealthTimeout)
 	}
+	docker.SetContainerBinary(cfg.ContainerBinary)
 	return &Runtime{
 		docker:         docker,
 		standalone:     standalone,

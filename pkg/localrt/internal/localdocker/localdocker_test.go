@@ -123,13 +123,13 @@ func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	e := New(filepath.Join(t.TempDir(), "proxy"), nil, images)
 	e.images = images
 	e.cmd = cmd
-	e.preferred = func() (engineConn, error) { return engineConn{bin: "docker"}, nil }
+	e.preferred = func(string) (engineConn, error) { return engineConn{bin: "docker"}, nil }
 	e.connFor = func(bin string) engineConn { return engineConn{bin: bin} }
 	e.portFree = func(string) bool { return true }
 	e.allocPort = func() (string, error) { return "", errors.New("allocation not expected") }
 	e.health = func(context.Context, []string, time.Duration) error { return nil }
 	e.now = func() time.Time { return time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC) }
-	e.ensureEngine = func(rt.Callbacks) error { return nil }
+	e.ensureEngine = func(rt.Callbacks, string) error { return nil }
 	e.composeAvail = func(context.Context, engineConn) error { return nil }
 	e.startSession = func(string, int) error { return nil }
 	return e
@@ -427,7 +427,7 @@ func TestStartBringsEngineUpFirst(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
 	var ensured bool
-	e.ensureEngine = func(rt.Callbacks) error { ensured = true; return nil }
+	e.ensureEngine = func(rt.Callbacks, string) error { ensured = true; return nil }
 	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
 	require.NoError(t, err)
 	assert.True(t, ensured, "the engine must be brought up before the start")
@@ -436,7 +436,7 @@ func TestStartBringsEngineUpFirst(t *testing.T) {
 func TestStartFailsWhenEngineCannotStart(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	e.ensureEngine = func(rt.Callbacks) error { return errors.New("engine down") }
+	e.ensureEngine = func(rt.Callbacks, string) error { return errors.New("engine down") }
 	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
 	assert.ErrorContains(t, err, "engine down")
 	assert.Empty(t, cmd.calls, "nothing may run when the engine cannot start")
@@ -954,7 +954,7 @@ func TestStartHandsSecretValuesToTheComposeUp(t *testing.T) {
 func TestStartLetsTheEngineConnectionWinOverSecretEnv(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	e.preferred = func() (engineConn, error) {
+	e.preferred = func(string) (engineConn, error) {
 		return engineConn{bin: "docker", env: []string{"DOCKER_HOST=unix:///real.sock"}}, nil
 	}
 	p := testPlan(t)

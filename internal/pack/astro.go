@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -56,15 +57,23 @@ type AstroTarget struct {
 	// docker runs the tag/save/probe commands the build itself does not: it
 	// reads the runtime label, retags to the content-addressed name, and saves.
 	docker imagebuild.Commander
-	// bin is the container CLI (docker); env reaches its daemon.
-	bin string
-	env []string
+	// engine picks the container CLI for the project being packaged and the
+	// env that reaches its daemon.
+	engine EngineResolver
 }
 
-// NewAstroTarget builds the target over a builder and a container command
-// runner. cmd wires both to os/exec; a test injects fakes.
-func NewAstroTarget(builder ImageBuilder, docker imagebuild.Commander, bin string, env []string) *AstroTarget {
-	return &AstroTarget{builder: builder, docker: docker, bin: bin, env: env}
+// EngineResolver returns the container CLI ("docker" or "podman") for the
+// project at projectDir and the env that reaches its daemon, erroring when no
+// engine is installed. A func of the project, called only when an image is
+// built, because container.binary can be set per project and the other
+// targets need no engine at all.
+type EngineResolver func(projectDir string) (bin string, env []string, err error)
+
+// NewAstroTarget builds the target over a builder, a container command runner,
+// and the engine resolver. cmd wires them to os/exec and container.binary; a
+// test injects fakes.
+func NewAstroTarget(builder ImageBuilder, docker imagebuild.Commander, engine EngineResolver) *AstroTarget {
+	return &AstroTarget{builder: builder, docker: docker, engine: engine}
 }
 
 func (t *AstroTarget) Name() string { return TargetAstro }
@@ -166,10 +175,10 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	// The astro artifact is an image, so Docker is required. Probe the engine up
-	// front for a plain message rather than an opaque build failure.
-	if err := t.probeDocker(ctx); err != nil {
-		return Result{}, ErrNoDocker
+	// The astro artifact is an image, so a container engine is required.
+	cli, err := t.reachEngine(ctx, req.ProjectDir)
+	if err != nil {
+		return Result{}, err
 	}
 
 	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, declaredDockerfile{
@@ -198,8 +207,8 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	breq.Tag = workingTag
 	breq.Platform = req.Platform
 	breq.Secrets = req.BuildSecrets
-	breq.Bin = t.bin
-	breq.Env = t.env
+	breq.Bin = cli.bin
+	breq.Env = cli.env
 	built, err := t.builder.BuildLocal(ctx, breq, cb)
 	if err != nil {
 		return Result{}, missingSecrets.Explain(err)
@@ -209,7 +218,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// Compared rather than assumed, so a builder that returns another reference
 	// never has that reference untagged.
 	if built == workingTag {
-		defer t.untag(ctx, workingTag)
+		defer cli.untag(ctx, workingTag)
 	}
 
 	// The exact runtime version comes off the built image's label, the same value
@@ -226,7 +235,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// The fallback stays for a GENERATED build, where it is defensive rather than
 	// load-bearing: that base is an Astro runtime by construction, so a missing
 	// label means something odd about the image rather than a choice the user made.
-	runtimeV, airflowLabel, inspected := t.readVersionLabels(ctx, built)
+	runtimeV, airflowLabel, inspected := cli.readVersionLabels(ctx, built)
 	runtimeVersion := runtimeV
 	if runtimeVersion == "" {
 		runtimeVersion = airflowLabel
@@ -265,13 +274,13 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if finalTag == "" {
 		finalTag = fmt.Sprintf("astro-package/%s:%s-%s", name, tagSafe(runtimeVersion), hash)
 	}
-	if err := t.tag(ctx, built, finalTag); err != nil {
+	if err := cli.tag(ctx, built, finalTag); err != nil {
 		return Result{}, err
 	}
 	// The moving :latest tag is part of the default scheme; a caller that pins
 	// its own --tag owns its naming, so skip it there.
 	if req.Tag == "" {
-		if err := t.tag(ctx, built, fmt.Sprintf("astro-package/%s:latest", name)); err != nil {
+		if err := cli.tag(ctx, built, fmt.Sprintf("astro-package/%s:latest", name)); err != nil {
 			return Result{}, err
 		}
 	}
@@ -284,7 +293,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		Warnings:       warnings,
 	}
 	if req.Save != "" {
-		if err := t.save(ctx, finalTag, req.Save, cb); err != nil {
+		if err := cli.save(ctx, finalTag, req.Save, cb); err != nil {
 			return Result{}, err
 		}
 		res.SavedPath = req.Save
@@ -295,11 +304,40 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	return res, nil
 }
 
-// probeDocker reports whether a container engine is reachable. `docker version`
-// contacts the daemon and returns non-zero when it is down, so a failure here
-// (or a missing binary) means no engine.
-func (t *AstroTarget) probeDocker(ctx context.Context) error {
-	return t.docker.Run(ctx, t.env, localrt.Stdio{}, t.bin, "version")
+// reachEngine resolves the container engine for the project and probes it up
+// front, so an engine that is missing or down is a plain ErrNoDocker rather
+// than an opaque build failure — or, for podman with no machine up, the podman
+// command that brings one up, which "start Docker" would not be.
+func (t *AstroTarget) reachEngine(ctx context.Context, projectDir string) (engineCLI, error) {
+	bin, env, err := t.engine(projectDir)
+	if errors.Is(err, container.ErrMachineNotRunning) {
+		return engineCLI{}, fmt.Errorf("building the astro package image needs a running container engine, but %w", err)
+	}
+	if err != nil {
+		return engineCLI{}, ErrNoDocker
+	}
+	cli := engineCLI{run: t.docker, bin: bin, env: env}
+	if err := cli.probe(ctx); err != nil {
+		return engineCLI{}, ErrNoDocker
+	}
+	return cli, nil
+}
+
+// engineCLI runs container commands against the engine resolved for one
+// build: the commander, the CLI it shells out to, and the env reaching its
+// daemon. A value per Build rather than fields on the target, so a target
+// never carries one project's engine into another's build.
+type engineCLI struct {
+	run imagebuild.Commander
+	bin string
+	env []string
+}
+
+// probe reports whether a container engine is reachable. `docker version`
+// (`podman version` alike) contacts the daemon and returns non-zero when it is
+// down, so a failure here (or a missing binary) means no engine.
+func (c engineCLI) probe(ctx context.Context) error {
+	return c.run.Run(ctx, c.env, localrt.Stdio{}, c.bin, "version")
 }
 
 // readVersionLabels reads both version labels off an image, keeping them apart.
@@ -315,10 +353,10 @@ func (t *AstroTarget) probeDocker(ctx context.Context) error {
 // failed", which the combined form flattens into "". A daemon restart mid-build
 // is not a statement about the image's base, and reporting it as one is a
 // confident wrong diagnosis.
-func (t *AstroTarget) readVersionLabels(ctx context.Context, image string) (runtimeV, airflowV string, ok bool) {
+func (c engineCLI) readVersionLabels(ctx context.Context, image string) (runtimeV, airflowV string, ok bool) {
 	var out bytes.Buffer
 	format := fmt.Sprintf("{{ index .Config.Labels %q }}\t{{ index .Config.Labels %q }}", runtimeVersionLabel, airflowVersionLabel)
-	if err := t.docker.Run(ctx, t.env, localrt.Stdio{Out: &out}, t.bin, "image", "inspect", "--format", format, image); err != nil {
+	if err := c.run.Run(ctx, c.env, localrt.Stdio{Out: &out}, c.bin, "image", "inspect", "--format", format, image); err != nil {
 		return "", "", false
 	}
 	rawRuntime, rawAirflow, _ := strings.Cut(strings.TrimSpace(out.String()), "\t")
@@ -356,8 +394,8 @@ func tagSafe(v string) string {
 }
 
 // tag points dst at the same image as src.
-func (t *AstroTarget) tag(ctx context.Context, src, dst string) error {
-	if err := t.docker.Run(ctx, t.env, localrt.Stdio{}, t.bin, "tag", src, dst); err != nil {
+func (c engineCLI) tag(ctx context.Context, src, dst string) error {
+	if err := c.run.Run(ctx, c.env, localrt.Stdio{}, c.bin, "tag", src, dst); err != nil {
 		return fmt.Errorf("tagging %s as %s: %w", src, dst, err)
 	}
 	return nil
@@ -366,20 +404,20 @@ func (t *AstroTarget) tag(ctx context.Context, src, dst string) error {
 // untag drops a tag reference. It runs after the final tags point at the image,
 // so it removes only the name, not the image. Failure is ignored: a leftover
 // working tag is harmless.
-func (t *AstroTarget) untag(ctx context.Context, ref string) {
+func (c engineCLI) untag(ctx context.Context, ref string) {
 	//nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
-	t.docker.Run(ctx, t.env, localrt.Stdio{}, t.bin, "image", "rm", "--no-prune", ref)
+	c.run.Run(ctx, c.env, localrt.Stdio{}, c.bin, "image", "rm", "--no-prune", ref)
 }
 
 // save writes the image to a tarball with `docker save`, streaming its output
 // (progress lands on stderr) through cb under the "package" component.
-func (t *AstroTarget) save(ctx context.Context, image, path string, cb localrt.Callbacks) error {
+func (c engineCLI) save(ctx context.Context, image, path string, cb localrt.Callbacks) error {
 	w := &localrt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(localrt.LogLine{Component: "package", Time: time.Now(), Text: line})
 		}
 	}}
-	err := t.docker.Run(ctx, t.env, localrt.Stdio{Err: w}, t.bin, "save", "--output", path, image)
+	err := c.run.Run(ctx, c.env, localrt.Stdio{Err: w}, c.bin, "save", "--output", path, image)
 	w.Flush()
 	if err != nil {
 		return fmt.Errorf("saving %s to %s: %w", image, path, err)

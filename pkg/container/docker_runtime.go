@@ -11,6 +11,7 @@ const (
 	open                  = "open"
 	timeoutErrMsg         = "timed out waiting for docker"
 	dockerOpenNotice      = "We couldn't start the docker engine automatically. Please start it manually and try again."
+	initMessage           = "Astro uses containers to run your project. Please wait while we get started…"
 )
 
 // DockerEngine abstracts the two Docker operations the runtime needs so tests
@@ -43,8 +44,7 @@ func (orbstackEngine) Start() (string, error) {
 }
 
 // DockerRuntime is the ContainerRuntime for Docker and OrbStack. Initialize
-// auto-starts the engine on Mac; Configure/ConfigureOrKill/Kill are no-ops
-// because the default Docker socket needs no per-process setup.
+// auto-starts the engine on Mac.
 type DockerRuntime struct {
 	Engine    DockerEngine
 	OSChecker OSChecker
@@ -69,10 +69,6 @@ func (rt *DockerRuntime) Initialize() error {
 	}
 	return rt.initializeDocker(defaultTimeoutSeconds)
 }
-
-func (rt *DockerRuntime) Configure() error       { return nil }
-func (rt *DockerRuntime) ConfigureOrKill() error { return nil }
-func (rt *DockerRuntime) Kill() error            { return nil }
 
 // initializeDocker checks whether Docker is running (`docker ps`) and, if not,
 // attempts to start it (`open -a docker`) and polls until it comes up or the

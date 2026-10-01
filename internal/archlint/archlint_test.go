@@ -76,6 +76,7 @@ var v2BelowCmd = []string{
 // no-printing rule applies; the no-config rule cannot.
 var v2ConfigReaders = []string{
 	"internal/astrosession",
+	"internal/containercfg",
 	"internal/emenv",
 	"internal/instancelocate",
 }

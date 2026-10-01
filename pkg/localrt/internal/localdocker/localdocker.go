@@ -66,22 +66,35 @@ type Engine struct {
 	images rt.ImageBuilder
 
 	cmd       Commander
-	preferred func() (engineConn, error)
+	preferred func(projectPath string) (engineConn, error)
 	connFor   func(bin string) engineConn
 	portFree  func(port string) bool
 	allocPort func() (string, error)
 	health    func(ctx context.Context, urls []string, timeout time.Duration) error
 	now       func() time.Time
 
-	// ensureEngine brings a stopped engine daemon/machine up before the start
-	// touches it (LOCAL engine auto-start). composeAvail checks the Compose v2
-	// plugin is present. startSession spawns the detached session watcher for
+	// ensureEngine brings a stopped Docker daemon up, or checks a podman
+	// machine is running, before the start touches it. composeAvail checks
+	// the Compose v2 plugin is present. startSession spawns the detached session watcher for
 	// --stop-with-session. All three are seams so tests never touch a daemon.
-	ensureEngine func(cb rt.Callbacks) error
+	ensureEngine func(cb rt.Callbacks, projectPath string) error
 	composeAvail func(ctx context.Context, conn engineConn) error
 	startSession func(projectPath string, parentPID int) error
 
 	healthTimeout time.Duration
+
+	// binaryFor is the container.binary setting for a project, which
+	// preferred and ensureEngine resolve the engine with. See
+	// localrt.Config.ContainerBinary.
+	binaryFor func(projectPath string) string
+}
+
+// SetContainerBinary sets where the engine reads container.binary from. A nil
+// func keeps auto-detection. A setter for the reason SetHealthTimeout is one.
+func (e *Engine) SetContainerBinary(f func(projectPath string) string) {
+	if f != nil {
+		e.binaryFor = f
+	}
 }
 
 // SetHealthTimeout bounds how long a start waits for the api-server to answer.
@@ -109,7 +122,7 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 		daemon:        daemon,
 		images:        images,
 		cmd:           execCommander{},
-		preferred:     resolvePreferredEngine,
+		binaryFor:     func(string) string { return "" },
 		connFor:       connFor,
 		portFree:      proxy.IsPortAvailable,
 		allocPort:     s.AllocatePort,
@@ -118,7 +131,12 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 		startSession:  spawnSessionWatcher,
 		healthTimeout: defaultHealthTimeout,
 	}
-	e.ensureEngine = func(cb rt.Callbacks) error { return ensureEngineUp(cb, e.now) }
+	e.preferred = func(projectPath string) (engineConn, error) {
+		return resolvePreferredEngine(e.binaryFor(projectPath), e.connFor)
+	}
+	e.ensureEngine = func(cb rt.Callbacks, projectPath string) error {
+		return ensureEngineUp(cb, e.now, e.binaryFor(projectPath))
+	}
 	e.composeAvail = e.probeCompose
 	return e
 }
@@ -243,7 +261,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 
 	// Bring a stopped engine up first, so `start --docker` with the daemon
 	// down recovers instead of failing on the first compose call.
-	if err := e.ensureEngine(cb); err != nil {
+	if err := e.ensureEngine(cb, projectPath); err != nil {
 		return nil, err
 	}
 
@@ -283,7 +301,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, err
 	}
 
-	conn, err := e.preferred()
+	conn, err := e.preferred(projectPath)
 	if err != nil {
 		return nil, err
 	}
@@ -702,7 +720,7 @@ func (e *Engine) Clean(ctx context.Context, projectPath string) (composeProject 
 		// not, so it is taken down under the name it was published as.
 		// composeProjectName is a pure function of the path, so this is that
 		// name rather than a guess.
-		conn, err = e.preferred()
+		conn, err = e.preferred(projectPath)
 		if err != nil {
 			return "", false, err
 		}
@@ -869,7 +887,7 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 		// Nothing running (created-but-stopped containers included):
 		// still run down under the recorded name so those get removed.
 		var err error
-		if conn, err = a.eng.preferred(); err != nil {
+		if conn, err = a.eng.preferred(a.rec.ProjectPath); err != nil {
 			return err
 		}
 		name = a.rec.ComposeProject

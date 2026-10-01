@@ -1,5 +1,11 @@
 package config
 
+import (
+	"path/filepath"
+
+	"github.com/spf13/viper"
+)
+
 // ValidatorFunc is a function that validates a configuration value
 type ValidatorFunc func(value string) error
 
@@ -49,8 +55,6 @@ type cfgs struct {
 	UpgradeMessage          cfg
 	DisableAstroRun         cfg
 	AutoSelect              cfg
-	MachineCPU              cfg
-	MachineMemory           cfg
 	ShaAsTag                cfg
 	RuffImage               cfg
 	RemoteClientRegistry    cfg
@@ -106,6 +110,23 @@ func (c cfg) SetProjectString(value string) error {
 func (c cfg) GetString() string {
 	if configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return c.GetProjectString()
+	}
+	return c.GetHomeString()
+}
+
+// GetStringFor is GetString for the project at projectDir rather than the
+// working directory: that project's .astro/config.yaml when it sets the value,
+// the home config otherwise. A command that acts on a project it was handed a
+// path to (astro local, Astro Desktop's mirror of it) resolves the project's
+// own setting even when run from somewhere else.
+func (c cfg) GetStringFor(projectDir string) string {
+	if projectDir != "" {
+		v := viper.New()
+		v.SetFs(configFs)
+		v.SetConfigFile(filepath.Join(projectDir, ConfigDir, ConfigFileNameWithExt))
+		if err := v.ReadInConfig(); err == nil && v.IsSet(c.Path) {
+			return v.GetString(c.Path)
+		}
 	}
 	return c.GetHomeString()
 }

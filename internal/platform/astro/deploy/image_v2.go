@@ -15,6 +15,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/containercfg"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -493,9 +494,13 @@ func finalizeDeployV2(organizationID, deploymentID, deployID, dagTarballVersion 
 
 // ensureContainerEngine resolves the container CLI and confirms its daemon is
 // reachable, so an image deploy fails with a plain message before any transport
-// work when Docker is absent or down.
+// work when Docker is absent or down — or, for podman with no machine up, with
+// the podman command that brings one up, which "Start Docker" would not be.
 func ensureContainerEngine(ctx context.Context, cmd imagebuild.Commander) (bin string, env []string, err error) {
 	bin, env, err = resolveContainerEngine()
+	if errors.Is(err, container.ErrMachineNotRunning) {
+		return "", nil, fmt.Errorf("an image deploy needs a running container engine, but %w. Or run 'astro deploy --dags' to deploy just your DAGs (no container engine needed)", err)
+	}
 	if err != nil {
 		return "", nil, errNoDocker
 	}
@@ -507,16 +512,10 @@ func ensureContainerEngine(ctx context.Context, cmd imagebuild.Commander) (bin s
 	return bin, env, nil
 }
 
-// defaultResolveContainerEngine picks the engine the way local Docker mode does:
-// pkg/container's PATH/OrbStack resolution plus its connection env.
+// defaultResolveContainerEngine picks the engine the way local Docker mode and
+// `astro package` do: the container.binary pin when set (the working
+// directory's project config over global), otherwise pkg/container's
+// PATH/OrbStack resolution, plus its connection env.
 func defaultResolveContainerEngine() (bin string, env []string, err error) {
-	eng, err := container.Resolve(container.Config{})
-	if err != nil {
-		return "", nil, err
-	}
-	bin = eng.Binary()
-	if mgr, mErr := container.NewManager(container.Config{Binary: bin}, nil); mErr == nil {
-		env, _ = mgr.ConnectionEnv() //nolint:errcheck // best-effort; a default daemon needs no extra env
-	}
-	return bin, env, nil
+	return containercfg.Engine(config.WorkingPath)
 }

@@ -109,7 +109,7 @@ func TestCleanReportsDockerUnreachable(t *testing.T) {
 func TestCleanReportsAnEngineItCannotResolve(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	e.preferred = func() (engineConn, error) { return engineConn{}, errors.New("no container engine found") }
+	e.preferred = func(string) (engineConn, error) { return engineConn{}, errors.New("no container engine found") }
 	project := t.TempDir()
 	composeMarker(t, project)
 

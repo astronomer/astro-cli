@@ -118,7 +118,7 @@ func TestStartRefusesBeforeItTouchesTheEngine(t *testing.T) {
 	e := testEngine(t, cmd)
 
 	engineWoken := false
-	e.ensureEngine = func(rt.Callbacks) error {
+	e.ensureEngine = func(rt.Callbacks, string) error {
 		engineWoken = true
 		return nil
 	}

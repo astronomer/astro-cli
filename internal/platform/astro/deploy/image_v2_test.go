@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -280,6 +282,31 @@ func TestDeployImageV2_NoDockerFailsEarly(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "needs Docker")
 	// Nothing on the transport was touched.
+	client.AssertNotCalled(t, "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// Podman with no machine up names the podman fix, not "Start Docker", and
+// still fails before the transport.
+func TestDeployImageV2_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	origResolve := resolveContainerEngine
+	resolveContainerEngine = func() (string, []string, error) {
+		return "", nil, fmt.Errorf("%w, and none exists yet; create and start one with `podman machine init --now`", container.ErrMachineNotRunning)
+	}
+	t.Cleanup(func() { resolveContainerEngine = origResolve })
+
+	_, err := DeployImageV2(ImageDeployV2Input{
+		ProjectDir:     v2ProjectDir(t),
+		DeploymentID:   "test-deployment-id",
+		AirflowVersion: "3.1",
+		IncludeDags:    true,
+	}, client)
+	require.ErrorIs(t, err, container.ErrMachineNotRunning)
+	assert.Contains(t, err.Error(), "podman machine init --now")
+	assert.Contains(t, err.Error(), "astro deploy --dags")
+	assert.NotContains(t, err.Error(), "Start Docker")
 	client.AssertNotCalled(t, "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
 }
 

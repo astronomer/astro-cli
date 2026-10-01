@@ -22,6 +22,7 @@ import (
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
@@ -265,6 +266,9 @@ func newRuntime() *localrt.Runtime {
 		ProxyDaemon:   newProxyDaemon(),
 		Images:        newImageBuilder(),
 		HealthTimeout: healthTimeout(),
+		// container.binary pins the engine docker mode drives: project
+		// config over global, read for the project being acted on.
+		ContainerBinary: containercfg.Binary,
 	})
 }
 

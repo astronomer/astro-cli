@@ -211,7 +211,7 @@ func TestRunInImageBringsTheEngineUpBeforeRunning(t *testing.T) {
 	withComposeFile(t, project)
 
 	var order []string
-	e.ensureEngine = func(rt.Callbacks) error { order = append(order, "ensureEngine"); return nil }
+	e.ensureEngine = func(rt.Callbacks, string) error { order = append(order, "ensureEngine"); return nil }
 	e.composeAvail = func(context.Context, engineConn) error {
 		order = append(order, "composeAvail")
 		return nil
@@ -231,7 +231,7 @@ func TestRunInImageStopsWhenTheEngineWillNotStart(t *testing.T) {
 	withComposeFile(t, project)
 
 	down := errors.New("the docker daemon is not running")
-	e.ensureEngine = func(rt.Callbacks) error { return down }
+	e.ensureEngine = func(rt.Callbacks, string) error { return down }
 
 	require.ErrorIs(t, e.RunInImage(context.Background(), project, rt.ImageRun{
 		Argv: []string{"python"},
@@ -307,7 +307,7 @@ func TestRunInImageAcceptsADockerRecord(t *testing.T) {
 func TestRunInImageGivesTheCallersEnvToComposeItself(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
-	e.preferred = func() (engineConn, error) {
+	e.preferred = func(string) (engineConn, error) {
 		return engineConn{bin: "docker", env: []string{"DOCKER_HOST=unix:///real.sock"}}, nil
 	}
 	project := t.TempDir()

@@ -152,7 +152,7 @@ func testRequest(t *testing.T) Request {
 }
 
 func newAstro(builder ImageBuilder, docker imagebuild.Commander) *AstroTarget {
-	return NewAstroTarget(builder, docker, "docker", nil)
+	return NewAstroTarget(builder, docker, func(string) (string, []string, error) { return "docker", nil, nil })
 }
 
 func TestAstroBuildTagShape(t *testing.T) {

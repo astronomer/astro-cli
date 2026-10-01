@@ -75,10 +75,10 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	// state where the engine is most likely to be down too. Without them the
 	// user gets "Cannot connect to the Docker daemon" or an opaque exit 125
 	// instead of the auto-start, or the actionable missing-plugin error.
-	if err := e.ensureEngine(rt.Callbacks{}); err != nil {
+	if err := e.ensureEngine(rt.Callbacks{}, projectPath); err != nil {
 		return err
 	}
-	conn, err := e.preferred()
+	conn, err := e.preferred(projectPath)
 	if err != nil {
 		return err
 	}

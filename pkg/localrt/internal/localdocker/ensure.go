@@ -16,14 +16,16 @@ import (
 var ErrComposeMissing = errors.New("Docker Compose v2 is required but was not found; install the Compose plugin (it ships with Docker Desktop and OrbStack): https://docs.docker.com/compose/install/")
 
 // ensureEngineUp brings the resolved container engine up before the start
-// touches it: v1 auto-started a stopped Docker daemon (open -a docker on Mac)
-// or the podman machine, and v2 resolved the engine by binary presence alone,
-// so `start --docker` with the daemon down failed immediately. This restores
-// the v1 path — a bounded wait with a clear message, failing only when the
-// engine cannot come up. Progress flows through the callbacks as "engine"
-// lines; the container package itself never prints.
-func ensureEngineUp(cb rt.Callbacks, now func() time.Time) error {
-	engine, err := container.GetContainerRuntime(container.Config{}, callbackFeedback{cb: cb, now: now})
+// touches it: v1 auto-started a stopped Docker daemon (open -a docker on Mac),
+// and v2 resolved the engine by binary presence alone, so `start --docker` with
+// the daemon down failed immediately. This restores the Docker half of the v1
+// path — a bounded wait with a clear message, failing only when the engine
+// cannot come up. Podman machines are the user's to run: for podman this only
+// checks one is up, and names `podman machine start` when it is not. Progress
+// flows through the callbacks as "engine" lines; the container package itself
+// never prints.
+func ensureEngineUp(cb rt.Callbacks, now func() time.Time, binary string) error {
+	engine, err := container.GetContainerRuntime(container.Config{Binary: binary}, callbackFeedback{cb: cb, now: now})
 	if err != nil {
 		return err
 	}

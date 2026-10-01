@@ -114,7 +114,7 @@ linters:
       # Keep this list in sync with v2BelowCmd and v2ConfigReaders in
       # internal/archlint/archlint_test.go when a new internal/ v2 package lands.
       - linters: [forbidigo]
-        path-except: ^internal/(apirequest|astrosession|deploy|emenv|envresolve|instancelocate|localenv|pack|plan|project|userstate|vaultenv)/
+        path-except: ^internal/(apirequest|astrosession|containercfg|deploy|emenv|envresolve|instancelocate|localenv|pack|plan|project|userstate|vaultenv)/
       - linters:
           - dupl
           - errcheck

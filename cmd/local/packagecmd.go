@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/internal/plan"
@@ -152,10 +153,11 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 }
 
 // packageRegistry builds the target registry with the production astro target:
-// the shared image builder and a docker command runner, both backed by os/exec.
+// the shared image builder and a container command runner, both backed by
+// os/exec, driving the engine container.binary picks for the project.
 func (c *cli) packageRegistry() *pack.Registry {
 	cmd := imagebuild.NewExecCommander()
-	astro := pack.NewAstroTarget(imagebuild.New(cmd, time.Now), cmd, "docker", nil)
+	astro := pack.NewAstroTarget(imagebuild.New(cmd, time.Now), cmd, containercfg.Engine)
 	return pack.NewRegistry(astro)
 }
 

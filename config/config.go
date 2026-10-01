@@ -104,8 +104,6 @@ var (
 		UpgradeMessage:          newCfg("upgrade_message", "true"),
 		DisableAstroRun:         newCfg("disable_astro_run", "false"),
 		AutoSelect:              newCfg("auto_select", "false"),
-		MachineCPU:              newCfg("machine.cpu", "2"),
-		MachineMemory:           newCfg("machine.memory", "4096"),
 		ShaAsTag:                newCfg("sha_as_tag", "false"),
 		RuffImage:               newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
 		RemoteClientRegistry:    newCfg("remote.client_registry", ""),

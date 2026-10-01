@@ -62,11 +62,12 @@ const (
 	binPodman = "podman"
 )
 
-// resolvePreferredEngine picks the engine for starting a project: pkg/
-// container's resolution ($PATH search, OrbStack detection) plus its
-// connection env.
-func resolvePreferredEngine() (engineConn, error) {
-	eng, err := container.Resolve(container.Config{})
+// resolvePreferredEngine picks the engine for starting a project: the
+// container.binary pin when it names one, otherwise pkg/container's
+// resolution ($PATH search, OrbStack detection), plus its connection env
+// from connFor.
+func resolvePreferredEngine(binary string, connFor func(bin string) engineConn) (engineConn, error) {
+	eng, err := container.Resolve(container.Config{Binary: binary})
 	if err != nil {
 		return engineConn{}, err
 	}
@@ -104,7 +105,7 @@ func (e *Engine) findProject(ctx context.Context, projectPath string) (conn engi
 // engine answered without error, which lets a caller tell a clean "not found"
 // from "no engine reachable".
 func (e *Engine) probeEngines(ctx context.Context, projectPath string) (conn engineConn, composeProject string, reached bool) {
-	pref, otherBin := e.engineOrder(ctx)
+	pref, otherBin := e.engineOrder(ctx, projectPath)
 	prefName, prefErr := e.probe(ctx, pref, projectPath)
 	if prefName != "" {
 		return pref, prefName, true
@@ -127,11 +128,14 @@ func (e *Engine) probeEngines(ctx context.Context, projectPath string) (conn eng
 // about which engine owns a project.
 //
 // Only the preferred engine's connection is resolved here. The other's costs a
-// `podman machine inspect`, and there is no reason to pay for it until the
-// first engine has come up short.
-func (e *Engine) engineOrder(ctx context.Context) (pref engineConn, otherBin string) {
+// `podman machine ls` and `inspect`, and there is no reason to pay for them
+// until the first engine has come up short.
+//
+// projectPath is the project whose container.binary decides the preferred
+// engine; "" (the whole-machine sweep) asks for the global setting.
+func (e *Engine) engineOrder(ctx context.Context, projectPath string) (pref engineConn, otherBin string) {
 	pref = bounded(ctx, engineConn{bin: binDocker}, func() engineConn {
-		conn, err := e.preferred()
+		conn, err := e.preferred(projectPath)
 		if err != nil {
 			return engineConn{bin: binDocker}
 		}
@@ -154,9 +158,9 @@ func (e *Engine) otherConn(ctx context.Context, bin string) engineConn {
 //
 // It exists because resolving an engine connection is the one step on the
 // probe path that cannot be handed a deadline: connFor reaches
-// container.Manager.ConnectionEnv, which shells out to `podman machine
-// inspect` through an exec.Command that takes no context at all. Bounding only
-// the `ps` that follows left the hang exactly where it was found — on a
+// container.Manager.ConnectionEnv, which shells out to `podman machine ls`
+// and `inspect` through exec.Commands that take no context at all. Bounding
+// only the `ps` that follows left the hang exactly where it was found — on a
 // machine whose podman is wedged, the CLI never reached a probe to time out.
 //
 // The abandoned goroutine outlives the call, which is the price of work that
@@ -268,7 +272,7 @@ func (e *Engine) ContainersGone(ctx context.Context, projectPath string) (bool, 
 // record's own project could lose its slot and its live Airflow be reported
 // stopped.
 func (e *Engine) runningProjects(ctx context.Context, paths []string) (found map[string][]string, reached bool) {
-	pref, otherBin := e.engineOrder(ctx)
+	pref, otherBin := e.engineOrder(ctx, "")
 	found, reached = e.projectsOn(ctx, pref)
 	if allFound(found, paths) {
 		return found, reached
