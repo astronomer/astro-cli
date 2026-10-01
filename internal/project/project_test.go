@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 const windowsOS = "windows"
@@ -209,6 +211,79 @@ func TestNotFoundErrorMentionsStart(t *testing.T) {
 	var nf *NotFoundError
 	require.True(t, errors.As(err, &nf))
 	assert.Contains(t, nf.Start, filepath.Base(dir))
+}
+
+func TestNotFoundErrorPointsAtInit(t *testing.T) {
+	_, err := Discover(t.TempDir())
+	var nf *NotFoundError
+	require.ErrorAs(t, err, &nf)
+	assert.Empty(t, nf.V1Dir)
+	assert.Contains(t, err.Error(), "`astro init`")
+	assert.NotContains(t, err.Error(), "v1")
+}
+
+// A v1 project has no marker, so Discover fails in it; the error says it is v1
+// and that `astro init` upgrades it, from the project root or below it.
+func TestDiscoverInV1ProjectNamesIt(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".astro"), 0o700))
+	dags := filepath.Join(root, "dags")
+	require.NoError(t, os.Mkdir(dags, 0o700))
+
+	t.Run("at the root", func(t *testing.T) {
+		_, err := Discover(root)
+		var nf *NotFoundError
+		require.ErrorAs(t, err, &nf)
+		assert.Equal(t, root, nf.V1Dir)
+		assert.Contains(t, err.Error(), "this directory holds an Astro v1 project")
+		assert.Contains(t, err.Error(), "Run `astro init` here")
+	})
+	t.Run("below the root", func(t *testing.T) {
+		_, err := Discover(dags)
+		var nf *NotFoundError
+		require.ErrorAs(t, err, &nf)
+		assert.Equal(t, root, nf.V1Dir)
+		assert.Contains(t, err.Error(), root+" holds an Astro v1 project")
+		assert.Contains(t, err.Error(), "Run `astro init` in "+root)
+	})
+}
+
+func TestLoadError(t *testing.T) {
+	other := errors.New("other")
+	assert.Same(t, other, LoadError(t.TempDir(), t.TempDir(), other))
+
+	t.Run("a tools-only pyproject", func(t *testing.T) {
+		dir := t.TempDir()
+		err := LoadError(dir, dir, manifest.ErrNoAstroSection)
+		var ns *NoAstroSectionError
+		require.ErrorAs(t, err, &ns)
+		assert.False(t, ns.V1)
+		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
+		assert.Contains(t, err.Error(), "no [tool.astro] section")
+		assert.Contains(t, err.Error(), "`astro init`")
+	})
+	t.Run("a tools-only pyproject in a v1 project", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
+		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
+		writeManifest(t, dir, toolsOnlyPyproject)
+		err := LoadError(dir, dir, manifest.ErrNoAstroSection)
+		var ns *NoAstroSectionError
+		require.ErrorAs(t, err, &ns)
+		assert.True(t, ns.V1)
+		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
+		assert.Contains(t, err.Error(), "Astro v1 project")
+		assert.Contains(t, err.Error(), "Run `astro init` here")
+
+		// From below the root, `astro init` "here" would scaffold a second
+		// project inside the v1 one, so the root is named instead.
+		dags := filepath.Join(dir, "dags")
+		require.NoError(t, os.Mkdir(dags, 0o700))
+		err = LoadError(dags, dir, manifest.ErrNoAstroSection)
+		assert.Contains(t, err.Error(), "Run `astro init` in "+dir)
+		assert.NotContains(t, err.Error(), "here")
+	})
 }
 
 func TestIsV1(t *testing.T) {

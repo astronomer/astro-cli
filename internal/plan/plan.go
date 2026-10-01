@@ -108,7 +108,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	}
 	m, err := manifest.Load(filepath.Join(proj.Dir, project.Marker))
 	if err != nil {
-		return nil, err
+		return nil, project.LoadError(workingDir, proj.Dir, err)
 	}
 	// In both modes, and standalone most of all: standalone installs the
 	// requirement, so a declared Dockerfile whose FROM names another Airflow is

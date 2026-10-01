@@ -24,14 +24,74 @@ import (
 // is manifest.Marker.
 const Marker = manifest.Marker
 
+// initCommand is what turns a directory into a project, and a v1 project into
+// a v2 one, in place.
+const initCommand = "astro init"
+
 // NotFoundError reports that no project marker was found in the start
 // directory or any of its parents.
 type NotFoundError struct {
 	Start string
+	// V1Dir is the nearest directory on the walk up that holds an astro v1
+	// project (see IsV1), or empty when there is none. A v1 project has no
+	// marker, so without this the error would only say what is missing, not
+	// that `astro init` upgrades what is there.
+	V1Dir string
 }
 
 func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("no %s found in %s or any parent directory", Marker, e.Start)
+	if e.V1Dir != "" {
+		return v1Message(e.Start, e.V1Dir)
+	}
+	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
+		Marker, e.Start, initCommand)
+}
+
+// NoAstroSectionError reports a project root whose pyproject.toml has no
+// [tool.astro] table: a Python project, often an astro v1 one keeping ruff or
+// pytest settings there, that is not yet an astro v2 project. It wraps
+// manifest.ErrNoAstroSection, so callers matching the sentinel still match.
+type NoAstroSectionError struct {
+	// Start is the directory the command ran in, Dir or one below it.
+	Start string
+	Dir   string
+	// V1 is whether Dir also holds an astro v1 project (see IsV1).
+	V1 bool
+}
+
+func (e *NoAstroSectionError) Error() string {
+	if e.V1 {
+		return v1Message(e.Start, e.Dir)
+	}
+	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
+		"Run `%s` in %s to add one; the rest of the file is left alone",
+		filepath.Join(e.Dir, Marker), initCommand, e.Dir)
+}
+
+func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection }
+
+// v1Message says that v1Dir holds an astro v1 project and how to upgrade it,
+// naming the directory only when it is not the one the command ran in.
+func v1Message(start, v1Dir string) string {
+	where, there := "this directory", "here"
+	if v1Dir != start {
+		where, there = v1Dir, "in "+v1Dir
+	}
+	return fmt.Sprintf("%s holds an Astro v1 project (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
+		"Run `%s` %s to upgrade it in place", where, initCommand, there)
+}
+
+// LoadError returns the error to report for a manifest.Load of dir's marker,
+// discovered from start, that failed with err: a *NoAstroSectionError in place
+// of the bare manifest.ErrNoAstroSection, and err unchanged otherwise.
+func LoadError(start, dir string, err error) error {
+	if !errors.Is(err, manifest.ErrNoAstroSection) {
+		return err
+	}
+	if abs, absErr := filepath.Abs(start); absErr == nil {
+		start = abs
+	}
+	return &NoAstroSectionError{Start: start, Dir: dir, V1: IsV1(dir)}
 }
 
 // Project is a discovered astro project.
@@ -52,12 +112,14 @@ type Project struct {
 
 // Discover walks up from startDir looking for a directory that contains
 // Marker and returns it as the project. It returns *NotFoundError when the
-// walk reaches the filesystem root without a match.
+// walk reaches the filesystem root without a match, naming the nearest v1
+// project it passed on the way.
 func Discover(startDir string) (*Project, error) {
 	abs, err := filepath.Abs(startDir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", startDir, err)
 	}
+	var v1Dir string
 	for dir := abs; ; {
 		info, err := os.Stat(filepath.Join(dir, Marker))
 		if err == nil && info.Mode().IsRegular() {
@@ -66,9 +128,12 @@ func Discover(startDir string) (*Project, error) {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
+		if v1Dir == "" && IsV1(dir) {
+			v1Dir = dir
+		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return nil, &NotFoundError{Start: abs}
+			return nil, &NotFoundError{Start: abs, V1Dir: v1Dir}
 		}
 		dir = parent
 	}

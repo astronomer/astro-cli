@@ -108,7 +108,8 @@ var problemKinds = []struct {
 }{
 	{KindNoProject, func(err error) bool {
 		var notFound *project.NotFoundError
-		return errors.As(err, &notFound)
+		var noSection *project.NoAstroSectionError
+		return errors.As(err, &notFound) || errors.As(err, &noSection)
 	}},
 	// Before already_running: a refusal carrying both is the more specific
 	// complaint, since the mode is why stopping and starting again will not

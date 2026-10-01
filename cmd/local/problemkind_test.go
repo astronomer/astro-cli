@@ -213,3 +213,12 @@ func TestTheCLIsOwnNotRunningErrorsAreNamed(t *testing.T) {
 		t.Errorf("open's error resolves to %q, want %q", got, KindNotRunning)
 	}
 }
+
+// A pyproject.toml without [tool.astro] is no astro project either, and says so
+// under the same kind as a directory with no pyproject.toml at all.
+func TestNoAstroSectionIsNoProject(t *testing.T) {
+	err := fmt.Errorf("start: %w", &project.NoAstroSectionError{Dir: "/somewhere"})
+	if got := problemKind(err); got != KindNoProject {
+		t.Fatalf("problemKind = %q, want %q", got, KindNoProject)
+	}
+}
