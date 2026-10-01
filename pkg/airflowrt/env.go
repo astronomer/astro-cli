@@ -36,6 +36,19 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 
 	// Layer 2: Standalone-critical settings
 	overrides["PATH"] = fmt.Sprintf("%s:%s", venvBin, os.Getenv("PATH"))
+	// The runtime image sets PYTHONPATH to the project root, so a DAG's
+	// `from include import x` resolves there and on Astro. Standalone must
+	// match or every such DAG is an import error locally. A PYTHONPATH from
+	// .env or the shell is kept, after the project root.
+	pythonPath := projectPath
+	extra, fromEnvFile := overrides["PYTHONPATH"]
+	if !fromEnvFile {
+		extra = os.Getenv("PYTHONPATH")
+	}
+	if extra != "" {
+		pythonPath += string(os.PathListSeparator) + extra
+	}
+	overrides["PYTHONPATH"] = pythonPath
 	overrides["AIRFLOW_HOME"] = standaloneHome
 	overrides["ASTRONOMER_ENVIRONMENT"] = "local"
 	overrides["AIRFLOW__CORE__LOAD_EXAMPLES"] = "False"

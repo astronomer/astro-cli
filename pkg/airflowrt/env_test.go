@@ -60,6 +60,30 @@ func TestBuildEnv(t *testing.T) {
 	assert.True(t, strings.HasPrefix(envMap["PATH"], filepath.Join(dir, ".venv", "bin")))
 }
 
+func TestBuildEnv_PythonPath(t *testing.T) {
+	sep := string(os.PathListSeparator)
+
+	t.Run("project root only", func(t *testing.T) {
+		t.Setenv("PYTHONPATH", "")
+		dir := t.TempDir()
+		assert.Equal(t, dir, envToMap(BuildEnv(dir, DefaultPort, ""))["PYTHONPATH"])
+	})
+
+	t.Run("inherited PYTHONPATH kept after the project root", func(t *testing.T) {
+		t.Setenv("PYTHONPATH", "/shell/lib")
+		dir := t.TempDir()
+		assert.Equal(t, dir+sep+"/shell/lib", envToMap(BuildEnv(dir, DefaultPort, ""))["PYTHONPATH"])
+	})
+
+	t.Run(".env PYTHONPATH wins over the inherited one", func(t *testing.T) {
+		t.Setenv("PYTHONPATH", "/shell/lib")
+		dir := t.TempDir()
+		envFile := filepath.Join(dir, ".env")
+		require.NoError(t, os.WriteFile(envFile, []byte("PYTHONPATH=/dotenv/lib\n"), 0o644))
+		assert.Equal(t, dir+sep+"/dotenv/lib", envToMap(BuildEnv(dir, DefaultPort, envFile))["PYTHONPATH"])
+	})
+}
+
 func TestBuildEnv_DefaultPort(t *testing.T) {
 	dir := t.TempDir()
 
