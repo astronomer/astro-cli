@@ -50,7 +50,7 @@ const (
 // and a conversion has to report those rather than drop them silently: run
 // CheckName and ValueSpec.Check over the result and carry what passes.
 //
-// # Strict, unlike ParseLegacyTolerant
+// # Strict
 //
 // This reader's caller is about to DELETE the file, so anything it cannot carry
 // faithfully is refused and reported while the file still exists. That is three
@@ -61,26 +61,9 @@ const (
 //     the two survives and the other goes with the file;
 //   - an entry with no key at all, which would land under the empty name.
 //
-// KnownFields alone catches only the first. A caller that is only reading wants
-// the tolerant one.
+// KnownFields alone catches only the first.
 func ParseLegacy(data []byte) (*Schema, error) {
 	return parseLegacy(data, true)
-}
-
-// ParseLegacyTolerant reads the same file, taking what it can: an unknown field
-// is ignored, a keyless entry is skipped, and a repeated key keeps the last.
-//
-// For a caller that READS the file and changes nothing — the app showing what a
-// project expects, every start, every edit. A fault there costs one declaration
-// and is recoverable by fixing the file; refusing the whole file instead would
-// take out everything else the project declares, on a path that has no reason
-// to be destructive about it.
-//
-// The tolerance is the ONLY difference. Both share one conversion, because two
-// copies of the gate inversion is how the two spellings of this grammar come to
-// disagree about what a declaration means.
-func ParseLegacyTolerant(data []byte) (*Schema, error) {
-	return parseLegacy(data, false)
 }
 
 func parseLegacy(data []byte, strict bool) (*Schema, error) {

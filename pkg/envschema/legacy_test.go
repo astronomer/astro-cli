@@ -150,29 +150,6 @@ func TestParseLegacyOnAnEmptyFile(t *testing.T) {
 	}
 }
 
-// The two readers differ in exactly one thing, and the difference is not
-// stylistic: the strict one is about to delete the file it just read.
-func TestParseLegacyTolerantIgnoresAnUnknownKey(t *testing.T) {
-	const typo = "env_vars:\n  - { key: A, mandatory: true }\n"
-
-	if _, err := ParseLegacy([]byte(typo)); err == nil {
-		t.Error("the strict reader accepted a typo, so a conversion would drop the declaration silently")
-	}
-
-	s, err := ParseLegacyTolerant([]byte(typo))
-	if err != nil {
-		t.Fatalf("the tolerant reader refused a file it only reads: %v", err)
-	}
-	if _, found := s.EnvVars["A"]; !found {
-		t.Errorf("the declaration itself was lost: %+v", s.EnvVars)
-	}
-	// And the shared conversion still ran: A spelled no usable gate flag, so it
-	// is not gated.
-	if !s.EnvVars["A"].Optional {
-		t.Error("the tolerant reader skipped the gate inversion")
-	}
-}
-
 // The v1 format is a LIST and this is a map, so a repeated key keeps one entry
 // and loses the other. KnownFields cannot see it: every field is spelled right.
 // The strict reader's caller deletes the file, so the lost declaration would be
@@ -194,22 +171,6 @@ func TestParseLegacyRefusesARepeatedKey(t *testing.T) {
 func TestParseLegacyRefusesAKeylessEntry(t *testing.T) {
 	if _, err := ParseLegacy([]byte("env_vars:\n  - { type: string }\n")); err == nil {
 		t.Error("an entry with no key was accepted")
-	}
-}
-
-// The tolerant reader takes what it can from the same faults, because its
-// caller only displays the result and deletes nothing.
-func TestParseLegacyTolerantTakesWhatItCan(t *testing.T) {
-	s, err := ParseLegacyTolerant([]byte(
-		"env_vars:\n  - { key: API_URL, type: url }\n  - { key: API_URL }\n  - { type: string }\n"))
-	if err != nil {
-		t.Fatalf("the tolerant reader refused a file it only reads: %v", err)
-	}
-	if len(s.EnvVars) != 1 {
-		t.Errorf("want the one named declaration, got %+v", s.EnvVars)
-	}
-	if _, found := s.EnvVars[""]; found {
-		t.Error("a keyless entry became a declaration under the empty name")
 	}
 }
 
