@@ -14,21 +14,53 @@ import "context"
 // The CLI passes an adapter over *imagebuild.Builder. Astro Desktop passes the
 // same, which is why imagebuild is a pkg/ sub-module rather than CLI-private.
 type ImageBuilder interface {
-	// RuntimeImage resolves the base image for an Airflow version. It takes a
-	// context because the answer is not always local: Airflow 3 tags its
-	// runtime images by the Airflow version, but an Airflow 2 image is tagged
-	// by runtime version, so which runtime carries a given Airflow is a lookup
-	// against Astronomer's version service.
+	// Request picks the build for a plan's manifest fields. Both consumers
+	// answer it with imagebuild.ForLocalManifest, the rule deploy and
+	// `astro package astro` follow through imagebuild.ForManifest, so a
+	// project starts from the image it deploys: a declared Dockerfile is the
+	// build, with the project as its context, and otherwise the image is
+	// generated over the runtime base the pin and runtime build resolve to.
 	//
-	// runtime is the plan's Runtime, the one build the manifest's
-	// [tool.astro] runtime names, or "" for none. When set, the base is that
-	// build and no lookup is made; airflowVersion is still passed, for the
-	// checks that hold whichever build is chosen.
-	RuntimeImage(ctx context.Context, airflowVersion, runtime string) (string, error)
+	// It takes a context because the base is not always local: an Airflow 2
+	// image is tagged by runtime version, so which runtime carries a given
+	// Airflow is a lookup against Astronomer's runtime catalog. Deploy refuses
+	// Airflow 2; docker mode runs it, and that is the one difference.
+	//
+	// The returned request carries BaseImage, or Dockerfile and Context, plus
+	// Dependencies and Packages. The engine fills in the rest.
+	Request(ctx context.Context, m ManifestBuild) (BuildRequest, error)
 	// Build layers the project's dependencies and OS packages over BaseImage and
 	// returns the image to run. With nothing to install it returns BaseImage
 	// unchanged rather than building an empty layer.
 	Build(ctx context.Context, req BuildRequest, cb Callbacks) (string, error)
+}
+
+// ManifestBuild is the part of a v2 project manifest that decides which image
+// the project builds, and is imagebuild.ManifestBuild (an alias): declared
+// here so ImageBuilder can take it without importing imagebuild. Plain fields
+// rather than a pkg/manifest type, so a caller holding its own manifest read
+// (Astro Desktop's, for one) fills it directly.
+type ManifestBuild struct {
+	// ProjectDir is the project's root, absolute. A declared Dockerfile resolves
+	// against it and builds with it as the context.
+	ProjectDir string
+	// AirflowVersion is the version the manifest's Airflow requirement pins
+	// (manifest.Airflow().Pin), which a generated build's runtime base
+	// resolves from. Unused when a Dockerfile is declared.
+	AirflowVersion string
+	// Runtime is [tool.astro] runtime (manifest.Airflow().Runtime), the one
+	// runtime build a generated image starts FROM instead of the newest build
+	// of AirflowVersion's series, or "" for none. The manifest never sets it
+	// beside a Dockerfile.
+	Runtime string
+	// Dockerfile is [tool.astro] dockerfile: slash-separated and relative to
+	// ProjectDir, or empty when the project declares none.
+	Dockerfile string
+	// Dependencies are [project] dependencies (PEP 508), as
+	// manifest.Requirements gives them.
+	Dependencies []string
+	// Packages are [tool.astro] packages, OS (apt) package names.
+	Packages []string
 }
 
 // BuildRequest is what the runtime asks an ImageBuilder for. It mirrors

@@ -377,13 +377,22 @@ func newImageBuilder() imageBuilder {
 	return imageBuilder{catalog: runtimecatalog.Options(0)}
 }
 
-// RuntimeImage resolves through LocalRuntimeImageWith, not RuntimeImageFor: a
-// local run takes either generation, and an Airflow 2 pin needs the runtime
-// catalog to say which runtime carries it, unless the manifest names the build
-// ([tool.astro] runtime). The deploy path keeps the pure RuntimeImageFor, which
-// is Airflow 3 alone.
-func (b imageBuilder) RuntimeImage(ctx context.Context, airflowVersion, build string) (string, error) {
-	return imagebuild.LocalRuntimeImageWith(ctx, airflowVersion, build, b.catalog)
+// Request picks the build through imagebuild.ForLocalManifest, deploy's and
+// package's rule (ForManifest) over a base that also takes Airflow 2, whose
+// runtime is looked up in the catalog unless the manifest names the build
+// ([tool.astro] runtime).
+func (b imageBuilder) Request(ctx context.Context, m imagebuild.ManifestBuild) (localrt.BuildRequest, error) {
+	req, err := imagebuild.ForLocalManifest(ctx, m, b.catalog)
+	if err != nil {
+		return localrt.BuildRequest{}, err
+	}
+	return localrt.BuildRequest{
+		BaseImage:    req.BaseImage,
+		Dockerfile:   req.Dockerfile,
+		Context:      req.Context,
+		Dependencies: req.Dependencies,
+		Packages:     req.Packages,
+	}, nil
 }
 
 // Build copies every field across, and the two that used to be missing are

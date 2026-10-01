@@ -3,6 +3,7 @@ package localdocker
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -24,6 +25,9 @@ type stubImages struct {
 	// runtimes is the runtime build each resolution was asked for, "" for
 	// none, so a test can see the plan's [tool.astro] runtime reach it.
 	runtimes []string
+	// manifests is every manifest the engine asked to have a build picked
+	// for, so a test can see the plan's fields reach the seam.
+	manifests []rt.ManifestBuild
 }
 
 func newStubImages() *stubImages {
@@ -40,17 +44,30 @@ func newStubImages() *stubImages {
 // TestStartRejectsNonDockerPlanAndBadVersions checks; the rules themselves —
 // the 2.7 floor, and the version-service lookup an Airflow 2 pin needs — belong
 // to pkg/imagebuild and are tested there.
-func (s *stubImages) RuntimeImage(_ context.Context, airflowVersion, runtime string) (string, error) {
-	s.runtimeImageCalls++
-	s.runtimes = append(s.runtimes, runtime)
-	switch {
-	case strings.HasPrefix(airflowVersion, "3"):
-		return s.base, nil
-	case strings.HasPrefix(airflowVersion, "2"):
-		return s.airflow2Base, nil
-	default:
-		return "", errors.New("Docker mode runs Airflow 2 or Airflow 3, not " + airflowVersion)
+//
+// Request follows imagebuild.ForLocalManifest's shape: a declared Dockerfile is
+// the build, resolved against the project with it as the context, and no base
+// is resolved; otherwise the base is resolved from the pin. That the real
+// adapter is that function is tested where it is wired, in cmd/local.
+func (s *stubImages) Request(_ context.Context, m rt.ManifestBuild) (rt.BuildRequest, error) {
+	s.manifests = append(s.manifests, m)
+	req := rt.BuildRequest{Dependencies: m.Dependencies, Packages: m.Packages}
+	if m.Dockerfile != "" {
+		req.Dockerfile = filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile))
+		req.Context = m.ProjectDir
+		return req, nil
 	}
+	s.runtimeImageCalls++
+	s.runtimes = append(s.runtimes, m.Runtime)
+	switch {
+	case strings.HasPrefix(m.AirflowVersion, "3"):
+		req.BaseImage = s.base
+	case strings.HasPrefix(m.AirflowVersion, "2"):
+		req.BaseImage = s.airflow2Base
+	default:
+		return rt.BuildRequest{}, errors.New("Docker mode runs Airflow 2 or Airflow 3, not " + m.AirflowVersion)
+	}
+	return req, nil
 }
 
 func (s *stubImages) Build(_ context.Context, req rt.BuildRequest, _ rt.Callbacks) (string, error) {

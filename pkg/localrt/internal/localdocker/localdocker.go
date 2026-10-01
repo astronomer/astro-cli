@@ -223,9 +223,11 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
 	}
-	// Resolved once, and used for the refusal, the build and the generation
-	// below. The pairing of Dockerfile with Context is only correct together,
-	// and doing it twice in one function is how they drift.
+	// The declared Dockerfile's path, for the two decisions made off the file
+	// before a build is picked: the refusal of a base that is not Astro
+	// Runtime, and the generation the compose file describes. The build itself
+	// takes its Dockerfile and Context from the image builder's request
+	// (imagebuild.ForLocalManifest), which joins the same path the same way.
 	declared := ""
 	if p.Dockerfile != "" {
 		// FromSlash because the manifest carries a slash-separated path (see the
@@ -268,20 +270,23 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if e.images == nil {
 		return nil, errors.New("docker mode needs an image builder: set Images on localrt.Config")
 	}
-	// Resolve the base image only for a generated build. A project that declared
-	// its own Dockerfile has already said what it builds on, and asking the
-	// version service for a base we would not use turns a working start into a
-	// network dependency.
-	var image string
-	if p.Dockerfile == "" {
-		// The resolution takes a context because an Airflow 2 base image is a
-		// lookup against the version service, not a tag built from the pin. It
-		// also validates the generation, which everything below reads off the
-		// plan. A [tool.astro] runtime names the build outright.
-		var err error
-		if image, err = e.images.RuntimeImage(ctx, p.AirflowVersion, p.Runtime); err != nil {
-			return nil, err
-		}
+	// Which image the manifest builds is the image builder's answer, the rule
+	// deploy and `astro package astro` share (rt.ImageBuilder.Request), so a
+	// project starts from the image it deploys. It resolves a base only for a
+	// generated build, since asking the runtime catalog for a base a declared
+	// Dockerfile would not use turns a working start into a network
+	// dependency. It also validates the pin's generation, which everything
+	// below reads off the plan.
+	build, err := e.images.Request(ctx, rt.ManifestBuild{
+		ProjectDir:     projectPath,
+		AirflowVersion: p.AirflowVersion,
+		Runtime:        p.Runtime,
+		Dockerfile:     p.Dockerfile,
+		Dependencies:   p.Dependencies,
+		Packages:       p.Packages,
+	})
+	if err != nil {
+		return nil, err
 	}
 	major := planMajor(p.AirflowVersion, base)
 	hostname, err := localshared.PlanHostname(p, projectPath)
@@ -325,25 +330,16 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// project's dependencies and OS packages into a layer over the runtime image
 	// so docker mode matches standalone: the builder drops apache-airflow (the
 	// base image already provides it) and, with nothing else to install, builds
-	// nothing and hands back the runtime image as-is.
-	build := rt.BuildRequest{
-		WorkDir:      stateDir,
-		BaseImage:    image,
-		Tag:          builtImageTag(name),
-		Dependencies: p.Dependencies,
-		Packages:     p.Packages,
-		Secrets:      p.BuildSecrets,
-		Bin:          conn.bin,
-		Env:          conn.env,
-	}
-	if declared != "" {
-		// Existence is NOT checked here: imagebuild.Build does it, and that is
-		// where this path, the deploy path and the package path meet. Two copies
-		// of that guard would be two messages for one mistake.
-		build.Dockerfile = declared
-		build.Context = projectPath
-	}
-	if image, err = e.images.Build(ctx, build, cb); err != nil {
+	// nothing and hands back the runtime image as-is. A declared Dockerfile's
+	// existence is not checked here: imagebuild.Build does it, where this path,
+	// deploy and package meet, so one mistake has one message.
+	build.WorkDir = stateDir
+	build.Tag = builtImageTag(name)
+	build.Secrets = p.BuildSecrets
+	build.Bin = conn.bin
+	build.Env = conn.env
+	image, err := e.images.Build(ctx, build, cb)
+	if err != nil {
 		return nil, err
 	}
 

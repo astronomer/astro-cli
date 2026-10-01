@@ -5,33 +5,18 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // ManifestBuild is the part of a v2 project manifest that decides which image
-// the project builds. Plain fields rather than a pkg/manifest type, so a
-// caller holding its own manifest read (Astro Desktop's, for one) fills it
-// directly.
-type ManifestBuild struct {
-	// ProjectDir is the project's root, absolute. A declared Dockerfile resolves
-	// against it and builds with it as the context.
-	ProjectDir string
-	// AirflowVersion is the version the manifest's Airflow requirement pins
-	// (manifest.Airflow().Pin), which a generated build's runtime base
-	// resolves from. Unused when a Dockerfile is declared.
-	AirflowVersion string
-	// Runtime is [tool.astro] runtime (manifest.Airflow().Runtime), the one
-	// runtime build a generated image starts FROM instead of the newest build
-	// of AirflowVersion's series, or "" for none. The manifest never sets it
-	// beside a Dockerfile.
-	Runtime string
-	// Dockerfile is [tool.astro] dockerfile: slash-separated and relative to
-	// ProjectDir, or empty when the project declares none.
-	Dockerfile string
-	// Dependencies are [project] dependencies (PEP 508).
-	Dependencies []string
-	// Packages are [tool.astro] packages, OS (apt) package names.
-	Packages []string
-}
+// the project builds. It is declared in rt, so the local runtime's image seam
+// (rt.ImageBuilder.Request) takes the same type without importing this
+// package; see rt.ManifestBuild for its fields.
+type ManifestBuild = rt.ManifestBuild
+
+// baseImageFunc resolves the runtime base a generated build starts FROM, from
+// the manifest's Airflow pin and its [tool.astro] runtime build ("" for none).
+type baseImageFunc func(ctx context.Context, airflowVersion, runtime string) (string, error)
 
 // ForManifest is the one rule for which image a project's manifest builds, so
 // every caller building from a manifest builds the same image from it.
@@ -46,10 +31,32 @@ type ManifestBuild struct {
 // Dependencies and Packages are carried in both cases, since Build ignores
 // them in Dockerfile mode rather than rejecting them.
 //
+// Deploy and `astro package astro` call this. Local Docker mode calls
+// ForLocalManifest, the same rule over a base that also takes Airflow 2.
+//
 // The caller fills the rest: WorkDir, Tag, Platform ("linux/amd64" for a
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild) (Request, error) {
+	return forManifestWith(context.Background(), m, deployBase)
+}
+
+// ForLocalManifest is ForManifest for local Docker mode. The one difference is
+// the base a generated build starts FROM: LocalRuntimeImageWith, which resolves
+// an Airflow 3 pin exactly as RuntimeImageFor does and also runs Airflow 2,
+// looking it up in the runtime catalog o describes. So an Airflow 3 project
+// starts from the image it deploys, and an Airflow 2 one, which deploy refuses,
+// still starts.
+func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Options) (Request, error) {
+	return forManifestWith(ctx, m, func(ctx context.Context, airflowVersion, runtime string) (string, error) {
+		return LocalRuntimeImageWith(ctx, airflowVersion, runtime, o)
+	})
+}
+
+// forManifestWith is the rule ForManifest and ForLocalManifest share, with a
+// generated build's base resolved by base. base is not called for a declared
+// Dockerfile.
+func forManifestWith(ctx context.Context, m ManifestBuild, base baseImageFunc) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
 		Packages:     m.Packages,
@@ -62,12 +69,18 @@ func ForManifest(m ManifestBuild) (Request, error) {
 		req.Context = m.ProjectDir
 		return req, nil
 	}
-	base, err := RuntimeImageFor(m.AirflowVersion, m.Runtime)
+	image, err := base(ctx, m.AirflowVersion, m.Runtime)
 	if err != nil {
 		return Request{}, err
 	}
-	req.BaseImage = base
+	req.BaseImage = image
 	return req, nil
+}
+
+// deployBase is the base deploy and package build FROM: RuntimeImageFor,
+// Airflow 3 alone, with nothing to look up.
+func deployBase(_ context.Context, airflowVersion, runtime string) (string, error) {
+	return RuntimeImageFor(airflowVersion, runtime)
 }
 
 // FromDeclaredDockerfile reports whether the request builds the project's own
