@@ -14,7 +14,7 @@ import (
 type Inputs struct {
 	Schema *envschema.Schema
 	// Providers is the ordered resolution chain: the first that holds a
-	// value wins. The shipped chain is shell env > project .env > project
+	// value wins. The shipped chain is project .env > shell env > project
 	// vault > global vault > global ~/.astro/env (internal/localenv assembles
 	// it).
 	Providers []Provider
@@ -88,7 +88,7 @@ type Result struct {
 }
 
 // Resolve assembles values for every declared name from the provider chain
-// (shell env > project .env > the two vault tiers > global ~/.astro/env > the
+// (project .env > shell env > the two vault tiers > global ~/.astro/env > the
 // linked workspace > the declaration's default), validates them, and reports what is missing and
 // where each present value came from. It never writes and resolves only
 // declared names — undeclared entries in any source, the workspace included,

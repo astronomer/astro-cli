@@ -7,7 +7,7 @@
 // encrypted tiers are internal/vaultenv's, and they are passed INTO the chain
 // this package assembles rather than built here, which is what keeps that true:
 //
-//	shell env > project .env > project vault > global vault > global ~/.astro/env
+//	project .env > shell env > project vault > global vault > global ~/.astro/env
 //
 // cmd renders; nothing here prints or exits.
 package localenv

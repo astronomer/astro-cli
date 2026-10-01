@@ -220,19 +220,22 @@ func TestUndeclared(t *testing.T) {
 func TestProviderPrecedence(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	writeGlobalEnv(t, "K=global\nONLY_GLOBAL=g\n")
+	writeGlobalEnv(t, "K=global\nONLY_GLOBAL=g\nSHELL_GLOBAL=global\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("K=project\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	src, err := LoadSources([]string{"K=shell"}, projDir)
+	src, err := LoadSources([]string{"K=shell", "SHELL_GLOBAL=shell"}, projDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ps := src.Providers(nil)
-	// shell beats project beats global.
-	if v, src, ok := firstHit(ps, "K"); !ok || v != "shell" || src != SourceShell {
-		t.Errorf("K resolved to %q from %q (ok=%v), want shell", v, src, ok)
+	// project beats shell, which start applies the .env over; shell beats global.
+	if v, src, ok := firstHit(ps, "K"); !ok || v != "project" || src != SourceProject {
+		t.Errorf("K resolved to %q from %q (ok=%v), want project", v, src, ok)
+	}
+	if v, src, ok := firstHit(ps, "SHELL_GLOBAL"); !ok || v != "shell" || src != SourceShell {
+		t.Errorf("SHELL_GLOBAL resolved to %q from %q (ok=%v), want shell", v, src, ok)
 	}
 	if v, src, ok := firstHit(ps, "ONLY_GLOBAL"); !ok || v != "g" || src != SourceGlobal {
 		t.Errorf("ONLY_GLOBAL resolved to %q from %q (ok=%v), want g/global", v, src, ok)

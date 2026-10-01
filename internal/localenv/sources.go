@@ -65,7 +65,7 @@ func LoadSources(environ []string, projectDir string) (Sources, error) {
 
 // Providers is the ordered resolution chain:
 //
-//	shell env > project .env > project vault > global vault > global ~/.astro/env
+//	project .env > shell env > project vault > global vault > global ~/.astro/env
 //
 // The project provider is omitted when there is no project.
 //
@@ -78,13 +78,19 @@ func LoadSources(environ []string, projectDir string) (Sources, error) {
 // The slot is the decision. A vault value sits BELOW the project's .env, so a
 // hand-written plaintext entry still wins, exactly as it does on the desktop;
 // and ABOVE the global file, so this machine's shared secret beats a global
-// plaintext default. Shell env stays on top, which is where a CLI user expects
-// `FOO=bar astro local start` to land.
+// plaintext default.
+//
+// The project .env sits above the shell because that is what a start delivers:
+// Injection applies the whole file through Plan.Env, which both engines set
+// over the inherited environment. Ranking it anywhere else would have list,
+// get and check name a source whose value Airflow never sees. The shell still
+// beats every tier below the file.
 func (s Sources) Providers(vault []envresolve.Provider) []envresolve.Provider {
-	ps := []envresolve.Provider{mapProvider{label: SourceShell, vals: s.shell}}
+	var ps []envresolve.Provider
 	if s.hasProject {
 		ps = append(ps, mapProvider{label: SourceProject, vals: s.project})
 	}
+	ps = append(ps, mapProvider{label: SourceShell, vals: s.shell})
 	ps = append(ps, vault...)
 	return append(ps, mapProvider{label: SourceGlobal, vals: s.global})
 }

@@ -8,10 +8,12 @@
 //
 // Resolution is an ordered chain (see Provider), lowest tiers last:
 //
-//	shell env > project .env > project vault > global vault > global ~/.astro/env > workspace EM > manifest default
+//	project .env > shell env > project vault > global vault > global ~/.astro/env > workspace EM > manifest default
 //
-// An exported variable is the most deliberate, most local statement, so it
-// wins; the project file beats the global one. A name declared source =
+// The project .env comes first because a start applies the whole file over the
+// inherited environment, so the chain names the value Airflow actually gets.
+// An exported variable beats every tier below it; the project file beats the
+// global one. A name declared source =
 // "workspace" also reads the workspace's Environment Manager below the files,
 // and a name with a manifest default falls back to it at the very bottom.
 // internal/localenv builds the file chain and owns the files; this package is

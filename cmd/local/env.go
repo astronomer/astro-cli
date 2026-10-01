@@ -120,7 +120,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"connections, and Airflow variables.\n\n" +
 			"Values live in the project's .env, or ~/.astro/env with --global. Pass --secret\n" +
 			"to use the encrypted vault instead.\n\n" +
-			"At start, each value comes from the first of: shell env, project .env, project\n" +
+			"At start, each value comes from the first of: project .env, shell env, project\n" +
 			"vault, global vault, ~/.astro/env, the linked workspace's Environment Manager,\n" +
 			"a declaration's default. Every source reaches Airflow whole, declared or not.\n" +
 			"A workspace that cannot be read is skipped with a note.",
@@ -938,7 +938,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	if ok {
 		return c.emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
 	}
-	msg := fmt.Sprintf("%s %q is not set anywhere (shell env, project .env, the encrypted vault, or global ~/.astro/env)", localenv.Noun(kind), name)
+	msg := fmt.Sprintf("%s %q is not set anywhere (project .env, shell env, the encrypted vault, or global ~/.astro/env)", localenv.Noun(kind), name)
 	// A global the vault holds that does not reach this checkout is the one
 	// absence worth explaining: the value exists, and the fix is a link.
 	for _, p := range vaultenv.Load(projectDir).Providers() {

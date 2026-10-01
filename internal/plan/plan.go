@@ -307,7 +307,7 @@ func PersistPort(projectPath string, chosen int) error {
 }
 
 // resolveEnv types the manifest's [tool.astro.env] section, resolves it
-// against the provider chain (shell env > project .env > project vault > global
+// against the provider chain (project .env > shell env > project vault > global
 // vault > global ~/.astro/env),
 // and returns the environment injected into Airflow at start plus the
 // declared names only the shell satisfies (Plan.PassthroughEnv). A required

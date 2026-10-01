@@ -12,7 +12,7 @@ import "strings"
 // so the same key resolves against the shell, a project file, or a global
 // file with no per-source translation.
 //
-// The chain that ships is shell env > project .env > project vault > global
+// The chain that ships is project .env > shell env > project vault > global
 // vault > global ~/.astro/env (internal/localenv assembles it; the vault tiers
 // come from internal/vaultenv). The chain is the extension point, and the vault
 // is the proof: it slotted into the same ordered walk without changing anything
