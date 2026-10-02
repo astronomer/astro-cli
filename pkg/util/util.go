@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/pkg/astroauth"
-	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -78,7 +77,17 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 
 // BuildSecretInputEnv holds newline-separated build secret specs, read when
 // no --build-secret is given.
-const BuildSecretInputEnv = imagebuild.BuildSecretInputEnv
+const BuildSecretInputEnv = "BUILD_SECRET_INPUT"
+
+// BuildSecretHint is the CLI's imagebuild.MissingSecrets.Hint: the
+// --build-secret flags that would give ids, or BuildSecretInputEnv.
+func BuildSecretHint(ids []string) string {
+	flags := make([]string, len(ids))
+	for i, id := range ids {
+		flags[i] = "--build-secret id=" + id + ",env=<VAR>"
+	}
+	return "pass " + strings.Join(flags, " ") + " or set " + BuildSecretInputEnv
+}
 
 // BuildSecretUsage is the help text of every --build-secret flag.
 const BuildSecretUsage = "Secret to expose to the build. See https://docs.docker.com/build/building/secrets/. Repeat to specify multiple secrets. (format: \"id=mysecret[,src=/local/secret]\" or \"id=mysecret,env=ENV_VAR\")"

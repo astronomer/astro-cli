@@ -39,6 +39,7 @@ func warnMissingBuildSecrets(r Renderer, p localrt.Plan) (imagebuild.MissingSecr
 		return imagebuild.MissingSecrets{}, nil
 	}
 	missing, err := imagebuild.CheckBuildSecrets(p.ProjectPath, p.Dockerfile, p.BuildSecrets)
+	missing.Hint = util.BuildSecretHint
 	for _, w := range missing.Warnings() {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}

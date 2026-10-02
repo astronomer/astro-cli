@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // runtimeVersionLabel is the label the runtime base image carries with its
@@ -128,6 +129,7 @@ func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets,
 		return missing, err
 	}
 	missing, err := imagebuild.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets)
+	missing.Hint = util.BuildSecretHint
 	for _, w := range missing.Warnings() {
 		emit(cb, "warning: "+w)
 	}

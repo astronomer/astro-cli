@@ -142,7 +142,7 @@ func TestRunFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
 
 	_, err := Run(req, &fakeDeployer{imgErr: buildErr})
 	require.ErrorIs(t, err, imagebuild.ErrDockerfileBuild)
-	assert.Contains(t, err.Error(), `exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`)
+	assert.Contains(t, err.Error(), `exit status 1. Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`)
 
 	other := errors.New("pushing the image: unauthorized")
 	_, err = Run(req, &fakeDeployer{imgErr: other})

@@ -13,11 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// BuildSecretInputEnv holds newline-separated build secret specs, read when
-// no --build-secret is given. The messages below name it as the other way to
-// give a secret.
-const BuildSecretInputEnv = "BUILD_SECRET_INPUT"
-
 // CheckBuildSecrets runs before an image build. It refuses a secret spec that
 // names an unset or empty environment variable: Docker would mount nothing for
 // it, and the build would fail later, in whatever step read the secret.
@@ -78,6 +73,10 @@ type MissingSecrets struct {
 	// Dropped are the ids a generated build does not pass on, since the
 	// runtime image mounts only manifest.RuntimeSecretID.
 	Dropped []string
+	// Hint, when set, says how the caller's tool gives the secrets ids name.
+	// Warnings and Explain append it after a semicolon. Without it they name
+	// no flag or variable, since how a secret is given depends on the tool.
+	Hint func(ids []string) string
 }
 
 // MissingBuildSecrets finds each secret the project's Dockerfile mounts that
@@ -113,14 +112,17 @@ func (m MissingSecrets) Warnings() []string {
 		warnings = append(warnings, fmt.Sprintf("build secret %q is not used: an image built without a Dockerfile reads only the %s secret", id, manifest.RuntimeSecretID))
 	}
 	for _, mount := range m.Mounts {
-		warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given; pass %s or set %s",
-			m.Dockerfile, mount.ID, mount.Line, buildSecretFlag(mount.ID), BuildSecretInputEnv))
+		warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given%s",
+			m.Dockerfile, mount.ID, mount.Line, m.hint([]string{mount.ID})))
 	}
 	return warnings
 }
 
-func buildSecretFlag(id string) string {
-	return "--build-secret id=" + id + ",env=<VAR>"
+func (m MissingSecrets) hint(ids []string) string {
+	if m.Hint == nil {
+		return ""
+	}
+	return "; " + m.Hint(ids)
 }
 
 // Explain adds the missing secrets to a failed build of the project's
@@ -131,13 +133,13 @@ func (m MissingSecrets) Explain(err error) error {
 		return err
 	}
 	ids := make([]string, len(m.Mounts))
-	flags := make([]string, len(m.Mounts))
+	quoted := make([]string, len(m.Mounts))
 	for i, mount := range m.Mounts {
-		ids[i] = strconv.Quote(mount.ID)
-		flags[i] = buildSecretFlag(mount.ID)
+		ids[i] = mount.ID
+		quoted[i] = strconv.Quote(mount.ID)
 	}
 	if len(ids) == 1 {
-		return fmt.Errorf("%w — %s mounts build secret %s, which was not given; pass %s or set %s", err, m.Dockerfile, ids[0], flags[0], BuildSecretInputEnv)
+		return fmt.Errorf("%w. %s mounts build secret %s, which was not given%s", err, m.Dockerfile, quoted[0], m.hint(ids))
 	}
-	return fmt.Errorf("%w — %s mounts build secrets %s, which were not given; pass %s or set %s", err, m.Dockerfile, strings.Join(ids, ", "), strings.Join(flags, " "), BuildSecretInputEnv)
+	return fmt.Errorf("%w. %s mounts build secrets %s, which were not given%s", err, m.Dockerfile, strings.Join(quoted, ", "), m.hint(ids))
 }

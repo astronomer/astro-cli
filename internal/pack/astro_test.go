@@ -532,7 +532,7 @@ func TestAstroBuildFailureNamesTheUnsuppliedSecretMount(t *testing.T) {
 
 	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.ErrorIs(t, err, imagebuild.ErrDockerfileBuild)
-	assert.Contains(t, err.Error(), `exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`)
+	assert.Contains(t, err.Error(), `exit status 1. Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR>`)
 
 	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT"}
 	_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})

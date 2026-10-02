@@ -50,10 +50,13 @@ func TestMissingSecretsExplain(t *testing.T) {
 	one := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{netrc}}
 	err := one.Explain(buildErr)
 	assert.ErrorIs(t, err, ErrDockerfileBuild)
-	assert.Equal(t, `building the project's Dockerfile failed; see the build output above: exit status 1 — Dockerfile mounts build secret "netrc", which was not given; pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT`, err.Error())
+	assert.Equal(t, `building the project's Dockerfile failed; see the build output above: exit status 1. Dockerfile mounts build secret "netrc", which was not given`, err.Error())
 
 	two := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{netrc, pip}}
-	assert.Equal(t, `building the project's Dockerfile failed; see the build output above: exit status 1 — Dockerfile mounts build secrets "netrc", "pip", which were not given; pass --build-secret id=netrc,env=<VAR> --build-secret id=pip,env=<VAR> or set BUILD_SECRET_INPUT`, two.Explain(buildErr).Error())
+	assert.Equal(t, `building the project's Dockerfile failed; see the build output above: exit status 1. Dockerfile mounts build secrets "netrc", "pip", which were not given`, two.Explain(buildErr).Error())
+
+	two.Hint = func(ids []string) string { return "give " + strings.Join(ids, " and ") }
+	assert.Equal(t, `building the project's Dockerfile failed; see the build output above: exit status 1. Dockerfile mounts build secrets "netrc", "pip", which were not given; give netrc and pip`, two.Explain(buildErr).Error())
 
 	other := errors.New("docker is not running")
 	assert.Equal(t, other, one.Explain(other), "only a failed Dockerfile build gets the hint")
@@ -79,4 +82,18 @@ func TestCheckBuildSecretEnv(t *testing.T) {
 	err = checkBuildSecretEnv([]string{"id=pw,env=hunter2,def"})
 	assert.ErrorContains(t, err, "not a key=value pair")
 	assert.NotContains(t, err.Error(), "hunter2")
+}
+
+func TestMissingSecretsNameNoToolWithoutAHint(t *testing.T) {
+	m := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{{ID: "netrc", Line: 2}}}
+	assert.Equal(t, []string{`Dockerfile mounts build secret "netrc" (line 2) but none was given`}, m.Warnings())
+	explained := m.Explain(fmt.Errorf("%w: exit status 1", ErrDockerfileBuild)).Error()
+	for _, text := range append(m.Warnings(), explained) {
+		assert.NotContains(t, text, "--", "a flag is the caller's to name")
+		assert.NotContains(t, text, "BUILD_SECRET_INPUT", "a variable is the caller's to name")
+		assert.NotContains(t, text, "—", "the desktop shows this text, and its copy has no em-dashes")
+	}
+
+	m.Hint = func(ids []string) string { return "give " + strings.Join(ids, " ") }
+	assert.Equal(t, []string{`Dockerfile mounts build secret "netrc" (line 2) but none was given; give netrc`}, m.Warnings())
 }

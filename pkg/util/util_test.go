@@ -344,3 +344,8 @@ func (s *Suite) TestResolveProjectBuildSecrets() {
 
 	s.Equal([]string{"id=ca,src=/etc/ca.pem"}, ResolveProjectBuildSecrets([]string{"id=ca,src=/etc/ca.pem"}, a))
 }
+
+func (s *Suite) TestBuildSecretHint() {
+	s.Equal("pass --build-secret id=netrc,env=<VAR> or set BUILD_SECRET_INPUT", BuildSecretHint([]string{"netrc"}))
+	s.Equal("pass --build-secret id=netrc,env=<VAR> --build-secret id=pip,env=<VAR> or set BUILD_SECRET_INPUT", BuildSecretHint([]string{"netrc", "pip"}))
+}

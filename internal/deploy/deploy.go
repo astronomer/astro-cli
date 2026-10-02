@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // Request is the resolved input for a v2 deploy. cmd fills it from flags, args,
@@ -288,6 +289,7 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, error) {
 	if missing, err = imagebuild.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets); err != nil {
 		return missing, err
 	}
+	missing.Hint = util.BuildSecretHint
 	for _, w := range missing.Warnings() {
 		warn(w)
 	}
