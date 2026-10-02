@@ -57,3 +57,18 @@ func AstroBuild(ctx context.Context, airflowPin, runtime string) (runtimeversion
 func CheckRuntime(ctx context.Context, runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 	return runtimeversions.CheckRuntime(ctx, Options(0), runtime, airflowPin)
 }
+
+// catalogTimeout bounds Catalog's fetch. The edit it serves has a fallback for
+// a missing catalog, so it waits seconds, as init does.
+const catalogTimeout = 3 * time.Second
+
+// Catalog reads the catalog for an edit that moves the Airflow pin: a fresh
+// cache, a fetch, a stale cache, in that order. nil when none of those works,
+// which the edit takes as "no catalog" rather than a failure.
+func Catalog(ctx context.Context) *runtimeversions.Catalog {
+	c, _, err := runtimeversions.Load(ctx, Options(catalogTimeout))
+	if err != nil {
+		return nil
+	}
+	return c
+}

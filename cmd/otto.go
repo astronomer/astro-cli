@@ -78,11 +78,16 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Everything else (flags, prompt, etc.) is forwarded directly to Otto.
-	// Propagate Otto's exit code when it exits non-zero — Otto has already
-	// printed its own error, so we skip cobra's "Error: exit status N" noise.
-	// Same treatment for ErrNotLoggedIn: Start has already printed the sign-up
-	// guidance to stderr, so returning the error to cobra would just tack on a
-	// redundant "Error: not logged in" line.
+	return launchOtto(args)
+}
+
+// launchOtto runs Otto with args and waits for it. It propagates Otto's exit
+// code when it exits non-zero: Otto has already printed its own error, so
+// cobra's "Error: exit status N" would be noise. Same treatment for
+// ErrNotLoggedIn: Start has already printed the sign-up guidance to stderr, so
+// returning the error to cobra would just tack on a redundant "Error: not
+// logged in" line.
+func launchOtto(args []string) error {
 	err := otto.Start(args)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {

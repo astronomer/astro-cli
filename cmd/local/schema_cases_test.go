@@ -35,6 +35,7 @@ var publishedPayloads = []schemaCase{
 	{"local-status", localrt.Status{}},
 	{"local-list-row", listRow{}},
 	{"local-reset", localrt.ResetReport{}},
+	{"local-upgrade-airflow", airflowUpgrade{}},
 	{"check-summary", checkSummary{}},
 	{"dev-removed", devRemoved{}},
 	{"env-result", envResult{}},

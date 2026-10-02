@@ -163,6 +163,9 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	// (config.initHome, and TestInitLeavesNoV1ConfigBehind in e2e).
 	v2Deps := local.NewDeps()
 	wireLinkPickers(&v2Deps, o.platform, astroV1Client, o.out)
+	// A single positional argument is Otto's first message in an interactive
+	// session.
+	v2Deps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
 	rootCmd.AddCommand(local.AddCmds(v2Deps)...)
 
 	groupCommands(rootCmd)

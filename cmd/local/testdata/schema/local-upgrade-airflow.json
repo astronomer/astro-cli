@@ -1,0 +1,18 @@
+{
+  "previous": "x",
+  "version": "x",
+  "changed": true,
+  "requirements": [
+    "x"
+  ],
+  "coreReplaced": true,
+  "removedAirflowKey": true,
+  "requiresPython": "x",
+  "runtime": "x",
+  "runtimeRemoved": true,
+  "dockerfile": "x",
+  "manifest": "x",
+  "target": "x",
+  "available": "x",
+  "restartNeeded": true
+}

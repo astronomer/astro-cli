@@ -138,6 +138,19 @@ type Deps struct {
 	// index through runtimecatalog.AstroBuild. A seam so a test never reaches
 	// the network; nil writes nothing.
 	AstroBuild func(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error)
+
+	// RuntimeCatalog reads the runtime catalog for an edit that moves the
+	// Airflow pin, which uses it to move requires-python and [tool.astro]
+	// runtime with the pin. nil, or a nil result, means no catalog: the edit
+	// then follows the built-in rules. Production reads it through
+	// runtimecatalog.Catalog. A seam so a test never reaches the network.
+	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
+
+	// LaunchOtto starts an interactive Otto session with prompt as its first
+	// message and waits for it to end, as `astro otto "<prompt>"` does. The
+	// root wires it, because Otto reads config/, which this tree never
+	// imports. nil means Otto cannot be started from here.
+	LaunchOtto func(prompt string) error
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -188,6 +201,7 @@ func NewDeps() Deps {
 		AirflowDefault:   catalogDefault,
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
+		RuntimeCatalog:   runtimecatalog.Catalog,
 	}
 }
 

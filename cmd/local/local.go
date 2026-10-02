@@ -153,6 +153,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 		newOpenCmd(c),
 		newResetCmd(c),
 		newCheckCmd(c),
+		newUpgradeCmd(c),
 		newEnvCmd(c),
 		newAPICmd(c),
 	)
