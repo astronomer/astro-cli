@@ -589,11 +589,6 @@ func TestDeploymentCreate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("returns an error if cluster-type flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cluster-type", "some-value"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-	})
 	t.Run("returns an error if type flag has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -985,7 +980,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd", "enable"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "enable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -1000,7 +995,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd", "disable"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "disable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -1008,11 +1003,6 @@ func TestDeploymentUpdate(t *testing.T) {
 	})
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "some-value"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-	})
-	t.Run("returns an error if cluster-type enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cluster-type", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})

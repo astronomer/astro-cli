@@ -115,19 +115,6 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 		}
 	})
 
-	// The deprecated alias shares one pflag Value with --build-secret, so
-	// dropping it from the gate would leave the secrets populated and skip
-	// the Dockerfile check entirely — the deploy would proceed with them
-	// silently dropped, which is the failure this file is about.
-	t.Run("the deprecated --build-secrets alias is refused too", func(t *testing.T) {
-		p := v2ProjectForDeploy(t).forT(t)
-		r := p.run("deploy", "--build-secrets", "id=x,src=/dev/null").requireFailure()
-
-		if !strings.Contains(r.Stderr, needsOne) {
-			t.Errorf("the alias reaches the same gate and should be refused the same way\n%s", r.output())
-		}
-	})
-
 	// With one declared the gate must let it through. The deploy still fails,
 	// because there is no account here — so rather than assert the absence of
 	// the refusal, which would also hold if the command died earlier for some

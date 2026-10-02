@@ -97,10 +97,10 @@ func removedVerbGuidance(verb, noun string, args []string) string {
 	} else {
 		body += "`set` is the same operation and also creates the object when it does not exist. " +
 			"Pass --no-create for the old behavior of failing on a key that is not there."
-		// --strict only ever existed on the two nouns whose update upserted.
-		// Offering it to the others sent the reader at "unknown flag".
+		// --strict only ever existed on the two nouns whose update upserted,
+		// so only their readers have a script passing it to rewrite.
 		if nounsWithFromFile[noun] {
-			body += " (--strict is the former name of --no-create, still accepted but deprecated.)"
+			body += " (--no-create replaces --strict.)"
 		}
 	}
 	return head + body

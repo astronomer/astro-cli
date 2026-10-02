@@ -687,11 +687,11 @@ func TestDeployRoutesV1Project(t *testing.T) {
 // DAGs path it never looked at, or saved a target it did not save. Each is
 // refused with what to do instead until an earlier fix ports the ones worth porting.
 //
-// Eight rather than ten: --build-secret and --build-secrets are deliberately NOT
-// in this table any more, because the v2 path READS them now. They still need a
-// project Dockerfile to be mounted into, and that refusal lives with the other
-// build-secret checks in TestDeployV2BuildSecretRefusals — gated on the flag
-// being given, which is why it cannot be a row here.
+// Eight rather than nine: --build-secret is deliberately NOT in this table any
+// more, because the v2 path READS it now. It still needs a project Dockerfile
+// to be mounted into, and that refusal lives with the other build-secret
+// checks in TestDeployV2BuildSecretRefusals — gated on the flag being given,
+// which is why it cannot be a row here.
 func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 	cases := []struct {
 		args []string

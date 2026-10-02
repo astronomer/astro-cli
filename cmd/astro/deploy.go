@@ -142,9 +142,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&v2Workspace, "workspace", "", "Workspace for the deploy, overriding the context. For v2 projects (a pyproject.toml with [tool.astro])")
 	cmd.Flags().StringVar(&deployOutput, "output", string(formatText), "Output format for v2 projects: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
-	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
-	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
-	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "this flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-DAG bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
 	cmd.Flags().StringVar(&nonDagsMountPath, "non-dags-mount-path", "", "Path to mount the non-DAG bundle in Airflow, for reference by DAGs. Used with --non-dags")
 	cmd.Flags().StringVar(&nonDagsBundleType, "non-dags-bundle-type", "none", "Free-form label identifying the kind of non-DAG bundle (e.g. dbt). Any value is accepted. Defaults to \"none\". Used with --non-dags")
@@ -271,7 +269,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.Flags().Changed(imageNameFlag) {
-		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secret", "build-secrets", "dag-bundle-name"} {
+		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secret", "dag-bundle-name"} {
 			if cmd.Flags().Changed(f) {
 				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
 			}
@@ -331,7 +329,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 }
 
 func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
-	for _, f := range []string{"dags", "image", imageNameFlag, "dag-bundle-name", "pytest", "parse", "build-secret", "build-secrets", "dags-path", "no-dags-base-dir"} {
+	for _, f := range []string{"dags", "image", imageNameFlag, "dag-bundle-name", "pytest", "parse", "build-secret", "dags-path", "no-dags-base-dir"} {
 		if cmd.Flags().Changed(f) {
 			return fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-DAG bundle deploy", f)
 		}
@@ -432,7 +430,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	//     before reaching it.
 	//
 	// One place, before anything is resolved or prompted for.
-	if cmd.Flags().Changed("build-secret") || cmd.Flags().Changed("build-secrets") {
+	if cmd.Flags().Changed("build-secret") {
 		switch {
 		case dags:
 			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))

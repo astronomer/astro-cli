@@ -29,8 +29,7 @@ import (
 // (docs/v2-instances.md): -d/--deployment names a deployment link the project's
 // manifest declares, --url reaches an Airflow no project declares, and both
 // resolve through pkg/instances, so an MWAA, Composer, or token-minting
-// Airflow is reachable here for free. The old flags stay as deprecated aliases
-// for one release.
+// Airflow is reachable here for free. The old flags were removed in v2.
 //
 // There is no default target. The command used to fall back to
 // http://localhost:8080, but each local project now gets its own port, so 8080
@@ -92,29 +91,19 @@ func (t *airflowTarget) client() *airflowapi.Client {
 	return t.airflow
 }
 
-// resolveAirflowTarget settles which Airflow this run talks to: --url (or its
-// --api-url alias), or -d/--deployment (or its --deployment-id alias). With
-// neither, it fails with errNoTarget.
+// resolveAirflowTarget settles which Airflow this run talks to: --url or
+// -d/--deployment. With neither, it fails with errNoTarget.
 //
 // Unlike the query commands there is no ambient layer here — no pin, no
 // ASTRO_DEPLOYMENT. A raw API escape hatch that silently redirected itself at a
 // deployment because a pin was set would be a worse surprise than typing -d.
 func resolveAirflowTarget(ctx context.Context, opts *AirflowOptions) (*airflowTarget, error) {
-	url, err := opts.targetURL()
-	if err != nil {
-		return nil, err
-	}
-	name, err := opts.targetDeployment()
-	if err != nil {
-		return nil, err
-	}
+	// A URL may carry an /api/vN suffix, naming the API base rather than the
+	// server. Strip it: the generation is detected, not typed.
+	url := airflowHostRoot(opts.URL)
+	name := opts.Deployment
 	if url != "" && name != "" {
-		// Name the flags the user actually typed. Half of these four spellings
-		// are deprecated aliases, and telling someone who wrote --api-url and
-		// --deployment-id to stop combining --url and --deployment sends them
-		// looking for flags they never used.
-		return nil, fmt.Errorf("%s and %s cannot be used together: %s names a deployment this project links, %s targets an Airflow with no name at all",
-			opts.urlFlag(), opts.deploymentFlag(), opts.deploymentFlag(), opts.urlFlag())
+		return nil, errors.New("--url and --deployment cannot be used together: --deployment names a deployment this project links, --url targets an Airflow with no name at all")
 	}
 
 	switch {
@@ -127,9 +116,9 @@ func resolveAirflowTarget(ctx context.Context, opts *AirflowOptions) (*airflowTa
 	}
 }
 
-// hasTarget reports whether any of the four targeting flags was passed.
+// hasTarget reports whether either targeting flag was passed.
 func (o *AirflowOptions) hasTarget() bool {
-	return firstNonEmpty(o.URL, o.APIURL, o.Deployment, o.DeploymentID) != ""
+	return o.URL != "" || o.Deployment != ""
 }
 
 // errNoTarget names the ways to pick an Airflow, with the links this project
@@ -170,43 +159,6 @@ func named(t *airflowTarget, err error) (*airflowTarget, error) {
 	return t, nil
 }
 
-// targetURL folds --api-url into --url. The two mean the same thing, so passing
-// both is a contradiction rather than a precedence question.
-func (o *AirflowOptions) targetURL() (string, error) {
-	if o.URL != "" && o.APIURL != "" && o.URL != o.APIURL {
-		return "", errors.New("--url and --api-url are the same flag under two names (--api-url is deprecated): pass one")
-	}
-	// The alias carried an /api/vN suffix, because it named the API base rather
-	// than the server. Strip it: the generation is detected, not typed.
-	return airflowHostRoot(firstNonEmpty(o.URL, o.APIURL)), nil
-}
-
-// targetDeployment folds --deployment-id into --deployment. --deployment takes a
-// link name and falls through to an id, so the deprecated flag's values keep
-// working under the new name.
-func (o *AirflowOptions) targetDeployment() (string, error) {
-	if o.Deployment != "" && o.DeploymentID != "" && o.Deployment != o.DeploymentID {
-		return "", errors.New("--deployment and --deployment-id are the same flag under two names (--deployment-id is deprecated): pass one")
-	}
-	return firstNonEmpty(o.Deployment, o.DeploymentID), nil
-}
-
-// urlFlag and deploymentFlag name the spelling this run actually used, so a
-// message about two flags naming two targets names the two the reader typed.
-func (o *AirflowOptions) urlFlag() string {
-	if o.URL == "" && o.APIURL != "" {
-		return "--api-url"
-	}
-	return "--url"
-}
-
-func (o *AirflowOptions) deploymentFlag() string {
-	if o.Deployment == "" && o.DeploymentID != "" {
-		return "--deployment-id"
-	}
-	return "--deployment"
-}
-
 func firstNonEmpty(vals ...string) string {
 	for _, v := range vals {
 		if v != "" {
@@ -218,7 +170,7 @@ func firstNonEmpty(vals ...string) string {
 
 // deploymentTarget resolves -d. The name is a deployment link the manifest
 // declares; a name no link declares is an Astro Deployment id, which is what
-// --deployment-id always meant and what CI already passes.
+// CI already passes.
 //
 // Only a directory with no manifest, or a pyproject.toml that is not an Astro
 // project, has no links. A manifest that is there and does not load is an

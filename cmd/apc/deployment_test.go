@@ -1155,7 +1155,7 @@ func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 	os.Stdin = r
 
 	houstonClient = api
-	_, err = execDeploymentCmd("delete", "--hard", mockDeployment.ID)
+	_, err = execDeploymentCmd("delete", mockDeployment.ID)
 	s.NoError(err)
 }
 
@@ -1185,7 +1185,7 @@ func (s *Suite) TestDeploymentDeleteHardResponseYes() {
 	os.Stdin = r
 
 	houstonClient = api
-	output, err := execDeploymentCmd("delete", "--hard", mockDeployment.ID)
+	output, err := execDeploymentCmd("delete", mockDeployment.ID)
 	s.NoError(err)
 	s.Contains(output, expectedOut)
 }

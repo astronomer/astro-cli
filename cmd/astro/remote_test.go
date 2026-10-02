@@ -125,32 +125,6 @@ func TestRemoteDeployCommandFlags(t *testing.T) {
 		assert.Equal(t, []string{"id=secret1,src=file1.txt", "id=secret2,src=file2.txt"}, buildSecretsValue)
 	})
 
-	t.Run("command accepts deprecated build-secrets flag", func(t *testing.T) {
-		cmd := newRemoteDeployCmd()
-
-		err := cmd.ParseFlags([]string{"--build-secrets", "id=mysecret,src=secrets.txt"})
-		assert.NoError(t, err)
-
-		// The deprecated alias is bound to the same variable as --build-secret
-		buildSecretsValue, err := cmd.Flags().GetStringArray("build-secret")
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"id=mysecret,src=secrets.txt"}, buildSecretsValue)
-	})
-
-	t.Run("command merges mixed build-secret and build-secrets flags", func(t *testing.T) {
-		cmd := newRemoteDeployCmd()
-
-		err := cmd.ParseFlags([]string{
-			"--build-secret", "id=secret1,src=file1.txt",
-			"--build-secrets", "id=secret2,src=file2.txt",
-		})
-		assert.NoError(t, err)
-
-		buildSecretsValue, err := cmd.Flags().GetStringArray("build-secret")
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"id=secret1,src=file1.txt", "id=secret2,src=file2.txt"}, buildSecretsValue)
-	})
-
 	t.Run("command accepts deployment-id flag", func(t *testing.T) {
 		cmd := newRemoteDeployCmd()
 
@@ -210,13 +184,6 @@ func TestRemoteDeployFlags(t *testing.T) {
 		assert.Equal(t, "stringArray", buildSecretFlag.Value.Type())
 		assert.Equal(t, "[]", buildSecretFlag.DefValue)
 		assert.Contains(t, buildSecretFlag.Usage, "Secret to expose to the build")
-	})
-
-	t.Run("deprecated build-secrets flag configuration", func(t *testing.T) {
-		buildSecretsFlag := cmd.Flags().Lookup("build-secrets")
-		assert.NotNil(t, buildSecretsFlag)
-		assert.Equal(t, "stringArray", buildSecretsFlag.Value.Type())
-		assert.Equal(t, "use --build-secret instead", buildSecretsFlag.Deprecated)
 	})
 
 	t.Run("deployment-id flag configuration", func(t *testing.T) {

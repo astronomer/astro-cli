@@ -67,11 +67,9 @@ func TestAirflowCmdFlags(t *testing.T) {
 		assert.Equal(t, want, flag.DefValue, "--%s default must come from pkg/airflowrt", name)
 	}
 
-	// The two spellings this command shipped with still parse, marked deprecated.
+	// The v1 spellings, --api-url and --deployment-id, are gone.
 	for _, name := range []string{"api-url", "deployment-id"} {
-		flag := cmd.PersistentFlags().Lookup(name)
-		require.NotNil(t, flag, name)
-		assert.NotEmpty(t, flag.Deprecated, name)
+		assert.Nil(t, cmd.PersistentFlags().Lookup(name), name)
 	}
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("organization-id"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("workspace-id"))
@@ -580,19 +578,8 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 	assert.Contains(t, errOut.String(), "The credential was withheld")
 }
 
-// The conflict message names the flags the reader typed, not the ones they did
-// not: half of these four spellings are deprecated aliases.
-func TestResolveAirflowTarget_ConflictNamesTheFlagsTyped(t *testing.T) {
-	opts := &AirflowOptions{APIURL: "https://a.dev", DeploymentID: "clx"}
-	_, err := resolveAirflowTarget(context.Background(), opts)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--api-url")
-	assert.Contains(t, err.Error(), "--deployment-id")
-	assert.NotContains(t, err.Error(), "--url and")
-}
-
 // --deployment falls through to an Astro Deployment id for a name no link
-// declares, which is what --deployment-id always meant.
+// declares.
 func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, err := config.GetCurrentContext()
@@ -617,16 +604,6 @@ func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
 	// The session token is stored without its scheme on some machines; the
 	// header carries one either way.
 	assert.Equal(t, "Bearer test-token", target.authorization)
-}
-
-// The deprecated flag still reaches the same place.
-func TestResolveAirflowTarget_DeploymentIDAliasStillWorks(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	opts := &AirflowOptions{DeploymentID: "clxyz123", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
-	_, err := resolveAirflowTarget(context.Background(), opts)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "requires cloud context")
 }
 
 // An explicit --username or --password is a claim about how to log in, so
@@ -661,9 +638,9 @@ func TestResolveAirflowTarget_URLDropsTheAPIPrefix(t *testing.T) {
 	assert.Empty(t, target.authorization)
 }
 
-func TestResolveAirflowTarget_APIURLIsAnAliasOfURL(t *testing.T) {
+func TestResolveAirflowTarget_URLIsNotANamedDeployment(t *testing.T) {
 	opts := &AirflowOptions{
-		APIURL:         "https://airflow.corp.dev/api/v1",
+		URL:            "https://airflow.corp.dev/api/v1",
 		RequestOptions: RequestOptions{RequestHeaders: []string{"Authorization: Bearer supplied"}},
 	}
 	target, err := resolveAirflowTarget(context.Background(), opts)
@@ -675,17 +652,9 @@ func TestResolveAirflowTarget_APIURLIsAnAliasOfURL(t *testing.T) {
 }
 
 func TestResolveAirflowTarget_RefusesTwoTargets(t *testing.T) {
-	cases := map[string]*AirflowOptions{
-		"--url with --deployment":    {URL: "https://a.dev", Deployment: "prod"},
-		"--url with --api-url":       {URL: "https://a.dev", APIURL: "https://b.dev"},
-		"--url with --deployment-id": {URL: "https://a.dev", DeploymentID: "clx"},
-	}
-	for name, opts := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, err := resolveAirflowTarget(context.Background(), opts)
-			require.Error(t, err)
-		})
-	}
+	opts := &AirflowOptions{URL: "https://a.dev", Deployment: "prod"}
+	_, err := resolveAirflowTarget(context.Background(), opts)
+	require.ErrorContains(t, err, "--url and --deployment cannot be used together")
 }
 
 // A deployment link the manifest declares is reached through the same
@@ -853,7 +822,7 @@ func TestRunAirflow_ConnectionRefused(t *testing.T) {
 	out := new(bytes.Buffer)
 	errOut := new(bytes.Buffer)
 	opts := &AirflowOptions{
-		APIURL:         closedURL,
+		URL:            closedURL,
 		AirflowVersion: "3.0.3", // Skip version auto-detection
 		RequestOptions: RequestOptions{
 			Out:         out,
@@ -882,7 +851,7 @@ func TestRunAirflow_ConnectionRefused_OperationID(t *testing.T) {
 	out := new(bytes.Buffer)
 	errOut := new(bytes.Buffer)
 	opts := &AirflowOptions{
-		APIURL:         closedURL,
+		URL:            closedURL,
 		AirflowVersion: "3.0.3",
 		RequestOptions: RequestOptions{
 			Out:         out,

@@ -35,7 +35,7 @@ Deploy a pre-built image:
 
 Deploy with build secrets:
 
-  $ astro remote deploy --build-secrets id=mysecret,src=secrets.txt
+  $ astro remote deploy --build-secret id=mysecret,src=secrets.txt
 
 Deploy with deployment validation:
 
@@ -77,7 +77,7 @@ func newRemoteDeployCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&remotePlatform, "platform", "", "Target platform for client image build (e.g., linux/amd64,linux/arm64). Defaults to host machine platform")
 	cmd.Flags().StringVarP(&remoteImageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag. The image should be present on the local machine.")
-	utils.AddBuildSecretFlags(cmd.Flags(), &remoteBuildSecrets)
+	utils.AddBuildSecretFlag(cmd.Flags(), &remoteBuildSecrets)
 	cmd.Flags().StringVar(&remoteDeploymentID, "deployment-id", "", "Deployment ID to validate client image runtime version against deployment runtime version")
 
 	return cmd

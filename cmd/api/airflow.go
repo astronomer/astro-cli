@@ -29,10 +29,6 @@ type AirflowOptions struct {
 	// URL is --url: an Airflow no project declares, addressed directly.
 	URL string
 
-	// APIURL and DeploymentID are the deprecated spellings of URL and
-	// Deployment, kept working for one release.
-	APIURL         string
-	DeploymentID   string
 	OrganizationID string
 	WorkspaceID    string
 	Username       string
@@ -150,14 +146,6 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
-	// The two spellings this command shipped with. They still work, under the
-	// names above, for one release.
-	cmd.PersistentFlags().StringVar(&opts.APIURL, "api-url", "", "Override the Airflow API base URL")
-	cmd.PersistentFlags().StringVar(&opts.DeploymentID, "deployment-id", "", "Use Airflow URL from this Astro Cloud deployment")
-	//nolint:errcheck // both flags are defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().MarkDeprecated("api-url", "use --url")
-	//nolint:errcheck // see above
-	cmd.PersistentFlags().MarkDeprecated("deployment-id", "use -d/--deployment")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace-id", "W", "", "Override workspace ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")

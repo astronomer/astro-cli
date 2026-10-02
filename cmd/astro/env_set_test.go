@@ -584,21 +584,22 @@ func TestCreateTombstoneOnlyOffersFromFileWhereItExists(t *testing.T) {
 	}
 }
 
-// --strict was renamed, not removed. A stale script should keep working and
-// be told the new name, rather than dying on "unknown flag" — the care the
-// tombstone gives `create`, for the path that actually survived.
-func TestStrictStillWorksAsADeprecatedAliasOfNoCreate(t *testing.T) {
+// --strict, v1's name for --no-create, is gone from set: it fails on the flag
+// before anything reaches the API, rather than being read as an upsert.
+func TestSetRefusesTheRemovedStrictFlag(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
-	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	expectAbsent(mc, "KEY_TYPO")
-	astroV1Client = mc
+	for _, noun := range []string{"var", "airflow-variable"} {
+		t.Run(noun, func(t *testing.T) {
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			astroV1Client = mc
 
-	_, err := execEnvCmd("var", "set", "KEY_TYPO", "--workspace-id", "ws-test", "--value", "x", "--strict")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "--no-create", "the deprecated flag must still refuse to create")
-	mc.AssertExpectations(t)
+			_, err := execEnvCmd(noun, "set", "KEY", "--workspace-id", "ws-test", "--value", "x", "--strict")
+			assert.ErrorContains(t, err, "unknown flag: --strict")
+			mc.AssertExpectations(t)
+		})
+	}
 }
 
 // A piped password still reaches the connection: the fix for the blanking bug
@@ -905,9 +906,9 @@ func TestEnvConnSetValueRejectsASchemelessURI(t *testing.T) {
 	mc.AssertExpectations(t)
 }
 
-// The tombstone may only offer --strict to the nouns that have it; the other
-// two never did, so following the advice produced "unknown flag".
-func TestUpdateTombstoneOnlyOffersStrictWhereItExists(t *testing.T) {
+// The tombstone names --strict's replacement only to the nouns that had it;
+// the other two never did.
+func TestUpdateTombstoneOnlyNamesStrictWhereItExisted(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 

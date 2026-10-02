@@ -97,13 +97,6 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
-	// --strict was this flag's name while the verb was `update`, where its job
-	// was to take away the create half. Against `set` the name contradicts the
-	// verb, so it was renamed — but a rename that answers "unknown flag" tells
-	// a stale script nothing, and this is the path that survived, unlike
-	// `create`, which got a whole tombstone. Deprecated, hidden, still works.
-	cmd.Flags().BoolVar(&envVarNoCreate, "strict", false, "")
-	_ = cmd.Flags().MarkDeprecated("strict", "use --no-create") //nolint:errcheck // the flag is registered on the line above; this only errors on an unknown name
 	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Set many from a dotenv file ('-' reads stdin)")
 	addAutoLinkFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive("value", "from-file")

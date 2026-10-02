@@ -37,7 +37,6 @@ var (
 	ErrTimedOut                  = errors.New("timed out waiting for the Deployment to enter a Healthy state")
 	ErrTimedOutHibernating       = errors.New("timed out waiting for the Deployment to hibernate")
 	ErrAirflowNotAnswering       = errors.New("timed out waiting for the Deployment's Airflow API to answer, though Astro reports the Deployment healthy")
-	ErrWrongEnforceInput         = errors.New("the input to the `--enforce-cicd` flag is invalid. Make sure to use either 'enable' or 'disable'")
 	ErrInvalidResourceRequest    = errors.New("invalid resource request")
 	ErrNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
 	ErrInvalidTokenName          = errors.New("no name provided for the deployment token. Retry with a valid name")

@@ -24,7 +24,6 @@ var (
 	ErrInvalidTeamMemberKey     = errors.New("invalid team member selection")
 	ErrInvalidName              = errors.New("no name provided for the team. Retry with a valid name")
 	ErrTeamNotFound             = errors.New("no team was found for the ID you provided")
-	ErrWrongEnforceInput        = errors.New("the input to the `--enforce-cicd` flag")
 	ErrNoTeamsFoundInOrg        = errors.New("no teams found in your organization")
 	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your workspace")
 	ErrNoTeamsFoundInDeployment = errors.New("no teams found in your deployment")

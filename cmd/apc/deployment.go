@@ -32,7 +32,6 @@ var (
 	skipPrompt                  bool
 	allDeployments              bool
 	cancel                      bool
-	hardDelete                  bool
 	executor                    string
 	airflowVersion              string
 	deploymentCreateLabel       string
@@ -250,11 +249,6 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentDelete(cmd, args, out)
 		},
 	}
-	// Deprecated (PLX-575): deletions are always hard deletes now, so --hard is a
-	// no-op. It is kept (hidden + deprecation notice) so existing scripts that
-	// pass --hard keep working; remove it in a future major release.
-	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deprecated: deletions always remove all infrastructure and records for the Deployment")
-	_ = cmd.Flags().MarkDeprecated("hard", "deletions are always hard deletes; the --hard flag no longer has any effect") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
