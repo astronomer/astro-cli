@@ -119,14 +119,9 @@ func StatusCause(status int, r Read) (Cause, bool) {
 	return 0, false
 }
 
-// StatusText is the message for a read the platform answered with a non-200
+// StatusTextFor is the message for a read the platform answered with a non-200
 // status: the cause's text for the statuses the contract names, and otherwise
 // the domain with err, the platform's own account of what went wrong.
-func StatusText(status int, domain, workspaceID string, err error) string {
-	return StatusTextFor(status, Read{Domain: domain, Workspace: workspaceID}, err)
-}
-
-// StatusTextFor is StatusText for a read that knows its organization.
 func StatusTextFor(status int, r Read, err error) string {
 	if c, ok := StatusCause(status, r); ok {
 		return c.TextFor(r)

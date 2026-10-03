@@ -40,7 +40,7 @@ func TestCauseTextUnknown(t *testing.T) {
 	}
 }
 
-func TestStatusText(t *testing.T) {
+func TestStatusTextFor(t *testing.T) {
 	const domain, workspace = "astronomer.io", "cmws123"
 	platform := errors.New("internal error")
 	cases := []struct {
@@ -55,8 +55,8 @@ func TestStatusText(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := StatusText(tc.status, domain, workspace, platform); got != tc.want {
-				t.Errorf("StatusText(%d):\n got  %q\n want %q", tc.status, got, tc.want)
+			if got := StatusTextFor(tc.status, Read{Domain: domain, Workspace: workspace}, platform); got != tc.want {
+				t.Errorf("StatusTextFor(%d):\n got  %q\n want %q", tc.status, got, tc.want)
 			}
 		})
 	}
