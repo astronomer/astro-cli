@@ -45,7 +45,7 @@ func declaredProblemCodes(t *testing.T) map[string]ProblemCode {
 	t.Helper()
 	out := map[string]ProblemCode{}
 	fset := token.NewFileSet()
-	for _, file := range []string{"envschema.go", "parse.go", "validate.go", "conform.go", "legacy.go"} {
+	for _, file := range []string{"envschema.go", "parse.go", "validate.go", "conform.go", "name.go"} {
 		f, err := goparser.ParseFile(fset, file, nil, 0)
 		if err != nil {
 			t.Fatalf("parsing %s: %v", file, err)

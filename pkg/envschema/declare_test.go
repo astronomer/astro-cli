@@ -72,11 +72,11 @@ func TestDeclarationTableRoundTrips(t *testing.T) {
 			Type: TypeEnum, Enum: []string{"debug", "info"}, Default: "info", HasDefault: true,
 			Optional: true, Description: "how loud",
 		}},
-		{"sensitive", SectionEnvVar, ValueSpec{Sensitive: true, HasSensitive: true, Description: "the token"}},
+		{"secret", SectionEnvVar, ValueSpec{Secret: true, HasSecret: true, Description: "the token"}},
 		{"workspace", SectionAirflowVariable, ValueSpec{Source: SourceWorkspace, Type: TypeInt}},
 		{"empty default", SectionAirflowVariable, ValueSpec{Default: "", HasDefault: true}},
 		{"connection", SectionConnection, ValueSpec{
-			Sensitive: true, ConnType: "postgres", Source: SourceWorkspace, Optional: true, Description: "db",
+			Secret: true, ConnType: "postgres", Source: SourceWorkspace, Optional: true, Description: "db",
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -110,14 +110,14 @@ func TestDeclarationTableRoundTrips(t *testing.T) {
 	}
 }
 
-// A connection is sensitive by its section, and `sensitive` there is refused
+// A connection is secret by its section, and `secret` there is refused
 // whichever value it carries, so a caller building a connection spec from the
-// zero value, or from one that says Sensitive, gets the same loadable table.
-func TestDeclarationTableNeverWritesSensitiveForAConnection(t *testing.T) {
-	for _, spec := range []ValueSpec{{}, {Sensitive: true, HasSensitive: true}} {
+// zero value, or from one that says Secret, gets the same loadable table.
+func TestDeclarationTableNeverWritesSecretForAConnection(t *testing.T) {
+	for _, spec := range []ValueSpec{{}, {Secret: true, HasSecret: true}} {
 		table := DeclarationTable(&spec, SectionConnection)
-		if _, ok := table["sensitive"]; ok {
-			t.Errorf("DeclarationTable(%+v) wrote sensitive for a connection: %v", spec, table)
+		if _, ok := table["secret"]; ok {
+			t.Errorf("DeclarationTable(%+v) wrote secret for a connection: %v", spec, table)
 		}
 		if _, err := ParseSchema(map[string]any{"connections": map[string]any{"x": table}}); err != nil {
 			t.Errorf("DeclarationTable(%+v) = %v, which does not load: %v", spec, table, err)

@@ -9,7 +9,7 @@ import (
 // Which rule fired, asserted on the code rather than on the sentence.
 //
 // TestValueSpecCheck already holds which annotation each rule blames and in
-// what order. What it could not say is WHICH rule blamed it: `sensitive` is
+// what order. What it could not say is WHICH rule blamed it: `secret` is
 // the Field for two different refusals, and `type` for three. The code says
 // which, so a caller can branch on it — and so this file can assert the rule
 // without copying its prose into a second place, where the prose would have
@@ -28,43 +28,43 @@ func TestCheckReportsTheRuleThatFired(t *testing.T) {
 			section: SectionEnvVar,
 		},
 		{
-			name:    "a sensitive value with a default",
-			spec:    ValueSpec{Sensitive: true, HasDefault: true},
+			name:    "a secret value with a default",
+			spec:    ValueSpec{Secret: true, HasDefault: true},
 			section: SectionEnvVar,
-			want:    []ProblemCode{CodeSensitiveDefault},
+			want:    []ProblemCode{CodeSecretDefault},
 		},
 		{
 			// A connection reaches the same rule without anybody writing
-			// `sensitive`, which is why the two share one code and the
+			// `secret`, which is why the two share one code and the
 			// sentence differs.
 			name:    "a connection with a default",
-			spec:    ValueSpec{Sensitive: true, HasDefault: true},
+			spec:    ValueSpec{Secret: true, HasDefault: true},
 			section: SectionConnection,
-			want:    []ProblemCode{CodeSensitiveDefault},
+			want:    []ProblemCode{CodeSecretDefault},
 		},
 		{
-			// Field is "sensitive" for both of these; only the code tells
+			// Field is "secret" for both of these; only the code tells
 			// them apart.
-			name:    "a connection declared not sensitive",
-			spec:    ValueSpec{HasSensitive: true},
+			name:    "a connection declared not secret",
+			spec:    ValueSpec{HasSecret: true},
 			section: SectionConnection,
-			want:    []ProblemCode{CodeConnectionNotSensitive},
+			want:    []ProblemCode{CodeConnectionNotSecret},
 		},
 		{
-			name:    "a connection declared sensitive",
-			spec:    ValueSpec{Sensitive: true, HasSensitive: true},
+			name:    "a connection declared secret",
+			spec:    ValueSpec{Secret: true, HasSecret: true},
 			section: SectionConnection,
-			want:    []ProblemCode{CodeConnectionSensitiveRedundant},
+			want:    []ProblemCode{CodeConnectionSecretRedundant},
 		},
 		{
 			name:    "a type on a connection",
-			spec:    ValueSpec{Sensitive: true, Type: TypeString},
+			spec:    ValueSpec{Secret: true, Type: TypeString},
 			section: SectionConnection,
 			want:    []ProblemCode{CodeTypeOnConnection},
 		},
 		{
 			name:    "an enum on a connection",
-			spec:    ValueSpec{Sensitive: true, Enum: []string{"a"}},
+			spec:    ValueSpec{Secret: true, Enum: []string{"a"}},
 			section: SectionConnection,
 			want:    []ProblemCode{CodeEnumOnConnection},
 		},
@@ -73,7 +73,7 @@ func TestCheckReportsTheRuleThatFired(t *testing.T) {
 			// the connection is not also told to add the type it may not
 			// declare.
 			name:    "a type and an enum on a connection",
-			spec:    ValueSpec{Sensitive: true, Type: TypeString, Enum: []string{"a"}},
+			spec:    ValueSpec{Secret: true, Type: TypeString, Enum: []string{"a"}},
 			section: SectionConnection,
 			want:    []ProblemCode{CodeTypeOnConnection, CodeEnumOnConnection},
 		},
@@ -172,9 +172,9 @@ func TestSpecProblemCodesSurviveParse(t *testing.T) {
 		want    ProblemCode
 	}{
 		{
-			name:    "a sensitive value with a default",
-			content: "[tool.astro.env]\nAPI_TOKEN = { sensitive = true, default = 'v' }\n",
-			want:    CodeSensitiveDefault,
+			name:    "a secret value with a default",
+			content: "[tool.astro.env]\nAPI_TOKEN = { secret = true, default = 'v' }\n",
+			want:    CodeSecretDefault,
 		},
 		{
 			name:    "type on a connection",
@@ -251,11 +251,11 @@ func checkFixtures() []struct {
 		spec    ValueSpec
 		section Section
 	}{
-		{ValueSpec{Sensitive: true, HasDefault: true}, SectionEnvVar},
-		{ValueSpec{HasSensitive: true}, SectionConnection},
-		{ValueSpec{Sensitive: true, HasSensitive: true}, SectionConnection},
-		{ValueSpec{Sensitive: true, Type: TypeString}, SectionConnection},
-		{ValueSpec{Sensitive: true, Enum: []string{"a"}}, SectionConnection},
+		{ValueSpec{Secret: true, HasDefault: true}, SectionEnvVar},
+		{ValueSpec{HasSecret: true}, SectionConnection},
+		{ValueSpec{Secret: true, HasSecret: true}, SectionConnection},
+		{ValueSpec{Secret: true, Type: TypeString}, SectionConnection},
+		{ValueSpec{Secret: true, Enum: []string{"a"}}, SectionConnection},
 		{ValueSpec{ConnType: "postgres"}, SectionEnvVar},
 		{ValueSpec{Type: "magenta"}, SectionEnvVar},
 		{ValueSpec{Enum: []string{"a"}}, SectionEnvVar},
@@ -274,7 +274,7 @@ TYPO = { typo = true }
 BADSRC = { source = 'cloud' }
 EMPTYTYPE = { type = '' }
 EMPTYENUM = { type = 'enum', enum = [] }
-NOTBOOL = { sensitive = 'yes' }
+NOTBOOL = { secret = 'yes' }
 NOTARRAY = { enum = 3 }
 NOTSTRINGS = { type = 'enum', enum = ['a', 3] }
 NOTSCALAR = { default = [1] }

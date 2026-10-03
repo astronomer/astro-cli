@@ -55,12 +55,12 @@ batch_size = '500'
 		AirflowVariables: map[string]ValueSpec{
 			"batch_size": {Default: "500", HasDefault: true},
 		},
-		// Sensitive without anyone saying so: a connection carries a credential
+		// Secret without anyone saying so: a connection carries a credential
 		// by construction, and the schema this grammar replaces treats them as
-		// unconditionally sensitive.
+		// unconditionally secret.
 		Connections: map[string]ValueSpec{
-			"warehouse": {Sensitive: true},
-			"reporting": {Source: SourceWorkspace, Sensitive: true},
+			"warehouse": {Secret: true},
+			"reporting": {Source: SourceWorkspace, Secret: true},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -159,13 +159,13 @@ func TestParseSchemaNonTableSection(t *testing.T) {
 //
 // D3 owed this and O19 gated the desktop's move onto it, because
 // [tool.astro.env] could express a default and a source and nothing else —
-// while the schema it has to replace carries type, sensitive, description and
+// while the schema it has to replace carries type, secret, description and
 // enum.
 func TestParseSchemaAnnotations(t *testing.T) {
 	env := decodeEnv(t, `
 [tool.astro.env]
 LOG_LEVEL = { default = 'info', type = 'enum', enum = ['debug', 'info', 'warn'], description = 'How much Airflow says' }
-DB_PASSWORD = { sensitive = true, description = 'Warehouse password' }
+DB_PASSWORD = { secret = true, description = 'Warehouse password' }
 SLACK_WEBHOOK = { optional = true, type = 'url' }
 PORT = { type = 'port', default = 8080 }
 DEBUG = { type = 'bool', default = false }
@@ -192,8 +192,8 @@ warehouse = { conn_type = 'postgres' }
 		t.Errorf("description = %q", logLevel.Description)
 	}
 
-	if !s.EnvVars["DB_PASSWORD"].Sensitive {
-		t.Error("sensitive did not decode")
+	if !s.EnvVars["DB_PASSWORD"].Secret {
+		t.Error("secret did not decode")
 	}
 	if got := s.EnvVars["SLACK_WEBHOOK"]; !got.Optional || got.Type != TypeURL {
 		t.Errorf("SLACK_WEBHOOK = %+v, want optional and url", got)
@@ -210,13 +210,13 @@ warehouse = { conn_type = 'postgres' }
 	}
 }
 
-// A connection is sensitive whether or not anyone said so, in both spellings.
+// A connection is secret whether or not anyone said so, in both spellings.
 //
-// The schema this replaces treats connections as unconditionally sensitive
+// The schema this replaces treats connections as unconditionally secret
 // ("Connections are inherently credential-bearing"). A per-declaration opt-in
 // would mean every connection that omitted the flag read as plaintext-safe,
 // which is a silent downgrade of every connection in every converted project.
-func TestConnectionsAreAlwaysSensitive(t *testing.T) {
+func TestConnectionsAreAlwaysSecret(t *testing.T) {
 	s, err := ParseSchema(decodeEnv(t, `
 [tool.astro.env]
 PLAIN = {}
@@ -229,12 +229,12 @@ typed = { conn_type = 'postgres' }
 		t.Fatal(err)
 	}
 	for _, name := range []string{"bare", "typed"} {
-		if !s.Connections[name].Sensitive {
-			t.Errorf("connection %q is not sensitive; a connection carries a credential by construction", name)
+		if !s.Connections[name].Secret {
+			t.Errorf("connection %q is not secret; a connection carries a credential by construction", name)
 		}
 	}
-	if s.EnvVars["PLAIN"].Sensitive {
-		t.Error("a plain env var must not become sensitive by default; that is what the flag is for")
+	if s.EnvVars["PLAIN"].Secret {
+		t.Error("a plain env var must not become secret by default; that is what the flag is for")
 	}
 }
 
@@ -309,29 +309,29 @@ BATCH_SIZE = { type = 'int', default = '100', optional = true }
 	}
 }
 
-// A sensitive value may not carry a default.
+// A secret value may not carry a default.
 //
 // This is the hole the first version of these checks left. A default is
 // committed to the manifest and injected at start — resolve.go puts it in the
 // injected set, which becomes Plan.Env, which docker mode writes into the
-// compose file on disk. So `{ sensitive = true, default = 'hunter2' }` put the
+// compose file on disk. So `{ secret = true, default = 'hunter2' }` put the
 // credential in git AND on disk, from the one annotation whose purpose is
 // keeping it out of both.
-func TestSensitiveMustNotCarryADefault(t *testing.T) {
+func TestSecretMustNotCarryADefault(t *testing.T) {
 	for _, tc := range []struct{ name, body, wantKey string }{
 		{
-			name:    "declared sensitive",
-			body:    "[tool.astro.env]\nDB_PASSWORD = { sensitive = true, default = 'hunter2' }\n",
+			name:    "declared secret",
+			body:    "[tool.astro.env]\nDB_PASSWORD = { secret = true, default = 'hunter2' }\n",
 			wantKey: "tool.astro.env.DB_PASSWORD.default",
 		},
 		{
-			// Never typed `sensitive`, but a connection always is.
-			name:    "a connection, which is sensitive without saying so",
+			// Never typed `secret`, but a connection always is.
+			name:    "a connection, which is secret without saying so",
 			body:    "[tool.astro.env.connections]\nwarehouse = { default = 'postgres://u:p@h/db' }\n",
 			wantKey: "tool.astro.env.connections.warehouse.default",
 		},
 		{
-			// The shorthand cannot say `sensitive`, and must not be a way around it.
+			// The shorthand cannot say `secret`, and must not be a way around it.
 			name:    "a connection declared with the string shorthand",
 			body:    "[tool.astro.env.connections]\nwarehouse = 'postgres://u:p@h/db'\n",
 			wantKey: "tool.astro.env.connections.warehouse.default",
@@ -380,9 +380,9 @@ func TestParseSchemaAnnotationProblems(t *testing.T) {
 			want: []string{"tool.astro.env.BADTYPE.type"},
 		},
 		{
-			name: "non-bool sensitive",
-			body: "BADBOOL = { sensitive = 'yes' }",
-			want: []string{"tool.astro.env.BADBOOL.sensitive"},
+			name: "non-bool secret",
+			body: "BADBOOL = { secret = 'yes' }",
+			want: []string{"tool.astro.env.BADBOOL.secret"},
 		},
 		{
 			// One mistake, one problem: the enum IS non-empty, so the coherence
@@ -456,9 +456,9 @@ func TestParseSchemaSectionProblems(t *testing.T) {
 		{
 			// Redundant at best, an attempt to turn it off at worst, and the
 			// second must not look like it worked.
-			name: "sensitive on a connection",
-			body: "[tool.astro.env.connections]\nc = { sensitive = false }\n",
-			want: []string{"tool.astro.env.connections.c.sensitive"},
+			name: "secret on a connection",
+			body: "[tool.astro.env.connections]\nc = { secret = false }\n",
+			want: []string{"tool.astro.env.connections.c.secret"},
 		},
 		{
 			name: "an empty conn_type",
@@ -485,9 +485,9 @@ func TestParseSchemaSectionProblems(t *testing.T) {
 
 // A bool annotation that does not decode yields one problem, not two.
 //
-// `sensitive` on a connection defaults to true, so a failed decode must leave
+// `secret` on a connection defaults to true, so a failed decode must leave
 // that default alone: overwriting it with false let Check add "cannot be
-// declared not sensitive", contradicting an author who wrote `sensitive = 'yes'`
+// declared not secret", contradicting an author who wrote `secret = 'yes'`
 // meaning true.
 func TestABadBoolYieldsOneProblem(t *testing.T) {
 	for _, tc := range []struct {
@@ -496,16 +496,16 @@ func TestABadBoolYieldsOneProblem(t *testing.T) {
 		want string
 	}{
 		{
-			name: "sensitive on a connection",
+			name: "secret on a connection",
 			env: map[string]any{"connections": map[string]any{
-				"c": map[string]any{"sensitive": "yes"},
+				"c": map[string]any{"secret": "yes"},
 			}},
-			want: "tool.astro.env.connections.c.sensitive",
+			want: "tool.astro.env.connections.c.secret",
 		},
 		{
-			name: "sensitive on an env var",
-			env:  map[string]any{"FOO": map[string]any{"sensitive": "yes"}},
-			want: "tool.astro.env.FOO.sensitive",
+			name: "secret on an env var",
+			env:  map[string]any{"FOO": map[string]any{"secret": "yes"}},
+			want: "tool.astro.env.FOO.secret",
 		},
 		{
 			name: "optional on an env var",
@@ -535,24 +535,24 @@ func TestABadBoolYieldsOneProblem(t *testing.T) {
 	}
 }
 
-// `sensitive` under connections is refused whichever way it is written, which
+// `secret` under connections is refused whichever way it is written, which
 // is what manifest-reference.md promises: "an error rather than a no-op".
 //
 // Both values are wrong, in different ways, so each gets its own sentence —
 // and each gets exactly one problem, not one arm of the rule firing on top of
 // the other.
-func TestSensitiveUnderConnectionsIsRefusedEitherWay(t *testing.T) {
+func TestSecretUnderConnectionsIsRefusedEitherWay(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		value any
 		want  string
 	}{
 		{"true adds nothing", true, "adds nothing"},
-		{"false contradicts what a connection is", false, "cannot be declared not sensitive"},
+		{"false contradicts what a connection is", false, "cannot be declared not secret"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := ParseSchema(map[string]any{"connections": map[string]any{
-				"warehouse": map[string]any{"conn_type": "postgres", "sensitive": tc.value},
+				"warehouse": map[string]any{"conn_type": "postgres", "secret": tc.value},
 			}})
 			var se *SchemaError
 			if !errors.As(err, &se) {
@@ -561,8 +561,8 @@ func TestSensitiveUnderConnectionsIsRefusedEitherWay(t *testing.T) {
 			if len(se.Problems) != 1 {
 				t.Fatalf("want exactly one problem, got %d: %+v", len(se.Problems), se.Problems)
 			}
-			if got := se.Problems[0].Key; got != "tool.astro.env.connections.warehouse.sensitive" {
-				t.Errorf("key = %q, want the sensitive key", got)
+			if got := se.Problems[0].Key; got != "tool.astro.env.connections.warehouse.secret" {
+				t.Errorf("key = %q, want the secret key", got)
 			}
 			if !strings.Contains(se.Problems[0].Reason, tc.want) {
 				t.Errorf("reason = %q, want it to mention %q", se.Problems[0].Reason, tc.want)
@@ -573,25 +573,25 @@ func TestSensitiveUnderConnectionsIsRefusedEitherWay(t *testing.T) {
 
 // Omitting it is the normal case and stays silent: the rule is about an author
 // stating the flag, not about every connection ever written.
-func TestAConnectionWithoutSensitiveIsFine(t *testing.T) {
+func TestAConnectionWithoutSecretIsFine(t *testing.T) {
 	s, err := ParseSchema(map[string]any{"connections": map[string]any{
 		"warehouse": map[string]any{"conn_type": "postgres"},
 	}})
 	if err != nil {
 		t.Fatalf("an ordinary connection must parse: %v", err)
 	}
-	if spec := s.Connections["warehouse"]; !spec.Sensitive || spec.HasSensitive {
-		t.Errorf("want sensitive by default and not stated, got %+v", spec)
+	if spec := s.Connections["warehouse"]; !spec.Secret || spec.HasSecret {
+		t.Errorf("want secret by default and not stated, got %+v", spec)
 	}
 }
 
-// A connection whose `sensitive` failed to decode keeps its default, so nothing
+// A connection whose `secret` failed to decode keeps its default, so nothing
 // downstream reads it as a plaintext-safe value.
-func TestABadSensitiveLeavesTheConnectionDefault(t *testing.T) {
+func TestABadSecretLeavesTheConnectionDefault(t *testing.T) {
 	// The parse fails, which is the point: a caller gets no schema at all
-	// rather than one whose connection is silently not sensitive.
+	// rather than one whose connection is silently not secret.
 	s, err := ParseSchema(map[string]any{"connections": map[string]any{
-		"c": map[string]any{"sensitive": "yes"},
+		"c": map[string]any{"secret": "yes"},
 	}})
 	if err == nil {
 		t.Fatal("want a refusal")

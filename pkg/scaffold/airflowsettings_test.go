@@ -101,11 +101,11 @@ func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 	require.NotContains(t, string(manifest), "optional")
 
 	// The Variable's value is in the vault too, and the manifest declares it
-	// sensitive with no default. v1 projects kept this file out of version
+	// secret with no default. v1 projects kept this file out of version
 	// control, so a default here would commit a token that never was.
 	require.Equal(t, secrets.KindVar, writer.kinds["batch_size"])
 	require.Equal(t, "50", writer.stored["batch_size"])
-	require.Contains(t, string(manifest), "batch_size = {sensitive = true}")
+	require.Contains(t, string(manifest), "batch_size = {secret = true}")
 	require.NotContains(t, string(manifest), "'50'")
 
 	require.Contains(t, string(manifest), "[tool.astro.pools]\nheavy = {slots = 4}")
@@ -242,8 +242,7 @@ func TestNoWriterIsNeededWhenNothingIsCarried(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, "pyproject.toml"))
 }
 
-// Nothing is carried, and the file stays whole and authoritative — the same
-// all-or-nothing rule the env schema follows, for the same reason: a partial
+// Nothing is carried, and the file stays whole and authoritative: a partial
 // carry creates [tool.astro.env], and whatever stayed behind has silently
 // stopped applying.
 func TestAFaultCarriesNothingAndKeepsTheFile(t *testing.T) {
@@ -267,62 +266,6 @@ func TestAFaultCarriesNothingAndKeepsTheFile(t *testing.T) {
 	require.NotContains(t, string(manifest), "warehouse")
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 	require.True(t, anyContains(cs.Notes, "no conn_id"), "the fault was not named: %v", cs.Notes)
-}
-
-// Two files declaring one name is not a merge with a winner. They spell
-// different things, so picking one would be this package deciding which of the
-// user's two answers it prefers, silently, about a connection.
-func TestOneNameInBothFilesCarriesNeither(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
-  connections:
-    - conn_id: warehouse
-      conn_type: snowflake
-      conn_password: hunter2
-`)
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "env.schema.yaml"), []byte(
-		"connections:\n  - conn_id: warehouse\n"), 0o600))
-
-	writer := newRecordingWriter()
-	cs, err := Plan(dir, Options{SecretWriter: writer})
-	require.NoError(t, err)
-	_, err = cs.Apply()
-	require.NoError(t, err)
-
-	require.Empty(t, writer.stored)
-	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
-	require.NoError(t, err)
-	require.NotContains(t, string(manifest), "[tool.astro.env")
-	require.True(t, anyContains(cs.Notes, "both declare"), "the collision was not named: %v", cs.Notes)
-}
-
-// Declarations from both files land together when they do not collide, and the
-// preview names both sources rather than whichever one this was built for.
-func TestBothFilesCarryWhenTheyDoNotCollide(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
-  connections:
-    - conn_id: warehouse
-      conn_type: snowflake
-      conn_password: hunter2
-`)
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "env.schema.yaml"), []byte(
-		"env_vars:\n  - key: LOG_LEVEL\n"), 0o600))
-
-	writer := newRecordingWriter()
-	cs, err := Plan(dir, Options{SecretWriter: writer})
-	require.NoError(t, err)
-	_, err = cs.Apply()
-	require.NoError(t, err)
-
-	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
-	require.NoError(t, err)
-	require.Contains(t, string(manifest), "LOG_LEVEL")
-	require.Contains(t, string(manifest), "warehouse = {conn_type = 'snowflake'}")
-	require.Contains(t, writer.stored, "warehouse")
-
-	require.True(t, anyContains(cs.Updated, SettingsRelPath) || anyContains(cs.Created, SettingsRelPath),
-		"the preview did not name airflow_settings.yaml as a source: %v %v", cs.Created, cs.Updated)
 }
 
 // A preview must be able to say a credential will be stored without being able
@@ -423,31 +366,6 @@ func TestAVaultThatCannotBeAskedKeepsTheFile(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 }
 
-// The declarations and the values are one carry. Anything that stops the
-// declarations reaching the manifest has to stop the values reaching the vault
-// — otherwise a project's credentials are written to a shared store while the
-// manifest declares none of them, which is the inverse of what applySecrets
-// guarantees, and silent.
-func TestABlockedEnvSchemaCarriesNoConnectionValuesEither(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "env.schema.yaml"), []byte(
-		"env_vars:\n  - key: \"not a legal name\"\n"), 0o600))
-
-	writer := newRecordingWriter()
-	cs, err := Plan(dir, Options{SecretWriter: writer})
-	require.NoError(t, err)
-	res, err := cs.Apply()
-	require.NoError(t, err)
-
-	require.Empty(t, writer.stored, "credentials went to the vault with nothing declaring them")
-	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
-	require.NoError(t, err)
-	require.NotContains(t, string(manifest), "[tool.astro.env")
-	require.True(t, anyContains(res.Notes, "has to be fixed first"),
-		"nothing said why the settings file was not carried: %v", res.Notes)
-}
-
 // v1 read this file through viper, which coerces. yaml.v3 into a typed struct
 // does not, and it fails the decode of the WHOLE document — so one quoted port
 // used to carry nothing from a file `astro dev start` read without complaint.
@@ -535,7 +453,7 @@ func TestASettingsFileWhoseValuesReachTheVaultIsRetired(t *testing.T) {
 }
 
 // No value from the file reaches the manifest, whatever its kind: a Variable
-// is declared sensitive with nothing after it, a connection by its conn_type.
+// is declared secret with nothing after it, a connection by its conn_type.
 func TestNoSettingsValueReachesTheManifest(t *testing.T) {
 	dir := v1WithSettings(t, `airflow:
   connections:
@@ -567,8 +485,8 @@ func TestNoSettingsValueReachesTheManifest(t *testing.T) {
 	} {
 		require.NotContains(t, string(manifest), value)
 	}
-	require.Contains(t, string(manifest), "CHRONOSPHERE_TOKEN = {sensitive = true}")
-	require.Contains(t, string(manifest), "SPLUNK_API_KEY = {sensitive = true}")
+	require.Contains(t, string(manifest), "CHRONOSPHERE_TOKEN = {secret = true}")
+	require.Contains(t, string(manifest), "SPLUNK_API_KEY = {secret = true}")
 }
 
 // An empty Variable has nothing to store, and v1 skipped it rather than create
@@ -586,7 +504,7 @@ func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
 	require.Empty(t, writer.stored)
 	raw, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
-	require.Contains(t, string(raw), "region = {optional = true, sensitive = true}")
+	require.Contains(t, string(raw), "region = {optional = true, secret = true}")
 	require.Contains(t, res.Advisories,
 		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with `astro local env airflow-variable set region`")
 	for _, a := range res.Advisories {
@@ -599,7 +517,7 @@ func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
 	s, err := envschema.ParseSchema(m.Astro.Env)
 	require.NoError(t, err)
 	require.True(t, s.AirflowVariables["region"].Optional)
-	require.True(t, s.AirflowVariables["region"].Sensitive)
+	require.True(t, s.AirflowVariables["region"].Secret)
 	require.Empty(t, envschema.Validate(s, envschema.Values{}),
 		"an empty v1 variable must not stop the converted project starting")
 }
@@ -958,16 +876,4 @@ func TestAnEntryWithNoIDIsBlankOnlyWithTheTemplatesPlaceholders(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 	require.Contains(t, res.Notes, SettingsRelPath+": connection 1 has no conn_id. Add one, or delete the entry")
 	require.Contains(t, res.Notes, SettingsRelPath+": pool 1 has no pool_name. Add one, or delete the entry")
-}
-
-// The stock template does not share a blocked env schema's fate: it declares
-// nothing, so no note says it was not carried.
-func TestTheStockTemplateIsNotHeldByABlockedEnvSchema(t *testing.T) {
-	dir := v1WithSettings(t, v1StockSettings)
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "env.schema.yaml"), []byte("connections: [\n"), 0o600))
-
-	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
-	require.NoError(t, err)
-	require.False(t, anyContains(cs.Notes, SettingsRelPath), "%v", cs.Notes)
 }

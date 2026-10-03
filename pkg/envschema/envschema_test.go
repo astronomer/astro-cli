@@ -22,23 +22,23 @@ func TestValueSpecCheck(t *testing.T) {
 			section: SectionEnvVar,
 		},
 		{
-			name:    "a sensitive value with a default",
-			spec:    ValueSpec{Sensitive: true, Default: "hunter2", HasDefault: true},
+			name:    "a secret value with a default",
+			spec:    ValueSpec{Secret: true, Default: "hunter2", HasDefault: true},
 			section: SectionEnvVar,
 			want:    []string{"default"},
 		},
 		{
 			// The rule a writer is most likely to trip.
-			name:    "a connection that is not sensitive",
+			name:    "a connection that is not secret",
 			spec:    ValueSpec{},
 			section: SectionConnection,
-			want:    []string{"sensitive"},
+			want:    []string{"secret"},
 		},
 		{
-			// Absent key: the reader defaults a connection to sensitive, so
+			// Absent key: the reader defaults a connection to secret, so
 			// this is what every ordinary connection looks like.
-			name:    "a sensitive connection is fine",
-			spec:    ValueSpec{Sensitive: true},
+			name:    "a secret connection is fine",
+			spec:    ValueSpec{Secret: true},
 			section: SectionConnection,
 		},
 		{
@@ -46,39 +46,39 @@ func TestValueSpecCheck(t *testing.T) {
 			// does nothing reads as a key that works, and an author who thinks
 			// this flag decides has a reason to think omitting it would leave
 			// the credential in plaintext.
-			name:    "a connection that says sensitive = true",
-			spec:    ValueSpec{Sensitive: true, HasSensitive: true},
+			name:    "a connection that says secret = true",
+			spec:    ValueSpec{Secret: true, HasSecret: true},
 			section: SectionConnection,
-			want:    []string{"sensitive"},
+			want:    []string{"secret"},
 		},
 		{
 			// The contradicting value keeps its own message, and gets exactly
 			// one problem rather than both arms firing.
-			name:    "a connection that says sensitive = false",
-			spec:    ValueSpec{HasSensitive: true},
+			name:    "a connection that says secret = false",
+			spec:    ValueSpec{HasSecret: true},
 			section: SectionConnection,
-			want:    []string{"sensitive"},
+			want:    []string{"secret"},
 		},
 		{
 			// The flag is only meaningless under connections; elsewhere it is
 			// the whole point.
-			name:    "an env var that says sensitive = true",
-			spec:    ValueSpec{Sensitive: true, HasSensitive: true},
+			name:    "an env var that says secret = true",
+			spec:    ValueSpec{Secret: true, HasSecret: true},
 			section: SectionEnvVar,
 		},
 		{
-			// Both fire and both are true: it is not marked sensitive, AND the
+			// Both fire and both are true: it is not marked secret, AND the
 			// default it carries would be committed either way. The credential
 			// rule keys on the section as well as the flag, so a spec built by
-			// hand cannot carry one past it by leaving Sensitive unset.
+			// hand cannot carry one past it by leaving Secret unset.
 			name:    "a connection with a default and no flag",
 			spec:    ValueSpec{Default: "postgres://u:p@h/db", HasDefault: true},
 			section: SectionConnection,
-			want:    []string{"sensitive", "default"},
+			want:    []string{"secret", "default"},
 		},
 		{
-			name:    "a sensitive connection with a default",
-			spec:    ValueSpec{Sensitive: true, Default: "postgres://u:p@h/db", HasDefault: true},
+			name:    "a secret connection with a default",
+			spec:    ValueSpec{Secret: true, Default: "postgres://u:p@h/db", HasDefault: true},
 			section: SectionConnection,
 			want:    []string{"default"},
 		},
@@ -96,7 +96,7 @@ func TestValueSpecCheck(t *testing.T) {
 		},
 		{
 			name:    "conn_type on a connection is fine",
-			spec:    ValueSpec{Sensitive: true, ConnType: "postgres"},
+			spec:    ValueSpec{Secret: true, ConnType: "postgres"},
 			section: SectionConnection,
 		},
 		{
@@ -109,13 +109,13 @@ func TestValueSpecCheck(t *testing.T) {
 			// A connection's resolved value is its conn_type, so nothing can
 			// enforce a `type` here.
 			name:    "a type on a connection",
-			spec:    ValueSpec{Sensitive: true, Type: TypeURL},
+			spec:    ValueSpec{Secret: true, Type: TypeURL},
 			section: SectionConnection,
 			want:    []string{"type"},
 		},
 		{
 			name:    "an enum on a connection",
-			spec:    ValueSpec{Sensitive: true, Enum: []string{"a", "b"}},
+			spec:    ValueSpec{Secret: true, Enum: []string{"a", "b"}},
 			section: SectionConnection,
 			want:    []string{"enum"},
 		},
@@ -123,7 +123,7 @@ func TestValueSpecCheck(t *testing.T) {
 			// One message, and it is not the spelling: the problem is that a
 			// connection declared a type at all.
 			name:    "an unknown type on a connection",
-			spec:    ValueSpec{Sensitive: true, Type: "enom"},
+			spec:    ValueSpec{Secret: true, Type: "enom"},
 			section: SectionConnection,
 			want:    []string{"type"},
 		},
@@ -131,13 +131,13 @@ func TestValueSpecCheck(t *testing.T) {
 			// Both refused on their own terms, and the coherence rule does not
 			// also fire telling it to add `type = "enum"`.
 			name:    "a type and an enum on a connection",
-			spec:    ValueSpec{Sensitive: true, Type: TypeEnum, Enum: []string{"a"}},
+			spec:    ValueSpec{Secret: true, Type: TypeEnum, Enum: []string{"a"}},
 			section: SectionConnection,
 			want:    []string{"type", "enum"},
 		},
 		{
 			name:    "a connection declaring neither is fine",
-			spec:    ValueSpec{Sensitive: true, ConnType: "postgres"},
+			spec:    ValueSpec{Secret: true, ConnType: "postgres"},
 			section: SectionConnection,
 		},
 		{
@@ -206,10 +206,10 @@ func TestSpecProblemNamesWhatItRead(t *testing.T) {
 			reads: []string{"type", "enum"},
 		},
 		{
-			name:  "a sensitive default reads both",
-			spec:  ValueSpec{Sensitive: true, HasDefault: true},
+			name:  "a secret default reads both",
+			spec:  ValueSpec{Secret: true, HasDefault: true},
 			field: "default",
-			reads: []string{"default", "sensitive"},
+			reads: []string{"default", "secret"},
 		},
 		{
 			name:  "a single-field rule reads only itself",

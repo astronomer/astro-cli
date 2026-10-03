@@ -276,7 +276,7 @@ func envKinds() []envKind {
   astro local env variable delete API_TOKEN
 
   # declare it in pyproject.toml, so a start requires it, and keep it in the vault
-  astro local env variable declare API_TOKEN --sensitive --description 'Token for the API'`,
+  astro local env variable declare API_TOKEN --secret --description 'Token for the API'`,
 		},
 		{
 			aliases: []string{"conn", "connections"},
@@ -367,7 +367,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		"The value is stored in the encrypted vault, which needs an OS keyring. --plain\n" +
 		"stores it unencrypted instead and needs none: a project value in the project's\n" +
 		".env, a global in the vault, marked plain. --plain is refused for a name the\n" +
-		"project's pyproject.toml declares sensitive.\n\n" +
+		"project's pyproject.toml declares secret.\n\n" +
 		"A new global reaches no project until you link it with\n" +
 		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --auto-link creates it\n" +
 		"auto-linked to every project instead. Updating an existing global keeps its links.\n" +
@@ -610,15 +610,15 @@ type envValue struct {
 // asks otherwise; then the project's .env in a project scope, and the vault,
 // marked plain, for a global (see envStore).
 //
-// --plain is refused for a name the project's manifest declares sensitive,
+// --plain is refused for a name the project's manifest declares secret,
 // since the declaration rules out the unencrypted copy it asks for. Declared
-// connections count, because envschema makes every one of them sensitive. The
+// connections count, because envschema makes every one of them secret. The
 // manifest is read only for --plain: no declaration makes the vault more
 // secret.
 //
 // Where the answer depends on the declarations and they do not read, a --plain
 // set is refused rather than guessing. Treating an unreadable manifest as
-// "nothing is sensitive" decides the question from an answer that does not
+// "nothing is secret" decides the question from an answer that does not
 // give it, and the result is a declared credential unencrypted. `astro local
 // start` refuses the same project, so declining the save until it is fixed is
 // the smaller surprise. Outside a project there is no manifest to consult.
@@ -635,25 +635,25 @@ func (c *cli) routeSet(scope *scopeFlags, kind localenv.Kind, name string) (*sco
 	manifestPath := filepath.Join(projectDir, project.Marker)
 	_, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
-		return nil, fmt.Errorf("cannot tell whether %s declares %s sensitive, so --plain is refused: %w", manifestPath, name, err)
+		return nil, fmt.Errorf("cannot tell whether %s declares %s secret, so --plain is refused: %w", manifestPath, name, err)
 	}
-	if spec, ok := declaredSpec(schema, kind, name); ok && spec.Sensitive {
+	if spec, ok := declaredSpec(schema, kind, name); ok && spec.Secret {
 		return nil, plaintextRefusal(kind, name, manifestPath)
 	}
 	return &route, nil
 }
 
-// plaintextRefusal is the error for `set --plain` on a declared-sensitive
+// plaintextRefusal is the error for `set --plain` on a declared-secret
 // name. A connection cannot be declared otherwise, so its message does not
 // offer the edit that would allow it.
 func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
 	if kind == localenv.KindConn {
-		return fmt.Errorf("connection %s is declared in %s, and a declared connection is always sensitive, "+
+		return fmt.Errorf("connection %s is declared in %s, and a declared connection is always secret, "+
 			"so it can only be stored encrypted. Drop --plain to store it in the vault",
 			name, manifestPath)
 	}
-	return fmt.Errorf("%s %s is declared sensitive in %s, so it can only be stored encrypted. "+
-		"Drop --plain to store it in the vault, or remove `sensitive = true` from its declaration to store it unencrypted",
+	return fmt.Errorf("%s %s is declared secret in %s, so it can only be stored encrypted. "+
+		"Drop --plain to store it in the vault, or remove `secret = true` from its declaration to store it unencrypted",
 		localenv.Noun(kind), name, manifestPath)
 }
 
@@ -1061,7 +1061,7 @@ func (c *cli) emitValue(r Renderer, v envValue) error {
 // keeps one copy per scope, so "delete this name" means wherever it is, and a
 // copy that got into the other store by hand or before the routing changed is
 // the one a delete of a credential most needs to catch. --plain deletes only
-// the .env copy, which is how a stale plaintext copy of a sensitive name is
+// the .env copy, which is how a stale plaintext copy of a secret name is
 // removed on its own. A global is deleted from the vault; ~/.astro/env is read
 // only, so a name only that file holds is refused with the line to remove.
 //

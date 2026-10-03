@@ -31,7 +31,7 @@ const SettingsRelPath = "airflow_settings.yaml"
 // A connection is a credential. Its value goes to the shared vault at the
 // project's scope — the same place `astro local env connection set` writes and
 // `astro local start` resolves — and the manifest gets a declaration naming it
-// and its conn_type, marked sensitive.
+// and its conn_type, marked secret.
 //
 // The declaration carries no `optional`, so it is required. That is deliberate
 // and it is the whole security improvement: for whoever converts, the vault
@@ -43,10 +43,10 @@ const SettingsRelPath = "airflow_settings.yaml"
 //
 // An Airflow Variable's value takes the same path as a connection's: the vault
 // at the project's scope, and a declaration in the manifest that carries no
-// value and is marked sensitive. The v1 file offers no way to mark a Variable
+// value and is marked secret. The v1 file offers no way to mark a Variable
 // secret, it routinely holds API tokens, and v1's project template kept the
 // file out of version control — so a declared default would commit tokens that
-// were never committed before. Every one is marked sensitive rather than
+// were never committed before. Every one is marked secret rather than
 // guessed at from its name, so the declaration says where the value lives and
 // a later `set --plain` is refused rather than moving it into a plain file.
 //
@@ -59,10 +59,10 @@ const SettingsRelPath = "airflow_settings.yaml"
 
 // carriedSettings is what airflow_settings.yaml yielded.
 //
-// It mirrors carriedEnvSchema, and for the same all-or-nothing reason: writing
-// SOME of this file's declarations creates [tool.astro.env], which makes the
-// manifest the project's declaration source from then on, so whatever stayed
-// behind in the YAML has silently stopped applying. See that type's doc.
+// It is all-or-nothing: writing SOME of this file's declarations creates
+// [tool.astro.env], which makes the manifest the project's declaration source
+// from then on, so whatever stayed behind in the YAML has silently stopped
+// applying.
 type carriedSettings struct {
 	// schema is the declarations to merge into [tool.astro.env].
 	schema *envschema.Schema
@@ -303,7 +303,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 			continue
 		}
 
-		spec := envschema.ValueSpec{ConnType: connType, Sensitive: true}
+		spec := envschema.ValueSpec{ConnType: connType, Secret: true}
 		if problems := spec.Check(envschema.SectionConnection); len(problems) > 0 {
 			for _, p := range problems {
 				c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be carried. "+p.Reason)
@@ -366,13 +366,13 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			// turn that working project into one that refuses to start, so it
 			// is declared optional: the name is recorded, and start resolves it
 			// as absent until someone sets it.
-			c.schema.AirflowVariables[name] = envschema.ValueSpec{Sensitive: true, HasSensitive: true, Optional: true}
+			c.schema.AirflowVariables[name] = envschema.ValueSpec{Secret: true, HasSecret: true, Optional: true}
 			c.advisories = append(c.advisories, name+
 				": declared as an optional Airflow variable, since it had no value to carry. "+
 				"Set it with `astro local env airflow-variable set "+name+"`")
 			continue
 		}
-		c.schema.AirflowVariables[name] = envschema.ValueSpec{Sensitive: true, HasSensitive: true}
+		c.schema.AirflowVariables[name] = envschema.ValueSpec{Secret: true, HasSecret: true}
 		c.secrets = append(c.secrets, SecretWrite{
 			Kind:  secrets.KindVar,
 			Name:  name,
@@ -555,6 +555,15 @@ func (c *carriedSettings) declares() bool {
 	return len(c.schema.AirflowVariables)+len(c.schema.Connections) > 0
 }
 
+// carriedAdvisories are the advisories of a carry that happened: none when no
+// declaration reached [tool.astro.env].
+func (c *carriedSettings) carriedAdvisories() []string {
+	if !c.declares() {
+		return nil
+	}
+	return c.advisories
+}
+
 // retirable reports that the conversion leaves nothing behind in the file: it
 // was carried, every value in it reaches the vault, and every pool reaches the
 // manifest.
@@ -675,39 +684,4 @@ func plural(n int, one, many string) string {
 		return "1 " + one
 	}
 	return fmt.Sprintf("%d %s", n, many)
-}
-
-// migratedFrom names the files that fed [tool.astro.env], so the preview line
-// says where the declarations came from rather than naming whichever file the
-// feature was built for first.
-func migratedFrom(v1 *v1Project) string {
-	var from []string
-	if v1.settings.declares() {
-		from = append(from, SettingsRelPath)
-	}
-	if len(from) == 0 || hasEnvSchemaDeclarations(v1) {
-		from = append([]string{envschema.LegacyRelPath}, from...)
-	}
-	return strings.Join(from, " and ")
-}
-
-// hasEnvSchemaDeclarations reports whether the env-schema FILE contributed,
-// as opposed to the merged result it shares with airflow_settings.yaml.
-func hasEnvSchemaDeclarations(v1 *v1Project) bool {
-	if v1.envSchema.schema == nil {
-		return false
-	}
-	// EnvVars can only have come from .astro/env.schema.yaml — this transform
-	// declares none — so it settles the question on its own. The other two
-	// sections are shared, and the merge already refused a name both files
-	// declare, so anything the settings file did not contribute is the schema's.
-	if len(v1.envSchema.schema.EnvVars) > 0 {
-		return true
-	}
-	settings := v1.settings.schema
-	if settings == nil {
-		return true
-	}
-	return len(v1.envSchema.schema.AirflowVariables) > len(settings.AirflowVariables) ||
-		len(v1.envSchema.schema.Connections) > len(settings.Connections)
 }

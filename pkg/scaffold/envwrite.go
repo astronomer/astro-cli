@@ -164,7 +164,7 @@ func editEnvDeclaration(ed tomledit.Editor, section envschema.Section, names []s
 	key, raw, declared := findEnvDeclaration(ed, section, names...)
 	path := append(envSectionPath(section), key)
 
-	old := envschema.ValueSpec{Sensitive: section == envschema.SectionConnection}
+	old := envschema.ValueSpec{Secret: section == envschema.SectionConnection}
 	if declared {
 		var err error
 		if old, err = readEnvDeclaration(section, key, raw); err != nil {

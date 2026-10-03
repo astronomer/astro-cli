@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
 // A file name in a note reads the same on every platform.
@@ -16,9 +14,8 @@ import (
 // The names go into Result's json, which a consumer parses — the desktop's
 // conversion preview groups by them. leftovers once built the
 // .astro/config.yaml entry with filepath.Join, so on Windows that note said
-// `.astro\config.yaml` while envschema.LegacyRelPath, a slash-form constant,
-// said `.astro/env.schema.yaml` in the same list: one contract disagreeing with
-// itself about two files in the same directory, and only on one platform.
+// `.astro\config.yaml` while the other names in the same list were slash-form:
+// one contract disagreeing with itself, and only on one platform.
 //
 // That entry is now concatenated from the same kind of constant, so this pins a
 // property the current code holds by construction rather than one it computes.
@@ -34,11 +31,6 @@ func TestLeftoverNamesUseForwardSlashes(t *testing.T) {
 	require.NoError(t, os.WriteFile(
 		filepath.Join(dir, ".astro", "config.yaml"),
 		[]byte("project:\n  name: orders\n  deployment: cm1orders\n"), 0o600))
-	// Beside it, the file whose name has always been slash-form, so the two
-	// are compared rather than asserted in isolation.
-	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, filepath.FromSlash(envschema.LegacyRelPath)),
-		[]byte("env_vars:\n  - key: API_URL\n"), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 
 	res, err := Run(dir, Options{})

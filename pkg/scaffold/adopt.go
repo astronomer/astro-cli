@@ -199,8 +199,8 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	if declaresDockerfile(v1) {
 		labels = append(labels, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
 	}
-	if v1.envSchema.declares() {
-		labels = append(labels, manifest.Marker+" (migrated "+migratedFrom(v1)+" into [tool.astro.env])")
+	if v1.settings.declares() {
+		labels = append(labels, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
 	}
 	labels = appendLabel(labels, poolsLabel(v1.settings.pools.byName))
 	return out, labels, pin, nil

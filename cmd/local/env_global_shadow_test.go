@@ -11,7 +11,7 @@ import (
 // project copy wins for this project, names the command that removes it, and
 // leaves it in place: a --global command does not delete project values.
 func TestGlobalSetWarnsAboutAProjectPlaintextCopy(t *testing.T) {
-	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
+	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("API_TOKEN=plain\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

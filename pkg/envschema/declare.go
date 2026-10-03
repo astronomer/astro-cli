@@ -64,9 +64,9 @@ func FoldName(section Section, key string) (string, error) {
 // section. ParseSchema reads the result back as the same declaration.
 //
 // It writes only what a reader would not already assume. `optional` is false
-// unless written, and a connection is sensitive by its section: writing
-// `sensitive` there is refused whichever value it carries, so it is never
-// written for a connection, whatever spec.Sensitive says.
+// unless written, and a connection is secret by its section: writing
+// `secret` there is refused whichever value it carries, so it is never
+// written for a connection, whatever spec.Secret says.
 //
 // It renders and does not judge. A spec Check refuses renders to a table
 // ParseSchema refuses too, which is where a writer finds out: pkg/scaffold's
@@ -82,8 +82,8 @@ func DeclarationTable(spec *ValueSpec, section Section) map[string]any {
 	if spec.Optional {
 		out["optional"] = true
 	}
-	if spec.Sensitive && section != SectionConnection {
-		out["sensitive"] = true
+	if spec.Secret && section != SectionConnection {
+		out["secret"] = true
 	}
 	if spec.HasDefault {
 		out["default"] = spec.Default

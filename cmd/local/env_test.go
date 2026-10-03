@@ -269,7 +269,7 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	for _, line := range strings.Split(out.String(), "\n") {
 		switch {
 		case strings.Contains(line, "STRAY"):
-			if !strings.Contains(line, "not declared (declare it to make it a requirement: astro local env variable declare STRAY --sensitive)") {
+			if !strings.Contains(line, "not declared (declare it to make it a requirement: astro local env variable declare STRAY --secret)") {
 				t.Errorf("STRAY row = %q, want the not-declared note", line)
 			}
 		case strings.Contains(line, "DECLARED"):
@@ -295,7 +295,7 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	if a := rows["STRAY"].Applied; a == nil || !*a {
 		t.Errorf("STRAY applied = %v, want true", a)
 	}
-	if rows["STRAY"].DeclareHint != "astro local env variable declare STRAY --sensitive" {
+	if rows["STRAY"].DeclareHint != "astro local env variable declare STRAY --secret" {
 		t.Errorf("STRAY declare hint = %q", rows["STRAY"].DeclareHint)
 	}
 	if rows["DECLARED"].Applied != nil {
@@ -391,10 +391,10 @@ func TestEnvListOrphanNote(t *testing.T) {
 }
 
 // A declaration's description shows in the text list, and the JSON rows carry
-// it with the required and sensitive flags.
+// it with the required and secret flags.
 func TestEnvListShowsTheDescription(t *testing.T) {
 	dir := envProject(t, "[tool.astro.env]\n"+
-		"API_TOKEN = { sensitive = true, description = '''Token for\nthe API''' }\n"+
+		"API_TOKEN = { secret = true, description = '''Token for\nthe API''' }\n"+
 		"LOG_LEVEL = { optional = true }\n")
 
 	d, out, _ := envDeps(t, dir, "")
@@ -428,10 +428,10 @@ func TestEnvListShowsTheDescription(t *testing.T) {
 		}
 		rows[it.Name] = it
 	}
-	if it := rows["API_TOKEN"]; !it.Required || !it.Sensitive || it.Description != "Token for\nthe API" {
+	if it := rows["API_TOKEN"]; !it.Required || !it.Secret || it.Description != "Token for\nthe API" {
 		t.Errorf("API_TOKEN row = %+v", it)
 	}
-	if it := rows["LOG_LEVEL"]; it.Required || it.Sensitive || it.Description != "" {
+	if it := rows["LOG_LEVEL"]; it.Required || it.Secret || it.Description != "" {
 		t.Errorf("LOG_LEVEL row = %+v", it)
 	}
 }

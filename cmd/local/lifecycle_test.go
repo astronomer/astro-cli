@@ -197,7 +197,7 @@ func TestRunWithWorkspaceFetchesWorkspaceValues(t *testing.T) {
 func TestRunWithWorkspaceStillRunsWithoutALocalValue(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	isolateEnvSources(t, "ASTRO_TEST_LOCAL_ONLY")
-	manifest := workspaceEnvManifest + "ASTRO_TEST_LOCAL_ONLY = { sensitive = true }\n"
+	manifest := workspaceEnvManifest + "ASTRO_TEST_LOCAL_ONLY = { secret = true }\n"
 	d, stderr, calls := stoppedWorkspaceProject(t, manifest)
 	if err := execute(t, d, "local", "run", "--with-workspace", "pytest"); err != nil {
 		t.Fatalf("run --with-workspace: %v", err)

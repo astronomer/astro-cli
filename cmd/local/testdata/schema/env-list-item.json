@@ -2,7 +2,7 @@
   "kind": "x",
   "name": "x",
   "required": true,
-  "sensitive": true,
+  "secret": true,
   "description": "x",
   "source": "x",
   "orphan": true,

@@ -375,7 +375,7 @@ func refusal(err error) error {
 		return fmt.Errorf("this machine's keyring is unreachable, so a secret cannot be stored or read here: %w\n\n"+
 			"On a headless machine or in CI there is no keyring to hold the master key. Supply the value in the "+
 			"environment instead, which the resolution chain reads first, or, for a name the project does not "+
-			"declare sensitive, set it with --plain, which needs no keyring", err)
+			"declare secret, set it with --plain, which needs no keyring", err)
 	default:
 		return err
 	}

@@ -52,8 +52,8 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 	if got[0].DeclareHint != "astro local env connection declare db_main" {
 		t.Errorf("declare hint = %q", got[0].DeclareHint)
 	}
-	if v := rows["api_token"]; len(v) != 1 || v[0].DeclareHint != "astro local env variable declare api_token --sensitive" {
-		t.Errorf("api_token rows = %+v, want one with a --sensitive declare hint", v)
+	if v := rows["api_token"]; len(v) != 1 || v[0].DeclareHint != "astro local env variable declare api_token --secret" {
+		t.Errorf("api_token rows = %+v, want one with a --secret declare hint", v)
 	}
 	if d := rows["declared"]; len(d) != 1 || d[0].Orphan {
 		t.Errorf("declared rows = %+v, want one declared row", d)

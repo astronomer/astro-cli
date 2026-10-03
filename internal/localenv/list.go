@@ -19,11 +19,11 @@ type ListItem struct {
 	Kind Kind   `json:"kind"`
 	Name string `json:"name"`
 	// Required is true for a declared name the start gate needs: every
-	// declaration not marked optional. Sensitive is the declaration's
-	// sensitive flag, which is always true for a declared connection. Both
+	// declaration not marked optional. Secret is the declaration's
+	// secret flag, which is always true for a declared connection. Both
 	// describe the declaration, so an orphan, which has none, carries false.
-	Required  bool `json:"required"`
-	Sensitive bool `json:"sensitive"`
+	Required bool `json:"required"`
+	Secret   bool `json:"secret"`
 	// Description is the declaration's prose for whoever supplies the value,
 	// and empty when it has none or the row is an orphan.
 	Description string `json:"description,omitempty"`
@@ -149,7 +149,7 @@ type VaultEntry struct {
 }
 
 // List builds the resolver-backed listing: every schema-declared name with
-// its resolved source and required/sensitive flags, plus orphan entries. It
+// its resolved source and required/secret flags, plus orphan entries. It
 // never reads a value into a row.
 func List(environ []string, projectDir string, schema *envschema.Schema, opts ListOptions) ([]ListItem, error) {
 	src, err := LoadSources(environ, projectDir)
@@ -333,7 +333,7 @@ func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem
 		Name:        rn.Name,
 		Source:      SourceAbsent,
 		Required:    !spec.Optional,
-		Sensitive:   spec.Sensitive,
+		Secret:      spec.Secret,
 		Description: spec.Description,
 		Resolved:    rn.Found,
 	}
@@ -534,13 +534,13 @@ func vaultOrphanItem(kind Kind, name string, tier VaultTier, inProject bool) Lis
 	return item
 }
 
-// vaultDeclareHint declares a vault-held variable sensitive, so a later set
-// leaves it in the vault; a connection is always sensitive.
+// vaultDeclareHint declares a vault-held variable secret, so a later set
+// leaves it in the vault; a connection is always secret.
 func vaultDeclareHint(kind Kind, name string) string {
 	if kind == KindConn {
 		return DeclareHint(kind, name)
 	}
-	return DeclareHint(kind, name) + " --sensitive"
+	return DeclareHint(kind, name) + " --secret"
 }
 
 func orphanItem(key string, scope Scope, project string, inProject bool) ListItem {

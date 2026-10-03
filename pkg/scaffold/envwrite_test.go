@@ -27,7 +27,7 @@ dependencies = ['apache-airflow==3.1.*']
 [tool.astro.env]
 # every environment starts at this level
 LOG_LEVEL = 'info'
-API_TOKEN = { sensitive = true } # from the vault
+API_TOKEN = { secret = true } # from the vault
 DEFAULTED = { default = 'x', description = 'has a default' }
 
 [tool.astro.env.WAREHOUSE_URI]
@@ -119,12 +119,12 @@ func SetEnvDeclaration(dir string, wrap func(run func() error) error, section en
 func TestAddEnvDeclarationWritesItsAnnotations(t *testing.T) {
 	dir, path := writeEditFixture(t, envFixture, 0o644)
 
-	spec := &envschema.ValueSpec{Sensitive: true, Optional: true, Description: "for the alerts channel", Type: envschema.TypeURL}
+	spec := &envschema.ValueSpec{Secret: true, Optional: true, Description: "for the alerts channel", Type: envschema.TypeURL}
 	require.NoError(t, AddEnvDeclaration(dir, nil, envschema.SectionEnvVar, "SLACK_WEBHOOK", spec))
 
 	got := loadSchema(t, path)
 	assert.Equal(t, envschema.ValueSpec{
-		Sensitive: true, HasSensitive: true, Optional: true, Description: "for the alerts channel", Type: envschema.TypeURL,
+		Secret: true, HasSecret: true, Optional: true, Description: "for the alerts channel", Type: envschema.TypeURL,
 	}, got.EnvVars["SLACK_WEBHOOK"])
 	assertOthersUnchanged(t, got, envschema.SectionEnvVar, "SLACK_WEBHOOK")
 	assertCommentsKept(t, readFile(t, path))
@@ -295,10 +295,10 @@ func TestRemoveEnvDeclarationFixesSeveralProblemsInTurn(t *testing.T) {
 		require.NoError(t, RemoveEnvDeclaration(dir, nil, envschema.SectionEnvVar, "OTHER-VAR"))
 		assert.True(t, envSectionLoads(t, path))
 	})
-	t.Run("a bad name, an unknown field and a sensitive connection", func(t *testing.T) {
+	t.Run("a bad name, an unknown field and a secret connection", func(t *testing.T) {
 		body := strings.Replace(envFixture, "LOG_LEVEL = 'info'", "LOG_LEVEL = 'info'\nMY-VAR = {}", 1)
-		body = strings.Replace(body, "API_TOKEN = { sensitive = true }", "API_TOKEN = { sensitive = true, shade = 'red' }", 1)
-		body = strings.Replace(body, "DB_Main = { conn_type = 'postgres' }", "DB_Main = { conn_type = 'postgres', sensitive = true }", 1)
+		body = strings.Replace(body, "API_TOKEN = { secret = true }", "API_TOKEN = { secret = true, shade = 'red' }", 1)
+		body = strings.Replace(body, "DB_Main = { conn_type = 'postgres' }", "DB_Main = { conn_type = 'postgres', secret = true }", 1)
 		dir, path := writeEditFixture(t, body, 0o644)
 
 		require.NoError(t, RemoveEnvDeclaration(dir, nil, envschema.SectionEnvVar, "MY-VAR"))
@@ -433,7 +433,7 @@ func TestSetEnvDeclarationToBareKeepsItDeclared(t *testing.T) {
 			envschema.SectionEnvVar: got.EnvVars, envschema.SectionConnection: got.Connections,
 		}[tc.section]
 		require.Contains(t, decls, tc.name, "setting %s to bare undeclared it", tc.name)
-		want := envschema.ValueSpec{Sensitive: tc.section == envschema.SectionConnection}
+		want := envschema.ValueSpec{Secret: tc.section == envschema.SectionConnection}
 		assert.Equal(t, want, decls[tc.name], tc.name)
 	}
 }
@@ -484,11 +484,11 @@ func TestDeclareEnvFromWorkspaceKeepsTheTable(t *testing.T) {
 	require.NoError(t, DeclareEnvFromWorkspace(dir, nil, envschema.SectionConnection, "AIRFLOW_CONN_DB_MAIN", "mysql"))
 
 	got := loadSchema(t, path)
-	assert.Equal(t, envschema.ValueSpec{Sensitive: true, HasSensitive: true, Source: envschema.SourceWorkspace},
+	assert.Equal(t, envschema.ValueSpec{Secret: true, HasSecret: true, Source: envschema.SourceWorkspace},
 		got.EnvVars["API_TOKEN"])
 	assert.Equal(t, envschema.ValueSpec{Type: envschema.TypeURL, Description: "the warehouse", Source: envschema.SourceWorkspace},
 		got.EnvVars["WAREHOUSE_URI"])
-	assert.Equal(t, envschema.ValueSpec{Sensitive: true, ConnType: "postgres", Source: envschema.SourceWorkspace},
+	assert.Equal(t, envschema.ValueSpec{Secret: true, ConnType: "postgres", Source: envschema.SourceWorkspace},
 		got.Connections["DB_Main"])
 	assert.NotContains(t, got.Connections, "db_main")
 	raw := readFile(t, path)
@@ -504,7 +504,7 @@ func TestDeclareEnvFromWorkspaceDeclaresANewName(t *testing.T) {
 
 	got := loadSchema(t, path)
 	assert.Equal(t, envschema.ValueSpec{Source: envschema.SourceWorkspace}, got.AirflowVariables["team"])
-	assert.Equal(t, envschema.ValueSpec{Sensitive: true, ConnType: "aws", Source: envschema.SourceWorkspace},
+	assert.Equal(t, envschema.ValueSpec{Secret: true, ConnType: "aws", Source: envschema.SourceWorkspace},
 		got.Connections["lake"])
 }
 
@@ -546,9 +546,9 @@ func TestEnvDeclarationThatWouldNotLoadIsRefused(t *testing.T) {
 		code    envschema.ProblemCode
 	}{
 		{
-			"sensitive with a default", envschema.SectionEnvVar, "API_TOKEN",
-			envschema.ValueSpec{Sensitive: true, Default: "hunter2", HasDefault: true},
-			envschema.CodeSensitiveDefault,
+			"secret with a default", envschema.SectionEnvVar, "API_TOKEN",
+			envschema.ValueSpec{Secret: true, Default: "hunter2", HasDefault: true},
+			envschema.CodeSecretDefault,
 		},
 		{
 			"enum without its type", envschema.SectionEnvVar, "NEW_ONE",
@@ -563,7 +563,7 @@ func TestEnvDeclarationThatWouldNotLoadIsRefused(t *testing.T) {
 		{
 			"a connection with a default", envschema.SectionConnection, "lake",
 			envschema.ValueSpec{Default: "s3://", HasDefault: true},
-			envschema.CodeSensitiveDefault,
+			envschema.CodeSecretDefault,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -595,7 +595,7 @@ func TestEnvDeclarationRefusesABadName(t *testing.T) {
 // A declaration that does not load cannot be read to edit, so editing it is
 // refused with the parser's reason, and the file is unchanged.
 func TestEditEnvDeclarationRefusesOneThatDoesNotLoad(t *testing.T) {
-	body := strings.Replace(envFixture, "API_TOKEN = { sensitive = true }", "API_TOKEN = { sensitive = 'yes' }", 1)
+	body := strings.Replace(envFixture, "API_TOKEN = { secret = true }", "API_TOKEN = { secret = 'yes' }", 1)
 	dir, path := writeEditFixture(t, body, 0o644)
 
 	err := DeclareEnvFromWorkspace(dir, nil, envschema.SectionEnvVar, "API_TOKEN", "")

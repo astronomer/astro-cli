@@ -128,17 +128,17 @@ func connTypeMismatch(declared, resolved string) string {
 //
 //nolint:gocritic // hugeParam: by value on purpose, see Check.
 func (s ValueSpec) CheckValue(value string) string {
-	// The offending value is quoted back, except for a sensitive declaration,
+	// The offending value is quoted back, except for a secret declaration,
 	// whose contents must never appear in a reason: callers put Reason on
 	// stdout and into their JSON event stream, and embedded in prose it cannot
-	// be redacted downstream. `{ sensitive = true, type = 'url' }` is legal —
-	// only sensitive+default is refused — so this arm is reachable.
+	// be redacted downstream. `{ secret = true, type = 'url' }` is legal —
+	// only secret+default is refused — so this arm is reachable.
 	//
 	// It is quoted for everything else because "expected an integer" against a
 	// schema of forty names does not say which value, and the caller reports
 	// these with no value to hand.
 	got := func() string {
-		if s.Sensitive {
+		if s.Secret {
 			return ""
 		}
 		return fmt.Sprintf(", got %q", value)

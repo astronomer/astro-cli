@@ -83,10 +83,10 @@ func ParseSchema(env map[string]any) (*Schema, error) {
 	vars := map[string]any{}
 	for name, raw := range env {
 		switch name {
-		case "connections":
+		case sectionKeyConnections:
 			s.Connections = p.specs(envRoot+".connections", raw, airflowenv.ValidConnID,
 				"not a valid connection id (letters, digits, _)", SectionConnection)
-		case "airflow_variables":
+		case sectionKeyAirflowVariables:
 			s.AirflowVariables = p.specs(envRoot+".airflow_variables", raw, airflowenv.ValidVarKey,
 				"not a valid variable key ("+airflowenv.VarKeyRule+")", SectionAirflowVariable)
 		default:
@@ -148,14 +148,14 @@ func (p *schemaParser) decodeSpec(key string, raw any, section Section) (ValueSp
 	case string:
 		// The shorthand, and literally sugar: it sets the same Default the
 		// table's `default` key sets, and nothing else — except that a
-		// connection is sensitive whichever spelling declared it, which makes
+		// connection is secret whichever spelling declared it, which makes
 		// the shorthand a way to write a connection with a committed default.
 		// Check refuses that, so the shorthand cannot be the way around a rule
 		// the table form obeys.
 		spec := ValueSpec{
 			Default:    v,
 			HasDefault: true,
-			Sensitive:  section == SectionConnection,
+			Secret:     section == SectionConnection,
 		}
 		if !p.checkSpec(key, spec, section, nil) {
 			return ValueSpec{}, false
@@ -172,11 +172,11 @@ func (p *schemaParser) decodeSpec(key string, raw any, section Section) (ValueSp
 func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section Section) (ValueSpec, bool) {
 	var spec ValueSpec
 	before := len(p.problems)
-	// Connections start sensitive, so an absent key means what it should. An
-	// explicit `sensitive` still decodes over the top and Check judges the
-	// result — which is how `sensitive = false` on a connection gets told it is
+	// Connections start secret, so an absent key means what it should. An
+	// explicit `secret` still decodes over the top and Check judges the
+	// result — which is how `secret = false` on a connection gets told it is
 	// not allowed rather than that it "says nothing".
-	spec.Sensitive = section == SectionConnection
+	spec.Secret = section == SectionConnection
 	// Which fields failed to decode, so the coherence rules below do not read a
 	// zero value left by a failure and report a second, contradictory problem.
 	failed := map[string]bool{}
@@ -197,33 +197,33 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				failed["default"] = true
 			}
 		case "optional":
-			// Recorded the same way as sensitive below. No Check rule reads
+			// Recorded the same way as secret below. No Check rule reads
 			// Optional; the package checklist does (internal/pack's
 			// valueMeta), so a mutant that drops this line fails the root
 			// module's tests rather than this one's. The two bool
 			// annotations are handled identically, so a rule that starts
 			// reading Optional does not reacquire the double-problem the
-			// sensitive case had.
+			// secret case had.
 			if b, ok := p.boolField(fieldKey, v); ok {
 				spec.Optional = b
 			} else {
 				failed["optional"] = true
 			}
-		case "sensitive":
+		case "secret":
 			// Left at its default when the decode failed: for a
 			// connection that default is true, and overwriting it would
 			// invite a second, contradictory problem from Check.
 			//
-			// HasSensitive records that the key was there at all, which is what
-			// lets Check refuse `sensitive` on a connection without also
+			// HasSecret records that the key was there at all, which is what
+			// lets Check refuse `secret` on a connection without also
 			// refusing every connection that simply omitted it. Not set on a
 			// failed decode: the value is unknown, the decode already reported
 			// itself, and claiming the author stated something would add a
 			// second problem about a key they may have meant either way.
 			if b, ok := p.boolField(fieldKey, v); ok {
-				spec.Sensitive, spec.HasSensitive = b, true
+				spec.Secret, spec.HasSecret = b, true
 			} else {
-				failed["sensitive"] = true
+				failed["secret"] = true
 			}
 		case "description":
 			spec.Description, _ = p.str(fieldKey, v)
@@ -274,6 +274,10 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 			default:
 				spec.ConnType = ct
 			}
+		case "sensitive":
+			// The key's earlier name. Still an unknown field, but one whose
+			// replacement is known, so the problem names it.
+			p.add(CodeUnknownField, fieldKey, "unknown field: use secret")
 		default:
 			p.add(CodeUnknownField, fieldKey, "unknown field")
 		}
@@ -338,10 +342,10 @@ func anyFailed(fields []string, failed map[string]bool) bool {
 // the caller can record the field in failed. A wrong type records a problem and
 // yields false.
 //
-// The second return matters for `sensitive` on a connection, which defaults to
+// The second return matters for `secret` on a connection, which defaults to
 // true: without it a failed decode overwrote that default with false and Check
-// then added "cannot be declared not sensitive", so one mistake produced two
-// problems and the second contradicted an author who wrote `sensitive = 'yes'`
+// then added "cannot be declared not secret", so one mistake produced two
+// problems and the second contradicted an author who wrote `secret = 'yes'`
 // meaning true.
 func (p *schemaParser) boolField(key string, raw any) (value, ok bool) {
 	v, isBool := raw.(bool)

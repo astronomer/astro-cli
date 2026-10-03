@@ -68,7 +68,7 @@ func TestDeclareANewName(t *testing.T) {
 			args:  []string{"db_main", "--type", "postgres", "--description", "Warehouse"},
 			kind:  localenv.KindConn,
 			decls: func(s *envschema.Schema) map[string]envschema.ValueSpec { return s.Connections },
-			want:  envschema.ValueSpec{ConnType: "postgres", Description: "Warehouse", Sensitive: true},
+			want:  envschema.ValueSpec{ConnType: "postgres", Description: "Warehouse", Secret: true},
 		},
 		{
 			noun:  "airflow-variable",
@@ -109,12 +109,12 @@ func TestDeclareKeepsWhatItWasNotGiven(t *testing.T) {
 	dir := envProject(t, "\n[tool.astro.env]\n# the API's token\n"+
 		"API_TOKEN = { type = 'string', optional = true, description = 'Token', source = 'workspace' }  # from EM\n")
 
-	res := declareJSON(t, dir, "variable", "declare", "API_TOKEN", "--sensitive")
+	res := declareJSON(t, dir, "variable", "declare", "API_TOKEN", "--secret")
 	assert.Equal(t, declStatusDeclared, res.Status)
 
 	assert.Equal(t, envschema.ValueSpec{
 		Type: envschema.TypeString, Optional: true, Description: "Token",
-		Source: envschema.SourceWorkspace, Sensitive: true, HasSensitive: true,
+		Source: envschema.SourceWorkspace, Secret: true, HasSecret: true,
 	}, declared(t, dir).EnvVars["API_TOKEN"])
 	body := readManifest(t, dir)
 	assert.Contains(t, body, "# the API's token")
@@ -134,7 +134,7 @@ func TestDeclareClearsAnAnnotationWhenAskedTo(t *testing.T) {
 func TestDeclareConnectionTypeIsTheConnType(t *testing.T) {
 	dir := envProject(t, "\n[tool.astro.env.connections]\ndb = { description = 'kept' }\n")
 	declareJSON(t, dir, "connection", "declare", "db", "--type", "snowflake")
-	assert.Equal(t, envschema.ValueSpec{ConnType: "snowflake", Description: "kept", Sensitive: true},
+	assert.Equal(t, envschema.ValueSpec{ConnType: "snowflake", Description: "kept", Secret: true},
 		declared(t, dir).Connections["db"])
 }
 
@@ -161,7 +161,7 @@ func TestDeclareFromTheWorkspace(t *testing.T) {
 
 	s := declared(t, dir)
 	assert.Equal(t, envschema.ValueSpec{
-		ConnType: "postgres", Optional: true, Source: envschema.SourceWorkspace, Sensitive: true,
+		ConnType: "postgres", Optional: true, Source: envschema.SourceWorkspace, Secret: true,
 	}, s.Connections["db"])
 	assert.Equal(t, envschema.ValueSpec{Source: envschema.SourceWorkspace}, s.AirflowVariables["zone"])
 
@@ -243,7 +243,7 @@ func TestDeclareAddressesALiteralEnvFormDeclaration(t *testing.T) {
 // undeclare removes the declaration and nothing else, and an undeclare of a
 // name that is not declared reports unchanged rather than failing.
 func TestUndeclare(t *testing.T) {
-	dir := envProject(t, "\n[tool.astro.env]\n# keep me\nLOG_LEVEL = 'info'\nAPI_TOKEN = { sensitive = true }\n")
+	dir := envProject(t, "\n[tool.astro.env]\n# keep me\nLOG_LEVEL = 'info'\nAPI_TOKEN = { secret = true }\n")
 
 	res := declareJSON(t, dir, "variable", "undeclare", "API_TOKEN")
 	assert.Equal(t, declStatusUndeclared, res.Status)
@@ -260,7 +260,7 @@ func TestUndeclare(t *testing.T) {
 // undeclare can remove the declaration that stops a section loading, which is
 // how that section gets fixed; declare on the same file is refused.
 func TestUndeclareFixesABrokenDeclaration(t *testing.T) {
-	dir := envProject(t, "\n[tool.astro.env]\nBAD = { sensitive = 'yes' }\nGOOD = {}\n")
+	dir := envProject(t, "\n[tool.astro.env]\nBAD = { secret = 'yes' }\nGOOD = {}\n")
 
 	d, _, _ := envDeps(t, dir, "")
 	require.Error(t, execute(t, d, "local", "env", "variable", "declare", "BAD", "--optional"))
@@ -273,7 +273,7 @@ func TestUndeclareFixesABrokenDeclaration(t *testing.T) {
 func TestDeclareRefusesAnUnparseableManifest(t *testing.T) {
 	for name, body := range map[string]string{
 		"toml error":   "\n[tool.astro.env\nX = {}\n",
-		"schema error": "\n[tool.astro.env]\nX = { sensitive = 'yes' }\n",
+		"schema error": "\n[tool.astro.env]\nX = { secret = 'yes' }\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := envProject(t, body)
@@ -307,16 +307,16 @@ func TestDeclareNeedsAProject(t *testing.T) {
 	assert.Equal(t, before, readManifest(t, dir))
 }
 
-// A refusal over a sensitive default never echoes the default, which is the
+// A refusal over a secret default never echoes the default, which is the
 // credential the rule exists to keep out of the file.
-func TestDeclareDoesNotEchoASensitiveDefault(t *testing.T) {
+func TestDeclareDoesNotEchoASecretDefault(t *testing.T) {
 	const secret = "hunter2-do-not-print"
 	for name, tc := range map[string]struct {
 		body string
 		args []string
 	}{
-		"given with --sensitive": {"", []string{"TOKEN", "--sensitive", "--default", secret}},
-		"already in the file":    {"\n[tool.astro.env]\nTOKEN = '" + secret + "'\n", []string{"TOKEN", "--sensitive"}},
+		"given with --secret": {"", []string{"TOKEN", "--secret", "--default", secret}},
+		"already in the file": {"\n[tool.astro.env]\nTOKEN = '" + secret + "'\n", []string{"TOKEN", "--secret"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := envProject(t, tc.body)
@@ -334,13 +334,13 @@ func TestDeclareDoesNotEchoASensitiveDefault(t *testing.T) {
 	}
 }
 
-// Declaring a name sensitive while its value sits in the plain .env says so,
+// Declaring a name secret while its value sits in the plain .env says so,
 // since the .env copy still wins at start until set moves it.
-func TestDeclareSensitiveNotesAPlaintextCopy(t *testing.T) {
+func TestDeclareSecretNotesAPlaintextCopy(t *testing.T) {
 	dir := envProject(t, "")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("API_TOKEN=x\n"), 0o600))
 	d, _, stderr := envDeps(t, dir, "")
-	require.NoError(t, execute(t, d, "local", "env", "variable", "declare", "API_TOKEN", "--sensitive"))
+	require.NoError(t, execute(t, d, "local", "env", "variable", "declare", "API_TOKEN", "--secret"))
 	assert.Contains(t, stderr.String(), "astro local env variable set API_TOKEN")
 }
 

@@ -33,7 +33,7 @@ const (
 	flagDeclEnum        = "enum"
 	flagDeclDescription = "description"
 	flagDeclOptional    = "optional"
-	flagDeclSensitive   = "sensitive"
+	flagDeclSecret      = "secret"
 	flagDeclSource      = "source"
 	flagDeclDefault     = "default"
 	flagDeclNoDefault   = "no-default"
@@ -73,7 +73,7 @@ type declareInput struct {
 	defaultValue string
 	noDefault    bool
 	optional     bool
-	sensitive    bool
+	secret       bool
 }
 
 // sectionFor maps a noun's kind to the part of [tool.astro.env] it declares in.
@@ -95,11 +95,11 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		"Only the annotations you pass change; the rest of the declaration, and any\n" +
 		"comments around it, stay as they are. No value is stored: use set for that."
 	if k.kind == localenv.KindConn {
-		long += "\n\nA connection is always sensitive and takes no default, type or enum; --type\n" +
+		long += "\n\nA connection is always secret and takes no default, type or enum; --type\n" +
 			"is the connection type, as it is for set."
 	} else {
-		long += "\n\n--sensitive keeps the value out of plain files: set stores it only in the\n" +
-			"vault. A sensitive name cannot have a default."
+		long += "\n\n--secret keeps the value out of plain files: set stores it only in the\n" +
+			"vault. A secret name cannot have a default."
 	}
 	long += "\n\n--source workspace resolves the name from the workspace's Environment Manager\n" +
 		"when no local file sets it. A name with a default cannot resolve from the\n" +
@@ -123,7 +123,7 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	}
 	f.StringVar(&in.typ, flagDeclType, "", "The value's type: string, int, number, bool, enum, url, port or json")
 	f.StringSliceVar(&in.enum, flagDeclEnum, nil, "The allowed values, comma-separated; implies --type enum")
-	f.BoolVar(&in.sensitive, flagDeclSensitive, false, "Store its value only in the vault; --sensitive=false clears it")
+	f.BoolVar(&in.secret, flagDeclSecret, false, "Store its value only in the vault; --secret=false clears it")
 	f.StringVar(&in.defaultValue, flagDeclDefault, "", "A default committed to pyproject.toml, used when nothing else sets it")
 	f.BoolVar(&in.noDefault, flagDeclNoDefault, false, "Remove the default")
 	cmd.MarkFlagsMutuallyExclusive(flagDeclDefault, flagDeclNoDefault)
@@ -147,7 +147,7 @@ func newEnvUndeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 // --source workspace declare into a general edit; see runEnvDeclare.
 var annotationFlags = []string{
 	flagDeclType, flagDeclEnum, flagDeclDescription, flagDeclOptional,
-	flagDeclSensitive, flagDeclDefault, flagDeclNoDefault,
+	flagDeclSecret, flagDeclDefault, flagDeclNoDefault,
 }
 
 func (c *cli) runEnvDeclare(cmd *cobra.Command, scope *scopeFlags, in *declareInput, kind localenv.Kind, name string) error {
@@ -201,7 +201,7 @@ func (c *cli) runEnvDeclare(cmd *cobra.Command, scope *scopeFlags, in *declareIn
 	if source == envschema.SourceWorkspace {
 		c.noteNoWorkspace(dir, res.Name)
 	}
-	if cmd.Flags().Changed(flagDeclSensitive) && in.sensitive {
+	if cmd.Flags().Changed(flagDeclSecret) && in.secret {
 		c.notePlaintextCopy(dir, kind, res.Name)
 	}
 	return r.Emit(res, func(w io.Writer) error {
@@ -362,8 +362,8 @@ func (in *declareInput) edit(cmd *cobra.Command, kind localenv.Kind, source envs
 				s.Type = envschema.TypeEnum
 			}
 		}
-		if given(flagDeclSensitive) {
-			s.Sensitive = in.sensitive
+		if given(flagDeclSecret) {
+			s.Secret = in.secret
 		}
 		switch {
 		case given(flagDeclDefault):
@@ -448,7 +448,7 @@ func (c *cli) noteNoWorkspace(dir, name string) {
 	fmt.Fprintf(c.d.Stderr, "note: [tool.astro] sets no workspace, so %s resolves only from local values until one is linked in Astro Desktop\n", name)
 }
 
-// notePlaintextCopy says, on stderr, that a name just declared sensitive still
+// notePlaintextCopy says, on stderr, that a name just declared secret still
 // has a copy in the project's plain .env, which outranks the vault at start.
 // The declaration changes where set stores the value next, not where it is
 // now, and moving it takes the value, which declare never asks for.

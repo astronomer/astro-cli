@@ -69,7 +69,7 @@ auth = { method = 'none' }
 
 [tool.astro.env]
 LOG_LEVEL = 'info' # committed on purpose
-API_TOKEN = { sensitive = true }
+API_TOKEN = { secret = true }
 `), 0o644))
 
 	var wg sync.WaitGroup
@@ -97,9 +97,9 @@ API_TOKEN = { sensitive = true }
 	require.NoError(t, err)
 	assert.Equal(t, "snowflake", schema.Connections["warehouse"].ConnType)
 	assert.Contains(t, schema.AirflowVariables, "batch_size")
-	assert.Equal(t, envschema.ValueSpec{Sensitive: true, HasSensitive: true, Source: envschema.SourceWorkspace},
+	assert.Equal(t, envschema.ValueSpec{Secret: true, HasSecret: true, Source: envschema.SourceWorkspace},
 		schema.EnvVars["API_TOKEN"])
-	assert.Equal(t, envschema.ValueSpec{Sensitive: true, ConnType: "postgres", Source: envschema.SourceWorkspace},
+	assert.Equal(t, envschema.ValueSpec{Secret: true, ConnType: "postgres", Source: envschema.SourceWorkspace},
 		schema.Connections["db_main"])
 
 	// Declare on a committed default is refused with a reason the desktop can

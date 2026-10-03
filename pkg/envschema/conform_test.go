@@ -67,7 +67,7 @@ func TestCheckValue(t *testing.T) {
 
 		{name: "enum accepts a member", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a", "b"}}, value: "a", ok: true},
 		{name: "enum refuses a non-member", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a", "b"}}, value: "c"},
-		{name: "enum is case sensitive", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a"}}, value: "A"},
+		{name: "enum is case secret", spec: ValueSpec{Type: TypeEnum, Enum: []string{"a"}}, value: "A"},
 		// An incomplete declaration, not a set admitting nothing. Check refuses
 		// the pairing so a manifest cannot reach it, but a caller holding a
 		// declaration mid-edit can.
@@ -90,13 +90,13 @@ func TestCheckValue(t *testing.T) {
 					t.Errorf("reason %q does not quote the offending value %q", reason, tc.value)
 				}
 
-				// ...unless the declaration is sensitive. Asserted for every
+				// ...unless the declaration is secret. Asserted for every
 				// refusing type, since every arm formats a value.
 				sens := tc.spec
-				sens.Sensitive = true
+				sens.Secret = true
 				sreason := sens.CheckValue(tc.value)
 				if sreason == "" {
-					t.Errorf("a sensitive declaration still has to refuse %q", tc.value)
+					t.Errorf("a secret declaration still has to refuse %q", tc.value)
 				}
 				// Asserted on the mechanism, not the value: a one-character
 				// fixture like the enum's "c" appears inside the word
@@ -104,27 +104,27 @@ func TestCheckValue(t *testing.T) {
 				// not one. The invariant is that no `, got "…"` clause is
 				// appended.
 				if strings.Contains(sreason, ", got ") {
-					t.Errorf("LEAK: sensitive reason %q still appends the value clause", sreason)
+					t.Errorf("LEAK: secret reason %q still appends the value clause", sreason)
 				}
 			}
 		})
 	}
 }
 
-// A sensitive value's contents never reach a Violation, which is what a caller
+// A secret value's contents never reach a Violation, which is what a caller
 // prints and streams as JSON.
 //
-// `{ sensitive = true, type = 'url' }` is legal — only sensitive+default is
+// `{ secret = true, type = 'url' }` is legal — only secret+default is
 // refused — and the value resolves from a vault or the shell, so a reason
 // carrying it would put a credential on stdout and in CI logs, unredactable
 // because it sits inside prose.
-func TestASensitiveValueNeverReachesAReason(t *testing.T) {
+func TestASecretValueNeverReachesAReason(t *testing.T) {
 	const secret = "hooks.slack.com/services/T00000/B00000/SuperSecretToken123"
-	spec := ValueSpec{Sensitive: true, Type: TypeURL}
+	spec := ValueSpec{Secret: true, Type: TypeURL}
 
 	// The premise: this declaration is legal, so the path is reachable.
 	if probs := spec.Check(SectionEnvVar); len(probs) != 0 {
-		t.Fatalf("sensitive+type must stay legal or this test proves nothing: %+v", probs)
+		t.Fatalf("secret+type must stay legal or this test proves nothing: %+v", probs)
 	}
 
 	if reason := spec.CheckValue(secret); reason == "" {
@@ -162,15 +162,15 @@ func TestEnumReasonNamesTheAllowedValues(t *testing.T) {
 
 	// The allowed set comes from the manifest, so it is not secret and stays
 	// even when the value is withheld.
-	spec.Sensitive = true
+	spec.Secret = true
 	sreason := spec.CheckValue("staging")
 	for _, want := range []string{"dev", "prod"} {
 		if !strings.Contains(sreason, want) {
-			t.Errorf("sensitive reason %q omits the allowed value %q", sreason, want)
+			t.Errorf("secret reason %q omits the allowed value %q", sreason, want)
 		}
 	}
 	if strings.Contains(sreason, ", got ") {
-		t.Errorf("LEAK: sensitive reason %q still appends the value clause", sreason)
+		t.Errorf("LEAK: secret reason %q still appends the value clause", sreason)
 	}
 }
 
@@ -185,8 +185,8 @@ func TestCheckValues(t *testing.T) {
 			"mode": {Type: TypeEnum, Enum: []string{"a", "b"}},
 		},
 		Connections: map[string]ValueSpec{
-			"warehouse": {Sensitive: true, ConnType: "snowflake"},
-			"anykind":   {Sensitive: true},
+			"warehouse": {Secret: true, ConnType: "snowflake"},
+			"anykind":   {Secret: true},
 		},
 	}
 
@@ -318,7 +318,7 @@ func TestConnTypeMismatch(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := CheckValues(
-				&Schema{Connections: map[string]ValueSpec{"c": {Sensitive: true, ConnType: tc.declared}}},
+				&Schema{Connections: map[string]ValueSpec{"c": {Secret: true, ConnType: tc.declared}}},
 				Values{Connections: map[string]string{"c": tc.resolved}},
 			)
 			if tc.flagged && len(got) != 1 {

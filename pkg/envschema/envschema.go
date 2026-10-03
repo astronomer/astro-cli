@@ -27,28 +27,28 @@
 //
 // A table declaration may carry annotations describing the value, all optional:
 //
-//	DB_PASSWORD  = { sensitive = true, description = 'Warehouse password' }
+//	DB_PASSWORD  = { secret = true, description = 'Warehouse password' }
 //	LOG_LEVEL    = { default = 'info', type = 'enum', enum = ['debug', 'info'] }
 //	SLACK_WEBHOOK = { optional = true, type = 'url' }
 //
-// `sensitive` says a value belongs in a vault rather than a plaintext file.
+// `secret` says a value belongs in a vault rather than a plaintext file.
 // Inferring sensitivity from a name is the guess that leaks a credential, so it
 // is declared instead.
 //
 // Writers route on it, and this package does not: it has no I/O, so the rule
 // lives with each writer. `astro local env <noun> set` stores every value in
 // the vault shared with Astro Desktop, encrypted, unless --plain opts out; it
-// refuses --plain for a declared-sensitive name, and refuses a --plain save
+// refuses --plain for a declared-secret name, and refuses a --plain save
 // when the declarations do not parse, rather than reading an unparseable
-// section as "nothing is sensitive". So the declaration decides only whether a
+// section as "nothing is secret". So the declaration decides only whether a
 // value may be stored unencrypted.
 //
-// A sensitive declaration may not carry a `default`. A default is committed to
-// the manifest and injected at start, so `{ sensitive = true, default = ... }`
+// A secret declaration may not carry a `default`. A default is committed to
+// the manifest and injected at start, so `{ secret = true, default = ... }`
 // would put the credential in git and in the compose file docker mode writes —
 // the exact outcome the flag exists to prevent.
 //
-// Connections are sensitive unconditionally, and `sensitive` under
+// Connections are secret unconditionally, and `secret` under
 // [tool.astro.env.connections] is refused whichever value it carries. A
 // connection holds a credential by construction, so a per-declaration opt-in
 // would mean every connection that forgot the flag read as plaintext-safe —
@@ -143,20 +143,20 @@ type ValueSpec struct {
 	// Default. Optional exempts this declaration from the missing-value gate,
 	// and false — the zero value, and what every manifest written before the key
 	// means — is required; the package doc says why it is not `Required`.
-	// Sensitive says the value belongs in a vault rather than a plaintext file,
+	// Secret says the value belongs in a vault rather than a plaintext file,
 	// declared rather than inferred because guessing it from the name is how a
 	// credential ends up in .env.
 	//
-	// HasSensitive says the key was WRITTEN, whatever its value, which Sensitive
-	// alone cannot express: a connection starts sensitive, so an absent key and
-	// `sensitive = true` both arrive as true. Check needs the difference,
+	// HasSecret says the key was WRITTEN, whatever its value, which Secret
+	// alone cannot express: a connection starts secret, so an absent key and
+	// `secret = true` both arrive as true. Check needs the difference,
 	// because under connections the two mean different things — one is the
 	// normal case, the other is an author who believes the flag is theirs to
 	// choose. Same job HasDefault does for Default.
-	HasDefault   bool
-	Optional     bool
-	Sensitive    bool
-	HasSensitive bool
+	HasDefault bool
+	Optional   bool
+	Secret     bool
+	HasSecret  bool
 }
 
 // ProblemCode names the rule a problem came from.
@@ -202,15 +202,15 @@ const (
 	CodeUnknownSource ProblemCode = "unknown_source"
 
 	// Checking a decoded declaration against the rules (see SpecProblem).
-	// CodeSensitiveDefault: a sensitive value carries a default, which would
+	// CodeSecretDefault: a secret value carries a default, which would
 	// be committed to the manifest.
-	CodeSensitiveDefault ProblemCode = "sensitive_default"
-	// CodeConnectionNotSensitive: a connection declared sensitive = false,
+	CodeSecretDefault ProblemCode = "secret_default"
+	// CodeConnectionNotSecret: a connection declared secret = false,
 	// which contradicts what a connection is.
-	CodeConnectionNotSensitive ProblemCode = "connection_not_sensitive"
-	// CodeConnectionSensitiveRedundant: a connection declared sensitive =
+	CodeConnectionNotSecret ProblemCode = "connection_not_secret"
+	// CodeConnectionSecretRedundant: a connection declared secret =
 	// true, which says nothing its section has not already said.
-	CodeConnectionSensitiveRedundant ProblemCode = "connection_sensitive_redundant"
+	CodeConnectionSecretRedundant ProblemCode = "connection_secret_redundant"
 	// CodeTypeOnConnection: `type` on a connection, which declares its kind
 	// with conn_type.
 	CodeTypeOnConnection ProblemCode = "type_on_connection"
@@ -239,8 +239,8 @@ var problemCodes = []ProblemCode{
 	CodeNameInvalid, CodeEmptyType, CodeEmptyEnum, CodeEmptyConnType,
 	CodeUnknownSource,
 
-	CodeSensitiveDefault, CodeConnectionNotSensitive,
-	CodeConnectionSensitiveRedundant, CodeTypeOnConnection,
+	CodeSecretDefault, CodeConnectionNotSecret,
+	CodeConnectionSecretRedundant, CodeTypeOnConnection,
 	CodeEnumOnConnection, CodeConnTypeOutsideConnections, CodeUnknownType,
 	CodeEnumNeedsType, CodeEnumTypeNeedsValues,
 }
@@ -255,7 +255,7 @@ type SpecProblem struct {
 	// Code names the rule, and is the part a caller may rely on. Reason is
 	// the part a person reads; see ProblemCode for why they are separate.
 	Code ProblemCode
-	// Field is the annotation at fault — "default", "sensitive", "type",
+	// Field is the annotation at fault — "default", "secret", "type",
 	// "enum", "conn_type" — or "" for the declaration as a whole.
 	Field string
 	// Reads names every annotation the rule consulted, which is not always just
@@ -280,7 +280,7 @@ type SpecProblem struct {
 // next `astro local start` refuses to load.
 //
 // Well-formedness only. Whether a value RESOLVES is Validate's question, and
-// whether the TOML decoded at all is the reader's. `{ sensitive = true,
+// whether the TOML decoded at all is the reader's. `{ secret = true,
 // default = 'x' }` decodes perfectly and is still not something anyone may
 // mean.
 //
@@ -328,14 +328,14 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 		skipTypeCoherence = true
 	}
 
-	// A connection carries a credential by construction, so `sensitive` is not
+	// A connection carries a credential by construction, so `secret` is not
 	// an author's to state — either value is refused, rather than one being
 	// rejected and the other quietly ignored. That is the same rule `type` and
 	// `enum` get above, and for the same reason: a key that is accepted and
 	// does nothing reads as a key that works.
 	//
 	// The two values are wrong in different ways, so they are told apart.
-	// `sensitive = false` contradicts what a connection is. `sensitive = true`
+	// `secret = false` contradicts what a connection is. `secret = true`
 	// agrees with it, but writing it means believing the flag decides — and an
 	// author who believes that has a reason to think omitting it would make the
 	// connection plaintext.
@@ -348,34 +348,34 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 	// already called it an error. The same change after a release would be worth
 	// arguing about; before one it costs nothing.
 	//
-	// Keyed on HasSensitive, not on the value: a reader defaults an absent key
-	// to true for a connection, so Sensitive alone cannot tell "said so" from
-	// "said nothing". The !s.Sensitive arm needs no such guard — nothing
+	// Keyed on HasSecret, not on the value: a reader defaults an absent key
+	// to true for a connection, so Secret alone cannot tell "said so" from
+	// "said nothing". The !s.Secret arm needs no such guard — nothing
 	// defaults a connection to false, so reaching it means either an explicit
 	// false or a constructed spec that skipped the rule.
 	switch {
 	case section != SectionConnection:
-	case !s.Sensitive:
-		add(CodeConnectionNotSensitive, "sensitive", "a connection always holds a credential, so it cannot be declared not sensitive")
-	case s.HasSensitive:
-		add(CodeConnectionSensitiveRedundant, "sensitive", "a connection is always sensitive, so sensitive = true adds nothing — remove it; the vault is chosen by the section, not by this flag")
+	case !s.Secret:
+		add(CodeConnectionNotSecret, "secret", "a connection always holds a credential, so it cannot be declared not secret")
+	case s.HasSecret:
+		add(CodeConnectionSecretRedundant, "secret", "a connection is always secret, so secret = true adds nothing — remove it; the vault is chosen by the section, not by this flag")
 	}
 
-	// A sensitive value may not carry a default. A default is committed to the
+	// A secret value may not carry a default. A default is committed to the
 	// manifest and injected into the environment at start, so this would put the
 	// credential in version control and on disk — the one thing the flag exists
 	// to prevent.
-	// Keyed on the section as well as the flag: a connection is sensitive by
+	// Keyed on the section as well as the flag: a connection is secret by
 	// definition, so a constructed spec carrying a default must be told about
-	// the credential even when nothing set Sensitive.
-	if (s.Sensitive || section == SectionConnection) && s.HasDefault {
-		what := "a sensitive value"
+	// the credential even when nothing set Secret.
+	if (s.Secret || section == SectionConnection) && s.HasDefault {
+		what := "a secret value"
 		if section == SectionConnection {
-			// Nobody had to write `sensitive` for a connection, so name the
+			// Nobody had to write `secret` for a connection, so name the
 			// reason it is one.
-			what = "a connection, which is always sensitive,"
+			what = "a connection, which is always secret,"
 		}
-		add(CodeSensitiveDefault, "default", what+" must not carry a default: it would be committed to the manifest and written into the environment on start", "default", "sensitive")
+		add(CodeSecretDefault, "default", what+" must not carry a default: it would be committed to the manifest and written into the environment on start", "default", "secret")
 	}
 
 	if s.ConnType != "" && section != SectionConnection {

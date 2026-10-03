@@ -46,10 +46,10 @@ func hasKey(keys []string, key string) bool {
 	return false
 }
 
-// A name the manifest declares sensitive goes to the vault, as every value does
+// A name the manifest declares secret goes to the vault, as every value does
 // by default, and the project's .env is not touched.
-func TestSetVaultsADeclaredSensitiveName(t *testing.T) {
-	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
+func TestSetVaultsADeclaredSecretName(t *testing.T) {
+	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
 	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
@@ -57,7 +57,7 @@ func TestSetVaultsADeclaredSensitiveName(t *testing.T) {
 	}
 
 	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, "API_TOKEN") {
-		t.Errorf("a declared-sensitive value was written to the plaintext .env (keys: %v)", keys)
+		t.Errorf("a declared-secret value was written to the plaintext .env (keys: %v)", keys)
 	}
 	if n := len(vaultFiles(t)); n != 1 {
 		t.Errorf("vault holds %d entries, want exactly one", n)
@@ -68,7 +68,7 @@ func TestSetVaultsADeclaredSensitiveName(t *testing.T) {
 }
 
 // A declared connection is vaulted: every connection is by default, and a
-// declared one is sensitive besides (envschema refuses saying otherwise).
+// declared one is secret besides (envschema refuses saying otherwise).
 func TestSetVaultsADeclaredConnection(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env.connections]\ndb_main = {}\n")
 
@@ -84,9 +84,9 @@ func TestSetVaultsADeclaredConnection(t *testing.T) {
 	}
 }
 
-// Declared but not sensitive, and not declared at all: --plain keeps both in
+// Declared but not secret, and not declared at all: --plain keeps both in
 // the plaintext file.
-func TestPlainKeepsNonSensitiveNamesInTheFile(t *testing.T) {
+func TestPlainKeepsNonSecretNamesInTheFile(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nLOG_LEVEL = {}\n")
 
 	for _, name := range []string{"LOG_LEVEL", "UNDECLARED"} {
@@ -99,15 +99,15 @@ func TestPlainKeepsNonSensitiveNamesInTheFile(t *testing.T) {
 		}
 	}
 	if names := vaultFiles(t); len(names) != 0 {
-		t.Errorf("non-sensitive sets reached the vault: %d entries", len(names))
+		t.Errorf("non-secret sets reached the vault: %d entries", len(names))
 	}
 }
 
 // A --plain set that cannot read the declarations refuses rather than guessing
-// "not sensitive", and writes nothing anywhere.
+// "not secret", and writes nothing anywhere.
 func TestPlainSetRefusesWhenTheDeclarationsDoNotRead(t *testing.T) {
 	for name, body := range map[string]string{
-		"schema error": "[tool.astro.env]\nAPI_TOKEN = { sensitive = 'yes' }\n",
+		"schema error": "[tool.astro.env]\nAPI_TOKEN = { secret = 'yes' }\n",
 		"toml error":   "[tool.astro.env\nAPI_TOKEN = {}\n",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -138,14 +138,14 @@ func TestPlainSetRefusesWhenTheDeclarationsDoNotRead(t *testing.T) {
 	}
 }
 
-// --plain is an explicit request for an unencrypted copy, which a sensitive
+// --plain is an explicit request for an unencrypted copy, which a secret
 // declaration rules out. Refused, with nothing written, in either scope.
-func TestSetRefusesPlaintextForADeclaredSensitiveName(t *testing.T) {
+func TestSetRefusesPlaintextForADeclaredSecretName(t *testing.T) {
 	cases := []struct {
 		name, body, noun, arg, value, envKey string
 	}{
-		{"variable", "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n", "variable", "API_TOKEN", "s3cr3t", "API_TOKEN"},
-		{"airflow variable", "[tool.astro.env.airflow_variables]\napi_key = { sensitive = true }\n", "airflow-variable", "api_key", "s3cr3t", "AIRFLOW_VAR_API_KEY"},
+		{"variable", "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n", "variable", "API_TOKEN", "s3cr3t", "API_TOKEN"},
+		{"airflow variable", "[tool.astro.env.airflow_variables]\napi_key = { secret = true }\n", "airflow-variable", "api_key", "s3cr3t", "AIRFLOW_VAR_API_KEY"},
 		{"connection", "[tool.astro.env.connections]\ndb_main = {}\n", "connection", "db_main", "postgres://u:p@h/db", "AIRFLOW_CONN_DB_MAIN"},
 	}
 	for _, tc := range cases {
@@ -156,7 +156,7 @@ func TestSetRefusesPlaintextForADeclaredSensitiveName(t *testing.T) {
 				d, _, _ := envDeps(t, dir, tc.value+"\n")
 				err := execute(t, d, append([]string{"local", "env", tc.noun, "set", tc.arg}, flags...)...)
 				if err == nil {
-					t.Fatalf("want %v refused for a declared-sensitive name", flags)
+					t.Fatalf("want %v refused for a declared-secret name", flags)
 				}
 				if !strings.Contains(err.Error(), "--plain") {
 					t.Errorf("the refusal should name the flag that asked for plaintext: %v", err)
@@ -172,10 +172,10 @@ func TestSetRefusesPlaintextForADeclaredSensitiveName(t *testing.T) {
 	}
 }
 
-// A plaintext copy written before the name was declared sensitive, or by hand,
+// A plaintext copy written before the name was declared secret, or by hand,
 // is removed by the next set, which vaults the value.
 func TestSetRemovesThePlaintextCopyOfAPromotedName(t *testing.T) {
-	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
+	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("KEEP=1\nAPI_TOKEN=old\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestPlainSetNeedsNoKeyring(t *testing.T) {
 // A default set on a machine with no keyring refuses, names --plain as the way
 // to store it unencrypted, and does not fall back to the plaintext file.
 func TestDefaultSetRefusesWithoutAKeyring(t *testing.T) {
-	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
+	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
 
 	for _, name := range []string{"API_TOKEN", "UNDECLARED"} {
@@ -281,10 +281,10 @@ func TestDefaultSetRefusesWithoutAKeyring(t *testing.T) {
 	}
 }
 
-// delete removes a declared-sensitive name from the vault,
+// delete removes a declared-secret name from the vault,
 // along with any plaintext copy in the same scope.
-func TestDeleteOfADeclaredSensitiveNameClearsBothStores(t *testing.T) {
-	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
+func TestDeleteOfADeclaredSecretNameClearsBothStores(t *testing.T) {
+	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
 	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
@@ -307,10 +307,10 @@ func TestDeleteOfADeclaredSensitiveNameClearsBothStores(t *testing.T) {
 	}
 }
 
-// delete --plain is how a stale plaintext copy of a sensitive name is
+// delete --plain is how a stale plaintext copy of a secret name is
 // removed on its own, so it is not refused the way a plaintext set is.
-func TestDeletePlaintextCopyOfASensitiveNameIsAllowed(t *testing.T) {
-	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
+func TestDeletePlaintextCopyOfASecretNameIsAllowed(t *testing.T) {
+	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("API_TOKEN=hand\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

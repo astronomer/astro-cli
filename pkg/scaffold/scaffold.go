@@ -453,7 +453,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// would keep the project's Dockerfile alive if these went there. They are
 	// the opposite KIND of statement: Notes is work outstanding, an advisory is
 	// a change already made.
-	cs.Advisories = append(cs.Advisories, v1.envSchema.advisories...)
+	cs.Advisories = append(cs.Advisories, v1.settings.carriedAdvisories()...)
 	cs.Advisories = append(cs.Advisories, v1.settings.pools.advisories...)
 	if a := v1.deployLinkAdvisory(); a != "" {
 		cs.Advisories = append(cs.Advisories, a)
@@ -624,7 +624,7 @@ func setV1Declarations(ed tomledit.Editor, v1 *v1Project) error {
 	if err := setDockerfileDeclaration(ed, v1); err != nil {
 		return err
 	}
-	if err := setEnvDeclarations(ed, v1.envSchema); err != nil {
+	if err := setEnvDeclarations(ed, &v1.settings); err != nil {
 		return err
 	}
 	if err := setDeployLink(ed, v1); err != nil {
@@ -719,8 +719,8 @@ func migratedLabels(v1 *v1Project) []string {
 	if len(v1.packages) > 0 {
 		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
 	}
-	if v1.envSchema.declares() {
-		out = append(out, manifest.Marker+" (migrated "+migratedFrom(v1)+" into [tool.astro.env])")
+	if v1.settings.declares() {
+		out = append(out, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
 	}
 	out = appendLabel(out, poolsLabel(v1.settings.pools.byName))
 
@@ -1118,9 +1118,8 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// Every name printed below is slash-form, and joined only to look a file
 	// up. A name reaches a json contract a consumer parses, so it has to read
 	// the same on every platform: filepath.Join once reported
-	// `.astro\config.yaml` on Windows while envschema.LegacyRelPath, a
-	// slash-form constant, reported `.astro/env.schema.yaml` in the same list,
-	// one contract disagreeing with itself about two files in one directory.
+	// `.astro\config.yaml` on Windows while the other names in the same list
+	// were slash-form, one contract disagreeing with itself.
 	// v1ConfigRelPath, the only nested name emitted now, is that same kind of
 	// constant and is concatenated rather than joined.
 	var out []string

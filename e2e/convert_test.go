@@ -267,49 +267,18 @@ func v1Cases() []v1Case {
 			},
 		},
 		{
-			// The desktop's env schema. Its connections are DECLARATIONS, so
-			// they reach the manifest and nothing reaches the vault — which is
-			// what keeps this case in tier 0 while a settings file with a
-			// connection value is not here at all.
-			name: "the desktop's env schema",
+			// An env schema left by an older desktop build is not a v1 file:
+			// the conversion reads nothing from it, says nothing about it, and
+			// leaves it where it is.
+			name: "an old desktop env schema is ignored",
 			files: map[string]string{
-				"Dockerfile": runtime2,
-				".astro/env.schema.yaml": "env_vars:\n" +
-					"  - key: API_URL\n" +
-					"    required: true\n" +
-					"    description: where the orders service lives\n" +
-					"  - key: BATCH_SIZE\n" +
-					"    default: \"500\"\n" +
-					"airflow_variables:\n" +
-					"  - key: region\n" +
-					"    default: us-east-1\n" +
-					"connections:\n" +
-					"  - conn_id: warehouse\n" +
-					"    conn_type: postgres\n",
+				"Dockerfile":             runtime2,
+				".astro/env.schema.yaml": "env_vars:\n  - key: API_URL\n    required: true\n",
 			},
-			airflow: "2",
-			manifestHas: []string{
-				"[tool.astro.env]",
-				"API_URL",
-				"where the orders service lives",
-				"BATCH_SIZE",
-				"default = '500'",
-				"[tool.astro.env.airflow_variables]",
-				"region",
-				"default = 'us-east-1'",
-				"[tool.astro.env.connections]",
-				"warehouse",
-				"conn_type = 'postgres'",
-			},
-			retired: []string{".astro/env.schema.yaml"},
-			// Not a note: a v1 default was documentation and was never applied,
-			// and now it is composed into the environment at start. Nothing is
-			// left to do and the project behaves differently, which is the
-			// whole reason advisories are a separate list.
-			advisories: []string{
-				"BATCH_SIZE: its default is now composed into the environment at start",
-				"region: its default is now composed into the environment at start",
-			},
+			airflow:       "2",
+			manifestLacks: []string{"[tool.astro.env", "API_URL"},
+			kept:          []string{".astro/env.schema.yaml"},
+			keptHas:       map[string]string{".astro/env.schema.yaml": "API_URL"},
 		},
 		{
 			// A manifest that already pins Airflow keeps its own pin: the
@@ -387,7 +356,7 @@ func v1Cases() []v1Case {
 			airflow: "2",
 			manifestHas: []string{
 				"[tool.astro.env.airflow_variables]",
-				"region = {optional = true, sensitive = true}",
+				"region = {optional = true, secret = true}",
 			},
 			manifestLacks: []string{"default"},
 			retired:       []string{"airflow_settings.yaml"},

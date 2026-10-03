@@ -396,8 +396,8 @@ func TestListMarksAGlobalByProjectCopiesOnly(t *testing.T) {
 	// applied instead. An Airflow setting is no orphan, so it gets no hint.
 	want := map[string]string{
 		"IN_SHELL global":                               "astro local env variable declare IN_SHELL",
-		"IN_VAULT project vault":                        "astro local env variable declare IN_VAULT --sensitive",
-		"token global vault":                            "astro local env airflow-variable declare token --sensitive",
+		"IN_VAULT project vault":                        "astro local env variable declare IN_VAULT --secret",
+		"token global vault":                            "astro local env airflow-variable declare token --secret",
 		"AIRFLOW__SECRETS__BACKEND_KWARGS global vault": "",
 	}
 	if len(marked) != len(want) {
@@ -424,7 +424,7 @@ func TestListOutsideAProjectLeavesGlobalUnmarked(t *testing.T) {
 	}
 }
 
-// Each declared row carries its declaration's required, sensitive and
+// Each declared row carries its declaration's required, secret and
 // description, per section, so `list --output json` answers what the manifest
 // asks for without a second read of it. An orphan has no declaration and
 // carries none of them.
@@ -436,14 +436,14 @@ func TestListCarriesTheDeclarationFlags(t *testing.T) {
 	}
 	schema := &envschema.Schema{
 		EnvVars: map[string]envschema.ValueSpec{
-			"API_TOKEN": {Sensitive: true, Description: "Token for the API"},
+			"API_TOKEN": {Secret: true, Description: "Token for the API"},
 			"LOG_LEVEL": {Optional: true},
 		},
 		AirflowVariables: map[string]envschema.ValueSpec{
 			"region": {Description: "Deploy region"},
 		},
 		Connections: map[string]envschema.ValueSpec{
-			"db_main": {Sensitive: true, Optional: true},
+			"db_main": {Secret: true, Optional: true},
 		},
 	}
 	items, err := List(nil, projDir, schema, ListOptions{})
@@ -451,8 +451,8 @@ func TestListCarriesTheDeclarationFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	type flags struct {
-		required, sensitive bool
-		description         string
+		required, secret bool
+		description      string
 	}
 	want := map[string]flags{
 		"API_TOKEN": {true, true, "Token for the API"},
@@ -463,7 +463,7 @@ func TestListCarriesTheDeclarationFlags(t *testing.T) {
 	}
 	got := map[string]flags{}
 	for _, it := range items {
-		got[it.Name] = flags{it.Required, it.Sensitive, it.Description}
+		got[it.Name] = flags{it.Required, it.Secret, it.Description}
 	}
 	for name, w := range want {
 		g, ok := got[name]

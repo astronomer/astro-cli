@@ -356,7 +356,6 @@ func TestGitIgnoresThePerMachineFiles(t *testing.T) {
 	}
 	shared := []string{
 		".astro/config.yaml",
-		".astro/env.schema.yaml",
 		".astro/otto/permissions.json",
 		".astro/otto/extensions.json",
 		".astro/memory/MEMORY.md",
