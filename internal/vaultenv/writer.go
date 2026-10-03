@@ -168,6 +168,7 @@ func (w *Writer) setSecret(vaultKey, value string) error {
 	if err := w.store.Set(vaultKey, value); err != nil {
 		return err
 	}
+	// TODO(vault-v1-retire): goes with secrets.Upgrade; see pkg/secrets.
 	_, _ = secrets.Upgrade(w.store) //nolint:errcheck // see above
 	return nil
 }

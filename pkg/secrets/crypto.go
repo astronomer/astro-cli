@@ -162,6 +162,9 @@ func (c *vaultCipher) open(name, value string) (plain string, legacy bool, err e
 		}
 		return plain, false, nil
 	case strings.HasPrefix(value, encPrefixV1):
+		// TODO(vault-v1-retire): drop this case and the bare "" one below; see
+		// upgrade.go for when.
+		//
 		// No key id and no AAD: a failure here cannot say whether the key or the
 		// value is wrong, so it carries neither sentinel.
 		plain, err := c.openRaw(strings.TrimPrefix(value, encPrefixV1), nil)

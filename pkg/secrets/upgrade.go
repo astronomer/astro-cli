@@ -16,6 +16,13 @@ import (
 // ListMeta and hasValues skip it.
 const upgradeLock = "upgrade.lock"
 
+// TODO(vault-v1-retire): remove this file, the older-form cases in open (the
+// enc:v1: envelope and the bare ""), and the sweep calls in internal/vaultenv
+// and Astro Desktop, once a public release of both the CLI and Astro Desktop
+// has shipped with enc:v2. No release wrote the older form, so only
+// pre-release vaults carry it, and any build with the sweep upgrades them.
+// Retire both tools' copies together: they share the vault.
+
 // Upgrader rewrites values stored in an older envelope in the current one: see
 // Upgrade. A separate interface, like PlainSetter, so a Store a caller wraps or
 // fakes keeps compiling; the store NewKeyringStore returns implements it.
