@@ -114,7 +114,7 @@ func devEnv(env []string) []string {
 }
 
 // devDefaults are the Airflow settings local dev runs with unless the project
-// or the shell sets them, per the design: fast DAG rescan and zero
+// or the shell sets them (docs/v2-architecture.md, "Dev-mode Airflow defaults"): fast DAG rescan and zero
 // default task retries. In Airflow 3 the dag-processor is a separate
 // component with its own config section, where dag_dir_list_interval is named
 // refresh_interval, so both the scheduler and dag_processor intervals are set.
@@ -124,8 +124,7 @@ func devEnv(env []string) []string {
 // one-DAG project; at 3 it idles at 1-2% and a saved change shows within ~5s.
 //
 // DAGs are created UNPAUSED but the scheduler creates no runs of its own,
-// which reverses what decision 13 originally said; docs/v2-architecture.md
-// carries the amended wording.
+// as docs/v2-architecture.md describes.
 //
 // Paused-at-creation is a deployment default. It stops a DAG that lands on a
 // shared scheduler from running before anyone has looked at it. Locally there

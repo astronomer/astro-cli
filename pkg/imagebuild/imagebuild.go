@@ -12,7 +12,7 @@
 // the other.
 //
 // It was lifted out of internal/localdocker so the v2 deploy path can build the
-// same image the local Docker engine builds (docs/v2-deploy.md, decision 7 and
+// same image the local Docker engine builds (docs/v2-deploy.md,
 // section 1). Its inputs are manifest-shaped — Python dependencies, OS packages,
 // a runtime base image, a tag — so it depends on neither localdocker nor a
 // deploy package; each caller resolves the manifest to a Request and hands it

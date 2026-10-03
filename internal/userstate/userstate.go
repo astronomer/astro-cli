@@ -49,7 +49,7 @@ type State struct {
 // keeps its pin either way.
 //
 // Drop the fallback and the dual write together at cutover, when no build in
-// the field reads the old name (docs/v2-release.md, D2).
+// the field reads the old name.
 //
 // UnmarshalJSON decodes a state file, taking the pin from the older name when
 // the current one is absent.

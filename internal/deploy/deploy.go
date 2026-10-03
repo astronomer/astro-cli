@@ -46,7 +46,7 @@ type Request struct {
 	// Preselect is what the ambient layers point at: ASTRO_DEPLOYMENT, then the
 	// project's `astro use` pin. It moves the cursor in the prompt and does
 	// nothing else — a deploy is never decided by state the user cannot see on
-	// the command line (docs/v2-instances.md decision 2).
+	// the command line (docs/v2-instances.md, "Deploy always asks").
 	Preselect string
 	// PreselectFrom names where Preselect came from, for the prompt's label:
 	// the env var's name, or "pinned". Ignored when Preselect is empty.
@@ -426,7 +426,7 @@ var ErrAborted = errors.New("no deployment selected")
 // resolveTarget settles which deployment this run ships to.
 //
 // Deploy is the one command that never resolves from ambient state
-// (docs/v2-instances.md decision 2): shipping code is too consequential to
+// (docs/v2-instances.md, "Deploy always asks"): shipping code is too consequential to
 // decide from a pin, an exported variable, or a marker in a file nobody looked
 // at. So there are exactly two ways here — the target is named on the command
 // line, or an interactive run is asked and answers. A pin, ASTRO_DEPLOYMENT, or
@@ -521,7 +521,7 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 // highlight came from, and only one of the three sources is the manifest's
 // marker. A prompt that says "← default" over an entry ASTRO_DEPLOYMENT put
 // there is telling the reader their file says something it does not — which is
-// the invisible-state surprise decision 2 exists to prevent, reintroduced as a
+// the invisible-state surprise "deploy always asks" exists to prevent, reintroduced as a
 // caption.
 type Preselect struct {
 	// Name is the deployment to highlight, "" when nothing points anywhere.

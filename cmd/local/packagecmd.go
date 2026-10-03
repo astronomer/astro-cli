@@ -26,8 +26,8 @@ const defaultPackagePlatform = "linux/amd64"
 // NewPackageCmd builds `astro package [target]` for a root to mount. It reads
 // the manifest and the project files, needs no account and no deployment link,
 // and touches the network only to pull a base image — the CI build stage
-// (docs/v2-deploy.md, section 4). Only the astro target builds in the MVP; the
-// rest are staged.
+// (docs/v2-deploy.md, section 4). The astro, mwaa and composer targets build;
+// oss is registered but not built.
 func NewPackageCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := newPackageCmd(c)

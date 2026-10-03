@@ -145,9 +145,8 @@ func newEnvCmd(c *cli) *cobra.Command {
 		Use:   "env",
 		Short: "Manage environment values for local Airflow",
 		// Wrapped by hand at the same width as `astro env --help`, which cobra
-		// does not do for us. What used to follow here moved to where it is
-		// needed: the keyring requirement for --secret is on `set --help`, and
-		// the files' 0600 mode is in docs/v2-secrets.md.
+		// does not do for us. The keyring requirement and --plain are on
+		// `set --help`, and the files' 0600 mode is in docs/v2-secrets.md.
 		Long: "Manage environment values for local Airflow: environment variables,\n" +
 			"connections, and Airflow variables.\n\n" +
 			"Values are stored in the encrypted vault, for the project or with --global for\n" +

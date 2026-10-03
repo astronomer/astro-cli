@@ -67,7 +67,7 @@ type ImageDeployV2Result struct {
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
-// (docs/v2-deploy.md decision 5). An image deploy needs a container builder;
+// (docs/v2-deploy.md, section 5). An image deploy needs a container builder;
 // dags-only does not.
 var errNoDocker = errors.New("an image deploy needs Docker, but no running container engine was found. Start Docker and try again, or run 'astro deploy --dags' to deploy just your DAGs (no Docker needed). Server-side builds are coming")
 
@@ -89,7 +89,7 @@ var (
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployDagsV2,
 // neither prints nor exits — it returns a result for cmd to render.
 //
-// Docker is required and checked before any transport work (decision 5).
+// Docker is required and checked before any transport work (docs/v2-deploy.md, section 5).
 //
 //nolint:gocritic // value input keeps this seam symmetric with DeployDagsV2
 func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (ImageDeployV2Result, error) {

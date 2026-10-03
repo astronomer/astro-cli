@@ -763,7 +763,7 @@ const deployPromptAttempts = 3
 // ConfirmTarget asks which deployment to ship to. Every interactive deploy that
 // did not name its target comes through here — a pin, ASTRO_DEPLOYMENT, or a
 // `default = true` marker moves the cursor and never skips the question
-// (docs/v2-instances.md decision 2).
+// (docs/v2-instances.md, "Deploy always asks").
 //
 // The highlight is labeled with what put it there, not with one word for all
 // three: a cursor sitting on an entry because a variable is exported in this

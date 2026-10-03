@@ -245,7 +245,7 @@ func (proxyDaemon) EnsureRunning() (string, error) {
 func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
 
 // newProxyDaemon returns the daemon seam, or nil on Windows, where the proxy
-// is unsupported (decision 12): the engines skip the daemon and Airflow stays
+// is unsupported (docs/v2-architecture.md, "Platform support"): the engines skip the daemon and Airflow stays
 // reachable on its direct localhost port.
 func newProxyDaemon() localrt.ProxyDaemon {
 	if runtime.GOOS == "windows" {

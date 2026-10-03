@@ -240,7 +240,7 @@ type Link struct {
 	// picked one: the last layer of the query commands' resolution rule, and
 	// the entry `astro deploy` highlights in its prompt. It does not decide a
 	// deploy — deploy always asks, and this only moves the cursor
-	// (docs/v2-instances.md decision 2). At most one link in a manifest may set
+	// (docs/v2-instances.md, "Deploy always asks"). At most one link in a manifest may set
 	// it.
 	Default bool
 }
