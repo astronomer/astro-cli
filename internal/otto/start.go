@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/astronomer/astro-cli/pkg/connwarehouse"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -76,14 +77,17 @@ func Start(args []string) error {
 	cfg.AirflowURL, cfg.AirflowV2 = DetectAirflow()
 
 	// Help and version exit before Otto reads anything, so they neither need
-	// the warehouses nor should open the keychain for them.
+	// the warehouses nor should open the keychain for them. The warehouses'
+	// secrets travel in Otto's environment, which its analyzing-data kernel
+	// inherits, rather than in a file.
+	var warehouses []connwarehouse.Materialized
 	if !isHelpOrVersion(args) {
 		if cwd, err := os.Getwd(); err == nil {
-			writeWarehouses(cwd)
+			warehouses = writeWarehouses(cwd)
 		}
 	}
 
-	return spawnOtto(BinaryPath(), args, cfg.BuildEnv())
+	return spawnOtto(BinaryPath(), args, connwarehouse.AppendEnv(cfg.BuildEnv(), warehouses))
 }
 
 // spawnOtto runs the Otto binary in the foreground and waits for it. A var so

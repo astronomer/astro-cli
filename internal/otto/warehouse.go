@@ -80,18 +80,21 @@ func warehouseConnections(projectDir string, v2 bool) []connmodel.Connection {
 // test writes under a temp directory rather than the real ~/.astro/agents.
 var warehouseDir = connwarehouse.ConfigDir
 
-// writeWarehouses rewrites ~/.astro/agents/warehouse.yml and .env from the
-// connections that reach the checkout at cwd, so Otto's analyzing-data skill
-// can query the same warehouses whichever tool launched it. The files are
-// global, so they are regenerated on every launch to match where Otto runs.
+// writeWarehouses rewrites ~/.astro/agents/warehouse.yml from the connections
+// that reach the checkout at cwd, so Otto's analyzing-data skill can query the
+// same warehouses whichever tool launched it, and returns the warehouses for
+// the caller to put their secret values into Otto's environment
+// (connwarehouse.AppendEnv): the values are never written to disk. The file is
+// global, so it is regenerated on every launch to match where Otto runs.
 //
-// Best effort: a failure is logged and the launch goes on without warehouses,
-// as the desktop's does.
+// Best effort: a failure is logged and the launch goes on, as the desktop's
+// does. The warehouses are returned even when the file write fails, since the
+// values reach Otto either way; a .env scrub failure is the usual cause.
 //
 // The checkout is the enclosing v2 project, or cwd itself otherwise: a v1
 // project's links and scoped entries name its own directory, and a directory
 // that is no project matches only the globals with no link row.
-func writeWarehouses(cwd string) {
+func writeWarehouses(cwd string) []connwarehouse.Materialized {
 	projectDir := cwd
 	v2 := false
 	if proj, err := project.Discover(cwd); err == nil {
@@ -106,12 +109,13 @@ func writeWarehouses(cwd string) {
 	dir, err := warehouseDir()
 	if err != nil {
 		logger.Warnf("otto: warehouse config dir: %v", err)
-		return
+		return nil
 	}
 	live, skipped := connwarehouse.MaterializeAll(warehouseConnections(projectDir, v2))
 	if err := connwarehouse.Write(dir, live); err != nil {
 		logger.Warnf("otto: writing warehouse config: %v", err)
-		return
+		return live
 	}
 	logger.Infof("otto: warehouse config written: %d queryable, %d skipped", len(live), len(skipped))
+	return live
 }

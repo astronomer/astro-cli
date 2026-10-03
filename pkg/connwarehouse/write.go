@@ -2,9 +2,13 @@ package connwarehouse
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -14,18 +18,26 @@ import (
 )
 
 // The analyzing-data skill reads its config from ~/.astro/agents (config.py
-// get_config_dir). We own a slice of two shared files there:
-//   - warehouse.yml: warehouse entries keyed by name. Ours are prefixed
-//     "airflow_" (namePrefix); any other entry is the user's and is preserved.
-//   - .env: the secret values our "${VAR}" refs resolve to. Ours are prefixed
-//     "AIRFLOW_" (managedEnvPrefix); other lines are preserved.
+// get_config_dir). We own a slice of the warehouse.yml there: warehouse
+// entries keyed by name, ours prefixed "airflow_" (namePrefix). Any other entry
+// is the user's and is preserved.
+//
+// The secrets our "${VAR}" refs name are not written anywhere. The skill
+// resolves a ref from the process environment (connectors.py
+// substitute_env_vars), and it loads ~/.astro/agents/.env without override, so
+// a value Otto's environment carries wins over the file. AppendEnv puts the
+// values into the environment Otto is started with, where its kernel inherits
+// them. The .env file is the user's alone: earlier versions wrote the secrets
+// there, as a banner followed by the managed assignments (keys prefixed
+// "AIRFLOW_", managedEnvPrefix), so Write and ScrubEnv strip that block and
+// nothing else.
 const managedEnvPrefix = "AIRFLOW_"
 
 const (
 	// dirPerm is the config directory's mode when this creates it.
 	dirPerm = 0o750
-	// filePerm is both files' mode: .env holds secrets, and warehouse.yml
-	// names the accounts they unlock.
+	// filePerm is both files' mode: warehouse.yml names the accounts the
+	// secrets unlock, and .env holds the user's own secrets.
 	filePerm = 0o600
 	// maxEnvLine bounds one .env line, which may hold a whole PEM key or URL.
 	maxEnvLine = 1 << 20
@@ -36,11 +48,13 @@ const (
 const yamlHeader = "# Partly managed by Astro: entries prefixed \"airflow_\" are generated\n" +
 	"# from your Airflow connections and rewritten on change. Other entries are yours.\n"
 
-const envBanner = "# --- Astro: Airflow connection secrets (regenerated on change; do not edit) ---"
-
-// legacyEnvBanner is the banner Astro Desktop wrote before this package was
-// shared. Recognized so a file it wrote does not keep a stray copy above ours.
-const legacyEnvBanner = "# --- Astro Desktop: Airflow connection secrets (regenerated on change; do not edit) ---"
+// envBanner and legacyEnvBanner head the block of secrets earlier versions
+// wrote to .env: the first by this package, the second by Astro Desktop
+// before this package was shared. Both are stripped with the block.
+const (
+	envBanner       = "# --- Astro: Airflow connection secrets (regenerated on change; do not edit) ---"
+	legacyEnvBanner = "# --- Astro Desktop: Airflow connection secrets (regenerated on change; do not edit) ---"
+)
 
 // ConfigDir returns the analyzing-data skill's config directory, ~/.astro/agents.
 // This is the skill's own config root (config.py), so it is constructed here
@@ -53,26 +67,102 @@ func ConfigDir() (string, error) {
 	return filepath.Join(home, ".astro", "agents"), nil
 }
 
-// Write merges the live warehouses into .env and warehouse.yml under dir,
-// replacing the managed entries (env keys prefixed "AIRFLOW_", warehouse keys
-// prefixed "airflow_") and preserving everything else. Writes are atomic
-// (pkg/fsatomic), and both files are 0600: .env holds secrets.
+// Write merges the live warehouses into warehouse.yml under dir, replacing
+// the managed entries (keys prefixed "airflow_") and preserving everything
+// else, and strips any managed secret an earlier version left in .env (see
+// ScrubEnv). It writes no secret: the entries' "${VAR}" refs resolve from the
+// environment AppendEnv builds for Otto. Writes are atomic (pkg/fsatomic) and
+// 0600.
 //
-// .env goes first. If it cannot be written, the managed lines already in it
-// are stripped as a best effort and warehouse.yml is left alone: the old
-// secrets may belong to connections that no longer reach the checkout, and a
-// plaintext credential outliving its reach is the failure worth avoiding. A
-// warehouse.yml entry whose secret is gone only fails to connect.
+// The .env scrub goes first and a failure there does not stop the
+// warehouse.yml write, which carries no secret: both errors are returned.
 func Write(dir string, live []Materialized) error {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return fmt.Errorf("create %s: %w", dir, err)
 	}
-	envPath := filepath.Join(dir, ".env")
-	if err := writeEnv(envPath, live); err != nil {
-		_ = writeEnv(envPath, nil) //nolint:errcheck // best effort; the write error is what the caller needs
-		return err
+	scrubErr := ScrubEnv(dir)
+	return errors.Join(scrubErr, writeWarehouseYAML(filepath.Join(dir, "warehouse.yml"), live))
+}
+
+// ScrubEnv removes the managed secrets an earlier version wrote (a banner and
+// the AIRFLOW_* assignments directly below it) from the .env under dir,
+// keeping the user's lines, AIRFLOW_* ones outside that block included. A file left
+// with nothing is removed; a missing file is not an error. Callers run it to
+// clean up the plaintext an earlier version wrote, even when they write no
+// warehouses.
+func ScrubEnv(dir string) error {
+	path := filepath.Join(dir, ".env")
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
 	}
-	return writeWarehouseYAML(filepath.Join(dir, "warehouse.yml"), live)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	preserved, changed, err := envPreserving(b)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	if !changed {
+		return nil // nothing of ours: leave the user's file byte for byte
+	}
+	if len(preserved) == 0 {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove %s: %w", path, err)
+		}
+		return nil
+	}
+	return writeFile(path, []byte(strings.Join(preserved, "\n")+"\n"), filePerm)
+}
+
+// AppendEnv returns env with the secret values live's "${VAR}" refs name
+// appended as KEY=VALUE, sorted by key, for the environment Otto is started
+// with. A key env already sets keeps its value, as the skill's own .env load
+// (python-dotenv without override) lets the process environment win; it also
+// keeps a launcher's own AIRFLOW_* settings (AIRFLOW_API_URL, say) from being
+// replaced by a connection whose id happens to produce the same name. Keys
+// compare without case on Windows, where the environment does.
+func AppendEnv(env []string, live []Materialized) []string {
+	set := make(map[string]bool, len(env))
+	for _, e := range env {
+		if k, _, ok := strings.Cut(e, "="); ok {
+			set[envKey(k)] = true
+		}
+	}
+	managed := map[string]string{}
+	for _, m := range live {
+		for k, v := range m.Env {
+			managed[k] = v
+		}
+	}
+	keys := make([]string, 0, len(managed))
+	for k := range managed {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := slices.Clip(env)
+	for _, k := range keys {
+		if set[envKey(k)] {
+			continue
+		}
+		out = append(out, k+"="+managed[k])
+	}
+	return out
+}
+
+// isWindows reports whether this is a Windows build.
+const isWindows = runtime.GOOS == "windows"
+
+// foldEnvCase reports whether environment keys compare without case, as they
+// do on Windows. A var so a test can exercise both rules on any platform.
+var foldEnvCase = isWindows
+
+// envKey is an environment key in the form two keys compare equal in.
+func envKey(k string) string {
+	if foldEnvCase {
+		return strings.ToUpper(k)
+	}
+	return k
 }
 
 // writeFile is fsatomic.WriteFile, a var so a test can fail one write.
@@ -127,88 +217,37 @@ func readYAMLMap(path string) (map[string]any, error) {
 	return data, nil
 }
 
-func writeEnv(path string, live []Materialized) error {
-	preserved, err := readEnvPreserving(path)
-	if err != nil {
-		return err
-	}
-
-	// Collect our managed assignments across all live warehouses, sorted for
-	// stable output.
-	managed := map[string]string{}
-	for _, m := range live {
-		for k, v := range m.Env {
-			managed[k] = v
-		}
-	}
-	keys := make([]string, 0, len(managed))
-	for k := range managed {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var b strings.Builder
-	for _, line := range preserved {
-		b.WriteString(line)
-		b.WriteByte('\n')
-	}
-	if len(keys) > 0 {
-		if b.Len() > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(envBanner)
-		b.WriteByte('\n')
-		for _, k := range keys {
-			b.WriteString(k)
-			b.WriteByte('=')
-			b.WriteString(dotenvQuote(managed[k]))
-			b.WriteByte('\n')
-		}
-	}
-
-	if b.Len() == 0 {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove %s: %w", path, err)
-		}
-		return nil
-	}
-	return writeFile(path, []byte(b.String()), filePerm)
-}
-
-// readEnvPreserving returns the lines of an existing .env to keep: everything
-// except our managed assignments (AIRFLOW_*=...) and our banner. User comments,
-// blank lines, and other assignments are preserved verbatim. Trailing blank
-// lines are trimmed so re-runs don't accumulate them.
-func readEnvPreserving(path string) ([]string, error) {
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", path, err)
-	}
-	defer f.Close()
-
-	var out []string
-	sc := bufio.NewScanner(f)
+// envPreserving returns the lines of a .env to keep: everything except our
+// banners and the managed assignments (AIRFLOW_*=...) that run directly below
+// one, which is the block earlier versions wrote. User comments, blank lines
+// and other assignments, an AIRFLOW_* one elsewhere included, are kept
+// verbatim; trailing blank lines are trimmed. changed reports whether anything
+// of ours was dropped.
+func envPreserving(b []byte) (out []string, changed bool, err error) {
+	sc := bufio.NewScanner(bytes.NewReader(b))
 	sc.Buffer(make([]byte, 0, envReadBuf), maxEnvLine) // tolerate long key/url lines
+	inBlock := false
 	for sc.Scan() {
 		line := sc.Text()
 		if line == envBanner || line == legacyEnvBanner {
+			changed, inBlock = true, true
 			continue
 		}
-		if key, ok := assignmentKey(line); ok && strings.HasPrefix(key, managedEnvPrefix) {
-			continue // a previously-managed secret; will be rewritten
+		if inBlock {
+			if key, ok := assignmentKey(line); ok && strings.HasPrefix(key, managedEnvPrefix) {
+				continue
+			}
+			inBlock = false
 		}
 		out = append(out, line)
 	}
 	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("read %s: %w", path, err)
+		return nil, false, err
 	}
 	for len(out) > 0 && strings.TrimSpace(out[len(out)-1]) == "" {
 		out = out[:len(out)-1]
 	}
-	return out, nil
+	return out, changed, nil
 }
 
 // assignmentKey returns the KEY of a "KEY=value" line (ignoring leading
@@ -224,12 +263,4 @@ func assignmentKey(line string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSpace(s[:eq]), true
-}
-
-// dotenvQuote wraps a value in double quotes and escapes backslash, double
-// quote, and newline as \n. python-dotenv unescapes these inside double quotes,
-// so multi-line secrets (e.g. a PEM private key) round-trip correctly.
-func dotenvQuote(v string) string {
-	r := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\r", `\r`)
-	return `"` + r.Replace(v) + `"`
 }

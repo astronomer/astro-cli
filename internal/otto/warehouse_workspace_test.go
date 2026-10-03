@@ -69,7 +69,7 @@ func (s *ConfigSuite) TestStartAddsWorkspaceConnectionsBelowTheVault() {
 	s.putConn(vault, canon, pg("own", "own-pw"))
 	s.linkWorkspace(cwd, false, cloudConn("cloud_only", "cloud-pw"), cloudConn("own", "cloud-own-pw"))
 
-	s.start()
+	l := s.start()
 
 	raw, err := os.ReadFile(filepath.Join(warehouses, "warehouse.yml"))
 	s.Require().NoError(err)
@@ -82,11 +82,10 @@ func (s *ConfigSuite) TestStartAddsWorkspaceConnectionsBelowTheVault() {
 	s.ElementsMatch([]string{"airflow_own", "airflow_cloud_only"}, names)
 	s.NotContains(string(raw), "-pw", "a secret reached warehouse.yml")
 
-	env, err := os.ReadFile(filepath.Join(warehouses, ".env"))
-	s.Require().NoError(err)
-	s.Contains(string(env), `AIRFLOW_OWN_PASSWORD="own-pw"`)
-	s.Contains(string(env), `AIRFLOW_CLOUD_ONLY_PASSWORD="cloud-pw"`)
-	s.NotContains(string(env), "cloud-own-pw", "the workspace beat the vault for a connection both hold")
+	own, _ := l.get("AIRFLOW_OWN_PASSWORD")
+	s.True(own == "own-pw", "AIRFLOW_OWN_PASSWORD is not the vault's value: the workspace beat the vault for a connection both hold")
+	cloud, _ := l.get("AIRFLOW_CLOUD_ONLY_PASSWORD")
+	s.True(cloud == "cloud-pw", "AIRFLOW_CLOUD_ONLY_PASSWORD is not the workspace's value")
 }
 
 // An unreachable workspace leaves its warehouses out and the launch goes on

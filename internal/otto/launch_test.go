@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -106,7 +107,8 @@ func pg(id, password string) *connmodel.Connection {
 // The reach rule, end to end: `astro otto` in a project writes the warehouses
 // of exactly the connections that reach it — its own, the globals linked to it
 // and the globals with no link row — and none linked elsewhere or to nothing.
-// Secrets land only in the 0600 .env, as references in the YAML.
+// The YAML holds references; the secrets go only into Otto's environment, and
+// no file under the skill's config dir holds one.
 func (s *ConfigSuite) TestStartWritesTheWarehousesThatReachTheCheckout() {
 	warehouses, vault := s.prepareLaunch()
 	cwd := s.chdirV2Project("reach-project")
@@ -128,7 +130,7 @@ func (s *ConfigSuite) TestStartWritesTheWarehousesThatReachTheCheckout() {
 		return nil
 	}))
 
-	s.start()
+	l := s.start()
 
 	raw, err := os.ReadFile(filepath.Join(warehouses, "warehouse.yml"))
 	s.Require().NoError(err)
@@ -139,26 +141,39 @@ func (s *ConfigSuite) TestStartWritesTheWarehousesThatReachTheCheckout() {
 		names = append(names, k)
 	}
 	s.ElementsMatch([]string{"airflow_own", "airflow_everywhere", "airflow_linked_here"}, names)
-	s.NotContains(string(raw), "-pw", "a secret reached warehouse.yml")
-
-	envPath := filepath.Join(warehouses, ".env")
-	env, err := os.ReadFile(envPath)
+	info, err := os.Stat(filepath.Join(warehouses, "warehouse.yml"))
 	s.Require().NoError(err)
-	for _, want := range []string{`AIRFLOW_OWN_PASSWORD="own-pw"`, `AIRFLOW_EVERYWHERE_PASSWORD="everywhere-pw"`, `AIRFLOW_LINKED_HERE_PASSWORD="linked-pw"`} {
-		s.Contains(string(env), want)
+	if runtime.GOOS != windowsGOOS {
+		s.Equal(os.FileMode(0o600), info.Mode().Perm())
 	}
-	for _, leaked := range []string{"elsewhere-pw", "unlinked-pw", "shadowed-pw"} {
-		s.NotContains(string(env), leaked, "a connection that does not reach this checkout was written")
+
+	for key, want := range map[string]string{
+		"AIRFLOW_OWN_PASSWORD":         "own-pw",
+		"AIRFLOW_EVERYWHERE_PASSWORD":  "everywhere-pw",
+		"AIRFLOW_LINKED_HERE_PASSWORD": "linked-pw",
+	} {
+		got, ok := l.get(key)
+		s.True(ok && got == want, "Otto's environment lacks the value of %s", key)
 	}
-	for _, p := range []string{envPath, filepath.Join(warehouses, "warehouse.yml")} {
-		info, err := os.Stat(p)
+	for _, key := range []string{"AIRFLOW_LINKED_ELSEWHERE_PASSWORD", "AIRFLOW_UNLINKED_PASSWORD"} {
+		_, ok := l.get(key)
+		s.False(ok, "%s reached Otto's environment, but its connection does not reach this checkout", key)
+	}
+
+	_, err = os.Stat(filepath.Join(warehouses, ".env"))
+	s.True(os.IsNotExist(err), "the launch wrote a .env")
+	entries, err := os.ReadDir(warehouses)
+	s.Require().NoError(err)
+	for _, e := range entries {
+		b, err := os.ReadFile(filepath.Join(warehouses, e.Name()))
 		s.Require().NoError(err)
-		s.Equal(os.FileMode(0o600), info.Mode().Perm(), p)
+		s.False(strings.Contains(string(b), "-pw"), "%s holds a connection secret", e.Name())
 	}
 }
 
-// A user's own entries in the shared files survive the launch, and a managed
-// entry that no longer reaches the checkout is dropped.
+// A user's own entries in the shared files survive the launch, a managed
+// entry that no longer reaches the checkout is dropped, and the plaintext
+// secrets an earlier launch left in .env are stripped.
 func (s *ConfigSuite) TestStartPreservesUserWarehouseEntries() {
 	warehouses, vault := s.prepareLaunch()
 	s.chdirV2Project("preserve-project")
@@ -166,10 +181,11 @@ func (s *ConfigSuite) TestStartPreservesUserWarehouseEntries() {
 	s.Require().NoError(os.WriteFile(filepath.Join(warehouses, "warehouse.yml"),
 		[]byte("mine:\n  type: duckdb\nairflow_gone:\n  type: postgres\n"), 0o600))
 	s.Require().NoError(os.WriteFile(filepath.Join(warehouses, ".env"),
-		[]byte("MY_TOKEN=keep\nAIRFLOW_GONE_PASSWORD=stale\n"), 0o600))
+		[]byte("MY_TOKEN=keep\n\n# --- Astro: Airflow connection secrets (regenerated on change; do not edit) ---\n"+
+			"AIRFLOW_GONE_PASSWORD=stale\nAIRFLOW_FRESH_PASSWORD=old-fresh\n"), 0o600))
 	s.putConn(vault, secrets.GlobalScope, pg("fresh", "fresh-pw"))
 
-	s.start()
+	l := s.start()
 
 	raw, err := os.ReadFile(filepath.Join(warehouses, "warehouse.yml"))
 	s.Require().NoError(err)
@@ -178,8 +194,31 @@ func (s *ConfigSuite) TestStartPreservesUserWarehouseEntries() {
 	s.NotContains(string(raw), "airflow_gone")
 	env, err := os.ReadFile(filepath.Join(warehouses, ".env"))
 	s.Require().NoError(err)
-	s.Contains(string(env), "MY_TOKEN=keep")
-	s.NotContains(string(env), "stale")
+	s.Equal("MY_TOKEN=keep\n", string(env))
+	fresh, _ := l.get("AIRFLOW_FRESH_PASSWORD")
+	s.True(fresh == "fresh-pw", "AIRFLOW_FRESH_PASSWORD in Otto's environment is not the vault's value")
+}
+
+// A key the launcher's own environment already sets keeps its value: the
+// skill's .env load never overrode the process environment, and a launch does
+// not either.
+func (s *ConfigSuite) TestStartKeepsAnInheritedWarehouseKey() {
+	_, vault := s.prepareLaunch()
+	s.chdirV2Project("inherit-project")
+	s.putConn(vault, secrets.GlobalScope, pg("mine", "vault-pw"))
+	s.T().Setenv("AIRFLOW_MINE_PASSWORD", "shell-pw")
+
+	l := s.start()
+
+	n := 0
+	for _, e := range l.env {
+		if strings.HasPrefix(e, "AIRFLOW_MINE_PASSWORD=") {
+			n++
+		}
+	}
+	s.Equal(1, n, "AIRFLOW_MINE_PASSWORD set more than once")
+	got, _ := l.get("AIRFLOW_MINE_PASSWORD")
+	s.True(got == "shell-pw", "the vault's value replaced the inherited AIRFLOW_MINE_PASSWORD")
 }
 
 // --version exits before Otto reads anything: no warehouse files, and so no

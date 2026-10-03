@@ -4,11 +4,15 @@
 //
 // The skill (astronomer/agents) reads ~/.astro/agents/warehouse.yml — a map of
 // warehouse name -> connector config — and resolves any value written exactly
-// as "${VAR}" from ~/.astro/agents/.env. This package turns a connections.
+// as "${VAR}" from its process environment. This package turns a connections.
 // Connection into that pair: a warehouse.yml entry whose secret fields are
-// "${VAR}" references, plus the .env assignments those references resolve to.
-// Secrets therefore live only in the gitignored .env that the local Python
-// kernel reads — never in the YAML, and never in Otto's prompt.
+// "${VAR}" references, plus the values those references resolve to. So are
+// the fields that say who connects and where (account, user, host, database,
+// project, key path) wherever the skill resolves them, which leaves the YAML
+// naming only object names such as a warehouse, role or schema. The
+// values go only into the environment Otto is started with (AppendEnv), which
+// the skill's Python kernel inherits — never into the YAML, never into a file
+// on disk, and never into Otto's prompt.
 //
 // Only connections whose credentials are actually present locally are
 // materialized; everything else is reported as a Skip with a reason so the
@@ -29,7 +33,7 @@ type Materialized struct {
 	ConnID   string            // source Airflow connection id
 	ConnType string            // source Airflow conn_type (normalized)
 	Config   map[string]any    // the warehouse.yml entry (secrets as "${VAR}")
-	Env      map[string]string // .env assignments the "${VAR}" refs resolve to
+	Env      map[string]string // the values the "${VAR}" refs resolve to, by variable name
 }
 
 // Skip is a connection that can't (yet) be made queryable, with a reason
@@ -43,6 +47,17 @@ type Skip struct {
 // namePrefix marks the warehouse.yml entries this package owns, so a writer can
 // distinguish managed entries from anything the user hand-authored.
 const namePrefix = "airflow_"
+
+// launcherEnv is the AIRFLOW_* settings Otto and af read from their
+// environment. A connection whose secret would land in one of them (a
+// Databricks connection with id "api" makes AIRFLOW_API_URL) is skipped: in
+// Otto's environment it would point af at the warehouse when no Airflow URL is
+// set, and AppendEnv keeps such a key whenever one is.
+var launcherEnv = map[string]bool{
+	"AIRFLOW_API_URL":  true,
+	"AIRFLOW_USERNAME": true,
+	"AIRFLOW_PASSWORD": true,
+}
 
 // Materialize maps a single Airflow connection to a warehouse entry. It returns
 // (entry, ok). When ok is false the Skip explains why — an unsupported
@@ -72,6 +87,11 @@ func Materialize(c connmodel.Connection) (Materialized, Skip, bool) { //nolint:g
 	}
 	if err != nil {
 		return skip(err.Error())
+	}
+	for k := range env {
+		if launcherEnv[k] {
+			return skip(fmt.Sprintf("its secret's variable %s is a setting Otto reads; rename the connection to query it", k))
+		}
 	}
 
 	return Materialized{
@@ -106,9 +126,12 @@ func MaterializeAll(conns []connmodel.Connection) ([]Materialized, []Skip) {
 
 // --- per-connector mappers ---
 //
-// Each returns the warehouse.yml entry (non-secret fields inline, secrets as
-// "${VAR}") and the .env values, or an error when a required credential/field
-// is missing (→ the connection is skipped, not emitted half-built).
+// Each returns the warehouse.yml entry and the values its "${VAR}" refs name,
+// or an error when a required credential/field is missing (→ the connection is
+// skipped, not emitted half-built). A field is a ref when it is a secret or
+// identifies the account, and the skill's from_dict passes it through
+// substitute_env_vars; everything else is inline, because the skill would read
+// a ref there literally.
 
 func snowflake(c *connmodel.Connection) (cfg map[string]any, env map[string]string, err error) {
 	account := firstNonEmpty(extraStr(c, "account"), extraStr(c, "extra__snowflake__account"), accountFromHost(c.ConnHost))
@@ -131,10 +154,11 @@ func snowflake(c *connmodel.Connection) (cfg map[string]any, env map[string]stri
 		return nil, nil, fmt.Errorf("snowflake %q: no login/user", c.ConnID)
 	}
 
+	env = map[string]string{}
 	cfg = map[string]any{
 		"type":    "snowflake",
-		"account": account,
-		"user":    c.ConnLogin,
+		"account": refTo(env, c.ConnID, "ACCOUNT", account),
+		"user":    refTo(env, c.ConnID, "USER", c.ConnLogin),
 	}
 	putNonEmpty(cfg, "warehouse", firstNonEmpty(extraStr(c, "warehouse"), extraStr(c, "extra__snowflake__warehouse")))
 	putNonEmpty(cfg, "role", firstNonEmpty(extraStr(c, "role"), extraStr(c, "extra__snowflake__role")))
@@ -144,8 +168,7 @@ func snowflake(c *connmodel.Connection) (cfg map[string]any, env map[string]stri
 	}
 
 	// Key-pair auth takes precedence when key material is present; otherwise
-	// fall back to password. Either way the secret goes to .env, not the yaml.
-	env = map[string]string{}
+	// fall back to password. Either way the secret goes to Env, not the yaml.
 	if key := firstNonEmpty(extraStr(c, "private_key_content"), extraStr(c, "private_key")); key != "" {
 		cfg["auth_type"] = "private_key"
 		v := envVar(c.ConnID, "PRIVATE_KEY")
@@ -188,18 +211,19 @@ func postgres(c *connmodel.Connection) (cfg map[string]any, env map[string]strin
 	if port == 0 {
 		port = 5432
 	}
+	// No "databases": the skill defaults it to the resolved database, and a
+	// list is read literally, so writing one would put the name back inline.
+	env = map[string]string{}
 	cfg = map[string]any{
-		"type":      "postgres",
-		"host":      c.ConnHost,
-		"port":      port,
-		"user":      c.ConnLogin,
-		"database":  database,
-		"databases": []string{database},
+		"type":     "postgres",
+		"host":     refTo(env, c.ConnID, "HOST", c.ConnHost),
+		"port":     port,
+		"user":     refTo(env, c.ConnID, "USER", c.ConnLogin),
+		"database": refTo(env, c.ConnID, "DATABASE", database),
+		"password": refTo(env, c.ConnID, "PASSWORD", c.ConnPassword),
 	}
 	putNonEmpty(cfg, "sslmode", extraStr(c, "sslmode"))
-	pv := envVar(c.ConnID, "PASSWORD")
-	cfg["password"] = ref(pv)
-	return cfg, map[string]string{pv: c.ConnPassword}, nil
+	return cfg, env, nil
 }
 
 func bigquery(c *connmodel.Connection) (cfg map[string]any, env map[string]string, err error) {
@@ -221,15 +245,17 @@ func bigquery(c *connmodel.Connection) (cfg map[string]any, env map[string]strin
 		// not handled yet. Application-default credentials (no key) also land here.
 		return nil, nil, fmt.Errorf("bigquery %q: only a credentials key-file path is supported yet (inline keyfile_dict / ADC pending)", c.ConnID)
 	}
+	// The key file is referenced by path and read by the kernel. No
+	// "databases", for the same reason as postgres: it defaults to the
+	// resolved project.
+	env = map[string]string{}
 	cfg = map[string]any{
 		"type":             "bigquery",
-		"project":          project,
-		"credentials_path": keyPath,
-		"databases":        []string{project},
+		"project":          refTo(env, c.ConnID, "PROJECT", project),
+		"credentials_path": refTo(env, c.ConnID, "CREDENTIALS_PATH", keyPath),
 	}
 	putNonEmpty(cfg, "location", firstNonEmpty(extraStr(c, "location"), extraStr(c, "extra__google_cloud_platform__location")))
-	// No secret value: the key file is referenced by path, read by the kernel.
-	return cfg, map[string]string{}, nil
+	return cfg, env, nil
 }
 
 func databricks(c *connmodel.Connection) (cfg map[string]any, env map[string]string, err error) {
@@ -251,7 +277,7 @@ func databricks(c *connmodel.Connection) (cfg map[string]any, env map[string]str
 		return nil, nil, fmt.Errorf("databricks %q: no catalog (set extra.catalog or the schema field)", c.ConnID)
 	}
 
-	// The whole URL (token included) goes to .env as one "${VAR}", because the
+	// The whole URL (token included) goes to Env as one "${VAR}", because the
 	// skill only substitutes a value that is exactly "${VAR}" — it won't expand
 	// a var embedded inside a larger string.
 	q := fmt.Sprintf("http_path=%s&catalog=%s", httpPath, catalog)
@@ -273,7 +299,7 @@ func databricks(c *connmodel.Connection) (cfg map[string]any, env map[string]str
 
 var envSanitize = regexp.MustCompile(`[^A-Z0-9]+`)
 
-// envVar builds the .env key for a connection's secret field, e.g.
+// envVar builds the environment variable name for a connection's field, e.g.
 // envVar("snow-prod", "PASSWORD") -> "AIRFLOW_SNOW_PROD_PASSWORD".
 func envVar(connID, field string) string {
 	id := envSanitize.ReplaceAllString(strings.ToUpper(connID), "_")
@@ -282,6 +308,14 @@ func envVar(connID, field string) string {
 }
 
 func ref(envVar string) string { return "${" + envVar + "}" }
+
+// refTo records value in env under the connection's variable for field and
+// returns the "${VAR}" ref the YAML carries in its place.
+func refTo(env map[string]string, connID, field, value string) string {
+	v := envVar(connID, field)
+	env[v] = value
+	return ref(v)
+}
 
 // extraStr reads a string-ish value from ConnExtra (values may be string, or a
 // JSON number/bool decoded into float64/bool). Returns "" when absent/empty.

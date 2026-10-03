@@ -22,8 +22,11 @@ func TestMaterializeSnowflakePassword(t *testing.T) {
 	if m.Name != "airflow_snow_prod" {
 		t.Errorf("name = %q", m.Name)
 	}
-	if m.Config["account"] != "acme-east" || m.Config["user"] != "svc" || m.Config["auth_type"] != "password" {
+	if m.Config["account"] != "${AIRFLOW_SNOW_PROD_ACCOUNT}" || m.Config["user"] != "${AIRFLOW_SNOW_PROD_USER}" || m.Config["auth_type"] != "password" {
 		t.Errorf("config = %+v", m.Config)
+	}
+	if m.Env["AIRFLOW_SNOW_PROD_ACCOUNT"] != "acme-east" || m.Env["AIRFLOW_SNOW_PROD_USER"] != "svc" {
+		t.Errorf("env keys = %d", len(m.Env))
 	}
 	if m.Config["password"] != "${AIRFLOW_SNOW_PROD_PASSWORD}" {
 		t.Errorf("password ref = %v", m.Config["password"])
@@ -35,6 +38,8 @@ func TestMaterializeSnowflakePassword(t *testing.T) {
 		t.Errorf("databases = %v", m.Config["databases"])
 	}
 	assertNoPlaintextSecret(t, m, "s3cret")
+	assertNoPlaintextSecret(t, m, "acme-east")
+	assertNoPlaintextSecret(t, m, "svc")
 }
 
 func TestMaterializeSnowflakeAccountFromHost(t *testing.T) {
@@ -48,8 +53,8 @@ func TestMaterializeSnowflakeAccountFromHost(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["account"] != "xy12345.us-east-1" {
-		t.Errorf("account from host = %v", m.Config["account"])
+	if got := resolved(t, m, "account"); got != "xy12345.us-east-1" {
+		t.Errorf("account from host = %v", got)
 	}
 }
 
@@ -67,8 +72,8 @@ func TestMaterializeSnowflakeFoldsRegionIntoLocator(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["account"] != "XY12345.us-east-1" {
-		t.Errorf("account = %v, want XY12345.us-east-1", m.Config["account"])
+	if got := resolved(t, m, "account"); got != "XY12345.us-east-1" {
+		t.Errorf("account = %v, want XY12345.us-east-1", got)
 	}
 }
 
@@ -84,8 +89,8 @@ func TestMaterializeSnowflakeRegionSkippedWhenQualified(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["account"] != "XY12345.us-east-1" {
-		t.Errorf("account = %v, want XY12345.us-east-1 (region not re-appended)", m.Config["account"])
+	if got := resolved(t, m, "account"); got != "XY12345.us-east-1" {
+		t.Errorf("account = %v, want XY12345.us-east-1 (region not re-appended)", got)
 	}
 }
 
@@ -103,8 +108,8 @@ func TestMaterializeSnowflakeRegionSkippedForOrgAccount(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["account"] != "acme-analytics" {
-		t.Errorf("account = %v, want acme-analytics (region not folded into an org account)", m.Config["account"])
+	if got := resolved(t, m, "account"); got != "acme-analytics" {
+		t.Errorf("account = %v, want acme-analytics (region not folded into an org account)", got)
 	}
 }
 
@@ -126,8 +131,8 @@ func TestMaterializeSnowflakePrefixedExtraKeys(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["account"] != "XY12345.us-east-1" {
-		t.Errorf("account = %v", m.Config["account"])
+	if got := resolved(t, m, "account"); got != "XY12345.us-east-1" {
+		t.Errorf("account = %v", got)
 	}
 	if m.Config["warehouse"] != "WH" || m.Config["role"] != "ANALYST" {
 		t.Errorf("config = %+v", m.Config)
@@ -190,16 +195,23 @@ func TestMaterializePostgres(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["type"] != "postgres" || m.Config["host"] != "db.example.com" || m.Config["port"] != 6543 {
+	if m.Config["type"] != "postgres" || m.Config["port"] != 6543 || m.Config["sslmode"] != "require" {
 		t.Errorf("config = %+v", m.Config)
 	}
-	if m.Config["database"] != "analytics" || m.Config["sslmode"] != "require" {
-		t.Errorf("config = %+v", m.Config)
+	if resolved(t, m, "host") != "db.example.com" || resolved(t, m, "user") != "rw" || resolved(t, m, "database") != "analytics" {
+		t.Errorf("identifying fields do not resolve to the connection's values")
+	}
+	// The skill reads a databases list literally and defaults it to the
+	// resolved database, so the entry must not carry one.
+	if _, ok := m.Config["databases"]; ok {
+		t.Errorf("databases = %v, want it left to the skill's default", m.Config["databases"])
 	}
 	if m.Config["password"] != "${AIRFLOW_PG_PASSWORD}" || m.Env["AIRFLOW_PG_PASSWORD"] != "pw" {
 		t.Errorf("secret handling = %+v / %+v", m.Config["password"], m.Env)
 	}
 	assertNoPlaintextSecret(t, m, "pw")
+	assertNoPlaintextSecret(t, m, "db.example.com")
+	assertNoPlaintextSecret(t, m, "analytics")
 }
 
 func TestMaterializePostgresDefaultsPort(t *testing.T) {
@@ -241,15 +253,17 @@ func TestMaterializeBigQueryKeyPath(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if m.Config["type"] != "bigquery" || m.Config["project"] != "my-proj" || m.Config["credentials_path"] != "/secrets/key.json" {
+	if m.Config["type"] != "bigquery" || m.Config["location"] != "US" {
 		t.Errorf("config = %+v", m.Config)
 	}
-	if m.Config["location"] != "US" {
-		t.Errorf("location = %v", m.Config["location"])
+	if resolved(t, m, "project") != "my-proj" || resolved(t, m, "credentials_path") != "/secrets/key.json" {
+		t.Errorf("project/credentials_path do not resolve to the connection's values")
 	}
-	if len(m.Env) != 0 {
-		t.Errorf("bigquery key-path should need no .env, got %+v", m.Env)
+	if _, ok := m.Config["databases"]; ok {
+		t.Errorf("databases = %v, want it left to the skill's default", m.Config["databases"])
 	}
+	assertNoPlaintextSecret(t, m, "my-proj")
+	assertNoPlaintextSecret(t, m, "/secrets/key.json")
 }
 
 func TestMaterializeBigQueryInlineSkipped(t *testing.T) {
@@ -290,8 +304,30 @@ func TestMaterializeDatabricks(t *testing.T) {
 			t.Errorf("url %q missing %q", url, want)
 		}
 	}
-	// Token is in .env only; the yaml carries just the ${VAR} ref.
+	// Token is in Env only; the yaml carries just the ${VAR} ref.
 	assertNoPlaintextSecret(t, m, "dapi-token")
+}
+
+// A connection whose secret variable would be a setting Otto reads (id "api"
+// makes AIRFLOW_API_URL) is skipped rather than allowed to set it.
+func TestMaterializeSkipsALauncherSetting(t *testing.T) {
+	_, s, ok := Materialize(connmodel.Connection{
+		ConnID:       "api",
+		ConnType:     "databricks",
+		ConnHost:     "https://dbc-abc.cloud.databricks.com",
+		ConnPassword: "dapi-token",
+		ConnSchema:   "default",
+		ConnExtra:    map[string]any{"http_path": "/sql/1.0/warehouses/xyz", "catalog": "main"},
+	})
+	if ok {
+		t.Fatal("a connection whose secret is AIRFLOW_API_URL was materialized")
+	}
+	if strings.Contains(s.Reason, "dapi-token") {
+		t.Fatal("the skip reason holds the token")
+	}
+	if !strings.Contains(s.Reason, "AIRFLOW_API_URL") {
+		t.Errorf("reason = %q, want it to name AIRFLOW_API_URL", s.Reason)
+	}
 }
 
 func TestMaterializeDatabricksMissingPieces(t *testing.T) {
@@ -376,11 +412,37 @@ func TestEnvVarSanitization(t *testing.T) {
 
 // assertNoPlaintextSecret guards the core invariant: a secret value must never
 // appear in the warehouse.yml entry — only in the .env map.
-func assertNoPlaintextSecret(t *testing.T, m Materialized, secret string) {
+// assertNoPlaintextSecret fails when value appears anywhere in the YAML entry,
+// lists included. Named for secrets, and used for the identifying fields too.
+func assertNoPlaintextSecret(t *testing.T, m Materialized, value string) {
 	t.Helper()
 	for k, v := range m.Config {
-		if s, ok := v.(string); ok && strings.Contains(s, secret) {
-			t.Errorf("plaintext secret leaked into config[%q] = %q", k, s)
+		switch x := v.(type) {
+		case string:
+			if strings.Contains(x, value) {
+				t.Errorf("value leaked into config[%q] (%d bytes)", k, len(x))
+			}
+		case []string:
+			for _, s := range x {
+				if strings.Contains(s, value) {
+					t.Errorf("value leaked into config[%q] list", k)
+				}
+			}
 		}
 	}
+}
+
+// resolved asserts config[key] is a "${VAR}" ref and returns what Env gives
+// that variable, which is what the skill resolves the field to.
+func resolved(t *testing.T, m Materialized, key string) string {
+	t.Helper()
+	v, _ := m.Config[key].(string)
+	if !strings.HasPrefix(v, "${") || !strings.HasSuffix(v, "}") {
+		t.Fatalf("config[%q] = %q, want a ${VAR} ref", key, v)
+	}
+	val, ok := m.Env[v[2:len(v)-1]]
+	if !ok {
+		t.Fatalf("config[%q] refs %s, which Env does not set", key, v)
+	}
+	return val
 }
