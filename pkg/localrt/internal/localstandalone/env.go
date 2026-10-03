@@ -27,6 +27,16 @@ const goosDarwin = "darwin"
 // the per-project JWT secret, and finally the dev-mode settings: defaults
 // wherever the environment so far left a key unset, and the loopback bind
 // over everything (docs/v2-architecture.md, "Defaults").
+//
+// The engine adds no AIRFLOW__CORE__FERNET_KEY of its own, deliberately. When
+// no key is configured the first time Airflow (2 or 3) is imported under
+// AIRFLOW_HOME, it generates one and writes it into airflow.cfg there,
+// owner-only, so connections and Variables in the metadata DB beside it are
+// encrypted, and every later process run with the same AIRFLOW_HOME decrypts
+// them with the same key. An environment value outranks airflow.cfg, so adding
+// one here would orphan every row already encrypted under the airflow.cfg key.
+// A key the user supplies (shell, .env or the plan) passes through like any
+// other value; keeping it stable is then theirs to do.
 func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, port int) []string {
 	env := airflowrt.BuildEnv(projectPath, strconv.Itoa(port), "")
 	// BuildEnv hardcodes AIRFLOW_HOME to the default location; honor the

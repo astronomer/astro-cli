@@ -174,6 +174,37 @@ func TestBuildEnvJWTSecretIsStablePerProject(t *testing.T) {
 	assert.Equal(t, "astro-local", iss)
 }
 
+// The JWT secret signs every API token, so it is owner-only, like the
+// airflow.cfg Airflow writes into AIRFLOW_HOME.
+func TestBuildEnvWritesTheJWTSecretOwnerOnly(t *testing.T) {
+	e, _, _ := testEngine(t)
+	project := t.TempDir()
+	stateDir := t.TempDir()
+	p := rt.Plan{ProjectPath: project, Mode: rt.ModeStandalone}
+	e.buildEnv(p, project, stateDir, filepath.Join(project, ".astro"), 8080)
+
+	info, err := os.Stat(filepath.Join(stateDir, jwtSecretFile))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+// The engine adds no Fernet key of its own. Airflow keeps the project's key in
+// airflow.cfg under AIRFLOW_HOME, and an environment value would outrank it and
+// orphan every row encrypted with it. A key the user supplies is not covered
+// here: it passes through like any other value.
+func TestBuildEnvAddsNoFernetKeyOfItsOwn(t *testing.T) {
+	t.Setenv("AIRFLOW__CORE__FERNET_KEY", "")
+	require.NoError(t, os.Unsetenv("AIRFLOW__CORE__FERNET_KEY"))
+
+	for _, version := range []string{"2.10.5", "3.0.2"} {
+		t.Run(version, func(t *testing.T) {
+			env := buildTestEnv(t, "linux", version, nil)
+			_, found := envValue(env, "AIRFLOW__CORE__FERNET_KEY")
+			assert.False(t, found, "buildEnv set AIRFLOW__CORE__FERNET_KEY, which overrides airflow.cfg")
+		})
+	}
+}
+
 func TestBuildEnvHonorsPlanAirflowHome(t *testing.T) {
 	e, _, _ := testEngine(t)
 	project := t.TempDir()
