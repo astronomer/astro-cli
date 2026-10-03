@@ -189,6 +189,30 @@ func TestReplaceGivesUpWithinItsBudget(t *testing.T) {
 	}
 }
 
+// An attempt that blocks past the whole budget still gets retried. The deadline
+// is checked after each attempt, so without a floor on attempts a first call
+// slower than the budget reports busy with no retry, which is how a Windows
+// rename that blocked for seconds on a contended file failed a write the next
+// attempt would have completed.
+func TestReplaceRetriesAfterAnAttemptOutlivesTheBudget(t *testing.T) {
+	const budget = 20 * time.Millisecond
+	attempts := 0
+	made, err := retryWhileBusy(budget, busyIs, func() error {
+		attempts++
+		if attempts == 1 {
+			time.Sleep(2 * budget)
+			return errBusy
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("a slow first attempt must still be retried: %v", err)
+	}
+	if made != 2 {
+		t.Errorf("%d attempts, want 2", made)
+	}
+}
+
 // The backoff has to GROW, which is the half of this change the budget does not
 // cover — and the half no test caught until one was written for it. Reverting
 // the doubling to a flat sleep left every other test green, because a 2s budget

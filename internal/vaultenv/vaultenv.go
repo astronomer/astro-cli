@@ -576,9 +576,17 @@ func (p *provider) Diagnose(key string) string {
 		return ""
 	}
 	if err := p.src.readErrFor(vaultKey); err != nil {
-		// Same three conditions refusal() separates, and for the same reason:
+		// The conditions refusal() separates, and for the same reason:
 		// "unlock your keychain" is useless advice for a key that is gone.
 		switch {
+		case errors.Is(err, secrets.ErrVaultDirUnsafe):
+			return fmt.Sprintf("the encrypted vault's directory cannot be used: %v", err)
+		case errors.Is(err, secrets.ErrWrongMasterKey):
+			return "the encrypted vault holds it but it was encrypted under a different master key than this " +
+				"machine's, so it cannot be decrypted here — set it again to replace it"
+		case errors.Is(err, secrets.ErrTampered):
+			return "the encrypted vault holds it but it failed the vault's integrity check, so it was not used — " +
+				"set it again to replace it"
 		case errors.Is(err, secrets.ErrVaultOrphaned):
 			return "the encrypted vault holds it but the master key that decrypts it is gone, so it cannot be " +
 				"recovered — a keychain reset or a new login keychain does this"

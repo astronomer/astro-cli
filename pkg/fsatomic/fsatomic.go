@@ -96,10 +96,19 @@ func ReadFile(path string) ([]byte, error) {
 // cares about is how long it can be made to wait. Two seconds is far longer
 // than any real contended window (the window is one rename) and still short
 // enough that a genuinely locked file is reported rather than spun on.
+//
+// The deadline alone is not enough, though, because it is checked after an
+// attempt and an attempt is not instant. On a loaded Windows machine a single
+// MoveFileEx onto a contended file can block for seconds before reporting it
+// busy, and a first attempt that outlives the budget would otherwise return
+// with no retry at all ("after 1 attempts"). replaceMinAttempts guarantees a
+// few retries after it, which is what such a wait needs: by the time a blocked
+// call returns, whatever held the file has usually let go.
 const (
-	replaceBudget  = 2 * time.Second
-	replaceMinWait = time.Millisecond
-	replaceMaxWait = 50 * time.Millisecond
+	replaceBudget      = 2 * time.Second
+	replaceMinWait     = time.Millisecond
+	replaceMaxWait     = 50 * time.Millisecond
+	replaceMinAttempts = 3
 )
 
 // replace renames tmp onto path, retrying while Windows reports the destination
@@ -133,8 +142,8 @@ func replace(tmp, path string) error {
 }
 
 // retryWhileBusy runs op until it succeeds, fails for a reason other than the
-// destination being held open, or runs out of budget. It reports how many
-// attempts it made.
+// destination being held open, or runs out of budget, which it cannot do
+// before replaceMinAttempts attempts. It reports how many attempts it made.
 //
 // The one place the policy lives. Both the read and the write need it, and the
 // two inline copies this replaced had already drifted — one of them doubled its
@@ -156,7 +165,7 @@ func retryWhileBusy(budget time.Duration, busy func(error) bool, op func() error
 		if err == nil || !busy(err) {
 			return attempts, err
 		}
-		if !time.Now().Before(deadline) {
+		if attempts >= replaceMinAttempts && !time.Now().Before(deadline) {
 			return attempts, err
 		}
 		time.Sleep(jitter(wait))

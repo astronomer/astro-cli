@@ -126,6 +126,9 @@ type linksDoc struct {
 // every entry reaches every project. An index that cannot be parsed wraps
 // ErrLinksUnreadable; one written by a newer format wraps ErrLinksTooNew.
 func OpenLinks(dir string) (*Links, error) {
+	if _, err := prepareDir(dir, false); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrLinksUnreadable, err)
+	}
 	raw, err := fsatomic.ReadFile(LinksPath(dir))
 	if errors.Is(err, os.ErrNotExist) {
 		return &Links{rows: map[string]Reach{}}, nil
@@ -227,8 +230,8 @@ var updateLinksHook func()
 // when a changed row is not valid: its key must be a global vault key and each
 // path must pass checkScope.
 func UpdateLinks(dir string, fn func(map[string]Reach) error) error {
-	if err := os.MkdirAll(dir, dirPerm); err != nil { //nolint:gosec // G703: dir is the vault directory the caller owns, DefaultDir in production
-		return fmt.Errorf("create secrets dir: %w", err)
+	if _, err := prepareDir(dir, true); err != nil {
+		return err
 	}
 	unlock, err := fsatomic.Lock(filepath.Join(dir, linksLock))
 	if err != nil {

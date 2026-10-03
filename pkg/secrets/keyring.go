@@ -1,7 +1,6 @@
 package secrets
 
 import (
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -107,8 +106,8 @@ type keyringStore struct {
 	// in-memory test store beside a real one, or two vaults in one process).
 	// Success is cached; failure is not, so a transient keyring error does
 	// not wedge a long-lived store.
-	mu  sync.Mutex
-	gcm cipher.AEAD
+	mu     sync.Mutex
+	cipher *vaultCipher
 }
 
 // aead returns the store's cipher, initialized from the OS keyring on first
@@ -128,11 +127,11 @@ type keyringStore struct {
 // with values still on disk, because a replacement key builds a perfectly valid
 // cipher that simply decrypts nothing. masterKey refuses that case up front
 // instead — see ErrVaultOrphaned.
-func (s *keyringStore) aead() (cipher.AEAD, error) {
+func (s *keyringStore) aead() (*vaultCipher, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.gcm != nil {
-		return s.gcm, nil
+	if s.cipher != nil {
+		return s.cipher, nil
 	}
 	key, err := s.masterKey()
 	if err != nil {
@@ -141,12 +140,12 @@ func (s *keyringStore) aead() (cipher.AEAD, error) {
 	// Unreachable with a key masterKey produced (it guarantees keyBytes, and AES
 	// accepts 32 bytes), and wrapped anyway so the invariant above holds for
 	// whatever a future key source does.
-	gcm, err := newAEAD(key)
+	c, err := newVaultCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrKeyringUnavailable, err)
 	}
-	s.gcm = gcm
-	return gcm, nil
+	s.cipher = c
+	return c, nil
 }
 
 func (s *keyringStore) masterKey() ([]byte, error) {
@@ -258,6 +257,9 @@ func readValueFile(path string) (valueFile, error) {
 }
 
 func (s *keyringStore) Get(key string) (string, error) {
+	if _, err := prepareDir(s.dir, false); err != nil {
+		return "", err
+	}
 	// Read the file before touching the keyring so a missing key reports
 	// ErrNotFound without ever prompting.
 	vf, err := readValueFile(s.path(key))
@@ -267,24 +269,38 @@ func (s *keyringStore) Get(key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read secret: %w", err)
 	}
+	// The filename is only a hash of the key, so a file placed under another
+	// key's name is refused here, plain or not, before anything is returned.
+	if vf.Key != key {
+		return "", fmt.Errorf("%w: the file for %q names a different key", ErrTampered, key)
+	}
 	if vf.Plain {
 		// Stored as written, so the keyring is never touched: a plain value
 		// reads on a machine that has none.
 		return vf.Value, nil
 	}
-	gcm, err := s.aead()
+	c, err := s.aead()
 	if err != nil {
 		return "", err
 	}
-	return decrypt(gcm, vf.Value)
+	plain, _, err := c.open(key, vf.Value)
+	if err != nil {
+		return "", fmt.Errorf("read secret %q: %w", key, err)
+	}
+	return plain, nil
 }
 
 func (s *keyringStore) Set(key, value string) error {
-	gcm, err := s.aead()
+	// Before the cipher: fetching it can list the directory (hasValues) and
+	// mint a master key, and neither may happen through an unsafe directory.
+	if _, err := prepareDir(s.dir, false); err != nil {
+		return err
+	}
+	c, err := s.aead()
 	if err != nil {
 		return err
 	}
-	enc, err := encrypt(gcm, value)
+	enc, err := c.seal(key, value)
 	if err != nil {
 		return err
 	}
@@ -303,8 +319,8 @@ func (s *keyringStore) write(vf valueFile) error {
 	if err != nil {
 		return fmt.Errorf("encode secret file: %w", err)
 	}
-	if err := os.MkdirAll(s.dir, dirPerm); err != nil {
-		return fmt.Errorf("create secrets dir: %w", err)
+	if _, err := prepareDir(s.dir, true); err != nil {
+		return err
 	}
 	// Write-then-rename: the CLI and desktop share this directory, so a
 	// concurrent reader must see the old value or the new one, never a torn
@@ -324,6 +340,9 @@ func (s *keyringStore) write(vf valueFile) error {
 }
 
 func (s *keyringStore) Delete(key string) error {
+	if _, err := prepareDir(s.dir, false); err != nil {
+		return err
+	}
 	err := os.Remove(s.path(key))
 	if errors.Is(err, os.ErrNotExist) {
 		return ErrNotFound
@@ -338,6 +357,9 @@ func (s *keyringStore) Delete(key string) error {
 // has no path to the AEAD or the keyring and returns no value, plain or
 // secret, so it can never reveal one, prompt, or fail on a headless machine.
 func (s *keyringStore) ListMeta() ([]Meta, error) {
+	if _, err := prepareDir(s.dir, false); err != nil {
+		return nil, err
+	}
 	entries, err := os.ReadDir(s.dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return []Meta{}, nil

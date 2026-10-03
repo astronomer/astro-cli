@@ -108,14 +108,11 @@ func TestUnmarkedFileReadsAsSecret(t *testing.T) {
 	dir := t.TempDir()
 	kr := newFakeKeyring()
 	s := testStore(t, kr, "astro-test", dir)
-	gcm, err := s.aead()
+	c, err := s.aead()
 	if err != nil {
 		t.Fatal(err)
 	}
-	enc, err := encrypt(gcm, "old-value")
-	if err != nil {
-		t.Fatal(err)
-	}
+	enc := sealV1(t, c, "old-value")
 	legacy := `{"key":"env:global:OLD","value":"` + enc + `"}`
 	if err := os.WriteFile(s.path("env:global:OLD"), []byte(legacy), 0o600); err != nil {
 		t.Fatal(err)

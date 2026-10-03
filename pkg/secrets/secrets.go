@@ -1,7 +1,8 @@
 // Package secrets stores sensitive values for local development. The
 // mechanism: one master key in the OS keyring, values AES-256-GCM encrypted
-// on disk, with the AEAD scoped per Store instance and the keyring service
-// name a constructor parameter.
+// on disk in per-key files, with the cipher scoped per Store instance and the
+// keyring service name a constructor parameter. crypto.go describes the
+// envelope.
 //
 // The CLI and Astro Desktop share one vault: both open the store with
 // DefaultService and DefaultDir, so a secret saved in either is readable in
@@ -9,13 +10,35 @@
 // the location is the interop, and two callers deriving it separately is how one
 // vault becomes two.
 //
-// State of the adoption, since this doc previously described a finished one that
-// had not started: the desktop is moving its three stores onto this package now.
-// It arrives with existing encrypted data under its own keyring service, so it
-// re-keys rather than adopting clean — the claim that there was nothing to
-// migrate was wrong, and acting on it would have orphaned every secret a user
-// had already saved. The CLI has no caller yet; internal/envresolve still needs
-// its vault provider before `astro local start` can read any of this.
+// # Threat model
+//
+// The vault protects values at rest. The master key never touches a regular
+// file, so a copy of ~/.astro — a backup, a synced or accidentally shared
+// dotfiles repository, a disk image, a file scraper, an AI agent reading files
+// in the home directory, another account on the same machine — holds
+// ciphertext and nothing that opens it.
+//
+// It does not protect against code running as the user, and is not meant to.
+// The OS keyring scopes the master key to the user account rather than to
+// either tool: on macOS, Windows and Linux alike, a process running as the
+// user can ask the keyring for it. Such a process can equally read the
+// environment of a running Airflow, which holds the decrypted values, or run
+// `astro local env get`. This is the posture of a common developer tool, and
+// the intended one; restricting the key to signed applications is not planned.
+//
+// Integrity holds against anyone who can write the vault directory but cannot
+// get the key: a secret entry is served only from an envelope that
+// authenticates under the master key and is bound to the entry's own key
+// name. A planted plaintext value is refused (ErrUnencrypted), a ciphertext
+// moved between entries fails to open (ErrTampered), and a value sealed under
+// another master key says so (ErrWrongMasterKey). Two limits remain. A plain
+// entry (SetPlain) is unauthenticated by design, since it must read without the
+// keyring, so such a writer can plant one; ListMeta reports it as plain, never
+// as a secret. And until a vault has been swept by Upgrade, its older v1
+// values, which are not bound to their key, can still be moved between
+// entries. The directory itself is checked on every use: a symlinked or
+// foreign-owned one is refused (ErrVaultDirUnsafe), and one open to group or
+// others is narrowed to the owner.
 package secrets
 
 import "errors"
@@ -34,7 +57,8 @@ type Meta struct {
 	// Plain marks an entry stored unencrypted, by SetPlain: a value its owner
 	// chose not to protect, which a consumer shows and passes on as plain
 	// rather than as a secret. False for every entry Set wrote, and for every
-	// file written before the marker existed.
+	// file written before the marker existed. It is read from the file and not
+	// authenticated, so it says how an entry is stored, not who stored it.
 	Plain bool
 }
 

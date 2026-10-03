@@ -156,7 +156,20 @@ func (w *Writer) put(vaultKey, value string) error {
 	if w.Plain {
 		return secrets.SetPlain(w.store, vaultKey, value)
 	}
-	return w.store.Set(vaultKey, value)
+	return w.setSecret(vaultKey, value)
+}
+
+// setSecret encrypts one value into the vault, then upgrades any value still
+// in the older envelope (secrets.Upgrade). The write has just fetched the
+// master key, so the sweep costs no further prompt, and it finds nothing to do
+// once a vault is current. Best effort: a value it cannot upgrade still reads,
+// and is reported by whatever read needs it.
+func (w *Writer) setSecret(vaultKey, value string) error {
+	if err := w.store.Set(vaultKey, value); err != nil {
+		return err
+	}
+	_, _ = secrets.Upgrade(w.store) //nolint:errcheck // see above
+	return nil
 }
 
 // Get returns the value this scope holds under (kind, name)'s env-var key and
@@ -348,7 +361,7 @@ func vaultKind(kind localenv.Kind) secrets.Kind {
 }
 
 // refusal turns a vault failure into the answer the user needs — which means
-// telling the three conditions apart, because their remediations have nothing in
+// telling the conditions apart, because their remediations have nothing in
 // common. pkg/secrets separates them for exactly this reason, and says so:
 // "Saying 'os keyring unavailable' alone would send someone to check a daemon
 // that is running fine."
@@ -357,6 +370,17 @@ func vaultKind(kind localenv.Kind) secrets.Kind {
 // umbrella has to be tested last or it swallows them.
 func refusal(err error) error {
 	switch {
+	case errors.Is(err, secrets.ErrVaultDirUnsafe):
+		// The keyring may be fine; the directory is what is refused, and the
+		// error names why.
+		return fmt.Errorf("the encrypted vault's directory cannot be used: %w\n\n"+
+			"Nothing is read from or written to it until it is a real directory owned by you", err)
+	case errors.Is(err, secrets.ErrWrongMasterKey):
+		return fmt.Errorf("this value was encrypted under a different master key than this machine's: %w\n\n"+
+			"It cannot be decrypted here. Set it again to replace it", err)
+	case errors.Is(err, secrets.ErrTampered):
+		return fmt.Errorf("this value failed the vault's integrity check, so it was not used: %w\n\n"+
+			"It was damaged, or written by something other than astro or Astro Desktop. Set it again to replace it", err)
 	case errors.Is(err, secrets.ErrVaultOrphaned):
 		// The keyring is fine and the values are intact; the key that decrypts
 		// them is gone. Unlocking anything will never help, and pkg/secrets
@@ -409,7 +433,7 @@ func (w *Writer) SetSecret(kind secrets.Kind, name, value string) error {
 	if held.Held && held.Equal {
 		return nil
 	}
-	if err := w.store.Set(key, value); err != nil {
+	if err := w.setSecret(key, value); err != nil {
 		return refusal(err)
 	}
 	return nil
