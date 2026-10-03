@@ -3,7 +3,6 @@ package local
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -71,7 +70,6 @@ func linkDeps(t *testing.T, dir string) (d Deps, stdout, stderr *bytes.Buffer) {
 	d, _ = testDeps(t)
 	d.Stdout, d.Stderr = stdout, stderr
 	d.WorkingDir = func() (string, error) { return dir, nil }
-	d.LoginDomain = func() (string, error) { return "", errors.New("no login") }
 	return d, stdout, stderr
 }
 
@@ -319,70 +317,6 @@ func TestLinkDefault(t *testing.T) {
 	assert.Equal(t, before, readManifest(t, dir))
 
 	_, _, err = runLink(t, dir, "default")
-	require.Error(t, err)
-}
-
-// Linking writes the workspace and the domain given; a switch keeps every
-// inheriting link where it was and says which.
-func TestLinkWorkspaceSwitchesAndPins(t *testing.T) {
-	dir, path := linkTestProject(t, linkManifest)
-	var res workspaceLinkResult
-	linkJSON(t, dir, &res, "workspace", "ws_B", "--domain", "https://cloud.astronomer-dev.io/")
-	assert.Equal(t, workspaceLinkResult{
-		Workspace: "ws_B", Domain: "astronomer-dev.io", Status: linkStatusLinked,
-		Pinned: []string{"dev", "stage"}, Manifest: path,
-	}, res)
-	m := loadManifest(t, path)
-	assert.Equal(t, "ws_B", m.Astro.Workspace)
-	assert.Equal(t, "ws_A", m.Astro.Deployments["dev"].Workspace)
-	assert.Equal(t, "ws_A", m.Astro.Deployments["stage"].Workspace)
-	assertCommentsKept(t, path)
-
-	out, _, err := runLink(t, dir, "workspace", "ws_B", "--domain", "astronomer-dev.io")
-	require.NoError(t, err)
-	assert.Contains(t, out, "already linked")
-}
-
-// With no --domain, linking takes the current login's host, and with no login
-// it asks for one rather than guessing.
-func TestLinkWorkspaceDefaultsTheDomainToTheLogin(t *testing.T) {
-	dir, path := linkTestProject(t, "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n")
-	_, _, err := runLink(t, dir, "workspace", "ws_A")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--domain")
-	assert.NotContains(t, readManifest(t, dir), "workspace")
-
-	d, out, _ := linkDeps(t, dir)
-	d.LoginDomain = func() (string, error) { return "cloud.astronomer-stage.io", nil }
-	require.NoError(t, execute(t, d, "link", "workspace", "ws_A", "--output", "json"))
-	var res workspaceLinkResult
-	require.NoError(t, json.Unmarshal(out.Bytes(), &res))
-	assert.Equal(t, "astronomer-stage.io", res.Domain)
-	assert.Equal(t, "astronomer-stage.io", loadManifest(t, path).Astro.Domain)
-}
-
-// --unset removes workspace and domain and pins the links that inherited it;
-// the bare command shows what is linked.
-func TestLinkWorkspaceUnsetAndShow(t *testing.T) {
-	dir, path := linkTestProject(t, linkManifest)
-	var res workspaceLinkResult
-	linkJSON(t, dir, &res, "workspace")
-	assert.Equal(t, workspaceLinkResult{Workspace: "ws_A", Domain: "astronomer.io", Status: linkStatusLinked, Manifest: path}, res)
-
-	linkJSON(t, dir, &res, "workspace", "--unset")
-	assert.Equal(t, workspaceLinkResult{Status: linkStatusUnlinked, Pinned: []string{"dev", "stage"}, Manifest: path}, res)
-	m := loadManifest(t, path)
-	assert.Empty(t, m.Astro.Workspace)
-	assert.Empty(t, m.Astro.Domain)
-	assert.Equal(t, "ws_A", m.Astro.Deployments["dev"].Workspace)
-	assertCommentsKept(t, path)
-
-	linkJSON(t, dir, &res, "workspace", "--unset")
-	assert.Equal(t, linkStatusUnchanged, res.Status)
-	linkJSON(t, dir, &res, "workspace")
-	assert.Equal(t, workspaceLinkResult{Status: linkStatusUnlinked, Manifest: path}, res)
-
-	_, _, err := runLink(t, dir, "workspace", "--unset", "ws_A")
 	require.Error(t, err)
 }
 

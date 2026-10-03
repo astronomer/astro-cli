@@ -683,6 +683,23 @@ domain = "astronomer-dev.io"
 		wantKeys: []string{"tool.astro.domain"},
 	},
 	{
+		name:      "organization without a workspace",
+		wantCodes: []ProblemCode{CodeOrganizationWithoutWorkspace},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+organization = "clorg"
+
+[tool.astro.deployments.prod]
+workspace = "cmws"
+deployment = "dep"
+`,
+		wantKeys: []string{"tool.astro.organization"},
+	},
+	{
 		name:      "domain with only links that skip the Astro login",
 		wantCodes: []ProblemCode{CodeDomainWithoutWorkspace},
 		content: `

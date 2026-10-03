@@ -89,3 +89,22 @@ func TestLoginDomain(t *testing.T) {
 		}
 	}
 }
+
+// The manifest's organization picks the org a workspace read asks under, and a
+// project that states none reads under the login's own organization.
+func TestWorkspaceOrganization(t *testing.T) {
+	for body, want := range map[string]string{
+		"workspace = \"cmws\"\n":                               "login-org",
+		"workspace = \"cmws\"\norganization = \"clorg\"\n":     "clorg",
+		"workspace = \"cmws\"\norganization = \"  clorg  \"\n": "clorg",
+		"workspace = \"cmws\"\norganization = \" \"\n":         "login-org",
+	} {
+		m, err := Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"+body))
+		if err != nil {
+			t.Fatalf("Load(%q): %v", body, err)
+		}
+		if got := m.Astro.WorkspaceOrganization("login-org"); got != want {
+			t.Errorf("WorkspaceOrganization for %q = %q, want %q", body, got, want)
+		}
+	}
+}

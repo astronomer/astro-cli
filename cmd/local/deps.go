@@ -86,11 +86,6 @@ type Deps struct {
 	// reached, which is what a test that declares none wants.
 	Locator func(domain string) instances.Locator
 
-	// LoginDomain is the Astro host the current login is for, which linking a
-	// workspace writes as its domain when none is given. A seam for the same
-	// reason Session is; nil reads as no login.
-	LoginDomain func() (string, error)
-
 	// CurrentWorkspace, PickDeployment and PickWorkspace are the Astro pickers
 	// `astro link` asks with when a run can be asked and an argument is
 	// missing: the current login's workspace, then the Deployment and workspace
@@ -195,7 +190,6 @@ func NewDeps() Deps {
 		WorkspaceClients: emenv.Clients,
 		Session:          astrosession.BearerFor,
 		Locator:          instancelocate.New,
-		LoginDomain:      astrosession.Domain,
 		Interactive:      stdinIsTerminal,
 		OutputTerminal:   stdoutIsTerminal,
 		AirflowDefault:   catalogDefault,

@@ -115,23 +115,6 @@ func Bearer(context.Context) (string, error) {
 	return ctx.Token, nil
 }
 
-// ErrNoDomain reports a machine with no Astro host to name: no ASTRO_DOMAIN, and
-// no login whose context would say which host it is for.
-var ErrNoDomain = errors.New("no Astro login to take the domain from")
-
-// Domain is the Astro host the current login is for, as `astro login` stored
-// it: ASTRO_DOMAIN when that is set, else the host the current context names.
-// Linking a workspace defaults its [tool.astro] domain to this, so a link made
-// while logged in to a host is read back with that host's login. The session
-// behind it is not checked: the host of an expired login is still its host.
-func Domain() (string, error) {
-	domain, err := config.GetCurrentDomain()
-	if err != nil || strings.TrimSpace(domain) == "" {
-		return "", ErrNoDomain
-	}
-	return domain, nil
-}
-
 // BearerFor is Bearer for a project whose Astro host is domain: after
 // ASTRO_API_TOKEN, the login stored for that domain, refreshed when stale,
 // whatever host the current context names. An empty domain is a project that

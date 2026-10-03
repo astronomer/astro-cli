@@ -115,6 +115,39 @@ func TestEnvGetFromWorkspace(t *testing.T) {
 	}
 }
 
+// `env list` and `env get` read the workspace under the manifest's
+// organization, not the login's.
+func TestEnvListAndGetReadUnderTheManifestsOrganization(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dir := workspaceEnvProject(t)
+	body := strings.Replace(workspaceEnvManifest, "domain = 'localhost'\n", "domain = 'localhost'\norganization = 'clother'\n", 1)
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"local", "env", "list", "--output", "json"},
+		{"local", "env", "variable", "get", "DATA_WAREHOUSE_URI", "--output", "json"},
+	} {
+		mc := warehouseClient()
+		d, out, _ := envDeps(t, dir, "")
+		d.WorkspaceClients = workspaceClients(mc)
+		if err := execute(t, d, args...); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), "workspace (cmws)") {
+			t.Fatalf("%v did not resolve from the workspace:\n%s", args, out.String())
+		}
+		for _, call := range mc.Calls {
+			if org := call.Arguments.String(1); org != "clother" {
+				t.Fatalf("%v read under organization %q, want the manifest's clother", args, org)
+			}
+		}
+		if len(mc.Calls) == 0 {
+			t.Fatalf("%v never read the workspace", args)
+		}
+	}
+}
+
 // A local set overrides the workspace source; get then reports the project
 // source.
 func TestEnvLocalSetOverridesWorkspace(t *testing.T) {

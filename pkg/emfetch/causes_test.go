@@ -23,7 +23,7 @@ func TestCauseText(t *testing.T) {
 		{CauseSecretsWithheld, "your org disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally"},
 		{CauseNoValue, "the workspace holds no value for it"},
 		{CauseOffline, "could not reach astronomer-dev.io. Check your connection, or set the value locally"},
-		{CauseNoWorkspace, "the manifest sets no `workspace`. Add `workspace = \"<id>\"` under [tool.astro]"},
+		{CauseNoWorkspace, "the manifest sets no `workspace`. Link a workspace to the project in Astro Desktop, or set the value locally"},
 	}
 	for _, tc := range cases {
 		if got := tc.cause.Text(domain, workspace); got != tc.want {
@@ -60,8 +60,59 @@ func TestStatusText(t *testing.T) {
 			}
 		})
 	}
-	if _, ok := StatusCause(http.StatusBadGateway); ok {
+	if _, ok := StatusCause(http.StatusBadGateway, Read{}); ok {
 		t.Error("StatusCause(502) named a cause; the contract gives it none")
+	}
+}
+
+// A read under an organization names it where the cause turns on it, and the
+// rest read as Text words them: the organization changes no other cause.
+func TestCauseTextForNamesTheOrganization(t *testing.T) {
+	r := Read{Domain: "astronomer-dev.io", Workspace: "cmws123", Organization: "clorg", OrganizationDeclared: true}
+	cases := []struct {
+		cause Cause
+		want  string
+	}{
+		{CauseSecretsWithheld, "organization clorg disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally"},
+		{CauseNoOrganizationAccess, "could not read workspace cmws123 in organization clorg on astronomer-dev.io, which pyproject.toml names. " +
+			"Check that you belong to it with `astro organization list`, and `organization` and `workspace` under [tool.astro]"},
+		{CauseNotFound, "workspace cmws123 was not found on astronomer-dev.io. Check `workspace` and `domain` in pyproject.toml, and your current organization"},
+		{CauseOffline, "could not reach astronomer-dev.io. Check your connection, or set the value locally"},
+	}
+	for _, tc := range cases {
+		if got := tc.cause.TextFor(r); got != tc.want {
+			t.Errorf("Cause(%d).TextFor:\n got  %q\n want %q", tc.cause, got, tc.want)
+		}
+	}
+}
+
+// A 403 or 404 under the organization the manifest names is that
+// organization's cause; under the login's own it is the plain access or
+// not-found cause, and other statuses are unchanged either way.
+func TestStatusCauseForADeclaredOrganization(t *testing.T) {
+	declared := Read{Domain: "astronomer.io", Workspace: "cmws123", Organization: "clorg", OrganizationDeclared: true}
+	fallback := Read{Domain: "astronomer.io", Workspace: "cmws123", Organization: "clorg"}
+	for _, tc := range []struct {
+		status int
+		r      Read
+		want   Cause
+	}{
+		{http.StatusForbidden, declared, CauseNoOrganizationAccess},
+		{http.StatusNotFound, declared, CauseNoOrganizationAccess},
+		{http.StatusUnauthorized, declared, CauseSessionExpired},
+		{http.StatusForbidden, fallback, CauseNoAccess},
+		{http.StatusNotFound, fallback, CauseNotFound},
+	} {
+		if got, ok := StatusCause(tc.status, tc.r); !ok || got != tc.want {
+			t.Errorf("StatusCause(%d, declared=%v) = (%d, %v), want %d", tc.status, tc.r.OrganizationDeclared, got, ok, tc.want)
+		}
+	}
+	if _, ok := StatusCause(http.StatusInternalServerError, declared); ok {
+		t.Error("StatusCause(500) under a declared organization named a cause")
+	}
+	want := CauseNoOrganizationAccess.TextFor(declared)
+	if got := StatusTextFor(http.StatusForbidden, declared, errors.New("forbidden")); got != want {
+		t.Errorf("StatusTextFor(403) = %q, want %q", got, want)
 	}
 }
 

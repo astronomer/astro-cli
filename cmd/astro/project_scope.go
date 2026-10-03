@@ -34,6 +34,9 @@ type projectPick struct {
 	domain string
 	// link is the Deployment link the pick came from, "" for [tool.astro].
 	link string
+	// organization is [tool.astro] organization when the pick is the
+	// project's workspace, "" when the manifest names none.
+	organization string
 }
 
 // followProjectPreRun is the pre-run of `astro env` and `astro deployment`:
@@ -126,6 +129,7 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	} else if m.Astro.Workspace != "" {
 		pick.workspace = m.Astro.Workspace
 		pick.domain = m.Astro.WorkspaceDomain()
+		pick.organization = m.Astro.Organization
 	}
 	return pick, nil
 }
@@ -201,9 +205,9 @@ func projectNote(ctx context.Context, pick projectPick, contextWorkspace string,
 	var what string
 	switch {
 	case pick.workspace != "" && switched:
-		what = fmt.Sprintf("workspace %s on %s", workspaceLabel(ctx, pick.workspace), pick.domain)
+		what = fmt.Sprintf("workspace %s on %s", workspaceLabel(ctx, pick.workspace, pick.organization), pick.domain)
 	case pick.workspace != "":
-		what = "workspace " + workspaceLabel(ctx, pick.workspace)
+		what = "workspace " + workspaceLabel(ctx, pick.workspace, pick.organization)
 	default:
 		what = pick.domain
 	}
@@ -214,12 +218,14 @@ func projectNote(ctx context.Context, pick projectPick, contextWorkspace string,
 }
 
 // workspaceLabel is the workspace's name, or its id when the name cannot be read.
-func workspaceLabel(ctx context.Context, id string) string {
+// It is looked up under org, the organization the manifest names, else the
+// current one.
+func workspaceLabel(ctx context.Context, id, org string) string {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return id
 	}
-	resp, err := astroV1Client.GetWorkspaceWithResponse(ctx, c.Organization, id)
+	resp, err := astroV1Client.GetWorkspaceWithResponse(ctx, (&manifest.Astro{Organization: org}).WorkspaceOrganization(c.Organization), id)
 	if err != nil || resp.JSON200 == nil || resp.JSON200.Name == "" {
 		return id
 	}

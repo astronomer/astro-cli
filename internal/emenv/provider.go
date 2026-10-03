@@ -33,6 +33,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // sourceLabel is the source name a workspace-resolved value reports.
@@ -60,10 +61,15 @@ type provider struct {
 	// domain is the Astro host the workspace lives on, from the manifest. It
 	// picks the stored login the read uses, whatever host the CLI's current
 	// context names — docs/v2-workspace-link.md.
-	domain    string
-	clientFor ClientFactory
-	client    astrov1.APIClient // built in load, from the domain's login
-	reveal    bool              // ask for secret values (start/get); false is presence-only (list)
+	domain string
+	// organization is the manifest's `organization`, empty when it names
+	// none; org is the one load chose from it and the login, through
+	// manifest.Astro.WorkspaceOrganization.
+	organization string
+	org          string
+	clientFor    ClientFactory
+	client       astrov1.APIClient // built in load, from the domain's login
+	reveal       bool              // ask for secret values (start/get); false is presence-only (list)
 	// timeout bounds the read; zero means fetchTimeout.
 	timeout time.Duration
 
@@ -216,7 +222,12 @@ func (p *provider) Diagnose(key string) string {
 // docs/v2-workspace-link.md words it. The words are pkg/emfetch's, so Astro
 // Desktop shows the same text and a failure reads the same from either app.
 func (p *provider) cause(c emfetch.Cause) string {
-	return c.Text(p.domain, p.workspaceID)
+	return c.TextFor(p.read())
+}
+
+// read is what a cause says about this provider's read.
+func (p *provider) read() emfetch.Read {
+	return emfetch.Read{Domain: p.domain, Workspace: p.workspaceID, Organization: p.org, OrganizationDeclared: p.organization != ""}
 }
 
 // load fetches the workspace's objects once, recording a whole-provider outage
@@ -241,6 +252,11 @@ func (p *provider) load() {
 			}
 			return
 		}
+		// The manifest's organization, else the login's: a token reads every
+		// organization its user belongs to, so a project that names its
+		// workspace's needs no `astro organization switch`.
+		astro := manifest.Astro{Workspace: p.workspaceID, Organization: p.organization}
+		p.org = astro.WorkspaceOrganization(ctx.Organization)
 		p.client = p.clientFor(Login{Domain: ctx.Domain, Token: ctx.Token, APIURL: ctx.GetPublicRESTAPIURL("v1")})
 		// When the org disallows reading secrets, non-secret values still
 		// resolve, so the fallback re-reads without the secret request and a
@@ -255,7 +271,7 @@ func (p *provider) load() {
 		defer cancel()
 		objs, secretsIncluded, err := emfetch.WithSecretsFallback(reqCtx, p.reveal,
 			func(reqCtx httpcontext.Context, showSecrets bool) (map[string]objectValue, error) {
-				return p.fetch(reqCtx, ctx.Organization, showSecrets)
+				return p.fetch(reqCtx, p.org, showSecrets)
 			})
 		if err != nil {
 			p.down = p.classify(err)
@@ -443,10 +459,10 @@ func (p *provider) classify(err error) *outage {
 			return &outage{short: shortLabels[emfetch.CauseSessionExpired], cause: astrosession.Rejected(p.domain).Error()}
 		}
 		short := "unreachable"
-		if c, named := emfetch.StatusCause(he.code); named {
+		if c, named := emfetch.StatusCause(he.code, p.read()); named {
 			short = shortLabels[c]
 		}
-		return &outage{short: short, cause: emfetch.StatusText(he.code, p.domain, p.workspaceID, he.err)}
+		return &outage{short: short, cause: emfetch.StatusTextFor(he.code, p.read(), he.err)}
 	}
 	if errors.Is(err, httpcontext.DeadlineExceeded) {
 		return &outage{short: "timed out", cause: p.cause(emfetch.CauseOffline)}
@@ -457,7 +473,8 @@ func (p *provider) classify(err error) *outage {
 // shortLabels is the `list` label suffix for each cause a platform status
 // names. The labels are the CLI's own; the causes they abbreviate are shared.
 var shortLabels = map[emfetch.Cause]string{
-	emfetch.CauseSessionExpired: "session expired",
-	emfetch.CauseNoAccess:       "no access",
-	emfetch.CauseNotFound:       "workspace not found",
+	emfetch.CauseSessionExpired:       "session expired",
+	emfetch.CauseNoAccess:             "no access",
+	emfetch.CauseNotFound:             "workspace not found",
+	emfetch.CauseNoOrganizationAccess: "no access to organization",
 }

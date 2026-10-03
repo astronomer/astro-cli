@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Login is the stored login a read uses: the one for the manifest's domain,
@@ -32,21 +33,42 @@ func Clients(l Login) astrov1.APIClient {
 	return astrov1.NewV1ClientForLogin(httputil.NewHTTPClient(), l.Token, l.APIURL)
 }
 
+// Workspace is the linked workspace a read is of, as the manifest states it.
+type Workspace struct {
+	// ID is [tool.astro] workspace; empty when the manifest sets none.
+	ID string
+	// Domain is the host it lives on, already defaulted
+	// (manifest.Astro.WorkspaceDomain). It picks the login the read uses.
+	Domain string
+	// Organization is [tool.astro] organization, empty when the manifest names
+	// none and the read asks under the login's organization.
+	Organization string
+}
+
+// WorkspaceOf is the workspace a's manifest links.
+func WorkspaceOf(a *manifest.Astro) Workspace {
+	return Workspace{ID: a.Workspace, Domain: a.WorkspaceDomain(), Organization: a.Organization}
+}
+
 // NewProvider builds the workspace Environment Manager provider for a run: it
-// resolves `source = "workspace"` names against workspaceID's objects on
-// domain, read with the login stored for domain. reveal asks for secret values
-// (start and get); list passes reveal = false so it reads presence only and
-// never pulls a secret value. One provider serves the whole run, so its fetch
-// is shared across every workspace-source name.
+// resolves `source = "workspace"` names against ws's objects, read with the
+// login stored for ws.Domain, under ws.Organization, else that login's
+// organization. reveal asks for secret values (start and get); list passes
+// reveal = false so it reads presence only and never pulls a secret value. One
+// provider serves the whole run, so its fetch is shared across every
+// workspace-source name.
 //
-// An empty workspaceID means the manifest sets no top-level `workspace`, which
-// a workspace source needs: the provider is then unavailable and names the fix.
-// domain is the manifest's, already defaulted (manifest.Astro.WorkspaceDomain).
-func NewProvider(workspaceID, domain string, clientFor ClientFactory, reveal bool) envresolve.Provider {
-	if workspaceID == "" {
-		return Unavailable(emfetch.CauseNoWorkspace.Text(domain, ""))
+// An empty ws.ID means the manifest sets no top-level `workspace`, which a
+// workspace source needs: the provider is then unavailable and names the fix.
+func NewProvider(ws Workspace, clientFor ClientFactory, reveal bool) envresolve.Provider {
+	if ws.ID == "" {
+		return Unavailable(emfetch.CauseNoWorkspace.Text(ws.Domain, ""))
 	}
-	return &provider{workspaceID: workspaceID, domain: domain, clientFor: clientFor, reveal: reveal}
+	return newProvider(ws, clientFor, reveal)
+}
+
+func newProvider(ws Workspace, clientFor ClientFactory, reveal bool) *provider {
+	return &provider{workspaceID: ws.ID, domain: ws.Domain, organization: ws.Organization, clientFor: clientFor, reveal: reveal}
 }
 
 // Unavailable returns a provider that is absent for the given reason, such as a
@@ -68,17 +90,18 @@ func (u *unavailable) Outage() (short, cause string) {
 	return u.reason, u.reason
 }
 
-// WorkspaceConnections is the native connections workspaceID holds on domain,
+// WorkspaceConnections is the native connections ws holds,
 // read with secret values, for the warehouse file Otto's analyzing-data skill
 // queries through: a connection without its credentials cannot be queried.
 // A connection the org's secrets policy withheld is left out. The error is
 // the read's outage cause when the workspace could not be read; an empty
-// workspaceID reads nothing and returns neither. timeout bounds the read.
-func WorkspaceConnections(workspaceID, domain string, clientFor ClientFactory, timeout time.Duration) ([]connmodel.Connection, error) {
-	if workspaceID == "" {
+// ws.ID reads nothing and returns neither. timeout bounds the read.
+func WorkspaceConnections(ws Workspace, clientFor ClientFactory, timeout time.Duration) ([]connmodel.Connection, error) {
+	if ws.ID == "" {
 		return nil, nil
 	}
-	p := &provider{workspaceID: workspaceID, domain: domain, clientFor: clientFor, reveal: true, timeout: timeout}
+	p := newProvider(ws, clientFor, true)
+	p.timeout = timeout
 	conns := p.Connections()
 	if _, cause := p.Outage(); cause != "" {
 		return nil, errors.New(cause)

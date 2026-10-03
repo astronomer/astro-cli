@@ -91,7 +91,7 @@ func ownKeys(t *testing.T, path, name string) map[string]any {
 // it pinned.
 func setWorkspace(t *testing.T, dir, id, domain string) error {
 	t.Helper()
-	_, err := SetWorkspaceLink(dir, nil, id, domain)
+	_, err := SetWorkspaceLink(dir, nil, id, domain, "")
 	return err
 }
 
@@ -744,7 +744,7 @@ environment = 'orders-prod'
 
 	t.Run("switch", func(t *testing.T) {
 		dir, path := linkProject(t, body)
-		pinned, err := SetWorkspaceLink(dir, nil, "ws_B", "astronomer.io")
+		pinned, err := SetWorkspaceLink(dir, nil, "ws_B", "astronomer.io", "")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"dev", "stage"}, pinned)
 		assert.Equal(t, "ws_B", loadLinks(t, path).Astro.Workspace)
@@ -754,7 +754,7 @@ environment = 'orders-prod'
 	})
 	t.Run("unlink", func(t *testing.T) {
 		dir, path := linkProject(t, body)
-		pinned, err := SetWorkspaceLink(dir, nil, "", "")
+		pinned, err := SetWorkspaceLink(dir, nil, "", "", "")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"dev", "stage"}, pinned)
 		m := loadLinks(t, path)
@@ -769,7 +769,7 @@ environment = 'orders-prod'
 func TestSetWorkspaceLinkTheSameWorkspaceIsANoOp(t *testing.T) {
 	const body = linkFixture + "workspace = 'ws_A'\ndomain = 'astronomer.io'\n\n[tool.astro.deployments.dev]\ndeployment = 'dep-dev'\n"
 	dir, path := linkProject(t, body)
-	pinned, err := SetWorkspaceLink(dir, nil, "ws_A", "astronomer.io")
+	pinned, err := SetWorkspaceLink(dir, nil, "ws_A", "astronomer.io", "")
 	require.NoError(t, err)
 	assert.Empty(t, pinned)
 	assert.Equal(t, body, readFile(t, path))
@@ -778,6 +778,77 @@ func TestSetWorkspaceLinkTheSameWorkspaceIsANoOp(t *testing.T) {
 	require.NoError(t, setWorkspace(t, dir, "ws_A", "astronomer-dev.io"))
 	assert.Empty(t, ownKeys(t, path, "dev"), "a domain change pinned the link")
 	assert.Equal(t, "astronomer-dev.io", loadLinks(t, path).Astro.Domain)
+}
+
+// Linking writes the organization beside the workspace and domain, trimmed, and
+// relinking the same three writes nothing.
+func TestSetWorkspaceLinkWritesTheOrganization(t *testing.T) {
+	dir, path := linkProject(t, linkFixture)
+	_, err := SetWorkspaceLink(dir, nil, "cmws123", "astronomer.io", " clorg ")
+	require.NoError(t, err)
+	m := loadLinks(t, path)
+	assert.Equal(t, "cmws123", m.Astro.Workspace)
+	assert.Equal(t, "astronomer.io", m.Astro.Domain)
+	assert.Equal(t, "clorg", m.Astro.Organization)
+	assert.Contains(t, readFile(t, path), "organization = ")
+
+	before := readFile(t, path)
+	_, err = SetWorkspaceLink(dir, nil, "cmws123", "astronomer.io", "clorg")
+	require.NoError(t, err)
+	assert.Equal(t, before, readFile(t, path))
+
+	// The same workspace in another organization moves the organization alone.
+	_, err = SetWorkspaceLink(dir, nil, "cmws123", "astronomer.io", "clother")
+	require.NoError(t, err)
+	assert.Equal(t, "clother", loadLinks(t, path).Astro.Organization)
+	assert.Equal(t, 1, strings.Count(readFile(t, path), "organization = "))
+}
+
+// An empty organization for the workspace already linked is "not given": the
+// organization stays, byte for byte, and so it does when only the domain moves.
+func TestSetWorkspaceLinkWithoutAnOrganizationKeepsTheLinkedWorkspaces(t *testing.T) {
+	body := linkFixture + "workspace = 'ws_A'\ndomain = 'astronomer.io'\norganization = 'clorg'\n"
+	dir, path := linkProject(t, body)
+	_, err := SetWorkspaceLink(dir, nil, "ws_A", "astronomer.io", "")
+	require.NoError(t, err)
+	assert.Equal(t, body, readFile(t, path))
+
+	_, err = SetWorkspaceLink(dir, nil, "ws_A", "astronomer-dev.io", "")
+	require.NoError(t, err)
+	m := loadLinks(t, path)
+	assert.Equal(t, "clorg", m.Astro.Organization)
+	assert.Equal(t, "astronomer-dev.io", m.Astro.Domain)
+}
+
+// An empty organization with another workspace removes the old one, which was
+// the old workspace's, so the new one reads under the login's own organization.
+func TestSetWorkspaceLinkWithoutAnOrganizationRemovesIt(t *testing.T) {
+	dir, path := linkProject(t, linkFixture+"workspace = 'ws_A'\ndomain = 'astronomer.io'\norganization = 'clorg'\n")
+	_, err := SetWorkspaceLink(dir, nil, "ws_B", "astronomer.io", "")
+	require.NoError(t, err)
+	m := loadLinks(t, path)
+	assert.Equal(t, "ws_B", m.Astro.Workspace)
+	assert.Empty(t, m.Astro.Organization)
+	assert.NotContains(t, readFile(t, path), "organization = ")
+}
+
+// Unlinking removes the organization with the workspace and domain, since the
+// parser refuses an organization with no workspace, and still pins the links
+// that inherited the workspace.
+func TestSetWorkspaceLinkUnlinkingClearsAllThree(t *testing.T) {
+	dir, path := linkProject(t, linkFixture+"workspace = 'ws_A'\ndomain = 'astronomer.io'\norganization = 'clorg'\n\n[tool.astro.deployments.dev]\ndeployment = 'dep-dev'\n")
+	pinned, err := SetWorkspaceLink(dir, nil, "", "", "")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"dev"}, pinned)
+	m := loadLinks(t, path)
+	assert.Empty(t, m.Astro.Workspace)
+	assert.Empty(t, m.Astro.Domain)
+	assert.Empty(t, m.Astro.Organization)
+	body := readFile(t, path)
+	for _, key := range []string{"domain = ", "organization = "} {
+		assert.NotContains(t, body, key)
+	}
+	assert.Equal(t, map[string]string{"dev": "ws_A"}, linkWorkspaces(t, path))
 }
 
 // Unlinking a project that links nothing writes nothing.

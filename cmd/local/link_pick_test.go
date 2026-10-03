@@ -3,7 +3,6 @@ package local
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -253,41 +252,6 @@ func TestLinkPickerShowsEachKind(t *testing.T) {
 	require.Error(t, execute(t, d, "link", "remove"))
 	assertPickerTable(t, run.out.String(), "Select a link to remove",
 		`1\s+aws\s+mwaa\s+orders-prod`, `3\s+oss\s+endpoint\s+https://airflow.example.com`)
-}
-
-// With no id, workspace asks which of the login's workspaces to use and links
-// it on the login's host; --show, or a run that cannot ask, prints instead.
-func TestLinkWorkspacePicksOrShows(t *testing.T) {
-	dir, path := linkTestProject(t, linkManifest)
-	d, run := pickDeps(t, dir, "", PickedDeployment{}, "ws_Z")
-	d.LoginDomain = func() (string, error) { return "astronomer-dev.io", nil }
-	require.NoError(t, execute(t, d, "link", "workspace"))
-	assert.Equal(t, 1, run.workspacePicks)
-	m := loadManifest(t, path)
-	assert.Equal(t, "ws_Z", m.Astro.Workspace)
-	assert.Equal(t, "astronomer-dev.io", m.Astro.Domain)
-	assert.Equal(t, "ws_A", m.Astro.Deployments["dev"].Workspace, "the switch moved an inheriting link")
-
-	for name, args := range map[string][]string{
-		"--show":      {"link", "workspace", "--show"},
-		"json":        {"link", "workspace", "--output", "json"},
-		"no terminal": {"link", "workspace"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			sd, srun := pickDeps(t, dir, "", PickedDeployment{}, "")
-			if name == "no terminal" {
-				sd.Interactive = func() bool { return false }
-			}
-			require.NoError(t, execute(t, sd, args...))
-			assert.Zero(t, srun.workspacePicks)
-			assert.Contains(t, srun.out.String(), "ws_Z")
-		})
-	}
-
-	d, _ = pickDeps(t, dir, "", PickedDeployment{}, "")
-	d.PickWorkspace = func() (string, error) { return "", errors.New("no login") }
-	require.Error(t, execute(t, d, "link", "workspace"))
-	require.Error(t, execute(t, d, "link", "workspace", "--show", "--unset"))
 }
 
 // The picker is told which Deployments the project already links, by ID, so it

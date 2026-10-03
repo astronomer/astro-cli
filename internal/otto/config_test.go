@@ -57,6 +57,23 @@ func (s *ConfigSuite) TestNewConfigFromContext() {
 	s.NotEmpty(cfg.Domain)
 }
 
+// Inside a v2 project that names its workspace's organization, Otto runs in
+// that organization; one that names none, and no project at all, keep the
+// login's.
+func (s *ConfigSuite) TestNewConfigFromContextTakesTheProjectsOrganization() {
+	s.Equal("test-org-id", NewConfigFromContext().Organization, "outside a project")
+
+	dir := s.chdirTempProject("org-project")
+	body := "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nworkspace = \"cmws\"\n"
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(body), 0o600))
+	s.Equal("test-org-id", NewConfigFromContext().Organization, "a project naming no organization")
+
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(body+"organization = \"clother\"\n"), 0o600))
+	s.Equal("clother", NewConfigFromContext().Organization)
+	env := strings.Join((&Config{Organization: NewConfigFromContext().Organization}).BuildEnv(), "\n")
+	s.Contains(env, "ASTRO_ORGANIZATION=clother")
+}
+
 func (s *ConfigSuite) TestBuildEnv_SetsVars() {
 	cfg := &Config{
 		Token:        "test-token",

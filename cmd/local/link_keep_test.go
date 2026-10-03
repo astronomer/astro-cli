@@ -1,7 +1,6 @@
 package local
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,43 +60,4 @@ func TestLinkAddRefusesACredentialFlagTheMethodDoesNotRead(t *testing.T) {
 		_, _, err := runLink(t, dir, append([]string{"add", "oss", "--url", url}, args...)...)
 		require.NoError(t, err, "%v", args)
 	}
-}
-
-// Without --domain, a committed domain is kept rather than replaced by the
-// current login's host.
-func TestLinkWorkspaceKeepsTheCommittedDomain(t *testing.T) {
-	body := "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'ws_A'\ndomain = 'astronomer-dev.io'\n"
-	dir, path := linkTestProject(t, body)
-	d, out, _ := linkDeps(t, dir)
-	d.LoginDomain = func() (string, error) { return "astronomer.io", nil }
-	require.NoError(t, execute(t, d, "link", "workspace", "ws_B", "--output", "json"))
-	var res workspaceLinkResult
-	require.NoError(t, json.Unmarshal(out.Bytes(), &res))
-	assert.Equal(t, "astronomer-dev.io", res.Domain)
-	assert.Equal(t, "astronomer-dev.io", loadManifest(t, path).Astro.Domain)
-
-	// Re-linking the same workspace with no login needs none: the domain is in
-	// the file, and nothing changes.
-	after := readManifest(t, dir)
-	linkJSON(t, dir, &res, "workspace", "ws_B")
-	assert.Equal(t, linkStatusUnchanged, res.Status)
-	assert.Equal(t, after, readManifest(t, dir))
-}
-
-// Re-linking the workspace a project already links with no committed domain
-// writes nothing and needs no login: the link reads as the default host, and
-// the login's host written over it would move it.
-func TestLinkWorkspaceRelinkWithNoCommittedDomainIsANoOp(t *testing.T) {
-	body := "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'ws_A'\n"
-	dir, _ := linkTestProject(t, body)
-	var res workspaceLinkResult
-	linkJSON(t, dir, &res, "workspace", "ws_A")
-	assert.Equal(t, linkStatusUnchanged, res.Status)
-	assert.Equal(t, "astronomer.io", res.Domain)
-	assert.Equal(t, body, readManifest(t, dir))
-
-	// A different workspace still needs a domain from somewhere.
-	_, _, err := runLink(t, dir, "workspace", "ws_B")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--domain")
 }

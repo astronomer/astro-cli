@@ -37,14 +37,42 @@ const (
 	// workspace source to read. It is a missing value, not a manifest error: a
 	// local value still satisfies the name, with no network needed.
 	CauseNoWorkspace
+	// CauseNoOrganizationAccess is the platform answering 403 or 404 to a read
+	// under the organization the manifest names: the login is not a member of
+	// it, or the workspace is not in it.
+	CauseNoOrganizationAccess
 )
+
+// Read is the workspace read a cause is about.
+type Read struct {
+	// Domain is the manifest's, already defaulted and normalized.
+	Domain string
+	// Workspace is the manifest's `workspace`.
+	Workspace string
+	// Organization is the organization the read asked under: the manifest's
+	// `organization`, else the login's. Empty when the read never got as far
+	// as choosing one.
+	Organization string
+	// OrganizationDeclared reports that Organization is the manifest's, which
+	// is what makes a 403 or 404 a fault of that organization.
+	OrganizationDeclared bool
+}
 
 // Text is the message for c. domain is the manifest's, already defaulted and
 // normalized; every cause that involves the platform names it, because a
 // production workspace asked of a dev host is the commonest wrong answer and
 // the fix is the login, not the manifest. workspaceID is the manifest's
-// `workspace`, which only CauseNotFound quotes.
+// `workspace`, which only CauseNotFound quotes. TextFor also names the
+// organization.
 func (c Cause) Text(domain, workspaceID string) string {
+	return c.TextFor(Read{Domain: domain, Workspace: workspaceID})
+}
+
+// TextFor is the message for c about r. It is Text, naming r's organization
+// where the cause turns on it: the organization a secrets policy belongs to,
+// and the one the manifest names that could not be read.
+func (c Cause) TextFor(r Read) string {
+	domain := r.Domain
 	switch c {
 	case CauseNotLoggedIn:
 		return fmt.Sprintf("not logged in to %s. Log in with `astro login %s`", domain, domain)
@@ -53,22 +81,33 @@ func (c Cause) Text(domain, workspaceID string) string {
 	case CauseNoAccess:
 		return fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (`astro organization switch`), or ask an org admin", domain)
 	case CauseNotFound:
-		return fmt.Sprintf("workspace %s was not found on %s. Check `workspace` and `domain` in pyproject.toml, and your current organization", workspaceID, domain)
+		return fmt.Sprintf("workspace %s was not found on %s. Check `workspace` and `domain` in pyproject.toml, and your current organization", r.Workspace, domain)
 	case CauseSecretsWithheld:
+		if r.Organization != "" {
+			return fmt.Sprintf("organization %s disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally", r.Organization)
+		}
 		return "your org disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally"
 	case CauseNoValue:
 		return "the workspace holds no value for it"
 	case CauseOffline:
 		return fmt.Sprintf("could not reach %s. Check your connection, or set the value locally", domain)
 	case CauseNoWorkspace:
-		return "the manifest sets no `workspace`. Add `workspace = \"<id>\"` under [tool.astro]"
+		return "the manifest sets no `workspace`. Link a workspace to the project in Astro Desktop, or set the value locally"
+	case CauseNoOrganizationAccess:
+		return fmt.Sprintf("could not read workspace %s in organization %s on %s, which pyproject.toml names. "+
+			"Check that you belong to it with `astro organization list`, and `organization` and `workspace` under [tool.astro]",
+			r.Workspace, r.Organization, domain)
 	}
 	return fmt.Sprintf("unknown cause %d", int(c))
 }
 
-// StatusCause is the cause a non-200 answer from the platform names, and false
-// for a status the contract gives no cause of its own.
-func StatusCause(status int) (Cause, bool) {
+// StatusCause is the cause a non-200 answer to r names, and false for a status
+// the contract gives no cause of its own. A 403 or 404 under an organization the
+// manifest names is that organization's, not the current one's.
+func StatusCause(status int, r Read) (Cause, bool) {
+	if r.OrganizationDeclared && (status == http.StatusForbidden || status == http.StatusNotFound) {
+		return CauseNoOrganizationAccess, true
+	}
 	switch status {
 	case http.StatusUnauthorized:
 		return CauseSessionExpired, true
@@ -84,10 +123,15 @@ func StatusCause(status int) (Cause, bool) {
 // status: the cause's text for the statuses the contract names, and otherwise
 // the domain with err, the platform's own account of what went wrong.
 func StatusText(status int, domain, workspaceID string, err error) string {
-	if c, ok := StatusCause(status); ok {
-		return c.Text(domain, workspaceID)
+	return StatusTextFor(status, Read{Domain: domain, Workspace: workspaceID}, err)
+}
+
+// StatusTextFor is StatusText for a read that knows its organization.
+func StatusTextFor(status int, r Read, err error) string {
+	if c, ok := StatusCause(status, r); ok {
+		return c.TextFor(r)
 	}
-	return fmt.Sprintf("%s returned an error: %v", domain, err)
+	return fmt.Sprintf("%s returned an error: %v", r.Domain, err)
 }
 
 // Object is what the withheld rule needs to know about one Environment Manager

@@ -53,10 +53,10 @@ func TestKeysAndConnectionsLeaveOutWithheldValues(t *testing.T) {
 				return !*p.ShowSecrets && *p.ObjectType == objectType
 			})).Return(okResp(rows...), nil)
 	}
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 	require.Equal(t, []string{"PLAIN"}, envresolve.Keys(p))
 
-	conns, err := WorkspaceConnections(testWorkspace, testDomain, clientsOf(mc), ReadTimeout)
+	conns, err := WorkspaceConnections(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), ReadTimeout)
 	require.NoError(t, err)
 	require.Empty(t, conns)
 }
@@ -68,13 +68,13 @@ func TestWorkspaceConnectionsDecodesNativeConnections(t *testing.T) {
 		astrov1.ENVIRONMENTVARIABLE: {envVarObj("AIRFLOW_CONN_ENV_KEYED", `{"conn_type":"http"}`, false)},
 		astrov1.CONNECTION:          {connObj("wh", &astrov1.EnvironmentObjectConnection{Type: "snowflake", Login: ptr("u"), Password: ptr("pw")})},
 	})
-	conns, err := WorkspaceConnections(testWorkspace, testDomain, clientsOf(mc), ReadTimeout)
+	conns, err := WorkspaceConnections(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), ReadTimeout)
 	require.NoError(t, err)
 	require.Len(t, conns, 1, "only native connections feed the warehouses")
 	require.Equal(t, "wh", conns[0].ConnID)
 	require.Equal(t, "pw", conns[0].ConnPassword)
 
-	none, err := WorkspaceConnections("", testDomain, clientsOf(mc), ReadTimeout)
+	none, err := WorkspaceConnections(Workspace{ID: "", Domain: testDomain}, clientsOf(mc), ReadTimeout)
 	require.NoError(t, err)
 	require.Nil(t, none)
 }
@@ -89,7 +89,7 @@ func TestSlowReadTimesOut(t *testing.T) {
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { <-args.Get(0).(context.Context).Done() }).
 		Return(nil, context.DeadlineExceeded)
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	short, cause := envresolve.Outage(p)
@@ -97,7 +97,7 @@ func TestSlowReadTimesOut(t *testing.T) {
 	require.Contains(t, cause, "could not reach")
 	require.Nil(t, envresolve.Keys(p))
 
-	_, err := WorkspaceConnections(testWorkspace, testDomain, clientsOf(mc), 20*time.Millisecond)
+	_, err := WorkspaceConnections(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), 20*time.Millisecond)
 	require.ErrorContains(t, err, "could not reach")
 }
 

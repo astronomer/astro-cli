@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
 
@@ -42,10 +43,31 @@ func NewConfigFromContext() *Config {
 	if err == nil {
 		cfg.Token = strings.TrimPrefix(ctx.Token, "Bearer ")
 		cfg.Domain = ctx.Domain
-		cfg.Organization = ctx.Organization
+		cfg.Organization = projectOrganization(ctx.Organization)
 	}
 
 	return cfg
+}
+
+// projectOrganization is the organization Otto runs in: the one the current
+// directory's v2 project names for its workspace, else fallback, the login's.
+// It is chosen the way the workspace reads choose it
+// (manifest.Astro.WorkspaceOrganization), so Otto asks about the organization
+// the project's values come from. A manifest that does not load names none.
+func projectOrganization(fallback string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fallback
+	}
+	proj, err := project.Discover(cwd)
+	if err != nil {
+		return fallback
+	}
+	m, err := manifest.Load(filepath.Join(proj.Dir, project.Marker))
+	if err != nil {
+		return fallback
+	}
+	return m.Astro.WorkspaceOrganization(fallback)
 }
 
 // DetectAirflow returns a URL to the Airflow belonging to the current project

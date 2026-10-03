@@ -960,12 +960,12 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 // plan takes a constructor rather than the client because the workspace comes
 // from the manifest, which plan is what reads. Building it here keeps the Astro
 // client in cmd/, where reaching into a platform is allowed.
-func (c *cli) workspaceProvider() func(workspace, domain string, reveal bool) envresolve.Provider {
+func (c *cli) workspaceProvider() func(astro *manifest.Astro, reveal bool) envresolve.Provider {
 	if c.d.WorkspaceClients == nil {
 		return nil
 	}
-	return func(workspace, domain string, reveal bool) envresolve.Provider {
-		return emenv.NewProvider(workspace, domain, c.d.WorkspaceClients, reveal)
+	return func(astro *manifest.Astro, reveal bool) envresolve.Provider {
+		return emenv.NewProvider(emenv.WorkspaceOf(astro), c.d.WorkspaceClients, reveal)
 	}
 }
 
@@ -987,7 +987,7 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 		return "", "", false, nil
 	}
 	// reveal = true: get is the one deliberate reveal of a value.
-	wp := emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, true)
+	wp := emenv.NewProvider(emenv.WorkspaceOf(&m.Astro), c.d.WorkspaceClients, true)
 	if v, has := wp.Lookup(key); has {
 		return v, localenv.WorkspaceSource(m.Astro.Workspace), true, nil
 	}
@@ -1260,7 +1260,7 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 	// reveal = false: list reports where each name resolves, never a value, so
 	// it reads Environment Manager for presence only and pulls no secret.
 	if m != nil && c.d.WorkspaceClients != nil {
-		opts.WorkspaceProvider = emenv.NewProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), c.d.WorkspaceClients, false)
+		opts.WorkspaceProvider = emenv.NewProvider(emenv.WorkspaceOf(&m.Astro), c.d.WorkspaceClients, false)
 		opts.Workspace = m.Astro.Workspace
 	}
 	return opts

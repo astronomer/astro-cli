@@ -445,7 +445,7 @@ func (c *cli) noteNoWorkspace(dir, name string) {
 	if err != nil || m.Astro.Workspace != "" {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "note: [tool.astro] sets no workspace, so %s resolves only from local values until one is linked\n", name)
+	fmt.Fprintf(c.d.Stderr, "note: [tool.astro] sets no workspace, so %s resolves only from local values until one is linked in Astro Desktop\n", name)
 }
 
 // notePlaintextCopy says, on stderr, that a name just declared sensitive still

@@ -143,6 +143,13 @@ type Astro struct {
 	// an astro-auth deployment link proves itself with — see
 	// docs/v2-workspace-link.md.
 	Domain string
+	// Organization is [tool.astro] organization, the id of the Astro
+	// organization Workspace lives in. Empty if unset; read it through
+	// WorkspaceOrganization, which falls back to the login's own organization.
+	// A login's token reads every organization the user belongs to, so naming
+	// the workspace's lets a project be read without `astro organization
+	// switch`. See docs/v2-workspace-link.md.
+	Organization string
 	// Target is [tool.astro] target, the default target every link inherits
 	// when the link sets none. Empty if unset (links then fall back to
 	// "astro"). It is already folded into each Link.Target; kept here for
@@ -375,6 +382,10 @@ const (
 	// no link that uses the Astro login: a host for nothing, most likely a
 	// workspace line deleted and its domain left behind.
 	CodeDomainWithoutWorkspace ProblemCode = "domain_without_workspace"
+	// CodeOrganizationWithoutWorkspace is [tool.astro] organization with no
+	// workspace: it names the organization of the linked workspace, and there
+	// is none.
+	CodeOrganizationWithoutWorkspace ProblemCode = "organization_without_workspace"
 
 	// The Airflow requirement in [project] dependencies, the one place a
 	// project states its Airflow version.
@@ -476,6 +487,7 @@ var problemCodes = []ProblemCode{
 	CodeProjectNameInvalid,
 	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeBuildSecretInvalid,
 	CodeBuildSecretsWithoutDockerfile, CodeTargetNotAName, CodeDomainWithoutWorkspace,
+	CodeOrganizationWithoutWorkspace,
 
 	CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 	CodeAirflowCoreBeforeThree, CodeDependenciesDynamic, CodeAirflowRemoved,
@@ -711,7 +723,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "packages", "pools", "runtime", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
 )
 
@@ -783,10 +795,13 @@ func (p *parser) astro(raw map[string]any) Astro {
 		Packages:  p.packages(raw["packages"]),
 		Workspace: p.str(astroRoot+".workspace", raw["workspace"]),
 		Domain:    strings.TrimSpace(p.str(astroRoot+".domain", raw["domain"])),
-		Target:    p.defaultTarget(raw["target"]),
-		Targets:   p.targets(raw["targets"]),
-		Env:       p.table(astroRoot+".env", raw["env"]),
-		Pools:     p.pools(raw["pools"]),
+		// Trimmed at decode for the reason Dockerfile is: a blank id names no
+		// organization, and WorkspaceOrganization must fall back for it.
+		Organization: strings.TrimSpace(p.str(astroRoot+".organization", raw["organization"])),
+		Target:       p.defaultTarget(raw["target"]),
+		Targets:      p.targets(raw["targets"]),
+		Env:          p.table(astroRoot+".env", raw["env"]),
+		Pools:        p.pools(raw["pools"]),
 		// Trimmed at DECODE, not just in validate, because the stored value is
 		// what consumers branch on. `dockerfile = " "` is non-empty to a
 		// `declared != ""` test and names no file, so leaving it untrimmed here
@@ -799,6 +814,9 @@ func (p *parser) astro(raw map[string]any) Astro {
 	a.Deployments = p.links(raw["deployments"], &a)
 	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
 		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the Astro host for a workspace or an astro-auth deployment link, and the project has neither")
+	}
+	if a.Organization != "" && a.Workspace == "" {
+		p.add(CodeOrganizationWithoutWorkspace, astroRoot+".organization", "names the organization of the linked workspace, and the project links none")
 	}
 	return a
 }
@@ -830,6 +848,19 @@ func (a *Astro) WorkspaceDomain() string {
 		return d
 	}
 	return DefaultWorkspaceDomain
+}
+
+// WorkspaceOrganization is the organization the linked workspace is read
+// under: [tool.astro] organization, else fallback, the organization of the
+// login the read uses (the one stored for WorkspaceDomain). Both apps choose
+// the organization through this, so a project reads the same workspace from
+// either. A login's token reads every organization its user belongs to, so the
+// manifest's organization needs no `astro organization switch`.
+func (a *Astro) WorkspaceOrganization(fallback string) string {
+	if a.Organization != "" {
+		return a.Organization
+	}
+	return fallback
 }
 
 // LoginDomain is the Astro host whose login this project's Astro calls use:

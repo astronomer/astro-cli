@@ -295,27 +295,36 @@ func SetDefaultLink(dir string, wrap func(run func() error) error, name string) 
 }
 
 // SetWorkspaceLink links the project in dir to the Astro workspace workspaceID
-// on domain, or unlinks it when workspaceID is empty, through EditManifest.
+// on domain, in the organization organization, or unlinks it when workspaceID
+// is empty, through EditManifest.
 //
-// Linking writes [tool.astro] workspace and domain together, the domain
-// normalized by manifest.NormalizeDomain the way `astro login` stores a login,
-// so both apps look the login up under the same key. An empty domain is
-// refused with ErrWorkspaceDomainRequired. Unlinking removes both keys, since
-// a domain with no workspace is a manifest the parser refuses.
+// Linking writes [tool.astro] workspace, domain and organization together, the
+// domain normalized by manifest.NormalizeDomain the way `astro login` stores a
+// login, so both apps look the login up under the same key. An empty domain is
+// refused with ErrWorkspaceDomainRequired. An empty organization means "not
+// given": relinking the workspace already linked keeps the organization the
+// file records, and linking another workspace writes none, removing the old
+// one, since it was the old workspace's. A workspace with no organization is
+// read under the login's own (manifest.Astro.WorkspaceOrganization), which is
+// what a manifest written before the key meant. There is no way to clear the
+// organization of the workspace already linked short of unlinking it. Unlinking removes all three keys,
+// since a domain or an organization with no workspace is a manifest the parser
+// refuses.
 //
 // The top-level workspace is also what an astro link with no workspace of its
 // own resolves through. So whenever it changes, switched or removed, each such
 // link first has the old value written onto itself and keeps pointing where it
 // did: without that, a switch would read deployment clx1 in ws_A as clx1 in
-// ws_B, and an unlink would leave a link the parser refuses. The domain does
-// not reach a deployment link: those are looked up with the current login,
-// never [tool.astro] domain (docs/v2-workspace-link.md), so changing or
-// removing the domain does not move a pinned link either. Linking the
+// ws_B, and an unlink would leave a link the parser refuses. The domain and the
+// organization do not reach a deployment link: those are looked up with the
+// current login, never [tool.astro] domain (docs/v2-workspace-link.md), so
+// changing or removing either does not move a pinned link. Linking the
 // workspace already linked copies nothing. pinned names the links the old
 // value was written onto, sorted, and is empty when nothing was written.
-func SetWorkspaceLink(dir string, wrap func(run func() error) error, workspaceID, domain string) (pinned []string, err error) {
+func SetWorkspaceLink(dir string, wrap func(run func() error) error, workspaceID, domain, organization string) (pinned []string, err error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	domain = manifest.NormalizeDomain(domain)
+	organization = strings.TrimSpace(organization)
 	if workspaceID != "" && domain == "" {
 		return nil, ErrWorkspaceDomainRequired
 	}
@@ -328,6 +337,7 @@ func SetWorkspaceLink(dir string, wrap func(run func() error) error, workspaceID
 			}
 		}
 		if workspaceID == "" {
+			ed.Delete(astroKey(manifestKeyOrganization))
 			ed.Delete(astroKey(manifestKeyDomain))
 			ed.Delete(astroKey(manifestKeyWorkspace))
 			return nil
@@ -340,7 +350,18 @@ func SetWorkspaceLink(dir string, wrap func(run func() error) error, workspaceID
 			}
 		}
 		if before.Astro.Domain != domain {
-			return ed.Set(astroKey(manifestKeyDomain), domain)
+			if err := ed.Set(astroKey(manifestKeyDomain), domain); err != nil {
+				return err
+			}
+		}
+		switch {
+		case before.Astro.Organization == organization:
+		case organization == "" && before.Astro.Workspace == workspaceID:
+			// Not given, for the workspace already linked: keep its organization.
+		case organization == "":
+			ed.Delete(astroKey(manifestKeyOrganization))
+		default:
+			return ed.Set(astroKey(manifestKeyOrganization), organization)
 		}
 		return nil
 	})
@@ -352,8 +373,9 @@ func SetWorkspaceLink(dir string, wrap func(run func() error) error, workspaceID
 
 // The [tool.astro] keys SetWorkspaceLink writes.
 const (
-	manifestKeyWorkspace = "workspace"
-	manifestKeyDomain    = "domain"
+	manifestKeyWorkspace    = "workspace"
+	manifestKeyDomain       = "domain"
+	manifestKeyOrganization = "organization"
 )
 
 func astroKey(field string) []string {

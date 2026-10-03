@@ -16,6 +16,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -48,9 +49,9 @@ func newWorkspaceProject(t *testing.T, body string) string {
 // tests still exercise the real emenv provider — its fetch, its scoping, and
 // the messages asserted below — rather than a stub that would only prove plan
 // calls something.
-func emProvider(mc astrov1.APIClient) func(string, string, bool) envresolve.Provider {
-	return func(workspace, domain string, reveal bool) envresolve.Provider {
-		return emenv.NewProvider(workspace, domain, func(emenv.Login) astrov1.APIClient { return mc }, reveal)
+func emProvider(mc astrov1.APIClient) func(*manifest.Astro, bool) envresolve.Provider {
+	return func(astro *manifest.Astro, reveal bool) envresolve.Provider {
+		return emenv.NewProvider(emenv.WorkspaceOf(astro), func(emenv.Login) astrov1.APIClient { return mc }, reveal)
 	}
 }
 
@@ -84,6 +85,29 @@ func TestBuildInjectsWorkspaceValue(t *testing.T) {
 	}
 	if _, onDisk := built.Plan.Env["DATA_WAREHOUSE_URI"]; onDisk {
 		t.Fatal("an Environment Manager value traveled in Env, which docker mode writes to disk")
+	}
+}
+
+// A start reads the workspace under the manifest's organization, not the
+// login's: the manifest reaches the provider whole.
+func TestBuildReadsUnderTheManifestsOrganization(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dir := newWorkspaceProject(t, strings.Replace(workspaceManifest, "domain = 'localhost'\n", "domain = 'localhost'\norganization = 'clother'\n", 1))
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, "clother", mock.Anything).
+		Return(okListResp(astrov1.EnvironmentObject{
+			ObjectKey:           "DATA_WAREHOUSE_URI",
+			ObjectType:          astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
+			EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "postgres://cloud"},
+		}), nil)
+
+	built, err := Build(dir, Options{WorkspaceProvider: emProvider(mc)})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if got := built.Plan.SecretEnv["DATA_WAREHOUSE_URI"]; got != "postgres://cloud" {
+		t.Fatalf("injected secret env = %q, want the value read under the manifest's organization", got)
 	}
 }
 

@@ -79,7 +79,7 @@ func mockClient(resp *astrov1.ListEnvironmentObjectsResponse) *astrov1_mocks.Cli
 func loggedInProvider(t *testing.T, client astrov1.APIClient, reveal bool) envresolve.Provider {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	return NewProvider(testWorkspace, testDomain, clientsOf(client), reveal)
+	return NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(client), reveal)
 }
 
 func TestLookupResolvesEnvVarAndAirflowVar(t *testing.T) {
@@ -114,7 +114,7 @@ func TestFetchUsesWorkspaceScope(t *testing.T) {
 		}),
 	).Return(okResp(envVarObj("K", "v", false)), nil)
 
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 	v, ok := p.Lookup("K")
 	require.True(t, ok)
 	require.Equal(t, "v", v)
@@ -139,7 +139,7 @@ func TestSharedFetchAcrossNames(t *testing.T) {
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Return(okResp(envVarObj("A", "1", false), envVarObj("B", "2", false)), nil)
 
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 
 	v, ok := p.Lookup("A")
 	require.True(t, ok)
@@ -155,7 +155,7 @@ func TestSharedFetchAcrossNames(t *testing.T) {
 func TestLoggedOutProviderAbsent(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.Initial) // no cloud context
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 
 	_, ok := p.Lookup("DATA_WAREHOUSE_URI")
 	require.False(t, ok)
@@ -178,7 +178,7 @@ func TestManifestDomainPicksTheLogin(t *testing.T) {
 		return mc
 	}
 
-	p := NewProvider(testWorkspace, "astronomer.io", factory, true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: "astronomer.io"}, factory, true)
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: not logged in to astronomer.io)", p.Label())
@@ -189,7 +189,7 @@ func TestManifestDomainPicksTheLogin(t *testing.T) {
 	// With a login for that domain, the client is built from it.
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Return(okResp(envVarObj("X", "v", false)), nil)
-	p = NewProvider(testWorkspace, testDomain, factory, true)
+	p = NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, factory, true)
 	v, ok := p.Lookup("X")
 	require.True(t, ok)
 	require.Equal(t, "v", v)
@@ -200,12 +200,12 @@ func TestManifestDomainPicksTheLogin(t *testing.T) {
 // the fix, without touching the API.
 func TestNoWorkspaceUnavailable(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	p := NewProvider("", testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: "", Domain: testDomain}, clientsOf(mc), true)
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Contains(t, p.Label(), "unavailable: the manifest sets no `workspace`")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "Add `workspace =")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "Link a workspace to the project in Astro Desktop")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -242,7 +242,7 @@ func TestReadUsesTheLoginForTheManifestsDomain(t *testing.T) {
 		usedToken = l.Token
 		return mc
 	}
-	p := NewProvider(testWorkspace, "astronomer.io", factory, true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: "astronomer.io"}, factory, true)
 	v, ok := p.Lookup("X")
 	require.True(t, ok)
 	require.Equal(t, "v", v)
@@ -258,7 +258,7 @@ func TestFailedRefreshReportsSessionExpired(t *testing.T) {
 	login = func(string) (config.Context, error) { return config.Context{}, astrosession.ErrSessionExpired }
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface) // never called
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: session expired)", p.Label())
@@ -297,7 +297,7 @@ func TestOfflineProviderAbsent(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Return((*astrov1.ListEnvironmentObjectsResponse)(nil), errors.New("dial tcp: no route to host"))
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
@@ -351,7 +351,7 @@ func TestSecretsDisabledHardMiss(t *testing.T) {
 		envVarObj("SECRET_TOKEN", "", true),
 	), nil)
 
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 
 	v, ok := p.Lookup("PLAIN")
 	require.True(t, ok, "non-secret value still resolves when secrets are disabled")
@@ -359,7 +359,7 @@ func TestSecretsDisabledHardMiss(t *testing.T) {
 
 	_, ok = p.Lookup("SECRET_TOKEN")
 	require.False(t, ok, "a withheld secret is a hard miss")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "your org disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "organization test-org-id disables Environment Secrets Fetching")
 
 	require.Equal(t, "workspace", p.Label())
 	// The first typed call is refused; the retry re-fetches every type without
@@ -395,10 +395,10 @@ func TestSecretsDisabledConnectionHardMiss(t *testing.T) {
 		).Return(okResp(objs...), nil)
 	}
 
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 	_, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
 	require.False(t, ok, "a connection read without secrets is a hard miss")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), "your org disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), "organization test-org-id disables Environment Secrets Fetching")
 }
 
 // Presence mode (list) still reports such a connection as held by the
@@ -463,13 +463,13 @@ func TestSecretsDisabledWhenTheRefusalIsNotAnEnvelope(t *testing.T) {
 		envVarObj("SECRET_TOKEN", "", true),
 	), nil)
 
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), true)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 
 	v, ok := p.Lookup("PLAIN")
 	require.True(t, ok, "the fallback ran, so non-secret values still resolve")
 	require.Equal(t, "visible", v)
 	require.Equal(t, "workspace", p.Label(), "the workspace is available, not unreachable")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "your org disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "organization test-org-id disables Environment Secrets Fetching")
 }
 
 // A secret the organization allowed but the platform returned empty is not the
@@ -483,7 +483,7 @@ func TestSecretWithNoValueWhenSecretsWereAllowed(t *testing.T) {
 	require.False(t, ok, "a secret with no value is a miss in reveal mode")
 
 	cause := p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN")
-	require.NotContains(t, cause, "your org disables Environment Secrets Fetching")
+	require.NotContains(t, cause, "disables Environment Secrets Fetching")
 	require.Contains(t, cause, "the workspace holds no value for it")
 }
 
@@ -521,7 +521,7 @@ func TestFetchPagesThroughMoreThanOneWindow(t *testing.T) {
 		mock.MatchedBy(atOffset(emfetch.PageLimit))).Return(
 		window([]astrov1.EnvironmentObject{envVarObj("LAST_KEY", "found", false)}), nil)
 
-	p := NewProvider(testWorkspace, testDomain, clientsOf(mc), false)
+	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), false)
 
 	v, ok := p.Lookup("LAST_KEY")
 	require.True(t, ok, "a key in the second window resolves")

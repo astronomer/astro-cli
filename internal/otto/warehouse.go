@@ -42,7 +42,7 @@ func workspaceConnections(projectDir string) ([]connmodel.Connection, error) {
 		// error itself; the launch should not fail over it here.
 		return nil, nil //nolint:nilerr // no readable manifest links no workspace
 	}
-	return emenv.WorkspaceConnections(m.Astro.Workspace, m.Astro.WorkspaceDomain(), workspaceClients, warehouseReadTimeout)
+	return emenv.WorkspaceConnections(emenv.WorkspaceOf(&m.Astro), workspaceClients, warehouseReadTimeout)
 }
 
 // warehouseConnections is every connection Otto's warehouses come from: the

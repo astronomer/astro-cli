@@ -19,7 +19,7 @@ func TestSaveLinkKeepsAPinnedWorkspaceWhenNoneIsGiven(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir, path := linkProject(t, linkFixture+"workspace = 'ws_A'\ndomain = 'astronomer.io'\n"+links)
-			pinned, err := SetWorkspaceLink(dir, nil, "ws_B", "astronomer.io")
+			pinned, err := SetWorkspaceLink(dir, nil, "ws_B", "astronomer.io", "")
 			require.NoError(t, err)
 			require.Equal(t, []string{"prod"}, pinned)
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -87,6 +88,23 @@ func TestEnvFollowsTheProjectWorkspace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml\n")
 	mc.AssertExpectations(t)
+}
+
+// The workspace's name is looked up in the organization the manifest names.
+func TestEnvNamesTheWorkspaceFromTheProjectsOrganization(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	inProject(t, strings.Replace(testProjectManifest, "domain = \"astronomer.io\"\n", "domain = \"astronomer.io\"\norganization = \"clother\"\n", 1))
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	expectEnvList(mc, func(p *astrov1.ListEnvironmentObjectsParams) bool { return true })
+	mc.On("GetWorkspaceWithResponse", mock.Anything, "clother", projectWS).Return(&astrov1.GetWorkspaceResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.Workspace{Id: projectWS, Name: "Example"},
+	}, nil)
+	astroV1Client = mc
+
+	out, err := execEnvCmd("variable", "list")
+	require.NoError(t, err)
+	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml\n")
 }
 
 func TestEnvWorkspaceFlagWinsOverTheProject(t *testing.T) {

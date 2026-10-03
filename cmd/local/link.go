@@ -50,20 +50,16 @@ const (
 	flagLinkClientIDEnv     = "client-id-env"
 	flagLinkClientSecretEnv = "client-secret-env"
 	flagLinkReplace         = "replace"
-	flagLinkDomain          = "domain"
 	flagLinkUnset           = "unset"
-	flagLinkShow            = "show"
 )
 
-// The status values of a linkResult and a workspaceLinkResult.
+// The status values of a linkResult.
 const (
 	linkStatusAdded     = "added"
 	linkStatusReplaced  = "replaced"
 	linkStatusRemoved   = "removed"
 	linkStatusDefault   = "default"
 	linkStatusCleared   = "cleared"
-	linkStatusLinked    = "linked"
-	linkStatusUnlinked  = "unlinked"
 	linkStatusUnchanged = "unchanged"
 )
 
@@ -76,33 +72,20 @@ type linkResult struct {
 	Manifest string `json:"manifest"`
 }
 
-// workspaceLinkResult is what `astro link workspace` reports: the workspace the
-// project links now and the host it lives on, empty when it links none.
-// Pinned names the deployment links that were inheriting the previous
-// workspace and now name it themselves, so they keep pointing where they did.
-type workspaceLinkResult struct {
-	Workspace string   `json:"workspace,omitempty"`
-	Domain    string   `json:"domain,omitempty"`
-	Status    string   `json:"status"`
-	Pinned    []string `json:"pinned,omitempty"`
-	Manifest  string   `json:"manifest"`
-}
-
 // NewLinkCmd builds `astro link` for the root, wired with its own deps.
 func NewLinkCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := &cobra.Command{
 		Use:   "link",
-		Short: "Link Deployments and a workspace to this project",
-		Long: "Link the Deployments this project works with, and the Astro workspace it uses. Links are\n" +
+		Short: "Link Deployments to this project",
+		Long: "Link the Deployments this project works with. Links are\n" +
 			"saved in the project, so everyone who clones it gets them. `astro use` lists them.",
 		Example: "  astro link add                              # pick a Deployment to link\n" +
 			"  astro link add prod --deployment clx123abc\n" +
-			"  astro link default prod\n" +
-			"  astro link workspace                        # pick the workspace to use",
+			"  astro link default prod",
 		Args: cobra.NoArgs,
 	}
-	cmd.AddCommand(newLinkAddCmd(c), newLinkRemoveCmd(c), newLinkDefaultCmd(c), newLinkWorkspaceCmd(c))
+	cmd.AddCommand(newLinkAddCmd(c), newLinkRemoveCmd(c), newLinkDefaultCmd(c))
 	addOutputFlag(cmd, &c.output)
 	markSkipPreRun(cmd)
 	return cmd
@@ -222,61 +205,6 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 	return cmd
 }
 
-func newLinkWorkspaceCmd(c *cli) *cobra.Command {
-	var (
-		unset, show bool
-		domain      string
-	)
-	cmd := &cobra.Command{
-		Use:   "workspace [WORKSPACE_ID]",
-		Short: "Set the Astro workspace this project uses",
-		Long: "Set the Astro workspace this project uses. Workspace values, and linked Deployments that\n" +
-			"don't name a workspace, come from it. Changing it leaves each linked Deployment in the\n" +
-			"workspace it was in.\n\n" +
-			"In a terminal, with no WORKSPACE_ID, it asks which of your workspaces to use. --show prints\n" +
-			"the current one, which is also what it does when it cannot ask.",
-		Example: "  astro link workspace\n" +
-			"  astro link workspace clws123abc\n" +
-			"  astro link workspace --show\n" +
-			"  astro link workspace --unset",
-		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			domainGiven := cmd.Flags().Changed(flagLinkDomain)
-			switch {
-			case show && (unset || len(args) > 0 || domainGiven):
-				return errors.New("--show takes no workspace id, --domain or --unset: it only prints")
-			case unset && (len(args) > 0 || domainGiven):
-				return errors.New("--unset takes no workspace id and no --domain: it removes both")
-			case unset:
-				return c.runLinkWorkspace("", "", true)
-			case len(args) == 1:
-				return c.runLinkWorkspace(args[0], domain, domainGiven)
-			case show || !c.mayPrompt() || c.d.PickWorkspace == nil:
-				if domainGiven {
-					return errors.New("--domain goes with a workspace id: astro link workspace WORKSPACE_ID --domain " + domain)
-				}
-				return c.runLinkWorkspaceShow()
-			}
-			id, err := c.d.PickWorkspace()
-			if err != nil {
-				return err
-			}
-			// The list is the current login's, so the workspace is on its host
-			// unless --domain says otherwise.
-			if !domainGiven {
-				if d, derr := c.loginDomain(); derr == nil {
-					domain, domainGiven = d, true
-				}
-			}
-			return c.runLinkWorkspace(id, domain, domainGiven)
-		},
-	}
-	cmd.Flags().BoolVar(&show, flagLinkShow, false, "Print the workspace this project uses")
-	cmd.Flags().BoolVar(&unset, flagLinkUnset, false, "Stop using a workspace")
-	cmd.Flags().StringVar(&domain, flagLinkDomain, "", "Astro domain of the workspace, like astronomer.io (default: the project's, else your login's)")
-	return cmd
-}
-
 // pickLink asks which of the project's links a command acts on, with the table
 // picker the Deployment picker uses, or fails with missing when this run cannot
 // be asked. A non-empty none adds a last row, described by it, that clears the
@@ -355,16 +283,6 @@ func linkWhere(l *manifest.Link) string {
 	case manifest.KindEndpoint:
 	}
 	return l.URL
-}
-
-// loginDomain is the host linking a workspace defaults to.
-func (c *cli) loginDomain() (string, error) {
-	if c.d.LoginDomain != nil {
-		if d, err := c.d.LoginDomain(); err == nil && strings.TrimSpace(d) != "" {
-			return d, nil
-		}
-	}
-	return "", fmt.Errorf("no Astro login to take the domain from: pass --%s (%s for production), or run astro login first", flagLinkDomain, manifest.DefaultWorkspaceDomain)
 }
 
 // linkProject is the project a link edit writes to, its manifest path, and the
@@ -719,122 +637,4 @@ func (c *cli) runLinkDefault(name string) error {
 		}
 		return werr
 	})
-}
-
-// runLinkWorkspace links workspaceID, or unlinks for an empty one. Without
-// --domain the committed domain is kept, since it is what the project's values
-// are read with and the current login may be for another host. The login's
-// host fills in only a domain the file does not state, and not at all when the
-// file already links this workspace: that link reads as the default host, and
-// writing the login's over it would move it.
-func (c *cli) runLinkWorkspace(workspaceID, domain string, domainGiven bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
-	dir, path, m, err := c.linkProject()
-	if err != nil {
-		return err
-	}
-	workspaceID = strings.TrimSpace(workspaceID)
-	relink := false
-	if workspaceID != "" && !domainGiven {
-		switch {
-		case m.Astro.Domain != "":
-			domain = m.Astro.Domain
-		case m.Astro.Workspace == workspaceID:
-			relink = true
-		default:
-			if domain, err = c.loginDomain(); err != nil {
-				return err
-			}
-		}
-	}
-	var pinned []string
-	changed := false
-	if !relink {
-		changed, err = watchManifest(dir, func(wrap func(run func() error) error) error {
-			var werr error
-			pinned, werr = scaffold.SetWorkspaceLink(dir, wrap, workspaceID, domain)
-			return werr
-		})
-	}
-	if err != nil {
-		if errors.Is(err, scaffold.ErrWorkspaceDomainRequired) {
-			return fmt.Errorf("%w: pass --%s, like --%s %s", err, flagLinkDomain, flagLinkDomain, manifest.DefaultWorkspaceDomain)
-		}
-		return err
-	}
-	res, err := workspaceLinkOf(path)
-	if err != nil {
-		return err
-	}
-	res.Pinned = pinned
-	switch {
-	case !changed:
-		res.Status = linkStatusUnchanged
-	case res.Workspace == "":
-		res.Status = linkStatusUnlinked
-	default:
-		res.Status = linkStatusLinked
-	}
-	return r.Emit(res, func(w io.Writer) error {
-		var werr error
-		switch {
-		case !changed && res.Workspace == "":
-			_, werr = fmt.Fprintf(w, "%s links no workspace\n", path)
-		case !changed:
-			_, werr = fmt.Fprintf(w, "already linked to workspace %s on %s in %s\n", res.Workspace, res.Domain, path)
-		case res.Workspace == "":
-			_, werr = fmt.Fprintf(w, "unlinked the workspace in %s\n", path)
-		default:
-			_, werr = fmt.Fprintf(w, "linked workspace %s on %s in %s\n", res.Workspace, res.Domain, path)
-		}
-		if werr == nil && len(pinned) > 0 {
-			_, werr = fmt.Fprintf(w, "kept on the previous workspace, now written onto each link: %s\n", strings.Join(pinned, ", "))
-		}
-		return werr
-	})
-}
-
-func (c *cli) runLinkWorkspaceShow() error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
-	_, path, _, err := c.linkProject()
-	if err != nil {
-		return err
-	}
-	res, err := workspaceLinkOf(path)
-	if err != nil {
-		return err
-	}
-	res.Status = linkStatusUnlinked
-	if res.Workspace != "" {
-		res.Status = linkStatusLinked
-	}
-	return r.Emit(res, func(w io.Writer) error {
-		if res.Workspace == "" {
-			_, werr := fmt.Fprintf(w, "%s links no workspace. Link one with `astro link workspace WORKSPACE_ID`\n", path)
-			return werr
-		}
-		_, werr := fmt.Fprintf(w, "workspace %s on %s\n", res.Workspace, res.Domain)
-		return werr
-	})
-}
-
-// workspaceLinkOf reads the workspace link the manifest at path holds, with the
-// domain a reader resolves it on: the one written, else ASTRO_DOMAIN, else
-// production.
-func workspaceLinkOf(path string) (workspaceLinkResult, error) {
-	m, err := manifest.Load(path)
-	if err != nil {
-		return workspaceLinkResult{}, err
-	}
-	res := workspaceLinkResult{Manifest: path, Workspace: m.Astro.Workspace}
-	if res.Workspace != "" {
-		res.Domain = m.Astro.WorkspaceDomain()
-	}
-	return res, nil
 }

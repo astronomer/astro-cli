@@ -84,7 +84,7 @@ deployment = 'dep-old'
 		func() error { return scaffold.SetDefaultLink(dir, w.wrap, "dev") },
 		func() error { _, err := scaffold.RemoveLink(dir, w.wrap, "old"); return err },
 		func() error {
-			_, err := scaffold.SetWorkspaceLink(dir, w.wrap, "ws_B", "https://cloud.astronomer.io")
+			_, err := scaffold.SetWorkspaceLink(dir, w.wrap, "ws_B", "https://cloud.astronomer.io", "clorg")
 			return err
 		},
 		func() error {

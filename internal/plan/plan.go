@@ -48,7 +48,7 @@ type Options struct {
 	// the manifest, which this package is what reads. Taking the Astro client
 	// directly would make every plan build import a platform, which the layer
 	// rules forbid below cmd/ (docs/v2-architecture.md).
-	WorkspaceProvider func(workspace, domain string, reveal bool) envresolve.Provider
+	WorkspaceProvider func(astro *manifest.Astro, reveal bool) envresolve.Provider
 	// AllowMissing starts even when a required value has no source, instead
 	// of returning *MissingEnvError: `--allow-missing`, and Astro Desktop's
 	// Start anyway. The missing values come back on Built.StartedWithout for
@@ -356,7 +356,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		// hands to the compose process rather than writing into the compose
 		// file, so it stays off disk either way — the posture Astro Desktop
 		// already runs its docker starts under.
-		in.WorkspaceProvider = opts.WorkspaceProvider(m.Astro.Workspace, m.Astro.WorkspaceDomain(), true)
+		in.WorkspaceProvider = opts.WorkspaceProvider(&m.Astro, true)
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
