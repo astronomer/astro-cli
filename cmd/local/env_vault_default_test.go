@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -40,14 +39,15 @@ func vaultMetas(t *testing.T) []secrets.Meta {
 	return metas
 }
 
-// legacyGlobalPath is ~/.astro/env under the test's isolated home.
+// legacyGlobalPath is ~/.astro/env under the test's isolated home: the file an
+// older build wrote, which nothing reads or writes now.
 func legacyGlobalPath(t *testing.T) string {
 	t.Helper()
-	p, err := localenv.GlobalEnvPath()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return p
+	return filepath.Join(home, ".astro", "env")
 }
 
 // writeLegacyGlobal writes ~/.astro/env as an older build would have.
@@ -230,72 +230,43 @@ func TestDeleteClearsBothProjectStores(t *testing.T) {
 	}
 }
 
-// ~/.astro/env is still read, at its old precedence, but nothing writes it: a
-// list says to move each entry, a delete of a name only it holds says to remove
-// the line by hand, and set, delete and get leave the file byte for byte.
-func TestTheLegacyGlobalFileIsReadOnly(t *testing.T) {
+// A ~/.astro/env left by an older build is ignored, silently: list shows
+// none of it, delete --global finds nothing there, set --global of a name it
+// holds is an ordinary new global, no command mentions the file, and the file
+// is left byte for byte.
+func TestTheLegacyGlobalFileIsIgnored(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	const legacy = "OLD_ONLY=1\nMOVED=old\n"
 	writeLegacyGlobal(t, legacy)
-
-	// Read: it still resolves.
-	if got := getJSON(t, dir, "OLD_ONLY"); got.Value != "1" || got.Source != localenv.SourceGlobal {
-		t.Errorf("get = %+v, want the ~/.astro/env value", got)
+	noMention := func(what, s string) {
+		t.Helper()
+		if strings.Contains(s, ".astro/env") || strings.Contains(s, "OLD_ONLY") {
+			t.Errorf("%s mentions the legacy file or its contents: %q", what, s)
+		}
 	}
 
-	// List: each row says to move it, and offers no delete.
-	d, out, _ := envDeps(t, dir, "")
+	d, out, stderr := envDeps(t, dir, "")
 	if err := execute(t, d, "local", "env", "list"); err != nil {
 		t.Fatal(err)
 	}
-	found := false
-	for _, line := range strings.Split(out.String(), "\n") {
-		if !strings.Contains(line, "OLD_ONLY") {
-			continue
-		}
-		found = true
-		if !strings.Contains(line, "read only: move it with astro local env variable set OLD_ONLY --global, then remove the line by hand") {
-			t.Errorf("OLD_ONLY row = %q, want the move note", line)
-		}
-		if strings.Contains(line, "delete") {
-			t.Errorf("OLD_ONLY row = %q offers a delete, which cannot edit the file", line)
-		}
-	}
-	if !found {
-		t.Errorf("list has no OLD_ONLY row:\n%s", out.String())
-	}
+	noMention("list", out.String()+stderr.String())
 
-	// Delete of a name only the file holds: refused, file untouched.
-	d, _, _ = envDeps(t, dir, "")
+	d, _, stderr = envDeps(t, dir, "")
 	err := execute(t, d, "local", "env", "variable", "delete", "OLD_ONLY", "--global")
-	if err == nil || !strings.Contains(err.Error(), "by hand") || !strings.Contains(err.Error(), "OLD_ONLY=") {
-		t.Errorf("delete --global of a ~/.astro/env name = %v, want the remove-by-hand message", err)
+	if err == nil || !strings.Contains(err.Error(), "not set") {
+		t.Errorf("delete --global of a name only ~/.astro/env holds = %v, want not set", err)
+	}
+	if err != nil {
+		noMention("delete", strings.ReplaceAll(err.Error(), `"OLD_ONLY"`, "")+stderr.String())
 	}
 
-	// Moving one in: set --global stores it in the vault, reaching every
-	// project as the file's copy did, and says the line is left to remove.
-	d, _, stderr := envDeps(t, dir, "")
+	d, _, stderr = envDeps(t, dir, "")
 	if err := execute(t, d, "local", "env", "variable", "set", "MOVED", "--value", "new", "--global"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stderr.String(), "remove that line by hand") {
-		t.Errorf("set --global of a ~/.astro/env name should say the line is left; stderr: %q", stderr.String())
-	}
-	if got := getJSON(t, dir, "MOVED"); got.Value != "new" || got.Source != vaultenv.SourceGlobal {
-		t.Errorf("get = %+v, want the moved value to win here", got)
-	}
-	if r := reachOf(t, "env:global:MOVED"); !r.Everywhere {
-		t.Errorf("a value moved in from ~/.astro/env reaches %+v, want every project, as before", r)
-	}
-
-	// Deleting the moved copy: the vault entry goes, the file's line applies
-	// again, and a note says so.
-	d, _, stderr = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "delete", "MOVED", "--global"); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(stderr.String(), "applies now that the vault copy is gone") {
-		t.Errorf("delete should say the file's line applies again; stderr: %q", stderr.String())
+	noMention("set", stderr.String())
+	if r := reachOf(t, "env:global:MOVED"); r.Everywhere {
+		t.Errorf("set --global of a name ~/.astro/env holds reaches %+v, want a new global's empty row", r)
 	}
 
 	if got := readLegacyGlobal(t); got != legacy {

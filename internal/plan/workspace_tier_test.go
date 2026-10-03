@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/internal/localenv"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -148,28 +149,25 @@ func TestBuildLocalSourcesBeatTheWorkspace(t *testing.T) {
 	}
 }
 
-// ~/.astro/env, the lowest local tier, still beats the workspace.
-func TestBuildGlobalFileBeatsTheWorkspace(t *testing.T) {
+// The global vault, the lowest local tier, still beats the workspace.
+func TestBuildGlobalVaultBeatsTheWorkspace(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	dir := newWorkspaceProject(t, linkedManifest)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte("TEAM_TOKEN=global\nREGION=global\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("USERPROFILE", home)
+	seedValue(t, "", localenv.KindEnv, "TEAM_TOKEN", "global")
+	seedValue(t, "", localenv.KindEnv, "REGION", "global")
 	built, err := Build(dir, Options{WorkspaceProvider: emProvider(sampleWorkspace())})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	for _, k := range []string{"TEAM_TOKEN", "REGION"} {
-		if got := built.Plan.Env[k]; got != "global" {
-			t.Errorf("%s = %q, want the ~/.astro/env value", k, got)
+		if got := built.Plan.SecretEnv[k]; got != "global" {
+			t.Errorf("%s = %q, want the global vault value", k, got)
 		}
-		if _, ok := built.Plan.SecretEnv[k]; ok {
-			t.Errorf("%s: the losing workspace value traveled beside the global file's", k)
+		if _, ok := built.Plan.Env[k]; ok {
+			t.Errorf("%s: a second copy traveled beside the global vault's", k)
 		}
 	}
 }

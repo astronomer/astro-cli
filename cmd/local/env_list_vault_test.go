@@ -94,7 +94,7 @@ func TestListGlobalShowsTheGlobalVault(t *testing.T) {
 }
 
 // An undeclared value in the global vault that reaches the project is passed to
-// it at start, the same as one in ~/.astro/env, so list marks it applied.
+// it at start, so list marks it applied.
 func TestListMarksUndeclaredGlobalVaultEntryApplied(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, _ := envDeps(t, dir, "")

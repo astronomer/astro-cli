@@ -116,26 +116,32 @@ func TestGetWithBothCopiesPicksTheChainsWinner(t *testing.T) {
 	if !strings.Contains(stderr.String(), "also set in") {
 		t.Errorf("get should say there is another copy; stderr: %q", stderr.String())
 	}
+}
 
-	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--value", "v", "--global"); err != nil {
-		t.Fatal(err)
-	}
-	globalPath, err := localenv.GlobalEnvPath()
+// A ~/.astro/env left by an older build is not a source: get finds nothing in
+// it, through the chain or with --global, and says nothing about the file.
+func TestGetIgnoresALegacyGlobalEnvFile(t *testing.T) {
+	dir := secretEnvProject(t, "")
+	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Dir(globalPath), 0o700); err != nil {
+	legacy := filepath.Join(home, ".astro", "env")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(globalPath, []byte("SHARED=hand\n"), 0o600); err != nil {
+	if err := os.WriteFile(legacy, []byte("LEGACY_ONLY=hand\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	g, err := getScopedJSON(t, dir, "variable", "SHARED", "--global")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if g.Source != vaultenv.SourceGlobal {
-		t.Errorf("global scope: source = %q, want the global vault, which outranks ~/.astro/env", g.Source)
+	for _, args := range [][]string{{}, {"--global"}} {
+		d, _, stderr := envDeps(t, dir, "")
+		err := execute(t, d, append([]string{"local", "env", "variable", "get", "LEGACY_ONLY"}, args...)...)
+		if err == nil {
+			t.Errorf("get %v found a value only ~/.astro/env holds", args)
+			continue
+		}
+		if strings.Contains(err.Error()+stderr.String(), ".astro/env") {
+			t.Errorf("get %v mentions the legacy file: %v; stderr: %q", args, err, stderr.String())
+		}
 	}
 }

@@ -257,7 +257,7 @@ func TestEnvLinkRefusesAnythingButAGlobalVaultEntry(t *testing.T) {
 		want string
 	}{
 		"project secret": {[]string{"connection", "link", "local_db"}, "already reaches only this project"},
-		"plain file":     {[]string{"variable", "link", "PLAIN"}, "plain file outside the vault"},
+		"legacy file":    {[]string{"variable", "link", "PLAIN"}, "holds no global variable PLAIN"},
 		"missing":        {[]string{"connection", "link", "nope"}, "holds no global connection nope"},
 		"--project":      {[]string{"connection", "link", "warehouse", "--project"}, "global vault entries only"},
 		"unlink missing": {[]string{"airflow-variable", "unlink", "nope"}, "holds no global airflow-variable nope"},
@@ -569,23 +569,5 @@ func TestEnvSetGlobalRefusesAnUnusableIndex(t *testing.T) {
 	}
 	if _, _, err := run(t, dir, "connection", "get", "warehouse", "--global"); err == nil {
 		t.Error("the refused create stored a value")
-	}
-}
-
-// A global moving into the vault from ~/.astro/env is not new: it reached
-// every project that declares it, so it moves in with no row and no hint,
-// and a declaring project still gets it.
-func TestEnvSetGlobalOfALegacyFileEntryKeepsItsReach(t *testing.T) {
-	dir := envProject(t, "[tool.astro.env]\nTOKEN = {}\n")
-	writeLegacyGlobal(t, "TOKEN=x\n")
-	_, stderr := mustRun(t, dir, "variable", "set", "TOKEN", "--value", "y", "--global")
-	if strings.Contains(stderr, "reaches no project") {
-		t.Errorf("a moved value got the new-global hint:\n%s", stderr)
-	}
-	if r := reachOf(t, "env:global:TOKEN"); !r.Everywhere {
-		t.Errorf("reach = %+v, want no row", r)
-	}
-	if v := linkGetJSON(t, dir, "variable", "get", "TOKEN"); v.Value != "y" || v.Source != vaultenv.SourceGlobal {
-		t.Errorf("get = %+v, want the vault value in the declaring project", v)
 	}
 }

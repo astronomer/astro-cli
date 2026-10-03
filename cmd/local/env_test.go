@@ -203,14 +203,8 @@ func TestEnvGlobalScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	// It went to the global vault, not ~/.astro/env or the project .env.
-	// Through GlobalEnvPath rather than by joining a path here: the layout is
-	// that function's to own.
-	gp, err := localenv.GlobalEnvPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(gp); !os.IsNotExist(err) {
-		t.Fatalf("a --global set wrote %s, which is read only now (stat: %v)", gp, err)
+	if _, err := os.Stat(legacyGlobalPath(t)); !os.IsNotExist(err) {
+		t.Fatalf("a --global set wrote ~/.astro/env (stat: %v)", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".env")); !os.IsNotExist(err) {
 		t.Fatalf("project .env should not exist for a --global set")

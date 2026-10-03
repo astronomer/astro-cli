@@ -9,11 +9,11 @@ import "strings"
 // The env-var key is the name Airflow reads: a plain var under its own NAME,
 // an Airflow Variable under AIRFLOW_VAR_<KEY>, a connection under
 // AIRFLOW_CONN_<ID> (pkg/airflowenv). Every provider keys on that one form,
-// so the same key resolves against the shell, a project file, or a global
-// file with no per-source translation.
+// so the same key resolves against the shell, a project file, or the vault
+// with no per-source translation.
 //
 // The chain that ships is project .env > shell env > project vault > global
-// vault > global ~/.astro/env (internal/localenv assembles it; the vault tiers
+// vault (internal/localenv assembles it; the vault tiers
 // come from internal/vaultenv). The chain is the extension point, and the vault
 // is the proof: it slotted into the same ordered walk without changing anything
 // here.

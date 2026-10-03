@@ -43,7 +43,7 @@ const (
 // the vault, encrypted, unless --plain says otherwise. A plain project value
 // goes to the project's .env; a plain global goes to the vault too, marked
 // plain and unencrypted, so every global keeps one layout and one set of
-// links. Nothing writes ~/.astro/env, which is read only.
+// links.
 //
 // plain is --plain, or the deprecated spelling --secret=false. secret is not a
 // flag: it is the store an act resolved to, the vault when true, which only a
@@ -152,11 +152,10 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"connections, and Airflow variables.\n\n" +
 			"Values are stored in the encrypted vault, for the project or with --global for\n" +
 			"every project. Pass --plain to store one unencrypted: in the project's .env,\n" +
-			"or for a global, in the vault without encryption. ~/.astro/env is still read,\n" +
-			"but no longer written.\n\n" +
+			"or for a global, in the vault without encryption.\n\n" +
 			"At start, each value comes from the first of: project .env, shell env, project\n" +
-			"vault, global vault, ~/.astro/env, the linked workspace's Environment Manager,\n" +
-			"a declaration's default. Every source reaches Airflow whole, declared or not.\n" +
+			"vault, global vault, the linked workspace's Environment Manager, a declaration's\n" +
+			"default. Every source reaches Airflow whole, declared or not.\n" +
 			"A workspace that cannot be read is skipped with a note.",
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
@@ -568,7 +567,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "Also include the global file, every known project's .env, and vault globals not linked to this project")
+	cmd.Flags().BoolVar(&all, "all", false, "Also include every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
 
@@ -674,7 +673,7 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	if everywhere && !isGlobalVault {
 		return errors.New("--auto-link applies to a global: pass --global")
 	}
-	created, inLegacy := false, false
+	created := false
 	if isGlobalVault {
 		had, herr := store.Has(kind, name)
 		if herr != nil {
@@ -682,15 +681,6 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 		}
 		created = !had
 		globalVault.NewAutoLink = everywhere
-		// A value moving in from ~/.astro/env is not new: that copy reaches
-		// every project, and seeding an empty row would take the value away
-		// from all of them the moment the vault copy starts to win. It moves
-		// in reaching every project, as it did.
-		inLegacy = legacyGlobalHas(kind, name)
-		if created && inLegacy {
-			created = false
-			globalVault.NewAutoLink = true
-		}
 	}
 	if _, err := store.Set(kind, name, value); err != nil {
 		return err
@@ -698,12 +688,6 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	if !isGlobalVault {
 		if err := c.removeOtherCopy(route, kind, name); err != nil {
 			return err
-		}
-	}
-	if inLegacy {
-		if path, err := localenv.GlobalEnvPath(); err == nil {
-			fmt.Fprintf(c.d.Stderr, "note: %s also has a line for %s, which the value just set now outranks. "+
-				"%s is read but no longer written, so remove that line by hand\n", path, name, path)
 		}
 	}
 	if route.global {
@@ -873,14 +857,12 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 }
 
 // getScoped reads one scope. In a project it reads the .env and the project
-// vault, or with --plain the .env alone; a global, the global vault and then
-// the read-only ~/.astro/env.
+// vault, or with --plain the .env alone; a global, the global vault.
 //
 // set keeps one copy per scope, so at most one store should answer. If both
 // do, the one the resolution chain would use wins, the order being the chain's
-// within one scope: the project .env outranks the project vault, and the global
-// vault outranks ~/.astro/env. A note on stderr names the other copy. The
-// manifest is not read.
+// within one scope: the project .env outranks the project vault. A note on
+// stderr names the other copy. The manifest is not read.
 func (c *cli) getScoped(r Renderer, scope *scopeFlags, kind localenv.Kind, name string) error {
 	stores, err := c.scopeStores(scope)
 	if err != nil {
@@ -955,7 +937,7 @@ func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
 	if ok {
 		return c.emitValue(r, envValue{Kind: kind, Name: name, Source: source, Value: v})
 	}
-	msg := fmt.Sprintf("%s %q is not set anywhere (project .env, shell env, the encrypted vault, or global ~/.astro/env)", localenv.Noun(kind), name)
+	msg := fmt.Sprintf("%s %q is not set anywhere (project .env, shell env, or the vault)", localenv.Noun(kind), name)
 	// A global the vault holds that does not reach this checkout is the one
 	// absence worth explaining: the value exists, and the fix is a link.
 	for _, p := range vaultenv.Load(projectDir).Providers() {
@@ -1062,8 +1044,7 @@ func (c *cli) emitValue(r Renderer, v envValue) error {
 // copy that got into the other store by hand or before the routing changed is
 // the one a delete of a credential most needs to catch. --plain deletes only
 // the .env copy, which is how a stale plaintext copy of a secret name is
-// removed on its own. A global is deleted from the vault; ~/.astro/env is read
-// only, so a name only that file holds is refused with the line to remove.
+// removed on its own. A global is deleted from the vault.
 //
 // Removing a vault entry deletes its file and needs no keyring, so delete works
 // where there is none.
@@ -1166,39 +1147,16 @@ func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (v
 	return store, nil
 }
 
-// deleteGlobal removes a global from the vault. ~/.astro/env is never edited:
-// a name only that file holds is refused with the line to remove, and one both
-// hold is deleted from the vault with a note that the file's line now applies.
+// deleteGlobal removes a global from the vault.
 func (c *cli) deleteGlobal(vault valueStore, kind localenv.Kind, name string) (valueStore, error) {
 	removed, err := c.deleteKeepingRow(vault, kind, name)
 	if err != nil {
 		return nil, err
 	}
-	legacyPath, _ := localenv.GlobalEnvPath() //nolint:errcheck // with no home there is no file to name, and legacyGlobalHas is false
-	inLegacy := legacyGlobalHas(kind, name)
-	switch {
-	case !removed && inLegacy:
-		key, _ := localenv.EnvKeyFor(kind, name)
-		return nil, fmt.Errorf("%s %s is set only in %s, which is read but no longer written, so nothing was deleted. "+
-			"Remove its line (%s=...) from that file by hand", localenv.Noun(kind), name, legacyPath, key)
-	case !removed:
+	if !removed {
 		return nil, fmt.Errorf("%s %q is %w in %s", localenv.Noun(kind), name, errValueNotSet, vault.ScopeName())
-	case inLegacy:
-		fmt.Fprintf(c.d.Stderr, "note: %s also has a line for %s, which applies now that the vault copy is gone. "+
-			"That file is read but no longer written, so remove the line by hand\n", legacyPath, name)
 	}
 	return vault, nil
-}
-
-// legacyGlobalHas reports whether ~/.astro/env holds (kind, name), matched on
-// the env key as the file store matches. An unreadable file holds nothing.
-func legacyGlobalHas(kind localenv.Kind, name string) bool {
-	gs, err := localenv.GlobalStore()
-	if err != nil {
-		return false
-	}
-	_, ok, err := gs.Get(kind, name)
-	return err == nil && ok
 }
 
 // scopeStores is every store a read of the scope looks in, in the order the
@@ -1208,15 +1166,8 @@ func (c *cli) scopeStores(scope *scopeFlags) ([]valueStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	if store.ScopeName() == vaultenv.SourceGlobal {
-		stores := []valueStore{store}
-		if gs, gerr := localenv.GlobalStore(); gerr == nil {
-			stores = append(stores, fileStore{gs})
-		}
-		return stores, nil
-	}
 	stores := []valueStore{store}
-	if !scope.plain {
+	if store.ScopeName() != vaultenv.SourceGlobal && !scope.plain {
 		vaultScope := *scope
 		vaultScope.secret = true
 		if vault, _, verr := c.envStore(&vaultScope); verr == nil {
@@ -1277,7 +1228,7 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	if err != nil {
 		return err
 	}
-	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global file
+	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global vault
 	m, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
 		return err
@@ -1436,12 +1387,6 @@ func listNote(it *localenv.ListItem) string {
 			note += "; remove: " + it.RemoveHint
 		}
 	}
-	if it.MoveHint != "" {
-		if note != "" {
-			note += "; "
-		}
-		note += "from ~/.astro/env, which is read only: move it with " + it.MoveHint + ", then remove the line by hand"
-	}
 	return note
 }
 
@@ -1450,8 +1395,7 @@ func listNote(it *localenv.ListItem) string {
 //
 // Two independent choices. The scope: --project outside a project is an error;
 // the default is project inside one, global otherwise. And the store: a global
-// is always the vault, marked plain for --plain, since ~/.astro/env is read
-// only; a project's is the vault when scope.secret is set and the .env
+// is always the vault, marked plain for --plain; a project's is the vault when scope.secret is set and the .env
 // otherwise. The scope is decided first and identically for both, so the store
 // never changes which tier a value belongs to.
 func (c *cli) envStore(scope *scopeFlags) (valueStore, string, error) {

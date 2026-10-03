@@ -153,48 +153,41 @@ func TestMultilineValueRejected(t *testing.T) {
 	}
 }
 
-// TestInjectionWholesale checks both files inject everything they hold,
-// declared or not: ~/.astro/env reaches every project. The project .env wins a
-// name both hold, and a global entry the shell also sets is left out, since the
-// shell outranks the global file.
+// TestInjectionWholesale checks the project .env injects everything it holds,
+// declared or not, and that a ~/.astro/env left by an older build injects
+// nothing.
 func TestInjectionWholesale(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	writeGlobalEnv(t, "GLOBAL_A=g\nUNDECLARED_GLOBAL=everywhere\nBOTH=global\nSHELL_SET=global\n")
+	writeLegacyGlobalEnv(t, home, "GLOBAL_A=g\nBOTH=global\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("PROJECT_A=p\nUNDECLARED_PROJECT=alsohere\nBOTH=project\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	src, err := LoadSources([]string{"SHELL_SET=shell"}, projDir)
+	src, err := LoadSources(nil, projDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	inj := src.Injection()
 
-	if inj["GLOBAL_A"] != "g" || inj["UNDECLARED_GLOBAL"] != "everywhere" {
-		t.Errorf("~/.astro/env not injected wholesale: %v", inj)
-	}
-	if inj["PROJECT_A"] != "p" || inj["UNDECLARED_PROJECT"] != "alsohere" {
+	if inj["PROJECT_A"] != "p" || inj["UNDECLARED_PROJECT"] != "alsohere" || inj["BOTH"] != "project" {
 		t.Errorf("project .env not injected wholesale: %v", inj)
 	}
-	if inj["BOTH"] != "project" {
-		t.Errorf("BOTH = %q, want the project .env to beat ~/.astro/env", inj["BOTH"])
-	}
-	if _, ok := inj["SHELL_SET"]; ok {
-		t.Errorf("SHELL_SET is injected, so ~/.astro/env would override the shell: %v", inj)
+	if _, ok := inj["GLOBAL_A"]; ok {
+		t.Errorf("~/.astro/env injected GLOBAL_A, but it is no longer read: %v", inj)
 	}
 }
 
 // TestUndeclared names what a project gets locally without declaring it: from
-// both files and the vault entries that reach it, never a declared name, an
-// Airflow setting, or a global linked elsewhere.
+// the project .env and the vault entries that reach it, never a declared name,
+// an Airflow setting, a global linked elsewhere, or a ~/.astro/env line.
 func TestUndeclared(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	writeGlobalEnv(t, "FROM_GLOBAL=g\nDECLARED=g\nAIRFLOW__CORE__LOAD_EXAMPLES=False\n")
+	writeLegacyGlobalEnv(t, home, "FROM_GLOBAL=g\n")
 	projDir := t.TempDir()
-	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("FROM_PROJECT=p\n"), 0o600); err != nil {
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("FROM_PROJECT=p\nDECLARED=p\nAIRFLOW__CORE__LOAD_EXAMPLES=False\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	src, err := LoadSources(nil, projDir)
@@ -211,7 +204,7 @@ func TestUndeclared(t *testing.T) {
 		}},
 	}
 	got := strings.Join(src.Undeclared(schema, tiers), ",")
-	want := "AIRFLOW_CONN_SHARED_DB,FROM_GLOBAL,FROM_PROJECT,PROJECT_SECRET"
+	want := "AIRFLOW_CONN_SHARED_DB,FROM_PROJECT,PROJECT_SECRET"
 	if got != want {
 		t.Errorf("Undeclared = %s, want %s", got, want)
 	}
@@ -220,25 +213,25 @@ func TestUndeclared(t *testing.T) {
 func TestProviderPrecedence(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	writeGlobalEnv(t, "K=global\nONLY_GLOBAL=g\nSHELL_GLOBAL=global\n")
+	writeLegacyGlobalEnv(t, home, "K=global\nONLY_GLOBAL=g\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("K=project\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	src, err := LoadSources([]string{"K=shell", "SHELL_GLOBAL=shell"}, projDir)
+	src, err := LoadSources([]string{"K=shell", "SHELL_ONLY=shell"}, projDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ps := src.Providers(nil)
-	// project beats shell, which start applies the .env over; shell beats global.
+	// project beats shell, which start applies the .env over.
 	if v, src, ok := firstHit(ps, "K"); !ok || v != "project" || src != SourceProject {
 		t.Errorf("K resolved to %q from %q (ok=%v), want project", v, src, ok)
 	}
-	if v, src, ok := firstHit(ps, "SHELL_GLOBAL"); !ok || v != "shell" || src != SourceShell {
-		t.Errorf("SHELL_GLOBAL resolved to %q from %q (ok=%v), want shell", v, src, ok)
+	if v, src, ok := firstHit(ps, "SHELL_ONLY"); !ok || v != "shell" || src != SourceShell {
+		t.Errorf("SHELL_ONLY resolved to %q from %q (ok=%v), want shell", v, src, ok)
 	}
-	if v, src, ok := firstHit(ps, "ONLY_GLOBAL"); !ok || v != "g" || src != SourceGlobal {
-		t.Errorf("ONLY_GLOBAL resolved to %q from %q (ok=%v), want g/global", v, src, ok)
+	if v, src, ok := firstHit(ps, "ONLY_GLOBAL"); ok {
+		t.Errorf("ONLY_GLOBAL resolved to %q from %q, but ~/.astro/env is no longer read", v, src)
 	}
 }
 
@@ -255,7 +248,7 @@ func firstHit(ps []envresolve.Provider, key string) (value, source string, ok bo
 func TestListSourceAndOrphans(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("ASTRO_HOME", home)
-	writeGlobalEnv(t, "STRAY_GLOBAL=x\n")
+	writeLegacyGlobalEnv(t, home, "STRAY_GLOBAL=x\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("DECLARED=p\nSTRAY_PROJECT=y\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -281,9 +274,8 @@ func TestListSourceAndOrphans(t *testing.T) {
 	if it := byName["STRAY_PROJECT"]; !it.Orphan || it.RemoveHint == "" || it.DeclareHint != "astro local env variable declare STRAY_PROJECT" {
 		t.Errorf("STRAY_PROJECT = %+v, want orphan with a remove and a declare hint", it)
 	}
-	if it := byName["STRAY_GLOBAL"]; !it.Orphan || it.Applied == nil || !*it.Applied ||
-		it.DeclareHint != "astro local env variable declare STRAY_GLOBAL" {
-		t.Errorf("STRAY_GLOBAL = %+v, want an orphan marked applied, with a declare hint", it)
+	if it, ok := byName["STRAY_GLOBAL"]; ok {
+		t.Errorf("STRAY_GLOBAL = %+v, listed from ~/.astro/env, which is no longer read", it)
 	}
 	if it := byName["STRAY_PROJECT"]; it.Applied == nil || !*it.Applied {
 		t.Errorf("STRAY_PROJECT = %+v, want it marked applied: the project .env passes through", it)
@@ -300,10 +292,9 @@ func TestListSourceAndOrphans(t *testing.T) {
 func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("ASTRO_HOME", t.TempDir())
-	writeGlobalEnv(t, "AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT=False\n")
 	projDir := t.TempDir()
 	other := t.TempDir()
-	body := "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False\nAIRFLOW_CONN_WAREHOUSE=postgres://h\nAIRFLOW_VAR_REGION=us\n"
+	body := "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False\nAIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT=False\nAIRFLOW_CONN_WAREHOUSE=postgres://h\nAIRFLOW_VAR_REGION=us\n"
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -350,12 +341,12 @@ func TestListAirflowSettingsAreNotOrphans(t *testing.T) {
 // the one applied, so only its row carries the mark.
 func TestListLeavesAShadowedGlobalUnmarked(t *testing.T) {
 	t.Setenv("ASTRO_HOME", t.TempDir())
-	writeGlobalEnv(t, "BOTH=g\n")
 	projDir := t.TempDir()
 	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("BOTH=p\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	items, err := List(nil, projDir, nil, ListOptions{})
+	tiers := []VaultTier{{Label: "global vault", Scope: ScopeGlobal, Entries: []VaultEntry{{Kind: KindEnv, Name: "BOTH", EnvKey: "BOTH"}}}}
+	items, err := List(nil, projDir, nil, ListOptions{VaultTiers: tiers})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,11 +364,12 @@ func TestListLeavesAShadowedGlobalUnmarked(t *testing.T) {
 // start sees.
 func TestListMarksAGlobalByProjectCopiesOnly(t *testing.T) {
 	t.Setenv("ASTRO_HOME", t.TempDir())
-	writeGlobalEnv(t, "IN_VAULT=g\nIN_SHELL=g\n")
 	projDir := t.TempDir()
 	tiers := []VaultTier{
 		{Label: "project vault", Scope: ScopeProject, Entries: []VaultEntry{{Kind: KindEnv, Name: "IN_VAULT", EnvKey: "IN_VAULT"}}},
 		{Label: "global vault", Scope: ScopeGlobal, Entries: []VaultEntry{
+			{Kind: KindEnv, Name: "IN_VAULT", EnvKey: "IN_VAULT"},
+			{Kind: KindEnv, Name: "IN_SHELL", EnvKey: "IN_SHELL"},
 			{Kind: KindVar, Name: "token", EnvKey: "AIRFLOW_VAR_TOKEN"},
 			{Kind: KindEnv, Name: "AIRFLOW__SECRETS__BACKEND_KWARGS", EnvKey: "AIRFLOW__SECRETS__BACKEND_KWARGS"},
 		}},
@@ -395,7 +387,7 @@ func TestListMarksAGlobalByProjectCopiesOnly(t *testing.T) {
 	// IN_VAULT's global row is the one left out: the project vault's copy is
 	// applied instead. An Airflow setting is no orphan, so it gets no hint.
 	want := map[string]string{
-		"IN_SHELL global":                               "astro local env variable declare IN_SHELL",
+		"IN_SHELL global vault":                         "astro local env variable declare IN_SHELL --secret",
 		"IN_VAULT project vault":                        "astro local env variable declare IN_VAULT --secret",
 		"token global vault":                            "astro local env airflow-variable declare token --secret",
 		"AIRFLOW__SECRETS__BACKEND_KWARGS global vault": "",
@@ -414,8 +406,8 @@ func TestListMarksAGlobalByProjectCopiesOnly(t *testing.T) {
 // undeclared one carries no applied mark.
 func TestListOutsideAProjectLeavesGlobalUnmarked(t *testing.T) {
 	t.Setenv("ASTRO_HOME", t.TempDir())
-	writeGlobalEnv(t, "STRAY_GLOBAL=x\n")
-	items, err := List(nil, "", nil, ListOptions{})
+	tiers := []VaultTier{{Label: "global vault", Scope: ScopeGlobal, Entries: []VaultEntry{{Kind: KindEnv, Name: "STRAY_GLOBAL", EnvKey: "STRAY_GLOBAL"}}}}
+	items, err := List(nil, "", nil, ListOptions{VaultTiers: tiers})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,57 +524,15 @@ func TestListNeverHasValueField(t *testing.T) {
 	_ = it.Source
 }
 
-// writeGlobalEnv puts a global env file where GlobalEnvPath says it goes.
-//
-// Through the function rather than by joining a path here: these tests used to
-// hardcode $ASTRO_HOME/env, which is the layout the code was getting wrong, so
-// they agreed with the bug and could not have caught it. What the layout IS is
-// pinned once, in TestGlobalEnvPathFollowsTheAstroHomeConvention.
-func writeGlobalEnv(t *testing.T, body string) {
+// writeLegacyGlobalEnv writes the ~/.astro/env an older build would have left
+// under astroHome, so a test can show nothing reads it.
+func writeLegacyGlobalEnv(t *testing.T, astroHome, body string) {
 	t.Helper()
-	p, err := GlobalEnvPath()
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := filepath.Join(astroHome, ".astro", "env")
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
-	}
-}
-
-// ASTRO_HOME names the PARENT of .astro. config.HomeConfigPath and cmd/local's
-// routesDir both read it that way, and this function claimed to and did not:
-// it put the env file at $ASTRO_HOME/env while the config went to
-// $ASTRO_HOME/.astro/config.yaml. Relocating an astro home has to move one
-// directory, not scatter files either side of it.
-func TestGlobalEnvPathFollowsTheAstroHomeConvention(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("ASTRO_HOME", home)
-
-	got, err := GlobalEnvPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := filepath.Join(home, ".astro", "env"); got != want {
-		t.Errorf("GlobalEnvPath() = %q, want %q — ASTRO_HOME is the parent of .astro", got, want)
-	}
-}
-
-// And with it unset the answer is unchanged, which is why the disagreement went
-// unnoticed for so long: both spellings land here.
-func TestGlobalEnvPathWithoutAstroHome(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("ASTRO_HOME", "")
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-
-	got, err := GlobalEnvPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := filepath.Join(home, ".astro", "env"); got != want {
-		t.Errorf("GlobalEnvPath() = %q, want %q", got, want)
 	}
 }

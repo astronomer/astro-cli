@@ -49,8 +49,7 @@ const (
 	ScopeGlobal  Scope = "global"
 )
 
-// Store is one dotenv file with its scope label. Build it with
-// ProjectStore or GlobalStore.
+// Store is one dotenv file with its scope label. Build it with ProjectStore.
 type Store struct {
 	Path  string
 	Scope Scope
@@ -59,15 +58,6 @@ type Store struct {
 // ProjectStore is the store for a project's <project>/.env.
 func ProjectStore(projectDir string) *Store {
 	return &Store{Path: ProjectEnvPath(projectDir), Scope: ScopeProject}
-}
-
-// GlobalStore is the store for the machine-wide ~/.astro/env.
-func GlobalStore() (*Store, error) {
-	path, err := GlobalEnvPath()
-	if err != nil {
-		return nil, err
-	}
-	return &Store{Path: path, Scope: ScopeGlobal}, nil
 }
 
 // Set writes value for the (kind, name) pair, merge-preserving the rest of

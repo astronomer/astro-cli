@@ -526,7 +526,7 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 }
 
 // isolateEnvSources cuts every ambient source the resolver consults above a
-// manifest default: HOME and USERPROFILE for `~/.astro/env`, XDG_CACHE_HOME for
+// manifest default: HOME and USERPROFILE for the global vault, XDG_CACHE_HOME for
 // user state, and the declared names themselves. testDeps sets none of them.
 //
 // Shell env outranks a manifest default, so any name a test relies on

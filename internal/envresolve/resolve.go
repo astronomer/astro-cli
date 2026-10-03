@@ -15,8 +15,7 @@ type Inputs struct {
 	Schema *envschema.Schema
 	// Providers is the ordered resolution chain: the first that holds a
 	// value wins. The shipped chain is project .env > shell env > project
-	// vault > global vault > global ~/.astro/env (internal/localenv assembles
-	// it).
+	// vault > global vault (internal/localenv assembles it).
 	Providers []Provider
 	// WorkspaceProvider is the linked workspace's Environment Manager objects,
 	// the tier below every local source and above a declaration's default. It
@@ -54,7 +53,7 @@ const SourceDefault = "default"
 
 // ResolvedName is one declared name with the source it resolved from — the
 // value-free record `list` reports. Source is a provider label ("shell",
-// "project", "global"), "default", or "" when nothing in the chain holds it.
+// "project", a vault tier), "default", or "" when nothing in the chain holds it.
 type ResolvedName struct {
 	Section envschema.Section
 	Name    string
@@ -88,8 +87,8 @@ type Result struct {
 }
 
 // Resolve assembles values for every declared name from the provider chain
-// (project .env > shell env > the two vault tiers > global ~/.astro/env > the
-// linked workspace > the declaration's default), validates them, and reports what is missing and
+// (project .env > shell env > the two vault tiers > the linked workspace > the
+// declaration's default), validates them, and reports what is missing and
 // where each present value came from. It never writes and resolves only
 // declared names — undeclared entries in any source, the workspace included,
 // are the caller's to pass through, unjudged.

@@ -116,7 +116,7 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"does not. --auto-link removes the links, and the value is auto-linked to every project\n" +
 			"again.\n\n" +
 			"Only global vault entries have links: a project secret already reaches only\n" +
-			"its own project, and ~/.astro/env reaches every project.\n\n" +
+			"its own project.\n\n" +
 			"Whatever reaches a project is passed to its Airflow at start, declared or not,\n" +
 			"so linking is how to keep a global out of the projects that should not get\n" +
 			"it. Astro Desktop reads the same links.",
@@ -306,8 +306,8 @@ func linkEditErr(w *vaultenv.Writer, kind localenv.Kind, name string, err error)
 }
 
 // linkWriter is the global vault writer for a name the global vault holds,
-// or the reason the name cannot be linked: it is a project value, a
-// ~/.astro/env entry, or not in the vault at all.
+// or the reason the name cannot be linked: it is a project value, or not in
+// the vault at all.
 func (c *cli) linkWriter(scope *scopeFlags, kind localenv.Kind, name string) (*vaultenv.Writer, error) {
 	noun := localenv.Noun(kind)
 	if scope.project {
@@ -330,13 +330,6 @@ func (c *cli) linkWriter(scope *scopeFlags, kind localenv.Kind, name string) (*v
 				return nil, fmt.Errorf("%s %s is in this project's vault, so it already reaches only this project. "+
 					"Links apply to global vault entries only", noun, name)
 			}
-		}
-	}
-	if gs, err := localenv.GlobalStore(); err == nil {
-		if _, ok, _ := gs.Get(kind, name); ok { //nolint:errcheck // an unreadable file just skips this reason
-			return nil, fmt.Errorf("%s %s is in %s, a plain file outside the vault, which has no links: a start passes it to every project. "+
-				"To limit it to specific projects, move it into the vault with: astro local env %s set %s --global (then remove its line from that file by hand)",
-				noun, name, gs.Path, noun, name)
 		}
 	}
 	return nil, fmt.Errorf("the vault holds no global %s %s, so there is nothing to link. Set one with: astro local env %s set %s --global",

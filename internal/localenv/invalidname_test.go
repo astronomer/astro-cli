@@ -14,7 +14,7 @@ func TestALeadingDigitDotenvVariableIsListedAndDeletable(t *testing.T) {
 	if err := os.WriteFile(path, []byte("AIRFLOW_VAR_1ST_REGION=us-east-1\nKEEP=1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	item := orphanItem("AIRFLOW_VAR_1ST_REGION", ScopeProject, "", true)
+	item := orphanItem("AIRFLOW_VAR_1ST_REGION", "", true)
 	if item.Name != "1st_region" || !strings.Contains(item.Invalid, "rename or delete it") || item.DeclareHint != "" || item.RemoveHint == "" {
 		t.Errorf("row = %+v, want the reason, a remove hint and no declare hint", item)
 	}

@@ -12,12 +12,11 @@ import (
 const (
 	SourceShell   = "shell"
 	SourceProject = "project"
-	SourceGlobal  = "global"
 	SourceAbsent  = "absent"
 )
 
 // mapProvider is a labeled bag of env-var keys implementing
-// envresolve.Provider. The shell, project, and global sources are all one.
+// envresolve.Provider. The shell and project sources are both one.
 type mapProvider struct {
 	label string
 	vals  map[string]string
@@ -26,23 +25,22 @@ type mapProvider struct {
 func (p mapProvider) Lookup(key string) (string, bool) { v, ok := p.vals[key]; return v, ok }
 func (p mapProvider) Label() string                    { return p.label }
 
-// Sources holds the three resolution sources for a single invocation, read
+// Sources holds the plain resolution sources for a single invocation, read
 // once. It builds the ordered provider chain and the runtime injection map
 // from the same parsed data, so list, the missing-value gate, and injection
 // never disagree about what a file holds.
 type Sources struct {
 	shell      map[string]string
 	project    map[string]string // nil when running outside a project
-	global     map[string]string
 	hasProject bool
 }
 
-// LoadSources reads the shell environment, the project's .env (when
-// projectDir is non-empty), and the global ~/.astro/env. environ is the
-// process environment in os.Environ() form; the caller passes it so tests can
-// pin it. A missing file is empty, not an error.
+// LoadSources reads the shell environment and the project's .env (when
+// projectDir is non-empty). environ is the process environment in
+// os.Environ() form; the caller passes it so tests can pin it. A missing file
+// is empty, not an error.
 func LoadSources(environ []string, projectDir string) (Sources, error) {
-	s := Sources{shell: environMap(environ), global: map[string]string{}}
+	s := Sources{shell: environMap(environ)}
 	if projectDir != "" {
 		m, err := readMap(ProjectEnvPath(projectDir))
 		if err != nil {
@@ -51,23 +49,15 @@ func LoadSources(environ []string, projectDir string) (Sources, error) {
 		s.project = m
 		s.hasProject = true
 	}
-	gpath, err := GlobalEnvPath()
-	if err != nil {
-		return Sources{}, err
-	}
-	gm, err := readMap(gpath)
-	if err != nil {
-		return Sources{}, err
-	}
-	s.global = gm
 	return s, nil
 }
 
 // Providers is the ordered resolution chain:
 //
-//	project .env > shell env > project vault > global vault > global ~/.astro/env
+//	project .env > shell env > project vault > global vault
 //
-// The project provider is omitted when there is no project.
+// The linked workspace and declaration defaults rank below these; the resolver
+// adds them. The project provider is omitted when there is no project.
 //
 // vault is the encrypted tier's providers, in their own order
 // (internal/vaultenv builds them). They are passed in rather than built here
@@ -76,9 +66,7 @@ func LoadSources(environ []string, projectDir string) (Sources, error) {
 // provider arrives as a seam. Pass nil for a chain without the vault.
 //
 // The slot is the decision. A vault value sits BELOW the project's .env, so a
-// hand-written plaintext entry still wins, exactly as it does on the desktop;
-// and ABOVE the global file, so this machine's shared secret beats a global
-// plaintext default.
+// hand-written plaintext entry still wins, exactly as it does on the desktop.
 //
 // The project .env sits above the shell because that is what a start delivers:
 // Injection applies the whole file through Plan.Env, which both engines set
@@ -91,8 +79,7 @@ func (s Sources) Providers(vault []envresolve.Provider) []envresolve.Provider {
 		ps = append(ps, mapProvider{label: SourceProject, vals: s.project})
 	}
 	ps = append(ps, mapProvider{label: SourceShell, vals: s.shell})
-	ps = append(ps, vault...)
-	return append(ps, mapProvider{label: SourceGlobal, vals: s.global})
+	return append(ps, vault...)
 }
 
 // AboveVault reports whether a source that OUTRANKS the vault tiers holds key —
@@ -120,38 +107,13 @@ func (s Sources) InShell(key string) bool {
 	return ok
 }
 
-// ShellOverGlobalFile is the ~/.astro/env keys Injection leaves out because the
-// shell sets them too, sorted. The caller passes them through to docker, which
-// inherits no host shell.
-func (s Sources) ShellOverGlobalFile() []string {
-	var out []string
-	for key := range s.global {
-		if s.InShell(key) {
-			out = append(out, key)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
 // Injection is the map layered into the Airflow environment at start: the
-// project .env WHOLESALE (every entry, docker-compose semantics) over the
-// global file's entries, also wholesale. ~/.astro/env reaches every project,
-// so all of it reaches this one, declared or not: a declaration makes a name a
-// requirement, it does not decide whether a value is passed. The shell
-// environment is not here, since the process already carries it, and a global
-// entry the shell also sets is left out: the shell outranks the global file,
-// and a Plan.Env entry would override it. Both engines apply this identically
-// through Plan.Env.
+// project .env WHOLESALE (every entry, docker-compose semantics), declared or
+// not: a declaration makes a name a requirement, it does not decide whether a
+// value is passed. The shell environment is not here, since the process
+// already carries it. Both engines apply this identically through Plan.Env.
 func (s Sources) Injection() map[string]string {
 	inj := map[string]string{}
-	for key, v := range s.global {
-		if s.InShell(key) {
-			continue
-		}
-		inj[key] = v
-	}
-	// Project: every entry, declared or not.
 	for k, v := range s.project {
 		inj[k] = v
 	}
@@ -159,13 +121,13 @@ func (s Sources) Injection() map[string]string {
 }
 
 // Undeclared is the env-var names a start of this project passes to Airflow
-// from local sources the schema does not declare: the project .env, the
-// global file, and the vault tiers' entries that reach this checkout. They
-// work locally and nowhere else, since a Deployment and a teammate's clone get
-// only what the project declares, so check and package name them. Airflow
-// settings (AIRFLOW__*) are left out: they configure Airflow rather than name a
-// value the project's code expects, the same reason list does not call them
-// orphans. Names only, sorted; nothing here is a value.
+// from local sources the schema does not declare: the project .env and the
+// vault tiers' entries that reach this checkout. They work locally and nowhere
+// else, since a Deployment and a teammate's clone get only what the project
+// declares, so check and package name them. Airflow settings (AIRFLOW__*) are
+// left out: they configure Airflow rather than name a value the project's code
+// expects, the same reason list does not call them orphans. Names only,
+// sorted; nothing here is a value.
 func (s Sources) Undeclared(schema *envschema.Schema, tiers []VaultTier) []string {
 	declared := map[string]bool{}
 	for _, k := range envschema.DeclaredEnvKeys(schema) {
@@ -178,9 +140,6 @@ func (s Sources) Undeclared(schema *envschema.Schema, tiers []VaultTier) []strin
 		}
 	}
 	for key := range s.project {
-		add(key)
-	}
-	for key := range s.global {
 		add(key)
 	}
 	for _, tier := range tiers {

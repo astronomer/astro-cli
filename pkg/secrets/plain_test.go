@@ -30,6 +30,32 @@ func TestSetPlainNeverTouchesKeyring(t *testing.T) {
 	}
 }
 
+// On a fresh machine the vault directory does not exist yet. The first plain
+// write creates it, and neither that nor reading the entry back asks the
+// keyring for anything, while an encrypted write fails on it.
+func TestFirstPlainWriteOnAFreshMachineNeedsNoKeyring(t *testing.T) {
+	kr := newFakeKeyring()
+	kr.err = errors.New("no dbus")
+	dir := t.TempDir() + "/secrets"
+	s := testStore(t, kr, "astro-test", dir)
+
+	if err := SetPlain(s, "env:global:REGION", "us-east-1"); err != nil {
+		t.Fatalf("SetPlain on a fresh machine: %v", err)
+	}
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		t.Fatalf("vault directory not created: %v", err)
+	}
+	if got, err := s.Get("env:global:REGION"); err != nil || got != "us-east-1" {
+		t.Fatalf("Get = %q, %v; want the plain value", got, err)
+	}
+	if kr.gets != 0 || kr.sets != 0 {
+		t.Fatalf("a plain write on a fresh machine touched the keyring: %d gets, %d sets", kr.gets, kr.sets)
+	}
+	if err := s.Set("env:global:TOKEN", "s3cret"); err == nil {
+		t.Fatal("an encrypted write succeeded with no keyring")
+	}
+}
+
 // Set and SetPlain replace each other, so one key is one entry, and the flag
 // follows the last write.
 func TestSetAndSetPlainReplaceEachOther(t *testing.T) {

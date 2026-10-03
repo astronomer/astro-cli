@@ -27,14 +27,14 @@ type ListItem struct {
 	// Description is the declaration's prose for whoever supplies the value,
 	// and empty when it has none or the row is an orphan.
 	Description string `json:"description,omitempty"`
-	// Source is where the value resolves from: shell, project, global,
+	// Source is where the value resolves from: project, shell, a vault tier,
 	// workspace, default, or absent (for a declared name with no value
 	// anywhere).
 	Source string `json:"source"`
 	// Orphan marks an entry present in a file that no schema declares.
 	Orphan bool `json:"orphan,omitempty"`
 	// Project is the project an --all orphan came from, when it is not the
-	// current one. Empty for the current project and the global file.
+	// current one. Empty for the current project and the vault.
 	Project string `json:"project,omitempty"`
 	// Invalid says why a stored entry no longer resolves, a Variable key an
 	// older build accepted, and that it should be renamed or deleted.
@@ -42,11 +42,6 @@ type ListItem struct {
 	Invalid string `json:"invalid,omitempty"`
 	// RemoveHint is the exact command to remove an orphan.
 	RemoveHint string `json:"remove_hint,omitempty"`
-	// MoveHint is set on a row ~/.astro/env supplies, which is read but no
-	// longer written: the command that stores the value as a global in the
-	// vault instead, after which the file's line can be removed by hand. No
-	// command removes the line, so such a row carries no RemoveHint.
-	MoveHint string `json:"move_hint,omitempty"`
 	// Applied is true for an undeclared value a start passes to the current
 	// project: everything that reaches a project is applied, declared or not.
 	// Omitted on declared rows, on a global row the project's own copy
@@ -78,17 +73,17 @@ type ListItem struct {
 
 // ListOptions selects which files list reports over.
 type ListOptions struct {
-	// Scope, when set, restricts the read to one file: the project .env
-	// (ScopeProject) or the global file (ScopeGlobal). Empty resolves the
-	// whole chain.
+	// Scope, when set, restricts the read to one scope: the project's .env and
+	// vault tier (ScopeProject) or the global vault (ScopeGlobal). Empty
+	// resolves the whole chain.
 	Scope Scope
-	// All widens the view to the global file plus every project's .env the
-	// CLI knows about, beyond the current project, and to the undeclared
+	// All widens the view to every project's .env the CLI knows about,
+	// beyond the current project, and to the undeclared
 	// globals in the vault that do not reach this project, marked
 	// NotLinkedHere. Without it those are left out.
 	All bool
 	// WorkspaceProvider is the linked workspace's Environment Manager objects,
-	// the tier below ~/.astro/env and above declaration defaults: a declared
+	// the tier below the global vault and above declaration defaults: a declared
 	// name nothing local holds resolves from it, and what it holds undeclared
 	// is listed the way an undeclared file entry is. nil leaves the tier out.
 	// Built presence-only (no secret values pulled).
@@ -189,9 +184,6 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 			item.SetHint = SetHint(item.Kind, item.Name)
 			item.UndeclareHint = UndeclareHint(item.Kind, item.Name)
 		}
-		if item.Source == SourceGlobal {
-			item.MoveHint = MoveHint(item.Kind, item.Name)
-		}
 		items = append(items, item)
 	}
 	items = append(items, orphans(src, schema, opts, projectDir)...)
@@ -227,7 +219,7 @@ func workspaceOrphans(src Sources, schema *envschema.Schema, opts ListOptions) [
 	}
 	declared := declaredKeySet(schema)
 	local := map[string]bool{}
-	for _, files := range []map[string]string{src.shell, src.project, src.global} {
+	for _, files := range []map[string]string{src.shell, src.project} {
 		for key := range files {
 			local[key] = true
 		}
@@ -294,8 +286,8 @@ func envKeyOfItem(item ListItem) string {
 
 // listProviders picks the chain a list reads over. A scope flag narrows it to
 // that scope's stores, in the chain's order, so `list --project` shows what the
-// project's .env and vault hold and `list --global` what the global vault and
-// ~/.astro/env do; otherwise the full chain reports the true winning source.
+// project's .env and vault hold and `list --global` what the global vault
+// does; otherwise the full chain reports the true winning source.
 // The vault is in the narrowed chains because a set stores there by default:
 // leaving it out would hide exactly what the same flags just set.
 func listProviders(src Sources, opts ListOptions) []envresolve.Provider {
@@ -303,7 +295,7 @@ func listProviders(src Sources, opts ListOptions) []envresolve.Provider {
 	case ScopeProject:
 		return append([]envresolve.Provider{mapProvider{label: SourceProject, vals: src.project}}, vaultProvidersFor(opts, ScopeProject)...)
 	case ScopeGlobal:
-		return append(vaultProvidersFor(opts, ScopeGlobal), mapProvider{label: SourceGlobal, vals: src.global})
+		return vaultProvidersFor(opts, ScopeGlobal)
 	default:
 		return src.Providers(opts.VaultProviders)
 	}
@@ -389,49 +381,21 @@ func KindForSection(s envschema.Section) Kind {
 func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir string) []ListItem {
 	declared := declaredKeySet(schema)
 	inProject := projectCopies(src, opts.VaultTiers)
-	globalVault := map[string]bool{}
-	for _, tier := range opts.VaultTiers {
-		if tier.Scope != ScopeGlobal {
-			continue
-		}
-		for _, e := range tier.Entries {
-			if !e.Unlinked {
-				globalVault[e.EnvKey] = true
-			}
-		}
-	}
 	var out []ListItem
-	add := func(files map[string]string, scope Scope) {
-		for key := range files {
+	if opts.Scope != ScopeGlobal {
+		for key := range src.project {
 			if declared[key] {
 				continue
 			}
-			item := orphanItem(key, scope, "", src.hasProject)
+			item := orphanItem(key, "", src.hasProject)
 			if isAirflowSetting(key) {
-				item = ListItem{Kind: KindEnv, Name: key, Source: string(scope)}
+				item = ListItem{Kind: KindEnv, Name: key, Source: string(ScopeProject)}
 			}
-			// The global vault outranks ~/.astro/env, so a name both hold is
-			// applied from the vault, and that row carries the mark.
-			if scope != ScopeGlobal || !globalVault[key] {
-				markApplied(&item, scope, key, inProject)
-			}
+			markApplied(&item, ScopeProject, key, inProject)
 			out = append(out, item)
 		}
 	}
-	switch {
-	case opts.Scope == ScopeProject:
-		add(src.project, ScopeProject)
-		out = append(out, vaultOrphans(src, opts, declared, inProject)...)
-	case opts.Scope == ScopeGlobal:
-		add(src.global, ScopeGlobal)
-		out = append(out, vaultOrphans(src, opts, declared, inProject)...)
-	default:
-		if src.hasProject {
-			add(src.project, ScopeProject)
-		}
-		add(src.global, ScopeGlobal)
-		out = append(out, vaultOrphans(src, opts, declared, inProject)...)
-	}
+	out = append(out, vaultOrphans(src, opts, declared, inProject)...)
 	if opts.All {
 		out = append(out, crossProjectOrphans(declared, projectDir)...)
 	}
@@ -508,7 +472,7 @@ func crossProjectOrphans(declared map[string]bool, projectDir string) []ListItem
 			if declared[key] || isAirflowSetting(key) {
 				continue
 			}
-			out = append(out, orphanItem(key, ScopeProject, rec.ProjectPath, false))
+			out = append(out, orphanItem(key, rec.ProjectPath, false))
 		}
 	}
 	return out
@@ -543,21 +507,16 @@ func vaultDeclareHint(kind Kind, name string) string {
 	return DeclareHint(kind, name) + " --secret"
 }
 
-func orphanItem(key string, scope Scope, project string, inProject bool) ListItem {
+// orphanItem is an undeclared entry of a project's .env.
+func orphanItem(key, project string, inProject bool) ListItem {
 	kind, name := kindFromKey(key)
-	item := ListItem{Kind: kind, Name: name, Source: string(scope), Orphan: true, Project: project}
+	item := ListItem{Kind: kind, Name: name, Source: string(ScopeProject), Orphan: true, Project: project}
 	item.Invalid = InvalidStoredReason(kind, name)
 	// A cross-project orphan (project set) lives in another project's file; the
 	// delete command runs against the cwd's project, so a hint would point at
-	// the wrong file. Only offer it for the current project and the global file.
+	// the wrong file. Only offer it for the current project.
 	if project == "" {
-		if scope == ScopeGlobal {
-			// ~/.astro/env is read only: no command removes the line, so the
-			// way out is to move the value.
-			item.MoveHint = MoveHint(kind, name)
-		} else {
-			item.RemoveHint = removeHint(kind, name, scope)
-		}
+		item.RemoveHint = removeHint(kind, name, ScopeProject)
 		if inProject && item.Invalid == "" {
 			item.DeclareHint = DeclareHint(kind, name)
 		}
@@ -652,12 +611,6 @@ func DeclareHint(kind Kind, name string) string {
 // value: set prompts for one and refuses it as an argument.
 func SetHint(kind Kind, name string) string {
 	return "astro local env " + Noun(kind) + " set " + name
-}
-
-// MoveHint is the command that stores a ~/.astro/env value as a global in the
-// vault. It names no value, as SetHint does not.
-func MoveHint(kind Kind, name string) string {
-	return SetHint(kind, name) + " --global"
 }
 
 // UndeclareHint is the `astro local env <noun> undeclare` command for a name.

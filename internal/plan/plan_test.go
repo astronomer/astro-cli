@@ -273,12 +273,9 @@ func seedVault(t *testing.T, projectDir, name string) {
 	}
 }
 
-// The chain puts both vault tiers ABOVE the machine-wide plaintext file. The
-// injection merge dropped a vault value whenever anything in Plan.Env held the
-// name, and Plan.Env carries ~/.astro/env's schema-declared entries — so the
-// plaintext value won, and in docker mode it was the one written into the compose
-// file left on disk.
-func TestVaultBeatsTheGlobalPlaintextFile(t *testing.T) {
+// A ~/.astro/env left by an older build is not a source: neither a declared
+// name it holds nor an undeclared one reaches Airflow from it.
+func TestALegacyGlobalEnvFileIsIgnored(t *testing.T) {
 	dir := t.TempDir()
 	manifest := manifestTOML + `
 [tool.astro.env]
@@ -291,11 +288,10 @@ TOKEN = {}
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	// The global plaintext file declares the same name.
 	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte("TOKEN=from-global-file\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte("TOKEN=from-global-file\nFILE_ONLY=from-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	seedVault(t, dir, "TOKEN")
@@ -305,10 +301,15 @@ TOKEN = {}
 		t.Fatal(err)
 	}
 	if got := built.Plan.SecretEnv["TOKEN"]; got != "from-vault" {
-		t.Errorf("SecretEnv[TOKEN] = %q, want the vault value: it outranks ~/.astro/env", got)
+		t.Errorf("SecretEnv[TOKEN] = %q, want the vault value", got)
 	}
-	if got := built.Plan.Env["TOKEN"]; got != "" {
-		t.Errorf("Env[TOKEN] = %q — the plaintext value must not also be carried, and must not reach the compose file", got)
+	for _, k := range []string{"TOKEN", "FILE_ONLY"} {
+		if got, ok := built.Plan.Env[k]; ok {
+			t.Errorf("Env[%s] = %q came from ~/.astro/env, which is no longer read", k, got)
+		}
+	}
+	if got, ok := built.Plan.SecretEnv["FILE_ONLY"]; ok {
+		t.Errorf("SecretEnv[FILE_ONLY] = %q came from ~/.astro/env, which is no longer read", got)
 	}
 }
 
@@ -389,9 +390,8 @@ func seedValue(t *testing.T, projectDir string, kind localenv.Kind, name, value 
 }
 
 // Nothing here is declared, and all of it reaches the project, so every name
-// injects and the chain alone picks each winner: shell > project .env >
-// project vault > global vault > ~/.astro/env. A declaration is not what gets
-// a value in.
+// injects and the chain alone picks each winner: project .env > shell >
+// project vault > global vault. A declaration is not what gets a value in.
 func TestUndeclaredValuesInjectInChainOrder(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifestTOML), 0o600); err != nil {
@@ -404,21 +404,12 @@ func TestUndeclaredValuesInjectInChainOrder(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	globalFile := "FILE_ONLY=from-file\nVAULT_OVER_FILE=from-file\nSHELL_OVER_FILE=from-file\n"
-	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte(globalFile), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	seedValue(t, "", localenv.KindConn, "shared_db", "postgres://global")
-	seedValue(t, "", localenv.KindEnv, "VAULT_OVER_FILE", "from-global-vault")
 	seedValue(t, "", localenv.KindEnv, "PROJECT_OVER_GLOBAL", "from-global-vault")
 	seedValue(t, dir, localenv.KindEnv, "PROJECT_OVER_GLOBAL", "from-project-vault")
 	seedValue(t, "", localenv.KindEnv, "DOTENV_OVER_VAULT", "from-global-vault")
 	seedValue(t, "", localenv.KindEnv, "SHELL_OVER_VAULT", "from-global-vault")
 	t.Setenv("SHELL_OVER_VAULT", "from-shell")
-	t.Setenv("SHELL_OVER_FILE", "from-shell")
 
 	built, err := Build(dir, Options{Mode: localrt.ModeStandalone})
 	if err != nil {
@@ -431,8 +422,6 @@ func TestUndeclaredValuesInjectInChainOrder(t *testing.T) {
 		key, want string
 	}{
 		{"an undeclared linked global connection injects", secret, "AIRFLOW_CONN_SHARED_DB", `{"conn_type":"postgres","host":"global"}`},
-		{"an ~/.astro/env entry injects undeclared", env, "FILE_ONLY", "from-file"},
-		{"the global vault beats ~/.astro/env", secret, "VAULT_OVER_FILE", "from-global-vault"},
 		{"project scope beats global", secret, "PROJECT_OVER_GLOBAL", "from-project-vault"},
 		{"the project .env beats the vault", env, "DOTENV_OVER_VAULT", "from-dotenv"},
 	}
@@ -441,25 +430,21 @@ func TestUndeclaredValuesInjectInChainOrder(t *testing.T) {
 			t.Errorf("%s: %s = %q, want %q", c.name, c.key, got, c.want)
 		}
 	}
-	for _, k := range []string{"VAULT_OVER_FILE", "PROJECT_OVER_GLOBAL"} {
-		if v, ok := env[k]; ok {
-			t.Errorf("Env[%s] = %q: the loser must not travel beside the winner", k, v)
-		}
+	if v, ok := env["PROJECT_OVER_GLOBAL"]; ok {
+		t.Errorf("Env[PROJECT_OVER_GLOBAL] = %q: the loser must not travel beside the winner", v)
 	}
 	if v, ok := secret["DOTENV_OVER_VAULT"]; ok {
 		t.Errorf("SecretEnv[DOTENV_OVER_VAULT] = %q, want the .env value alone", v)
 	}
-	for _, k := range []string{"SHELL_OVER_VAULT", "SHELL_OVER_FILE"} {
-		if v, ok := secret[k]; ok {
-			t.Errorf("SecretEnv[%s] = %q would override the shell", k, v)
-		}
-		if v, ok := env[k]; ok {
-			t.Errorf("Env[%s] = %q would override the shell", k, v)
-		}
+	if v, ok := secret["SHELL_OVER_VAULT"]; ok {
+		t.Errorf("SecretEnv[SHELL_OVER_VAULT] = %q would override the shell", v)
+	}
+	if v, ok := env["SHELL_OVER_VAULT"]; ok {
+		t.Errorf("Env[SHELL_OVER_VAULT] = %q would override the shell", v)
 	}
 }
 
-// An undeclared name the vault, ~/.astro/env and the shell all hold resolves to
+// An undeclared name the vault and the shell both hold resolves to
 // the shell in both engines. Standalone inherits the shell, so nothing may
 // carry the lower values; docker inherits nothing, so the name has to ride the
 // passthrough list or the container gets no value at all.
@@ -472,16 +457,9 @@ func TestShellBeatsUndeclaredLowerSourcesInBothEngines(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(home, ".astro", "env"), []byte("SHELL_WINS=from-file\nFILE_ONLY_SHELL=from-file\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	seedValue(t, "", localenv.KindEnv, "SHELL_WINS", "from-global-vault")
 	seedValue(t, "", localenv.KindEnv, "VAULT_ONLY_SHELL", "from-global-vault")
 	t.Setenv("SHELL_WINS", "from-shell")
-	t.Setenv("FILE_ONLY_SHELL", "from-shell")
 	t.Setenv("VAULT_ONLY_SHELL", "from-shell")
 
 	for _, mode := range []localrt.Mode{localrt.ModeStandalone, localrt.ModeDocker} {
@@ -489,7 +467,7 @@ func TestShellBeatsUndeclaredLowerSourcesInBothEngines(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, k := range []string{"SHELL_WINS", "FILE_ONLY_SHELL", "VAULT_ONLY_SHELL"} {
+		for _, k := range []string{"SHELL_WINS", "VAULT_ONLY_SHELL"} {
 			if v, ok := built.Plan.Env[k]; ok {
 				t.Errorf("%s: Env[%s] = %q would override the shell", mode, k, v)
 			}

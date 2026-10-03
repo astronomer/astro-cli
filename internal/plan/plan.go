@@ -39,7 +39,7 @@ type Options struct {
 	StopWithSession bool
 	// WorkspaceProvider, when set, turns on the linked workspace's tier: the
 	// manifest's workspace's Environment Manager objects reach Airflow below
-	// ~/.astro/env and above declaration defaults, declared or not, and a name
+	// the global vault and above declaration defaults, declared or not, and a name
 	// declared `source = "workspace"` resolves from them. nil leaves the tier
 	// out and a workspace source unresolved (a required one gates as missing)
 	// — the offline default, no network.
@@ -308,13 +308,12 @@ func PersistPort(projectPath string, chosen int) error {
 
 // resolveEnv types the manifest's [tool.astro.env] section, resolves it
 // against the provider chain (project .env > shell env > project vault > global
-// vault > global ~/.astro/env),
-// and returns the environment injected into Airflow at start plus the
+// vault > linked workspace > declaration default), and returns the environment injected into Airflow at start plus the
 // declared names only the shell satisfies (Plan.PassthroughEnv). A required
 // value with no source surfaces as *MissingEnvError — the clone-and-run gate.
 //
 // Injection is not the resolved map: everything that reaches the project goes
-// in, declared or not. The project .env and the global file go in wholesale
+// in, declared or not. The project .env goes in wholesale
 // (localenv.Sources.Injection), and the vault's project secrets and every
 // global linked to this checkout come back separately, for Plan.SecretEnv
 // (vaultenv.SecretInjection). A declaration is a requirement, not a gate: it
@@ -406,23 +405,20 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	// rather than by the chain — which means everything the chain already decided
 	// has to be applied here by hand.
 	//
-	// Membership in `inj` is the wrong test, in both directions. `inj` carries
-	// the global file's entries, and those sit BELOW both vault tiers, so keying
-	// on it would let ~/.astro/env delete a secret that had won. And a name the
-	// shell environment satisfied is not in `inj` at all, so keying on it would
-	// leave the secret in place and let it override an explicit
-	// `FOO=bar astro local start`. Both invert the documented order.
+	// Membership in `inj` is the wrong test: a name the shell environment
+	// satisfied is not in `inj` at all, so keying on it would leave the secret
+	// in place and let it override an explicit `FOO=bar astro local start`,
+	// inverting the documented order.
 	//
 	// The resolver already made this decision for every DECLARED name, so ask it
 	// rather than re-deriving. A name the schema does not declare was never
 	// resolved — both vault tiers inject everything that reaches the checkout —
-	// so those are checked against the sources that outrank the vault, and
-	// otherwise beat the global file.
+	// so those are checked against the sources that outrank the vault.
 	secretInj := vault.SecretInjection()
 	// shellWon is the undeclared names a lower source held that the shell beat.
 	// Standalone inherits the shell, but a docker container does not, so these
 	// have to join the passthrough list or docker gets no value at all.
-	shellWon := src.ShellOverGlobalFile()
+	var shellWon []string
 	for k := range secretInj {
 		if source, declared := winner[k]; declared {
 			if vaultenv.IsVaultSource(source) {
