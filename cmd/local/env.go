@@ -24,39 +24,69 @@ import (
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// vaultFlagHelp documents --secret, in one place because set, get and delete
-// each register the flag and must describe it identically. Named for the vault
-// rather than the flag so gosec's hardcoded-credential heuristic does not read
-// a help string as a password.
-const vaultFlagHelp = "Use the encrypted vault instead of a plain file"
+// The --plain help, one per verb because set stores and get/delete narrow.
+// Named for the store rather than the flag so gosec's hardcoded-credential
+// heuristic does not read a help string as a password.
+const (
+	plainSetHelp    = "Store the value unencrypted: in the project's .env, or for a global, in the vault without encryption"
+	plainNarrowHelp = "In a project, act on the plain .env only, not the vault"
+	// legacySecretUsage is the deprecation notice cobra prints for --secret.
+	legacySecretUsage = "values are stored in the encrypted vault by default; use --plain to opt out (--secret=false still means --plain)"
+)
 
-// scopeFlags carries the shared --project/--global choice and the --secret
-// store choice. It is filled by cobra before any RunE runs, so every env leaf
-// reads the same struct.
+// scopeFlags carries the shared --project/--global choice and the store
+// choice. It is filled by cobra before any RunE runs, so every env leaf reads
+// the same struct.
 //
 // The two are separate axes on purpose: --project/--global pick WHICH SCOPE a
-// value belongs to, --secret picks WHICH STORE holds it. They compose, so
-// `--global --secret` is a machine-wide secret and `--global` alone is a
-// machine-wide plaintext default.
+// value belongs to, --plain picks whether it is protected. Every value goes to
+// the vault, encrypted, unless --plain says otherwise. A plain project value
+// goes to the project's .env; a plain global goes to the vault too, marked
+// plain and unencrypted, so every global keeps one layout and one set of
+// links. Nothing writes ~/.astro/env, which is read only.
 //
-// secretGiven records whether --secret was on the command line at all, which
-// the value of secret cannot say: `--secret=false` and no flag both leave it
-// false, and only the first is a request for a plain file. set refuses that
-// request for a name the manifest declares sensitive, and the way to keep an
-// undeclared connection or Airflow variable out of the vault; see routeSet.
+// plain is --plain, or the deprecated spelling --secret=false. secret is not a
+// flag: it is the store an act resolved to, the vault when true, which only a
+// project scope can leave false.
 type scopeFlags struct {
-	project     bool
-	global      bool
-	secret      bool
-	secretGiven bool
+	project bool
+	global  bool
+	plain   bool
+	secret  bool
+	// legacySecret is the deprecated --secret, read through readStoreFlags.
+	legacySecret bool
+}
+
+// addStoreFlags registers --plain with help, and the deprecated --secret.
+func addStoreFlags(cmd *cobra.Command, scope *scopeFlags, plainHelp string) {
+	cmd.Flags().BoolVar(&scope.plain, "plain", false, plainHelp)
+	cmd.Flags().BoolVar(&scope.legacySecret, "secret", false, "Deprecated: the vault is the default")
+	_ = cmd.Flags().MarkDeprecated("secret", legacySecretUsage) //nolint:errcheck // the flag was just registered
+}
+
+// readStoreFlags folds the deprecated --secret into --plain. --secret is the
+// default and changes nothing; --secret=false, which used to mean a plain
+// file, still does, so a script written for it keeps its meaning. --plain with
+// --secret asks for both stores at once and is refused.
+func readStoreFlags(cmd *cobra.Command, scope *scopeFlags) error {
+	if !cmd.Flags().Changed("secret") {
+		return nil
+	}
+	if scope.legacySecret && scope.plain {
+		return errors.New("--plain and --secret cannot be used together: the vault is the default, and --plain opts out of it")
+	}
+	if !scope.legacySecret {
+		scope.plain = true
+	}
+	return nil
 }
 
 // valueStore is the one store a set/get/delete acts on: a plain dotenv file or
-// the vault shared with Astro Desktop. --secret picks which.
+// the vault shared with Astro Desktop.
 //
 // The two already had the same three operations with the same signatures, which
 // is not a coincidence — the vault writer was built to mirror the file store,
-// so that `--secret` changes where a value goes and nothing else about how the
+// so that `--plain` changes where a value goes and nothing else about how the
 // command behaves or what it reports.
 type valueStore interface {
 	Set(kind localenv.Kind, name, value string) (string, error)
@@ -98,6 +128,8 @@ type setInput struct {
 	// everywhere creates a new global vault entry reaching every project
 	// instead of none.
 	everywhere bool
+	// replaceSecret lets a --plain set overwrite a value stored encrypted.
+	replaceSecret bool
 }
 
 // newEnvCmd builds the `astro local env` tree. The three kinds — environment
@@ -118,8 +150,10 @@ func newEnvCmd(c *cli) *cobra.Command {
 		// the files' 0600 mode is in docs/v2-secrets.md.
 		Long: "Manage environment values for local Airflow: environment variables,\n" +
 			"connections, and Airflow variables.\n\n" +
-			"Values live in the project's .env, or ~/.astro/env with --global. Pass --secret\n" +
-			"to use the encrypted vault instead.\n\n" +
+			"Values are stored in the encrypted vault, for the project or with --global for\n" +
+			"every project. Pass --plain to store one unencrypted: in the project's .env,\n" +
+			"or for a global, in the vault without encryption. ~/.astro/env is still read,\n" +
+			"but no longer written.\n\n" +
 			"At start, each value comes from the first of: project .env, shell env, project\n" +
 			"vault, global vault, ~/.astro/env, the linked workspace's Environment Manager,\n" +
 			"a declaration's default. Every source reaches Airflow whole, declared or not.\n" +
@@ -128,8 +162,8 @@ func newEnvCmd(c *cli) *cobra.Command {
 		RunE:                       helpOrUnknownSubcommand,
 		SuggestionsMinimumDistance: 2,
 	}
-	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's .env (the default inside a project)")
-	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global ~/.astro/env (the default outside a project)")
+	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's values (the default inside a project)")
+	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global values every linked project gets (the default outside a project)")
 	for _, k := range envKinds() {
 		cmd.AddCommand(newEnvKindCmd(c, scope, k))
 	}
@@ -232,9 +266,9 @@ func envKinds() []envKind {
   # set a variable (prompts for the value, echo off)
   astro local env variable set API_TOKEN
 
-  # read the value from a pipe, or keep it in the encrypted vault
+  # read the value from a pipe, or keep a non-secret one unencrypted in .env
   echo "$TOKEN" | astro local env variable set API_TOKEN --stdin
-  astro local env variable set API_TOKEN --secret
+  astro local env variable set LOG_LEVEL --value debug --plain
 
   # show, list and delete
   astro local env variable get API_TOKEN
@@ -329,15 +363,14 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	fields := &connFields{}
 	long := "Set " + k.article + " " + k.label + ", creating it if it does not exist.\n\n" +
 		"The value comes from a prompt with echo off, --stdin, or --value; never a bare\n" +
-		"argument, which would land in shell history. --secret stores it in the\n" +
-		"encrypted vault, which needs an OS keyring.\n\n" +
-		"Connections and Airflow variables go to the vault by default; --secret=false\n" +
-		"keeps one in a plain file. An environment variable goes to the vault when\n" +
-		"the project's pyproject.toml declares it sensitive. --secret=false is refused\n" +
-		"for a declared-sensitive name.\n\n" +
-		"A new global in the vault reaches no project until you link it with\n" +
-		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --everywhere creates it\n" +
-		"reaching every project instead. Updating an existing global keeps its links.\n" +
+		"argument, which would land in shell history.\n\n" +
+		"The value is stored in the encrypted vault, which needs an OS keyring. --plain\n" +
+		"stores it unencrypted instead and needs none: a project value in the project's\n" +
+		".env, a global in the vault, marked plain. --plain is refused for a name the\n" +
+		"project's pyproject.toml declares sensitive.\n\n" +
+		"A new global reaches no project until you link it with\n" +
+		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --auto-link creates it\n" +
+		"auto-linked to every project instead. Updating an existing global keeps its links.\n" +
 		"A global goes to the Airflow of every project it reaches, whether or not the\n" +
 		"project declares it."
 	if k.kind == localenv.KindConn {
@@ -350,7 +383,9 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Long:  long,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			scope.secretGiven = cmd.Flags().Changed("secret")
+			if err := readStoreFlags(cmd, scope); err != nil {
+				return err
+			}
 			// The route is decided before the value is read, so a save the
 			// manifest will refuse fails before prompting for a credential.
 			route, err := c.routeSet(scope, k.kind, args[0])
@@ -361,12 +396,13 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return c.runEnvSet(route, k.kind, args[0], value, in.everywhere)
+			return c.runEnvSet(route, k.kind, args[0], value, in.everywhere, in.replaceSecret)
 		},
 	}
-	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
+	addStoreFlags(cmd, scope, plainSetHelp)
 	cmd.Flags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
-	cmd.Flags().BoolVar(&in.everywhere, "everywhere", false, "With --global, create a new vault entry reaching every project instead of none")
+	cmd.Flags().BoolVar(&in.replaceSecret, "replace-secret", false, "With --plain, overwrite a value stored encrypted with a plain one")
+	cmd.Flags().BoolVar(&in.everywhere, "auto-link", false, "With --global, create a new global auto-linked to every project instead of linked to none")
 	valueHelp := "The value; omit it to be prompted with echo off, or use --stdin"
 	if k.kind == localenv.KindConn {
 		valueHelp = "The whole connection as a URI or JSON; omit it to be prompted, or use --stdin"
@@ -469,11 +505,13 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Short: "Show " + k.article + " " + k.label + " and where it resolves from",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			scope.secretGiven = cmd.Flags().Changed("secret")
+			if err := readStoreFlags(cmd, scope); err != nil {
+				return err
+			}
 			return c.runEnvGet(scope, k.kind, args[0])
 		},
 	}
-	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
+	addStoreFlags(cmd, scope, plainNarrowHelp)
 	return cmd
 }
 
@@ -492,11 +530,13 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"and refuses outside a project.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			scope.secretGiven = cmd.Flags().Changed("secret")
+			if err := readStoreFlags(cmd, scope); err != nil {
+				return err
+			}
 			return c.runEnvDelete(scope, k.kind, args[0], undeclare)
 		},
 	}
-	cmd.Flags().BoolVar(&scope.secret, "secret", false, vaultFlagHelp)
+	addStoreFlags(cmd, scope, plainNarrowHelp)
 	cmd.Flags().BoolVar(&undeclare, "undeclare", false, "Also remove the name's declaration from the current project's pyproject.toml")
 	return cmd
 }
@@ -566,157 +606,108 @@ type envValue struct {
 	Reach *reachJSON `json:"reach,omitempty"`
 }
 
-// envRoute is the store choice a set acts on once the defaults and the manifest
-// have had their say: the flags as given, or the flags with the vault chosen.
-type envRoute struct {
-	scope *scopeFlags
-	// vaultedBecause says why the vault was chosen without --secret, as a
-	// clause for the messages ("is declared sensitive in <file>"), and is empty
-	// when the flags alone chose the store.
-	vaultedBecause string
-	// declared is true when that reason is a declaration, which --secret=false
-	// cannot override, rather than the default for the kind, which it can.
-	declared bool
-}
-
-// vaultsByDefault reports whether a kind goes to the vault when set without
-// --secret. Connections and Airflow variables do, whether or not the manifest
-// declares them, as they do in Astro Desktop: both routinely carry credentials,
-// and nothing outside Airflow reads them. A plain environment variable stays in
-// the .env file unless it is declared sensitive, since most are not secrets and
-// other tools read that file.
-func vaultsByDefault(kind localenv.Kind) bool {
-	return kind == localenv.KindConn || kind == localenv.KindVar
-}
-
-// routeSet decides the store for a set of one name:
+// routeSet decides the store for a set of one name. The vault, unless --plain
+// asks otherwise; then the project's .env in a project scope, and the vault,
+// marked plain, for a global (see envStore).
 //
-//   - --secret: the vault, and the manifest is not read, since no declaration
-//     makes the vault more secret.
-//   - A connection or Airflow variable with no --secret flag: the vault, by
-//     default. The manifest is not read for this either.
-//   - A name the project's manifest declares sensitive: the vault, and
-//     --secret=false is refused. That flag is an explicit request for the
-//     plaintext file the declaration rules out. Declared connections count,
-//     because envschema makes every one of them sensitive.
-//   - Anything else, including an undeclared connection or Airflow variable
-//     with --secret=false, the escape hatch where there is no keyring: the
-//     plain file.
+// --plain is refused for a name the project's manifest declares sensitive,
+// since the declaration rules out the unencrypted copy it asks for. Declared
+// connections count, because envschema makes every one of them sensitive. The
+// manifest is read only for --plain: no declaration makes the vault more
+// secret.
 //
-// Where the answer depends on the declarations and they do not read, the set is
-// refused rather than guessing. Treating an unreadable manifest as "nothing is
-// sensitive" decides the question from an answer that does not give it, and
-// the result is a declared credential in a plaintext file. `astro local start`
-// refuses the same project, so declining the save until it is fixed is the
-// smaller surprise. Outside a project there is no manifest to consult.
-func (c *cli) routeSet(scope *scopeFlags, kind localenv.Kind, name string) (envRoute, error) {
-	route := envRoute{scope: scope}
-	if scope.secret {
-		return route, nil
-	}
-	if vaultsByDefault(kind) && !scope.secretGiven {
-		return vaultRoute(scope, "is "+kindPhrase(kind)+", and those are stored in the vault by default", false), nil
+// Where the answer depends on the declarations and they do not read, a --plain
+// set is refused rather than guessing. Treating an unreadable manifest as
+// "nothing is sensitive" decides the question from an answer that does not
+// give it, and the result is a declared credential unencrypted. `astro local
+// start` refuses the same project, so declining the save until it is fixed is
+// the smaller surprise. Outside a project there is no manifest to consult.
+func (c *cli) routeSet(scope *scopeFlags, kind localenv.Kind, name string) (*scopeFlags, error) {
+	route := *scope
+	route.secret = !scope.plain
+	if !scope.plain {
+		return &route, nil
 	}
 	projectDir, err := c.discoverProject()
 	if err != nil {
-		return route, nil //nolint:nilerr // outside a project there are no declarations; envStore reports a --project that needed one
+		return &route, nil //nolint:nilerr // outside a project there are no declarations; envStore reports a --project that needed one
 	}
 	manifestPath := filepath.Join(projectDir, project.Marker)
 	_, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
-		return route, fmt.Errorf("cannot tell whether %s declares %s sensitive: %w", manifestPath, name, err)
+		return nil, fmt.Errorf("cannot tell whether %s declares %s sensitive, so --plain is refused: %w", manifestPath, name, err)
 	}
-	spec, ok := declaredSpec(schema, kind, name)
-	if !ok || !spec.Sensitive {
-		return route, nil
+	if spec, ok := declaredSpec(schema, kind, name); ok && spec.Sensitive {
+		return nil, plaintextRefusal(kind, name, manifestPath)
 	}
-	if scope.secretGiven {
-		return route, plaintextRefusal(kind, name, manifestPath)
-	}
-	return vaultRoute(scope, "is declared sensitive in "+manifestPath, true), nil
+	return &route, nil
 }
 
-func vaultRoute(scope *scopeFlags, because string, declared bool) envRoute {
-	vaulted := *scope
-	vaulted.secret = true
-	return envRoute{scope: &vaulted, vaultedBecause: because, declared: declared}
-}
-
-// kindPhrase names a vault-by-default kind with its article, for a sentence
-// about one name.
-func kindPhrase(kind localenv.Kind) string {
-	if kind == localenv.KindConn {
-		return "a connection"
-	}
-	return "an Airflow variable"
-}
-
-// plaintextRefusal is the error for `set --secret=false` on a declared-sensitive
+// plaintextRefusal is the error for `set --plain` on a declared-sensitive
 // name. A connection cannot be declared otherwise, so its message does not
 // offer the edit that would allow it.
 func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
 	if kind == localenv.KindConn {
 		return fmt.Errorf("connection %s is declared in %s, and a declared connection is always sensitive, "+
-			"so it can only be stored in the encrypted vault. Drop --secret=false to store it there",
+			"so it can only be stored encrypted. Drop --plain to store it in the vault",
 			name, manifestPath)
 	}
-	return fmt.Errorf("%s %s is declared sensitive in %s, so it can only be stored in the encrypted vault. "+
-		"Drop --secret=false to store it there, or remove `sensitive = true` from its declaration to keep it in a plain file",
+	return fmt.Errorf("%s %s is declared sensitive in %s, so it can only be stored encrypted. "+
+		"Drop --plain to store it in the vault, or remove `sensitive = true` from its declaration to store it unencrypted",
 		localenv.Noun(kind), name, manifestPath)
 }
 
-func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string, everywhere bool) error {
+func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value string, everywhere, replaceSecret bool) error {
 	r, err := c.renderer()
 	if err != nil {
 		return err
 	}
-	store, projectDir, err := c.envStore(route.scope)
+	store, projectDir, err := c.envStore(route)
 	if err != nil {
 		return err
 	}
-	if err := refusePinnedToPlain(store, kind, name); err != nil {
+	if err := c.checkPlainOverwrite(route, store, kind, name, replaceSecret); err != nil {
 		return err
 	}
 	globalVault, isGlobalVault := store.(*vaultenv.Writer)
 	isGlobalVault = isGlobalVault && store.ScopeName() == vaultenv.SourceGlobal
 	if everywhere && !isGlobalVault {
-		return errors.New("--everywhere applies to a global in the vault: pass --global, and drop --secret=false")
+		return errors.New("--auto-link applies to a global: pass --global")
 	}
-	created := false
+	created, inLegacy := false, false
 	if isGlobalVault {
 		had, herr := store.Has(kind, name)
 		if herr != nil {
 			return herr
 		}
 		created = !had
-		globalVault.NewEverywhere = everywhere
-		// A value moving in from ~/.astro/env is not new: it already reached
-		// every project, and the plain copy is about to be
-		// removed, so seeding an empty row would take it away from all of
-		// them. It moves in with no row.
-		if created && plainGlobalHas(kind, name) {
+		globalVault.NewAutoLink = everywhere
+		// A value moving in from ~/.astro/env is not new: that copy reaches
+		// every project, and seeding an empty row would take the value away
+		// from all of them the moment the vault copy starts to win. It moves
+		// in reaching every project, as it did.
+		inLegacy = legacyGlobalHas(kind, name)
+		if created && inLegacy {
 			created = false
-			globalVault.NewEverywhere = true
+			globalVault.NewAutoLink = true
 		}
 	}
 	if _, err := store.Set(kind, name, value); err != nil {
-		switch {
-		case route.declared:
-			return fmt.Errorf("%s %s %s, so it is stored only in the vault: %w",
-				localenv.Noun(kind), name, route.vaultedBecause, err)
-		case route.vaultedBecause != "":
-			return fmt.Errorf("%s %s %s: %w", localenv.Noun(kind), name, route.vaultedBecause, err)
+		return err
+	}
+	if !isGlobalVault {
+		if err := c.removeOtherCopy(route, kind, name); err != nil {
+			return err
 		}
-		return err
 	}
-	if route.declared {
-		fmt.Fprintf(c.d.Stderr, "note: %s %s, so it was stored in the vault\n", name, route.vaultedBecause)
+	if inLegacy {
+		if path, err := localenv.GlobalEnvPath(); err == nil {
+			fmt.Fprintf(c.d.Stderr, "note: %s also has a line for %s, which the value just set now outranks. "+
+				"%s is read but no longer written, so remove that line by hand\n", path, name, path)
+		}
 	}
-	if err := c.removeOtherCopy(route.scope, kind, name); err != nil {
-		return err
-	}
-	if route.scope.global {
-		if !c.warnProjectShadows(route.scope, kind, name) {
+	if route.global {
+		if !c.warnProjectShadows(route, kind, name) {
 			c.noteUndeclaredGlobal(kind, name)
 		}
 	}
@@ -729,10 +720,10 @@ func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string, 
 	}
 	switch {
 	case created && !everywhere:
-		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with `%s`, or re-run with --everywhere.\n",
+		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with `%s`, or re-run with --auto-link.\n",
 			name, localenv.LinkHint(kind, name))
 	case !created && everywhere:
-		fmt.Fprintf(c.d.Stderr, "note: %s already existed, so its links were kept; to reach every project run: %s --everywhere\n",
+		fmt.Fprintf(c.d.Stderr, "note: %s already existed, so its links were kept; to auto-link it to every project run: %s --auto-link\n",
 			name, localenv.LinkHint(kind, name))
 	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
@@ -742,8 +733,51 @@ func (c *cli) runEnvSet(route envRoute, kind localenv.Kind, name, value string, 
 	})
 }
 
-// removeOtherCopy deletes the name from the store a set did not write, in the
-// same scope, so each name has one home per scope. Two copies are worse than
+// checkPlainOverwrite applies --replace-secret: it is only meaningful with
+// --plain, and without it a --plain set may not replace an encrypted value.
+func (c *cli) checkPlainOverwrite(route *scopeFlags, store valueStore, kind localenv.Kind, name string, replaceSecret bool) error {
+	switch {
+	case replaceSecret && !route.plain:
+		return errors.New("--replace-secret applies to a --plain set, which is the only one that can replace an encrypted value")
+	case route.plain && !replaceSecret:
+		return c.refuseDowngrade(route, store, kind, name)
+	}
+	return nil
+}
+
+// refuseDowngrade refuses a --plain set that would replace a value the scope's
+// vault holds encrypted: in place for a global, or by removing the project
+// vault's copy for a project. Turning a secret into cleartext is a choice the
+// user makes with --replace-secret, not a side effect of --plain. It reads the
+// vault index only, so it needs no keyring; a vault that cannot be opened
+// holds nothing to replace.
+func (c *cli) refuseDowngrade(route *scopeFlags, store valueStore, kind localenv.Kind, name string) error {
+	vault, ok := store.(*vaultenv.Writer)
+	if !ok {
+		vaultScope := *route
+		vaultScope.secret = true
+		other, _, err := c.envStore(&vaultScope)
+		if err != nil {
+			return nil //nolint:nilerr // no vault, so no encrypted value to replace
+		}
+		if vault, ok = other.(*vaultenv.Writer); !ok {
+			return nil
+		}
+	}
+	encrypted, err := vault.HoldsEncrypted(kind, name)
+	if err != nil {
+		return err
+	}
+	if encrypted {
+		return fmt.Errorf("%s %s is stored encrypted in %s; delete it first, or pass --replace-secret to store it as plain text",
+			localenv.Noun(kind), name, vault.ScopeName())
+	}
+	return nil
+}
+
+// removeOtherCopy deletes the name from the project store a set did not write,
+// so each name has one home per scope. A global has one store, the vault, so
+// it has no other copy to remove. Two copies are worse than
 // untidy: the project .env outranks the vault, so a plaintext copy left beside a
 // vaulted value keeps winning at start and keeps the credential in a file, and a
 // delete against one store leaves the other copy standing. Astro Desktop's
@@ -783,7 +817,7 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 	warned := false
 	for _, secret := range []bool{false, true} {
 		projScope := *scope
-		projScope.global, projScope.project, projScope.secret = false, true, secret
+		projScope.global, projScope.project, projScope.secret, projScope.plain = false, true, secret, false
 		st, _, err := c.envStore(&projScope)
 		if err != nil {
 			continue
@@ -791,14 +825,10 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 		if ok, err := st.Has(kind, name); err != nil || !ok {
 			continue
 		}
-		flag := "--secret=false"
-		if secret {
-			flag = "--secret"
-		}
 		fmt.Fprintf(c.d.Stderr,
 			"warning: %s is also set in %s (%s), which outranks the global value for this project, so start uses that copy. "+
-				"Remove it with: astro local env %s delete %s --project %s\n",
-			name, st.ScopeName(), st.Location(), localenv.Noun(kind), name, flag)
+				"Remove it with: astro local env %s delete %s --project\n",
+			name, st.ScopeName(), st.Location(), localenv.Noun(kind), name)
 		warned = true
 	}
 	return warned
@@ -836,16 +866,15 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 	}
 	// A scope or store flag reads that scope; no flag resolves the whole chain
 	// and reports the winning source.
-	if scope.project || scope.global || scope.secretGiven {
+	if scope.project || scope.global || scope.plain {
 		return c.getScoped(r, scope, kind, name)
 	}
 	return c.getResolved(r, kind, name)
 }
 
-// getScoped reads one scope. --secret reads only its vault and --secret=false
-// only its plain file. With neither, it reads both, since set files a value in
-// whichever one its routing picked and delete clears both: a get that looked in
-// one store would miss what the same flags just set.
+// getScoped reads one scope. In a project it reads the .env and the project
+// vault, or with --plain the .env alone; a global, the global vault and then
+// the read-only ~/.astro/env.
 //
 // set keeps one copy per scope, so at most one store should answer. If both
 // do, the one the resolution chain would use wins, the order being the chain's
@@ -853,21 +882,9 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 // vault outranks ~/.astro/env. A note on stderr names the other copy. The
 // manifest is not read.
 func (c *cli) getScoped(r Renderer, scope *scopeFlags, kind localenv.Kind, name string) error {
-	store, _, err := c.envStore(scope)
+	stores, err := c.scopeStores(scope)
 	if err != nil {
 		return err
-	}
-	stores := []valueStore{store}
-	if !scope.secretGiven {
-		vaultScope := *scope
-		vaultScope.secret = true
-		if vault, _, verr := c.envStore(&vaultScope); verr == nil {
-			if string(vault.ScopeName()) == vaultenv.SourceGlobal {
-				stores = []valueStore{vault, store}
-			} else {
-				stores = append(stores, vault)
-			}
-		}
 	}
 	var winner valueStore
 	for _, st := range stores {
@@ -1039,16 +1056,17 @@ func (c *cli) emitValue(r Renderer, v envValue) error {
 	})
 }
 
-// runEnvDelete removes a name from the scope. With no --secret flag it clears
-// both stores, the plain file and the vault, as Astro Desktop's delete does:
-// set keeps one copy per scope, so "delete this name" means wherever it is, and
-// a copy that got into the other store by hand or before the routing changed is
-// the one a delete of a credential most needs to catch. --secret deletes only
-// the vault copy, and --secret=false only the plaintext one, which is how a stale
-// plaintext copy of a sensitive name is removed on its own.
+// runEnvDelete removes a name from the scope. In a project it clears both
+// stores, the .env and the project vault, as Astro Desktop's delete does: set
+// keeps one copy per scope, so "delete this name" means wherever it is, and a
+// copy that got into the other store by hand or before the routing changed is
+// the one a delete of a credential most needs to catch. --plain deletes only
+// the .env copy, which is how a stale plaintext copy of a sensitive name is
+// removed on its own. A global is deleted from the vault; ~/.astro/env is read
+// only, so a name only that file holds is refused with the line to remove.
 //
-// Removing a vault entry deletes its file and needs no keyring, so the no-flag
-// form works where there is none.
+// Removing a vault entry deletes its file and needs no keyring, so delete works
+// where there is none.
 //
 // The value is all it removes: a declaration of the name stays, and the result
 // says what it leaves (see deleteRemainder). undeclare also removes the
@@ -1101,7 +1119,10 @@ func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (v
 	if err != nil {
 		return nil, err
 	}
-	if scope.secretGiven {
+	if store.ScopeName() == vaultenv.SourceGlobal {
+		return c.deleteGlobal(store, kind, name)
+	}
+	if scope.plain {
 		ok, err := c.deleteKeepingRow(store, kind, name)
 		if err != nil {
 			return nil, err
@@ -1145,6 +1166,66 @@ func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (v
 	return store, nil
 }
 
+// deleteGlobal removes a global from the vault. ~/.astro/env is never edited:
+// a name only that file holds is refused with the line to remove, and one both
+// hold is deleted from the vault with a note that the file's line now applies.
+func (c *cli) deleteGlobal(vault valueStore, kind localenv.Kind, name string) (valueStore, error) {
+	removed, err := c.deleteKeepingRow(vault, kind, name)
+	if err != nil {
+		return nil, err
+	}
+	legacyPath, _ := localenv.GlobalEnvPath() //nolint:errcheck // with no home there is no file to name, and legacyGlobalHas is false
+	inLegacy := legacyGlobalHas(kind, name)
+	switch {
+	case !removed && inLegacy:
+		key, _ := localenv.EnvKeyFor(kind, name)
+		return nil, fmt.Errorf("%s %s is set only in %s, which is read but no longer written, so nothing was deleted. "+
+			"Remove its line (%s=...) from that file by hand", localenv.Noun(kind), name, legacyPath, key)
+	case !removed:
+		return nil, fmt.Errorf("%s %q is %w in %s", localenv.Noun(kind), name, errValueNotSet, vault.ScopeName())
+	case inLegacy:
+		fmt.Fprintf(c.d.Stderr, "note: %s also has a line for %s, which applies now that the vault copy is gone. "+
+			"That file is read but no longer written, so remove the line by hand\n", legacyPath, name)
+	}
+	return vault, nil
+}
+
+// legacyGlobalHas reports whether ~/.astro/env holds (kind, name), matched on
+// the env key as the file store matches. An unreadable file holds nothing.
+func legacyGlobalHas(kind localenv.Kind, name string) bool {
+	gs, err := localenv.GlobalStore()
+	if err != nil {
+		return false
+	}
+	_, ok, err := gs.Get(kind, name)
+	return err == nil && ok
+}
+
+// scopeStores is every store a read of the scope looks in, in the order the
+// resolution chain ranks them: see getScoped.
+func (c *cli) scopeStores(scope *scopeFlags) ([]valueStore, error) {
+	store, _, err := c.envStore(scope)
+	if err != nil {
+		return nil, err
+	}
+	if store.ScopeName() == vaultenv.SourceGlobal {
+		stores := []valueStore{store}
+		if gs, gerr := localenv.GlobalStore(); gerr == nil {
+			stores = append(stores, fileStore{gs})
+		}
+		return stores, nil
+	}
+	stores := []valueStore{store}
+	if !scope.plain {
+		vaultScope := *scope
+		vaultScope.secret = true
+		if vault, _, verr := c.envStore(&vaultScope); verr == nil {
+			stores = append(stores, vault)
+		}
+	}
+	return stores, nil
+}
+
 // deleteKeepingRow is store.Delete, with a global's link row that could not be
 // removed after its value was reported as a warning rather than a failure: the
 // value is gone, and the row left behind only narrows what a re-created entry
@@ -1152,7 +1233,7 @@ func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (v
 func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string) (bool, error) {
 	ok, err := store.Delete(kind, name)
 	if errors.Is(err, vaultenv.ErrLinkRowKept) {
-		fmt.Fprintf(c.d.Stderr, "warning: deleted %s %s, but %v. A new global of this name would reach only the projects that row names; once the index is usable, clear it with: %s --everywhere\n",
+		fmt.Fprintf(c.d.Stderr, "warning: deleted %s %s, but %v. A new global of this name would reach only the projects that row names; once the index is usable, clear it with: %s --auto-link\n",
 			localenv.Noun(kind), name, err, localenv.LinkHint(kind, name))
 		return ok, nil
 	}
@@ -1355,6 +1436,12 @@ func listNote(it *localenv.ListItem) string {
 			note += "; remove: " + it.RemoveHint
 		}
 	}
+	if it.MoveHint != "" {
+		if note != "" {
+			note += "; "
+		}
+		note += "from ~/.astro/env, which is read only: move it with " + it.MoveHint + ", then remove the line by hand"
+	}
 	return note
 }
 
@@ -1362,10 +1449,11 @@ func listNote(it *localenv.ListItem) string {
 // returning it and the project dir (empty for global scope with no project).
 //
 // Two independent choices. The scope: --project outside a project is an error;
-// the default is project inside one, global otherwise. And the store: --secret
-// selects the shared vault, anything else a plain dotenv file. The scope is
-// decided first and identically for both, so --secret never changes which tier
-// a value belongs to.
+// the default is project inside one, global otherwise. And the store: a global
+// is always the vault, marked plain for --plain, since ~/.astro/env is read
+// only; a project's is the vault when scope.secret is set and the .env
+// otherwise. The scope is decided first and identically for both, so the store
+// never changes which tier a value belongs to.
 func (c *cli) envStore(scope *scopeFlags) (valueStore, string, error) {
 	if scope.project && scope.global {
 		return nil, "", errors.New("--project and --global are mutually exclusive")
@@ -1375,27 +1463,22 @@ func (c *cli) envStore(scope *scopeFlags) (valueStore, string, error) {
 	if scope.project && perr != nil {
 		return nil, "", perr
 	}
-	if scope.secret {
+	if global {
 		// The vault's project tier is keyed by the project path, so a global
 		// write must not pass one.
-		dir := projectDir
-		if global {
-			dir = ""
-		}
-		w, err := vaultenv.NewWriter(dir)
+		w, err := vaultenv.NewWriter("")
 		if err != nil {
 			return nil, "", err
 		}
-		return w, dir, nil
+		w.Plain = scope.plain
+		return w, "", nil
 	}
-	if global {
-		store, err := localenv.GlobalStore()
-		// projectDir is still reported for a --global write inside a project:
-		// the gitignore warning is about the project, not about the file.
-		if scope.global {
-			return fileStore{store}, projectDir, err
+	if scope.secret {
+		w, err := vaultenv.NewWriter(projectDir)
+		if err != nil {
+			return nil, "", err
 		}
-		return fileStore{store}, "", err
+		return w, projectDir, nil
 	}
 	return fileStore{localenv.ProjectStore(projectDir)}, projectDir, nil
 }

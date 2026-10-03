@@ -16,13 +16,13 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env.connections]\ndeclared = {}\n")
 	for _, name := range []string{"db_main", "declared"} {
 		d, _, _ := envDeps(t, dir, "")
-		if err := execute(t, d, "local", "env", "connection", "set", name, "--value", "postgres://u:p@h/db", "--secret"); err != nil {
+		if err := execute(t, d, "local", "env", "connection", "set", name, "--value", "postgres://u:p@h/db"); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "set", "api_token", "--value", "s3cret", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "api_token", "--value", "s3cret"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +46,7 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 	if !got[0].Orphan || got[0].Source != vaultenv.SourceProject || got[0].Kind != localenv.KindConn {
 		t.Errorf("db_main row = %+v, want a conn orphan sourced from the project vault", got[0])
 	}
-	if got[0].RemoveHint != "astro local env connection delete db_main --project --secret" {
+	if got[0].RemoveHint != "astro local env connection delete db_main --project" {
 		t.Errorf("remove hint = %q", got[0].RemoveHint)
 	}
 	if got[0].DeclareHint != "astro local env connection declare db_main" {
@@ -59,13 +59,37 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 		t.Errorf("declared rows = %+v, want one declared row", d)
 	}
 
-	// --project names the dotenv file, so the vault orphan is not in it.
+	// --project covers the project's vault as well as its .env, since a set
+	// stores there by default; --global covers neither.
 	d, out, _ = envDeps(t, dir, "")
 	if err := execute(t, d, "local", "env", "list", "--project", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(out.String(), `"db_main"`) || !strings.Contains(out.String(), `"source":"vault"`) {
+		t.Errorf("list --project left out the project vault:\n%s", out.String())
+	}
+	d, out, _ = envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "--global", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(out.String(), `"db_main"`) {
-		t.Errorf("list --project showed a vault entry:\n%s", out.String())
+		t.Errorf("list --global showed a project vault entry:\n%s", out.String())
+	}
+}
+
+// list --global covers the global vault, where every global is stored now.
+func TestListGlobalShowsTheGlobalVault(t *testing.T) {
+	dir := secretEnvProject(t, "")
+	d, _, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--value", "v", "--global", "--auto-link"); err != nil {
+		t.Fatal(err)
+	}
+	d, out, _ := envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "--global", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"SHARED"`) || !strings.Contains(out.String(), `"source":"`+vaultenv.SourceGlobal+`"`) {
+		t.Errorf("list --global left out the global vault:\n%s", out.String())
 	}
 }
 
@@ -74,7 +98,7 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 func TestListMarksUndeclaredGlobalVaultEntryApplied(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "shared_db", "--value", "postgres://u:p@h/db", "--global", "--everywhere"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "shared_db", "--value", "postgres://u:p@h/db", "--global", "--auto-link"); err != nil {
 		t.Fatal(err)
 	}
 

@@ -39,7 +39,7 @@ func mustRun(t *testing.T, dir string, args ...string) (stdout, stderr string) {
 // project, as a global made before link state existed does.
 func setGlobalConn(t *testing.T, dir, name string) {
 	t.Helper()
-	mustRun(t, dir, "connection", "set", name, "--value", linkTestURI, "--global", "--everywhere")
+	mustRun(t, dir, "connection", "set", name, "--value", linkTestURI, "--global", "--auto-link")
 }
 
 func canonPath(t *testing.T, dir string) string {
@@ -88,7 +88,7 @@ func TestEnvLinkThenGetShowsTheReach(t *testing.T) {
 	setGlobalConn(t, dir, "warehouse")
 
 	v := linkGetJSON(t, dir, "connection", "get", "warehouse")
-	if v.Reach == nil || !v.Reach.Everywhere {
+	if v.Reach == nil || !v.Reach.AutoLink {
 		t.Fatalf("before any link, reach = %+v, want everywhere", v.Reach)
 	}
 
@@ -100,7 +100,7 @@ func TestEnvLinkThenGetShowsTheReach(t *testing.T) {
 
 	v = linkGetJSON(t, dir, "connection", "get", "warehouse")
 	want := reachJSON{Projects: []reachPath{{Path: home, Exists: true}}}
-	if v.Reach == nil || v.Reach.Everywhere || !slices.Equal(v.Reach.Projects, want.Projects) {
+	if v.Reach == nil || v.Reach.AutoLink || !slices.Equal(v.Reach.Projects, want.Projects) {
 		t.Errorf("reach = %+v, want %+v", v.Reach, want)
 	}
 
@@ -118,7 +118,7 @@ func TestEnvLinkThenGetShowsTheReach(t *testing.T) {
 	if err := os.RemoveAll(other); err != nil {
 		t.Fatal(err)
 	}
-	_, stderr = mustRun(t, dir, "connection", "get", "warehouse", "--global", "--secret")
+	_, stderr = mustRun(t, dir, "connection", "get", "warehouse", "--global")
 	if !strings.Contains(stderr, "(missing)") || !strings.Contains(stderr, home) {
 		t.Errorf("a gone path should be marked missing, stderr:\n%s", stderr)
 	}
@@ -137,7 +137,7 @@ func TestEnvLinkFromAWorktreeLinksTheHome(t *testing.T) {
 	l := secretstest.NewLayout(t)
 	wt := l.Dir(secretstest.PlaceCustomWorktree)
 	setGlobalConn(t, wt, "warehouse")
-	mustRun(t, wt, "variable", "set", "SLACK_TOKEN", "--value", "x", "--global", "--secret")
+	mustRun(t, wt, "variable", "set", "SLACK_TOKEN", "--value", "x", "--global")
 
 	mustRun(t, wt, "connection", "link", "warehouse")
 	if got, want := reachOf(t, "conn:global:warehouse").Projects, []string{l.Checkout(secretstest.PlaceMain).Path}; !slices.Equal(got, want) {
@@ -204,7 +204,7 @@ func TestEnvUnlinkToEmptyWarns(t *testing.T) {
 	if !strings.Contains(stderr, "reaches no project") {
 		t.Errorf("unlinking the last project should warn, stderr:\n%s", stderr)
 	}
-	if !strings.Contains(out, "Reach: no project") {
+	if !strings.Contains(out, "Reach: not linked (no project)") {
 		t.Errorf("out:\n%s", out)
 	}
 	if r := reachOf(t, "conn:global:warehouse"); r.Everywhere || len(r.Projects) != 0 {
@@ -212,11 +212,11 @@ func TestEnvUnlinkToEmptyWarns(t *testing.T) {
 	}
 }
 
-func TestEnvUnlinkOnAnEverywhereEntryErrors(t *testing.T) {
+func TestEnvUnlinkOnAnAutoLinkedEntryErrors(t *testing.T) {
 	dir := envProject(t, "")
 	setGlobalConn(t, dir, "warehouse")
 	_, _, err := run(t, dir, "connection", "unlink", "warehouse")
-	if err == nil || !strings.Contains(err.Error(), "reaches every project") || !strings.Contains(err.Error(), "connection link warehouse") {
+	if err == nil || !strings.Contains(err.Error(), "is auto-linked to every project") || !strings.Contains(err.Error(), "connection link warehouse") {
 		t.Fatalf("err = %v, want one naming the link command", err)
 	}
 	if _, statErr := os.Stat(secrets.LinksPath(vaultDir(t))); !os.IsNotExist(statErr) {
@@ -224,12 +224,12 @@ func TestEnvUnlinkOnAnEverywhereEntryErrors(t *testing.T) {
 	}
 }
 
-func TestEnvLinkEverywhereRemovesTheRow(t *testing.T) {
+func TestEnvLinkAutoLinkRemovesTheRow(t *testing.T) {
 	dir := envProject(t, "")
 	setGlobalConn(t, dir, "warehouse")
 	mustRun(t, dir, "connection", "link", "warehouse")
-	out, _ := mustRun(t, dir, "connection", "link", "warehouse", "--everywhere")
-	if !strings.Contains(out, "now reaches every project") {
+	out, _ := mustRun(t, dir, "connection", "link", "warehouse", "--auto-link")
+	if !strings.Contains(out, "is now auto-linked to every project") {
 		t.Errorf("out:\n%s", out)
 	}
 	raw, err := os.ReadFile(secrets.LinksPath(vaultDir(t)))
@@ -237,10 +237,10 @@ func TestEnvLinkEverywhereRemovesTheRow(t *testing.T) {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(raw), "warehouse") {
-		t.Errorf("the row survived --everywhere:\n%s", raw)
+		t.Errorf("the row survived --auto-link:\n%s", raw)
 	}
-	if _, _, err := run(t, dir, "connection", "link", "warehouse", "--everywhere", dir); err == nil {
-		t.Error("--everywhere with a directory should be refused")
+	if _, _, err := run(t, dir, "connection", "link", "warehouse", "--auto-link", dir); err == nil {
+		t.Error("--auto-link with a directory should be refused")
 	}
 }
 
@@ -249,7 +249,7 @@ func TestEnvLinkEverywhereRemovesTheRow(t *testing.T) {
 func TestEnvLinkRefusesAnythingButAGlobalVaultEntry(t *testing.T) {
 	dir := envProject(t, "")
 	mustRun(t, dir, "connection", "set", "local_db", "--value", linkTestURI, "--project")
-	mustRun(t, dir, "variable", "set", "PLAIN", "--value", "x", "--global")
+	writeLegacyGlobal(t, "PLAIN=x\n")
 	setGlobalConn(t, dir, "warehouse")
 
 	for name, tc := range map[string]struct {
@@ -358,10 +358,10 @@ func TestEnvDeleteRemovesTheLinkRow(t *testing.T) {
 		t.Error("another entry's row went with it")
 	}
 
-	// --secret deletes the same way.
-	mustRun(t, dir, "connection", "delete", "kept", "--global", "--secret")
+	// A vault delete works the same way.
+	mustRun(t, dir, "connection", "delete", "kept", "--global")
 	if r := reachOf(t, "conn:global:kept"); !r.Everywhere {
-		t.Errorf("the row survived delete --secret: %+v", r)
+		t.Errorf("the row survived delete: %+v", r)
 	}
 }
 
@@ -375,7 +375,7 @@ func TestEnvDeleteWithAnUnusableIndexKeepsTheRowAndWarns(t *testing.T) {
 	if !strings.Contains(stderr, "link row") {
 		t.Errorf("stderr:\n%s", stderr)
 	}
-	if _, _, err := run(t, dir, "connection", "get", "warehouse", "--global", "--secret"); err == nil {
+	if _, _, err := run(t, dir, "connection", "get", "warehouse", "--global"); err == nil {
 		t.Error("the value survived")
 	}
 }
@@ -401,7 +401,7 @@ func TestEnvLinkRefusesAnUnusableIndex(t *testing.T) {
 
 			for _, args := range [][]string{
 				{"connection", "link", "warehouse"},
-				{"connection", "link", "warehouse", "--everywhere"},
+				{"connection", "link", "warehouse", "--auto-link"},
 				{"connection", "unlink", "warehouse"},
 			} {
 				_, _, err := run(t, dir, args...)
@@ -414,8 +414,8 @@ func TestEnvLinkRefusesAnUnusableIndex(t *testing.T) {
 				t.Errorf("the index was rewritten: %q, %v", raw, err)
 			}
 
-			v := linkGetJSON(t, dir, "connection", "get", "warehouse", "--global", "--secret")
-			if v.Reach == nil || v.Reach.Error == "" || v.Reach.Everywhere {
+			v := linkGetJSON(t, dir, "connection", "get", "warehouse", "--global")
+			if v.Reach == nil || v.Reach.Error == "" || v.Reach.AutoLink {
 				t.Errorf("reach = %+v, want the index error", v.Reach)
 			}
 			out, _ := mustRun(t, dir, "connection", "list", "--all")
@@ -464,7 +464,7 @@ func TestEnvSetOfAnotherSpellingKeepsTheReach(t *testing.T) {
 	if got := reachOf(t, "var:global:region"); !got.Everywhere {
 		t.Errorf("the replaced spelling's row survived: %+v", got)
 	}
-	if v := linkGetJSON(t, dir, "airflow-variable", "get", "REGION", "--global", "--secret"); v.Value != "eu" || v.Reach == nil || v.Reach.Everywhere {
+	if v := linkGetJSON(t, dir, "airflow-variable", "get", "REGION", "--global"); v.Value != "eu" || v.Reach == nil || v.Reach.AutoLink {
 		t.Errorf("get = %+v", v)
 	}
 }
@@ -479,27 +479,24 @@ func TestEnvSetOfAnotherSpellingRefusesAnUnusableIndex(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "links.idx") {
 		t.Fatalf("err = %v, want a refusal naming the index", err)
 	}
-	if v := linkGetJSON(t, dir, "airflow-variable", "get", "region", "--global", "--secret"); v.Value != "us" {
+	if v := linkGetJSON(t, dir, "airflow-variable", "get", "region", "--global"); v.Value != "us" {
 		t.Errorf("the refused set changed the value: %+v", v)
 	}
 }
 
-// Moving a pinned global out of the vault into ~/.astro/env, which has no
-// links, would widen it; refused.
-func TestEnvPlainSetOfAPinnedGlobalIsRefused(t *testing.T) {
+// A plain global stays in the vault, so making a pinned global plain keeps its
+// pin: nothing widens, and the value still resolves where it is linked.
+func TestEnvPlainSetOfAPinnedGlobalKeepsThePin(t *testing.T) {
 	dir := envProject(t, "")
-	mustRun(t, dir, "variable", "set", "TOKEN", "--value", "x", "--global", "--secret")
+	mustRun(t, dir, "variable", "set", "TOKEN", "--value", "x", "--global")
 	mustRun(t, dir, "variable", "link", "TOKEN")
-	_, _, err := run(t, dir, "variable", "set", "TOKEN", "--value", "y", "--global", "--secret=false")
-	if err == nil || !strings.Contains(err.Error(), "has no links") {
-		t.Fatalf("err = %v, want a refusal", err)
+	mustRun(t, dir, "variable", "set", "TOKEN", "--value", "y", "--global", "--plain", "--replace-secret")
+	if got := reachOf(t, "env:global:TOKEN"); got.Everywhere || len(got.Projects) != 1 {
+		t.Errorf("reach = %+v, want the pin kept", got)
 	}
-	if got := reachOf(t, "env:global:TOKEN"); got.Everywhere {
-		t.Error("the refused set dropped the pin")
+	if v := linkGetJSON(t, dir, "variable", "get", "TOKEN"); v.Value != "y" || v.Source != vaultenv.SourceGlobal {
+		t.Errorf("get = %+v, want the plain global where it is linked", v)
 	}
-	// Once it reaches every project there is nothing to widen.
-	mustRun(t, dir, "variable", "link", "TOKEN", "--everywhere")
-	mustRun(t, dir, "variable", "set", "TOKEN", "--value", "y", "--global", "--secret=false")
 }
 
 // A new global starts out reaching no project: an empty row, written with the
@@ -508,7 +505,7 @@ func TestEnvPlainSetOfAPinnedGlobalIsRefused(t *testing.T) {
 func TestEnvSetGlobalCreatesItUnlinked(t *testing.T) {
 	dir := envProject(t, "")
 	_, stderr := mustRun(t, dir, "connection", "set", "warehouse", "--value", linkTestURI, "--global")
-	if !strings.Contains(stderr, "warehouse reaches no project yet. Link it with `astro local env connection link warehouse`, or re-run with --everywhere.") {
+	if !strings.Contains(stderr, "warehouse reaches no project yet. Link it with `astro local env connection link warehouse`, or re-run with --auto-link.") {
 		t.Errorf("stderr:\n%s", stderr)
 	}
 	if r := reachOf(t, "conn:global:warehouse"); r.Everywhere || len(r.Projects) != 0 {
@@ -533,31 +530,31 @@ func TestEnvSetGlobalCreatesItUnlinked(t *testing.T) {
 	}
 }
 
-// --everywhere creates it with no row; updating an existing global, with or
+// --auto-link creates it with no row; updating an existing global, with or
 // without the flag, never touches its row.
 func TestEnvSetGlobalEverywhereAndUpdatesKeepTheRow(t *testing.T) {
 	dir := envProject(t, "")
-	mustRun(t, dir, "connection", "set", "open", "--value", linkTestURI, "--global", "--everywhere")
+	mustRun(t, dir, "connection", "set", "open", "--value", linkTestURI, "--global", "--auto-link")
 	if r := reachOf(t, "conn:global:open"); !r.Everywhere {
-		t.Errorf("--everywhere wrote a row: %+v", r)
+		t.Errorf("--auto-link wrote a row: %+v", r)
 	}
 	// An existing no-row global stays reaching every project on update.
 	mustRun(t, dir, "connection", "set", "open", "--value", linkTestURI+"2", "--global")
 	if r := reachOf(t, "conn:global:open"); !r.Everywhere {
 		t.Errorf("an update narrowed an everywhere global: %+v", r)
 	}
-	// And an existing pinned one keeps its pin, --everywhere or not.
+	// And an existing pinned one keeps its pin, --auto-link or not.
 	mustRun(t, dir, "connection", "set", "pinned", "--value", linkTestURI, "--global")
 	mustRun(t, dir, "connection", "link", "pinned")
-	_, stderr := mustRun(t, dir, "connection", "set", "pinned", "--value", linkTestURI+"2", "--global", "--everywhere")
+	_, stderr := mustRun(t, dir, "connection", "set", "pinned", "--value", linkTestURI+"2", "--global", "--auto-link")
 	if r := reachOf(t, "conn:global:pinned"); r.Everywhere || len(r.Projects) != 1 {
 		t.Errorf("an update changed the row: %+v", r)
 	}
 	if !strings.Contains(stderr, "links were kept") {
 		t.Errorf("stderr:\n%s", stderr)
 	}
-	if _, _, err := run(t, dir, "connection", "set", "p", "--value", linkTestURI, "--project", "--everywhere"); err == nil {
-		t.Error("--everywhere on a project secret should be refused")
+	if _, _, err := run(t, dir, "connection", "set", "p", "--value", linkTestURI, "--project", "--auto-link"); err == nil {
+		t.Error("--auto-link on a project secret should be refused")
 	}
 }
 
@@ -570,7 +567,7 @@ func TestEnvSetGlobalRefusesAnUnusableIndex(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "links.idx") {
 		t.Fatalf("err = %v, want a refusal naming the index", err)
 	}
-	if _, _, err := run(t, dir, "connection", "get", "warehouse", "--global", "--secret"); err == nil {
+	if _, _, err := run(t, dir, "connection", "get", "warehouse", "--global"); err == nil {
 		t.Error("the refused create stored a value")
 	}
 }
@@ -578,10 +575,10 @@ func TestEnvSetGlobalRefusesAnUnusableIndex(t *testing.T) {
 // A global moving into the vault from ~/.astro/env is not new: it reached
 // every project that declares it, so it moves in with no row and no hint,
 // and a declaring project still gets it.
-func TestEnvSetSecretOfAPlainGlobalKeepsItsReach(t *testing.T) {
+func TestEnvSetGlobalOfALegacyFileEntryKeepsItsReach(t *testing.T) {
 	dir := envProject(t, "[tool.astro.env]\nTOKEN = {}\n")
-	mustRun(t, dir, "variable", "set", "TOKEN", "--value", "x", "--global")
-	_, stderr := mustRun(t, dir, "variable", "set", "TOKEN", "--value", "y", "--global", "--secret")
+	writeLegacyGlobal(t, "TOKEN=x\n")
+	_, stderr := mustRun(t, dir, "variable", "set", "TOKEN", "--value", "y", "--global")
 	if strings.Contains(stderr, "reaches no project") {
 		t.Errorf("a moved value got the new-global hint:\n%s", stderr)
 	}

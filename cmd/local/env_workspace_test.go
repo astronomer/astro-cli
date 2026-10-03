@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/emenv"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -171,7 +172,7 @@ func TestEnvLocalSetOverridesWorkspace(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	if got.Source != "project" || got.Value != "postgres://local" {
+	if got.Source != vaultenv.SourceProject || got.Value != "postgres://local" {
 		t.Fatalf("get json = %+v, want the local value to win", got)
 	}
 }

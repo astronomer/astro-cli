@@ -12,7 +12,7 @@ import (
 
 // seedLinks writes the link row of a global about to be created, before its
 // value, so the value never exists without it: "projects": [] (no project
-// until linked), or with NewEverywhere no row at all, removing any row an
+// until linked), or with NewAutoLink no row at all, removing any row an
 // earlier entry of this key left behind. A value write that then fails leaves
 // at most an empty row, which only narrows. An index that cannot be used
 // refuses the create: the row could not be written, and without it the new
@@ -29,11 +29,11 @@ func (w *Writer) seedLinks(vaultKey string) error {
 	if err != nil {
 		return refuse(err)
 	}
-	if w.NewEverywhere && links.ReachOf(vaultKey).Everywhere {
+	if w.NewAutoLink && links.ReachOf(vaultKey).Everywhere {
 		return nil // no row to remove, so no index to write
 	}
 	if err := secrets.UpdateLinks(w.dir, func(rows map[string]secrets.Reach) error {
-		if w.NewEverywhere {
+		if w.NewAutoLink {
 			delete(rows, vaultKey)
 		} else {
 			rows[vaultKey] = secrets.Reach{Projects: []string{}}

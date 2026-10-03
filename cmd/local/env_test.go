@@ -13,6 +13,7 @@ import (
 	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/internal/localenv"
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
 
 // envProject writes a project with the given [tool.astro.env] body and isolates
@@ -59,7 +60,7 @@ func TestEnvSetGetRoundTrip(t *testing.T) {
 
 	// Set an env var from stdin (a non-TTY stdin reads the value).
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	// The value landed in the project .env at 0600.
@@ -84,7 +85,7 @@ func TestEnvSetGetRoundTrip(t *testing.T) {
 func TestEnvGetJSONShape(t *testing.T) {
 	dir := envProject(t, "")
 	d, _, _ := envDeps(t, dir, "http://api\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "API_URL"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_URL", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	d, out, _ := envDeps(t, dir, "")
@@ -102,12 +103,12 @@ func TestEnvGetJSONShape(t *testing.T) {
 	}
 }
 
-// --secret=false keeps an undeclared connection in the .env file, which is where
+// --plain keeps an undeclared connection in the .env file, which is where
 // this checks the stored encoding.
 func TestEnvSetConnFromURI(t *testing.T) {
 	dir := envProject(t, "")
 	d, _, _ := envDeps(t, dir, "postgres://u:p@host:5432/db\n")
-	if err := execute(t, d, "local", "env", "connection", "set", "warehouse", "--secret=false"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "warehouse", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	content, err := os.ReadFile(filepath.Join(dir, ".env"))
@@ -123,11 +124,11 @@ func TestEnvSetConnAndVarWithValueFlag(t *testing.T) {
 	dir := envProject(t, "")
 	// The conn/var subcommands inherit --value (persistent on `set`); no stdin.
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "http_api", "--value", `{"conn_type":"http","host":"api"}`, "--secret=false"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "http_api", "--value", `{"conn_type":"http","host":"api"}`, "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "airflow-variable", "set", "region", "--value", "us-east-1", "--secret=false"); err != nil {
+	if err := execute(t, d, "local", "env", "airflow-variable", "set", "region", "--value", "us-east-1", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	content, _ := os.ReadFile(filepath.Join(dir, ".env"))
@@ -201,23 +202,25 @@ func TestEnvGlobalScope(t *testing.T) {
 	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--global"); err != nil {
 		t.Fatal(err)
 	}
-	// It went to the global file, not the project .env. Through GlobalEnvPath
-	// rather than by joining a path here: the layout is that function's to own,
-	// and restating it is how this test agreed with the bug where ASTRO_HOME was
-	// read as .astro itself rather than as its parent.
+	// It went to the global vault, not ~/.astro/env or the project .env.
+	// Through GlobalEnvPath rather than by joining a path here: the layout is
+	// that function's to own.
 	gp, err := localenv.GlobalEnvPath()
 	if err != nil {
 		t.Fatal(err)
 	}
-	gc, err := os.ReadFile(gp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(gc), "SHARED=globalval") {
-		t.Fatalf("global file missing value:\n%s", gc)
+	if _, err := os.Stat(gp); !os.IsNotExist(err) {
+		t.Fatalf("a --global set wrote %s, which is read only now (stat: %v)", gp, err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".env")); !os.IsNotExist(err) {
 		t.Fatalf("project .env should not exist for a --global set")
+	}
+	if n := len(vaultFiles(t)); n != 1 {
+		t.Fatalf("vault holds %d entries, want the one global", n)
+	}
+	got := getJSON(t, dir, "SHARED", "--global")
+	if got.Source != vaultenv.SourceGlobal || got.Value != "globalval" {
+		t.Fatalf("get --global = %+v, want the global vault's value", got)
 	}
 }
 
@@ -251,11 +254,11 @@ func TestEnvGlobalSetNotesAnUndeclaredName(t *testing.T) {
 func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	dir := envProject(t, "[tool.astro.env]\nDECLARED = {}\n")
 	d, _, _ := envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global", "--auto-link"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "DECLARED", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "DECLARED", "--global", "--auto-link"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -266,7 +269,7 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	for _, line := range strings.Split(out.String(), "\n") {
 		switch {
 		case strings.Contains(line, "STRAY"):
-			if !strings.Contains(line, "not declared (declare it to make it a requirement: astro local env variable declare STRAY)") {
+			if !strings.Contains(line, "not declared (declare it to make it a requirement: astro local env variable declare STRAY --sensitive)") {
 				t.Errorf("STRAY row = %q, want the not-declared note", line)
 			}
 		case strings.Contains(line, "DECLARED"):
@@ -292,7 +295,7 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	if a := rows["STRAY"].Applied; a == nil || !*a {
 		t.Errorf("STRAY applied = %v, want true", a)
 	}
-	if rows["STRAY"].DeclareHint != "astro local env variable declare STRAY" {
+	if rows["STRAY"].DeclareHint != "astro local env variable declare STRAY --sensitive" {
 		t.Errorf("STRAY declare hint = %q", rows["STRAY"].DeclareHint)
 	}
 	if rows["DECLARED"].Applied != nil {
@@ -307,7 +310,7 @@ func TestEnvSetWarnsWhenNotGitignored(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, _, stderr := envDeps(t, dir, "x\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stderr.String(), "gitignore") {

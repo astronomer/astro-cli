@@ -9,6 +9,7 @@
   "project": "x",
   "invalid": "x",
   "remove_hint": "x",
+  "move_hint": "x",
   "applied": true,
   "not_linked_here": true,
   "links_down": "x",

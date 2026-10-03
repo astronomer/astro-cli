@@ -42,6 +42,11 @@ type ListItem struct {
 	Invalid string `json:"invalid,omitempty"`
 	// RemoveHint is the exact command to remove an orphan.
 	RemoveHint string `json:"remove_hint,omitempty"`
+	// MoveHint is set on a row ~/.astro/env supplies, which is read but no
+	// longer written: the command that stores the value as a global in the
+	// vault instead, after which the file's line can be removed by hand. No
+	// command removes the line, so such a row carries no RemoveHint.
+	MoveHint string `json:"move_hint,omitempty"`
 	// Applied is true for an undeclared value a start passes to the current
 	// project: everything that reaches a project is applied, declared or not.
 	// Omitted on declared rows, on a global row the project's own copy
@@ -104,11 +109,11 @@ type ListOptions struct {
 	// the listing.
 	VaultProviders []envresolve.Provider
 	// VaultTiers are the names each vault tier holds, so an undeclared one is
-	// listed as an orphan the way an undeclared file entry is. A connection or
-	// Airflow variable is stored in the vault by default, so without this a
-	// value just set would be missing from the listing. Only the unnarrowed
-	// view reads them, for the reason listProviders gives. nil lists no vault
-	// orphans.
+	// listed as an orphan the way an undeclared file entry is. Every value is
+	// stored in the vault by default, so without this a value just set would
+	// be missing from the listing. A narrowed view reads only its own scope's
+	// tier. Each tier's Scope also matches its VaultProviders by label. nil
+	// lists no vault orphans.
 	VaultTiers []VaultTier
 }
 
@@ -151,7 +156,7 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 	if err != nil {
 		return nil, err
 	}
-	providers := listProviders(src, opts.Scope, opts.VaultProviders)
+	providers := listProviders(src, opts)
 	res, err := envresolve.Resolve(envresolve.Inputs{
 		Schema:            schema,
 		Providers:         providers,
@@ -183,6 +188,9 @@ func List(environ []string, projectDir string, schema *envschema.Schema, opts Li
 		if !item.Resolved && !item.NotLinkedHere {
 			item.SetHint = SetHint(item.Kind, item.Name)
 			item.UndeclareHint = UndeclareHint(item.Kind, item.Name)
+		}
+		if item.Source == SourceGlobal {
+			item.MoveHint = MoveHint(item.Kind, item.Name)
 		}
 		items = append(items, item)
 	}
@@ -285,23 +293,38 @@ func envKeyOfItem(item ListItem) string {
 }
 
 // listProviders picks the chain a list reads over. A scope flag narrows it to
-// one FILE so `list --project` shows exactly what that file holds; otherwise
-// the full chain reports the true winning source.
-//
-// The vault is deliberately absent from the narrowed chains: --project and
-// --global name the two dotenv files, which is what those flags have always
-// meant, and folding an encrypted tier into "what this file holds" would make
-// the answer untrue. A vault entry shows up in the default listing, labeled
-// with the tier that held it.
-func listProviders(src Sources, scope Scope, vault []envresolve.Provider) []envresolve.Provider {
-	switch scope {
+// that scope's stores, in the chain's order, so `list --project` shows what the
+// project's .env and vault hold and `list --global` what the global vault and
+// ~/.astro/env do; otherwise the full chain reports the true winning source.
+// The vault is in the narrowed chains because a set stores there by default:
+// leaving it out would hide exactly what the same flags just set.
+func listProviders(src Sources, opts ListOptions) []envresolve.Provider {
+	switch opts.Scope {
 	case ScopeProject:
-		return []envresolve.Provider{mapProvider{label: SourceProject, vals: src.project}}
+		return append([]envresolve.Provider{mapProvider{label: SourceProject, vals: src.project}}, vaultProvidersFor(opts, ScopeProject)...)
 	case ScopeGlobal:
-		return []envresolve.Provider{mapProvider{label: SourceGlobal, vals: src.global}}
+		return append(vaultProvidersFor(opts, ScopeGlobal), mapProvider{label: SourceGlobal, vals: src.global})
 	default:
-		return src.Providers(vault)
+		return src.Providers(opts.VaultProviders)
 	}
+}
+
+// vaultProvidersFor is the vault providers of one scope, matched to it by the
+// label its tier carries.
+func vaultProvidersFor(opts ListOptions, scope Scope) []envresolve.Provider {
+	labels := map[string]bool{}
+	for _, tier := range opts.VaultTiers {
+		if tier.Scope == scope {
+			labels[tier.Label] = true
+		}
+	}
+	var out []envresolve.Provider
+	for _, p := range opts.VaultProviders {
+		if labels[p.Label()] {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem {
@@ -398,8 +421,10 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 	switch {
 	case opts.Scope == ScopeProject:
 		add(src.project, ScopeProject)
+		out = append(out, vaultOrphans(src, opts, declared, inProject)...)
 	case opts.Scope == ScopeGlobal:
 		add(src.global, ScopeGlobal)
+		out = append(out, vaultOrphans(src, opts, declared, inProject)...)
 	default:
 		if src.hasProject {
 			add(src.project, ScopeProject)
@@ -417,6 +442,10 @@ func orphans(src Sources, schema *envschema.Schema, opts ListOptions, projectDir
 func vaultOrphans(src Sources, opts ListOptions, declared, inProject map[string]bool) []ListItem {
 	var out []ListItem
 	for _, tier := range opts.VaultTiers {
+		// A narrowed listing reads only its own scope's tier.
+		if opts.Scope != "" && tier.Scope != opts.Scope {
+			continue
+		}
 		for _, e := range tier.Entries {
 			if declared[e.EnvKey] {
 				continue
@@ -497,7 +526,7 @@ func isAirflowSetting(key string) bool {
 func vaultOrphanItem(kind Kind, name string, tier VaultTier, inProject bool) ListItem {
 	item := ListItem{
 		Kind: kind, Name: name, Source: tier.Label, Orphan: true,
-		RemoveHint: removeHint(kind, name, tier.Scope) + " --secret",
+		RemoveHint: removeHint(kind, name, tier.Scope),
 	}
 	if inProject {
 		item.DeclareHint = vaultDeclareHint(kind, name)
@@ -522,7 +551,13 @@ func orphanItem(key string, scope Scope, project string, inProject bool) ListIte
 	// delete command runs against the cwd's project, so a hint would point at
 	// the wrong file. Only offer it for the current project and the global file.
 	if project == "" {
-		item.RemoveHint = removeHint(kind, name, scope)
+		if scope == ScopeGlobal {
+			// ~/.astro/env is read only: no command removes the line, so the
+			// way out is to move the value.
+			item.MoveHint = MoveHint(kind, name)
+		} else {
+			item.RemoveHint = removeHint(kind, name, scope)
+		}
 		if inProject && item.Invalid == "" {
 			item.DeclareHint = DeclareHint(kind, name)
 		}
@@ -617,6 +652,12 @@ func DeclareHint(kind Kind, name string) string {
 // value: set prompts for one and refuses it as an argument.
 func SetHint(kind Kind, name string) string {
 	return "astro local env " + Noun(kind) + " set " + name
+}
+
+// MoveHint is the command that stores a ~/.astro/env value as a global in the
+// vault. It names no value, as SetHint does not.
+func MoveHint(kind Kind, name string) string {
+	return SetHint(kind, name) + " --global"
 }
 
 // UndeclareHint is the `astro local env <noun> undeclare` command for a name.

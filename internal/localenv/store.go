@@ -124,7 +124,7 @@ func (s *Store) Delete(kind Kind, name string) (ok bool, err error) {
 
 // InvalidName is the per-kind rejection message, named as a rule the user can
 // act on rather than a generic "invalid". Exported so the vault writer reports a
-// bad name identically: --secret is meant to change where a value goes and
+// bad name identically: --plain is meant to change where a value goes and
 // nothing else about what the command says.
 func InvalidName(kind Kind, name string) error {
 	switch kind {

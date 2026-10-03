@@ -36,14 +36,12 @@
 // is declared instead.
 //
 // Writers route on it, and this package does not: it has no I/O, so the rule
-// lives with each writer. `astro local env <noun> set` stores a declared-sensitive
-// name in the vault shared with Astro Desktop without --secret, refuses
-// --secret=false for one, and refuses a save that depends on the declarations
-// when they do not parse, rather than reading an unparseable section as
-// "nothing is sensitive". Astro Desktop's Environment Manager keeps the same
-// rule for its saves. Both tools also vault every connection and Airflow
-// variable by default, declared or not, so for those two kinds the declaration
-// decides only whether --secret=false may keep one in a plain file.
+// lives with each writer. `astro local env <noun> set` stores every value in
+// the vault shared with Astro Desktop, encrypted, unless --plain opts out; it
+// refuses --plain for a declared-sensitive name, and refuses a --plain save
+// when the declarations do not parse, rather than reading an unparseable
+// section as "nothing is sensitive". So the declaration decides only whether a
+// value may be stored unencrypted.
 //
 // A sensitive declaration may not carry a `default`. A default is committed to
 // the manifest and injected at start, so `{ sensitive = true, default = ... }`

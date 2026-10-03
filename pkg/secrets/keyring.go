@@ -192,8 +192,10 @@ func (s *keyringStore) masterKey() ([]byte, error) {
 	return key, nil
 }
 
-// hasValues reports whether the vault directory holds any stored value, which is
-// what separates "never used" from "the key is gone".
+// hasValues reports whether the vault directory holds any encrypted value, which
+// is what separates "never used" from "the key is gone". A plain entry does not
+// count: it was never encrypted, so minting a key loses nothing. A file that
+// cannot be read or parsed does count, since it may be ciphertext.
 func (s *keyringStore) hasValues() (bool, error) {
 	entries, err := os.ReadDir(s.dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -203,20 +205,33 @@ func (s *keyringStore) hasValues() (bool, error) {
 		return false, fmt.Errorf("list secrets: %w", err)
 	}
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), valueExt) {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), valueExt) {
+			continue
+		}
+		vf, err := readValueFile(filepath.Join(s.dir, e.Name()))
+		if errors.Is(err, os.ErrNotExist) {
+			continue // deleted between ReadDir and here
+		}
+		if err != nil || !vf.Plain {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-// valueFile is the on-disk JSON for one secret. The key lives inside the
+// valueFile is the on-disk JSON for one value. The key lives inside the
 // file, not in the filename: keys may be longer than a filename allows and
 // may carry characters (colons, slashes) that filesystems reject, so the
 // filename is a hash of the key and ListMeta reads keys back from the files.
+//
+// Plain marks a value stored as written rather than encrypted (SetPlain). It
+// is omitted when false, so a secret's file is byte-for-byte what it was
+// before the marker existed, and a file without it reads as secret: every
+// existing vault stays readable.
 type valueFile struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+	Plain bool   `json:"plain,omitempty"`
 }
 
 const valueExt = ".json"
@@ -252,6 +267,11 @@ func (s *keyringStore) Get(key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read secret: %w", err)
 	}
+	if vf.Plain {
+		// Stored as written, so the keyring is never touched: a plain value
+		// reads on a machine that has none.
+		return vf.Value, nil
+	}
 	gcm, err := s.aead()
 	if err != nil {
 		return "", err
@@ -268,7 +288,18 @@ func (s *keyringStore) Set(key, value string) error {
 	if err != nil {
 		return err
 	}
-	raw, err := json.Marshal(valueFile{Key: key, Value: enc})
+	return s.write(valueFile{Key: key, Value: enc})
+}
+
+// SetPlain stores value under key as written, marked plain: see PlainSetter.
+// It never touches the keyring.
+func (s *keyringStore) SetPlain(key, value string) error {
+	return s.write(valueFile{Key: key, Value: value, Plain: true})
+}
+
+// write publishes one value file, replacing whatever its key held.
+func (s *keyringStore) write(vf valueFile) error {
+	raw, err := json.Marshal(vf)
 	if err != nil {
 		return fmt.Errorf("encode secret file: %w", err)
 	}
@@ -286,7 +317,7 @@ func (s *keyringStore) Set(key, value string) error {
 	// directory two processes share — and the hand-rolled version this replaced
 	// had no answer for it. One implementation, and it is the one that already
 	// had to learn this.
-	if err := fsatomic.WriteFile(s.path(key), raw, valuePerm); err != nil {
+	if err := fsatomic.WriteFile(s.path(vf.Key), raw, valuePerm); err != nil {
 		return err
 	}
 	return nil
@@ -303,9 +334,9 @@ func (s *keyringStore) Delete(key string) error {
 	return nil
 }
 
-// ListMeta reads the cached ciphertext files and nothing else. It has no
-// path to the AEAD or the keyring, so it can never return a value, prompt,
-// or fail on a headless machine.
+// ListMeta reads the value files' keys and plain markers and nothing else. It
+// has no path to the AEAD or the keyring and returns no value, plain or
+// secret, so it can never reveal one, prompt, or fail on a headless machine.
 func (s *keyringStore) ListMeta() ([]Meta, error) {
 	entries, err := os.ReadDir(s.dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -326,7 +357,7 @@ func (s *keyringStore) ListMeta() ([]Meta, error) {
 		if err != nil {
 			return nil, fmt.Errorf("list secrets: %w", err)
 		}
-		metas = append(metas, Meta{Key: vf.Key})
+		metas = append(metas, Meta{Key: vf.Key, Plain: vf.Plain})
 	}
 	return metas, nil
 }

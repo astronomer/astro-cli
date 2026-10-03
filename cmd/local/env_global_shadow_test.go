@@ -24,7 +24,7 @@ func TestGlobalSetWarnsAboutAProjectPlaintextCopy(t *testing.T) {
 	if !strings.Contains(msg, "warning: API_TOKEN is also set in project") {
 		t.Errorf("a global set shadowed by the project .env should warn; stderr: %q", msg)
 	}
-	if !strings.Contains(msg, "astro local env variable delete API_TOKEN --project --secret=false") {
+	if !strings.Contains(msg, "astro local env variable delete API_TOKEN --project\n") {
 		t.Errorf("the warning should name the command that removes the plaintext copy; stderr: %q", msg)
 	}
 	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); !hasKey(keys, "API_TOKEN") {
@@ -41,10 +41,10 @@ func TestGlobalSetWarnsAboutAProjectVaultCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, _, stderr := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global", "--everywhere"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global", "--auto-link"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stderr.String(), "astro local env connection delete db --project --secret\n") {
+	if !strings.Contains(stderr.String(), "astro local env connection delete db --project\n") {
 		t.Errorf("the warning should name the project vault's delete command; stderr: %q", stderr.String())
 	}
 	if n := len(vaultFiles(t)); n != 2 {
@@ -56,7 +56,7 @@ func TestGlobalSetWarnsAboutAProjectVaultCopy(t *testing.T) {
 func TestGlobalSetWithNoProjectCopyDoesNotWarn(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, stderr := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global", "--everywhere"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "db", "--value", "postgres://u:p@g/db", "--global", "--auto-link"); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(stderr.String(), "warning:") {

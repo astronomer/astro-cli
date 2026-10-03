@@ -29,7 +29,7 @@ func TestPlainSetRemovesTheVaultCopyUnderAnotherSpelling(t *testing.T) {
 				t.Fatal(err)
 			}
 			d, _, _ = envDeps(t, dir, "")
-			if err := execute(t, d, "local", "env", tc.noun, "set", tc.lower, "--value", tc.value, "--secret=false"); err != nil {
+			if err := execute(t, d, "local", "env", tc.noun, "set", tc.lower, "--value", tc.value, "--plain", "--replace-secret"); err != nil {
 				t.Fatal(err)
 			}
 			if n := len(vaultFiles(t)); n != 0 {
@@ -65,11 +65,11 @@ func TestVaultSetReplacesTheOtherSpelling(t *testing.T) {
 			}
 			for _, spelling := range []string{tc.lower, tc.upper} {
 				d, out, _ := envDeps(t, dir, "")
-				if err := execute(t, d, "local", "env", tc.noun, "get", spelling, "--secret"); err != nil {
-					t.Fatalf("get %s --secret: %v", spelling, err)
+				if err := execute(t, d, "local", "env", tc.noun, "get", spelling); err != nil {
+					t.Fatalf("get %s: %v", spelling, err)
 				}
 				if !strings.Contains(out.String(), "later") {
-					t.Errorf("get %s --secret did not return the later value", spelling)
+					t.Errorf("get %s did not return the later value", spelling)
 				}
 			}
 		})
@@ -86,8 +86,8 @@ func TestDeleteMatchesTheOtherSpelling(t *testing.T) {
 				t.Fatal(err)
 			}
 			d, _, _ = envDeps(t, dir, "")
-			if err := execute(t, d, "local", "env", tc.noun, "delete", tc.lower, "--secret"); err != nil {
-				t.Fatalf("delete %s --secret: %v", tc.lower, err)
+			if err := execute(t, d, "local", "env", tc.noun, "delete", tc.lower); err != nil {
+				t.Fatalf("delete %s: %v", tc.lower, err)
 			}
 			if n := len(vaultFiles(t)); n != 0 {
 				t.Errorf("delete left %d vault entries", n)

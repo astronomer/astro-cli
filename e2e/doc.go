@@ -59,8 +59,9 @@
 // uvCache in harness_test.go.
 //
 // The one thing no environment variable moves is the OS keyring. Relocating
-// HOME keeps the vault's *files* in a temp dir, but a `--secret` write would
-// still reach the real Keychain or Secret Service. No case here does that, and
+// HOME keeps the vault's *files* in a temp dir, but an encrypted vault write,
+// which is what `astro local env <noun> set` does without --plain, would still
+// reach the real Keychain or Secret Service. No case here does that, and
 // the first one that needs to has to bring its own opt-in gate: writing
 // credentials into the developer's own Keychain is not something a suite may
 // decide to do on their behalf.

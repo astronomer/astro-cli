@@ -34,9 +34,10 @@ import (
 // than ours. A connection is a record — type, host, login, port, password — and a
 // consumer that can only read its password cannot build a connection from it, so
 // the value under a conn key is the whole object. A variable is a scalar, so the
-// value under an env or var key is just that: the value. Only secret variables
-// are stored here at all; a plain one has nothing to protect and reading it
-// should not cost a keyring round trip.
+// value under an env or var key is just that: the value. Secret and plain values
+// share this grammar and this layout: a plain one carries a marker in its value
+// file (Meta.Plain) and is stored unencrypted, since it has nothing to protect
+// and reading it should not cost a keyring round trip.
 //
 // The conn ENCODING is part of the contract, not an implementation detail, and
 // naming it here is the cheapest way to keep it one: the value is the single-line
@@ -56,9 +57,9 @@ import (
 type Kind string
 
 const (
-	// KindEnv is a secret plain environment variable's value.
+	// KindEnv is an environment variable's value.
 	KindEnv Kind = "env"
-	// KindVar is a secret Airflow Variable's value.
+	// KindVar is an Airflow Variable's value.
 	KindVar Kind = "var"
 	// KindConn is a whole connection, serialized.
 	KindConn Kind = "conn"

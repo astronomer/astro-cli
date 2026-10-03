@@ -35,7 +35,7 @@ func TestGetWithTheSetsScopeFlagFindsTheValue(t *testing.T) {
 	}{
 		{"connection", "db_main", "postgres://u:p@h:5432/db", vaultenv.SourceProject, vaultenv.SourceGlobal},
 		{"airflow-variable", "region", "us-east-1", vaultenv.SourceProject, vaultenv.SourceGlobal},
-		{"variable", "LOG_LEVEL", "info", string(localenv.ScopeProject), string(localenv.ScopeGlobal)},
+		{"variable", "LOG_LEVEL", "info", vaultenv.SourceProject, vaultenv.SourceGlobal},
 	}
 	for _, tc := range cases {
 		for _, flag := range []string{"--project", "--global"} {
@@ -67,26 +67,26 @@ func TestGetWithTheSetsScopeFlagFindsTheValue(t *testing.T) {
 	}
 }
 
-// --secret=false reads only the plain file and --secret only the vault.
+// --plain reads only the plain file; with no flag a get reads both stores.
 func TestGetSecretFlagPicksOneStore(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, _ := envDeps(t, dir, "")
 	if err := execute(t, d, "local", "env", "connection", "set", "db_main", "--value", "postgres://u:p@h/db"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := getScopedJSON(t, dir, "connection", "db_main", "--project", "--secret=false"); err == nil {
-		t.Error("get --secret=false found a value that is only in the vault")
+	if _, err := getScopedJSON(t, dir, "connection", "db_main", "--project", "--plain"); err == nil {
+		t.Error("get --plain found a value that is only in the vault")
 	}
-	if got, err := getScopedJSON(t, dir, "connection", "db_main", "--secret"); err != nil || got.Source != vaultenv.SourceProject {
-		t.Errorf("get --secret = %q, %v; want the project vault", got.Source, err)
+	if got, err := getScopedJSON(t, dir, "connection", "db_main"); err != nil || got.Source != vaultenv.SourceProject {
+		t.Errorf("get = %q, %v; want the project vault", got.Source, err)
 	}
 
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "set", "LOG_LEVEL", "--value", "info"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "LOG_LEVEL", "--value", "info", "--plain"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := getScopedJSON(t, dir, "variable", "LOG_LEVEL", "--secret"); err == nil {
-		t.Error("get --secret found a value that is only in the plain file")
+	if got, err := getScopedJSON(t, dir, "variable", "LOG_LEVEL", "--plain"); err != nil || got.Source != string(localenv.ScopeProject) {
+		t.Errorf("get --plain = %q, %v; want the plain file", got.Source, err)
 	}
 }
 
@@ -96,7 +96,7 @@ func TestGetSecretFlagPicksOneStore(t *testing.T) {
 func TestGetWithBothCopiesPicksTheChainsWinner(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--value", "v", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--value", "v"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("TOKEN=hand\n"), 0o600); err != nil {
@@ -118,7 +118,7 @@ func TestGetWithBothCopiesPicksTheChainsWinner(t *testing.T) {
 	}
 
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--value", "v", "--secret", "--global"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--value", "v", "--global"); err != nil {
 		t.Fatal(err)
 	}
 	globalPath, err := localenv.GlobalEnvPath()

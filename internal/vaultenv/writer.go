@@ -12,12 +12,12 @@ import (
 )
 
 // Writer edits one scope of the shared vault: the store behind
-// `astro local env <noun> set --secret`. Build it with NewWriter.
+// `astro local env <noun> set` by default. Build it with NewWriter.
 //
 // It deliberately mirrors localenv.Store — same Set/Get/Delete shape, same
 // (kind, name) addressing, same normalization for a connection — because the
-// two are the same operation against different storage, and `--secret` is the
-// flag that chooses which. A connection normalized differently by store would
+// two are the same operation against different storage, and `--plain` in a
+// project is the flag that chooses the file. A connection normalized differently by store would
 // make one conn_id mean two things depending on where it was written.
 type Writer struct {
 	store secrets.Store
@@ -29,9 +29,14 @@ type Writer struct {
 	label string
 	// dir is the vault directory, where the link index lives beside the values.
 	dir string
-	// NewEverywhere makes a global this writer creates reach every project
+	// NewAutoLink makes a global this writer creates reach every project
 	// (no link row) instead of none. See seedLinks.
-	NewEverywhere bool
+	NewAutoLink bool
+	// Plain makes Set store the value unencrypted, marked plain
+	// (secrets.SetPlain), so it is written and read without the keyring. It is
+	// how a --plain global is kept: in the vault's layout and link state like
+	// every other global, but not encrypted.
+	Plain bool
 }
 
 // NewWriter opens the shared vault for writing. An empty projectDir writes the
@@ -65,8 +70,8 @@ func NewWriter(projectDir string) (*Writer, error) {
 // chain reports — "vault" or "vault (global)", not "project"/"global".
 //
 // Deliberately not localenv.Store's vocabulary, even though the two are
-// otherwise mirrored. A `set --secret` that reported "project" was
-// byte-identical to a plain `set`, so nothing reading the output — a script, an
+// otherwise mirrored. A vault set that reported "project" was
+// byte-identical to a `set --plain`, so nothing reading the output — a script, an
 // agent, a user — could tell whether a credential had landed in the encrypted
 // vault or in a committable .env. That is the one distinction the flag exists to
 // make, so it belongs in what the command says it did.
@@ -79,7 +84,12 @@ func (w *Writer) DotenvPath() string { return "" }
 // Location is where the value lives, for the same message. Not a file path: the
 // vault holds one file per key under a name derived from a hash, and pointing a
 // user at it would invite hand-editing something only the master key can read.
-func (w *Writer) Location() string { return "the encrypted vault" }
+func (w *Writer) Location() string {
+	if w.Plain {
+		return "the vault, unencrypted"
+	}
+	return "the encrypted vault"
+}
 
 // Set stores value for the (kind, name) pair and returns the Airflow env-var
 // key it will resolve under.
@@ -119,13 +129,13 @@ func (w *Writer) Set(kind localenv.Kind, name, value string) (envKey string, err
 	}
 	// A global that is new, under any spelling, gets its link row first too:
 	// it starts out reaching no project, as a new global does in Astro
-	// Desktop, unless NewEverywhere is set.
+	// Desktop, unless NewAutoLink is set.
 	if len(existing) == 0 {
 		if err := w.seedLinks(vaultKey); err != nil {
 			return "", fmt.Errorf("set %s: %w", name, err)
 		}
 	}
-	if err := w.store.Set(vaultKey, value); err != nil {
+	if err := w.put(vaultKey, value); err != nil {
 		return "", refusal(err)
 	}
 	var removed []string
@@ -139,6 +149,14 @@ func (w *Writer) Set(kind localenv.Kind, name, value string) (envKey string, err
 	// row left behind only narrows a later entry of that spelling.
 	_ = w.dropLinkRows(removed) //nolint:errcheck // see above
 	return key, nil
+}
+
+// put writes one value, marked plain when the writer is.
+func (w *Writer) put(vaultKey, value string) error {
+	if w.Plain {
+		return secrets.SetPlain(w.store, vaultKey, value)
+	}
+	return w.store.Set(vaultKey, value)
 }
 
 // Get returns the value this scope holds under (kind, name)'s env-var key and
@@ -174,6 +192,34 @@ func (w *Writer) Has(kind localenv.Kind, name string) (bool, error) {
 	}
 	matches, err := w.sameEnvKey(kind, key)
 	return len(matches) > 0, err
+}
+
+// HoldsEncrypted reports whether this scope holds an encrypted (not plain)
+// entry under (kind, name)'s env-var key. It reads the index only, so it
+// needs no keyring.
+func (w *Writer) HoldsEncrypted(kind localenv.Kind, name string) (bool, error) {
+	key, _, err := w.keys(kind, name)
+	if err != nil {
+		return false, err
+	}
+	matches, err := w.sameEnvKey(kind, key)
+	if err != nil || len(matches) == 0 {
+		return false, err
+	}
+	metas, err := w.store.ListMeta()
+	if err != nil {
+		return false, fmt.Errorf("list the encrypted vault: %w", err)
+	}
+	held := map[string]bool{}
+	for _, k := range matches {
+		held[k] = true
+	}
+	for _, m := range metas {
+		if held[m.Key] && !m.Plain {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Delete removes every entry of this kind in this scope that resolves to (kind,
@@ -329,7 +375,7 @@ func refusal(err error) error {
 		return fmt.Errorf("this machine's keyring is unreachable, so a secret cannot be stored or read here: %w\n\n"+
 			"On a headless machine or in CI there is no keyring to hold the master key. Supply the value in the "+
 			"environment instead, which the resolution chain reads first, or, for a name the project does not "+
-			"declare sensitive, set it with --secret=false to keep it in a plain file", err)
+			"declare sensitive, set it with --plain, which needs no keyring", err)
 	default:
 		return err
 	}

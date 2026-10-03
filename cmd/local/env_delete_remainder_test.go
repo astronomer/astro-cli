@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -133,7 +134,7 @@ func TestUndeclareTextSaysWhetherItChanged(t *testing.T) {
 func TestDeleteOutsideAProjectReportsOnlyTheDelete(t *testing.T) {
 	dir := envProject(t, "")
 	d, _, _ := envDeps(t, dir, "global-value\n")
-	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--secret=false"))
+	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--plain", "--auto-link"))
 
 	res := deleteJSON(t, t.TempDir(), "variable", "delete", "API_URL", "--global")
 	assert.Equal(t, "deleted", res.Status)
@@ -144,18 +145,18 @@ func TestDeleteOutsideAProjectReportsOnlyTheDelete(t *testing.T) {
 func TestDeleteOfANameAnotherTierSuppliesNamesThatTier(t *testing.T) {
 	dir := envProject(t, "\n[tool.astro.env]\nAPI_URL = {}\n")
 	d, _, _ := envDeps(t, dir, "global-s3cr3t\n")
-	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--secret=false"))
+	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--plain", "--auto-link"))
 	writeEnvFile(t, dir, "API_URL=project-s3cr3t\n")
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL")
-	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+", and now resolves from global.")
+	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+", and now resolves from "+vaultenv.SourceGlobal+".")
 	assert.NotContains(t, out, "s3cr3t")
 	assert.NotContains(t, out, "undeclare")
 
 	writeEnvFile(t, dir, "API_URL=project-s3cr3t\n")
 	res := deleteJSON(t, dir, "variable", "delete", "API_URL")
 	assert.Equal(t, envschema.RemainderSupplied, res.Remainder)
-	assert.Equal(t, "global", res.Source)
+	assert.Equal(t, vaultenv.SourceGlobal, res.Source)
 	assert.Empty(t, res.SetHint)
 	assert.Empty(t, res.UndeclareHint)
 }
@@ -311,11 +312,11 @@ func TestDeleteUndeclareGlobalEditsOnlyTheCurrentProject(t *testing.T) {
 	otherManifest := "[project]\nname = 'other'\n\n[tool.astro.env]\nAPI_URL = {}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(other, "pyproject.toml"), []byte(otherManifest), 0o600))
 	d, _, _ := envDeps(t, dir, "global-value\n")
-	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--secret=false"))
+	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--plain", "--auto-link"))
 	writeEnvFile(t, dir, "API_URL=project-value\n")
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL", "--global", "--undeclare")
-	assert.Contains(t, out, "deleted variable API_URL from global")
+	assert.Contains(t, out, "deleted variable API_URL from "+vaultenv.SourceGlobal)
 	assert.Contains(t, out, "undeclared variable API_URL in "+filepath.Join(dir, "pyproject.toml"))
 	assert.NotContains(t, declared(t, dir).EnvVars, "API_URL")
 	b, err := os.ReadFile(filepath.Join(other, "pyproject.toml"))
@@ -329,7 +330,7 @@ func TestDeleteUndeclareGlobalEditsOnlyTheCurrentProject(t *testing.T) {
 func TestDeleteUndeclareOutsideAProjectRefuses(t *testing.T) {
 	dir := envProject(t, "")
 	d, _, _ := envDeps(t, dir, "global-value\n")
-	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--secret=false"))
+	require.NoError(t, execute(t, d, "local", "env", "variable", "set", "API_URL", "--global", "--plain", "--auto-link"))
 	outside := t.TempDir()
 
 	for _, args := range [][]string{

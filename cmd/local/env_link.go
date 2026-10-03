@@ -40,17 +40,17 @@ type reachPath struct {
 
 // reachJSON is where a global vault entry is linked, as get and link report it.
 type reachJSON struct {
-	// Everywhere is true when the entry has no link row: it reaches every
+	// AutoLink is true when the entry has no link row: it is auto-linked to every
 	// project. Projects is then empty.
-	Everywhere bool        `json:"everywhere"`
-	Projects   []reachPath `json:"projects"`
+	AutoLink bool        `json:"auto_link"`
+	Projects []reachPath `json:"projects"`
 	// Error is set when the link index cannot be used. No global resolves in
 	// any project while it stands, whatever the row would say.
 	Error string `json:"error,omitempty"`
 }
 
 func newReachJSON(r secrets.Reach) *reachJSON {
-	out := &reachJSON{Everywhere: r.Everywhere, Projects: []reachPath{}}
+	out := &reachJSON{AutoLink: r.Everywhere, Projects: []reachPath{}}
 	for _, p := range r.Projects {
 		_, err := os.Stat(p)
 		out.Projects = append(out.Projects, reachPath{Path: p, Exists: err == nil})
@@ -58,16 +58,16 @@ func newReachJSON(r secrets.Reach) *reachJSON {
 	return out
 }
 
-// text is the reach for a person: "every project", the paths with the missing
-// ones marked, or "no project".
+// text is the reach for a person: "auto-linked (every project)", the paths with the missing
+// ones marked, or "not linked (no project)".
 func (r *reachJSON) text() string {
 	switch {
 	case r.Error != "":
 		return "unknown, because " + r.Error + "; no global resolves in any project until it is fixed"
-	case r.Everywhere:
-		return "every project"
+	case r.AutoLink:
+		return "auto-linked (every project)"
 	case len(r.Projects) == 0:
-		return "no project"
+		return "not linked (no project)"
 	}
 	parts := make([]string, len(r.Projects))
 	for i, p := range r.Projects {
@@ -109,11 +109,11 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Use:   "link " + k.arg + " [DIR...]",
 		Short: "Limit a global " + k.label + " in the vault to specific projects",
 		Long: "Link a global " + k.label + " in the encrypted vault to projects, so it reaches\n" +
-			"those projects and no others. With no link it reaches every project.\n\n" +
+			"those projects and no others. With no link it is auto-linked to every project.\n\n" +
 			"Each DIR is a project directory; the default is the current project. A link\n" +
 			"to a project also reaches its git worktrees. --this-checkout links the\n" +
 			"checkout itself instead, so a worktree gets the value and its main project\n" +
-			"does not. --everywhere removes the links, and the value reaches every project\n" +
+			"does not. --auto-link removes the links, and the value is auto-linked to every project\n" +
 			"again.\n\n" +
 			"Only global vault entries have links: a project secret already reaches only\n" +
 			"its own project, and ~/.astro/env reaches every project.\n\n" +
@@ -130,16 +130,16 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
   # link only this worktree, not its main project
   astro local env ` + noun + ` link ` + exampleName(k.kind) + ` --this-checkout
 
-  # reach every project again
-  astro local env ` + noun + ` link ` + exampleName(k.kind) + ` --everywhere`,
+  # auto-link it to every project again
+  astro local env ` + noun + ` link ` + exampleName(k.kind) + ` --auto-link`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return c.runEnvLink(scope, k.kind, args[0], args[1:], thisCheckout, everywhere)
 		},
 	}
 	cmd.Flags().BoolVar(&thisCheckout, "this-checkout", false, "Link each checkout's own path rather than its project, so a worktree does not share it with its main project")
-	cmd.Flags().BoolVar(&everywhere, "everywhere", false, "Remove the links, so it reaches every project")
-	cmd.MarkFlagsMutuallyExclusive("this-checkout", "everywhere")
+	cmd.Flags().BoolVar(&everywhere, "auto-link", false, "Remove the links, so it is auto-linked to every project")
+	cmd.MarkFlagsMutuallyExclusive("this-checkout", "auto-link")
 	return cmd
 }
 
@@ -152,7 +152,7 @@ func newEnvUnlinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"is a project directory, or a linked path that no longer exists; the default\n" +
 			"is the current project. Afterwards the checkout is not reached, whether it\n" +
 			"was linked as a project or on its own.\n\n" +
-			"An entry with no links reaches every project, so there is nothing to unlink\n" +
+			"An entry with no links is auto-linked to every project, so there is nothing to unlink\n" +
 			"it from: link it to the projects it should reach instead. Unlinking the last\n" +
 			"project leaves it reaching no project.",
 		Example: `
@@ -188,7 +188,7 @@ func (c *cli) runEnvLink(scope *scopeFlags, kind localenv.Kind, name string, dir
 		return err
 	}
 	if everywhere && len(dirs) > 0 {
-		return errors.New("--everywhere reaches every project, so it takes no directories")
+		return errors.New("--auto-link reaches every project, so it takes no directories")
 	}
 	w, err := c.linkWriter(scope, kind, name)
 	if err != nil {
@@ -220,11 +220,11 @@ func (c *cli) runEnvLink(scope *scopeFlags, kind localenv.Kind, name string, dir
 		var msg string
 		switch {
 		case everywhere && before.Everywhere:
-			msg = fmt.Sprintf("%s %s already reaches every project\n", localenv.Noun(kind), name)
+			msg = fmt.Sprintf("%s %s is already auto-linked to every project\n", localenv.Noun(kind), name)
 		case everywhere:
-			msg = fmt.Sprintf("%s %s now reaches every project\n", localenv.Noun(kind), name)
+			msg = fmt.Sprintf("%s %s is now auto-linked to every project\n", localenv.Noun(kind), name)
 		case before.Everywhere:
-			msg = fmt.Sprintf("%s %s reached every project; it now reaches only %s\n", localenv.Noun(kind), name, reach.text())
+			msg = fmt.Sprintf("%s %s was auto-linked to every project; it now reaches only %s\n", localenv.Noun(kind), name, reach.text())
 		default:
 			msg = fmt.Sprintf("linked %s %s to %s\nReach: %s\n", localenv.Noun(kind), name, strings.Join(paths, ", "), reach.text())
 		}
@@ -249,7 +249,7 @@ func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, d
 	var removed []string
 	_, after, err := w.EditReach(kind, name, func(before secrets.Reach) (secrets.Reach, error) {
 		if before.Everywhere {
-			return before, fmt.Errorf("%s %s has no links, so it reaches every project and there is nothing to unlink it from. "+
+			return before, fmt.Errorf("%s %s has no links, so it is auto-linked to every project and there is nothing to unlink it from. "+
 				"To limit it, link it to the projects it should reach: %s [DIR...]",
 				localenv.Noun(kind), name, localenv.LinkHint(kind, name))
 		}
@@ -271,7 +271,7 @@ func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, d
 		return linkEditErr(w, kind, name, err)
 	}
 	if len(after.Projects) == 0 {
-		fmt.Fprintf(c.d.Stderr, "warning: %s %s now reaches no project. Link it to one with: %s, or reach every project with: %s --everywhere\n",
+		fmt.Fprintf(c.d.Stderr, "warning: %s %s now reaches no project. Link it to one with: %s, or auto-link it to every project with: %s --auto-link\n",
 			localenv.Noun(kind), name, localenv.LinkHint(kind, name), localenv.LinkHint(kind, name))
 	}
 	reach := newReachJSON(after)
@@ -280,47 +280,6 @@ func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, d
 		_, werr := fmt.Fprintf(out, "unlinked %s %s from %s\nReach: %s\n", localenv.Noun(kind), name, strings.Join(removed, ", "), reach.text())
 		return werr
 	})
-}
-
-// refusePinnedToPlain refuses a plain ~/.astro/env set of a name the global
-// vault holds with link state. The set would remove the vault copy, row and
-// all (removeOtherCopy), and a plain global has no links: it reaches every
-// project, so a pinned value would silently widen. Nothing
-// is refused for a project store, or for a vault entry that reaches every
-// project already.
-func refusePinnedToPlain(store valueStore, kind localenv.Kind, name string) error {
-	if _, plain := store.(fileStore); !plain || store.ScopeName() != localenv.ScopeGlobal {
-		return nil
-	}
-	w, err := vaultenv.NewWriter("")
-	if err != nil {
-		return nil //nolint:nilerr // no vault, so no vault copy to replace
-	}
-	r, err := w.Reach(kind, name)
-	switch {
-	case errors.Is(err, vaultenv.ErrNotHeld):
-		return nil
-	case err != nil:
-		return fmt.Errorf("%s %s is held in the vault, and its link state cannot be read, so moving it to %s could widen "+
-			"which projects it reaches. Nothing was changed; repair %s first: %w",
-			localenv.Noun(kind), name, store.Location(), w.LinksPath(), err)
-	case r.Everywhere:
-		return nil
-	}
-	return fmt.Errorf("%s %s is held in the vault linked to %s. %s has no links, so the value would reach every project. "+
-		"Keep it in the vault (drop --secret=false), or first run: %s --everywhere",
-		localenv.Noun(kind), name, newReachJSON(r).text(), store.Location(), localenv.LinkHint(kind, name))
-}
-
-// plainGlobalHas reports whether ~/.astro/env holds (kind, name), matched on
-// the env key as the file store matches. An unreadable file holds nothing.
-func plainGlobalHas(kind localenv.Kind, name string) bool {
-	gs, err := localenv.GlobalStore()
-	if err != nil {
-		return false
-	}
-	_, ok, err := gs.Get(kind, name)
-	return err == nil && ok
 }
 
 func dirsOrCurrent(dirs []string) []string {
@@ -347,7 +306,7 @@ func linkEditErr(w *vaultenv.Writer, kind localenv.Kind, name string, err error)
 }
 
 // linkWriter is the global vault writer for a name the global vault holds,
-// or the reason the name cannot be linked: it is a project secret, a plain
+// or the reason the name cannot be linked: it is a project value, a
 // ~/.astro/env entry, or not in the vault at all.
 func (c *cli) linkWriter(scope *scopeFlags, kind localenv.Kind, name string) (*vaultenv.Writer, error) {
 	noun := localenv.Noun(kind)
@@ -368,7 +327,7 @@ func (c *cli) linkWriter(scope *scopeFlags, kind localenv.Kind, name string) (*v
 	if projectDir, perr := c.discoverProject(); perr == nil {
 		if pw, err := vaultenv.NewWriter(projectDir); err == nil {
 			if ok, _ := pw.Has(kind, name); ok { //nolint:errcheck // an unreadable project vault just skips this reason
-				return nil, fmt.Errorf("%s %s is a secret of this project, in the project's vault, so it already reaches only this project. "+
+				return nil, fmt.Errorf("%s %s is in this project's vault, so it already reaches only this project. "+
 					"Links apply to global vault entries only", noun, name)
 			}
 		}
@@ -376,11 +335,11 @@ func (c *cli) linkWriter(scope *scopeFlags, kind localenv.Kind, name string) (*v
 	if gs, err := localenv.GlobalStore(); err == nil {
 		if _, ok, _ := gs.Get(kind, name); ok { //nolint:errcheck // an unreadable file just skips this reason
 			return nil, fmt.Errorf("%s %s is in %s, a plain file outside the vault, which has no links: a start passes it to every project. "+
-				"To limit it to specific projects, move it into the vault with: astro local env %s set %s --global --secret",
+				"To limit it to specific projects, move it into the vault with: astro local env %s set %s --global (then remove its line from that file by hand)",
 				noun, name, gs.Path, noun, name)
 		}
 	}
-	return nil, fmt.Errorf("the vault holds no global %s %s, so there is nothing to link. Set one with: astro local env %s set %s --global --secret",
+	return nil, fmt.Errorf("the vault holds no global %s %s, so there is nothing to link. Set one with: astro local env %s set %s --global",
 		noun, name, noun, name)
 }
 

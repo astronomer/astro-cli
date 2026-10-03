@@ -18,7 +18,7 @@ func bothCopies(t *testing.T) string {
 	}
 	dir := secretEnvProject(t, "")
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--value", "v", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--value", "v"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("TOKEN=hand\n"), 0o600); err != nil {

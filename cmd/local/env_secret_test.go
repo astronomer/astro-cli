@@ -21,7 +21,8 @@ func secretEnvProject(t *testing.T, envBody string) (dir string) {
 	return envProject(t, envBody)
 }
 
-// vaultFiles is what the shared vault holds on disk.
+// vaultFiles is the value files the shared vault holds on disk: not the link
+// index a global seeds beside them, or its lock.
 func vaultFiles(t *testing.T) []string {
 	t.Helper()
 	home, err := os.UserHomeDir()
@@ -37,25 +38,27 @@ func vaultFiles(t *testing.T) []string {
 	}
 	var names []string
 	for _, e := range entries {
-		names = append(names, e.Name())
+		if strings.HasSuffix(e.Name(), ".json") {
+			names = append(names, e.Name())
+		}
 	}
 	return names
 }
 
-// --secret is the store choice: the value goes to the vault, the project's .env
+// The vault is the default store: the value goes to the vault, the project's .env
 // is not touched, and the chain resolves it back labeled with the tier it came
 // from.
 func TestEnvSetSecretWritesTheVaultNotTheFile(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, ".env")); !os.IsNotExist(err) {
 		content, _ := os.ReadFile(filepath.Join(dir, ".env"))
-		t.Errorf("--secret wrote a plain .env:\n%s", content)
+		t.Errorf("a default set wrote a plain .env:\n%s", content)
 	}
 	if len(vaultFiles(t)) != 1 {
 		t.Errorf("vault holds %v, want exactly one entry", vaultFiles(t))
@@ -85,7 +88,7 @@ func TestEnvSetSecretStoresCiphertext(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "plaintext-canary\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,7 +125,7 @@ func getJSON(t *testing.T, dir string, args ...string) envValue {
 	return v
 }
 
-// --secret composes with the scope flags rather than replacing them: --global
+// The vault composes with the scope flags rather than replacing them: --global
 // writes the machine-wide tier, which reports itself distinctly so a user can
 // tell which one answered.
 func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
@@ -131,7 +134,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 	// A value with no tier name in it, so only the source field can satisfy the
 	// assertion below.
 	d, _, _ := envDeps(t, dir, "shared-secret\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--secret", "--global", "--everywhere"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--global", "--auto-link"); err != nil {
 		t.Fatal(err)
 	}
 	got := getJSON(t, dir, "SHARED")
@@ -144,7 +147,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 
 	// And the project tier wins over it for the same name.
 	d, _, _ = envDeps(t, dir, "project-secret\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "SHARED", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "SHARED"); err != nil {
 		t.Fatal(err)
 	}
 	got = getJSON(t, dir, "SHARED")
@@ -162,7 +165,7 @@ func TestPlainProjectFileStillBeatsTheVault(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "from-vault\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("TOKEN=from-file\n"), 0o600); err != nil {
@@ -178,16 +181,16 @@ func TestPlainProjectFileStillBeatsTheVault(t *testing.T) {
 	}
 }
 
-// delete --secret removes the vaulted value and leaves nothing behind.
+// delete removes the vaulted value and leaves nothing behind.
 func TestEnvDeleteSecret(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	if names := vaultFiles(t); len(names) != 0 {
@@ -196,21 +199,21 @@ func TestEnvDeleteSecret(t *testing.T) {
 
 	// Deleting what is not there says so rather than reporting success.
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN", "--secret"); err == nil {
+	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN"); err == nil {
 		t.Error("deleting a value that is not set should fail")
 	}
 }
 
 // The refusal the whole design turns on. With no reachable keyring there is no
 // vault, and the command must say so — never fall back to writing a credential
-// into a plain file, which is the silent downgrade that would make --secret a
+// into a plain file, which is the silent downgrade that would make the vault a
 // lie.
 func TestEnvSetSecretRefusesWithoutAKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret")
+	err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN")
 	if err == nil {
 		t.Fatal("want a refusal when the keyring is unreachable")
 	}
@@ -223,10 +226,10 @@ func TestEnvSetSecretRefusesWithoutAKeyring(t *testing.T) {
 		t.Errorf("the error should say what to do instead: %q", msg)
 	}
 	if _, statErr := os.Stat(filepath.Join(dir, ".env")); !os.IsNotExist(statErr) {
-		t.Error("a refused --secret must not fall back to the plain file")
+		t.Error("a refused vault set must not fall back to the plain file")
 	}
 	if names := vaultFiles(t); len(names) != 0 {
-		t.Errorf("a refused --secret left %v behind", names)
+		t.Errorf("a refused vault set left %v behind", names)
 	}
 }
 
@@ -236,18 +239,18 @@ func TestEnvSetSecretNormalizesAConnectionLikeTheFileDoes(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "postgres://u:p@h:5432/db\n")
-	if err := execute(t, d, "local", "env", "connection", "set", "my_db", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "my_db"); err != nil {
 		t.Fatal(err)
 	}
 	d, vaultOut, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "connection", "get", "my_db", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "get", "my_db"); err != nil {
 		t.Fatal(err)
 	}
 
 	// The same input through the plain file, in a fresh project.
 	other := secretEnvProject(t, "")
 	d, _, _ = envDeps(t, other, "postgres://u:p@h:5432/db\n")
-	if err := execute(t, d, "local", "env", "connection", "set", "my_db", "--secret=false"); err != nil {
+	if err := execute(t, d, "local", "env", "connection", "set", "my_db", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	d, fileOut, _ := envDeps(t, other, "")
@@ -271,7 +274,7 @@ func TestListSeesAVaultOnlyValue(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = {}\n")
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -287,20 +290,20 @@ func TestListSeesAVaultOnlyValue(t *testing.T) {
 	}
 }
 
-// set/get --secret have to say they used the vault. Reporting the scope name made
+// set/get of a vault value have to say they used the vault. Reporting the scope name made
 // the output byte-identical to a plain set, so nothing reading it could tell
 // whether a credential landed in the encrypted store or a committable file.
 func TestSecretOperationsNameTheVault(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, out, _ := envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret", "--output", "json"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "vault") {
-		t.Errorf("set --secret should report the vault, got %s", out.String())
+		t.Errorf("set should report the vault, got %s", out.String())
 	}
-	if got := getJSON(t, dir, "TOKEN", "--secret"); got.Source != vaultenv.SourceProject {
-		t.Errorf("get --secret source = %q, want %q", got.Source, vaultenv.SourceProject)
+	if got := getJSON(t, dir, "TOKEN"); got.Source != vaultenv.SourceProject {
+		t.Errorf("get source = %q, want %q", got.Source, vaultenv.SourceProject)
 	}
 }

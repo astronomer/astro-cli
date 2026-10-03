@@ -3,7 +3,7 @@
   "name": "x",
   "status": "x",
   "reach": {
-    "everywhere": true,
+    "auto_link": true,
     "projects": [
       {
         "path": "x",

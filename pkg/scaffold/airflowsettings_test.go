@@ -227,7 +227,7 @@ func TestNoWriterKeepsTheFile(t *testing.T) {
 	require.False(t, anyContains(res.Deleted, SettingsRelPath), "%v", res.Deleted)
 	require.Contains(t, res.Notes, SettingsRelPath+": the values of its 1 connection and 1 Airflow variable "+
 		"stayed in the file. Convert this project in Astro Desktop, or run "+
-		"`astro local env connection set <id> --secret` and `astro local env airflow-variable set <key> --secret`, "+
+		"`astro local env connection set <id>` and `astro local env airflow-variable set <key>`, "+
 		"to move them into the encrypted vault")
 }
 
@@ -351,7 +351,7 @@ func anyContains(hay []string, needle string) bool {
 //
 // What is carried is whatever was committed, which may be months stale or a
 // placeholder. What is already there was put there deliberately, through
-// `astro local env <noun> set --secret` or the app. Overwriting it destroys the good
+// `astro local env <noun> set` or the app. Overwriting it destroys the good
 // credential and leaves the project running against exactly the value this
 // transform exists to get out of version control.
 func TestAValueAlreadyInTheVaultIsNotOverwritten(t *testing.T) {
@@ -588,7 +588,7 @@ func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(raw), "region = {optional = true, sensitive = true}")
 	require.Contains(t, res.Advisories,
-		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with `astro local env airflow-variable set region --secret`")
+		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with `astro local env airflow-variable set region`")
 	for _, a := range res.Advisories {
 		require.NotContains(t, a, "required")
 	}

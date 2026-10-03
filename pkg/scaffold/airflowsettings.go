@@ -29,7 +29,7 @@ const SettingsRelPath = "airflow_settings.yaml"
 // # Connections go to the vault, and are declared
 //
 // A connection is a credential. Its value goes to the shared vault at the
-// project's scope — the same place `astro local env connection set --secret` writes and
+// project's scope — the same place `astro local env connection set` writes and
 // `astro local start` resolves — and the manifest gets a declaration naming it
 // and its conn_type, marked sensitive.
 //
@@ -48,7 +48,7 @@ const SettingsRelPath = "airflow_settings.yaml"
 // file out of version control — so a declared default would commit tokens that
 // were never committed before. Every one is marked sensitive rather than
 // guessed at from its name, so the declaration says where the value lives and
-// a later `set --secret=false` cannot move it into a plain file.
+// a later `set --plain` is refused rather than moving it into a plain file.
 //
 // # Pools go to [tool.astro.pools]
 //
@@ -319,7 +319,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 			// anyway, minus the part where nothing said so.
 			c.advisories = append(c.advisories, id+
 				": declared as a required connection, with no value to carry. "+
-				"Set it with `astro local env connection set "+id+" --secret`")
+				"Set it with `astro local env connection set "+id+"`")
 			continue
 		}
 		c.secrets = append(c.secrets, SecretWrite{
@@ -369,7 +369,7 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			c.schema.AirflowVariables[name] = envschema.ValueSpec{Sensitive: true, HasSensitive: true, Optional: true}
 			c.advisories = append(c.advisories, name+
 				": declared as an optional Airflow variable, since it had no value to carry. "+
-				"Set it with `astro local env airflow-variable set "+name+" --secret`")
+				"Set it with `astro local env airflow-variable set "+name+"`")
 			continue
 		}
 		c.schema.AirflowVariables[name] = envschema.ValueSpec{Sensitive: true, HasSensitive: true}
@@ -429,7 +429,7 @@ func connClues(sc *settingsConn) string {
 //
 // Both arms end at airflowenv, which is the one definition of what a stored
 // connection looks like. A conn_uri is normalized through the same function
-// `astro local env connection set --secret` uses, rather than stored as written: the vault
+// `astro local env connection set` uses, rather than stored as written: the vault
 // holds JSON, and a URI sitting in it is a record only one of the two tools can
 // read back.
 //
@@ -662,10 +662,10 @@ func valueCount(writes []SecretWrite) string {
 func setCommands(writes []SecretWrite) string {
 	var cmds []string
 	if slices.ContainsFunc(writes, func(w SecretWrite) bool { return w.Kind == secrets.KindConn }) {
-		cmds = append(cmds, "`astro local env connection set <id> --secret`")
+		cmds = append(cmds, "`astro local env connection set <id>`")
 	}
 	if slices.ContainsFunc(writes, func(w SecretWrite) bool { return w.Kind == secrets.KindVar }) {
-		cmds = append(cmds, "`astro local env airflow-variable set <key> --secret`")
+		cmds = append(cmds, "`astro local env airflow-variable set <key>`")
 	}
 	return strings.Join(cmds, " and ")
 }

@@ -46,12 +46,12 @@ func hasKey(keys []string, key string) bool {
 	return false
 }
 
-// A name the manifest declares sensitive goes to the vault without --secret, and
-// the project's .env is not touched.
+// A name the manifest declares sensitive goes to the vault, as every value does
+// by default, and the project's .env is not touched.
 func TestSetVaultsADeclaredSensitiveName(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
 
-	d, _, stderr := envDeps(t, dir, "s3cr3t\n")
+	d, _, _ := envDeps(t, dir, "s3cr3t\n")
 	if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
 		t.Fatal(err)
 	}
@@ -64,9 +64,6 @@ func TestSetVaultsADeclaredSensitiveName(t *testing.T) {
 	}
 	if got := getJSON(t, dir, "API_TOKEN"); got.Source != vaultenv.SourceProject || got.Value != "s3cr3t" {
 		t.Errorf("get resolved source %q (value matches: %t), want the project vault", got.Source, got.Value == "s3cr3t")
-	}
-	if !strings.Contains(stderr.String(), "declared sensitive") {
-		t.Errorf("set should say why the value went to the vault; stderr: %q", stderr.String())
 	}
 }
 
@@ -87,14 +84,14 @@ func TestSetVaultsADeclaredConnection(t *testing.T) {
 	}
 }
 
-// Declared but not sensitive, and not declared at all: both keep the plaintext
-// file, as before.
-func TestSetKeepsNonSensitiveNamesInTheFile(t *testing.T) {
+// Declared but not sensitive, and not declared at all: --plain keeps both in
+// the plaintext file.
+func TestPlainKeepsNonSensitiveNamesInTheFile(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nLOG_LEVEL = {}\n")
 
 	for _, name := range []string{"LOG_LEVEL", "UNDECLARED"} {
 		d, _, _ := envDeps(t, dir, "v\n")
-		if err := execute(t, d, "local", "env", "variable", "set", name); err != nil {
+		if err := execute(t, d, "local", "env", "variable", "set", name, "--plain"); err != nil {
 			t.Fatalf("set %s: %v", name, err)
 		}
 		if keys := dotenvKeys(t, filepath.Join(dir, ".env")); !hasKey(keys, name) {
@@ -106,9 +103,9 @@ func TestSetKeepsNonSensitiveNamesInTheFile(t *testing.T) {
 	}
 }
 
-// A set that cannot read the declarations refuses rather than guessing "not
-// sensitive", and writes nothing anywhere.
-func TestSetRefusesWhenTheDeclarationsDoNotRead(t *testing.T) {
+// A --plain set that cannot read the declarations refuses rather than guessing
+// "not sensitive", and writes nothing anywhere.
+func TestPlainSetRefusesWhenTheDeclarationsDoNotRead(t *testing.T) {
 	for name, body := range map[string]string{
 		"schema error": "[tool.astro.env]\nAPI_TOKEN = { sensitive = 'yes' }\n",
 		"toml error":   "[tool.astro.env\nAPI_TOKEN = {}\n",
@@ -117,7 +114,7 @@ func TestSetRefusesWhenTheDeclarationsDoNotRead(t *testing.T) {
 			dir := secretEnvProject(t, body)
 
 			d, _, _ := envDeps(t, dir, "s3cr3t\n")
-			err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN")
+			err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--plain")
 			if err == nil {
 				t.Fatal("want a refusal when the manifest does not read")
 			}
@@ -131,18 +128,18 @@ func TestSetRefusesWhenTheDeclarationsDoNotRead(t *testing.T) {
 				t.Errorf("a refused set left %d vault entries", n)
 			}
 
-			// --secret does not need the declarations: the value is going to
-			// the vault whatever they say.
+			// The default does not need the declarations: the value is going
+			// to the vault whatever they say.
 			d, _, _ = envDeps(t, dir, "s3cr3t\n")
-			if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN", "--secret"); err != nil {
-				t.Errorf("set --secret should not depend on the manifest reading: %v", err)
+			if err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN"); err != nil {
+				t.Errorf("a default set should not depend on the manifest reading: %v", err)
 			}
 		})
 	}
 }
 
-// --secret=false is an explicit request for the plaintext file, which a
-// sensitive declaration rules out. Refused, with nothing written.
+// --plain is an explicit request for an unencrypted copy, which a sensitive
+// declaration rules out. Refused, with nothing written, in either scope.
 func TestSetRefusesPlaintextForADeclaredSensitiveName(t *testing.T) {
 	cases := []struct {
 		name, body, noun, arg, value, envKey string
@@ -155,19 +152,21 @@ func TestSetRefusesPlaintextForADeclaredSensitiveName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := secretEnvProject(t, tc.body)
 
-			d, _, _ := envDeps(t, dir, tc.value+"\n")
-			err := execute(t, d, "local", "env", tc.noun, "set", tc.arg, "--secret=false")
-			if err == nil {
-				t.Fatal("want --secret=false refused for a declared-sensitive name")
-			}
-			if !strings.Contains(err.Error(), "--secret=false") {
-				t.Errorf("the refusal should name the flag that asked for plaintext: %v", err)
-			}
-			if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, tc.envKey) {
-				t.Errorf("a refused plaintext write still reached .env (keys: %v)", keys)
-			}
-			if n := len(vaultFiles(t)); n != 0 {
-				t.Errorf("a refused write left %d vault entries", n)
+			for _, flags := range [][]string{{"--plain"}, {"--plain", "--global"}, {"--secret=false"}} {
+				d, _, _ := envDeps(t, dir, tc.value+"\n")
+				err := execute(t, d, append([]string{"local", "env", tc.noun, "set", tc.arg}, flags...)...)
+				if err == nil {
+					t.Fatalf("want %v refused for a declared-sensitive name", flags)
+				}
+				if !strings.Contains(err.Error(), "--plain") {
+					t.Errorf("the refusal should name the flag that asked for plaintext: %v", err)
+				}
+				if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, tc.envKey) {
+					t.Errorf("a refused plaintext write still reached .env (keys: %v)", keys)
+				}
+				if n := len(vaultFiles(t)); n != 0 {
+					t.Errorf("a refused write left %d vault entries", n)
+				}
 			}
 		})
 	}
@@ -201,17 +200,17 @@ func TestSetRemovesThePlaintextCopyOfAPromotedName(t *testing.T) {
 }
 
 // One home per scope, in both directions, for names with no declaration too: a
-// plain set removes the vault copy, and a --secret set removes the file copy.
+// --plain set removes the vault copy, and a default set removes the file copy.
 // Otherwise a delete against one store leaves the other standing.
 func TestSetKeepsOneHomePerScope(t *testing.T) {
 	dir := secretEnvProject(t, "")
 
 	d, _, _ := envDeps(t, dir, "v1\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "v2\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--plain", "--replace-secret"); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(vaultFiles(t)); n != 0 {
@@ -219,16 +218,16 @@ func TestSetKeepsOneHomePerScope(t *testing.T) {
 	}
 
 	d, _, _ = envDeps(t, dir, "v3\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, "TOKEN") {
-		t.Errorf("a --secret set left the plaintext copy behind (keys: %v)", keys)
+		t.Errorf("a default set left the plaintext copy behind (keys: %v)", keys)
 	}
 
 	// With one copy, a delete leaves nothing.
 	d, _, _ = envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN", "--secret"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "delete", "TOKEN"); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ = envDeps(t, dir, "")
@@ -237,38 +236,52 @@ func TestSetKeepsOneHomePerScope(t *testing.T) {
 	}
 }
 
-// A plain set on a machine with no keyring still works: removing a vault copy
-// deletes a file and needs no master key.
+// A --plain set on a machine with no keyring still works, in both scopes:
+// removing a vault copy deletes a file, and a plain global is stored
+// unencrypted, so neither needs the master key. The keyring mock fails every
+// call, so a set that reached it would fail.
 func TestPlainSetNeedsNoKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
 
 	d, _, _ := envDeps(t, dir, "v\n")
-	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--plain"); err != nil {
 		t.Fatalf("a plain set must not depend on the keyring: %v", err)
+	}
+	d, _, _ = envDeps(t, dir, "g\n")
+	if err := execute(t, d, "local", "env", "variable", "set", "REGION", "--plain", "--global", "--auto-link"); err != nil {
+		t.Fatalf("a plain global must not depend on the keyring: %v", err)
+	}
+	if got := getJSON(t, dir, "REGION", "--global"); got.Value != "g" || got.Source != vaultenv.SourceGlobal {
+		t.Errorf("get --global = %+v, want the plain global read without a keyring", got)
+	}
+	if got := getJSON(t, dir, "REGION"); got.Value != "g" {
+		t.Errorf("resolved get = %+v, want the plain global read without a keyring", got)
 	}
 }
 
-// A promoted write on a machine with no keyring refuses, says the declaration
-// is why, and does not fall back to the plaintext file.
-func TestPromotedSetRefusesWithoutAKeyring(t *testing.T) {
+// A default set on a machine with no keyring refuses, names --plain as the way
+// to store it unencrypted, and does not fall back to the plaintext file.
+func TestDefaultSetRefusesWithoutAKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
 
-	d, _, _ := envDeps(t, dir, "s3cr3t\n")
-	err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN")
-	if err == nil {
-		t.Fatal("want a refusal when the keyring is unreachable")
-	}
-	if !strings.Contains(err.Error(), "declared sensitive") {
-		t.Errorf("the error should say the declaration sent it to the vault: %v", err)
+	for _, name := range []string{"API_TOKEN", "UNDECLARED"} {
+		d, _, _ := envDeps(t, dir, "s3cr3t\n")
+		err := execute(t, d, "local", "env", "variable", "set", name)
+		if err == nil {
+			t.Fatalf("set %s: want a refusal when the keyring is unreachable", name)
+		}
+		if !strings.Contains(err.Error(), "--plain") {
+			t.Errorf("set %s: the error should name --plain: %v", name, err)
+		}
 	}
 	if _, statErr := os.Stat(filepath.Join(dir, ".env")); !os.IsNotExist(statErr) {
-		t.Error("a refused promoted set fell back to the plaintext file")
+		t.Error("a refused set fell back to the plaintext file")
 	}
 }
 
-// delete without --secret removes a declared-sensitive name from the vault,
+// delete removes a declared-sensitive name from the vault,
 // along with any plaintext copy in the same scope.
 func TestDeleteOfADeclaredSensitiveNameClearsBothStores(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
@@ -294,7 +307,7 @@ func TestDeleteOfADeclaredSensitiveNameClearsBothStores(t *testing.T) {
 	}
 }
 
-// delete --secret=false is how a stale plaintext copy of a sensitive name is
+// delete --plain is how a stale plaintext copy of a sensitive name is
 // removed on its own, so it is not refused the way a plaintext set is.
 func TestDeletePlaintextCopyOfASensitiveNameIsAllowed(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { sensitive = true }\n")
@@ -302,10 +315,10 @@ func TestDeletePlaintextCopyOfASensitiveNameIsAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, _, _ := envDeps(t, dir, "")
-	if err := execute(t, d, "local", "env", "variable", "delete", "API_TOKEN", "--secret=false"); err != nil {
+	if err := execute(t, d, "local", "env", "variable", "delete", "API_TOKEN", "--plain"); err != nil {
 		t.Fatal(err)
 	}
 	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, "API_TOKEN") {
-		t.Errorf("delete --secret=false left the plaintext copy (keys: %v)", keys)
+		t.Errorf("delete --plain left the plaintext copy (keys: %v)", keys)
 	}
 }
