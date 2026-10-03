@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -90,17 +91,20 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	if err != nil {
 		return err
 	}
+	// The caller's values travel in the compose process's environment and
+	// nowhere else. They are typically decrypted connections and variables, and
+	// a command line is readable by every local user through ps.
+	environ := secretEnviron(req.Env)
 	line := composeLine{
 		conn:       conn,
 		files:      composeFiles(path, projectPath),
 		name:       name,
 		projectDir: projectPath,
-		// The caller's environment reaches the compose process too, not only
-		// the container: the file declares each PassthroughEnv and SecretEnv
-		// key without a value, and compose resolves those from its own
-		// environment. A key it cannot resolve is dropped from the container
-		// silently.
-		extraEnv: secretEnviron(req.Env),
+		// Compose resolves two kinds of valueless entry from this: the
+		// PassthroughEnv and SecretEnv keys the file declares, and the bare
+		// -e KEY flags below. A key it cannot resolve is dropped from the
+		// container silently.
+		extraEnv: environ,
 	}
 
 	// --pull never: the image was built locally and never pushed, so a pull can
@@ -120,12 +124,18 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	// and prints to stdout while it waits. Overriding it also discards the
 	// service's own command, so the arguments below are the whole command line
 	// and a program with no arguments runs as itself.
+	//
+	// -e names each key with no value, so compose takes the value from its own
+	// environment. The flag is still needed: Env is not limited to keys the
+	// file declares, and one it does not declare would otherwise never reach
+	// the container.
 	args := []string{
 		"run", "--rm", "--no-deps", "-T", "--pull", "never",
 		"--entrypoint", req.Argv[0],
 	}
-	for _, kv := range secretEnviron(req.Env) {
-		args = append(args, "-e", kv)
+	for _, kv := range environ {
+		key, _, _ := strings.Cut(kv, "=")
+		args = append(args, "-e", key)
 	}
 	args = append(args, execService)
 	args = append(args, req.Argv[1:]...)

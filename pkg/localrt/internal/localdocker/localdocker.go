@@ -1050,7 +1050,7 @@ type composeLine struct {
 	projectDir string
 	// extraEnv is added to the compose process environment on top of the engine
 	// connection's own. It carries SecretEnv values, which the file declares
-	// without recording — see passEnv.
+	// without recording (see passEnv) and RunInImage names with bare -e flags.
 	extraEnv []string
 }
 
@@ -1087,8 +1087,9 @@ func (l composeLine) argv(args ...string) []string {
 // name anything, so a plan carrying DOCKER_HOST for a DockerOperator DAG would
 // silently point the start at a different daemon while Stop, which uses
 // conn.env untouched, still looked at the right one. A secret that loses to
-// the engine connection simply does not reach the container; a compose command
-// talking to the wrong daemon is unrecoverable from the UI.
+// the engine connection reaches the container with the connection's value
+// instead of its own; a compose command talking to the wrong daemon is
+// unrecoverable from the UI.
 func (l composeLine) env() []string {
 	out := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
 	out = append(out, l.extraEnv...)

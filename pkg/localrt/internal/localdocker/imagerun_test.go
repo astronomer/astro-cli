@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -103,7 +104,7 @@ func TestRunInImageRequiresACommand(t *testing.T) {
 	assert.Empty(t, cmd.calls)
 }
 
-// Extra environment reaches the command, in a deterministic order, and a key
+// Extra environment is named to compose, in a deterministic order, and a key
 // that cannot survive KEY=VALUE is dropped rather than declared-but-unresolved.
 func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 	cmd := &fakeCmd{}
@@ -123,11 +124,51 @@ func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 
 	require.Len(t, cmd.calls, 1)
 	call := cmd.calls[0]
-	assert.Contains(t, call, "-e AIRFLOW_HOME=/tmp/scratch")
-	assert.Contains(t, call, "-e ZED=last")
-	assert.NotContains(t, call, "BAD=KEY", "a key holding = would never resolve")
-	assert.Less(t, strings.Index(call, "AIRFLOW_HOME"), strings.Index(call, "ZED=last"),
-		"env should be ordered so the command line is reproducible")
+	assert.Contains(t, call, "-e AIRFLOW_HOME -e ZED "+execService,
+		"each key should be named bare, in order, so the command line is reproducible")
+	assert.NotContains(t, call, "BAD", "a key holding = would never resolve")
+
+	env, ok := cmd.envFor("run --rm")
+	require.True(t, ok, "the run command's environment was not recorded")
+	assert.Contains(t, env, "AIRFLOW_HOME=/tmp/scratch")
+	assert.Contains(t, env, "ZED=last")
+	for _, kv := range env {
+		assert.False(t, strings.HasPrefix(kv, "BAD"), "a key holding = would never resolve")
+	}
+}
+
+// Values never appear on the command line, where any local user can read them
+// through ps. They reach the container only through the compose process's
+// environment, which compose resolves each bare -e KEY from.
+func TestRunInImageKeepsValuesOffTheCommandLine(t *testing.T) {
+	cmd := &fakeCmd{}
+	e := testEngine(t, cmd)
+	project := t.TempDir()
+	withComposeFile(t, project)
+
+	secrets := map[string]string{
+		"AIRFLOW_CONN_WAREHOUSE": "postgres://user:hunter2-conn@db:5432/x",
+		"AIRFLOW_VAR_API_TOKEN":  "tok-hunter2-var",
+		"SNOWFLAKE_PASSWORD":     "pw-hunter2-env",
+	}
+	require.NoError(t, e.RunInImage(context.Background(), project, rt.ImageRun{
+		Argv: []string{"python", "-c", "pass"},
+		Env:  secrets,
+	}))
+
+	require.Len(t, cmd.calls, 1)
+	call := cmd.calls[0]
+	env, ok := cmd.envFor("run --rm")
+	require.True(t, ok, "the run command's environment was not recorded")
+	for k, v := range secrets {
+		// The value itself is never printed: a failure here names the key and
+		// says how long the leaked value was, which is enough to find it.
+		assert.Truef(t, !strings.Contains(call, v),
+			"the value of %s (%d bytes) is on the command line", k, len(v))
+		assert.Truef(t, strings.Contains(call, "-e "+k+" "), "%s should be named to compose", k)
+		assert.Truef(t, slices.Contains(env, k+"="+v),
+			"the value of %s should be in the compose process environment", k)
+	}
 }
 
 // The caller's streams are the command's streams: the program arrives on stdin
@@ -301,9 +342,12 @@ func TestRunInImageAcceptsADockerRecord(t *testing.T) {
 // The caller's environment reaches the compose PROCESS, not only the container.
 //
 // The compose file declares every PassthroughEnv and SecretEnv key without a
-// value, and compose resolves those from its own environment; a key it cannot
-// resolve is dropped from the container silently. The engine connection still
+// value, the command line names every caller key the same way, and compose
+// resolves all of them from its own environment; a key it cannot resolve is
+// dropped from the container silently. The engine connection still
 // goes last, so a caller-supplied DOCKER_HOST cannot retarget the invocation.
+// The same resolution means the container gets the connection's DOCKER_HOST,
+// not the caller's, exactly as the running Airflow does after a start.
 func TestRunInImageGivesTheCallersEnvToComposeItself(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
@@ -334,6 +378,11 @@ func TestRunInImageGivesTheCallersEnvToComposeItself(t *testing.T) {
 	}
 	assert.Equal(t, "DOCKER_HOST=unix:///real.sock", last,
 		"a caller-supplied DOCKER_HOST must not retarget the invocation")
+	require.Len(t, cmd.calls, 1)
+	assert.Contains(t, cmd.calls[0], "-e DOCKER_HOST ",
+		"the key is named bare, so compose resolves it to the connection's value")
+	assert.NotContains(t, cmd.calls[0], "attacker.sock",
+		"a value on the command line would outrank compose's own environment")
 }
 
 // A compose file that stat cannot resolve for some other reason is not reported

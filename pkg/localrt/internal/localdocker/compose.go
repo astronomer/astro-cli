@@ -336,9 +336,11 @@ func passEnv(names []string, secretEnv map[string]string, env []envVar) []string
 	return out
 }
 
-// secretEnviron renders SecretEnv as KEY=VALUE for a child process environment.
-// Sorted so a command line is reproducible; the compose child reads these to
-// resolve the valueless entries passEnv declared.
+// secretEnviron renders SecretEnv as KEY=VALUE for a child process environment,
+// sorted so the result is deterministic. The compose child reads these to
+// resolve valueless entries: the ones passEnv declared, and RunInImage's bare
+// -e KEY flags. The values belong in an environment only, never on a command
+// line, where any local user can read them through ps.
 func secretEnviron(secretEnv map[string]string) []string {
 	if len(secretEnv) == 0 {
 		return nil
