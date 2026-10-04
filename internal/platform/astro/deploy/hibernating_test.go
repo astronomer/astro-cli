@@ -15,6 +15,7 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -118,9 +119,11 @@ func TestDeployImageV2_HibernatingSaysHowToWakeIt(t *testing.T) {
 	_, handler := withImageSeams(t, "3.1-2")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+		},
+		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), wakeUpHint)

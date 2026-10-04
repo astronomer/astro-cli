@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -155,8 +156,10 @@ func imageDeployWithCapture(t *testing.T, in *ImageDeployV2Input) (ImageDeployV2
 func TestDeployImageV2_RecordsTheCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	res, req := imageDeployWithCapture(t, &ImageDeployV2Input{
-		ProjectDir:     v2GitProjectDir(t, false),
-		AirflowVersion: "3.1",
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2GitProjectDir(t, false),
+			AirflowVersion: "3.1",
+		},
 	})
 
 	assertGitHubCommit(t, req.Git)
@@ -167,8 +170,10 @@ func TestDeployImageV2_RecordsTheCommit(t *testing.T) {
 func TestDeployImageV2_PrebuiltImageRecordsNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	res, req := imageDeployWithCapture(t, &ImageDeployV2Input{
-		ProjectDir: v2GitProjectDir(t, false),
-		ImageName:  "astro-package/demo:7.0.0-abc",
+		Build: imagebuild.ManifestBuild{
+			ProjectDir: v2GitProjectDir(t, false),
+		},
+		ImageName: "astro-package/demo:7.0.0-abc",
 	})
 
 	assert.Nil(t, req.Git)

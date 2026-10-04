@@ -159,14 +159,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
 	// would build.
-	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuild{
-		ProjectDir:     req.ProjectDir,
-		AirflowVersion: airflow.Pin,
-		Runtime:        airflow.Runtime,
-		Dockerfile:     req.Manifest.Astro.Dockerfile,
-		Dependencies:   req.Manifest.Requirements(),
-		Packages:       req.Manifest.Astro.Packages,
-	})
+	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest))
 	if err != nil {
 		return Result{}, err
 	}

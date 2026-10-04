@@ -277,14 +277,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// Dockerfile would not use turns a working start into a network
 	// dependency. It also validates the pin's generation, which everything
 	// below reads off the plan.
-	build, err := e.images.Request(ctx, rt.ManifestBuild{
-		ProjectDir:     projectPath,
-		AirflowVersion: p.AirflowVersion,
-		Runtime:        p.Runtime,
-		Dockerfile:     p.Dockerfile,
-		Dependencies:   p.Dependencies,
-		Packages:       p.Packages,
-	})
+	build, err := e.images.Request(ctx, p.ManifestBuild(projectPath))
 	if err != nil {
 		return nil, err
 	}

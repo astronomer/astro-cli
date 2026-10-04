@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -13,6 +14,30 @@ import (
 // (rt.ImageBuilder.Request) takes the same type without importing this
 // package; see rt.ManifestBuild for its fields.
 type ManifestBuild = rt.ManifestBuild
+
+// ManifestBuildOf reads the fields that decide a project's image out of its
+// manifest, for the project rooted at dir (absolute). It is the one place that
+// mapping lives: the CLI's local start, deploy and `astro package astro`, and
+// Astro Desktop, all fill a ManifestBuild through it, so a field added to
+// ManifestBuild is wired once here and every consumer builds the same image.
+// A nil m yields just ProjectDir.
+//
+// It lives here rather than beside ManifestBuild in rt because rt keeps an
+// empty dependency list, and reading a manifest needs pkg/manifest.
+func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
+	if m == nil {
+		return ManifestBuild{ProjectDir: dir}
+	}
+	airflow := m.Airflow()
+	return ManifestBuild{
+		ProjectDir:     dir,
+		AirflowVersion: airflow.Pin,
+		Runtime:        airflow.Runtime,
+		Dockerfile:     m.Astro.Dockerfile,
+		Dependencies:   m.Requirements(),
+		Packages:       m.Astro.Packages,
+	}
+}
 
 // baseImageFunc resolves the runtime base a generated build starts FROM, from
 // the manifest's Airflow pin and its [tool.astro] runtime build ("" for none).

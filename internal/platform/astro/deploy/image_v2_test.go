@@ -104,12 +104,14 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 	cmd, handler := withImageSeams(t, "3.1-2")
 
 	res, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		Dependencies:   []string{"pandas"},
-		IncludeDags:    true,
-		Description:    "a v2 image deploy",
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+			Dependencies:   []string{"pandas"},
+		},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  true,
+		Description:  "a v2 image deploy",
 	}, client)
 	require.NoError(t, err)
 
@@ -139,11 +141,13 @@ func TestDeployImageV2_ImageOnlySkipsDags(t *testing.T) {
 	_, handler := withImageSeams(t, "3.1-2")
 
 	res, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		Dependencies:   []string{"pandas"},
-		IncludeDags:    false,
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+			Dependencies:   []string{"pandas"},
+		},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  false,
 	}, client)
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
@@ -164,7 +168,9 @@ func TestDeployImageV2_ImageNameSkipsBuild(t *testing.T) {
 	cmd, _ := withImageSeams(t, "3.1-2")
 
 	res, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+		Build: imagebuild.ManifestBuild{
+			ProjectDir: v2ProjectDir(t),
+		},
 		DeploymentID: "test-deployment-id",
 		ImageName:    "astro-package/demo:7.0.0-abc",
 		IncludeDags:  false,
@@ -223,11 +229,13 @@ func TestDeployImageV2_NothingToInstallBuildsASinglePlatformImage(t *testing.T) 
 
 	dir := v2ProjectDir(t)
 	res, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     dir,
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		Dependencies:   []string{"apache-airflow==3.1.*"},
-		IncludeDags:    false,
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     dir,
+			AirflowVersion: "3.1",
+			Dependencies:   []string{"apache-airflow==3.1.*"},
+		},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  false,
 	}, client)
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
@@ -252,11 +260,13 @@ func TestDeployImageV2_RuntimeVersionRejected(t *testing.T) {
 	withImageSeams(t, "3.1-1")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		Dependencies:   []string{"pandas"},
-		IncludeDags:    true,
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+			Dependencies:   []string{"pandas"},
+		},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  true,
 	}, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "downgrade")
@@ -274,10 +284,12 @@ func TestDeployImageV2_NoDockerFailsEarly(t *testing.T) {
 	t.Cleanup(func() { resolveContainerEngine = origResolve })
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		IncludeDags:    true,
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+		},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  true,
 	}, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "needs Docker")
@@ -298,10 +310,12 @@ func TestDeployImageV2_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
 	t.Cleanup(func() { resolveContainerEngine = origResolve })
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		IncludeDags:    true,
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+		},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  true,
 	}, client)
 	require.ErrorIs(t, err, container.ErrMachineNotRunning)
 	assert.Contains(t, err.Error(), "podman machine init --now")
@@ -368,34 +382,34 @@ func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 	}{
 		{
 			name:    "an older Airflow pin",
-			in:      ImageDeployV2Input{AirflowVersion: "3.2"},
+			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2"}},
 			wantErr: "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, pin apache-airflow to 3.3 or newer in pyproject.toml",
 		},
 		{
 			name:    "an older runtime build in another series",
-			in:      ImageDeployV2Input{AirflowVersion: "3.2", Runtime: "3.2-10"},
+			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Runtime: "3.2-10"}},
 			wantErr: "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, pin apache-airflow to 3.3 and set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml",
 		},
 		{
 			name:    "an older runtime build",
-			in:      ImageDeployV2Input{AirflowVersion: "3.3", Runtime: "3.3-7"},
+			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.3", Runtime: "3.3-7"}},
 			wantErr: "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml",
 		},
 		{
 			name:       "a Dockerfile FROM an older runtime",
-			in:         ImageDeployV2Input{AirflowVersion: "3.2", Dockerfile: "Dockerfile"},
+			in:         ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Dockerfile: "Dockerfile"}},
 			dockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.2-10-python-3.12\n",
 			wantErr:    "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, change the FROM line in Dockerfile to Astro Runtime 3.3-8 or newer, and pin apache-airflow to 3.3 in pyproject.toml",
 		},
 		{
 			name:       "a Dockerfile whose final stage is FROM an older series tag",
-			in:         ImageDeployV2Input{AirflowVersion: "3.2", Dockerfile: "Dockerfile"},
+			in:         ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Dockerfile: "Dockerfile"}},
 			dockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.3 AS deps\nFROM astrocrpublic.azurecr.io/runtime:3.2\n",
 			wantErr:    "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, change the FROM line in Dockerfile to Astro Runtime 3.3-8 or newer, and pin apache-airflow to 3.3 in pyproject.toml",
 		},
 		{
 			name:    "a series the deployment does not offer",
-			in:      ImageDeployV2Input{AirflowVersion: "3.5"},
+			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.5"}},
 			wantErr: "cannot deploy unsupported Astro Runtime 3.5; supported versions: 3.2-10, 3.3-8",
 		},
 	}
@@ -409,10 +423,10 @@ func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 
 			in := tt.in
 			in.OnBuild = func() { t.Error("a refused deploy must not announce a build") }
-			in.ProjectDir = v2ProjectDir(t)
+			in.Build.ProjectDir = v2ProjectDir(t)
 			in.DeploymentID = "test-deployment-id"
 			if tt.dockerfile != "" {
-				require.NoError(t, os.WriteFile(filepath.Join(in.ProjectDir, "Dockerfile"), []byte(tt.dockerfile), 0o600))
+				require.NoError(t, os.WriteFile(filepath.Join(in.Build.ProjectDir, "Dockerfile"), []byte(tt.dockerfile), 0o600))
 			}
 
 			_, err := DeployImageV2(in, client)
@@ -435,10 +449,12 @@ func TestDeployImageV2_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *testin
 
 	built := false
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.3",
-		OnBuild:        func() { built = true },
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.3",
+		},
+		DeploymentID: "test-deployment-id",
+		OnBuild:      func() { built = true },
 	}, client)
 	require.EqualError(t, err, "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml")
 	assert.True(t, built, "the build was announced before it ran")
@@ -456,7 +472,9 @@ func TestDeployImageV2_ImageNameDowngradeNamesTheFix(t *testing.T) {
 	withImageSeams(t, "3.2-10")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+		Build: imagebuild.ManifestBuild{
+			ProjectDir: v2ProjectDir(t),
+		},
 		DeploymentID: "test-deployment-id",
 		ImageName:    "astro-package/demo:3.2-10-abc",
 	}, client)
@@ -516,13 +534,15 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN apt-get install -y unixodbc-dev\n"), 0o600))
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     dir,
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		Dependencies:   []string{"pandas"},
-		Dockerfile:     "docker/Dockerfile",
-		BuildSecrets:   []string{"id=tok,env=TOK"},
-		IncludeDags:    true,
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     dir,
+			AirflowVersion: "3.1",
+			Dependencies:   []string{"pandas"},
+			Dockerfile:     "docker/Dockerfile",
+		},
+		DeploymentID: "test-deployment-id",
+		BuildSecrets: []string{"id=tok,env=TOK"},
+		IncludeDags:  true,
 	}, client)
 	require.NoError(t, err)
 
@@ -553,10 +573,12 @@ func TestDeployImageV2_RefusesAnUnreadableDeclaration(t *testing.T) {
 	cmd, _ := withImageSeams(t, "3.1-2")
 
 	_, err := DeployImageV2(ImageDeployV2Input{
-		ProjectDir:     v2ProjectDir(t),
-		DeploymentID:   "test-deployment-id",
-		AirflowVersion: "3.1",
-		Dockerfile:     "docker/Dockerfile", // never written
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     v2ProjectDir(t),
+			AirflowVersion: "3.1",
+			Dockerfile:     "docker/Dockerfile", // never written
+		},
+		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Dockerfile")

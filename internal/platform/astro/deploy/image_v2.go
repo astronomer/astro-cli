@@ -32,17 +32,14 @@ import (
 type ImageDeployV2Input struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment and its registry live on; nil is the current context.
-	Login          *config.Context
-	ProjectDir     string
-	DeploymentID   string
-	AirflowVersion string   // the manifest's Airflow requirement pin; the base resolves from it
-	Runtime        string   // the manifest's [tool.astro] runtime build, "" for the series' newest
-	Dependencies   []string // manifest [project] dependencies
-	Packages       []string // manifest [tool.astro] packages
-	// Dockerfile is the manifest's [tool.astro] dockerfile, slash-separated and
-	// relative to ProjectDir. Set means the project's own file is the build.
-	Dockerfile string
-	// BuildSecrets are docker build --secret specs for that file's build.
+	Login *config.Context
+	// Build is the project's root (Build.ProjectDir, absolute, which the
+	// commit lookup and the dags upload use too) and the manifest's
+	// image-deciding fields, as imagebuild.ManifestBuildOf reads them.
+	Build        imagebuild.ManifestBuild
+	DeploymentID string
+	// BuildSecrets are docker build --secret specs for a declared Dockerfile's
+	// build (Build.Dockerfile).
 	BuildSecrets []string
 	ImageName    string // a prebuilt local image (--image-name); "" builds from the manifest
 	// OnBuild runs once the deployment has cleared the deploy and just before
@@ -110,21 +107,14 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	var gitInfo DeployGitV2
 	var commitMessage string
 	if in.ImageName == "" {
-		gitInfo, commitMessage = readDeployGitV2(in.ProjectDir)
+		gitInfo, commitMessage = readDeployGitV2(in.Build.ProjectDir)
 	}
 
 	var req imagebuild.Request
 	if in.ImageName == "" {
 		// Which image the manifest builds is imagebuild's rule, shared with
 		// every other consumer that builds from a manifest.
-		req, err = imagebuild.ForManifest(imagebuild.ManifestBuild{
-			ProjectDir:     in.ProjectDir,
-			AirflowVersion: in.AirflowVersion,
-			Runtime:        in.Runtime,
-			Dockerfile:     in.Dockerfile,
-			Dependencies:   in.Dependencies,
-			Packages:       in.Packages,
-		})
+		req, err = imagebuild.ForManifest(in.Build)
 		if err != nil {
 			return ImageDeployV2Result{}, err
 		}
@@ -179,7 +169,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	// A "both" deploy also ships the dags tarball, fitting the image just pushed.
 	var tarballVersion string
 	if in.IncludeDags {
-		tarballVersion, err = uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
+		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
 			return ImageDeployV2Result{}, err
 		}
@@ -281,7 +271,7 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, req *imageb
 	defer os.RemoveAll(workDir) //nolint:errcheck // best-effort cleanup of a temp dir
 
 	req.WorkDir = workDir
-	req.Tag = deployImageTag(in.ProjectDir)
+	req.Tag = deployImageTag(in.Build.ProjectDir)
 	req.Secrets = in.BuildSecrets
 	req.Platform = deployImagePlatformSupport[0]
 	req.Bin = bin
@@ -305,7 +295,7 @@ func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, req *imageb
 		// Astro Runtime, and naming the base there would name an empty string
 		// and send them at a decision they did not make.
 		if req.FromDeclaredDockerfile() {
-			return "", "", fmt.Errorf("the image built from %s is missing the %s label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image", in.Dockerfile, runtimeImageLabel)
+			return "", "", fmt.Errorf("the image built from %s is missing the %s label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image", in.Build.Dockerfile, runtimeImageLabel)
 		}
 		return "", "", fmt.Errorf("the built image is missing the %s label; the runtime base %s should carry it", runtimeImageLabel, req.BaseImage)
 	}
@@ -371,7 +361,7 @@ func planRuntime(in *ImageDeployV2Input, req *imagebuild.Request) plannedRuntime
 	case req.FromDeclaredDockerfile():
 		v := airflowrt.ReadDeclaredBase(req.Dockerfile).RuntimeVersion()
 		p := plannedRuntime{raise: func(minimum string) string {
-			fix := fmt.Sprintf("change the FROM line in %s to Astro Runtime %s or newer", in.Dockerfile, minimum)
+			fix := fmt.Sprintf("change the FROM line in %s to Astro Runtime %s or newer", in.Build.Dockerfile, minimum)
 			if s := runtimeSeries(minimum); s != "" && s != runtimeSeries(v) {
 				fix += fmt.Sprintf(", and pin apache-airflow to %s in pyproject.toml", s)
 			}
@@ -381,9 +371,9 @@ func planRuntime(in *ImageDeployV2Input, req *imagebuild.Request) plannedRuntime
 			p.version, p.series = v, !tag.Build
 		}
 		return p
-	case in.Runtime != "":
-		return plannedRuntime{version: in.Runtime, raise: func(minimum string) string {
-			if s := runtimeSeries(minimum); s != "" && s != runtimeSeries(in.Runtime) {
+	case in.Build.Runtime != "":
+		return plannedRuntime{version: in.Build.Runtime, raise: func(minimum string) string {
+			if s := runtimeSeries(minimum); s != "" && s != runtimeSeries(in.Build.Runtime) {
 				return fmt.Sprintf("pin apache-airflow to %s and set [tool.astro] runtime to %s or newer in pyproject.toml", s, minimum)
 			}
 			return fmt.Sprintf("set [tool.astro] runtime to %s or newer in pyproject.toml", minimum)

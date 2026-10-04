@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -129,6 +130,34 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		return nil, err
 	}
 
+	p := localrt.Plan{
+		ProjectPath:  proj.Dir,
+		Mode:         opts.Mode,
+		BuildSecrets: util.ResolveProjectBuildSecrets(opts.BuildSecretFlags, m.Astro.BuildSecretSpecs()),
+		// Empty when the manifest states requires-python: the venv is
+		// built inside the project, so uv reads it from the manifest
+		// itself and passing it would only restate what uv is about to
+		// read. Without one, uv would pick the newest CPython it knows of,
+		// which an Airflow 2 pin cannot run under, so the fallback names
+		// a version. Astro Desktop applies the same function, so the two
+		// tools build the same interpreter for the same manifest.
+		PythonVersion:   airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin),
+		StopWithSession: opts.StopWithSession,
+		Env:             resolved.env,
+		// The vault's values, kept out of Env on purpose: docker mode
+		// writes Env into the compose file it leaves in the state
+		// directory, and a decrypted credential on disk would undo the
+		// reason the vault exists. SecretEnv is declared there without a
+		// value and handed to the compose process instead; standalone
+		// treats it as ordinary environment.
+		SecretEnv:      resolved.secretEnv,
+		PassthroughEnv: resolved.passthrough,
+		Hostname:       proj.Hostname,
+		StateDir:       stateDir,
+		RequestedPort:  choosePort(opts.RequestedPort, us.Port),
+	}
+	p.SetManifestBuild(imagebuild.ManifestBuildOf(proj.Dir, m))
+
 	return &Built{
 		Project:          proj,
 		EnvWarnings:      resolved.warnings,
@@ -136,54 +165,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		WorkspaceNote:    resolved.workspaceNote,
 		ManifestWarnings: m.Warnings,
 		Pools:            m.Astro.Pools,
-		Plan: localrt.Plan{
-			ProjectPath:    proj.Dir,
-			Mode:           opts.Mode,
-			AirflowVersion: m.Airflow().Pin,
-			// The one runtime build Docker mode builds FROM, when the manifest
-			// names one; standalone installs the requirement and ignores it.
-			Runtime: m.Airflow().Runtime,
-			// Docker mode installs these into the runtime image for parity
-			// with standalone, which gets them from the uv venv sync.
-			Dependencies: m.Requirements(),
-			// OS packages: docker mode bakes them into the image; standalone
-			// mode has no image and is warned about them (cmd/local start).
-			Packages: m.Astro.Packages,
-			// The project's own Dockerfile, when it declared one. Docker mode
-			// then runs that file as the build and AirflowVersion, Dependencies
-			// and Packages stop describing the image; standalone ignores it.
-			//
-			// This was missing rather than deliberately omitted, and the gap was
-			// only visible from outside: a converted project that KEPT a
-			// Dockerfile (one doing more than naming a base image) built from
-			// that file in the desktop, which inferred the tier from the file
-			// being present, and got a generated image here, which read no such
-			// thing. Same project, two tools, two different images, and the one
-			// that dropped the user's RUN steps was this one.
-			Dockerfile:   m.Astro.Dockerfile,
-			BuildSecrets: util.ResolveProjectBuildSecrets(opts.BuildSecretFlags, m.Astro.BuildSecretSpecs()),
-			// Empty when the manifest states requires-python: the venv is
-			// built inside the project, so uv reads it from the manifest
-			// itself and passing it would only restate what uv is about to
-			// read. Without one, uv would pick the newest CPython it knows of,
-			// which an Airflow 2 pin cannot run under, so the fallback names
-			// a version. Astro Desktop applies the same function, so the two
-			// tools build the same interpreter for the same manifest.
-			PythonVersion:   airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin),
-			StopWithSession: opts.StopWithSession,
-			Env:             resolved.env,
-			// The vault's values, kept out of Env on purpose: docker mode
-			// writes Env into the compose file it leaves in the state
-			// directory, and a decrypted credential on disk would undo the
-			// reason the vault exists. SecretEnv is declared there without a
-			// value and handed to the compose process instead; standalone
-			// treats it as ordinary environment.
-			SecretEnv:      resolved.secretEnv,
-			PassthroughEnv: resolved.passthrough,
-			Hostname:       proj.Hostname,
-			StateDir:       stateDir,
-			RequestedPort:  choosePort(opts.RequestedPort, us.Port),
-		},
+		Plan:             p,
 	}, nil
 }
 

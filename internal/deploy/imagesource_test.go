@@ -79,7 +79,7 @@ func TestRunChecksTheRuntimeBuild(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, [][2]string{{"3.1-12", "3.1"}}, calls)
 	assert.Equal(t, []string{"pyproject.toml: tool.astro.runtime: yanked"}, warnings)
-	assert.Equal(t, "3.1-12", d.imgInput.Runtime, "the build reaches the transport")
+	assert.Equal(t, "3.1-12", d.imgInput.Build.Runtime, "the build reaches the transport")
 
 	// A blocking finding stops the deploy before anything is shipped.
 	blocking := errors.New("another series")

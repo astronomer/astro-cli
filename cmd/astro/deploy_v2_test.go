@@ -932,7 +932,7 @@ func TestDeployV2DeployActionInvocations(t *testing.T) {
 			assert.True(t, fake.imgInput.Wait)
 			assert.Equal(t, tc.includeDags, fake.imgInput.IncludeDags)
 			if tc.includeDags {
-				assert.Equal(t, "Dockerfile", fake.imgInput.Dockerfile)
+				assert.Equal(t, "Dockerfile", fake.imgInput.Build.Dockerfile)
 				assert.Equal(t, []string{"id=x,env=Y"}, fake.imgInput.BuildSecrets)
 				assert.Equal(t, "d", fake.imgInput.Description)
 			}

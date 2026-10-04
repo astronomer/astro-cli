@@ -37,9 +37,14 @@ type ImageBuilder interface {
 
 // ManifestBuild is the part of a v2 project manifest that decides which image
 // the project builds, and is imagebuild.ManifestBuild (an alias): declared
-// here so ImageBuilder can take it without importing imagebuild. Plain fields
-// rather than a pkg/manifest type, so a caller holding its own manifest read
-// (Astro Desktop's, for one) fills it directly.
+// here so ImageBuilder can take it without importing imagebuild.
+//
+// Fill it with imagebuild.ManifestBuildOf, which maps a *manifest.Manifest to
+// every field, so a field added here is wired once rather than at each
+// consumer; a Plan carries the same fields and moves them with
+// Plan.ManifestBuild and Plan.SetManifestBuild. The fields stay plain, rather
+// than a pkg/manifest type, so a caller can override one after filling it,
+// and so this package keeps its empty dependency list.
 type ManifestBuild struct {
 	// ProjectDir is the project's root, absolute. A declared Dockerfile resolves
 	// against it and builds with it as the context.
@@ -61,6 +66,31 @@ type ManifestBuild struct {
 	Dependencies []string
 	// Packages are [tool.astro] packages, OS (apt) package names.
 	Packages []string
+}
+
+// ManifestBuild is the image-deciding part of the plan, for the project at
+// projectDir: the fields SetManifestBuild sets, read back. It leaves the
+// plan's ProjectPath alone, since an engine passes the path it resolved.
+func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
+	return ManifestBuild{
+		ProjectDir:     projectDir,
+		AirflowVersion: p.AirflowVersion,
+		Runtime:        p.Runtime,
+		Dockerfile:     p.Dockerfile,
+		Dependencies:   p.Dependencies,
+		Packages:       p.Packages,
+	}
+}
+
+// SetManifestBuild copies mb's image-deciding fields into the plan, the
+// inverse of ManifestBuild. mb.ProjectDir is not copied: ProjectPath is the
+// plan's own, set by its builder.
+func (p *Plan) SetManifestBuild(mb ManifestBuild) {
+	p.AirflowVersion = mb.AirflowVersion
+	p.Runtime = mb.Runtime
+	p.Dockerfile = mb.Dockerfile
+	p.Dependencies = mb.Dependencies
+	p.Packages = mb.Packages
 }
 
 // BuildRequest is what the runtime asks an ImageBuilder for. It mirrors

@@ -378,9 +378,9 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 	// A default deploy ships both, from the manifest fields.
 	assert.True(t, d.imgInput.IncludeDags)
 	assert.Equal(t, "dep-prod", d.imgInput.DeploymentID)
-	assert.Equal(t, "3.1", d.imgInput.AirflowVersion)
-	assert.Equal(t, []string{"apache-airflow==3.1.*", "pandas"}, d.imgInput.Dependencies)
-	assert.Equal(t, []string{"libpq-dev"}, d.imgInput.Packages)
+	assert.Equal(t, "3.1", d.imgInput.Build.AirflowVersion)
+	assert.Equal(t, []string{"apache-airflow==3.1.*", "pandas"}, d.imgInput.Build.Dependencies)
+	assert.Equal(t, []string{"libpq-dev"}, d.imgInput.Build.Packages)
 	assert.Empty(t, d.imgInput.ImageName)
 	assert.Equal(t, "image-and-dag", res.Type)
 	assert.Equal(t, "deploy-2026", res.ImageTag)
@@ -592,7 +592,7 @@ func TestRun_CarriesTheDeclaredDockerfile(t *testing.T) {
 				},
 			}, d)
 			require.NoError(t, err)
-			assert.Equal(t, tc.declared, d.imgInput.Dockerfile)
+			assert.Equal(t, tc.declared, d.imgInput.Build.Dockerfile)
 		})
 	}
 }

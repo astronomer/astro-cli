@@ -880,22 +880,17 @@ func toV2DeployGit(g astrodeploy.DeployGitV2) v2deploy.Git {
 // cloud/deploy transport.
 func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
 	res, err := astrodeploy.DeployImageV2(astrodeploy.ImageDeployV2Input{
-		Login:          &d.login.context,
-		ProjectDir:     in.ProjectDir,
-		DeploymentID:   in.DeploymentID,
-		AirflowVersion: in.AirflowVersion,
-		Runtime:        in.Runtime,
-		Dependencies:   in.Dependencies,
-		Packages:       in.Packages,
-		Dockerfile:     in.Dockerfile,
-		BuildSecrets:   in.BuildSecrets,
-		ImageName:      in.ImageName,
-		OnBuild:        in.OnBuild,
-		IncludeDags:    in.IncludeDags,
-		Description:    in.Description,
-		NoDagsBaseDir:  in.NoDagsBaseDir,
-		Wait:           in.Wait,
-		WaitTime:       in.WaitTime,
+		Login:         &d.login.context,
+		Build:         in.Build,
+		DeploymentID:  in.DeploymentID,
+		BuildSecrets:  in.BuildSecrets,
+		ImageName:     in.ImageName,
+		OnBuild:       in.OnBuild,
+		IncludeDags:   in.IncludeDags,
+		Description:   in.Description,
+		NoDagsBaseDir: in.NoDagsBaseDir,
+		Wait:          in.Wait,
+		WaitTime:      in.WaitTime,
 	}, d.login.client)
 	if err != nil {
 		return v2deploy.ImageResult{}, err
