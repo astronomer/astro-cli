@@ -323,6 +323,12 @@ func TestSetup(t *testing.T) {
 		t.Setenv("ASTRONOMER_KEY_ID", "key")
 		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
 
+		origFetch := fetchDomainAuthConfig
+		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
+			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
+		}
+		defer func() { fetchDomainAuthConfig = origFetch }()
+
 		mockResp := TokenResponse{
 			AccessToken: "test-token",
 			IDToken:     "test-id",

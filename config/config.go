@@ -153,6 +153,7 @@ var (
 
 // InitConfig initializes the config files
 func InitConfig(fs afero.Fs) {
+	forgetEnvironmentLogin()
 	initHome(fs)
 	initProject(fs)
 	registerValidators()

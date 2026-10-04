@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/spf13/viper"
@@ -224,6 +227,9 @@ func takeUnchangedLogins() {
 // storing those would delete a login over a keyring that was briefly
 // unavailable. Signing out, which does mean to empty both, is SignOut.
 func putLoginField(cKey, field, value string) {
+	if writesEnvironmentLogin(cKey, field, value) {
+		return
+	}
 	ctxMap := viperHome.GetStringMap(contextsKey + "." + cKey)
 	stored := secrets.Login{Token: stringField(ctxMap, tokenField), RefreshToken: stringField(ctxMap, refreshTokenField)}
 	login, err := logins().Read(HomeConfigFile, cKey, stored)
@@ -252,6 +258,7 @@ func saveContextLogin(cKey string, login secrets.Login) secrets.Login {
 	ctxMap := viperHome.GetStringMap(contextsKey + "." + cKey)
 	stored := secrets.Login{Token: stringField(ctxMap, tokenField), RefreshToken: stringField(ctxMap, refreshTokenField)}
 	held, err := logins().Read(HomeConfigFile, cKey, stored)
+	login = withoutEnvironmentLogin(cKey, login, held)
 	if (err == nil && held == login) || (err != nil && login == secrets.Login{}) {
 		return stored
 	}
@@ -333,4 +340,166 @@ func ReloadHome() {
 func stringField(m map[string]interface{}, field string) string {
 	s, _ := m[field].(string)
 	return s
+}
+
+// Credentials from the environment (ASTRO_API_TOKEN, API keys) belong to the
+// process that was given them. UseEnvironmentLogin hands one to the context a
+// command runs on, and SetEnvironmentContextKey the organization and workspace
+// it is for: every read of that context in this process returns them, with no
+// refresh token, and nothing stores them. The saved login and the context's
+// saved selection stay as they were, for the next command run without the
+// variable, and a token that turns out to be bad is never kept.
+type environmentLogin struct {
+	cKey      string
+	token     string
+	expiresAt time.Time
+	// fields holds the selection made for the credential, by config field.
+	fields map[string]string
+}
+
+var (
+	envLoginMu sync.Mutex
+	// envLoginHeld is this process's environment login, if it has one.
+	envLoginHeld *environmentLogin
+)
+
+// environmentFields are the fields SetEnvironmentContextKey sets.
+var environmentFields = []string{"organization", "organization_product", "workspace"}
+
+var errNoEnvironmentLogin = errors.New("this context has no login from the environment")
+
+// UseEnvironmentLogin makes token, a credential from the environment, this
+// context's login for the rest of the process, expiring at expiresAt. It is
+// not saved, and replaces any environment login the process held before.
+func (c *Context) UseEnvironmentLogin(token string, expiresAt time.Time) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	envLoginHeld = &environmentLogin{cKey: cKey, token: token, expiresAt: expiresAt, fields: map[string]string{}}
+	return nil
+}
+
+// SetEnvironmentContextKey is SetContextKey for the organization and workspace
+// an environment credential is for: like the credential, the value holds for
+// this process only. The context must have an environment login.
+func (c *Context) SetEnvironmentContextKey(key, value string) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	key = strings.ToLower(key)
+	if !slices.Contains(environmentFields, key) {
+		return fmt.Errorf("%s is not set from the environment", key)
+	}
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	if !holdsEnvironmentLogin(cKey) {
+		return errNoEnvironmentLogin
+	}
+	envLoginHeld.fields[key] = value
+	return nil
+}
+
+// holdsEnvironmentLogin reports whether the process's environment login is
+// for the context under cKey. The caller holds envLoginMu.
+func holdsEnvironmentLogin(cKey string) bool {
+	return envLoginHeld != nil && strings.EqualFold(envLoginHeld.cKey, cKey)
+}
+
+// envLogin returns a copy of the environment login held for the context
+// under cKey.
+func envLogin(cKey string) (environmentLogin, bool) {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	if !holdsEnvironmentLogin(cKey) {
+		return environmentLogin{}, false
+	}
+	l := *envLoginHeld
+	l.fields = maps.Clone(l.fields)
+	return l, true
+}
+
+// isEnvironmentToken reports whether token is the one this process took from
+// the environment.
+func isEnvironmentToken(token string) bool {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	return envLoginHeld != nil && envLoginHeld.token == token
+}
+
+func forgetEnvironmentLogin() {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	envLoginHeld = nil
+}
+
+// writesEnvironmentLogin reports whether setting field of the context under
+// cKey to value would store what the environment's login reads as: its token,
+// under any context, or the empty refresh token it reads with. Callers write
+// back fields they read (an organization switch rewrites the token,
+// SetContext the whole context), and storing those would replace the saved
+// login with the environment's, or sign it out. A login renewed from the saved
+// refresh token is neither, and is stored.
+func writesEnvironmentLogin(cKey, field, value string) bool {
+	switch field {
+	case tokenField:
+		return isEnvironmentToken(value)
+	case refreshTokenField:
+		_, ok := envLogin(cKey)
+		return ok && value == ""
+	}
+	return false
+}
+
+// withoutEnvironmentLogin is writesEnvironmentLogin for a whole login: each
+// field that would store the environment's login keeps held, the login saved
+// for the context.
+func withoutEnvironmentLogin(cKey string, login, held secrets.Login) secrets.Login {
+	if writesEnvironmentLogin(cKey, tokenField, login.Token) {
+		login.Token = held.Token
+	}
+	if writesEnvironmentLogin(cKey, refreshTokenField, login.RefreshToken) {
+		login.RefreshToken = held.RefreshToken
+	}
+	return login
+}
+
+// writesEnvironmentField reports whether setting field of the context under
+// cKey to value writes back the selection made for the environment's login,
+// which is not stored, as writesEnvironmentLogin does for its token. Any other
+// value for that field is the command's own choice: it is stored, and from
+// then on the process reads the stored value like every other.
+func writesEnvironmentField(cKey, field string, value interface{}) bool {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	if !holdsEnvironmentLogin(cKey) {
+		return false
+	}
+	held, ok := envLoginHeld.fields[field]
+	if !ok {
+		return false
+	}
+	if s, isString := value.(string); isString && s == held {
+		return true
+	}
+	delete(envLoginHeld.fields, field)
+	return false
+}
+
+// applyEnvironmentLogin puts l in c in place of the saved login and selection.
+func applyEnvironmentLogin(l *environmentLogin, c *Context) {
+	c.Token, c.RefreshToken = l.token, ""
+	for field, value := range l.fields {
+		switch field {
+		case "organization":
+			c.Organization = value
+		case "organization_product":
+			c.OrganizationProduct = value
+		case "workspace":
+			c.Workspace = value
+		}
+	}
 }

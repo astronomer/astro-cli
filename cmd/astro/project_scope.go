@@ -153,9 +153,9 @@ func projectManifest(dir string) (*manifest.Manifest, error) {
 }
 
 // credentialFromEnv reports an API token or key in the environment. Setup
-// stores a login for one under the domain it runs on and makes that domain
-// current, so the command stays on the host the environment names rather than
-// move the user's current context.
+// uses one, for that process only, as the login of the domain it runs on and
+// makes that domain current, so the command stays on the host the environment
+// names rather than move the user's current context.
 func credentialFromEnv() bool {
 	return os.Getenv(astrosession.EnvAPIToken) != "" || os.Getenv("ASTRONOMER_KEY_ID") != ""
 }

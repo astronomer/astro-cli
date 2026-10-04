@@ -444,34 +444,8 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		fmt.Println("\nWarning: Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://www.astronomer.io/docs/astro/deployment-api-tokens")
 	}
 
-	// get authConfig
-	c, err := context.GetCurrentContext() // get current context
-	if err != nil {
-		// set context
-		var domain string
-		if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
-			domain = defaultDomain
-		}
-		if !context.Exists(domain) {
-			err := context.SetContext(domain)
-			if err != nil {
-				return false, err
-			}
-		}
-
-		// Switch context
-		err = context.Switch(domain)
-		if err != nil {
-			return false, err
-		}
-
-		c, err = context.GetContext(domain) // get current context
-		if err != nil {
-			return false, err
-		}
-	}
-
-	authConfig, err := fetchDomainAuthConfig(c.Domain)
+	domain, current := environmentDomain()
+	authConfig, err := fetchDomainAuthConfig(domain)
 	if err != nil {
 		return false, err
 	}
@@ -513,12 +487,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		return false, errors.New(tokenRes.ErrorDescription)
 	}
 
-	err = c.SetContextKey("token", "Bearer "+tokenRes.AccessToken)
-	if err != nil {
-		return false, err
-	}
-
-	err = c.SetExpiresIn(tokenRes.ExpiresIn)
+	c, err := useEnvironmentLogin(domain, current, "Bearer "+tokenRes.AccessToken, time.Now().Add(time.Duration(tokenRes.ExpiresIn)*time.Second))
 	if err != nil {
 		return false, err
 	}
@@ -538,15 +507,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	}
 	workspaceID = deployments[0].WorkspaceId
 
-	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
-	if err != nil {
-		fmt.Println("no workspace set")
-	}
-
-	err = c.SetOrganizationContext(orgID, orgProduct)
-	if err != nil {
-		fmt.Println("no organization context set")
-	}
+	useEnvironmentSelection(&c, orgID, orgProduct, workspaceID)
 	return true, nil
 }
 
@@ -560,42 +521,6 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 		fmt.Println("Using an Astro API Token")
 	}
 
-	// get authConfig
-	c, err := context.GetCurrentContext() // get current context
-	if err != nil {
-		// set context
-		var domain string
-		if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
-			domain = defaultDomain
-		}
-		if !context.Exists(domain) {
-			err := context.SetContext(domain)
-			if err != nil {
-				return false, err
-			}
-		}
-
-		// Switch context
-		err = context.Switch(domain)
-		if err != nil {
-			return false, err
-		}
-
-		c, err = context.GetContext(domain) // get current context
-		if err != nil {
-			return false, err
-		}
-	}
-
-	err = c.SetContextKey("token", "Bearer "+astroAPIToken)
-	if err != nil {
-		return false, err
-	}
-
-	err = c.SetExpiresIn(time.Now().AddDate(1, 0, 0).Unix())
-	if err != nil {
-		return false, err
-	}
 	// Parse the token to peek at the custom claims
 	claims, err := parseAPIToken(astroAPIToken)
 	if err != nil {
@@ -604,9 +529,20 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 	if len(claims.Permissions) == 0 {
 		return false, errNotAPIToken
 	}
-	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
-		fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
-		return false, errExpiredAPIToken
+	// A token with no expiry of its own reads as live for a year.
+	expiresAt := time.Now().AddDate(1, 0, 0)
+	if claims.ExpiresAt != nil {
+		if claims.ExpiresAt.Before(time.Now()) {
+			fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
+			return false, errExpiredAPIToken
+		}
+		expiresAt = claims.ExpiresAt.Time
+	}
+
+	domain, current := environmentDomain()
+	c, err := useEnvironmentLogin(domain, current, "Bearer "+astroAPIToken, expiresAt)
+	if err != nil {
+		return false, err
 	}
 
 	var wsID, orgID string
@@ -634,15 +570,55 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 		wsID = c.Workspace
 	}
 
-	err = c.SetContextKey("workspace", wsID)
-	if err != nil {
+	useEnvironmentSelection(&c, orgID, orgProduct, wsID)
+	return true, nil
+}
+
+// environmentDomain returns the domain a credential from the environment is
+// used on: the current context's, or when there is none, ASTRO_DOMAIN's or
+// astronomer.io. current reports the first case. It reads no saved login.
+func environmentDomain() (domain string, current bool) {
+	if d, err := config.GetCurrentDomain(); err == nil && context.Exists(d) {
+		return d, true
+	}
+	if d := os.Getenv("ASTRO_DOMAIN"); d != "" {
+		return d, false
+	}
+	return defaultDomain, false
+}
+
+// useEnvironmentLogin makes token, from the environment, the login of
+// domain's context for this process only, and returns the context as the
+// process now reads it. The saved login stays as it is. A domain that is not
+// current is made current, and its context created when there is none, so
+// the command stays on the host the environment names.
+func useEnvironmentLogin(domain string, current bool, token string, expiresAt time.Time) (config.Context, error) {
+	c := config.Context{Domain: domain}
+	if err := c.UseEnvironmentLogin(token, expiresAt); err != nil {
+		return c, err
+	}
+	if !current {
+		if err := context.Switch(domain); err != nil {
+			return c, err
+		}
+	}
+	return c.GetContext()
+}
+
+// useEnvironmentSelection records the organization and workspace the
+// environment's credential is for, for this process only, as the credential
+// itself is.
+func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) {
+	if err := c.SetEnvironmentContextKey("workspace", wsID); err != nil {
 		fmt.Println("no workspace set")
 	}
-	err = c.SetOrganizationContext(orgID, orgProduct)
-	if err != nil {
+	if err := c.SetEnvironmentContextKey("organization", orgID); err != nil {
+		fmt.Println("no organization context set")
+		return
+	}
+	if err := c.SetEnvironmentContextKey("organization_product", orgProduct); err != nil {
 		fmt.Println("no organization context set")
 	}
-	return true, nil
 }
 
 func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {

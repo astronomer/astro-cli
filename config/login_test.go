@@ -48,6 +48,8 @@ func loginHome(t *testing.T, yaml string, keyringErr error) *secrets.Logins {
 		keyring.MockInit()
 	}
 	t.Cleanup(keyring.MockInit)
+	forgetEnvironmentLogin()
+	t.Cleanup(forgetEnvironmentLogin)
 	initHome(afero.NewOsFs())
 	if yaml != "" {
 		if err := os.MkdirAll(HomeConfigPath, 0o700); err != nil {

@@ -59,8 +59,7 @@ import (
 // until it restarts. A save ignores the stamp, since another session's
 // failure says nothing about this one, unless the stamp records a keyring that
 // did not answer in time: asking that one again would make every save wait out
-// the timeout, and a command that saves a token each time it runs (with
-// ASTRO_API_TOKEN set) would wait on every run. Reading the master key is
+// the timeout on every run. Reading the master key is
 // bounded by loginKeyringTimeout, because an unattended keyring can wait for
 // an unlock prompt nobody will answer.
 //
@@ -104,8 +103,8 @@ import (
 // login its config holds, until the next login.
 //
 // Credentials supplied through the environment, such as ASTRO_API_TOKEN, are
-// read by each tool before it looks at a saved login, and nothing here changes
-// that.
+// read by each tool before it looks at a saved login, and are never saved as
+// one: a command run with the variable set leaves the saved login as it was.
 
 // LoginInVault is the token field's value for a login held in the vault.
 const LoginInVault = "Bearer "

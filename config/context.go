@@ -108,6 +108,12 @@ func (c *Context) GetContext() (Context, error) {
 	if err != nil {
 		return *c, err
 	}
+	// The environment's login needs nothing from the vault, so a command run
+	// with one never waits on the keyring for a login it does not use.
+	if l, ok := envLogin(key); ok {
+		applyEnvironmentLogin(&l, c)
+		return *c, nil
+	}
 	resolveLogin(key, c)
 	return *c, nil
 }
@@ -137,13 +143,24 @@ func (c *Context) SetContext() error {
 	}
 
 	login := saveContextLogin(key, secrets.Login{Token: c.Token, RefreshToken: c.RefreshToken})
+	saved := viperHome.GetStringMap(contextsKey + "." + key)
+	selected := func(field, value string) string {
+		if writesEnvironmentField(key, field, value) {
+			return stringField(saved, field)
+		}
+		return value
+	}
+	workspace, lastUsed := c.Workspace, c.Workspace
+	if writesEnvironmentField(key, "workspace", c.Workspace) {
+		workspace, lastUsed = stringField(saved, "workspace"), stringField(saved, "last_used_workspace")
+	}
 	context := map[string]interface{}{
 		"token":                login.Token,
 		"domain":               c.Domain,
-		"organization":         c.Organization,
-		"organization_product": c.OrganizationProduct,
-		"workspace":            c.Workspace,
-		"last_used_workspace":  c.Workspace,
+		"organization":         selected("organization", c.Organization),
+		"organization_product": selected("organization_product", c.OrganizationProduct),
+		"workspace":            workspace,
+		"last_used_workspace":  lastUsed,
 		"refreshtoken":         login.RefreshToken,
 		"user_email":           c.UserEmail,
 		"auth_domain":          c.AuthDomain,
@@ -196,6 +213,9 @@ func setContextField(cKey, field string, value interface{}) error {
 	if s, ok := value.(string); ok && isLoginField(field) {
 		putLoginField(cKey, field, s)
 	} else {
+		if writesEnvironmentField(cKey, field, value) {
+			return nil
+		}
 		putContextField(cKey, field, value)
 	}
 	return saveConfig(viperHome, HomeConfigFile)
@@ -382,6 +402,11 @@ func (c *Context) GetExpiresIn() (time.Time, error) {
 		return time.Time{}, err
 	}
 
+	// Only for the context read with the environment's token: one read
+	// without it (ContextsSharingLogin) holds the saved login and its expiry.
+	if l, ok := envLogin(cKey); ok && c.Token == l.token {
+		return l.expiresAt, nil
+	}
 	cfgPath := fmt.Sprintf("%s.%s.%s", contextsKey, cKey, "ExpiresIn")
 	return viperHome.GetTime(cfgPath), nil
 }

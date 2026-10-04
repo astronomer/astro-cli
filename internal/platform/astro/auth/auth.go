@@ -660,8 +660,8 @@ func (a *Authenticator) savedLogin(domain string, authConfig Config) (Result, bo
 }
 
 // workingLogin tries the saved access token before the refresh token. An access
-// token userinfo rejects, such as an API token saved from ASTRO_API_TOKEN,
-// still leaves the refresh token to try.
+// token userinfo rejects, such as an API token an older build saved from
+// ASTRO_API_TOKEN, still leaves the refresh token to try.
 func (a *Authenticator) workingLogin(c *config.Context, authConfig Config) (Result, bool) {
 	expiry, _ := c.GetExpiresIn() //nolint:errcheck // a missing expiry reads as zero, which is expired
 	if accessToken := strings.TrimSpace(strings.TrimPrefix(c.Token, "Bearer ")); accessToken != "" && time.Now().Add(AccessTokenRefreshMargin).Before(expiry) {
