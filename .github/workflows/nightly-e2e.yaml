@@ -33,6 +33,8 @@ on:
 permissions:
   contents: read
   issues: write
+  # The skip check reads earlier runs of this workflow.
+  actions: read
 
 concurrency:
   group: nightly-e2e
@@ -87,14 +89,96 @@ jobs:
     # report nothing at all.
     timeout-minutes: 55
     steps:
+      # A scheduled night skips the pinned leg when the latest pinned result
+      # at this exact commit is a pass. Its inputs are this repository and
+      # the pinned date, so rerunning it on an unchanged trunk mostly
+      # re-measures flakiness. That covers quiet days, weekends mostly.
+      #
+      # live-pypi never skips: what it watches is PyPI, which moves whether
+      # or not trunk does. workflow_dispatch never skips either, because a
+      # hand-run is somebody asking for one.
+      #
+      # The latest result, not any pass: a failure after a pass at the same
+      # commit runs again, so an open issue keeps collecting nights and is
+      # closed by a real pass, never by a skip. A skipped night reports
+      # success, which the next night then reads as a pass, and that chain
+      # always starts from a real one.
+      #
+      # This is a step gating the rest rather than a job removing the leg
+      # from the matrix, because a matrix cannot drop a leg it declares under
+      # include: exclude is applied first, and include then adds the entry
+      # back as a new leg of its own.
+      - id: gate
+        name: Skip if trunk has not moved since the pinned leg passed
+        if: ${{ matrix.leg == 'pinned' && github.event_name == 'schedule' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          # Named by file, so renaming the workflow does not quietly turn
+          # off the skip. Newest first. This run is still in progress, so
+          # status=completed leaves it out. An API error lists nothing, and
+          # the leg runs: a skip has to be proven, never assumed.
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nightly-e2e.yaml/runs?head_sha=$GITHUB_SHA&status=completed&per_page=50" \
+            --jq '.workflow_runs[].id' || true)
+          for id in $runs; do
+            # A cancelled or absent pinned job says nothing either way, so
+            # the loop moves on to the run before it.
+            result=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+              --jq 'first(.jobs[] | select(.name == "pinned" and (.conclusion == "success" or .conclusion == "failure")) | .conclusion) // empty' || true)
+            case "$result" in
+              success)
+                echo "The pinned leg passed at $GITHUB_SHA in run $id and trunk has not moved since; skipping it tonight."
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                exit 0 ;;
+              failure)
+                echo "The pinned leg last failed at $GITHUB_SHA (run $id); running it again."
+                exit 0 ;;
+            esac
+          done
+          echo "No pinned result yet at $GITHUB_SHA; running it."
+
+      # Tier 3 pulls two runtime bases (the scaffold's Airflow 3 and the
+      # Airflow 2 case's) and builds on each, and the restored Go cache is
+      # another ~1.6 GB compressed. Together they fill the ~14 GB a hosted
+      # runner leaves free: even passing nights went down to 59 MB, and
+      # failing ones end in "no space left on device" from layer
+      # registration. So this step deletes toolchains the image preinstalls
+      # that this job never uses. It runs first, before setup-go writes
+      # into the hostedtoolcache this step only partly removes.
+      # rm -rf rather than a third-party action, for the reason the issue
+      # steps use gh: one fewer thing to pin by SHA.
+      - name: Free the runner's disk for the Docker tier
+        if: ${{ matrix.tier >= 3 && steps.gate.outputs.skip != 'true' }}
+        shell: bash
+        run: |
+          df -h /
+          sudo rm -rf \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/share/swift \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/local/lib/node_modules
+          docker image prune --all --force > /dev/null
+          df -h /
+
+      # Every step from here to the tests carries the same guard: Actions
+      # has no way to end a job early, only to skip its steps.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: ${{ steps.gate.outputs.skip != 'true' }}
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           go-version-file: go.mod
           cache: false
 
       - id: go-env
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         shell: bash
         run: |
           echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
@@ -105,6 +189,7 @@ jobs:
       # the same key and win by being later, with objects built from whatever
       # trunk looked like hours ago.
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           path: |
             ${{ steps.go-env.outputs.build }}
@@ -115,14 +200,17 @@ jobs:
             go-test-${{ runner.os }}-
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           enable-cache: false
 
       - name: Point uv's cache at a path this job restores
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         shell: bash
         run: echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
 
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           path: ${{ env.UV_CACHE_DIR }}
           key: uv-${{ runner.os }}-${{ hashFiles('pkg/scaffold/scaffold.go', 'e2e/excludenewer_test.go') }}
@@ -140,9 +228,20 @@ jobs:
       # The pinned leg leaves ASTRO_E2E_EXCLUDE_NEWER empty, which the suite
       # reads as its own date; see the matrix above.
       - name: Run e2e tests (tiers 0 through ${{ matrix.tier }})
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         env:
           ASTRO_E2E_EXCLUDE_NEWER: ${{ matrix.exclude_newer }}
         run: make test-e2e ASTRO_E2E_MAX_TIER=${{ matrix.tier }}
+
+      # The headroom left at the end, printed every night, so a margin
+      # shrinking toward zero shows up in the log before it causes a failure.
+      - name: Report disk headroom
+        if: ${{ always() && steps.gate.outputs.skip != 'true' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          df -h /
+          docker system df || true
 
       # gh rather than a scripting action, because the runner already has it
       # and this repo pins every action by SHA — one fewer thing to pin and
@@ -199,7 +298,8 @@ jobs:
       # hand-run that happens to pass would otherwise close the outage and lose
       # the thread the next nightly would have added to.
       - name: Close the failure issue once it passes
-        if: ${{ success() && github.event_name == 'schedule' }}
+        # Not on a skipped night, which proves nothing new.
+        if: ${{ success() && github.event_name == 'schedule' && steps.gate.outputs.skip != 'true' }}
         # A red nightly with a green test step and no issue is the worst
         # outcome available, so a flaky gh call must not fail the job.
         continue-on-error: true
