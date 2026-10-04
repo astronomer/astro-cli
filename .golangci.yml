@@ -135,7 +135,7 @@ linters:
       - path: (.+)\.go$
         text: 'sloppyTestFuncName: function cleanUpInitFiles should be of form'
       # v2 tree: Deps and the contract structs (localrt's Plan, Callbacks and
-      # Record, envresolve Inputs, airflowapi's per-call options,
+      # Record, envresolve Inputs, plan.Options, airflowapi's per-call options,
       # imagebuild.Request, proxy.Route, instances.Instance) are passed by value
       # on purpose (docs/v2-architecture.md), so hugeParam does not apply.
       # `instance` is a prefix in BOTH groups: it covers instances and
@@ -149,7 +149,7 @@ linters:
       # short-lived v2 composition root; the name now holds
       # the v1 Astro tree, which gets no v2 exemption.
       - linters: [gocritic]
-        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack)|pkg/(airflowapi|imagebuild|instance|awsauth|googleauth|localrt|proxy))
+        path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack|plan)|pkg/(airflowapi|imagebuild|instance|awsauth|googleauth|localrt|proxy))
         text: 'hugeParam:'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]

@@ -371,6 +371,17 @@ func TestCheckPlannedRuntime(t *testing.T) {
 	}
 }
 
+func TestPlanRuntimeReadsTheGeneratedBase(t *testing.T) {
+	series := planRuntime(&ImageDeployV2Input{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3"})
+	assert.Equal(t, "3.3", series.version)
+	assert.True(t, series.series)
+
+	exact := planRuntime(&ImageDeployV2Input{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3-8-python-3.13"})
+	assert.Equal(t, "3.3-8", exact.version)
+	assert.False(t, exact.series)
+	assert.Equal(t, "set [tool.astro] runtime to 3.3-9 or newer in pyproject.toml", exact.raise("3.3-9"))
+}
+
 // A deploy the deployment would refuse for its runtime is refused before the
 // build, which is minutes for a real project, and names what to change.
 func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {

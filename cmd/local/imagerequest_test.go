@@ -54,7 +54,7 @@ func TestDockerStartPicksTheImageDeployPicks(t *testing.T) {
 		require.NoError(t, err, name)
 		assert.Equal(t, tc.want, got, "%s: start", name)
 
-		deploy, err := imagebuild.ForManifest(tc.m)
+		deploy, err := imagebuild.ForManifest(tc.m, nil)
 		require.NoError(t, err, name)
 		assert.Equal(t, tc.want, localrt.BuildRequest{
 			BaseImage:    deploy.BaseImage,

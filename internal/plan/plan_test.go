@@ -84,6 +84,9 @@ func TestBuildFillsPlanFromManifest(t *testing.T) {
 	if p.PythonVersion != "" {
 		t.Errorf("PythonVersion = %q, want empty (uv reads requires-python)", p.PythonVersion)
 	}
+	if p.RequiresPython != ">=3.10" {
+		t.Errorf("RequiresPython = %q, want >=3.10 (docker mode picks the image's Python from it)", p.RequiresPython)
+	}
 	if p.Mode != localrt.ModeDocker || !p.StopWithSession || p.RequestedPort != 8080 {
 		t.Errorf("flags not carried: mode=%q stopWithSession=%v port=%d", p.Mode, p.StopWithSession, p.RequestedPort)
 	}

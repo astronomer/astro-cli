@@ -33,6 +33,7 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		ProjectDir:     dir,
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
+		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
 		Dependencies:   m.Requirements(),
 		Packages:       m.Astro.Packages,
@@ -40,8 +41,9 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 }
 
 // baseImageFunc resolves the runtime base a generated build starts FROM, from
-// the manifest's Airflow pin and its [tool.astro] runtime build ("" for none).
-type baseImageFunc func(ctx context.Context, airflowVersion, runtime string) (string, error)
+// the manifest's Airflow pin, its [tool.astro] runtime build ("" for none) and
+// its requires-python.
+type baseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 
 // ForManifest is the one rule for which image a project's manifest builds, so
 // every caller building from a manifest builds the same image from it.
@@ -50,8 +52,8 @@ type baseImageFunc func(ctx context.Context, airflowVersion, runtime string) (st
 // resolved against the project, and the project as its context, and no runtime
 // base is resolved, since the file names its own FROM and asking for a base it
 // would not use only adds a way to fail. Otherwise the image is generated over
-// the runtime base the Airflow pin and runtime build resolve to
-// (RuntimeImageFor), installing Dependencies and Packages; a pin it refuses is
+// the runtime base the Airflow pin, runtime build and requires-python resolve
+// to (RuntimeImageForPython), installing Dependencies and Packages; a pin it refuses is
 // the error returned.
 // Dependencies and Packages are carried in both cases, since Build ignores
 // them in Dockerfile mode rather than rejecting them.
@@ -62,19 +64,22 @@ type baseImageFunc func(ctx context.Context, airflowVersion, runtime string) (st
 // The caller fills the rest: WorkDir, Tag, Platform ("linux/amd64" for a
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
-func ForManifest(m ManifestBuild) (Request, error) {
-	return forManifestWith(context.Background(), m, deployBase)
+func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
+	return forManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
+		return RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
+	})
 }
 
 // ForLocalManifest is ForManifest for local Docker mode. The one difference is
 // the base a generated build starts FROM: LocalRuntimeImageWith, which resolves
-// an Airflow 3 pin exactly as RuntimeImageFor does and also runs Airflow 2,
-// looking it up in the runtime catalog o describes. So an Airflow 3 project
+// an Airflow 3 pin exactly as ForManifest does (RuntimeImageForPython, its
+// Python read from the runtime catalog o describes) and also runs Airflow 2,
+// looking it up in that catalog. So an Airflow 3 project
 // starts from the image it deploys, and an Airflow 2 one, which deploy refuses,
 // still starts.
 func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Options) (Request, error) {
-	return forManifestWith(ctx, m, func(ctx context.Context, airflowVersion, runtime string) (string, error) {
-		return LocalRuntimeImageWith(ctx, airflowVersion, runtime, o)
+	return forManifestWith(ctx, m, func(ctx context.Context, m ManifestBuild) (string, error) {
+		return LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
 	})
 }
 
@@ -94,18 +99,12 @@ func forManifestWith(ctx context.Context, m ManifestBuild, base baseImageFunc) (
 		req.Context = m.ProjectDir
 		return req, nil
 	}
-	image, err := base(ctx, m.AirflowVersion, m.Runtime)
+	image, err := base(ctx, m)
 	if err != nil {
 		return Request{}, err
 	}
 	req.BaseImage = image
 	return req, nil
-}
-
-// deployBase is the base deploy and package build FROM: RuntimeImageFor,
-// Airflow 3 alone, with nothing to look up.
-func deployBase(_ context.Context, airflowVersion, runtime string) (string, error) {
-	return RuntimeImageFor(airflowVersion, runtime)
 }
 
 // FromDeclaredDockerfile reports whether the request builds the project's own

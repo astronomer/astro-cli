@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/plan"
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -274,19 +273,19 @@ func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Opt
 	if err != nil {
 		return checks.Result{}, errors.Join(noInterpreter(opts.ProjectPath), err)
 	}
+	venvPython, _ := plan.VenvPython(m, c.pythonCatalog(ctx))
 	res, err := checks.RunProvisioned(ctx, opts, checks.ProvisionInput{
 		ProjectPath: opts.ProjectPath,
 		DagsDir:     checks.DefaultDagsDir(opts.ProjectPath),
 		Pin:         m.Airflow().Pin,
 		Deps:        m.Requirements(),
-		// The venv is built outside the project, where uv cannot read the
-		// manifest, so a stated requires-python is passed through. Without one
-		// the check takes the interpreter a start would, rather than whatever
-		// uv finds newest.
-		RequiresPython: cmp.Or(m.Project.RequiresPython,
-			airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin)),
-		Constraints: m.UV.ConstraintDependencies,
-		FindLinks:   m.UV.IndexPages(),
+		// The interpreter a start's venv would ask for, which is the one the
+		// project's image runs (plan.VenvPython). When that leaves the choice
+		// to uv, the venv is built outside the project, where uv cannot read
+		// the manifest, so the stated requires-python is passed through.
+		RequiresPython: cmp.Or(venvPython, m.Project.RequiresPython),
+		Constraints:    m.UV.ConstraintDependencies,
+		FindLinks:      m.UV.IndexPages(),
 	}, prov, c.d.CheckVenv, c.progressFn(r, nameCheck))
 	if err != nil && !errors.Is(err, checks.ErrEnvNotReady) {
 		// An operational failure of the parse itself is not an environment

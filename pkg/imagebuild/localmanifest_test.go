@@ -48,7 +48,7 @@ func TestForLocalManifestPicksWhatForManifestPicksForAirflow3(t *testing.T) {
 		tc.m.Dependencies, tc.m.Packages = deps, pkgs
 		tc.want.Dependencies, tc.want.Packages = deps, pkgs
 
-		deploy, err := ForManifest(tc.m)
+		deploy, err := ForManifest(tc.m, nil)
 		require.NoError(t, err, name)
 		assert.Equal(t, tc.want, deploy, "%s: deploy", name)
 
@@ -74,7 +74,7 @@ func TestForLocalManifestResolvesNoBaseForADeclaredDockerfile(t *testing.T) {
 // mode runs it. A named runtime build needs no catalog lookup.
 func TestForLocalManifestAlsoRunsAirflow2(t *testing.T) {
 	m := ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.10.5", Runtime: "12.9.0"}
-	_, err := ForManifest(m)
+	_, err := ForManifest(m, nil)
 	assert.ErrorContains(t, err, "only Airflow 3")
 
 	req, err := ForLocalManifest(context.Background(), m, noCatalog)

@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -115,6 +116,13 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	return warnings, nil
 }
 
+func runtimeCatalog(ctx context.Context, req Request) func() *runtimeversions.Catalog {
+	if req.RuntimeCatalog == nil {
+		return nil
+	}
+	return func() *runtimeversions.Catalog { return req.RuntimeCatalog(ctx) }
+}
+
 // checkSecrets runs before the image build. It refuses a build secret whose
 // variable is unset, and warns about each secret a declared Dockerfile mounts
 // that no build secret supplies, returning those for a failed build to name
@@ -159,7 +167,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
 	// would build.
-	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest))
+	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest), runtimeCatalog(ctx, req))
 	if err != nil {
 		return Result{}, err
 	}

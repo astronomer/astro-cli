@@ -15,8 +15,9 @@ import (
 func fullManifest() *manifest.Manifest {
 	return &manifest.Manifest{
 		Project: manifest.Project{
-			Name:         "p",
-			Dependencies: []string{"apache-airflow==3.1.*", "pandas"},
+			Name:           "p",
+			RequiresPython: "==3.13.*",
+			Dependencies:   []string{"apache-airflow==3.1.*", "pandas"},
 		},
 		Astro: manifest.Astro{
 			Runtime:    "3.1-2",
@@ -47,6 +48,7 @@ func TestManifestBuildOf(t *testing.T) {
 		ProjectDir:     "/project",
 		AirflowVersion: "3.1",
 		Runtime:        "3.1-2",
+		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas"},
 		Packages:       []string{"libpq-dev"},

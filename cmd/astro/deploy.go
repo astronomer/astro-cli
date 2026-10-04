@@ -882,6 +882,7 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 	res, err := astrodeploy.DeployImageV2(astrodeploy.ImageDeployV2Input{
 		Login:         &d.login.context,
 		Build:         in.Build,
+		Catalog:       func() *runtimeversions.Catalog { return runtimecatalog.Catalog(context.Background()) },
 		DeploymentID:  in.DeploymentID,
 		BuildSecrets:  in.BuildSecrets,
 		ImageName:     in.ImageName,

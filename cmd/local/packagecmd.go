@@ -116,14 +116,15 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		}
 	}
 	res, err := target.Build(ctx, pack.Request{
-		ProjectDir:   dir,
-		Manifest:     m,
-		Save:         opts.save,
-		Tag:          opts.tag,
-		Platform:     opts.platform,
-		BuildSecrets: util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
-		OutDir:       opts.outDir,
-		CheckRuntime: c.d.RuntimeCheck,
+		ProjectDir:     dir,
+		Manifest:       m,
+		Save:           opts.save,
+		Tag:            opts.tag,
+		Platform:       opts.platform,
+		BuildSecrets:   util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
+		OutDir:         opts.outDir,
+		CheckRuntime:   c.d.RuntimeCheck,
+		RuntimeCatalog: c.d.RuntimeCatalog,
 	}, c.callbacks(r))
 	if err != nil {
 		return err

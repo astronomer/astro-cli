@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -33,6 +35,11 @@ const (
 	// completed. Everything under the floor is Astro Runtime 8 or older, out of
 	// maintenance since 2023, so this refuses nothing that is still supported.
 	minAirflow2Minor = 7
+	// pythonCatalogTimeout bounds the catalog fetch an Airflow 3 start makes to
+	// pick the image's Python. That choice has a fallback (the runtime's
+	// default Python), so it waits seconds, as the CLI's runtimecatalog.Catalog
+	// does for deploy and package.
+	pythonCatalogTimeout = 3 * time.Second
 )
 
 // ErrNoRuntimeForAirflow reports an Airflow version no published runtime
@@ -40,7 +47,8 @@ const (
 var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow version")
 
 // LocalRuntimeImageWith picks the base image local Docker mode builds FROM.
-// Airflow 3 resolves exactly as the deploy path does. Airflow 2 is looked up in
+// Airflow 3 resolves exactly as the deploy path does, requires-python included
+// (RuntimeImageForPython). Airflow 2 is looked up in
 // the runtime catalog, and the newest runtime carrying that Airflow wins, down
 // to the 2.7 floor. Yanked runtimes are skipped.
 //
@@ -59,9 +67,9 @@ var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow v
 // (the catalog's word on an Airflow 2 build's series, a yanked build) is
 // runtimeversions.CheckRuntime's, which the caller runs where it can say so.
 //
-// This is the local start path only. The deploy path stays on RuntimeImageFor,
-// which is Airflow 3 alone.
-func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime string, o runtimeversions.Options) (string, error) {
+// This is the local start path only. The deploy path stays on
+// RuntimeImageForPython, which is Airflow 3 alone.
+func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime, requiresPython string, o runtimeversions.Options) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {
 		return "", errors.New("no Airflow version was given; one is needed to pick a runtime image")
@@ -69,7 +77,19 @@ func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime string, 
 	runtime = strings.TrimSpace(runtime)
 	switch major, _, _ := strings.Cut(v, "."); major {
 	case "3":
-		return RuntimeImageFor(v, runtime)
+		return RuntimeImageForPython(v, runtime, requiresPython, func() *runtimeversions.Catalog {
+			// Unlike the Airflow 2 lookup below, a catalog that cannot be read
+			// here only means the default Python, so the wait is short.
+			o := o
+			if o.Timeout <= 0 || o.Timeout > pythonCatalogTimeout {
+				o.Timeout = pythonCatalogTimeout
+			}
+			catalog, _, err := runtimeversions.Load(ctx, o)
+			if err != nil {
+				return nil
+			}
+			return catalog
+		})
 	case "2":
 		if err := checkAirflow2Floor(v); err != nil {
 			return "", err
@@ -124,4 +144,61 @@ func seriesHint(pin string) string {
 		series = parts[0]
 	}
 	return fmt.Sprintf(". %s is exactly Airflow %s; for the newest Airflow %s, pin apache-airflow==%s.*", pin, pin, series, series)
+}
+
+// StandalonePython is the interpreter a standalone venv of a manifest asks uv
+// for, given its Airflow pin, [tool.astro] runtime ("" for none) and [project]
+// requires-python: the Python a generated image of the same manifest runs
+// (runtimeversions.ProjectPython), so a project runs one Python in standalone
+// mode, in Docker mode and on a deployment. For `requires-python = '>=3.12'`,
+// which `astro init` writes, that is the runtime build's default rather than
+// whichever compatible interpreter uv finds first. The CLI and Astro Desktop
+// both build their venvs from it.
+//
+// When ProjectPython cannot decide (no catalog, as offline; Airflow 2, whose
+// builds list no Python; no requires-python; a specifier it does not read),
+// this is airflowrt.PythonFallback, the rule that needs no catalog: "" when
+// requires-python is set, so uv picks within it, and a version otherwise.
+//
+// A requires-python that admits none of the build's Pythons comes back as
+// *runtimeversions.PythonNotShippedError beside that fallback, rather than
+// instead of it. An image is refused over it, but a venv need not be: uv can
+// still satisfy requires-python with another interpreter, and the project may
+// well run under it, so the caller warns and builds the venv.
+func StandalonePython(airflowVersion, runtime, requiresPython string, catalog func() *runtimeversions.Catalog) (string, error) {
+	python, _, err := runtimeversions.ProjectPython(airflowVersion, runtime, requiresPython, catalog)
+	if python == "" {
+		python = airflowrt.PythonFallback(requiresPython, airflowVersion)
+	}
+	return python, err
+}
+
+// RuntimeImageForPython is RuntimeImageFor for a generated build, which also
+// has to run the Python runtimeversions.ProjectPython chooses for the project:
+// the one a standalone venv of the same manifest runs too.
+//
+// A runtime build ships several Pythons, and its tag runs the default one;
+// runtime:<build>-python-X.Y runs another. There is no such tag for a series,
+// so a Python other than the default needs the exact build, which
+// ProjectPython names. When it chooses the default, or has nothing to decide
+// on (no catalog, no build of the pin, no Python listed, a requires-python it
+// does not read), the base is RuntimeImageFor's, unchanged: an offline build
+// runs the default Python, as it did before this looked. A build that ships no
+// Python requires-python admits is refused before anything is built.
+//
+// catalog reads the runtime catalog, and returns nil when it cannot. It is
+// called only when requires-python is set.
+func RuntimeImageForPython(airflowVersion, runtime, requiresPython string, catalog func() *runtimeversions.Catalog) (string, error) {
+	base, err := RuntimeImageFor(airflowVersion, runtime)
+	if err != nil {
+		return base, err
+	}
+	python, build, err := runtimeversions.ProjectPython(airflowVersion, runtime, requiresPython, catalog)
+	if err != nil {
+		return "", fmt.Errorf("%w. Change requires-python to admit one of them, or build from a runtime that ships one it admits", err)
+	}
+	if python == "" || build == "" {
+		return base, nil
+	}
+	return RuntimeImageRepo + ":" + build + "-python-" + python, nil
 }

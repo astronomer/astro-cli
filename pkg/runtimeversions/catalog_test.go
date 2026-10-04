@@ -222,6 +222,30 @@ func TestNewestRuntimeFor(t *testing.T) {
 	}
 }
 
+// A build listed ahead of its release date has no image yet, so the newest
+// published build skips it; a build with no date still counts.
+func TestNewestPublishedRuntimeFor(t *testing.T) {
+	standOn(t, "2026-10-04")
+	c := parse(t, `{"runtimeVersionsV3": {
+    "3.3-7": {"metadata": {"airflowVersion": "3.3.1", "channel": "stable", "releaseDate": "2026-09-01"}},
+    "3.3-8": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "releaseDate": "2026-10-04"}},
+    "3.3-9": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "releaseDate": "2026-10-05"}},
+    "3.2-4": {"metadata": {"airflowVersion": "3.2.2", "channel": "stable"}},
+    "3.2-5": {"metadata": {"airflowVersion": "3.2.2", "channel": "stable", "yanked": true}}
+  }}`)
+	for pin, want := range map[string]string{"3.3": "3.3-8", "3.3.1": "3.3-7", "3.2": "3.2-4"} {
+		if got, ok := c.NewestPublishedRuntimeFor(pin); !ok || got != want {
+			t.Errorf("NewestPublishedRuntimeFor(%q) = %q, %v; want %q", pin, got, ok, want)
+		}
+	}
+	if got, ok := c.NewestRuntimeFor("3.3"); !ok || got != "3.3-9" {
+		t.Errorf("NewestRuntimeFor(3.3) = %q, %v; want the scheduled 3.3-9, which it does not filter", got, ok)
+	}
+	if got, ok := c.NewestPublishedRuntimeFor("3.4"); ok {
+		t.Errorf("NewestPublishedRuntimeFor(3.4) = %q; want none", got)
+	}
+}
+
 func TestAirflowFor(t *testing.T) {
 	c := loadFixture(t)
 	for _, tc := range []struct{ pin, runtime, want string }{

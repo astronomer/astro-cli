@@ -19,11 +19,11 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -60,6 +60,12 @@ type Options struct {
 	// the manifest's build-secrets (util.ResolveProjectBuildSecrets); whether
 	// asking for them makes sense is cmd's to decide.
 	BuildSecretFlags []string
+	// PythonCatalog reads the runtime catalog for a standalone plan, to pick
+	// the venv's Python the way a generated image picks its own (VenvPython).
+	// It returns nil when the catalog cannot be read, and is called only for
+	// an Airflow 3 manifest that states requires-python. nil, or a docker-mode
+	// plan, keeps the rule that needs no catalog (airflowrt.PythonFallback).
+	PythonCatalog func() *runtimeversions.Catalog
 }
 
 // Built is a resolved plan plus the discovered project, so cmd can persist the
@@ -89,6 +95,11 @@ type Built struct {
 	// manifest links none, or the tier was not asked for. Carried out for the
 	// same reason as EnvWarnings.
 	WorkspaceNote string
+	// PythonNote is one line saying requires-python admits none of the
+	// Pythons the runtime build ships, so a generated image of the project
+	// would be refused while the venv goes ahead on uv's choice; empty
+	// otherwise. Carried out for the same reason as EnvWarnings.
+	PythonNote string
 	// Pools are the manifest's [tool.astro.pools], which a start creates or
 	// updates once Airflow answers. They are not part of the Plan: the
 	// runtime starts Airflow, and the pools go in over its API afterwards.
@@ -129,19 +140,21 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	if err != nil {
 		return nil, err
 	}
+	catalog := opts.PythonCatalog
+	if opts.Mode == localrt.ModeDocker {
+		// Docker mode picks the image's Python itself, from the same function,
+		// and never reads PythonVersion: no catalog read for nothing.
+		catalog = nil
+	}
+	python, pythonNote := VenvPython(m, catalog)
 
 	p := localrt.Plan{
 		ProjectPath:  proj.Dir,
 		Mode:         opts.Mode,
 		BuildSecrets: util.ResolveProjectBuildSecrets(opts.BuildSecretFlags, m.Astro.BuildSecretSpecs()),
-		// Empty when the manifest states requires-python: the venv is
-		// built inside the project, so uv reads it from the manifest
-		// itself and passing it would only restate what uv is about to
-		// read. Without one, uv would pick the newest CPython it knows of,
-		// which an Airflow 2 pin cannot run under, so the fallback names
-		// a version. Astro Desktop applies the same function, so the two
-		// tools build the same interpreter for the same manifest.
-		PythonVersion:   airflowrt.PythonFallback(m.Project.RequiresPython, m.Airflow().Pin),
+		// The Python a generated image of this manifest runs, so the venv
+		// and the image agree (VenvPython). Docker mode never reads it.
+		PythonVersion:   python,
 		StopWithSession: opts.StopWithSession,
 		Env:             resolved.env,
 		// The vault's values, kept out of Env on purpose: docker mode
@@ -160,6 +173,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 
 	return &Built{
 		Project:          proj,
+		PythonNote:       pythonNote,
 		EnvWarnings:      resolved.warnings,
 		StartedWithout:   resolved.startedWithout,
 		WorkspaceNote:    resolved.workspaceNote,
@@ -167,6 +181,21 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		Pools:            m.Astro.Pools,
 		Plan:             p,
 	}, nil
+}
+
+// VenvPython is the interpreter a venv built for the project asks uv for
+// (imagebuild.StandalonePython: the Python the project's image runs, so the
+// two modes agree), and a line to warn with when the project's requires-python
+// admits none of its runtime build's Pythons, empty otherwise. That does not
+// stop a venv, which goes ahead on uv's choice within requires-python: the
+// note says an image would be refused, so a start finds out what a deploy
+// would.
+func VenvPython(m *manifest.Manifest, catalog func() *runtimeversions.Catalog) (python, note string) {
+	python, err := imagebuild.StandalonePython(m.Airflow().Pin, m.Airflow().Runtime, m.Project.RequiresPython, catalog)
+	if err != nil {
+		note = err.Error() + ", so an image of this project would not build; the environment uses the Python uv picks for requires-python"
+	}
+	return python, note
 }
 
 // EnvReport is what a start's gate would have said about the declared

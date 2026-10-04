@@ -58,8 +58,18 @@ type Plan struct {
 	// mode builds a generated image FROM that build rather than the newest one
 	// of AirflowVersion's series. Standalone ignores it: it installs the
 	// requirement. The manifest never sets it beside a Dockerfile.
-	Runtime       string
+	Runtime string
+	// PythonVersion is the interpreter standalone asks uv for ("3.13"), or ""
+	// to let uv pick within requires-python. A caller sets it with
+	// imagebuild.StandalonePython: the Python a generated image of the same
+	// manifest runs when that can be decided, airflowrt.PythonFallback
+	// otherwise. uv rebuilds an existing venv on another Python. Docker mode
+	// ignores it.
 	PythonVersion string
+	// RequiresPython is the manifest's [project] requires-python, which picks
+	// the Python a generated image runs. Standalone ignores it: uv reads it
+	// from the manifest.
+	RequiresPython string
 	// Dependencies is the project's [project] dependencies (PEP 508 specs).
 	// Standalone mode ignores it — uv syncs the venv straight from the
 	// manifest — but docker mode installs these into the runtime image so

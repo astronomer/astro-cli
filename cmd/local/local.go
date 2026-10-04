@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
@@ -217,6 +218,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
 	opts.BuildSecretFlags = buildSecretFlag
+	opts.PythonCatalog = c.pythonCatalog(ctx)
 	if opts.Mode != localrt.ModeDocker {
 		c.refreshAstroBuild(ctx, r, wd)
 	}
@@ -225,6 +227,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 		return c.reportBuildError(r, err)
 	}
 	warnManifest(r, built.ManifestWarnings)
+	warnPython(r, built.PythonNote)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
@@ -436,6 +439,29 @@ func warnWithout(r Renderer, doing string, missing []envresolve.Missing) {
 // without its values. A value only the workspace could supply that is
 // required still refuses the start, through *plan.MissingEnvError; this is for
 // the rest, which Airflow simply does not get this time.
+// warnPython reports a requires-python the runtime build ships no Python for:
+// the venv goes ahead, and an image of the project would be refused.
+func warnPython(r Renderer, note string) {
+	if note == "" {
+		return
+	}
+	emitWarning(r, event{Event: "warning", Text: manifest.Marker + ": " + requiresPythonKey + ": " + note, Key: requiresPythonKey, Reason: note})
+}
+
+// requiresPythonKey is the manifest key a Python-choice warning is about.
+const requiresPythonKey = "project.requires-python"
+
+// pythonCatalog is plan.Options.PythonCatalog: the runtime catalog, read
+// through Deps.RuntimeCatalog only when a standalone plan asks for it, at its
+// 3s cap, so an offline start waits seconds at most and then keeps the rule
+// that needs no catalog. nil when there is no catalog reader.
+func (c *cli) pythonCatalog(ctx context.Context) func() *runtimeversions.Catalog {
+	if c.d.RuntimeCatalog == nil {
+		return nil
+	}
+	return func() *runtimeversions.Catalog { return c.d.RuntimeCatalog(ctx) }
+}
+
 func warnWorkspaceUnread(r Renderer, note string) {
 	if note == "" {
 		return
@@ -580,6 +606,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 		StopWithSession:  st.StopWithSession,
 		AllowMissing:     allowMissing,
 		BuildSecretFlags: buildSecretFlag,
+		PythonCatalog:    c.pythonCatalog(ctx),
 
 		WorkspaceProvider: c.workspaceProvider(),
 	})
@@ -591,6 +618,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 		return err
 	}
 	warnManifest(r, built.ManifestWarnings)
+	warnPython(r, built.PythonNote)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err

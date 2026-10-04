@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // ImageDeployV2Input is the resolved input for a v2 project's image deploy. The
@@ -36,7 +37,11 @@ type ImageDeployV2Input struct {
 	// Build is the project's root (Build.ProjectDir, absolute, which the
 	// commit lookup and the dags upload use too) and the manifest's
 	// image-deciding fields, as imagebuild.ManifestBuildOf reads them.
-	Build        imagebuild.ManifestBuild
+	Build imagebuild.ManifestBuild
+	// Catalog reads the runtime catalog for the image's Python
+	// (imagebuild.RuntimeImageForPython); nil, or a nil catalog, builds on the
+	// runtime's default Python.
+	Catalog      func() *runtimeversions.Catalog
 	DeploymentID string
 	// BuildSecrets are docker build --secret specs for a declared Dockerfile's
 	// build (Build.Dockerfile).
@@ -114,7 +119,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	if in.ImageName == "" {
 		// Which image the manifest builds is imagebuild's rule, shared with
 		// every other consumer that builds from a manifest.
-		req, err = imagebuild.ForManifest(in.Build)
+		req, err = imagebuild.ForManifest(in.Build, in.Catalog)
 		if err != nil {
 			return ImageDeployV2Result{}, err
 		}
@@ -379,12 +384,15 @@ func planRuntime(in *ImageDeployV2Input, req *imagebuild.Request) plannedRuntime
 			return fmt.Sprintf("set [tool.astro] runtime to %s or newer in pyproject.toml", minimum)
 		}}
 	default:
-		_, tag, _ := strings.Cut(req.BaseImage, ":")
-		return plannedRuntime{version: tag, series: true, raise: func(minimum string) string {
+		_, ref, _ := strings.Cut(req.BaseImage, ":")
+		tag, _ := airflowrt.ParseRuntimeTagPython(ref)
+		parsed, _ := manifest.ParseRuntimeTag(tag)
+		return plannedRuntime{version: tag, series: !parsed.Build, raise: func(minimum string) string {
 			s := runtimeSeries(minimum)
-			if s == tag {
-				// The pin is already the deployment's series; only its
-				// moving tag served an older build.
+			if s == runtimeSeries(tag) {
+				// The pin is already the deployment's series; only the build
+				// it resolved to (its moving tag, or the exact build a
+				// requires-python Python flavor names) is older.
 				return fmt.Sprintf("set [tool.astro] runtime to %s or newer in pyproject.toml", minimum)
 			}
 			return fmt.Sprintf("pin apache-airflow to %s or newer in pyproject.toml", cmp.Or(s, minimum))

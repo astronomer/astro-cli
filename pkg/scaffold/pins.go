@@ -57,11 +57,13 @@ func airflowExtrasNote(spec string) []string {
 // requiresPython is the [project] requires-python for a project pinned to this
 // Airflow: the interpreters that Airflow can actually run under.
 //
-// It matters because, once it is written, nothing else chooses the
-// interpreter. A start passes no PythonVersion for a manifest that states
-// requires-python — uv reads it from the manifest — so this string is the only
-// thing standing between the pin and whatever Python the machine happens to
-// have newest. airflowrt.PythonFallback covers a manifest that states none,
+// It matters because, once it is written, it bounds the interpreter. An
+// Airflow 3 start asks for the Python the runtime build's image runs, which
+// it picks within this range (runtimeversions.ProjectPython); an Airflow 2
+// start, or one with no catalog, passes no PythonVersion and uv reads the range
+// from the manifest — so for Airflow 2 this string is the only thing standing
+// between the pin and whatever Python the machine happens to have newest.
+// airflowrt.PythonFallback covers a manifest that states none,
 // with the same ceiling as below; the two are kept in step by hand, because
 // this module does not import that one.
 //

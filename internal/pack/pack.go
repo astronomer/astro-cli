@@ -74,6 +74,9 @@ type Request struct {
 	// FROM that build (runtimeversions.CheckRuntime's contract: warnings to
 	// report, and the blocking finding as the error). nil checks nothing.
 	CheckRuntime func(ctx context.Context, runtime, airflowPin string) ([]runtimeversions.Finding, error)
+	// RuntimeCatalog reads the runtime catalog, for the image target to pick
+	// its Python (imagebuild.RuntimeImageForPython). nil builds on the default.
+	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
 }
 
 // Result is the packaged artifact — the value both text and json render. The

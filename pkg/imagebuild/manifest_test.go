@@ -32,7 +32,7 @@ func TestForManifestDeclaredDockerfileIsTheBuild(t *testing.T) {
 		ProjectDir:     dir,
 		AirflowVersion: "2.9",
 		Dockerfile:     "docker/Dockerfile",
-	})
+	}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(dir, "docker", "Dockerfile"), req.Dockerfile)
 	assert.Equal(t, dir, req.Context, "a declared Dockerfile builds with the project as its context")
@@ -44,7 +44,7 @@ func TestForManifestGeneratesFromTheAirflowPin(t *testing.T) {
 	req, err := ForManifest(ManifestBuild{
 		ProjectDir:     t.TempDir(),
 		AirflowVersion: "3.1",
-	})
+	}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, RuntimeImageRepo+":3.1", req.BaseImage)
 	assert.Empty(t, req.Dockerfile)
@@ -56,18 +56,18 @@ func TestForManifestGeneratesFromTheAirflowPin(t *testing.T) {
 // place of the series tag.
 func TestForManifestBuildsFromTheRuntimeBuild(t *testing.T) {
 	for _, pin := range []string{"3.3", "3.3.1", "3"} {
-		req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin, Runtime: "3.3-8"})
+		req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin, Runtime: "3.3-8"}, nil)
 		require.NoError(t, err, pin)
 		assert.Equal(t, RuntimeImageRepo+":3.3-8", req.BaseImage, pin)
 	}
 	// Deploy and package stay Airflow 3 only, runtime or not.
-	_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.11", Runtime: "13.11.0"})
+	_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.11", Runtime: "13.11.0"}, nil)
 	assert.ErrorContains(t, err, "only Airflow 3")
 }
 
 func TestForManifestRefusesAPinWithNoRuntimeImage(t *testing.T) {
 	for _, pin := range []string{"", "2.9"} {
-		_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin})
+		_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin}, nil)
 		assert.Error(t, err, "pin %q", pin)
 	}
 }
@@ -80,7 +80,7 @@ func TestForManifestCarriesDependenciesAndPackages(t *testing.T) {
 		"declared":  {ProjectDir: declaredProject(t), Dockerfile: "docker/Dockerfile"},
 	} {
 		m.Dependencies, m.Packages = deps, pkgs
-		req, err := ForManifest(m)
+		req, err := ForManifest(m, nil)
 		require.NoError(t, err, name)
 		assert.Equal(t, deps, req.Dependencies, name)
 		assert.Equal(t, pkgs, req.Packages, name)
@@ -95,7 +95,7 @@ func TestForManifestGeneratedRequestInstallsDependenciesAndPackages(t *testing.T
 		AirflowVersion: "3.1",
 		Dependencies:   []string{"apache-airflow==3.1.0", "pandas>=2"},
 		Packages:       []string{"libpq-dev"},
-	})
+	}, nil)
 	require.NoError(t, err)
 	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-deploy/p", "docker"
 
@@ -129,7 +129,7 @@ func TestFromDeclaredDockerfileMatchesWhereSecretsReachTheBuild(t *testing.T) {
 		{"declared", ManifestBuild{ProjectDir: declaredProject(t), Dockerfile: "docker/Dockerfile"}, true},
 	}
 	for _, tc := range cases {
-		req, err := ForManifest(tc.m)
+		req, err := ForManifest(tc.m, nil)
 		require.NoError(t, err, tc.name)
 		req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-deploy/p", "docker"
 		req.Secrets = []string{"id=tok,env=TOK"}
@@ -150,7 +150,7 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 		ProjectDir:     t.TempDir(),
 		AirflowVersion: "3.1",
 		Dependencies:   []string{"apache-airflow==3.1.*"},
-	})
+	}, nil)
 	require.NoError(t, err)
 	req.WorkDir, req.Tag, req.Bin, req.Platform = t.TempDir(), "astro-deploy/p", "docker", "linux/amd64"
 
@@ -178,7 +178,7 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 // Build keeps its fast path: local docker mode runs the base as-is at the host
 // platform when there is nothing to install.
 func TestBuildKeepsTheFastPathBuildLocalSkips(t *testing.T) {
-	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"})
+	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"}, nil)
 	require.NoError(t, err)
 	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-local/p", "docker"
 
@@ -194,7 +194,7 @@ func TestBuildLocalReturnsTheTagForEveryMode(t *testing.T) {
 		"generated with deps": {ProjectDir: t.TempDir(), AirflowVersion: "3.1", Dependencies: []string{"pandas"}},
 		"declared":            {ProjectDir: declaredProject(t), Dockerfile: "docker/Dockerfile"},
 	} {
-		req, err := ForManifest(m)
+		req, err := ForManifest(m, nil)
 		require.NoError(t, err, name)
 		req.WorkDir, req.Tag, req.Bin, req.Platform = t.TempDir(), "astro-deploy/p", "docker", "linux/amd64"
 
@@ -207,7 +207,7 @@ func TestBuildLocalReturnsTheTagForEveryMode(t *testing.T) {
 }
 
 func TestBuildLocalNamesAFailedBuild(t *testing.T) {
-	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"})
+	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"}, nil)
 	require.NoError(t, err)
 	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-deploy/p", "docker"
 

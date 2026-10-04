@@ -19,7 +19,8 @@ type ImageBuilder interface {
 	// `astro package astro` follow through imagebuild.ForManifest, so a
 	// project starts from the image it deploys: a declared Dockerfile is the
 	// build, with the project as its context, and otherwise the image is
-	// generated over the runtime base the pin and runtime build resolve to.
+	// generated over the runtime base the pin, runtime build and
+	// requires-python resolve to.
 	//
 	// It takes a context because the base is not always local: an Airflow 2
 	// image is tagged by runtime version, so which runtime carries a given
@@ -58,6 +59,10 @@ type ManifestBuild struct {
 	// of AirflowVersion's series, or "" for none. The manifest never sets it
 	// beside a Dockerfile.
 	Runtime string
+	// RequiresPython is [project] requires-python. A generated image runs the
+	// newest Python of its runtime build that it admits, preferring the
+	// build's default (imagebuild.RuntimeImageForPython).
+	RequiresPython string
 	// Dockerfile is [tool.astro] dockerfile: slash-separated and relative to
 	// ProjectDir, or empty when the project declares none.
 	Dockerfile string
@@ -76,6 +81,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		ProjectDir:     projectDir,
 		AirflowVersion: p.AirflowVersion,
 		Runtime:        p.Runtime,
+		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
 		Packages:       p.Packages,
@@ -88,6 +94,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.AirflowVersion = mb.AirflowVersion
 	p.Runtime = mb.Runtime
+	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies
 	p.Packages = mb.Packages

@@ -216,6 +216,24 @@ func (c *Catalog) NewestRuntimeFor(airflowPin string) (string, bool) {
 	return best, best != ""
 }
 
+// NewestPublishedRuntimeFor is NewestRuntimeFor less the builds the catalog
+// dates after today: the build a series tag such as runtime:3.3 serves, whose
+// own tags (runtime:3.3-8-python-3.13) a caller can pull. A build listed ahead
+// of its release has no image yet. A build with no date, or one that does not
+// parse, still counts, as it does for NewestRuntimeFor.
+func (c *Catalog) NewestPublishedRuntimeFor(airflowPin string) (string, bool) {
+	var best string
+	for tag, r := range c.runtimes {
+		if r.Yanked || r.scheduled() || !pinCovers(airflowPin, r.AirflowVersion) {
+			continue
+		}
+		if best == "" || compareVersions(tag, best) > 0 {
+			best = tag
+		}
+	}
+	return best, best != ""
+}
+
 // AirflowFor is the exact Airflow a deployment of this project runs: the one
 // the runtime build carries when the manifest names one, and otherwise the one
 // the newest build of the pin carries, which is what the series image tag
@@ -249,6 +267,13 @@ func (r *Runtime) released() bool {
 		return false
 	}
 	return !day.After(now().UTC())
+}
+
+// scheduled reports a release date after today, in UTC: a build the catalog
+// lists before it ships.
+func (r *Runtime) scheduled() bool {
+	day, err := time.Parse(releaseDateLayout, r.ReleaseDate)
+	return err == nil && day.After(now().UTC())
 }
 
 // pinCovers reports whether an Airflow release satisfies a pin that may name
