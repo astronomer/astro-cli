@@ -12,7 +12,10 @@ import (
 // -shuffle. Restoring afterward leaves the real args for anything that runs later.
 func TestMain(m *testing.M) {
 	origArgs := os.Args
-	os.Args = []string{"astro"}
+	// A helper process (TestForcedRenewalHelper) needs its -test.run.
+	if os.Getenv(renewHelperEnv) == "" {
+		os.Args = []string{"astro"}
+	}
 	code := m.Run()
 	os.Args = origArgs
 	os.Exit(code)

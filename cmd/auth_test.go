@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/secrets"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -21,6 +25,13 @@ func (s *CmdSuite) TestAuthRootCommand() {
 	s.Contains(output, "Authenticate to Astro or APC")
 	s.Contains(output, "--signup")
 	s.Contains(output, "--signin")
+	s.Contains(output, "--force")
+}
+
+func (s *CmdSuite) TestAuthTokenHasForce() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	output, err := executeCommand("auth", "token", "--help")
+	s.NoError(err)
 	s.Contains(output, "--force")
 }
 
@@ -162,6 +173,46 @@ func (s *CmdSuite) TestLoginForce() {
 	s.True(got)
 }
 
+// --vault lets a login kept in the config for an older CLI back into the
+// local secrets vault; without it the login stays in the config.
+func (s *CmdSuite) TestLoginVault() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	keyring.MockInit()
+	l, err := secrets.NewLogins(filepath.Join(s.T().TempDir(), "secrets"))
+	s.Require().NoError(err)
+	s.T().Cleanup(config.UseLoginsForTesting(l))
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+		return nil
+	}
+	s.T().Cleanup(func() { loginInVault = false })
+	buf := new(bytes.Buffer)
+
+	// A config file of the test's own on disk, whose time the older CLI's
+	// write below sets.
+	prevFile := config.HomeConfigFile
+	s.T().Cleanup(func() { config.HomeConfigFile = prevFile })
+	config.HomeConfigFile = filepath.Join(s.T().TempDir(), "config.yaml")
+	s.Require().NoError(os.WriteFile(config.HomeConfigFile, nil, 0o600))
+	cfg, key := config.HomeConfigFile, "astronomer_io"
+	older := secrets.Login{Token: "Bearer older-access", RefreshToken: "older-refresh"}
+	l.Save(cfg, key, secrets.Login{Token: "Bearer first-access", RefreshToken: "first-refresh"})
+	// An older CLI logged in over the vault's login, writing the config after
+	// the vault entry.
+	later := time.Now().Add(time.Minute)
+	s.Require().NoError(os.Chtimes(cfg, later, later))
+	l.Resolve(cfg, key, older)
+	inVault := secrets.Login{Token: secrets.LoginInVault}
+
+	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.True(l.Save(cfg, key, older) == older, "without --vault the login left the config")
+
+	loginInVault = true
+	// Spelled the way the login page's address is, which the login saves
+	// under astronomer.io.
+	s.NoError(login(&cobra.Command{}, []string{"cloud.astronomer.io"}, nil, buf))
+	s.True(l.Save(cfg, key, older) == inVault, "--vault did not let the login back into the vault")
+}
+
 func (s *CmdSuite) TestLoginSignupAndSigninConflict() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	s.T().Cleanup(func() { signup, signin = false, false })
@@ -242,7 +293,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "Bearer "+expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	err = printAuthToken(&cobra.Command{}, "", false, buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -251,7 +302,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	err = printAuthToken(&cobra.Command{}, "", false, buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -260,13 +311,13 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "")
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	err = printAuthToken(&cobra.Command{}, "", false, buf)
 	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 
 	// Test with no current context set
 	buf.Reset()
 	config.ResetCurrentContext()
-	err = printAuthToken(&cobra.Command{}, "", buf)
+	err = printAuthToken(&cobra.Command{}, "", false, buf)
 	s.Error(err)
 }
 
@@ -282,13 +333,13 @@ func (s *CmdSuite) TestAuthTokenWithContext() {
 	s.NoError(err)
 
 	// Retrieve token using explicit context domain
-	err = printAuthToken(&cobra.Command{}, c.Domain, buf)
+	err = printAuthToken(&cobra.Command{}, c.Domain, false, buf)
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
 	// Test with non-existent context
 	buf.Reset()
-	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", buf)
+	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", false, buf)
 	s.Error(err)
 }
 

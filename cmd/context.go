@@ -113,7 +113,7 @@ func pickContext(in io.Reader, out io.Writer) (string, error) {
 	if !contextPickerMayPrompt() {
 		return "", errors.New("name the context to switch to: `astro context switch <domain>`")
 	}
-	contexts, err := config.GetContexts()
+	contexts, err := config.ListContexts()
 	if err != nil {
 		return "", err
 	}

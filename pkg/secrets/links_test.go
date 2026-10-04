@@ -332,9 +332,9 @@ func TestListMetaAndHasValuesSkipTheLinkFiles(t *testing.T) {
 	if len(metas) != 0 {
 		t.Errorf("ListMeta = %v, want the link files skipped", metas)
 	}
-	has, err := s.hasValues()
+	has, _, err := s.scanValues()
 	if err != nil || has {
-		t.Errorf("hasValues = %v, %v; want false: link state is not an encrypted value", has, err)
+		t.Errorf("scanValues = %v, %v; want false: link state is not an encrypted value", has, err)
 	}
 	if err := s.Set("env:global:A", "v"); err != nil {
 		t.Errorf("first Set beside link state: %v", err)

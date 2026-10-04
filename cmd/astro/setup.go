@@ -107,7 +107,21 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		isDeploymentFile = true
 	}
 
+	// `astro auth token` prints a token for scripts and for Otto, which runs it
+	// with no terminal. It renews the login it prints itself (FreshLogin) and
+	// must never start the login flow, which would wait for a browser nobody
+	// is watching. Credentials in the environment still apply.
+	if isAuthTokenCmd(cmd) {
+		// Quietly: the command's output is the token alone.
+		_, err := ensureEnvCredentials(true, astroV1Client)
+		return err
+	}
+
 	return ensureLogin(isDeploymentFile, astroV1Client)
+}
+
+func isAuthTokenCmd(cmd *cobra.Command) bool {
+	return cmd.CalledAs() == "token" && cmd.Parent() != nil && cmd.Parent().Name() == "auth"
 }
 
 // EnsureLogin runs the login check Setup gives every cloud command before it
@@ -121,24 +135,155 @@ func EnsureLogin(astroV1Client astrov1.APIClient) error {
 
 // ensureLogin is Setup's auth half, shared with EnsureLogin.
 func ensureLogin(deploymentFile bool, astroV1Client astrov1.APIClient) error {
-	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(deploymentFile, astroV1Client)
-	if err != nil {
+	used, err := ensureEnvCredentials(deploymentFile, astroV1Client)
+	if err != nil || used {
 		return err
-	}
-	if apiToken {
-		return nil
-	}
-
-	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(astroV1Client, deploymentFile)
-	if err != nil {
-		return err
-	}
-	if apiKey {
-		return nil
 	}
 	return checkToken(astroV1Client, os.Stdout)
+}
+
+// ensureEnvCredentials sets up an API token or API keys from the environment,
+// reporting whether one was found. They come before any saved login.
+func ensureEnvCredentials(deploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
+	apiToken, err := checkAPIToken(deploymentFile, astroV1Client)
+	if err != nil || apiToken {
+		return apiToken, err
+	}
+	return checkAPIKeys(astroV1Client, deploymentFile)
+}
+
+// FreshLogin returns the context for domain, or the current context when
+// domain is empty, renewing its access token first when it is about to
+// expire, or with force whatever expiry the config records (for a token the
+// platform refused although it looked current). The renewed login is saved
+// for every context on its tenant, as checkToken saves one, but the context's
+// other fields are left alone. It never starts the login flow: a login that
+// cannot be renewed is an error, and a context that is not logged in comes back
+// with an empty token.
+//
+// Renewals are serialized across processes. Several processes that find the
+// same token stale, or were refused with it, at the same moment (Otto and its
+// subagents each run this) renew it once: the others wait, re-read the login,
+// and return the renewal (see renewedMeanwhile).
+func FreshLogin(domain string, force bool) (config.Context, error) {
+	if force && envCredentials() {
+		return config.Context{}, errForceWithEnvCredentials
+	}
+	c, err := loginContext(domain)
+	if err != nil || c.Token == "" {
+		return c, err
+	}
+	if c.RefreshToken == "" {
+		if force {
+			return c, errNoRefreshToken
+		}
+		return c, nil
+	}
+	if !force && !needsRenewal(&c) {
+		return c, nil
+	}
+
+	unlock := config.LockLoginRenewal()
+	defer unlock()
+	config.ReloadHome()
+	fresh, err := loginContext(domain)
+	if err != nil || fresh.Token == "" {
+		return fresh, err
+	}
+	if fresh.RefreshToken == "" {
+		if force {
+			return fresh, errNoRefreshToken
+		}
+		return fresh, nil
+	}
+	if renewedMeanwhile(c.Token, &fresh, force) {
+		return fresh, nil
+	}
+	if err := renewLogin(&fresh); err != nil {
+		return fresh, fmt.Errorf("could not renew your Astro login, run 'astro login' to log in again: %w", err)
+	}
+	return loginContext(domain)
+}
+
+// renewedRecently is how new an access token must be for a forced renewal to
+// take it as another process's renewal rather than the token that was refused.
+const renewedRecently = time.Minute
+
+func needsRenewal(c *config.Context) bool {
+	expireTime, _ := c.GetExpiresIn() //nolint:errcheck // a missing expiry reads as expired, which renews
+	return isExpired(expireTime, auth.AccessTokenRefreshMargin)
+}
+
+// renewedMeanwhile reports whether the login fresh, re-read under the renewal
+// lock, needs no renewal after all. before is the token this process read
+// before waiting for the lock.
+//
+//   - A token other than before: another process renewed it while this one
+//     waited.
+//   - Without force, a token no longer about to expire.
+//   - With force, a token issued less than renewedRecently ago. The caller does
+//     not say which token was refused, and a process started a moment after
+//     another finished renewing reads the renewal as before. A token refused
+//     within a minute of being issued is not one a second renewal would fix,
+//     and the caller can ask again once the minute has passed. A token issued
+//     more than that in this machine's future says its clock is wrong, not
+//     that the token is new, and is renewed.
+func renewedMeanwhile(before string, fresh *config.Context, force bool) bool {
+	if fresh.Token != before {
+		return true
+	}
+	if !force {
+		return !needsRenewal(fresh)
+	}
+	issued, ok := tokenIssuedAt(fresh.Token)
+	age := time.Since(issued)
+	return ok && age < renewedRecently && age > -renewedRecently
+}
+
+// tokenIssuedAt reads the issued-at claim of an access token, without
+// verifying it: it only decides whether to renew, never whether to trust.
+func tokenIssuedAt(token string) (time.Time, bool) {
+	var claims jwt.RegisteredClaims
+	if _, _, err := jwt.NewParser().ParseUnverified(strings.TrimPrefix(token, "Bearer "), &claims); err != nil || claims.IssuedAt == nil {
+		return time.Time{}, false
+	}
+	return claims.IssuedAt.Time, true
+}
+
+var (
+	errNoRefreshToken          = errors.New("this login cannot be renewed because it has no refresh token, run 'astro login' to log in again")
+	errForceWithEnvCredentials = errors.New("--force renews a saved login, and the token here comes from the environment (ASTRO_API_TOKEN or an API key), which cannot be renewed")
+)
+
+// envCredentials reports whether the environment supplies the credentials
+// Setup uses before any saved login.
+func envCredentials() bool {
+	return os.Getenv("ASTRO_API_TOKEN") != "" || (os.Getenv("ASTRONOMER_KEY_ID") != "" && os.Getenv("ASTRONOMER_KEY_SECRET") != "")
+}
+
+func renewLogin(c *config.Context) error {
+	authConfig, err := fetchDomainAuthConfig(c.Domain)
+	if err != nil {
+		return err
+	}
+	if err := c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID); err != nil {
+		return err
+	}
+	res, err := refresh(c.RefreshToken, authConfig)
+	if err != nil {
+		return err
+	}
+	// The login only: saveRenewedToken also rewrites the workspace from
+	// LastUsedWorkspace, which would undo a workspace switch every time a
+	// tool fetches a token in the background.
+	return saveRenewedLogin(c, &res)
+}
+
+func loginContext(domain string) (config.Context, error) {
+	if domain != "" {
+		return context.GetContext(domain)
+	}
+	return context.GetCurrentContext()
 }
 
 // RefreshLogin renews the current login's access token now, whatever expiry
@@ -207,6 +352,23 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 
 // saveRenewedToken persists the context with the renewed access token.
 func saveRenewedToken(c *config.Context, res *TokenResponse) error {
+	if err := saveRenewedLogin(c, res); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("workspace", c.Workspace); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("workspace", c.LastUsedWorkspace); err != nil {
+		return err
+	}
+	if err := c.SetContextKey("organization", c.Organization); err != nil {
+		return err
+	}
+	return c.SetContextKey("organization_product", c.OrganizationProduct)
+}
+
+// saveRenewedLogin persists the renewed login and nothing else.
+func saveRenewedLogin(c *config.Context, res *TokenResponse) error {
 	// A token renewed from the refresh token works on every host on the tenant,
 	// so the whole login goes to them: its refresh token and email with it.
 	// Sharing the access token alone would leave a host that held another
@@ -224,19 +386,7 @@ func saveRenewedToken(c *config.Context, res *TokenResponse) error {
 	if err := c.SetSharedExpiresIn(res.ExpiresIn); err != nil {
 		return err
 	}
-	if err := c.SetSharedContextKey("user_email", c.UserEmail); err != nil {
-		return err
-	}
-	if err := c.SetContextKey("workspace", c.Workspace); err != nil {
-		return err
-	}
-	if err := c.SetContextKey("workspace", c.LastUsedWorkspace); err != nil {
-		return err
-	}
-	if err := c.SetContextKey("organization", c.Organization); err != nil {
-		return err
-	}
-	return c.SetContextKey("organization_product", c.OrganizationProduct)
+	return c.SetSharedContextKey("user_email", c.UserEmail)
 }
 
 // isExpired is true if now() + a threshold is after the given date
@@ -258,14 +408,12 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 
 	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {
-		logger.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
 	}
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := client.Do(r)
 	if err != nil {
-		logger.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
 	}
 	defer res.Body.Close()

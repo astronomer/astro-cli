@@ -29,7 +29,7 @@ import (
 // Why a separate file rather than a field in the value file: every build that
 // already shipped re-marshals only {key, value} on Set, so an older tool
 // editing a pinned value would silently drop the pin and the entry would reach
-// every project. Neither file name ends in valueExt, so ListMeta and hasValues
+// every project. Neither file name ends in valueExt, so ListMeta and scanValues
 // in every build, old or new, skip both.
 //
 // Reading never touches the keyring. Reaching too few projects is the safe

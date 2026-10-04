@@ -726,11 +726,7 @@ func Logout(domain string, out io.Writer) {
 	domain = domainutil.FormatDomain(domain)
 	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
 
-	err := c.SetSharedContextKey("token", "")
-	if err != nil {
-		return
-	}
-	err = c.SetSharedContextKey("refreshtoken", "")
+	err := c.SignOut()
 	if err != nil {
 		return
 	}

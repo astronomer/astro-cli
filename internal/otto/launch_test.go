@@ -276,6 +276,33 @@ func (s *ConfigSuite) TestStartPutsOnlyTheLauncherFirstOnPath() {
 	s.Require().NoError(err)
 	s.Equal(want, target)
 	s.Equal(BinaryPath(), l.bin)
+	// Otto is told which astro launched it, so it asks this CLI for tokens.
+	cliPath, ok := l.get(CLIPathEnv)
+	s.True(ok)
+	s.Equal(filepath.Join(LauncherBinDir(), "astro"), cliPath)
+}
+
+// When the launcher entry cannot be made, Otto is still told which astro
+// launched it, rather than keeping an ASTRO_CLI_PATH it inherited.
+func (s *ConfigSuite) TestStartNamesTheLauncherWithoutALauncherEntry() {
+	s.prepareLaunch()
+	s.chdirTempProject("no-launcher-project")
+	exe := filepath.Join(s.T().TempDir(), "astro")
+	s.Require().NoError(os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755))
+	origExe := executable
+	executable = func() (string, error) { return exe, nil }
+	s.T().Cleanup(func() { executable = origExe })
+	s.T().Setenv(CLIPathEnv, "/somewhere/else/astro")
+	// A file where the launcher directory's parent should be.
+	s.Require().NoError(os.RemoveAll(filepath.Dir(LauncherBinDir())))
+	s.Require().NoError(os.MkdirAll(filepath.Dir(filepath.Dir(LauncherBinDir())), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Dir(LauncherBinDir()), []byte("x"), 0o600))
+
+	l := s.start()
+
+	cliPath, ok := l.get(CLIPathEnv)
+	s.True(ok)
+	s.Equal(exe, cliPath)
 }
 
 // Windows spells the key "Path". Prepending must extend that entry, not add

@@ -13,7 +13,7 @@ import (
 )
 
 // upgradeLock serializes Upgrade sweeps between processes. Not ".json", so
-// ListMeta and hasValues skip it.
+// ListMeta and scanValues skip it.
 const upgradeLock = "upgrade.lock"
 
 // TODO(vault-v1-retire): remove this file, the older-form cases in open (the

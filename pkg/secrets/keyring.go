@@ -20,8 +20,9 @@ import (
 
 // ErrKeyringUnavailable is the umbrella: the vault as a whole cannot be opened,
 // so no value in it can be read. Every such error wraps it, which is what lets a
-// caller tell this from a single corrupt value — see aead. There is no fallback
-// yet (open decision in an earlier fix); the store refuses loudly instead.
+// caller tell this from a single corrupt value — see aead. The store itself
+// has no fallback and refuses loudly; a caller that has one decides it, as
+// Logins does by keeping a login in the config (login.go).
 //
 // On its own it means the OS keyring is unreachable: headless Linux without a
 // Secret Service, most CI, a locked or denied keychain. Retrying can help, and
@@ -49,6 +50,10 @@ var ErrMasterKeyUnusable = fmt.Errorf("%w: master key is unusable", ErrKeyringUn
 // no way to tell them apart. Refusing keeps the ciphertext intact and the
 // condition legible; recovery is deleting the directory, which is the user's
 // call to make and not this package's.
+//
+// Logins (login.go) are the exception. Logging in again recovers one, so
+// they do not count toward this: with nothing else encrypted, a new key is
+// made and the logins the lost key left behind are removed.
 var ErrVaultOrphaned = fmt.Errorf("%w: encrypted values exist but the master key is gone", ErrKeyringUnavailable)
 
 const (
@@ -151,14 +156,7 @@ func (s *keyringStore) aead() (*vaultCipher, error) {
 func (s *keyringStore) masterKey() ([]byte, error) {
 	stored, err := s.kr.Get(s.service, keyringAccount)
 	if err == nil {
-		key, err := base64.StdEncoding.DecodeString(stored)
-		if err != nil {
-			return nil, fmt.Errorf("%w: not base64: %w", ErrMasterKeyUnusable, err)
-		}
-		if len(key) != keyBytes {
-			return nil, fmt.Errorf("%w: length %d, want %d", ErrMasterKeyUnusable, len(key), keyBytes)
-		}
-		return key, nil
+		return decodeMasterKey(stored)
 	}
 	// Any failure other than "no entry yet" means we cannot reach the keyring at
 	// all. %w rather than %v so a caller can still reach the platform's own
@@ -170,17 +168,37 @@ func (s *keyringStore) masterKey() ([]byte, error) {
 	}
 	// No key. Minting one is right for a vault that has never been used and
 	// destructive for a vault that has: see ErrVaultOrphaned.
-	orphaned, err := s.hasValues()
+	orphaned, logins, err := s.scanValues()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrKeyringUnavailable, err)
 	}
 	if orphaned {
 		return nil, ErrVaultOrphaned
 	}
-	// Two processes racing the very first key creation can each generate a
-	// key and the loser's values are orphaned. The OS keyring has no
-	// compare-and-swap, the window exists once per vault ever, and desktop
-	// carries the same behavior — accepted.
+	// Logins do not count as values here: a login is recovered by logging in
+	// again, and one left behind could never be read under a new key. They go
+	// before the new key exists, so no login written under it is removed.
+	if len(logins) > 0 {
+		// A login stored since the read above was stored under a key another
+		// process has just made. Use that key rather than remove its logins,
+		// and remove nothing unless the keyring still answers that there is
+		// no key.
+		stored, err := s.kr.Get(s.service, keyringAccount)
+		if err == nil {
+			return decodeMasterKey(stored)
+		}
+		if !errors.Is(err, keyring.ErrNotFound) {
+			return nil, fmt.Errorf("%w: read master key: %w", ErrKeyringUnavailable, err)
+		}
+		for _, path := range logins {
+			_ = os.Remove(path) //nolint:errcheck // one left behind reads as unreadable, which a login replaces
+		}
+	}
+	// Two processes racing to create a key, the very first one or one that
+	// replaces a lost key, can each generate a key and the loser's values
+	// are orphaned. The OS keyring has no compare-and-swap, the window is
+	// short and opens only when there is no key, and desktop carries the same
+	// behavior — accepted.
 	key := make([]byte, keyBytes)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("%w: generate master key: %w", ErrKeyringUnavailable, err)
@@ -191,31 +209,51 @@ func (s *keyringStore) masterKey() ([]byte, error) {
 	return key, nil
 }
 
-// hasValues reports whether the vault directory holds any encrypted value, which
-// is what separates "never used" from "the key is gone". A plain entry does not
-// count: it was never encrypted, so minting a key loses nothing. A file that
-// cannot be read or parsed does count, since it may be ciphertext.
-func (s *keyringStore) hasValues() (bool, error) {
+func decodeMasterKey(stored string) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(stored)
+	if err != nil {
+		return nil, fmt.Errorf("%w: not base64: %w", ErrMasterKeyUnusable, err)
+	}
+	if len(key) != keyBytes {
+		return nil, fmt.Errorf("%w: length %d, want %d", ErrMasterKeyUnusable, len(key), keyBytes)
+	}
+	return key, nil
+}
+
+// scanValues reports whether the vault directory holds any encrypted value,
+// which is what separates "never used" from "the key is gone", and lists the
+// files of the login entries. A plain entry does not count: it was never
+// encrypted, so minting a key loses nothing. Nor does a login (isLoginKey),
+// which logging in again replaces. A file that cannot be read or parsed does
+// count, since it may be ciphertext, and so does a login in a file not named
+// for it.
+func (s *keyringStore) scanValues() (found bool, logins []string, err error) {
 	entries, err := os.ReadDir(s.dir)
 	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
+		return false, nil, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("list secrets: %w", err)
+		return false, nil, fmt.Errorf("list secrets: %w", err)
 	}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), valueExt) {
 			continue
 		}
-		vf, err := readValueFile(filepath.Join(s.dir, e.Name()))
-		if errors.Is(err, os.ErrNotExist) {
-			continue // deleted between ReadDir and here
-		}
-		if err != nil || !vf.Plain {
-			return true, nil
+		path := filepath.Join(s.dir, e.Name())
+		vf, err := readValueFile(path)
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			// deleted between ReadDir and here
+		case err != nil:
+			found = true
+		case vf.Plain:
+		case isLoginKey(vf.Key) && path == s.path(vf.Key):
+			logins = append(logins, path)
+		default:
+			found = true
 		}
 	}
-	return false, nil
+	return found, logins, nil
 }
 
 // valueFile is the on-disk JSON for one value. The key lives inside the
@@ -285,13 +323,18 @@ func (s *keyringStore) Get(key string) (string, error) {
 	}
 	plain, _, err := c.open(key, vf.Value)
 	if err != nil {
+		// A login removed since it was read, by the minting of a new key
+		// (masterKey), is gone rather than unreadable.
+		if _, serr := os.Stat(s.path(key)); isLoginKey(key) && errors.Is(serr, os.ErrNotExist) {
+			return "", ErrNotFound
+		}
 		return "", fmt.Errorf("read secret %q: %w", key, err)
 	}
 	return plain, nil
 }
 
 func (s *keyringStore) Set(key, value string) error {
-	// Before the cipher: fetching it can list the directory (hasValues) and
+	// Before the cipher: fetching it can list the directory (scanValues) and
 	// mint a master key, and neither may happen through an unsafe directory.
 	if _, err := prepareDir(s.dir, false); err != nil {
 		return err

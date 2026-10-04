@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
 var (
@@ -106,18 +108,24 @@ func (c *Context) GetContext() (Context, error) {
 	if err != nil {
 		return *c, err
 	}
+	resolveLogin(key, c)
 	return *c, nil
 }
 
-// GetContexts gets all contexts currently configured in the global config
-// Returns a Contexts struct containing a map of all Context structs
-func GetContexts() (Contexts, error) {
+// ListContexts returns every context in the global config, without their
+// logins: Token and RefreshToken are empty. Reading a login can reach the OS
+// keyring; GetContext returns one context with its login.
+func ListContexts() (Contexts, error) {
 	var c Contexts
 	err := viperHome.Unmarshal(&c)
 	if err != nil {
 		return c, err
 	}
-
+	for key := range c.Contexts {
+		ctx := c.Contexts[key]
+		ctx.Token, ctx.RefreshToken = "", ""
+		c.Contexts[key] = ctx
+	}
 	return c, nil
 }
 
@@ -128,14 +136,15 @@ func (c *Context) SetContext() error {
 		return err
 	}
 
+	login := saveContextLogin(key, secrets.Login{Token: c.Token, RefreshToken: c.RefreshToken})
 	context := map[string]interface{}{
-		"token":                c.Token,
+		"token":                login.Token,
 		"domain":               c.Domain,
 		"organization":         c.Organization,
 		"organization_product": c.OrganizationProduct,
 		"workspace":            c.Workspace,
 		"last_used_workspace":  c.Workspace,
-		"refreshtoken":         c.RefreshToken,
+		"refreshtoken":         login.RefreshToken,
 		"user_email":           c.UserEmail,
 		"auth_domain":          c.AuthDomain,
 		"auth_client_id":       c.AuthClientID,
@@ -183,7 +192,12 @@ func (c *Context) SetSharedExpiresIn(value int64) error {
 
 // setContextField updates one field in one context and persists the config.
 func setContextField(cKey, field string, value interface{}) error {
-	putContextField(cKey, strings.ToLower(field), value)
+	field = strings.ToLower(field)
+	if s, ok := value.(string); ok && isLoginField(field) {
+		putLoginField(cKey, field, s)
+	} else {
+		putContextField(cKey, field, value)
+	}
 	return saveConfig(viperHome, HomeConfigFile)
 }
 
@@ -193,6 +207,10 @@ func shareContextField(cKey, field string, value interface{}) error {
 		return fmt.Errorf("%w: %s is not a login field", errNotLoginField, field)
 	}
 	for _, key := range append([]string{cKey}, contextKeysSharingLogin(cKey)...) {
+		if s, ok := value.(string); ok && isLoginField(field) {
+			putLoginField(key, field, s)
+			continue
+		}
 		putContextField(key, field, value)
 	}
 	return saveConfig(viperHome, HomeConfigFile)
@@ -208,7 +226,18 @@ func shareContextField(cKey, field string, value interface{}) error {
 //
 // field must be lowercase: GetStringMap returns lowercase keys, and a second
 // key that differs only in case collides with the first when viper folds them.
+//
+// Setting a token field marks the context's login as changed by this process,
+// so the next write keeps it (see takeUnchangedLogins).
 func putContextField(cKey, field string, value interface{}) {
+	if isLoginField(field) {
+		markLoginWrite(cKey)
+	}
+	storeContextField(cKey, field, value)
+}
+
+// storeContextField is putContextField without marking a login as changed.
+func storeContextField(cKey, field string, value interface{}) {
 	parentPath := fmt.Sprintf("%s.%s", contextsKey, cKey)
 	ctxMap := viperHome.GetStringMap(parentPath)
 	if ctxMap == nil {
@@ -266,7 +295,7 @@ func ContextsSharingLogin(authDomain, authClientID string) ([]Context, error) {
 	if authDomain == "" || authClientID == "" {
 		return nil, nil
 	}
-	contexts, err := GetContexts()
+	contexts, err := ListContexts()
 	if err != nil {
 		return nil, err
 	}
@@ -281,6 +310,9 @@ func ContextsSharingLogin(authDomain, authClientID string) ([]Context, error) {
 		if c.Domain == "" {
 			c.Domain = strings.ReplaceAll(key, "_", ".")
 		}
+		ctxMap := viperHome.GetStringMap(contextsKey + "." + key)
+		c.Token, c.RefreshToken = stringField(ctxMap, tokenField), stringField(ctxMap, refreshTokenField)
+		resolveLogin(key, &c)
 		sharing = append(sharing, c)
 	}
 	return sharing, nil
@@ -331,6 +363,7 @@ func (c *Context) DeleteContext() error {
 	if err != nil {
 		return err
 	}
+	logins().Save(HomeConfigFile, cKey, secrets.Login{})
 	return nil
 }
 

@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
 func CreateTempProject() (dir string, cleanup func(), err error) {
@@ -24,4 +26,13 @@ func CreateTempProject() (dir string, cleanup func(), err error) {
 		configFile.Close()
 		os.RemoveAll(projectDir) //nolint:errcheck // best-effort cleanup
 	}, nil
+}
+
+// UseLoginsForTesting keeps logins in l for the rest of a test, in place of
+// the shared vault, which is off in test binaries. It returns a func that
+// restores the previous vault.
+func UseLoginsForTesting(l *secrets.Logins) (restore func()) {
+	prev := loginsOverride
+	loginsOverride = l
+	return func() { loginsOverride = prev }
 }

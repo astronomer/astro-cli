@@ -1716,9 +1716,7 @@ func TestLogout(t *testing.T) {
 
 	t.Run("success_with_email", func(t *testing.T) {
 		assertions := func(expUserEmail string, expToken string) {
-			contexts, err := config.GetContexts()
-			assert.NoError(t, err)
-			context := contexts.Contexts["localhost"]
+			context, err := (&config.Context{Domain: "localhost"}).GetContext()
 
 			assert.NoError(t, err)
 			assert.Equal(t, expUserEmail, context.UserEmail)

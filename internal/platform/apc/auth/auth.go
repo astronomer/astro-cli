@@ -264,7 +264,7 @@ func Logout(domain string) {
 		return
 	}
 
-	err = c.SetContextKey("token", "")
+	err = c.SignOut()
 	if err != nil {
 		return
 	}

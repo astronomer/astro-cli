@@ -138,7 +138,7 @@ func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	var domain string
-	contexts, err := config.GetContexts()
+	contexts, err := config.ListContexts()
 	if err != nil {
 		return err
 	}

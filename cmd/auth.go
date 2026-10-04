@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	apcAuth "github.com/astronomer/astro-cli/internal/platform/apc/auth"
@@ -23,6 +24,7 @@ var (
 	signup                 bool
 	signin                 bool
 	forceLogin             bool
+	loginInVault           bool
 
 	cloudLogin  = astroAuth.Login
 	cloudLogout = astroAuth.Logout
@@ -72,10 +74,34 @@ func signupForDomain(domain string) bool {
 	}
 }
 
+// resumeLoginVault lets the login being logged in to back into the local
+// secrets vault when --vault asks for it: the domain named, or the current
+// context's.
+func resumeLoginVault(args []string) error {
+	if !loginInVault {
+		return nil
+	}
+	domain := domainutil.DefaultDomain
+	if len(args) == 1 {
+		domain = domainutil.ExpandShortName(args[0])
+		if context.IsCloudDomain(domain) {
+			// The context the login is saved under, as cloudLogin names it.
+			domain = domainutil.FormatDomain(domain)
+		}
+	} else if ctx, err := context.GetCurrentContext(); err == nil && ctx.Domain != "" {
+		domain = ctx.Domain
+	}
+	c := config.Context{Domain: domain}
+	return c.ResumeLoginVault()
+}
+
 func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	if err := resumeLoginVault(args); err != nil {
+		return err
+	}
 	if len(args) == 1 {
 		domain := domainutil.ExpandShortName(args[0])
 		// check if user provided a valid cloud domain
@@ -154,6 +180,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	cmd.Flags().BoolVar(&signup, "signup", false, "Create a new Astro account instead of signing in to an existing one")
 	cmd.Flags().BoolVar(&signin, "signin", false, "Sign in to an existing Astro account instead of creating one")
 	cmd.Flags().BoolVar(&forceLogin, "force", false, "Log in through the browser even when a saved login still works, and ask for the password again")
+	cmd.Flags().BoolVar(&loginInVault, "vault", false, "Keep this login in the local secrets vault even after an older Astro CLI or Astro Desktop was seen using it. That older tool will ask you to log in again")
 	cmd.MarkFlagsMutuallyExclusive("signup", "signin")
 	return cmd
 }
@@ -172,31 +199,29 @@ func newAuthLogoutCommand(out io.Writer) *cobra.Command {
 }
 
 func newAuthTokenCommand(out io.Writer) *cobra.Command {
-	var tokenDomain string
+	var (
+		tokenDomain string
+		forceRenew  bool
+	)
 	cmd := &cobra.Command{
 		Use:   "token",
 		Short: "Print the authentication token",
 		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printAuthToken(cmd, tokenDomain, out)
+			return printAuthToken(cmd, tokenDomain, forceRenew, out)
 		},
 	}
 	cmd.Flags().StringVarP(&tokenDomain, "domain", "d", "", "Print the token for a specific context domain instead of the current context")
+	cmd.Flags().BoolVar(&forceRenew, "force", false, "Renew the token from the saved login even if it has not expired yet")
 	return cmd
 }
 
-func printAuthToken(cmd *cobra.Command, contextDomain string, out io.Writer) error {
+func printAuthToken(cmd *cobra.Command, contextDomain string, force bool, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var c config.Context
-	var err error
-	if contextDomain != "" {
-		c, err = context.GetContext(contextDomain)
-	} else {
-		c, err = context.GetCurrentContext()
-	}
+	c, err := astroCmd.FreshLogin(contextDomain, force)
 	if err != nil {
 		return err
 	}

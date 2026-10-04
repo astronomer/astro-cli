@@ -160,6 +160,7 @@ func InitConfig(fs afero.Fs) {
 
 // Init viper for config file in home directory
 func initHome(fs afero.Fs) {
+	forgetLoginWrites()
 	viperHome = viper.New()
 	viperHome.SetFs(fs)
 	configFs = fs
@@ -350,6 +351,10 @@ func saveConfig(v *viper.Viper, file string) error {
 		created = true
 	}
 
+	home := v == viperHome && file == HomeConfigFile
+	if home {
+		takeUnchangedLogins()
+	}
 	if err := v.WriteConfigAs(file); err != nil {
 		if created {
 			// Take the empty file back out. An empty config parses cleanly,
@@ -358,6 +363,9 @@ func saveConfig(v *viper.Viper, file string) error {
 			_ = configFs.Remove(file) //nolint:errcheck // the write error below is the one worth reporting
 		}
 		return fmt.Errorf("error saving config: %w", err)
+	}
+	if home {
+		forgetLoginWrites()
 	}
 	return nil
 }

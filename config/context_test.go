@@ -192,12 +192,12 @@ func (s *Suite) TestResetCurrentContext() {
 	s.ErrorIs(err, ErrGetHomeString)
 }
 
-func (s *Suite) TestGetContexts() {
+func (s *Suite) TestListContexts() {
 	initTestConfig()
-	ctxs, err := GetContexts()
+	ctxs, err := ListContexts()
 	s.NoError(err)
 	context := func(domain string) Context {
-		return Context{Domain: domain, Organization: "test-org-id", Workspace: "ck05r3bor07h40d02y2hw4n4v", LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v", Token: "token"}
+		return Context{Domain: domain, Organization: "test-org-id", Workspace: "ck05r3bor07h40d02y2hw4n4v", LastUsedWorkspace: "ck05r3bor07h40d02y2hw4n4v"}
 	}
 	s.Equal(Contexts{Contexts: map[string]Context{"test_com": context("test.com"), "example_com": context("example.com")}}, ctxs)
 }
@@ -280,9 +280,8 @@ contexts:
 	s.Require().NoError(ctx.SetContextKey("workspace", "ws-new"))
 
 	InitConfig(fs)
-	contexts, err := GetContexts()
+	sibling, err := (&Context{Domain: "pr2222.astronomer-dev.io"}).GetContext()
 	s.Require().NoError(err)
-	sibling := contexts.Contexts["pr2222_astronomer-dev_io"]
 	s.Equal("Bearer shared", sibling.Token)
 	s.Equal("shared-refresh", sibling.RefreshToken)
 	s.Equal("ws-2222", sibling.Workspace)
@@ -292,9 +291,14 @@ contexts:
 	s.NoError(err)
 	s.Equal(ownExpiry, siblingExpiry)
 
-	s.Equal("Bearer dev", contexts.Contexts["astronomer-dev_io"].Token)
-	s.Equal("Bearer never-recorded", contexts.Contexts["pr3333_astronomer-dev_io"].Token)
-	s.Equal("ws-new", contexts.Contexts["pr1111_astronomer-dev_io"].Workspace)
+	for domain, token := range map[string]string{"astronomer-dev.io": "Bearer dev", "pr3333.astronomer-dev.io": "Bearer never-recorded"} {
+		other, err := (&Context{Domain: domain}).GetContext()
+		s.NoError(err)
+		s.Equal(token, other.Token)
+	}
+	own, err := (&Context{Domain: "pr1111.astronomer-dev.io"}).GetContext()
+	s.NoError(err)
+	s.Equal("ws-new", own.Workspace)
 
 	s.Run("a new expiry replaces the old one every time", func() {
 		for i := range 20 {
@@ -370,7 +374,7 @@ func (s *Suite) TestSetContextKey_KeepsDomainOfNewContext() {
 	s.Require().NoError(ctx.SetContext())
 	s.Require().NoError(ctx.SetContextKey("token", "Bearer new"))
 
-	contexts, err := GetContexts()
+	contexts, err := ListContexts()
 	s.Require().NoError(err)
 	s.Equal("pr1111.astronomer-dev.io", contexts.Contexts["pr1111_astronomer-dev_io"].Domain)
 }

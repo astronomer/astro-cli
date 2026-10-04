@@ -188,8 +188,14 @@ func (c *Config) BuildEnv() []string {
 	// where Otto itself is installed.
 	foldCase := runtime.GOOS == windowsGOOS
 	env = prependPath(env, BinDir(), foldCase)
+	// Named as well, so Otto asks this CLI for the login token (`astro auth
+	// token`) whatever PATH it ends up with: the launcher entry, or the
+	// binary itself when that entry could not be made.
 	if dir := ensureLauncherBin(); dir != "" {
 		env = prependPath(env, dir, foldCase)
+		set(CLIPathEnv, filepath.Join(dir, launcherName()))
+	} else if exe, err := executable(); err == nil {
+		set(CLIPathEnv, exe)
 	}
 
 	// Auth context — Otto reads these instead of parsing config.yaml
@@ -252,6 +258,17 @@ func prependPath(env []string, dir string, foldCase bool) []string {
 	return append(env, "PATH="+dir)
 }
 
+// CLIPathEnv names, for Otto, the CLI that launched it. Otto runs it to get a
+// current login token when config.yaml does not hold the login.
+const CLIPathEnv = "ASTRO_CLI_PATH"
+
+func launcherName() string {
+	if runtime.GOOS == windowsGOOS {
+		return "astro.exe"
+	}
+	return "astro"
+}
+
 // executable is os.Executable, a var so a test can stand in a launcher.
 var executable = os.Executable
 
@@ -284,9 +301,8 @@ func ensureLauncherBin() string {
 		logger.Debugf("otto: creating %s: %v", dir, err)
 		return ""
 	}
-	name := "astro"
+	name := launcherName()
 	if runtime.GOOS == windowsGOOS {
-		name += ".exe"
 		err = copyExecutable(exe, filepath.Join(dir, name))
 	} else {
 		err = os.Symlink(exe, filepath.Join(dir, name))
