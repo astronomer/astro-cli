@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/context"
@@ -458,6 +460,87 @@ func TestInspect(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), workloadIdentity)
 		mockV1Client.AssertExpectations(t)
+	})
+}
+
+func TestInspectRemoteExecutionAPIURL(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	const remoteAPIURL = "https://remote-api.example.com"
+	withRemoteExecution := newSourceDeployment()
+	withRemoteExecution.RemoteExecution = &astrov1.DeploymentRemoteExecution{
+		Enabled:                true,
+		AllowedIpAddressRanges: []string{"0.0.0.0/0"},
+		RemoteApiUrl:           remoteAPIURL,
+	}
+	run := func(t *testing.T, d astrov1.Deployment, outputFormat, requestedField string, template bool) (string, error) {
+		t.Helper()
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		resp := astrov1.GetDeploymentResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &d}
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil).Once()
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Maybe()
+		out := new(bytes.Buffer)
+		err := Inspect("test-ws-id", "", deploymentID, outputFormat, mockV1Client, out, requestedField, template, false)
+		mockV1Client.AssertExpectations(t)
+		return out.String(), err
+	}
+
+	t.Run("yaml output carries the url in metadata", func(t *testing.T) {
+		out, err := run(t, withRemoteExecution, "yaml", "", false)
+		require.NoError(t, err)
+		var parsed FormattedDeployment
+		require.NoError(t, yaml.Unmarshal([]byte(out), &parsed))
+		require.NotNil(t, parsed.Deployment.Metadata)
+		require.NotNil(t, parsed.Deployment.Metadata.RemoteExecutionAPIURL)
+		assert.Equal(t, remoteAPIURL, *parsed.Deployment.Metadata.RemoteExecutionAPIURL)
+		assert.Equal(t, 1, strings.Count(out, remoteAPIURL), "the url belongs in metadata only, not under configuration.remote_execution")
+	})
+	t.Run("json output carries the url in metadata", func(t *testing.T) {
+		out, err := run(t, withRemoteExecution, "json", "", false)
+		require.NoError(t, err)
+		var parsed FormattedDeployment
+		require.NoError(t, json.Unmarshal([]byte(out), &parsed))
+		require.NotNil(t, parsed.Deployment.Metadata)
+		require.NotNil(t, parsed.Deployment.Metadata.RemoteExecutionAPIURL)
+		assert.Equal(t, remoteAPIURL, *parsed.Deployment.Metadata.RemoteExecutionAPIURL)
+		assert.Equal(t, 1, strings.Count(out, remoteAPIURL))
+	})
+	t.Run("--key metadata.remote_execution_api_url prints the url alone", func(t *testing.T) {
+		out, err := run(t, withRemoteExecution, "yaml", "metadata.remote_execution_api_url", false)
+		require.NoError(t, err)
+		assert.Equal(t, remoteAPIURL+"\n", out)
+	})
+	for _, format := range []string{"yaml", "json"} {
+		t.Run("a "+format+" template leaves the url out", func(t *testing.T) {
+			out, err := run(t, withRemoteExecution, format, "", true)
+			require.NoError(t, err)
+			assert.NotContains(t, out, remoteAPIURL)
+			assert.NotContains(t, out, "remote_execution_api_url")
+			assert.Contains(t, out, "remote_execution", "the editable remote execution settings stay in the template")
+		})
+	}
+	t.Run("a deployment without remote execution has no url key", func(t *testing.T) {
+		for _, format := range []string{"yaml", "json"} {
+			out, err := run(t, newSourceDeployment(), format, "", false)
+			require.NoError(t, err)
+			assert.NotContains(t, out, "remote_execution_api_url")
+		}
+		_, err := run(t, newSourceDeployment(), "yaml", "metadata.remote_execution_api_url", false)
+		assert.ErrorIs(t, err, errKeyNotFound)
+	})
+	t.Run("an empty url from the API is left out", func(t *testing.T) {
+		d := newSourceDeployment()
+		d.RemoteExecution = &astrov1.DeploymentRemoteExecution{Enabled: true}
+		info, err := getDeploymentInfo(d)
+		require.NoError(t, err)
+		assert.NotContains(t, info, "remote_execution_api_url")
+	})
+	t.Run("a url on disabled remote execution is left out", func(t *testing.T) {
+		d := newSourceDeployment()
+		d.RemoteExecution = &astrov1.DeploymentRemoteExecution{Enabled: false, RemoteApiUrl: remoteAPIURL}
+		info, err := getDeploymentInfo(d)
+		require.NoError(t, err)
+		assert.NotContains(t, info, "remote_execution_api_url")
 	})
 }
 

@@ -17,19 +17,20 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID        *string              `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID         *string              `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID           *string              `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName         *string              `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion      *string              `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	CurrentTag          *string              `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
-	Status              *string              `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt           *time.Time           `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt           *time.Time           `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL       *string              `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL        *string              `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
-	AirflowAPIURL       *string              `mapstructure:"airflow_api_url" yaml:"airflow_api_url" json:"airflow_api_url"`
-	HibernationOverride *HibernationOverride `mapstructure:"hibernation_override,omitempty" yaml:"hibernation_override,omitempty" json:"hibernation_override,omitempty"`
+	DeploymentID          *string              `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID           *string              `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID             *string              `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName           *string              `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion        *string              `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	CurrentTag            *string              `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
+	Status                *string              `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt             *time.Time           `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt             *time.Time           `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL         *string              `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL          *string              `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	AirflowAPIURL         *string              `mapstructure:"airflow_api_url" yaml:"airflow_api_url" json:"airflow_api_url"`
+	RemoteExecutionAPIURL *string              `mapstructure:"remote_execution_api_url,omitempty" yaml:"remote_execution_api_url,omitempty" json:"remote_execution_api_url,omitempty"`
+	HibernationOverride   *HibernationOverride `mapstructure:"hibernation_override,omitempty" yaml:"hibernation_override,omitempty" json:"hibernation_override,omitempty"`
 }
 
 type HibernationOverride struct {
@@ -216,6 +217,11 @@ func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}
 				OverrideUntil: override.OverrideUntil,
 			}
 		}
+	}
+	// remote agents reach the deployment here; the key is left out unless
+	// remote execution is enabled and the API returned a url
+	if re := deploymentObj.RemoteExecution; re != nil && re.Enabled && re.RemoteApiUrl != "" {
+		metadata["remote_execution_api_url"] = re.RemoteApiUrl
 	}
 	return metadata, nil
 }
