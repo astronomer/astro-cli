@@ -43,6 +43,7 @@ func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 		newRemovedVerbCmd("create", "airflow-variable"),
 		newRemovedVerbCmd("update", "airflow-variable"),
 		newEnvAirflowVarDeleteCmd(out),
+		newEnvLinkRootCmd(out, &airflowVarLinkNoun),
 	)
 	return cmd
 }

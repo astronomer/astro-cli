@@ -48,6 +48,7 @@ func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 		newRemovedVerbCmd("create", "connection"),
 		newRemovedVerbCmd("update", "connection"),
 		newEnvConnDeleteCmd(out),
+		newEnvLinkRootCmd(out, &connLinkNoun),
 	)
 	return cmd
 }
@@ -133,7 +134,7 @@ func connFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&envConnType, "type", "t", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&envConnHost, "host", "", "Connection host")
 	cmd.Flags().StringVarP(&envConnLogin, "login", "l", "", "Connection login or username")
-	cmd.Flags().StringVarP(&envConnPassword, "password", "p", "", "Connection password; prefer piping it, since a flag lands in shell history (empty clears it)")
+	cmd.Flags().StringVarP(&envConnPassword, "password", "p", "", "Connection password; prefer piping it, since a flag lands in shell history. Empty keeps the stored one: the platform cannot clear a password")
 	cmd.Flags().StringVar(&envConnSchema, "schema", "", "Connection schema")
 	cmd.Flags().IntVar(&envConnPort, "port", 0, "Connection port")
 	cmd.Flags().StringVar(&envConnExtra, "extra", "", "Extra configuration as a JSON object string")
@@ -400,8 +401,9 @@ func buildConnInput(cmd *cobra.Command, idOrKey string) (env.ConnInput, error) {
 	// Password is opt-in: only resolve a value when the flag was set or stdin is
 	// piped. Many connection types (HTTP, SSH-via-key, etc.) are passwordless;
 	// prompting on TTY by default would block the common case.
-	// --password given explicitly is authoritative, including when it is empty:
-	// an empty value here is how you clear a stored password on purpose.
+	// --password given explicitly is sent as given. Empty does not clear a
+	// stored password, though: the platform treats an empty password on update
+	// as "keep the stored one", and has no way to remove it.
 	//
 	// Otherwise a piped password is still read — that is the only way to supply
 	// one without putting it in shell history — but an EMPTY read is treated as

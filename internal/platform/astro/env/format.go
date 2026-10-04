@@ -97,9 +97,16 @@ func WriteVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets b
 
 // WriteVarLinks renders a VarLinksReport in the requested format.
 func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, out io.Writer) error {
+	return writeLinksReport(report, format, func() linksTable { return varLinksTable(report, includeSecrets) }, out)
+}
+
+// writeLinksReport is the format switch both link reports share; only the
+// table differs.
+func writeLinksReport(report any, format Format, table func() linksTable, out io.Writer) error {
 	switch format {
 	case "", FormatTable:
-		writeVarLinksTable(report, includeSecrets, out)
+		t := table()
+		t.write(out)
 		return nil
 	case FormatJSON:
 		return writeJSON(report, out)
@@ -308,38 +315,116 @@ func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
 	return *override
 }
 
-func writeVarLinksTable(report *VarLinksReport, includeSecrets bool, out io.Writer) {
-	value := report.WorkspaceValue
-	if report.IsSecret && !includeSecrets {
-		value = maskedSecret + " (secret)"
+// linksTable is a link report as the table view shows it: a few labeled
+// lines about the object, then its links, then its excludes. Both link
+// reports render through it, so `variable link list` and `connection link
+// list` read the same.
+type linksTable struct {
+	// fields are the labeled lines above the links, in order.
+	fields [][2]string
+	// overrideHeader names the links' override column.
+	overrideHeader string
+	// links are each link's deployment and rendered override.
+	links    [][2]string
+	excludes []string
+}
+
+func (t *linksTable) write(out io.Writer) {
+	const label = "%-20s%s\n"
+	for _, f := range t.fields {
+		fmt.Fprintf(out, label, f[0]+":", f[1])
 	}
-	fmt.Fprintf(out, "KEY:                %s\n", report.ObjectKey)
-	fmt.Fprintf(out, "ID:                 %s\n", report.ObjectID)
-	fmt.Fprintf(out, "WORKSPACE VALUE:    %s\n", clampTableValue(value))
-	fmt.Fprintf(out, "AUTO-LINK:          %t\n", report.AutoLinkDeployments)
 	fmt.Fprintln(out)
 
-	if len(report.Links) == 0 {
-		fmt.Fprintln(out, "LINKS:              (none)")
+	if len(t.links) == 0 {
+		fmt.Fprintf(out, label, "LINKS:", "(none)")
 	} else {
-		linkTable := &printutil.Table{DynamicPadding: true, Header: []string{"#", "DEPLOYMENT", "OVERRIDE"}}
-		for i, l := range report.Links {
-			override := clampTableValue(overrideDisplay(l.OverrideValue, report.IsSecret, includeSecrets))
-			linkTable.AddRow([]string{strconv.Itoa(i + 1), l.DeploymentID, override}, false)
+		linkTable := &printutil.Table{DynamicPadding: true, Header: []string{"#", "DEPLOYMENT", t.overrideHeader}}
+		for i, l := range t.links {
+			linkTable.AddRow([]string{strconv.Itoa(i + 1), l[0], clampTableValue(l[1])}, false)
 		}
 		fmt.Fprintln(out, "LINKS:")
 		linkTable.Print(out) //nolint:errcheck // best-effort render to the terminal
 	}
 
 	fmt.Fprintln(out)
-	if len(report.ExcludeLinks) == 0 {
-		fmt.Fprintln(out, "EXCLUDES:           (none)")
+	if len(t.excludes) == 0 {
+		fmt.Fprintf(out, label, "EXCLUDES:", "(none)")
 	} else {
 		fmt.Fprintln(out, "EXCLUDES:")
-		for i, depID := range report.ExcludeLinks {
+		for i, depID := range t.excludes {
 			fmt.Fprintf(out, "  %d. %s\n", i+1, depID)
 		}
 	}
+}
+
+func varLinksTable(report *VarLinksReport, includeSecrets bool) linksTable {
+	value := report.WorkspaceValue
+	if report.IsSecret && !includeSecrets {
+		value = maskedSecret + " (secret)"
+	}
+	t := linksTable{
+		fields: [][2]string{
+			{"KEY", report.ObjectKey},
+			{"ID", report.ObjectID},
+			{"WORKSPACE VALUE", clampTableValue(value)},
+			{"AUTO-LINK", strconv.FormatBool(report.AutoLinkDeployments)},
+		},
+		overrideHeader: "OVERRIDE",
+		excludes:       report.ExcludeLinks,
+	}
+	for _, l := range report.Links {
+		t.links = append(t.links, [2]string{l.DeploymentID, overrideDisplay(l.OverrideValue, report.IsSecret, includeSecrets)})
+	}
+	return t
+}
+
+// WriteLinks renders a LinksReport in the requested format.
+func WriteLinks(report *LinksReport, format Format, out io.Writer) error {
+	return writeLinksReport(report, format, func() linksTable {
+		t := linksTable{
+			fields: [][2]string{
+				{"KEY", report.ObjectKey},
+				{"ID", report.ObjectID},
+				{"AUTO-LINK", strconv.FormatBool(report.AutoLinkDeployments)},
+			},
+			overrideHeader: "OVERRIDES",
+			excludes:       report.ExcludeLinks,
+		}
+		for _, l := range report.Links {
+			t.links = append(t.links, [2]string{l.DeploymentID, overridesDisplay(l)})
+		}
+		return t
+	}, out)
+}
+
+// overridesDisplay renders a link's overrides as name=value pairs. A field
+// set but absent from the overrides is a secret the platform masked, shown
+// as hidden rather than dropped, so a set password is not mistaken for none.
+func overridesDisplay(l ObjectLink) string {
+	var parts []string
+	shown := map[string]bool{}
+	for name, v := range l.Overrides {
+		if extra, ok := v.(map[string]any); ok {
+			for key, ev := range extra {
+				parts = append(parts, fmt.Sprintf("%s.%s=%v", name, key, ev))
+				shown[name+"."+key] = true
+			}
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%v", name, v))
+		shown[name] = true
+	}
+	for _, f := range l.SetFields {
+		if !shown[f] {
+			parts = append(parts, f+"=(hidden, use --include-secrets)")
+		}
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	slices.Sort(parts)
+	return strings.Join(parts, " ")
 }
 
 func writeConnTable(envObjs []astrov1.EnvironmentObject, out io.Writer) error {

@@ -121,15 +121,7 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1
 		return nil, err
 	}
 	body := astrov1.UpdateEnvironmentObjectJSONRequestBody{
-		Connection: &astrov1.UpdateEnvironmentObjectConnectionRequest{
-			Type:     in.Type,
-			Host:     in.Host,
-			Login:    in.Login,
-			Password: in.Password,
-			Schema:   in.Schema,
-			Port:     in.Port,
-			Extra:    in.Extra,
-		},
+		Connection:          patchConn(in, current.Connection),
 		AutoLinkDeployments: in.AutoLinkDeployments,
 	}
 	echoPreservedFields(&body, current)
@@ -144,6 +136,50 @@ func UpdateConn(idOrKey string, scope Scope, in ConnInput, astroV1Client astrov1
 		return nil, errors.New("update returned empty response body")
 	}
 	return resp.JSON200, nil
+}
+
+// patchConn builds the update body's connection: what in sets, and the
+// current value for each field it leaves unset.
+//
+// The platform does not patch a connection. It stores host, login, schema,
+// port and auth type as sent, so a field left out of the body is cleared —
+// `set db --type postgres --host new` blanked the login, schema and port it
+// was never given. Only the password and extra keys are kept when absent,
+// which is why those two pass through as given: GET masks them, and echoing
+// the masked form back would be the thing that cleared them.
+//
+// The auth type describes one connection type, so it is kept only while the
+// type stays the same.
+func patchConn(in ConnInput, current *astrov1.EnvironmentObjectConnection) *astrov1.UpdateEnvironmentObjectConnectionRequest {
+	req := &astrov1.UpdateEnvironmentObjectConnectionRequest{
+		Type:     in.Type,
+		Host:     in.Host,
+		Login:    in.Login,
+		Password: in.Password,
+		Schema:   in.Schema,
+		Port:     in.Port,
+		Extra:    in.Extra,
+	}
+	if current == nil {
+		return req
+	}
+	if req.Host == nil {
+		req.Host = current.Host
+	}
+	if req.Login == nil {
+		req.Login = current.Login
+	}
+	if req.Schema == nil {
+		req.Schema = current.Schema
+	}
+	if req.Port == nil {
+		req.Port = current.Port
+	}
+	if a := current.ConnectionAuthType; a != nil && a.Id != "" && a.AirflowType == in.Type {
+		id := a.Id
+		req.AuthTypeId = &id
+	}
+	return req
 }
 
 // DeleteConn deletes a connection by ID or key.

@@ -114,7 +114,7 @@ func metricsCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&envMetricsAuthType, "auth-type", "", "Auth type: BASIC, AUTH_TOKEN, or SIGV4")
 	cmd.Flags().StringVar(&envMetricsBasicToken, "basic-token", "", "Bearer/auth token (for AUTH_TOKEN auth)")
 	cmd.Flags().StringVar(&envMetricsUsername, "username", "", "Username (for BASIC auth)")
-	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password for BASIC auth; prefer piping it, since a flag lands in shell history (empty clears it)")
+	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password for BASIC auth; prefer piping it, since a flag lands in shell history. Empty keeps the stored one: the platform cannot clear a password")
 	cmd.Flags().StringVar(&envMetricsSigV4AssumeArn, "sigv4-assume-arn", "", "AWS IAM role to assume (for SIGV4 auth)")
 	cmd.Flags().StringVar(&envMetricsSigV4StsRegion, "sigv4-sts-region", "", "AWS STS region (for SIGV4 auth)")
 	cmd.Flags().StringToStringVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form. Repeatable.")
@@ -257,9 +257,9 @@ func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
 	if cmd.Flags().Changed("sigv4-sts-region") {
 		in.SigV4StsRegion = &envMetricsSigV4StsRegion
 	}
-	// Same rule as a connection's password: an explicit --password is
-	// authoritative, including when empty, because that is how a stored one is
-	// cleared on purpose. Under BASIC auth a piped password is still read, but
+	// Same rule as a connection's password: an explicit --password is sent as
+	// given, though empty does not clear a stored one — the platform keeps the
+	// stored password when an update's is empty. Under BASIC auth a piped password is still read, but
 	// an EMPTY read means "not given" rather than "the password is empty".
 	//
 	// Without that last distinction, `set prom_main --auth-type BASIC

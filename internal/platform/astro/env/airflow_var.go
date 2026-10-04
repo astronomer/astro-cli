@@ -71,6 +71,9 @@ func CreateAirflowVar(scope Scope, key, value string, isSecret bool, autoLink *b
 // does not allow toggling IsSecret. autoLink, when non-nil, toggles the
 // "auto-link to all deployments" flag (workspace scope only).
 func UpdateAirflowVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	if err := validateAutoLink(scope, autoLink); err != nil {
+		return nil, err
+	}
 	// Fetch the full object (not just the ID): the update body must round-trip
 	// the existing Links/ExcludeLinks and auto-link flag or the platform drops
 	// them. See echoPreservedFields.

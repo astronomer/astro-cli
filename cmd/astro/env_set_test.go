@@ -699,8 +699,8 @@ func TestEnvVerbOrderIsUniform(t *testing.T) {
 		want []string
 	}{
 		{"variable", []string{"list", "get", "export", "set", "delete", "link"}},
-		{"connection", []string{"list", "get", "set", "delete"}},
-		{"airflow-variable", []string{"list", "get", "set", "delete"}},
+		{"connection", []string{"list", "get", "set", "delete", "link"}},
+		{"airflow-variable", []string{"list", "get", "set", "delete", "link"}},
 		{"metrics-export", []string{"list", "get", "set", "delete"}},
 	} {
 		t.Run(tc.noun, func(t *testing.T) {
