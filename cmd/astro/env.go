@@ -181,8 +181,8 @@ func newEnvRootCmd(out io.Writer) *cobra.Command {
 		Long: `Manage environment objects on Astro: environment variables, connections,
 Airflow variables, and metrics exports, scoped to a workspace or a deployment.
 
-Objects here can be shared across deployments. To change one deployment
-directly, use 'astro deployment variable' or 'astro deployment connection'.`,
+Objects here can be shared across deployments from a workspace, or set on
+one deployment with --deployment-id.`,
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
 	cmd.SetOut(out)

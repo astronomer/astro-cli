@@ -1484,29 +1484,3 @@ func TestGetTemplate(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
-
-func TestReturnSpecifiedValue(t *testing.T) {
-	sourceDeployment = newSourceDeployment()
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	deploymentName := "test-deployment-label"
-
-	t.Run("run function successfully", func(t *testing.T) {
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-
-		value, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockV1Client)
-		assert.NoError(t, err)
-		assert.Contains(t, value, deploymentName)
-		mockV1Client.AssertExpectations(t)
-	})
-	t.Run("get deployment error", func(t *testing.T) {
-		// Mock an error when trying to get cluster information
-		clusterErr := errors.New("test cluster error")
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, clusterErr).Once()
-
-		_, err := ReturnSpecifiedValue(&sourceDeployment, "configuration.name", mockV1Client)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "test cluster error")
-		mockV1Client.AssertExpectations(t)
-	})
-}

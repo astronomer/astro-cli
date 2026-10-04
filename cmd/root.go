@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	airflowclient "github.com/astronomer/astro-cli/internal/platform/astro/clients/airflowclient"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/internal/telemetry"
@@ -82,7 +81,6 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	houstonClient = o.houstonClient
 	houstonVersion = ""
 
-	airflowClient := airflowclient.NewAirflowClient(httputil.NewHTTPClient())
 	astroV1Client := astrov1.NewV1Client(httputil.NewHTTPClient())
 	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient())
 
@@ -136,7 +134,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if isCloudCtx { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			astroCmd.AddCmds(astroV1Client, airflowClient, v1Alpha1Client, o.out)...,
+			astroCmd.AddCmds(astroV1Client, v1Alpha1Client, o.out)...,
 		)
 	} else { // Include all the commands to be exposed for APC users
 		rootCmd.AddCommand(

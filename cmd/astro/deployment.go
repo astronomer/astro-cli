@@ -136,9 +136,6 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentVariableRootCmd(out),
 		newDeploymentWorkerQueueRootCmd(out),
 		newDeploymentInspectCmd(out),
-		newDeploymentConnectionRootCmd(out),
-		newDeploymentAirflowVariableRootCmd(out),
-		newDeploymentPoolRootCmd(out),
 		newDeploymentUserRootCmd(out),
 		newDeploymentTeamRootCmd(out),
 		newDeploymentTokenRootCmd(out),
@@ -146,6 +143,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
 	)
+	cmd.AddCommand(newRemovedDeploymentObjectCmds()...)
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
 		case "inspect", "logs", "update", "delete", "hibernate", "wake-up":

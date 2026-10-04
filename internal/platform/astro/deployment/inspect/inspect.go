@@ -310,40 +310,6 @@ func getAdditionalNullableFields(deploymentObj *astrov1.Deployment, nodePools []
 	}
 }
 
-func ReturnSpecifiedValue(depl *astrov1.Deployment, requestedField string, astroV1Client astrov1.APIClient) (value any, err error) {
-	showWorkloadIdentity := strings.Contains(requestedField, "workload_identity") // if the caller has requested for workload_identity, we set the flag to true to fetch the deployment workload_identity
-
-	// create a map for deployment.information
-	deploymentInfoMap, err := getDeploymentInfo(*depl)
-	if err != nil {
-		return nil, err
-	}
-	// create a map for deployment.configuration
-	deploymentConfigMap, err := getDeploymentConfig(depl, astroV1Client, showWorkloadIdentity)
-	if err != nil {
-		return nil, err
-	}
-	nodePools := []astrov1.NodePool{}
-	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.environment_variables
-	if depl.ClusterId != nil {
-		cluster, err := deployment.GetClusterByID("", *depl.ClusterId, astroV1Client)
-		if err != nil {
-			return nil, err
-		}
-		if cluster.NodePools != nil {
-			nodePools = *cluster.NodePools
-		}
-	}
-	additionalMap := getAdditionalNullableFields(depl, nodePools)
-	// create a map for the entire deployment
-	printableDeployment := getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
-	value, err = getSpecificField(printableDeployment, requestedField)
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
 func getQMap(deploymentPointer *astrov1.Deployment, sourceNodePools []astrov1.NodePool) []map[string]interface{} {
 	deploymentObj := *deploymentPointer
 	var sourceDeploymentQs []astrov1.WorkerQueue
