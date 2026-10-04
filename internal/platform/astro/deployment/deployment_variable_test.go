@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"bytes"
 	"net/http"
 	"os"
 	"testing"
@@ -39,16 +38,13 @@ func TestVariableList(t *testing.T) {
 			},
 		}
 
-		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockV1Client, buf)
+		got, err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockV1Client)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-key-1")
-		assert.Contains(t, buf.String(), "test-value-1")
+		assert.Equal(t, []VariableInfo{{Key: "test-key-1", Value: "test-value-1"}}, got.Variables)
 
-		err = VariableList("test-id-1", "", ws, "", "", false, mockV1Client, buf)
+		got, err = VariableList("test-id-1", "", ws, "", "", false, mockV1Client)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-key-1")
-		assert.Contains(t, buf.String(), "test-value-1")
+		assert.Equal(t, []VariableInfo{{Key: "test-key-1", Value: "test-value-1"}}, got.Variables)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -57,8 +53,7 @@ func TestVariableList(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "0")()
 
-		buf := new(bytes.Buffer)
-		err := VariableList("", "test-key-1", ws, "", "", false, mockV1Client, buf)
+		_, err := VariableList("", "test-key-1", ws, "", "", false, mockV1Client)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -69,18 +64,16 @@ func TestVariableList(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "1")()
 
-		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-invalid-key", ws, "", "", false, mockV1Client, buf)
+		got, err := VariableList("test-id-1", "test-invalid-key", ws, "", "", false, mockV1Client)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "No variables found")
+		assert.Empty(t, got.Variables)
 		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 
-		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockV1Client, buf)
+		_, err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockV1Client)
 		assert.ErrorIs(t, err, errMock)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -89,10 +82,8 @@ func TestVariableList(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "\000x", "", true, mockV1Client, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "unable to write environment variables to file")
+		_, err := VariableList("test-id-1", "test-key-1", ws, "\000x", "", true, mockV1Client)
+		assert.ErrorContains(t, err, "unable to write environment variables to")
 	})
 }
 
@@ -144,13 +135,19 @@ func TestVariableModify(t *testing.T) {
 			},
 		}
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
+		res, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-key-1")
-		assert.Contains(t, buf.String(), "test-key-2")
-		assert.Contains(t, buf.String(), "test-value-1")
-		assert.Contains(t, buf.String(), "test-value-2")
+		// test-key-2 is already on the Deployment and this call passes
+		// updateVars=false, so it is skipped. The old test read as an update
+		// because it asserted on the post-update list, which carries the key
+		// either way.
+		assert.Equal(t, []VariableOutcome{
+			{Kind: VariableSkippedExists, Key: "test-key-2", Reason: "already set; use the update command to change it"},
+		}, res.Outcomes)
+		assert.Equal(t, []VariableInfo{
+			{Key: "test-key-1", Value: "test-value-1"},
+			{Key: "test-key-2", Value: "test-value-2"},
+		}, res.Variables)
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -174,20 +171,16 @@ func TestVariableModify(t *testing.T) {
 			},
 		}
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, true, mockV1Client, buf)
+		res, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, true, mockV1Client)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-key-1")
-		assert.Contains(t, buf.String(), "test-key-2")
-		assert.Contains(t, buf.String(), "****")
+		assert.Equal(t, []VariableOutcome{{Kind: VariableUpdated, Key: "test-key-2"}}, res.Outcomes)
 		mockV1Client.AssertExpectations(t)
 	})
 
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
+		_, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, errMock)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -195,13 +188,12 @@ func TestVariableModify(t *testing.T) {
 	t.Run("invalid deployment", func(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
+		_, err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		defer testUtil.MockUserInput(t, "0")()
 
-		err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
+		_, err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -213,15 +205,17 @@ func TestVariableModify(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
-		assert.Contains(t, buf.String(), "You must provide a variable key")
-		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
+		res, err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(res.InvalidInputs()))
+		assert.Equal(t, VariableInvalid, res.Outcomes[0].Kind)
+		assert.Contains(t, res.Outcomes[0].Reason, "no key given")
 
-		buf = new(bytes.Buffer)
-		err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
-		assert.Contains(t, buf.String(), "You must provide a variable value")
-		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
+		res, err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockV1Client)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(res.InvalidInputs()))
+		assert.Equal(t, "test-key-2", res.Outcomes[0].Key)
+		assert.Contains(t, res.Outcomes[0].Reason, "no value given")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -232,8 +226,7 @@ func TestVariableModify(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
+		_, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, errMock)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -247,9 +240,9 @@ func TestVariableModify(t *testing.T) {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		buf := new(bytes.Buffer)
-		_ = VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockV1Client, buf)
-		assert.Contains(t, buf.String(), "No variables for this Deployment")
+		res, err := VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockV1Client)
+		assert.NoError(t, err)
+		assert.Empty(t, res.Variables)
 		mockV1Client.AssertExpectations(t)
 	})
 }
@@ -267,36 +260,47 @@ func TestReadLines(t *testing.T) {
 }
 
 func TestAddVariableFromFile(t *testing.T) {
-	resp, _ := addVariablesFromFile(
+	res := &VariableModifyResult{}
+	resp := addVariablesFromFile(
 		"./testfiles/test-env-file", []string{"test-key-2"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-2", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, true, false,
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, true, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}, {Key: "test-key-1", Value: &testValue1}}, resp)
+	assert.Equal(t, []VariableOutcome{{Kind: VariableCreated, Key: "test-key-1"}}, res.Outcomes)
 
-	resp, _ = addVariablesFromFile(
+	res = &VariableModifyResult{}
+	resp = addVariablesFromFile(
 		"./testfiles/test-env-file", []string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, true, false,
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, true, false, res,
 	)
-
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue1}}, resp)
+	assert.Equal(t, []VariableOutcome{{Kind: VariableUpdated, Key: "test-key-1"}}, res.Outcomes)
 
-	resp, _ = addVariablesFromFile(
+	// Without --update an existing file key keeps its value and, as before
+	// this shape, fails the run: it is an invalid outcome, which picks the
+	// exit code, not a skip.
+	res = &VariableModifyResult{}
+	resp = addVariablesFromFile(
 		"./testfiles/test-env-file", []string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false,
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false, res,
 	)
-
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
+	assert.Equal(t, VariableInvalid, res.Outcomes[0].Kind)
+	assert.Equal(t, []string{"test-key-1"}, res.InvalidInputs())
 
-	resp, _ = addVariablesFromFile(
+	// A malformed file yields no variable and one invalid outcome naming the
+	// line, which the old shape only printed.
+	res = &VariableModifyResult{}
+	resp = addVariablesFromFile(
 		"./testfiles/test-env-file-wrong", []string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue2}},
-		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false,
+		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, false, false, res,
 	)
-
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
+	assert.Positive(t, len(res.InvalidInputs()))
 }
 
 func TestWriteVarToFile(t *testing.T) {
@@ -321,56 +325,79 @@ func TestWriteVarToFile(t *testing.T) {
 }
 
 func TestAddVariable(t *testing.T) {
-	buf := new(bytes.Buffer)
+	res := &VariableModifyResult{}
 	resp := addVariable(
 		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
-		"test-key-1", "test-value-3", true, false, buf,
+		"test-key-1", "test-value-3", true, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
+	assert.Equal(t, []VariableOutcome{{Kind: VariableUpdated, Key: "test-key-1"}}, res.Outcomes)
 
-	buf = new(bytes.Buffer)
+	res = &VariableModifyResult{}
 	resp = addVariable(
 		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
-		"test-key-1", "test-value-3", false, false, buf,
+		"test-key-1", "test-value-3", false, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}}, resp)
+	assert.Equal(t, VariableSkippedExists, res.Outcomes[0].Kind)
 }
 
 func TestAddVariablesFromArgs(t *testing.T) {
-	buf := new(bytes.Buffer)
-	resp, _ := addVariablesFromArgs(
+	res := &VariableModifyResult{}
+	resp := addVariablesFromArgs(
 		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
-		[]string{"test-key-1=test-value-3"}, true, false, buf,
+		[]string{"test-key-1=test-value-3"}, true, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue3}}, resp)
 
-	resp, _ = addVariablesFromArgs(
+	res = &VariableModifyResult{}
+	resp = addVariablesFromArgs(
 		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{{Key: "test-key-1", Value: &testValue1}},
 		[]astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}},
-		[]string{"test-key-1=test-value-3"}, false, false, buf,
+		[]string{"test-key-1=test-value-3"}, false, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-1", Value: &testValue2}}, resp)
 
-	resp, _ = addVariablesFromArgs(
+	res = &VariableModifyResult{}
+	resp = addVariablesFromArgs(
 		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{},
 		[]astrov1.DeploymentEnvironmentVariableRequest{},
-		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false, buf,
+		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue3}}, resp)
 
-	resp, _ = addVariablesFromArgs(
+	res = &VariableModifyResult{}
+	resp = addVariablesFromArgs(
 		[]string{"test-key-1"},
 		[]astrov1.DeploymentEnvironmentVariable{},
 		[]astrov1.DeploymentEnvironmentVariableRequest{},
-		[]string{"test-key-2=test-value=4", "test-key-3=", "test-key-3"}, false, false, buf,
+		[]string{"test-key-2=test-value=4", "test-key-3=", "test-key-3"}, false, false, res,
 	)
 	assert.Equal(t, []astrov1.DeploymentEnvironmentVariableRequest{{Key: "test-key-2", Value: &testValue4}}, resp)
+}
+
+// A rejected file line can carry a secret's value. The outcome, which the
+// error and the rendered output both draw on, names the key or the line
+// number, never the line itself.
+func TestAddVariablesFromFileDoesNotEchoValues(t *testing.T) {
+	envFile := t.TempDir() + "/.env"
+	require.NoError(t, os.WriteFile(envFile, []byte("DB_PASSWORD=hunter2\nDB_PASSWORD=hunter2\n=hunter2\n"), 0o600))
+
+	res := &VariableModifyResult{}
+	addVariablesFromFile(envFile, nil, nil, nil, false, true, res)
+
+	require.Len(t, res.Outcomes, 3)
+	assert.Equal(t, VariableCreated, res.Outcomes[0].Kind)
+	assert.Equal(t, []string{"DB_PASSWORD", envFile + " line 3"}, res.InvalidInputs())
+	for _, o := range res.Outcomes {
+		assert.NotContains(t, o.Input+o.Key+o.Reason, "hunter2")
+	}
 }

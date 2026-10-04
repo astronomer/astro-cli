@@ -3,165 +3,141 @@ package deployment
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var errVarCreateUpdate = errors.New(
-	"there was an error while creating or updating one or more of the environment variables. Check the command output above for more information",
-)
-
-const maskedSecret = "****"
-
-func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, astroV1Client astrov1.APIClient, out io.Writer) error {
-	environmentVariablesObjects := []astrov1.DeploymentEnvironmentVariable{}
-
-	// get deployment
+// VariableList returns a Deployment's environment variables, optionally
+// narrowed to one key.
+//
+// When useEnvFile is set it also appends them to envFile, and reports the
+// count written so cmd can say so. A write that fails is an error naming the
+// file, not a line on stderr: the caller decides whether a partial file is
+// fatal.
+func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, astroV1Client astrov1.APIClient) (*DeploymentVariables, error) {
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	objs := []astrov1.DeploymentEnvironmentVariable{}
 	if currentDeployment.EnvironmentVariables != nil {
-		environmentVariablesObjects = *currentDeployment.EnvironmentVariables
+		objs = *currentDeployment.EnvironmentVariables
 	}
 	if variableKey != "" {
-		environmentVariablesObjects = slices.DeleteFunc(environmentVariablesObjects, func(v astrov1.DeploymentEnvironmentVariable) bool {
+		objs = slices.DeleteFunc(objs, func(v astrov1.DeploymentEnvironmentVariable) bool {
 			return v.Key != variableKey
 		})
 	}
 
-	// open env file
 	if useEnvFile {
-		err = writeVarToFile(environmentVariablesObjects, envFile)
-		if err != nil {
-			fmt.Fprintln(out, errors.Wrap(err, "unable to write environment variables to file"))
+		if err := writeVarToFile(objs, envFile); err != nil {
+			return nil, errors.Wrapf(err, "unable to write environment variables to %s", envFile)
 		}
 	}
-	if len(environmentVariablesObjects) == 0 {
-		fmt.Fprintln(out, "\nNo variables found")
-		return nil
-	}
 
-	makeVarTable(environmentVariablesObjects).Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return &DeploymentVariables{Variables: toVariableInfo(objs)}, nil
 }
 
-func makeVarTable(vars []astrov1.DeploymentEnvironmentVariable) *printutil.Table {
-	table := printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "KEY", "VALUE", "SECRET"},
-	}
-	for i, variable := range vars {
-		var value string
-
-		if variable.IsSecret {
-			value = maskedSecret
-		} else if variable.Value != nil {
-			value = *variable.Value
+// toVariableInfo converts the API's variables into the value cmd renders. A
+// secret's value is dropped rather than masked: masking is a text-rendering
+// choice, and a JSON caller should get no value at all rather than a string of
+// asterisks it might mistake for one.
+func toVariableInfo(vars []astrov1.DeploymentEnvironmentVariable) []VariableInfo {
+	out := make([]VariableInfo, 0, len(vars))
+	for i := range vars {
+		info := VariableInfo{Key: vars[i].Key, IsSecret: vars[i].IsSecret}
+		if !vars[i].IsSecret && vars[i].Value != nil {
+			info.Value = *vars[i].Value
 		}
-		table.AddRow([]string{strconv.Itoa(i + 1), variable.Key, value, strconv.FormatBool(variable.IsSecret)}, false)
+		out = append(out, info)
 	}
-	return &table
+	return out
 }
 
-// this function modifies a deployment's environment variable object
-// it is used to create and update deployment's environment variables
+// VariableModify creates or updates a Deployment's environment variables from
+// a key/value pair, a list of `key=value` arguments, an env file, or any
+// combination, and reports what happened to each input.
+//
+// It returns a result even when some inputs were invalid: the Deployment is
+// still updated with the ones that were usable, and the caller decides what to
+// do about the rest. Only a failure to reach the Deployment is an error.
 func VariableModify(
 	deploymentID, variableKey, variableValue, ws, envFile, deploymentName string,
 	variableList []string,
 	useEnvFile, makeSecret, updateVars bool,
 	astroV1Client astrov1.APIClient,
-	out io.Writer,
-) error {
-	environmentVariablesObjects := []astrov1.DeploymentEnvironmentVariable{}
-
-	// get deployment
+) (*VariableModifyResult, error) {
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// build query input
 	oldEnvironmentVariables := []astrov1.DeploymentEnvironmentVariable{}
 	if currentDeployment.EnvironmentVariables != nil {
 		oldEnvironmentVariables = *currentDeployment.EnvironmentVariables
 	}
 
-	newEnvironmentVariables := make([]astrov1.DeploymentEnvironmentVariableRequest, 0)
-	oldKeyList := make([]string, 0)
-	varErr := false
-
-	// add old variables to update
+	newEnvironmentVariables := make([]astrov1.DeploymentEnvironmentVariableRequest, 0, len(oldEnvironmentVariables))
+	oldKeyList := make([]string, 0, len(oldEnvironmentVariables))
 	for i := range oldEnvironmentVariables {
-		oldEnvironmentVariable := astrov1.DeploymentEnvironmentVariableRequest{
+		newEnvironmentVariables = append(newEnvironmentVariables, astrov1.DeploymentEnvironmentVariableRequest{
 			IsSecret: oldEnvironmentVariables[i].IsSecret,
 			Key:      oldEnvironmentVariables[i].Key,
 			Value:    oldEnvironmentVariables[i].Value,
-		}
-		newEnvironmentVariables = append(newEnvironmentVariables, oldEnvironmentVariable)
+		})
 		oldKeyList = append(oldKeyList, oldEnvironmentVariables[i].Key)
 	}
 
-	// add new variable from flag
-	if variableKey != "" && variableValue != "" {
-		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret, out)
+	result := &VariableModifyResult{}
+
+	switch {
+	case variableKey != "" && variableValue != "":
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables,
+			variableKey, variableValue, updateVars, makeSecret, result)
+	case variableKey != "" && variableValue == "":
+		result.Outcomes = append(result.Outcomes, VariableOutcome{
+			Kind:   VariableInvalid,
+			Key:    variableKey,
+			Reason: "no value given; a variable needs both a key and a value",
+		})
+	case variableValue != "" && variableKey == "":
+		result.Outcomes = append(result.Outcomes, VariableOutcome{
+			Kind:   VariableInvalid,
+			Input:  variableValue,
+			Reason: "no key given; a variable needs both a key and a value",
+		})
 	}
-	if variableValue == "" && variableKey != "" {
-		fmt.Fprintf(out, "Variable with key %s not created or updated\nYou must provide a variable value", variableKey)
-		varErr = true
-	}
-	if variableValue != "" && variableKey == "" {
-		fmt.Fprintf(out, "Variable with value %s not created or updated with flags\nYou must provide a variable key", variableValue)
-		varErr = true
-	}
-	// add new variables from list of variables provided through args
+
 	if len(variableList) > 0 {
-		var listErr bool
-		newEnvironmentVariables, listErr = addVariablesFromArgs(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableList, updateVars, makeSecret, out)
-		varErr = varErr || listErr
+		newEnvironmentVariables = addVariablesFromArgs(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables,
+			variableList, updateVars, makeSecret, result)
 	}
-	// add new variables from file
 	if useEnvFile {
-		var fileErr bool
-		newEnvironmentVariables, fileErr = addVariablesFromFile(envFile, oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, updateVars, makeSecret)
-		varErr = varErr || fileErr
+		newEnvironmentVariables = addVariablesFromFile(envFile, oldKeyList, oldEnvironmentVariables,
+			newEnvironmentVariables, updateVars, makeSecret, result)
 	}
 
-	// update deployment
-	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, newEnvironmentVariables, nil, nil, nil, false, astroV1Client)
+	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+		0, 0, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, newEnvironmentVariables,
+		nil, nil, nil, false, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	deployment, err := GetDeploymentByID("", currentDeployment.Id, astroV1Client)
+	updated, err := GetDeploymentByID("", currentDeployment.Id, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if deployment.EnvironmentVariables != nil {
-		environmentVariablesObjects = *deployment.EnvironmentVariables
-	}
-
-	if len(environmentVariablesObjects) == 0 {
-		fmt.Fprintln(out, "\nNo variables for this Deployment")
-	} else {
-		fmt.Fprintln(out, "\nUpdated list of your Deployment's variables:")
-		makeVarTable(environmentVariablesObjects).Print(out) //nolint:errcheck // best-effort render to the terminal
-	}
-	if varErr {
-		return errVarCreateUpdate
+	if updated.EnvironmentVariables != nil {
+		result.Variables = toVariableInfo(*updated.EnvironmentVariables)
 	}
 
-	return nil
+	return result, nil
 }
 
 func contains(elems []string, v string) (exist bool, num int) {
@@ -173,7 +149,6 @@ func contains(elems []string, v string) (exist bool, num int) {
 	return false, 0
 }
 
-// readLines reads a whole file into memory and returns a slice of its lines.
 func readLines(path string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -189,13 +164,17 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-// writes vars from cloud into a file
+// writeVarToFile appends the variables to envFile, secrets by key only.
+//
+// A single failed write used to print to stderr and carry on, which left a
+// half-written file and a zero exit. It now stops at the first failure and
+// names the variable, so the caller can tell a complete file from a partial
+// one.
 func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentVariable, envFile string) error {
 	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
 	if err != nil {
 		return err
 	}
-
 	defer f.Close()
 
 	for _, variable := range environmentVariablesObjects {
@@ -205,149 +184,171 @@ func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentV
 		} else if variable.Value != nil {
 			value = *variable.Value
 		}
-		_, err := f.WriteString("\n" + variable.Key + "=" + value)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to write variable %s to file:\n%s\n", variable.Key, err)
+		if _, err := f.WriteString("\n" + variable.Key + "=" + value); err != nil {
+			return errors.Wrapf(err, "writing variable %s", variable.Key)
 		}
 	}
-	fmt.Printf("\nThe following environment variables were saved to the file %s,\nsecret environment variables were saved only with a key:\n\n", envFile)
 	return nil
 }
 
-// Add variables
-func addVariable(oldKeyList []string, oldEnvironmentVariables []astrov1.DeploymentEnvironmentVariable, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astrov1.DeploymentEnvironmentVariableRequest {
-	var newEnvironmentVariable astrov1.DeploymentEnvironmentVariableRequest
+// addVariable records one input against the Deployment's existing keys and
+// appends its outcome to result.
+func addVariable(
+	oldKeyList []string,
+	oldEnvironmentVariables []astrov1.DeploymentEnvironmentVariable,
+	newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest,
+	variableKey, variableValue string,
+	updateVars, makeSecret bool,
+	result *VariableModifyResult,
+) []astrov1.DeploymentEnvironmentVariableRequest {
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
-	case exist && !updateVars: // don't update variable
-		fmt.Fprintf(out, "key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
-	case exist && updateVars: // update variable
-		fmt.Fprintf(out, "updating variable %s \n", variableKey)
+	case exist && !updateVars:
+		result.Outcomes = append(result.Outcomes, VariableOutcome{
+			Kind:   VariableSkippedExists,
+			Key:    variableKey,
+			Reason: "already set; use the update command to change it",
+		})
+	case exist && updateVars:
+		// A variable can be made secret but never made public again, so an
+		// update keeps the old flag unless this run asks for secret.
 		secret := makeSecret
-		if !makeSecret { // you can only make variables secret a user can't make them not secret
+		if !makeSecret {
 			secret = oldEnvironmentVariables[num].IsSecret
 		}
-		newEnvironmentVariable = astrov1.DeploymentEnvironmentVariableRequest{
+		newEnvironmentVariables[num] = astrov1.DeploymentEnvironmentVariableRequest{
 			IsSecret: secret,
 			Key:      oldEnvironmentVariables[num].Key,
 			Value:    &variableValue,
 		}
-		newEnvironmentVariables[num] = newEnvironmentVariable
+		result.Outcomes = append(result.Outcomes, VariableOutcome{Kind: VariableUpdated, Key: variableKey})
 	default:
-		newFileEnvironmentVariable := astrov1.DeploymentEnvironmentVariableRequest{
+		newEnvironmentVariables = append(newEnvironmentVariables, astrov1.DeploymentEnvironmentVariableRequest{
 			IsSecret: makeSecret,
 			Key:      variableKey,
 			Value:    &variableValue,
-		}
-		newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
-		fmt.Printf("adding variable %s\n", variableKey)
+		})
+		result.Outcomes = append(result.Outcomes, VariableOutcome{Kind: VariableCreated, Key: variableKey})
 	}
 	return newEnvironmentVariables
 }
 
-func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astrov1.DeploymentEnvironmentVariable, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, variableList []string, updateVars, makeSecret bool, out io.Writer) ([]astrov1.DeploymentEnvironmentVariableRequest, bool) {
-	var key string
-	var val string
-	varErr := false
-	// validate each key-value pair and add it to the new variables list
+// addVariablesFromArgs validates each `key=value` argument and adds the usable
+// ones, recording an outcome for every input either way.
+func addVariablesFromArgs(
+	oldKeyList []string,
+	oldEnvironmentVariables []astrov1.DeploymentEnvironmentVariable,
+	newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest,
+	variableList []string,
+	updateVars, makeSecret bool,
+	result *VariableModifyResult,
+) []astrov1.DeploymentEnvironmentVariableRequest {
 	for i := range variableList {
-		// split pair
 		pair := strings.SplitN(variableList[i], "=", 2)
-		if len(pair) == 2 {
-			key = pair[0]
-			val = pair[1]
-			if key == "" || val == "" {
-				fmt.Printf("Input %s has blank key or value\n", variableList[i])
-				varErr = true
-				continue
-			}
-		} else {
-			fmt.Printf("Input %s is not a valid key value pair, should be of the form key=value\n", variableList[i])
-			varErr = true
+		if len(pair) != 2 {
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind:   VariableInvalid,
+				Input:  variableList[i],
+				Reason: "not a key=value pair",
+			})
 			continue
 		}
-		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, key, val, updateVars, makeSecret, out)
+		key, val := pair[0], pair[1]
+		if key == "" || val == "" {
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind:   VariableInvalid,
+				Input:  variableList[i],
+				Key:    key,
+				Reason: "blank key or value",
+			})
+			continue
+		}
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables,
+			key, val, updateVars, makeSecret, result)
 	}
-	return newEnvironmentVariables, varErr
+	return newEnvironmentVariables
 }
 
-// Add variables from file
-func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVariables []astrov1.DeploymentEnvironmentVariable, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, updateVars, makeSecret bool) ([]astrov1.DeploymentEnvironmentVariableRequest, bool) {
-	newKeyList := make([]string, 0)
-	varErr := false
+// addVariablesFromFile reads envFile and adds the variables it declares.
+//
+// A file that cannot be read is one invalid outcome naming the file, not a
+// silent skip: the run continues so the flag-supplied variables still land.
+func addVariablesFromFile(
+	envFile string,
+	oldKeyList []string,
+	oldEnvironmentVariables []astrov1.DeploymentEnvironmentVariable,
+	newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest,
+	updateVars, makeSecret bool,
+	result *VariableModifyResult,
+) []astrov1.DeploymentEnvironmentVariableRequest {
 	vars, err := readLines(envFile)
 	if err != nil {
-		fmt.Printf("unable to read file %s :\n", envFile)
-		fmt.Println(err)
+		result.Outcomes = append(result.Outcomes, VariableOutcome{
+			Kind:   VariableInvalid,
+			Input:  envFile,
+			Reason: "unable to read file: " + err.Error(),
+		})
+		return newEnvironmentVariables
 	}
-	for i := range vars {
-		if strings.HasPrefix(vars[i], "#") {
-			continue
-		}
-		if vars[i] == "" {
-			continue
-		}
-		if len(strings.SplitN(vars[i], "=", 2)) == 1 {
-			fmt.Printf("%s is an improperly formatted variable, no variable created\n", vars[i])
-			varErr = true
-			continue
-		}
-		key := strings.SplitN(vars[i], "=", 2)[0]
-		value := strings.SplitN(vars[i], "=", 2)[1]
-		if key == "" {
-			fmt.Printf("empty key! skipping creating variable with key: %s\n", key)
-			varErr = true
-			continue
-		}
-		if value == "" {
-			fmt.Printf("empty value! skipping creating variable with key: %s\n", key)
-			varErr = true
-			continue
-		}
-		// check if key is listed twice in file
-		existFile, _ := contains(newKeyList, key)
-		if existFile {
-			fmt.Printf("key %s already exists within the file specified, skipping creation\n", key)
-			varErr = true
-			continue
-		}
 
-		fmt.Printf("Cleaning quotes and whitespaces from variable %s", key)
+	fileKeys := make([]string, 0, len(vars))
+	for i := range vars {
+		if strings.HasPrefix(vars[i], "#") || vars[i] == "" {
+			continue
+		}
+		pair := strings.SplitN(vars[i], "=", 2)
+		if len(pair) != 2 {
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind:   VariableInvalid,
+				Input:  vars[i],
+				Reason: "not a key=value pair",
+			})
+			continue
+		}
+		key, value := pair[0], pair[1]
+		switch {
+		case key == "":
+			// Not the line itself: its value may be a secret, and the error
+			// carries Input to stderr and CI logs.
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind: VariableInvalid, Input: fmt.Sprintf("%s line %d", envFile, i+1), Reason: "blank key",
+			})
+			continue
+		case value == "":
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind: VariableInvalid, Input: vars[i], Key: key, Reason: "blank value",
+			})
+			continue
+		}
+		if exist, _ := contains(fileKeys, key); exist {
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind: VariableInvalid, Key: key,
+				Reason: "declared twice in the file",
+			})
+			continue
+		}
+		fileKeys = append(fileKeys, key)
+
+		// A file value may be quoted for the shell's sake; the API wants the
+		// value itself. Args do not get this, because a shell has already
+		// removed their quotes by the time they reach us.
 		value = strings.Trim(value, `"`)
 		value = strings.Trim(value, `'`)
 		value = strings.TrimSpace(value)
 
-		// check if key already exists
-		exist, num := contains(oldKeyList, key)
-		if exist {
-			if !updateVars { // only update a variable if a user specifys
-				fmt.Printf("key %s already exists skipping creation use the --update flag to update old variables\n", key)
-				varErr = true
-				continue
-			}
-			// update variable
-			fmt.Printf("updating variable %s \n", key)
-			secret := makeSecret
-			if !makeSecret { // you can only make variables secret a user can't make them not secret
-				secret = oldEnvironmentVariables[num].IsSecret
-			}
-
-			newEnvironmentVariables[num] = astrov1.DeploymentEnvironmentVariableRequest{
-				IsSecret: secret,
-				Key:      oldEnvironmentVariables[num].Key,
-				Value:    &value,
-			}
-			newKeyList = append(newKeyList, key)
+		// A file key the Deployment already has fails the run unless this is
+		// an update, where an arg key is only skipped. That difference is
+		// older than this shape and scripts may rely on the exit code.
+		if exist, _ := contains(oldKeyList, key); exist && !updateVars {
+			result.Outcomes = append(result.Outcomes, VariableOutcome{
+				Kind: VariableInvalid, Key: key,
+				Reason: "already set on the Deployment; use the update command to change it",
+			})
 			continue
 		}
-		newFileEnvironmentVariable := astrov1.DeploymentEnvironmentVariableRequest{
-			IsSecret: makeSecret,
-			Key:      key,
-			Value:    &value,
-		}
-		newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
-		newKeyList = append(newKeyList, key)
-		fmt.Printf("adding variable %s\n", key)
+
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables,
+			key, value, updateVars, makeSecret, result)
 	}
-	return newEnvironmentVariables, varErr
+	return newEnvironmentVariables
 }

@@ -926,7 +926,15 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroV1Client, out)
+	vars, err := deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroV1Client)
+	if err != nil {
+		return err
+	}
+	if useEnvFile {
+		fmt.Fprintf(out, "\nThe following environment variables were saved to the file %s,\nsecret environment variables were saved only with a key:\n\n", envFile)
+	}
+	renderVariables(out, vars.Variables, "No variables found")
+	return nil
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -940,7 +948,12 @@ func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroV1Client, out)
+	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
+		deploymentName, variableList, useEnvFile, makeSecret, false, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderVariableModify(out, res)
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -954,7 +967,12 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroV1Client, out)
+	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
+		deploymentName, variableList, useEnvFile, makeSecret, true, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderVariableModify(out, res)
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernating bool) error {
