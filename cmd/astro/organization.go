@@ -44,6 +44,7 @@ var (
 	organizationListOutputFlags        output.Flags
 	organizationUserListOutputFlags    output.Flags
 	organizationTeamListOutputFlags    output.Flags
+	organizationClusterListOutputFlags output.Flags
 	forceTeam                          bool
 )
 
@@ -71,6 +72,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationAuditLogs(out),
 		newOrganizationTokenRootCmd(out),
 		newOrganizationRoleRootCmd(out),
+		newOrganizationClusterRootCmd(out),
 	)
 	return cmd
 }
@@ -805,4 +807,44 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 func listRoles(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	return roleClient.ListOrgRoles(out, astroV1Client, shouldIncludeDefaultRoles)
+}
+
+func newOrganizationClusterRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "cluster",
+		Aliases: []string{"cl", "clusters"},
+		Short:   "Manage clusters in your Astro Organization",
+		Long:    "Manage clusters in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationClusterListCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the clusters in your Astro Organization",
+		Long:    "List all the clusters in your Astro Organization. Only Dedicated and Hybrid clusters are listed. Standard Deployments run on clusters that Astronomer manages, so an Organization with only Standard Deployments has no clusters to list.",
+		Example: `  astro organization cluster list
+  astro organization cluster list --json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listClusters(cmd, out)
+		},
+	}
+	organizationClusterListOutputFlags.AddFlags(cmd)
+	return cmd
+}
+
+func listClusters(cmd *cobra.Command, out io.Writer) error {
+	format, err := organizationClusterListOutputFlags.Resolve()
+	if err != nil {
+		return err
+	}
+
+	cmd.SilenceUsage = true
+	return organization.ListClustersWithFormat(astroV1Client, format, organizationClusterListOutputFlags.Template, out)
 }

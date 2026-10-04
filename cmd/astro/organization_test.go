@@ -98,6 +98,92 @@ func TestOrganizationListJSON(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
+func mockClusterListResponse(clusters []astrov1.Cluster) *astrov1.ListClustersResponse {
+	return &astrov1.ListClustersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrov1.ClustersPaginated{
+			Clusters:   clusters,
+			TotalCount: len(clusters),
+		},
+	}
+}
+
+func TestOrganizationClusterList(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	clusters := []astrov1.Cluster{
+		{
+			Name:          "test-cluster",
+			Id:            "test-cluster-id",
+			CloudProvider: "AWS",
+			Region:        "us-east-1",
+			Type:          "DEDICATED",
+			Status:        "CREATED",
+		},
+	}
+
+	t.Run("lists the clusters in the current Organization", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(mockClusterListResponse(clusters), nil).Once()
+		astroV1Client = mockV1Client
+
+		resp, err := execOrganizationCmd("cluster", "list")
+		assert.NoError(t, err)
+		assert.Contains(t, resp, "test-cluster")
+		assert.Contains(t, resp, "us-east-1")
+		assert.Contains(t, resp, "CREATED")
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("json output", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(mockClusterListResponse(clusters), nil).Once()
+		astroV1Client = mockV1Client
+
+		resp, err := execOrganizationCmd("cluster", "list", "--json")
+		assert.NoError(t, err)
+
+		var result organization.ClusterList
+		assert.NoError(t, json.Unmarshal([]byte(resp), &result))
+		assert.Len(t, result.Clusters, 1)
+		assert.Equal(t, "test-cluster", result.Clusters[0].Name)
+		assert.Equal(t, "test-cluster-id", result.Clusters[0].ID)
+		assert.Equal(t, "DEDICATED", result.Clusters[0].Type)
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(mockClusterListResponse(nil), nil).Once()
+		astroV1Client = mockV1Client
+
+		resp, err := execOrganizationCmd("cluster", "ls")
+		assert.NoError(t, err)
+		assert.Contains(t, resp, "No clusters found in this Organization")
+		mockV1Client.AssertExpectations(t)
+	})
+
+	t.Run("api error", func(t *testing.T) {
+		errorBody, err := json.Marshal(astrov1.Error{Message: "failed to fetch clusters"})
+		assert.NoError(t, err)
+		errorResponse := &astrov1.ListClustersResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 500,
+			},
+			Body: errorBody,
+		}
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(errorResponse, nil).Once()
+		astroV1Client = mockV1Client
+
+		_, err = execOrganizationCmd("cluster", "list")
+		assert.ErrorContains(t, err, "failed to fetch clusters")
+		mockV1Client.AssertExpectations(t)
+	})
+}
+
 func TestOrganizationSwitch(t *testing.T) {
 	t.Run("workspace flag triggers wsSwitch with provided id", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)

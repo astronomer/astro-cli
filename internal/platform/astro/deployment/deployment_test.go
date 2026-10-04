@@ -1713,6 +1713,8 @@ func (s *Suite) TestSelectCluster() {
 		_, err := selectCluster("test-invalid-id", mockOrgID, mockV1Client)
 		s.Error(err)
 		s.Contains(err.Error(), "unable to find specified Cluster")
+		s.Contains(err.Error(), `"test-invalid-id"`)
+		s.Contains(err.Error(), "astro organization cluster list")
 	})
 }
 

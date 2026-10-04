@@ -500,43 +500,6 @@ func (s *Suite) TestIsOrgHosted() {
 	})
 }
 
-func (s *Suite) TestListClusters() {
-	// initialize empty config
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-	orgID := "test-org-id"
-	mockListClustersResponse := astrov1.ListClustersResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrov1.ClustersPaginated{
-			Clusters: []astrov1.Cluster{
-				{
-					Id:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					Id:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			},
-		},
-	}
-
-	s.Run("successful list all clusters", func() {
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		clusters, err := ListClusters(orgID, mockV1Client)
-		s.NoError(err)
-		s.Equal(len(clusters), 2)
-	})
-
-	s.Run("error on listing clusters", func() {
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListClustersResponse{}, errNetwork).Once()
-		_, err := ListClusters(orgID, mockV1Client)
-		s.ErrorIs(err, errNetwork)
-	})
-}
-
 func (s *Suite) TestExportAuditLogs() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)

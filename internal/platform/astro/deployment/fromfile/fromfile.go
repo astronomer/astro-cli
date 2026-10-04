@@ -869,7 +869,7 @@ func getClusterInfoFromName(clusterName, organizationID string, astroV1Client as
 			return cluster.Id, nodePools, nil
 		}
 	}
-	err = fmt.Errorf("cluster_name: %s %w in organization", clusterName, errNotFound)
+	err = fmt.Errorf("cluster_name: %s %w in organization. Run \"astro organization cluster list\" to see its clusters", clusterName, errNotFound)
 	return "", nil, err
 }
 

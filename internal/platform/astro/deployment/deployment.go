@@ -825,7 +825,7 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 		}
 	}
 	if csID == "" {
-		return "", errors.New("unable to find specified Cluster")
+		return "", fmt.Errorf("unable to find specified Cluster %q in this Organization. Run \"astro organization cluster list\" to see its clusters", clusterID)
 	}
 	return clusterID, nil
 }

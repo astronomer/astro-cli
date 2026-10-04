@@ -477,7 +477,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
 	}
-	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
+	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in. Run \"astro organization cluster list\" to see your Organization's cluster IDs")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force create: Don't prompt for confirmation")
 	return cmd
 }

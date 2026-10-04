@@ -335,22 +335,3 @@ func IsOrgHosted() bool {
 	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
 	return c.OrganizationProduct == "HOSTED"
 }
-
-func ListClusters(organizationID string, astroV1Client astrov1.APIClient) ([]astrov1.Cluster, error) {
-	limit := 1000
-	clusterListParams := &astrov1.ListClustersParams{
-		Limit: &limit,
-	}
-	resp, err := astroV1Client.ListClustersWithResponse(http_context.Background(), organizationID, clusterListParams)
-	if err != nil {
-		return nil, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	csPaginated := *resp.JSON200
-	cs := csPaginated.Clusters
-
-	return cs, nil
-}
