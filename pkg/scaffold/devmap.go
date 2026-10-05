@@ -1,8 +1,8 @@
 package scaffold
 
-// DevReplacement maps one v1 `astro dev` subcommand to what replaces it.
-// One source, two surfaces: the `astro dev` removal stub renders this data
-// as its error text, and the scaffold publishes it in AGENTS.md.
+// DevReplacement maps one v1 `astro dev` subcommand to what replaces it. The
+// `astro dev` removal stub renders this data as its error text and its JSON
+// payload.
 type DevReplacement struct {
 	Command     string `json:"command"`
 	Replacement string `json:"replacement"`
@@ -28,9 +28,9 @@ func DevReplacements() []DevReplacement {
 		// There is no "object import" row: v1's import covered connections and
 		// variables together, no single v2 command does, and the honest answer
 		// — the tree — is what the "object" row below already gives. A second
-		// row saying the same thing publishes a duplicate line in the
-		// scaffolded AGENTS.md and in the stub's payload, and lookup is
-		// longest-prefix-first, so removing it changes no answer.
+		// row saying the same thing publishes a duplicate line in the stub's
+		// payload, and lookup is longest-prefix-first, so leaving it out
+		// changes no answer.
 		{"object export", "astro local env list"},
 		{"object", "astro local env"},
 	}

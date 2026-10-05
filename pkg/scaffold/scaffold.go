@@ -941,7 +941,7 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 
 	files := []templateFile{
 		{fileGitignore, gitignoreTemplate},
-		{fileAgents, agentsContent()},
+		{fileAgents, agentsContent},
 	}
 	// The starter DAG is for a project that has none, which is not the same as
 	// a project that lacks a file called exampledag.py.

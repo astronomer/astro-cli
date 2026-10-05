@@ -17,8 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// The dev-to-local mapping lives in pkg/scaffold, which also publishes
-// it in every scaffolded AGENTS.md; the stub renders the same data.
+// The dev-to-local mapping lives in pkg/scaffold; the stub renders it.
 type devReplacement = scaffold.DevReplacement
 
 func devReplacements() []devReplacement { return scaffold.DevReplacements() }

@@ -92,6 +92,32 @@ func TestInitLinksTheAgentGuidance(t *testing.T) {
 	}
 }
 
+// The demo and the example project say their AGENTS.md is exactly what init
+// writes. A template edit that leaves either copy behind shows readers a file
+// no project gets.
+func TestInitAgentsMatchesTheShippedCopies(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+	p.run("init", "--name", "demo").requireSuccess()
+	want := read(t, filepath.Join(p.Dir, "AGENTS.md"))
+
+	root, err := repoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, copyPath := range []string{
+		filepath.Join("demo", "project", "AGENTS.md"),
+		filepath.Join("examples", "etl-demo", "AGENTS.md"),
+	} {
+		// A Windows checkout may convert the copy's line endings.
+		got := strings.ReplaceAll(read(t, filepath.Join(root, copyPath)), "\r\n", "\n")
+		if got != want {
+			t.Errorf("%s differs from what astro init writes; copy the scaffolded file over it.\ninit wrote:\n%s", copyPath, want)
+		}
+	}
+}
+
 // Re-running init over its own output is something people do, usually by
 // accident. It refuses rather than reconciling, which is the safer of the two:
 // the alternative is a command that quietly rewrites a manifest someone has

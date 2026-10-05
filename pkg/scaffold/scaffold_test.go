@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -768,14 +769,40 @@ func TestStarterDagLeavesAnOddDagsEntryAlone(t *testing.T) {
 	})
 }
 
-func TestAgentsMdCarriesTheDevMapping(t *testing.T) {
-	content := agentsContent()
-	for _, m := range DevReplacements() {
-		row := "| `astro dev " + m.Command + "` | `" + m.Replacement + "` |"
-		assert.Contains(t, content, row)
+// AGENTS.md belongs to the project once written and init never refreshes it, so
+// anything in it that the CLI can change goes stale in every project scaffolded
+// before the change. It keeps the project's own facts and sends the reader to
+// the installed CLI for commands.
+func TestAgentsMdHoldsOnlyStableFacts(t *testing.T) {
+	// Compared with whitespace collapsed, so rewrapping a paragraph is not a
+	// failure.
+	content := strings.Join(strings.Fields(agentsContent), " ")
+	for _, want := range []string{
+		"pyproject.toml",
+		"`apache-airflow` requirement in `[project] dependencies`",
+		"`[tool.astro] runtime`",
+		"`dags/`", "`include/`", "`plugins/`", "`tests/`", "`.venv/`",
+		"`uv run pytest`",
+		"`uv add <package>`",
+		"`astro --help`",
+		"`astro local --help`",
+		"`astro local af`",
+		"never suggest an `astro dev` command; running one prints its replacement",
+	} {
+		assert.Contains(t, content, want)
 	}
-	assert.Contains(t, content, "pyproject.toml")
-	assert.NotContains(t, content, runtimeversions.FallbackAirflowSeries,
+	// The command surface is the volatile part: neither the `astro dev`
+	// mapping the stub prints nor a list of `astro local` subcommands.
+	for _, m := range DevReplacements() {
+		assert.NotContains(t, content, "astro dev "+m.Command,
+			"AGENTS.md restates the `astro dev` mapping the stub prints")
+	}
+	// Every `astro local` mention is the help pointer or the af group.
+	for _, m := range regexp.MustCompile("astro local [^ `]+").FindAllString(content, -1) {
+		assert.Contains(t, []string{"astro local --help", "astro local af"}, m,
+			"AGENTS.md names an `astro local` subcommand")
+	}
+	assert.NotContains(t, agentsContent, runtimeversions.FallbackAirflowSeries,
 		"AGENTS.md must reference the manifest, not duplicate its values")
 }
 

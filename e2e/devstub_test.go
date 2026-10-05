@@ -47,7 +47,7 @@ var devMapping = []struct {
 	// `object export` is the row that carries that check now: there is no
 	// `object import` row any more, because the only honest answer for it was
 	// the same tree the `object` row names and a duplicate row publishes a
-	// duplicate line in the scaffolded AGENTS.md. So a shorter prefix winning
+	// duplicate line in the stub's payload. So a shorter prefix winning
 	// shows up as `object export` answering with "astro local env".
 	{"object export", "astro local env list"},
 	{"object", "astro local env"},
